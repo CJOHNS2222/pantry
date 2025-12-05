@@ -1,16 +1,13 @@
 import { GoogleGenAI, Type, Schema } from "@google/genai";
-import { PantryItem, RecipeSearchResult } from "../types";
+import { PantryItem, RecipeSearchResult, RecipeSearchParams, StructuredRecipe } from "../types";
 
 // Initialize Gemini Client
-// CRITICAL: We use process.env.API_KEY directly as requested.
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 /**
  * Analyzes an image to identify pantry items.
- * Uses Gemini 2.5 Flash for multimodal analysis with JSON schema.
  */
 export const analyzePantryImage = async (base64Image: string, mimeType: string): Promise<PantryItem[]> => {
-  // Flash is optimized for speed and multimodal tasks like this
   const modelId = "gemini-2.5-flash"; 
 
   const schema: Schema = {
@@ -21,15 +18,15 @@ export const analyzePantryImage = async (base64Image: string, mimeType: string):
       properties: {
         item: {
           type: Type.STRING,
-          description: "The specific name of the item (e.g., 'Canned Tomatoes', 'Quinoa', 'Olive Oil').",
+          description: "The specific name of the item.",
         },
         category: {
           type: Type.STRING,
-          description: "The broad category (e.g., 'Canned Goods', 'Grains', 'Condiments', 'Produce').",
+          description: "The broad category.",
         },
         quantity_estimate: {
           type: Type.STRING,
-          description: "Visual estimate of quantity (e.g., '1 full jar', 'approx 500g', '2 boxes').",
+          description: "Visual estimate of quantity.",
         },
       },
       required: ["item", "category", "quantity_estimate"],
@@ -61,7 +58,6 @@ export const analyzePantryImage = async (base64Image: string, mimeType: string):
     const jsonText = response.text;
     if (!jsonText) throw new Error("No data returned from Gemini.");
     
-    // Clean potential markdown fences just in case
     const cleanJson = jsonText.replace(/^```json\s*/, "").replace(/\s*```$/, "");
     return JSON.parse(cleanJson) as PantryItem[];
 
@@ -72,40 +68,82 @@ export const analyzePantryImage = async (base64Image: string, mimeType: string):
 };
 
 /**
- * Searches for recipes using Google Search Grounding.
- * Uses Gemini 2.5 Flash with googleSearch tool.
- * Note: JSON mode is NOT compatible with googleSearch tool, so we request structured text.
+ * Searches for recipes using Google Search Grounding with enhanced filters and structured JSON output.
  */
-export const searchRecipes = async (ingredients: string, restrictions: string): Promise<RecipeSearchResult> => {
+export const searchRecipes = async (params: RecipeSearchParams): Promise<RecipeSearchResult> => {
   const modelId = "gemini-2.5-flash";
-
-  let prompt = `I have these ingredients: ${ingredients}. `;
   
-  if (restrictions) {
-    prompt += `Please respect these dietary restrictions: ${restrictions}. `;
+  let prompt = "";
+
+  if (params.query) {
+    // Mode 1: Specific Search
+    prompt = `Find exactly 3 detailed recipes for "${params.query}". `;
+    if (params.restrictions) prompt += `Dietary restrictions: ${params.restrictions}. `;
+  } else {
+    // Mode 2: Generate from Pantry
+    prompt = `Suggest exactly 3 creative recipes based on these available ingredients: ${params.ingredients}. `;
+    
+    if (params.strictMode) {
+      prompt += `STRICT MODE: Only use the provided ingredients. You may assume simple pantry staples like oil, salt, pepper, and water, but DO NOT include recipes that require buying other significant ingredients. `;
+    } else {
+      prompt += `You may include recipes that use these ingredients but might require a few additional common items. `;
+    }
+
+    if (params.restrictions) prompt += `Dietary restrictions: ${params.restrictions}. `;
+    if (params.maxCookTime) prompt += `Maximum cook time: ${params.maxCookTime} minutes. `;
+    if (params.maxIngredients) prompt += `Maximum number of ingredients: ${params.maxIngredients}. `;
   }
 
-  prompt += `
-Please find 3 creative and distinct recipes I can make. 
-For each recipe, provide:
-1. The Recipe Title (in bold)
-2. A brief appetizing description
-3. A list of key ingredients required
+  prompt += `Please use the ${params.measurementSystem} measurement system for all quantities. `;
 
-Format the response in Markdown for easy reading.
-`;
+  // Explicitly request JSON structure in the prompt since we cannot use responseSchema with tools
+  prompt += `
+  
+  Provide the result strictly as a valid JSON object matching this structure:
+  {
+    "recipes": [
+      {
+        "title": "string",
+        "description": "string",
+        "ingredients": ["string (ingredient with quantity)"],
+        "instructions": ["string (step by step)"],
+        "cookTime": "string"
+      }
+    ]
+  }
+  Ensure the "recipes" array contains exactly 3 distinct recipes.
+  Do not include any markdown formatting (like \`\`\`json). Just the raw JSON string.
+  `;
 
   try {
     const response = await ai.models.generateContent({
       model: modelId,
       contents: prompt,
       config: {
-        tools: [{ googleSearch: {} }], // Enable Google Search Grounding
+        tools: [{ googleSearch: {} }],
+        // responseMimeType: "application/json", // REMOVED due to incompatibility with tools
+        // responseSchema: schema // REMOVED due to incompatibility with tools
       },
     });
 
+    const jsonText = response.text;
+    let recipes: StructuredRecipe[] = [];
+    
+    if (jsonText) {
+        // Clean up markdown if present
+        const cleanJson = jsonText.replace(/^```json\s*/, "").replace(/^```\s*/, "").replace(/\s*```$/, "").trim();
+        try {
+            const parsed = JSON.parse(cleanJson);
+            recipes = parsed.recipes || [];
+        } catch (e) {
+            console.error("JSON Parse Error:", e);
+            console.log("Raw Text:", jsonText);
+            // Attempt to recover or return empty
+        }
+    }
+
     return {
-      text: response.text || "I couldn't find any recipes at this time.",
+      recipes: recipes,
       groundingChunks: response.candidates?.[0]?.groundingMetadata?.groundingChunks,
     };
 
