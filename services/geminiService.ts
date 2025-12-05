@@ -1,4 +1,5 @@
-import { GoogleGenAI, Type, Schema } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
+import type { Schema } from "@google/genai";
 import { PantryItem, RecipeSearchResult, RecipeSearchParams, StructuredRecipe } from "../types";
 
 // Initialize Gemini Client

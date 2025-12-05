@@ -7,6 +7,7 @@
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="manifest" href="manifest.json" />
     <title>Smart Pantry Chef</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -42,6 +43,7 @@
         color: var(--text-primary);
         overscroll-behavior-y: none;
         transition: background-color 0.3s ease, color 0.3s ease;
+        -webkit-tap-highlight-color: transparent;
       }
       
       h1, h2, h3, .serif {
@@ -107,6 +109,15 @@
     "lucide-react": "https://aistudiocdn.com/lucide-react@^0.555.0"
   }
 }
+</script>
+<script>
+  window.onerror = function(message, source, lineno, colno, error) {
+    console.error('Global Error:', message, error);
+    // Optional: display user friendly error if root fails to mount
+    if (document.body.innerHTML.trim() === '<div id="root"></div>') {
+        document.body.innerHTML = '<div style="color:red; padding:20px;"><h1>App Error</h1><p>' + message + '</p><button onclick="localStorage.clear();window.location.reload()">Reset App Data</button></div>';
+    }
+  };
 </script>
 </head>
   <body>

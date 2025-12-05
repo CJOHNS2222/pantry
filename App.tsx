@@ -7,7 +7,7 @@ import { Tutorial } from './components/Tutorial';
 import { HouseholdManager } from './components/Household';
 import { ShoppingList } from './components/ShoppingList';
 import { Community } from './components/Community';
-import { ChefHat, ShoppingBasket, CalendarDays, UtensilsCrossed, Users, Sun, Moon } from 'lucide-react';
+import { ChefHat, ShoppingBasket, CalendarDays, UtensilsCrossed, Users, Sun, Moon, Download } from 'lucide-react';
 import { User, PantryItem, DayPlan, StructuredRecipe, Household, ShoppingItem, SavedRecipe, RecipeRating } from './types';
 
 enum Tab {
@@ -20,49 +20,89 @@ enum Tab {
 
 type Theme = 'dark' | 'light';
 
+// Helper to safely parse JSON from localStorage
+const safeParse = <T,>(key: string, fallback: T): T => {
+  try {
+    const saved = localStorage.getItem(key);
+    return saved ? JSON.parse(saved) : fallback;
+  } catch (e) {
+    console.warn(`Error parsing ${key} from localStorage, resetting to default.`, e);
+    return fallback;
+  }
+};
+
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>(Tab.PANTRY);
   const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem('theme') as Theme) || 'dark');
+  const [installPrompt, setInstallPrompt] = useState<any>(null);
   
   // User State
-  const [user, setUser] = useState<User | null>(() => {
-    const saved = localStorage.getItem('user');
-    return saved ? JSON.parse(saved) : null;
-  });
+  const [user, setUser] = useState<User | null>(() => safeParse<User | null>('user', null));
 
   const [showTutorial, setShowTutorial] = useState(false);
   const [showHousehold, setShowHousehold] = useState(false);
 
   // Data States
-  const [inventory, setInventory] = useState<PantryItem[]>(() => {
-    const saved = localStorage.getItem('inventory');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [inventory, setInventory] = useState<PantryItem[]>(() => safeParse<PantryItem[]>('inventory', []));
 
-  const [shoppingList, setShoppingList] = useState<ShoppingItem[]>(() => {
-    const saved = localStorage.getItem('shoppingList');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [shoppingList, setShoppingList] = useState<ShoppingItem[]>(() => safeParse<ShoppingItem[]>('shoppingList', []));
 
-  const [savedRecipes, setSavedRecipes] = useState<SavedRecipe[]>(() => {
-    const saved = localStorage.getItem('savedRecipes');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [savedRecipes, setSavedRecipes] = useState<SavedRecipe[]>(() => safeParse<SavedRecipe[]>('savedRecipes', []));
 
-  const [ratings, setRatings] = useState<RecipeRating[]>(() => {
-    const saved = localStorage.getItem('ratings');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [ratings, setRatings] = useState<RecipeRating[]>(() => safeParse<RecipeRating[]>('ratings', []));
 
-  const [mealPlan, setMealPlan] = useState<DayPlan[]>(() => {
-    const saved = localStorage.getItem('mealPlan');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [mealPlan, setMealPlan] = useState<DayPlan[]>(() => safeParse<DayPlan[]>('mealPlan', []));
 
   const [household, setHousehold] = useState<Household>(() => {
-    const saved = localStorage.getItem('household');
-    return saved ? JSON.parse(saved) : { id: 'h1', name: 'My Family', members: [] };
+      const defaultValue = { id: 'h1', name: 'My Family', members: [] };
+      const parsed = safeParse<Household>('household', defaultValue);
+      // Extra validation for household structure
+      if (!parsed || !Array.isArray(parsed.members)) return defaultValue;
+      return parsed;
   });
+
+  // Handle Android Install Prompt
+  useEffect(() => {
+    const handler = (e: any) => {
+      e.preventDefault();
+      setInstallPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const handleInstallClick = () => {
+    if (installPrompt) {
+      installPrompt.prompt();
+      installPrompt.userChoice.then((choiceResult: any) => {
+        if (choiceResult.outcome === 'accepted') {
+          setInstallPrompt(null);
+        }
+      });
+    }
+  };
+
+  // Handle Android Back Button (History API)
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      if (event.state?.tab) {
+        setActiveTab(event.state.tab);
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    
+    // Set initial state if needed
+    if (!window.history.state) {
+        window.history.replaceState({ tab: Tab.PANTRY }, '', '#pantry');
+    }
+    
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const handleTabChange = (tab: Tab) => {
+    setActiveTab(tab);
+    window.history.pushState({ tab }, '', `#${tab.toLowerCase()}`);
+  };
 
   // Apply Theme
   useEffect(() => {
@@ -102,10 +142,12 @@ const App: React.FC = () => {
   const handleLogin = (loggedInUser: User) => {
     setUser(loggedInUser);
     setHousehold(prev => {
-        if (!prev.members.find(m => m.email === loggedInUser.email)) {
+        // Ensure prev and prev.members exist before accessing
+        const currentMembers = prev?.members || [];
+        if (!currentMembers.find(m => m.email === loggedInUser.email)) {
              return {
                  ...prev,
-                 members: [...prev.members, {
+                 members: [...currentMembers, {
                      id: loggedInUser.id,
                      name: loggedInUser.name,
                      email: loggedInUser.email,
@@ -129,13 +171,15 @@ const App: React.FC = () => {
 
   const handleAddToPlan = (recipe: StructuredRecipe) => {
     const newPlan = [...mealPlan];
-    newPlan[0].meals.push({
-        id: Math.random().toString(36).substr(2, 9),
-        recipe: recipe
-    });
-    setMealPlan(newPlan);
-    alert(`Added ${recipe.title} to ${newPlan[0].dayName}.`);
-    setActiveTab(Tab.MEALS);
+    if (newPlan.length > 0) {
+        newPlan[0].meals.push({
+            id: Math.random().toString(36).substr(2, 9),
+            recipe: recipe
+        });
+        setMealPlan(newPlan);
+        alert(`Added ${recipe.title} to ${newPlan[0].dayName}.`);
+        handleTabChange(Tab.MEALS);
+    }
   };
 
   const handleSaveRecipe = (recipe: StructuredRecipe) => {
@@ -195,12 +239,23 @@ const App: React.FC = () => {
                 <span className="text-[10px] uppercase tracking-widest text-theme-secondary opacity-60">AI Kitchen Assistant</span>
             </div>
 
-            <button 
-                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                className="p-2 text-theme-secondary opacity-70 hover:opacity-100"
-            >
-                {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-            </button>
+            <div className="flex items-center">
+                {installPrompt && (
+                    <button 
+                        onClick={handleInstallClick}
+                        className="p-2 text-theme-secondary hover:text-[var(--accent-color)] transition-colors animate-pulse"
+                        title="Install App"
+                    >
+                        <Download className="w-5 h-5" />
+                    </button>
+                )}
+                <button 
+                    onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                    className="p-2 text-theme-secondary opacity-70 hover:opacity-100"
+                >
+                    {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+                </button>
+            </div>
         </div>
       </header>
 
@@ -213,7 +268,7 @@ const App: React.FC = () => {
                 addToShoppingList={(items) => {
                     const newItems = items.map(i => ({ id: Math.random().toString(36).substr(2,9), item: i, category: 'Manual', checked: false }));
                     setShoppingList(prev => [...prev, ...newItems]);
-                    setActiveTab(Tab.SHOPPING);
+                    handleTabChange(Tab.SHOPPING);
                 }}
             />
         )}
@@ -237,7 +292,7 @@ const App: React.FC = () => {
                 addToShoppingList={(items) => {
                     const newItems = items.map(i => ({ id: Math.random().toString(36).substr(2,9), item: i, category: 'Planned Meal', checked: false }));
                     setShoppingList(prev => [...prev, ...newItems]);
-                    setActiveTab(Tab.SHOPPING);
+                    handleTabChange(Tab.SHOPPING);
                 }}
             />
         )}
@@ -273,7 +328,7 @@ const App: React.FC = () => {
           ].map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => handleTabChange(tab.id)}
                 className={`flex flex-col items-center justify-center flex-1 py-2 transition-all duration-300 ${
                   activeTab === tab.id ? '-translate-y-1' : 'opacity-60 hover:opacity-100'
                 }`}
