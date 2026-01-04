@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { doc, onSnapshot, collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { db, analytics } from './firebaseConfig';
+import { doc, onSnapshot, collection, addDoc, serverTimestamp, query, where } from 'firebase/firestore';
+import { db } from './firebaseConfig';
 import { Login } from './components/Login';
 import { HouseholdManager } from './components/Household';
+import { Tutorial } from './components/Tutorial';
+import ErrorBoundary from './components/ErrorBoundary';
 import { AppHeader } from './components/layout/AppHeader';
 import { AppNavigation } from './components/layout/AppNavigation';
 import { MainContent } from './components/layout/MainContent';
@@ -13,24 +15,45 @@ import { useTheme } from './hooks/useTheme';
 import { useSettings } from './hooks/useSettings';
 import { useToasts } from './hooks/useToasts';
 import { useDataManagement } from './hooks/useDataManagement';
-import { isHouseholdMember } from './utils/appUtils';
-import { logEvent } from 'firebase/analytics';
+import AnalyticsService from './services/analyticsService';
+import { isHouseholdMember, inferCategoryFromItemName, inferStorageLocationFromItemName, parseIngredientForShoppingList } from './utils/appUtils';
+import { GlobalUpdatePrompt } from './components/GlobalUpdatePrompt';
 
 type Theme = 'dark' | 'light';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>(Tab.PANTRY);
   const [persistedRecipeResult, setPersistedRecipeResult] = useState<RecipeSearchResult | null>(null);
+  const [initialSearchQuery, setInitialSearchQuery] = useState<string>('');
 
   // UI States
   const [showTutorial, setShowTutorial] = useState(false);
   const [showHousehold, setShowHousehold] = useState(false);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [showNotificationsModal, setShowNotificationsModal] = useState(false);
 
   // Custom hooks
   const { user, setUser, handleLogout } = useAuth();
   const { settings, setSettings } = useSettings();
   const { theme } = useTheme(settings.theme);
-  const { toasts, addToast } = useToasts();
+  const { toasts, setToasts, addToast } = useToasts();
+
+  // Function to add items to shopping list
+  const addToShoppingList = (items: string[]) => {
+    const newItems = items.map(i => {
+      const parsed = parseIngredientForShoppingList(i);
+      return { 
+        id: Math.random().toString(36).substr(2,9), 
+        item: parsed.itemName, 
+        quantity: parsed.quantity,
+        category: inferCategoryFromItemName(parsed.itemName), 
+        checked: false 
+      };
+    });
+    setShoppingList(prev => [...prev, ...newItems]);
+    setActiveTab(Tab.SHOPPING);
+  };
+
   const {
     inventory,
     setInventory,
@@ -43,69 +66,126 @@ const App: React.FC = () => {
     setMealPlan,
     household,
     setHousehold,
+    consumptionSuggestions,
+    expirationAlerts,
+    recipeSuggestions,
+    customCategories,
+    addCustomCategory,
+    updateCustomCategory,
+    deleteCustomCategory,
     handleAddToPlan,
     handleSaveRecipe,
     handleDeleteRecipe,
     handleRateRecipe,
-  } = useDataManagement(user, addToast);
+  } = useDataManagement(user, addToast, addToShoppingList);
 
+  // Listen for notifications while user is logged in
+  useEffect(() => {
+    if (!user?.email) return;
 
+    const notificationsQuery = query(
+      collection(db, "notifications"),
+      where("email", "==", user.email),
+      where("read", "==", false)
+    );
 
-
-  const handleLogin = (loggedInUser: User) => {
-    setUser(loggedInUser);
-    const isNewMember = !household?.members.find(m => m.email === loggedInUser.email);
-    setHousehold(prev => {
-        if (isNewMember && prev) {
-             return {
-                 ...prev,
-                 members: [...prev.members, {
-                     id: loggedInUser.id,
-                     name: loggedInUser.name,
-                     email: loggedInUser.email,
-                     role: 'Admin',
-                     status: 'Active'
-                 }]
-             };
-        }
-        return prev;
-    });
-    if (!loggedInUser.hasSeenTutorial) setShowTutorial(true);
-
-    if (analytics) {
-      logEvent(analytics, 'login', { method: loggedInUser.provider });
-    }
-    
-    if (isNewMember && household?.id) {
-      if (analytics) {
-        logEvent(analytics, 'join_group', { groupId: household.id, groupName: household.name });
+    const unsubscribe = onSnapshot(notificationsQuery, (snapshot) => {
+      const unread: any[] = [];
+      snapshot.forEach(doc => unread.push({ id: doc.id, ...doc.data() }));
+      if (unread.length > 0 && !showNotificationsModal) {
+        setNotifications(unread);
+        setShowNotificationsModal(true);
       }
+    });
+
+    return unsubscribe;
+  }, [user?.email]);
+
+
+
+
+  const handleLogin = async (loggedInUser: User) => {
+    setUser(loggedInUser);
+
+    // Track login event
+    AnalyticsService.trackLogin(loggedInUser.provider || 'email');
+
+    // Set user properties for analytics
+    AnalyticsService.setUser(loggedInUser.id, {
+      email: loggedInUser.email,
+      provider: loggedInUser.provider,
+      has_seen_tutorial: loggedInUser.hasSeenTutorial
+    });
+
+    // Check if user belongs to a household
+    const { getOrCreateHousehold } = await import('./services/householdService');
+    const userHousehold = await getOrCreateHousehold(loggedInUser);
+    if (userHousehold) {
+      setHousehold(userHousehold);
+      // Track household membership
+      AnalyticsService.trackHouseholdJoin(userHousehold.id, isHouseholdMember(userHousehold, loggedInUser.id) ? 'member' : 'owner');
     }
 
-    if (loggedInUser?.email) {
-      import('firebase/firestore').then(({ query, where, getDocs, collection }) => {
-        const notificationsQuery = query(
-          collection(db, "notifications"),
-          where("email", "==", loggedInUser.email),
-          where("read", "==", false)
-        );
-        getDocs(notificationsQuery).then(snapshot => {
-          const unread: any[] = [];
-          snapshot.forEach(doc => unread.push({ id: doc.id, ...doc.data() }));
-          if (unread.length > 0) {
-            setNotifications(unread);
-            setShowNotificationsModal(true);
-          }
-        });
-      });
-    }
+    if (!loggedInUser.hasSeenTutorial) setShowTutorial(true);
   };
+
+  // Notifications are now handled by the real-time listener above
+
+  // Load household when user is authenticated
+  useEffect(() => {
+    if (user?.id) {
+      const loadHousehold = async () => {
+        try {
+          const { getOrCreateHousehold } = await import('./services/householdService');
+          const userHousehold = await getOrCreateHousehold(user);
+          if (userHousehold) {
+            setHousehold(userHousehold);
+          } else {
+            setHousehold(null); // Clear if no household found
+          }
+        } catch (error) {
+          console.error('Error loading household:', error);
+          setHousehold(null);
+        }
+      };
+      loadHousehold();
+    }
+  }, [user?.id]);
+
+  // Track app lifecycle events
+  useEffect(() => {
+    AnalyticsService.trackAppOpen();
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        AnalyticsService.trackAppBackground();
+      } else {
+        AnalyticsService.trackAppForeground();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
+
+  // Track tab switches
+  const [previousTab, setPreviousTab] = useState<Tab>(Tab.PANTRY);
+  useEffect(() => {
+    if (activeTab !== previousTab) {
+      AnalyticsService.trackTabSwitch(previousTab, activeTab);
+      setPreviousTab(activeTab);
+    }
+  }, [activeTab, previousTab]);
 
   if (!user) return <Login onLogin={handleLogin} />;
 
   return (
     <>
-      <div className="min-h-screen flex flex-col max-w-md mx-auto shadow-2xl overflow-hidden relative border-x border-theme transition-colors duration-300" style={{ background: 'var(--theme-background, var(--theme-primary))' }}>
+      <ErrorBoundary>
+        <div className="min-h-screen flex flex-col max-w-md mx-auto shadow-2xl overflow-hidden relative border-x border-theme transition-colors duration-300">
         {showHousehold && (
           <HouseholdManager 
               user={user} 
@@ -115,7 +195,106 @@ const App: React.FC = () => {
               setActiveTab={setActiveTab}
           />
         )}
+
+        {showTutorial && (
+          <Tutorial onClose={async () => {
+            setShowTutorial(false);
+            // Mark tutorial as seen
+            if (user) {
+              const { doc, updateDoc } = await import('firebase/firestore');
+              await updateDoc(doc(db, 'users', user.id), { hasSeenTutorial: true });
+              setUser({ ...user, hasSeenTutorial: true });
+            }
+          }} />
+        )}
+
+        {/* Notifications Modal */}
+        {showNotificationsModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg max-w-md w-full max-h-[80vh] overflow-y-auto">
+              <div className="p-6 pb-2.5">
+                <h2 className="text-xl font-bold mb-4 text-gray-800">Notifications</h2>
+                <div className="space-y-3">
+                  {notifications.map((notification) => (
+                    <div key={notification.id} className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                      {notification.type === 'household_invite' ? (
+                        <div>
+                          <p className="text-gray-800 font-medium">{notification.message}</p>
+                          <p className="text-sm text-gray-600 mt-1">
+                            You can now share pantry items, meal plans, and shopping lists with your household members.
+                          </p>
+                          <button
+                            onClick={async () => {
+                              // Load the household data
+                              const { doc, getDoc, writeBatch } = await import('firebase/firestore');
+                              const householdDoc = await getDoc(doc(db, 'households', notification.householdId));
+                              if (householdDoc.exists()) {
+                                const householdData = householdDoc.data();
+                                setHousehold({
+                                  id: notification.householdId,
+                                  name: householdData.name,
+                                  members: householdData.members || [],
+                                  memberIds: householdData.memberIds || []
+                                });
+                              }
+                              
+                              // Mark this notification as read
+                              const batch = writeBatch(db);
+                              batch.update(doc(db, 'notifications', notification.id), { read: true });
+                              await batch.commit();
+                              
+                              setActiveTab(Tab.PANTRY); // Go to pantry tab instead of household
+                              setShowNotificationsModal(false);
+                              
+                              // Remove this notification from the local state
+                              setNotifications(prev => prev.filter(n => n.id !== notification.id));
+                            }}
+                            className="mt-3 bg-amber-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-amber-700 transition-colors"
+                          >
+                            Join Household
+                          </button>
+                        </div>
+                      ) : (
+                        <p className="text-gray-800">{notification.message}</p>
+                      )}
+                      <p className="text-sm text-gray-500 mt-2">
+                        {notification.timestamp?.toDate?.()?.toLocaleString() || 'Just now'}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-3 mt-6">
+                  <button
+                    onClick={() => {
+                      // Mark notifications as read
+                      import('firebase/firestore').then(async ({ writeBatch, doc }) => {
+                        const batch = writeBatch(db);
+                        notifications.forEach(notification => {
+                          batch.update(doc(db, 'notifications', notification.id), { read: true });
+                        });
+                        await batch.commit();
+                        setNotifications([]);
+                        setShowNotificationsModal(false);
+                      });
+                    }}
+                    className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-blue-700 transition-colors"
+                  >
+                    Mark as Read
+                  </button>
+                  <button
+                    onClick={() => setShowNotificationsModal(false)}
+                    className="flex-1 bg-gray-200 text-gray-800 py-2 px-4 rounded-lg font-medium hover:bg-gray-300 transition-colors"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         <AppHeader user={user} settings={settings} setSettings={setSettings} onShowHousehold={() => setShowHousehold(true)} />
+        
         <MainContent 
           activeTab={activeTab}
           setActiveTab={setActiveTab}
@@ -132,6 +311,8 @@ const App: React.FC = () => {
           setSettings={setSettings}
           persistedRecipeResult={persistedRecipeResult}
           setPersistedRecipeResult={setPersistedRecipeResult}
+          initialSearchQuery={initialSearchQuery}
+          setInitialSearchQuery={setInitialSearchQuery}
           onAddToPlan={handleAddToPlan}
           onSaveRecipe={handleSaveRecipe}
           onDeleteRecipe={handleDeleteRecipe}
@@ -147,7 +328,14 @@ const App: React.FC = () => {
                   const prevQty = parseInt(updated[idx].quantity_estimate) || 1;
                   updated[idx].quantity_estimate = (prevQty + Math.abs(addQty)).toString();
                 } else {
-                  updated.push({ item: i.item, category: i.category, quantity_estimate: Math.abs(addQty).toString() });
+                  updated.push({
+                    id: Math.random().toString(36).substr(2,9),
+                    item: i.item,
+                    category: inferCategoryFromItemName(i.item),
+                    quantity_estimate: Math.abs(addQty).toString(),
+                    storageLocation: inferStorageLocationFromItemName(i.item),
+                    originalQuantity: typeof i.quantity === 'string' ? i.quantity : undefined
+                  });
                 }
               });
               const merged: { [key: string]: PantryItem } = {};
@@ -162,15 +350,56 @@ const App: React.FC = () => {
               return Object.values(merged);
             });
           }}
-          onAddToShoppingList={(items) => {
-            const newItems = items.map(i => ({ id: Math.random().toString(36).substr(2,9), item: i, category: 'Manual', checked: false }));
-            setShoppingList(prev => [...prev, ...newItems]);
-            setActiveTab(Tab.SHOPPING);
-          }}
+          onAddToShoppingList={addToShoppingList}
+          consumptionSuggestions={consumptionSuggestions}
+          expirationAlerts={expirationAlerts}
+          recipeSuggestions={recipeSuggestions}
+          customCategories={customCategories}
+          onAddCustomCategory={addCustomCategory}
+          onUpdateCustomCategory={updateCustomCategory}
+          onDeleteCustomCategory={deleteCustomCategory}
           onLogout={handleLogout}
         />
         <AppNavigation activeTab={activeTab} setActiveTab={setActiveTab} />
+        
+        {/* Toast Notifications */}
+        <div className="fixed bottom-4 right-4 z-50 space-y-2">
+          {toasts.map((toast) => (
+            <div
+              key={toast.id}
+              className={`max-w-sm p-4 rounded-lg shadow-lg border transition-all duration-300 ${
+                toast.type === 'error'
+                  ? 'bg-red-50 border-red-200 text-red-800'
+                  : 'bg-blue-50 border-blue-200 text-blue-800'
+              }`}
+            >
+              <div className="flex items-start gap-3">
+                <div className="flex-1">
+                  <p className="text-sm font-medium">{toast.message}</p>
+                  {toast.actionLabel && toast.action && (
+                    <button
+                      onClick={toast.action}
+                      className="mt-2 text-xs underline hover:no-underline"
+                    >
+                      {toast.actionLabel}
+                    </button>
+                  )}
+                </div>
+                <button
+                  onClick={() => setToasts(prev => prev.filter(t => t.id !== toast.id))}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
+      </ErrorBoundary>
+
+      {/* Global Update Prompt */}
+      <GlobalUpdatePrompt />
     </>
   );
 }
