@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, onSnapshot } from 'firebase/firestore';
 import { User } from '../types';
-import { logEvent } from 'firebase/analytics';
 import { analytics, db } from '../firebaseConfig';
+import AnalyticsService from '../services/analyticsService';
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(() => {
@@ -13,7 +13,15 @@ export function useAuth() {
 
   useEffect(() => {
     const auth = getAuth();
+    let userDocUnsubscribe: (() => void) | null = null;
+
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
+      // Clean up previous user document listener
+      if (userDocUnsubscribe) {
+        userDocUnsubscribe();
+        userDocUnsubscribe = null;
+      }
+
       if (!fbUser) {
         setUser(null);
         return;
@@ -46,16 +54,28 @@ export function useAuth() {
         }
       }
 
-      setUser(prev => ({
-        id: fbUser.uid,
-        name: fbUser.displayName || (fbUser.email ? fbUser.email.split('@')[0] : 'User'),
-        email: fbUser.email || '',
-        avatar: fbUser.photoURL || undefined,
-        provider: fbUser.providerData?.[0]?.providerId?.includes('google') ? 'google' : 'email',
-        hasSeenTutorial: prev?.hasSeenTutorial ?? false
-      }));
+      // Set up listener for user document changes
+      userDocUnsubscribe = onSnapshot(userDocRef, (userDocSnap) => {
+        const userData = userDocSnap.data();
+        setUser({
+          id: fbUser.uid,
+          name: fbUser.displayName || (fbUser.email ? fbUser.email.split('@')[0] : 'User'),
+          email: fbUser.email || '',
+          avatar: userData?.avatar || fbUser.photoURL || undefined,
+          provider: fbUser.providerData?.[0]?.providerId?.includes('google') ? 'google' : 'email',
+          hasSeenTutorial: user?.hasSeenTutorial ?? false,
+          subscription: userData?.subscription,
+          profile: userData?.profile
+        });
+      });
     });
-    return () => unsubscribe();
+
+    return () => {
+      unsubscribe();
+      if (userDocUnsubscribe) {
+        userDocUnsubscribe();
+      }
+    };
   }, []);
 
   // Persist user to localStorage
@@ -72,6 +92,7 @@ export function useAuth() {
 
   const handleLogout = () => {
     if (confirm("Are you sure you want to log out?")) {
+      AnalyticsService.trackLogout();
       signOut(getAuth());
       setUser(null);
       localStorage.clear();

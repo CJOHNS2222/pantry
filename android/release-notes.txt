@@ -1,0 +1,21 @@
+Smart Pantry App - Release Notes
+
+Version: 1.0
+Date: January 3, 2026
+
+New Features:
+- Enhanced meal planning with drag and drop functionality
+- Improved grocery price estimation with community data
+- Advanced AI photo inventory with loading states
+- Shopping list parsing for better ingredient management
+- User profile management in settings
+
+Bug Fixes:
+- Fixed shopping list item parsing to separate quantities from item names
+- Resolved profile data loading from database
+- Improved error handling and user feedback
+
+Technical Improvements:
+- Updated Firebase integration for better data persistence
+- Enhanced authentication flow
+- Improved build process and distribution setup

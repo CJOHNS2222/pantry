@@ -137,7 +137,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
       setHousehold(prev => ({ ...prev, members: prev.members.filter(m => m.id !== id) }));
     }
   };
-      console.log("Invitation sent and member added as pending!");
+      // console.log("Invitation sent and member added as pending!");
 
     } catch (error) {
       console.error("Error sending invitation:", error);
@@ -170,7 +170,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
           </button>
         </div>
 
-        <div className="p-6 overflow-y-auto flex-1">
+        <div className="p-6 pb-2.5 overflow-y-auto flex-1">
           <div className="bg-[#2A0A10]/50 p-4 rounded-xl border border-red-900/30 mb-6">
             <h3 className="text-sm font-bold text-amber-500 uppercase mb-3">Invite Family Member</h3>
             <form onSubmit={handleInvite} className="flex gap-2">
@@ -273,7 +273,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
           </div>
         </div>
 
-        <div className="p-4 bg-[#2A0A10] border-t border-red-900/50 text-center">
+        <div className="p-4 pb-2.5 bg-[#2A0A10] border-t border-red-900/50 text-center">
             <p className="text-xs text-red-200/30">Changes are saved to your family group instantly.</p>
         </div>
       </div>

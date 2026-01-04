@@ -20,7 +20,9 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }
   const [paymentMethod, setPaymentMethod] = useState<'stripe' | 'paypal'>('stripe');
 
   const handleUpgrade = (plan: any) => {
-    setSelectedPlan(plan);
+    // Temporarily disabled until Stripe payments are fully functional
+    alert('Premium subscriptions coming soon! We\'re working on implementing payment processing. Stay tuned for updates.');
+    // setSelectedPlan(plan);
   };
 
   const handleCheckoutSuccess = (subscriptionId: string) => {
@@ -42,14 +44,16 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }
       period: 'forever',
       description: 'Perfect for getting started',
       features: [
-        'Up to 25 saved recipes',
-        'Basic meal planning',
+        'Up to 10 saved recipes',
+        '3 recipes per week meal planning',
+        '5 recipe searches per week',
         '1 household member',
         'Community access'
       ],
       limitations: [
         'Limited recipe storage',
-        'Basic features only'
+        'Limited searches',
+        'Basic meal planning only'
       ],
       popular: false
     },
@@ -60,8 +64,9 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }
       period: 'per month',
       description: 'Everything you need for meal planning',
       features: [
-        'Unlimited recipes',
-        'Advanced meal planning',
+        'Up to 25 saved recipes',
+        '2 weeks meal planning (unlimited entries)',
+        'Unlimited recipe searches',
         'Up to 3 household members',
         'Priority support',
         'Offline access',
@@ -82,7 +87,8 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }
         'Shared shopping lists',
         'Family meal planning',
         'Advanced analytics',
-        'Recipe sharing'
+        'Recipe sharing',
+        'And more!'
       ],
       limitations: [],
       popular: false
@@ -128,7 +134,7 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }
           onClick={() => setShowPlans(!showPlans)}
           className="w-full bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg font-medium transition-colors"
         >
-          {isPremium ? 'Manage Subscription' : 'Upgrade Plan'}
+          {isPremium ? 'Manage Subscription' : 'View Plans (Coming Soon)'}
         </button>
       </div>
 
@@ -215,7 +221,7 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }
                     ? 'Current Plan'
                     : plan.id === 'free'
                     ? 'Downgrade'
-                    : 'Upgrade'}
+                    : 'Coming Soon'}
                 </button>
               </div>
             ))}

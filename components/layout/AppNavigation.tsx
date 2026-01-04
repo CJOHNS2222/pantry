@@ -19,7 +19,7 @@ export const AppNavigation: React.FC<AppNavigationProps> = ({ activeTab, setActi
 
   return (
     <nav className="bg-theme-secondary border-t border-theme fixed bottom-0 w-full max-w-md pb-safe z-30 shadow-[0_-5px_20px_rgba(0,0,0,0.1)] transition-colors duration-300">
-      <div className="flex justify-around items-end pb-2 pt-1">
+      <div className="flex justify-around items-end pb-1">
         {tabs.map((tab) => (
           <button
             key={tab.id}

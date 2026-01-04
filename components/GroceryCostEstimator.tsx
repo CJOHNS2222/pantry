@@ -1,0 +1,459 @@
+import React, { useState, useMemo, useEffect } from 'react';
+import { DollarSign, Calculator, ShoppingCart, TrendingUp, Users, RefreshCw } from 'lucide-react';
+import { DayPlan, PantryItem } from '../types';
+import { groceryPriceService, PriceData } from '../services/groceryPriceService';
+
+interface GroceryCostEstimatorProps {
+  mealPlan: DayPlan[];
+  inventory: PantryItem[];
+}
+
+interface IngredientCost {
+  ingredient: string;
+  quantity: number;
+  unit: string;
+  estimatedCost: number;
+  source: 'estimated' | 'known';
+}
+
+export const GroceryCostEstimator: React.FC<GroceryCostEstimatorProps> = ({ mealPlan, inventory }) => {
+  const [showEstimator, setShowEstimator] = useState(false);
+  const [customPrices, setCustomPrices] = useState<Record<string, number>>({});
+  const [priceData, setPriceData] = useState<Record<string, PriceData>>({});
+  const [loadingPrices, setLoadingPrices] = useState(false);
+  const [showPriceInput, setShowPriceInput] = useState<string | null>(null);
+  const [userPriceInputs, setUserPriceInputs] = useState<Record<string, { price: string; unit: string; store: string }>>({});
+
+  // Fetch current prices when component mounts or meal plan changes
+  useEffect(() => {
+    if (showEstimator) {
+      fetchCurrentPrices();
+    }
+  }, [showEstimator, mealPlan]);
+
+  const fetchCurrentPrices = async () => {
+    setLoadingPrices(true);
+    try {
+      // Get all unique ingredients from meal plan
+      const allIngredients = mealPlan.flatMap(day =>
+        [...(day.breakfast || []), ...(day.lunch || []), ...(day.dinner || [])]
+          .flatMap(meal => meal.recipe.ingredients || [])
+      );
+
+      const uniqueIngredients = [...new Set(allIngredients.map(ing => parseIngredient(ing).name))];
+
+      const pricePromises = uniqueIngredients.map(async (ingredient) => {
+        const data = await groceryPriceService.getIngredientPrice(ingredient);
+        return { ingredient: ingredient.toLowerCase(), data };
+      });
+
+      const results = await Promise.all(pricePromises);
+      const newPriceData: Record<string, PriceData> = {};
+
+      results.forEach(({ ingredient, data }) => {
+        if (data) {
+          newPriceData[ingredient] = data;
+        }
+      });
+
+      setPriceData(newPriceData);
+    } catch (error) {
+      console.error('Error fetching prices:', error);
+    } finally {
+      setLoadingPrices(false);
+    }
+  };
+
+  const submitUserPrice = async (ingredient: string) => {
+    const input = userPriceInputs[ingredient];
+    if (!input || !input.price || !input.unit) return;
+
+    try {
+      const price = parseFloat(input.price);
+      if (isNaN(price) || price <= 0) return;
+
+      // For now, we'll use a placeholder user ID. In a real app, this would come from auth
+      const userId = 'anonymous_user';
+
+      await groceryPriceService.submitPriceUpdate(
+        ingredient,
+        price,
+        input.unit,
+        userId,
+        input.store || undefined
+      );
+
+      // Clear the input
+      setUserPriceInputs(prev => ({
+        ...prev,
+        [ingredient]: { price: '', unit: '', store: '' }
+      }));
+
+      setShowPriceInput(null);
+
+      // Refresh prices
+      await fetchCurrentPrices();
+
+      alert('Price submitted successfully! Thank you for contributing.');
+    } catch (error) {
+      console.error('Error submitting price:', error);
+      alert('Error submitting price. Please try again.');
+    }
+  };
+
+  // Common ingredient prices per unit (USD) - Updated 2024 prices
+  const defaultPrices: Record<string, { price: number; unit: string }> = {
+    // Proteins
+    'chicken': { price: 3.99, unit: 'lb' },
+    'beef': { price: 5.99, unit: 'lb' },
+    'pork': { price: 4.49, unit: 'lb' },
+    'fish': { price: 8.99, unit: 'lb' },
+    'salmon': { price: 12.99, unit: 'lb' },
+    'eggs': { price: 0.25, unit: 'each' },
+    'milk': { price: 3.99, unit: 'gallon' },
+    'cheese': { price: 4.99, unit: 'lb' },
+    'yogurt': { price: 0.69, unit: 'cup' },
+    'butter': { price: 4.99, unit: 'lb' },
+    
+    // Produce
+    'onion': { price: 1.29, unit: 'lb' },
+    'garlic': { price: 0.79, unit: 'head' },
+    'tomato': { price: 2.49, unit: 'lb' },
+    'lettuce': { price: 1.99, unit: 'head' },
+    'carrot': { price: 1.49, unit: 'lb' },
+    'potato': { price: 0.89, unit: 'lb' },
+    'apple': { price: 2.49, unit: 'lb' },
+    'banana': { price: 0.79, unit: 'lb' },
+    'lemon': { price: 1.29, unit: 'each' },
+    'lime': { price: 0.89, unit: 'each' },
+    'broccoli': { price: 2.99, unit: 'head' },
+    'spinach': { price: 3.99, unit: 'bag' },
+    'bell pepper': { price: 1.99, unit: 'each' },
+    'cucumber': { price: 1.49, unit: 'each' },
+    
+    // Pantry staples
+    'flour': { price: 3.49, unit: 'lb' },
+    'sugar': { price: 2.49, unit: 'lb' },
+    'rice': { price: 2.99, unit: 'lb' },
+    'pasta': { price: 1.49, unit: 'lb' },
+    'bread': { price: 3.49, unit: 'loaf' },
+    'oil': { price: 5.99, unit: 'bottle' },
+    'salt': { price: 1.49, unit: 'container' },
+    'pepper': { price: 2.99, unit: 'container' },
+    
+    // Spices & seasonings
+    'cumin': { price: 4.99, unit: 'oz' },
+    'paprika': { price: 3.99, unit: 'oz' },
+    'oregano': { price: 3.49, unit: 'oz' },
+    'thyme': { price: 3.99, unit: 'oz' },
+    'basil': { price: 3.49, unit: 'oz' },
+    'cinnamon': { price: 4.49, unit: 'oz' },
+    'nutmeg': { price: 5.99, unit: 'oz' },
+  };
+
+  const getIngredientKey = (ingredient: string): string => {
+    return ingredient.toLowerCase().split(' ')[0]; // Get first word
+  };
+
+  const parseIngredient = (ingredient: string): { name: string; quantity: number; unit: string } => {
+    // Simple parsing - could be enhanced with better NLP
+    const parts = ingredient.toLowerCase().split(' ');
+    let quantity = 1;
+    let unit = 'each';
+    let name = ingredient;
+
+    // Try to extract quantity and unit
+    if (parts.length >= 2) {
+      const firstPart = parts[0];
+      const secondPart = parts[1];
+      
+      // Check if first part is a number
+      const qty = parseFloat(firstPart);
+      if (!isNaN(qty)) {
+        quantity = qty;
+        // Check if second part is a unit
+        if (['cup', 'cups', 'tbsp', 'tsp', 'oz', 'lb', 'lbs', 'g', 'kg', 'ml', 'l', 'pound', 'pounds'].includes(secondPart)) {
+          unit = secondPart;
+          name = parts.slice(2).join(' ');
+        } else {
+          name = parts.slice(1).join(' ');
+        }
+      }
+    }
+
+    return { name, quantity, unit };
+  };
+
+  const estimateCost = (ingredient: string): IngredientCost => {
+    const parsed = parseIngredient(ingredient);
+    const key = getIngredientKey(parsed.name);
+
+    // Check if user has set a custom price
+    if (customPrices[key]) {
+      return {
+        ingredient: parsed.name,
+        quantity: parsed.quantity,
+        unit: parsed.unit,
+        estimatedCost: customPrices[key] * parsed.quantity,
+        source: 'estimated'
+      };
+    }
+
+    // Check real-time price data
+    const realTimeData = priceData[key.toLowerCase()];
+    if (realTimeData) {
+      return {
+        ingredient: parsed.name,
+        quantity: parsed.quantity,
+        unit: realTimeData.unit,
+        estimatedCost: realTimeData.averagePrice * parsed.quantity,
+        source: 'estimated'
+      };
+    }
+
+    // Check default prices (fallback)
+    if (defaultPrices[key]) {
+      const priceInfo = defaultPrices[key];
+      return {
+        ingredient: parsed.name,
+        quantity: parsed.quantity,
+        unit: priceInfo.unit,
+        estimatedCost: priceInfo.price * parsed.quantity,
+        source: 'estimated'
+      };
+    }
+
+    // Default estimate
+    return {
+      ingredient: parsed.name,
+      quantity: parsed.quantity,
+      unit: parsed.unit,
+      estimatedCost: 2.00, // Default $2 per ingredient
+      source: 'estimated'
+    };
+  };
+
+  const costBreakdown = useMemo(() => {
+    const allIngredients = mealPlan.flatMap(day => 
+      [...(day.breakfast || []), ...(day.lunch || []), ...(day.dinner || [])].flatMap(meal => meal.recipe.ingredients || [])
+    );
+    
+    // Group by ingredient name
+    const groupedIngredients: Record<string, number> = {};
+    
+    allIngredients.forEach(ing => {
+      const parsed = parseIngredient(ing);
+      const key = parsed.name.toLowerCase();
+      groupedIngredients[key] = (groupedIngredients[key] || 0) + parsed.quantity;
+    });
+    
+    // Check inventory and calculate costs for missing items
+    const costItems: IngredientCost[] = [];
+    
+    Object.entries(groupedIngredients).forEach(([name, totalQty]) => {
+      // Check if we have this in inventory
+      const inInventory = inventory.some(item => 
+        name.includes(item.item.toLowerCase()) || 
+        item.item.toLowerCase().includes(name)
+      );
+      
+      if (!inInventory) {
+        const costItem = estimateCost(`${totalQty} ${name}`);
+        costItem.quantity = totalQty;
+        costItems.push(costItem);
+      }
+    });
+    
+    return costItems;
+  }, [mealPlan, inventory, customPrices]);
+
+  const totalCost = costBreakdown.reduce((sum, item) => sum + item.estimatedCost, 0);
+
+  if (!showEstimator) {
+    return (
+      <button
+        onClick={() => setShowEstimator(true)}
+        className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+      >
+        <Calculator className="w-4 h-4" />
+        Estimate Grocery Costs
+      </button>
+    );
+  }
+
+  return (
+    <div className="bg-theme-primary rounded-xl p-6 border border-theme">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-semibold text-theme-secondary flex items-center gap-2">
+          <DollarSign className="w-5 h-5" />
+          Grocery Cost Estimator
+        </h3>
+        <button
+          onClick={() => setShowEstimator(false)}
+          className="text-theme-secondary hover:text-theme-primary"
+        >
+          ✕
+        </button>
+      </div>
+
+      <div className="space-y-4">
+        <div className="bg-theme-secondary/10 rounded-lg p-4">
+          <div className="text-2xl font-bold text-green-600">
+            ${totalCost.toFixed(2)}
+          </div>
+          <div className="text-sm text-theme-secondary">
+            Estimated cost for missing ingredients
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <h4 className="font-medium text-theme-secondary">Missing Ingredients:</h4>
+            <button
+              onClick={fetchCurrentPrices}
+              disabled={loadingPrices}
+              className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3 h-3 ${loadingPrices ? 'animate-spin' : ''}`} />
+              Refresh Prices
+            </button>
+          </div>
+          {costBreakdown.length === 0 ? (
+            <p className="text-sm text-theme-secondary/70">All ingredients are in your pantry! 🎉</p>
+          ) : (
+            <div className="space-y-2 max-h-60 overflow-y-auto">
+              {costBreakdown.map((item, index) => {
+                const ingredientKey = getIngredientKey(item.ingredient).toLowerCase();
+                const realTimeData = priceData[ingredientKey];
+                const hasRealTimeData = !!realTimeData;
+
+                return (
+                  <div key={index} className="py-2 px-3 bg-theme-secondary/5 rounded-lg border">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex-1">
+                        <span className="font-medium">{item.ingredient}</span>
+                        <span className="text-sm text-theme-secondary/70 ml-2">
+                          ({item.quantity} {item.unit})
+                        </span>
+                        {hasRealTimeData && (
+                          <span className="text-xs text-green-600 ml-2 flex items-center gap-1">
+                            <TrendingUp className="w-3 h-3" />
+                            Live data ({realTimeData.sampleSize} samples)
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        <span className="font-medium text-lg">${item.estimatedCost.toFixed(2)}</span>
+                        {hasRealTimeData && (
+                          <div className="text-xs text-theme-secondary/70">
+                            ${realTimeData.minPrice.toFixed(2)} - ${realTimeData.maxPrice.toFixed(2)}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        step="0.01"
+                        placeholder="Custom price"
+                        className="flex-1 px-2 py-1 text-sm border border-theme rounded"
+                        onChange={(e) => {
+                          const price = parseFloat(e.target.value);
+                          if (!isNaN(price)) {
+                            setCustomPrices(prev => ({
+                              ...prev,
+                              [getIngredientKey(item.ingredient)]: price
+                            }));
+                          }
+                        }}
+                      />
+                      <button
+                        onClick={() => setShowPriceInput(showPriceInput === item.ingredient ? null : item.ingredient)}
+                        className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center gap-1"
+                      >
+                        <Users className="w-3 h-3" />
+                        Contribute Price
+                      </button>
+                    </div>
+
+                    {showPriceInput === item.ingredient && (
+                      <div className="mt-2 p-2 bg-blue-50 rounded border">
+                        <div className="grid grid-cols-3 gap-2 mb-2">
+                          <input
+                            type="number"
+                            step="0.01"
+                            placeholder="Price"
+                            className="px-2 py-1 text-sm border rounded"
+                            value={userPriceInputs[item.ingredient]?.price || ''}
+                            onChange={(e) => setUserPriceInputs(prev => ({
+                              ...prev,
+                              [item.ingredient]: { ...prev[item.ingredient], price: e.target.value }
+                            }))}
+                          />
+                          <input
+                            type="text"
+                            placeholder="Unit (lb, each, etc.)"
+                            className="px-2 py-1 text-sm border rounded"
+                            value={userPriceInputs[item.ingredient]?.unit || ''}
+                            onChange={(e) => setUserPriceInputs(prev => ({
+                              ...prev,
+                              [item.ingredient]: { ...prev[item.ingredient], unit: e.target.value }
+                            }))}
+                          />
+                          <input
+                            type="text"
+                            placeholder="Store (optional)"
+                            className="px-2 py-1 text-sm border rounded"
+                            value={userPriceInputs[item.ingredient]?.store || ''}
+                            onChange={(e) => setUserPriceInputs(prev => ({
+                              ...prev,
+                              [item.ingredient]: { ...prev[item.ingredient], store: e.target.value }
+                            }))}
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => submitUserPrice(item.ingredient)}
+                            className="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700"
+                          >
+                            Submit Price
+                          </button>
+                          <button
+                            onClick={() => setShowPriceInput(null)}
+                            className="px-3 py-1 text-xs bg-gray-600 text-white rounded hover:bg-gray-700"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="text-xs text-theme-secondary/70 bg-theme-secondary/5 p-3 rounded-lg space-y-2">
+          <div className="flex items-start gap-2">
+            <TrendingUp className="w-4 h-4 mt-0.5 text-green-600" />
+            <div>
+              <strong>Live Price Data:</strong> Prices are updated from community contributions and show current market rates.
+              Green indicators show live data availability.
+            </div>
+          </div>
+          <div className="flex items-start gap-2">
+            <Users className="w-4 h-4 mt-0.5 text-blue-600" />
+            <div>
+              <strong>Contribute Prices:</strong> Help improve estimates by sharing current prices from your local stores.
+            </div>
+          </div>
+          <div>
+            💡 <strong>Pro tip:</strong> Costs only include ingredients not already in your pantry. Use custom prices for the most accurate estimates.
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};

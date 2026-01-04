@@ -4,11 +4,13 @@ import { PantryItem, ShoppingItem, StructuredRecipe, SavedRecipe, DayPlan, MealP
 describe('Type Definitions', () => {
   it('should create a valid PantryItem', () => {
     const item: PantryItem = {
+      id: '123',
       item: 'Milk',
       category: 'Dairy',
       quantity_estimate: '2 liters',
     };
 
+    expect(item.id).toBe('123');
     expect(item.item).toBe('Milk');
     expect(item.category).toBe('Dairy');
     expect(item.quantity_estimate).toBe('2 liters');
@@ -65,12 +67,16 @@ describe('Type Definitions', () => {
     const dayPlan: DayPlan = {
       date: '2024-01-15',
       dayName: 'Monday',
-      meals: [],
+      breakfast: [],
+      lunch: [],
+      dinner: [],
     };
 
     expect(dayPlan.date).toBe('2024-01-15');
     expect(dayPlan.dayName).toBe('Monday');
-    expect(dayPlan.meals).toEqual([]);
+    expect(dayPlan.breakfast).toEqual([]);
+    expect(dayPlan.lunch).toEqual([]);
+    expect(dayPlan.dinner).toEqual([]);
   });
 
   it('should create a valid MealPlanItem', () => {

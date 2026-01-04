@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, ChevronRight, ChevronLeft, Sparkles, ShoppingBasket, CalendarDays, UtensilsCrossed, Users } from 'lucide-react';
+import { X, ChevronRight, ChevronLeft, Sparkles, ShoppingBasket, CalendarDays, UtensilsCrossed, Users, Grid3X3, User } from 'lucide-react';
 
 interface TutorialProps {
   onClose: () => void;
@@ -20,14 +20,24 @@ export const Tutorial: React.FC<TutorialProps> = ({ onClose }) => {
       icon: <ShoppingBasket className="w-12 h-12 text-[var(--accent-color)]" />,
     },
     {
+      title: "Smart Organization",
+      description: "Your pantry is now organized by categories. Add items manually or scan receipts with AI.",
+      icon: <Grid3X3 className="w-12 h-12 text-[var(--accent-color)]" />,
+    },
+    {
       title: "AI Recipe Chef",
       description: "Find recipes based on your exact pantry items. See community ratings and save your favorites.",
       icon: <UtensilsCrossed className="w-12 h-12 text-[var(--accent-color)]" />,
     },
     {
-      title: "Community & Sharing",
-      description: "Check the 'Social' tab to see what others are cooking and rating. Invite your family to share the pantry.",
+      title: "Household Sharing",
+      description: "Create or join a household to share your pantry, shopping lists, and meal plans with family members.",
       icon: <Users className="w-12 h-12 text-[var(--accent-color)]" />,
+    },
+    {
+      title: "Personal Avatars",
+      description: "Customize your profile with avatars and manage your account settings in the top-right menu.",
+      icon: <User className="w-12 h-12 text-[var(--accent-color)]" />,
     }
   ];
 
@@ -58,7 +68,7 @@ export const Tutorial: React.FC<TutorialProps> = ({ onClose }) => {
           <X className="w-6 h-6" />
         </button>
 
-        <div className="p-8 flex flex-col items-center text-center">
+        <div className="p-8 pb-2.5 flex flex-col items-center text-center">
           <div className="mb-6 p-4 bg-theme-primary rounded-full border border-theme shadow-inner">
             {steps[step].icon}
           </div>

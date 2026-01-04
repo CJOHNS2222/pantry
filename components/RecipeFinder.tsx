@@ -1,14 +1,14 @@
-import React, { useState } from 'react';
-import { Search, Loader2, Sparkles, ExternalLink, Globe, Plus, Clock, List, ChefHat, ToggleLeft, ToggleRight, Star, Heart, Bookmark } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Search, Loader2, Sparkles, ExternalLink, Globe, Plus, Clock, List, ChefHat, ToggleLeft, ToggleRight, Star, Heart, Bookmark, Zap } from 'lucide-react';
 import { searchRecipes } from '../services/geminiService';
-import { RecipeSearchResult, LoadingState, RecipeRating, StructuredRecipe, PantryItem, SavedRecipe } from '../types';
+import { RecipeSearchResult, LoadingState, RecipeRating, StructuredRecipe, PantryItem, SavedRecipe, User } from '../types';
 import { Tab } from '../types/app';
-import { fetchRecipeImage } from '../services/imageService';
+import { RecipeCardSkeleton } from './SkeletonLoader';
+import { PremiumFeature } from './PremiumFeature';
 import { RecipeRatingUI } from './RecipeRating';
 import RecipeModal from './RecipeModal';
-import { logEvent } from 'firebase/analytics';
-import { analytics } from '../firebaseConfig';
-import { PremiumFeature } from './PremiumFeature';
+import AnalyticsService from '../services/analyticsService';
+import { UsageService } from '../services/usageService';
 
 interface RecipeFinderProps {
     onAddToPlan: (recipe: StructuredRecipe) => void;
@@ -23,28 +23,62 @@ interface RecipeFinderProps {
     setActiveTab: (tab: Tab) => void;
     persistedResult?: RecipeSearchResult | null;
     setPersistedResult?: (result: RecipeSearchResult | null) => void;
+    initialSearchQuery?: string;
 }
 
-export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveRecipe, onDeleteRecipe, onMarkAsMade, inventory, ratings, onRate, savedRecipes, user, setActiveTab, persistedResult, setPersistedResult }) => {
-        // List of staple items to ignore
-        const STAPLES = ['salt', 'pepper', 'oil', 'water', 'flour', 'sugar', 'butter', 'vinegar', 'baking powder', 'baking soda', 'spices', 'seasoning', 'soy sauce', 'cornstarch', 'yeast'];
+export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveRecipe, onDeleteRecipe, onMarkAsMade, inventory, ratings, onRate, savedRecipes, user, setActiveTab, persistedResult, setPersistedResult, initialSearchQuery }) => {
+    // List of staple items to ignore
+    const STAPLES = ['salt', 'pepper', 'oil', 'water', 'flour', 'sugar', 'butter', 'vinegar', 'baking powder', 'baking soda', 'spices', 'seasoning', 'soy sauce', 'cornstarch', 'yeast'];
+    
+    // Extract search logic to custom hook
     const [activeView, setActiveView] = useState<'search' | 'saved'>('search');
     const [selectedCategory, setSelectedCategory] = useState<string>('All');
-  
+    
+    // Search parameters
     const [specificQuery, setSpecificQuery] = useState('');
     const [maxCookTime, setMaxCookTime] = useState<string>('60');
     const [maxIngredients, setMaxIngredients] = useState<string>('10');
     const [recipeType, setRecipeType] = useState<'Snack' | 'Dinner' | 'Dessert' | ''>('');
     const [measurement, setMeasurement] = useState<'Metric' | 'Standard'>('Standard');
     const [strictMode, setStrictMode] = useState(false);
-  
-    // Use persistedResult if available
+    
+    // Search state
     const [result, setResult] = useState<RecipeSearchResult | null>(persistedResult || null);
     const [loadingState, setLoadingState] = useState<LoadingState>(LoadingState.IDLE);
     const [searchError, setSearchError] = useState<string | null>(null);
+    const [isResultFromCache, setIsResultFromCache] = useState(false);
+    
+    // Recipe cache to avoid duplicate API calls
+    const [recipeCache, setRecipeCache] = useState<Map<string, RecipeSearchResult>>(new Map());
+    
+    // Debounce state to prevent rapid successive searches
+    const [lastSearchTime, setLastSearchTime] = useState<number>(0);
+
+    // Generate cache key for search parameters
+    const getCacheKey = (params: any): string => {
+        return JSON.stringify({
+            query: params.query || '',
+            ingredients: params.ingredients || '',
+            restrictions: params.restrictions || '',
+            maxCookTime: params.maxCookTime || 60,
+            maxIngredients: params.maxIngredients || 10,
+            measurementSystem: params.measurementSystem || 'Standard',
+            type: params.type || '',
+            strictMode: params.strictMode || false
+        });
+    };
+    
+    // Modal state
     const [showRecipeModal, setShowRecipeModal] = useState(false);
     const [modalRecipe, setModalRecipe] = useState<StructuredRecipe | null>(null);
     const [modalIsSavedView, setModalIsSavedView] = useState(false);
+
+    // Set initial search query if provided
+    useEffect(() => {
+        if (initialSearchQuery && !specificQuery) {
+            setSpecificQuery(initialSearchQuery);
+        }
+    }, [initialSearchQuery]);
 
     // Popular recipes from CSV
     const csvRecipes: StructuredRecipe[] = [
@@ -578,12 +612,26 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
         }
     ];
 
-  const inventoryString = inventory.map(i => i.item).join(', ');
+  // Limit inventory items to reduce API token cost (top 25 most relevant items)
+  const inventoryString = inventory
+    .filter(item => !STAPLES.some(staple => item.item.toLowerCase().includes(staple)))
+    .slice(0, 25)
+    .map(i => i.item)
+    .join(', ');
 
   const handleSpecificSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!specificQuery.trim()) return;
-    performSearch({ query: specificQuery, ingredients: '' });
+    if (!specificQuery.trim()) {
+      alert('Please enter a recipe name or ingredients to search for.');
+      return;
+    }
+    if (specificQuery.trim().length < 2) {
+      alert('Please enter at least 2 characters for your search.');
+      return;
+    }
+    
+    const params = { query: specificQuery, ingredients: '' };
+    await performSearch(params);
   };
 
   const handleGenerate = async (e: React.FormEvent) => {
@@ -592,15 +640,70 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
         alert("Please add items to your pantry list first!");
         return;
     }
-    performSearch({ 
+    if (inventory.length < 2) {
+        alert("Please add at least 2 items to your pantry for better recipe suggestions.");
+        return;
+    }
+    
+    // Check if API key is configured
+    if (!import.meta.env.VITE_GEMINI_API_KEY) {
+        setSearchError('Recipe search service is not available. Please try again later.');
+        setLoadingState(LoadingState.ERROR);
+        return;
+    }
+    
+    const params = { 
         ingredients: inventoryString,
         strictMode: strictMode
-    });
+    };
+    await performSearch(params);
   };
 
+
+
     const performSearch = async (params: any) => {
+        // Debounce: prevent searches within 2 seconds of each other
+        const now = Date.now();
+        if (now - lastSearchTime < 2000) {
+            console.debug('Search debounced - too soon after previous search');
+            return;
+        }
+        setLastSearchTime(now);
+
+        // Check search limits for free users
+        if (user) {
+            try {
+                const canSearch = await UsageService.canPerformSearch(user);
+                if (!canSearch) {
+                    alert('You\'ve reached your weekly search limit. Upgrade to Premium for unlimited searches!');
+                    return;
+                }
+            } catch (error) {
+                console.error('Error checking search limits:', error);
+                // Continue with search if limit check fails
+            }
+        }
+
+        // Check cache first to avoid duplicate API calls
+        const cacheKey = getCacheKey(params);
+        const cachedResult = recipeCache.get(cacheKey);
+        if (cachedResult) {
+            console.debug('Using cached recipe result');
+            setResult(cachedResult);
+            setIsResultFromCache(true);
+            if (setPersistedResult) setPersistedResult(cachedResult);
+            setLoadingState(LoadingState.SUCCESS);
+            // Track cached search (no API cost)
+            AnalyticsService.trackRecipeSearch(
+                params.query || 'generate_from_pantry_cached',
+                cachedResult.recipes?.length || 0
+            );
+            return;
+        }
+
         setLoadingState(LoadingState.LOADING);
         setResult(null);
+        setIsResultFromCache(false);
         setSearchError(null);
         if (setPersistedResult) setPersistedResult(null);
         try {
@@ -621,19 +724,55 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                 });
             }
             setResult({ ...data, recipes: filteredRecipes });
+            setIsResultFromCache(false);
             if (setPersistedResult) setPersistedResult({ ...data, recipes: filteredRecipes });
+            
+            // Cache the result to avoid duplicate API calls (limit cache to 20 entries)
+            setRecipeCache(prev => {
+                const newCache = new Map(prev);
+                newCache.set(cacheKey, { ...data, recipes: filteredRecipes });
+                // Keep only the 20 most recent entries
+                if (newCache.size > 20) {
+                    const oldestKey = newCache.keys().next().value;
+                    newCache.delete(oldestKey);
+                }
+                return newCache;
+            });
+            
             setLoadingState(LoadingState.SUCCESS);
-            // Log search event
-            if (analytics) {
-              logEvent(analytics, 'search', {
-                  query: params.query || 'generate_from_pantry',
-                  resultCount: filteredRecipes?.length || 0,
-                  recipeType: recipeType || 'any'
-              });
+            // Track recipe search
+            AnalyticsService.trackRecipeSearch(
+                params.query || 'generate_from_pantry',
+                filteredRecipes?.length || 0
+            );
+
+            // Record search usage for limit tracking
+            if (user) {
+                try {
+                    await UsageService.recordSearch(user);
+                } catch (error) {
+                    console.error('Error recording search usage:', error);
+                    // Don't fail the search if recording fails
+                }
             }
         } catch (error: any) {
             console.error('performSearch error:', error);
-            setSearchError(error?.message ? String(error.message) : JSON.stringify(error));
+            let errorMessage = error?.message ? String(error.message) : JSON.stringify(error);
+            
+            // Provide user-friendly error messages
+            if (errorMessage.includes('API key not configured')) {
+                errorMessage = 'Recipe search is not configured. Please contact support.';
+            } else if (errorMessage.includes('API configuration error')) {
+                errorMessage = 'Service configuration error. Please try again later.';
+            } else if (errorMessage.includes('quota exceeded')) {
+                errorMessage = 'Service is temporarily unavailable. Please try again in a few minutes.';
+            } else if (errorMessage.includes('Network error') || errorMessage.includes('fetch')) {
+                errorMessage = 'Connection error. Please check your internet and try again.';
+            } else if (errorMessage.includes('timeout')) {
+                errorMessage = 'Request timed out. Please try again.';
+            }
+            
+            setSearchError(errorMessage);
             setLoadingState(LoadingState.ERROR);
         }
     };
@@ -650,20 +789,14 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
       };
   };
 
-        const [imageUrls, setImageUrls] = useState<{ [title: string]: string }>({});
-
-        React.useEffect(() => {
-            if (result && result.recipes) {
-                result.recipes.forEach(async (recipe) => {
-                    if (!imageUrls[recipe.title]) {
-                        const url = await fetchRecipeImage(recipe.title);
-                        if (url) setImageUrls(prev => ({ ...prev, [recipe.title]: url }));
-                    }
-                });
-            }
-        }, [result]);
-
         const openRecipeModal = (recipe: any, isSavedView = false) => {
+            // Track recipe view
+            AnalyticsService.trackRecipeView(
+                recipe.title || 'Untitled Recipe',
+                recipe.title || 'Untitled Recipe',
+                isSavedView ? 'saved' : 'search'
+            );
+
             // Normalize recipe shape so modal can safely render instructions/ingredients
             const normalized: any = { ...recipe };
             normalized.title = normalized.title || 'Untitled Recipe';
@@ -696,7 +829,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
             const ratingInfo = getRatingInfo(recipe.title);
             const isSaved = savedRecipes.some(r => r.title === recipe.title);
             const titleKey = recipe.title || 'Untitled Recipe';
-            const imgUrl = imageUrls[titleKey] || `https://source.unsplash.com/600x400/?${encodeURIComponent((titleKey as string).split(' ').slice(0,2).join(','))},food`;
+            const imgUrl = `https://source.unsplash.com/600x400/?${encodeURIComponent((titleKey as string).split(' ').slice(0,2).join(','))},food`;
             // Filter out staple items from ingredient list
             const filteredIngredients = recipe.ingredients.filter(ing => {
                 const ingLower = ing.toLowerCase();
@@ -706,17 +839,20 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
             if (isCompact) {
                 return (
                     <div key={titleKey} className="bg-theme-secondary rounded-lg shadow-md border border-theme overflow-hidden group hover:shadow-lg transition-all cursor-pointer" onClick={() => openRecipeModal(recipe, isSavedView)}>
-                        <div className="h-24 relative bg-gray-200 overflow-hidden">
-                            <div 
-                                className="absolute inset-0 bg-cover bg-center opacity-80 group-hover:scale-105 transition-transform duration-300"
-                                style={{
-                                    backgroundImage: `url(${imgUrl})`,
-                                    backgroundColor: '#2A0A10'
+                        <div className="h-16 relative bg-theme-primary overflow-hidden">
+                            <img
+                                src={imgUrl}
+                                alt={recipe.title}
+                                className="w-full h-full object-cover"
+                                loading="lazy"
+                                onError={(e) => {
+                                    const target = e.target as HTMLImageElement;
+                                    target.src = `https://source.unsplash.com/600x400/?food`;
                                 }}
-                            ></div>
+                            />
                             <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent"></div>
                             <div className="absolute bottom-2 left-2 right-2 text-white">
-                                <h4 className="text-sm font-bold leading-tight">{recipe.title}</h4>
+                                <h4 className="text-xs font-bold leading-tight">{recipe.title}</h4>
                             </div>
                         </div>
                     </div>
@@ -726,18 +862,21 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
             return (
                 <div key={titleKey} className="bg-theme-secondary rounded-2xl shadow-xl border border-theme overflow-hidden group hover:shadow-2xl transition-all mb-6 cursor-pointer" onClick={() => openRecipeModal(recipe, isSavedView)}>
                     {/* Recipe Image */}
-                    <div className="h-40 relative bg-gray-200 overflow-hidden">
-                        <div 
-                            className="absolute inset-0 bg-cover bg-center opacity-80 group-hover:scale-105 transition-transform duration-500"
-                            style={{
-                                backgroundImage: `url(${imgUrl})`,
-                                backgroundColor: '#2A0A10'
+                    <div className="h-20 relative bg-gray-200 overflow-hidden">
+                        <img 
+                            src={imgUrl}
+                            alt={recipe.title}
+                            className="absolute inset-0 w-full h-full object-cover opacity-80 group-hover:scale-105 transition-transform duration-500"
+                            loading="lazy"
+                            onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.src = `https://source.unsplash.com/600x400/?food`;
                             }}
-                        ></div>
+                        />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/90 to-transparent"></div>
-                        <div className="absolute bottom-4 left-4 right-4 text-white">
-                            <h4 className="text-xl font-serif font-bold leading-tight mb-1 shadow-black drop-shadow-md">{recipe.title}</h4>
-                            <div className="flex items-center gap-3 text-xs font-medium opacity-90">
+                        <div className="absolute bottom-2 left-4 right-4 text-white">
+                            <h4 className="text-lg font-serif font-bold leading-tight mb-1 shadow-black drop-shadow-md">{recipe.title}</h4>
+                            <div className="flex items-center gap-2 text-xs font-medium opacity-90">
                                 <span className="bg-black/40 backdrop-blur px-2 py-1 rounded flex items-center gap-1">
                                     <Clock className="w-3 h-3 text-[var(--accent-color)]" /> {recipe.cookTime}
                                 </span>
@@ -750,10 +889,10 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                         </div>
                     </div>
 
-                    <div className="p-6">
-                        <p className="text-theme-secondary opacity-70 text-sm mb-4 leading-relaxed">{recipe.description}</p>
-                        <div className="grid gap-4 mb-6">
-                            <div className="bg-theme-primary/50 p-4 rounded-lg">
+                    <div className="p-4">
+                        <p className="text-theme-secondary opacity-70 text-sm mb-3 leading-relaxed">{recipe.description}</p>
+                        <div className="grid gap-3 mb-4">
+                            <div className="bg-theme-primary/50 p-3 rounded-lg">
                                 <h5 className="text-xs font-bold text-[var(--accent-color)] uppercase mb-2 flex items-center gap-2">
                                     <List className="w-3 h-3" /> Ingredients
                                 </h5>
@@ -766,14 +905,14 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                         <div className="flex gap-2">
                             <button 
                                 onClick={(e) => { e.stopPropagation(); onAddToPlan(recipe); }}
-                                className="flex-1 bg-theme-primary border border-theme hover:border-[var(--accent-color)] text-[var(--accent-color)] font-bold py-3 rounded-xl transition-all flex items-center justify-center gap-2 hover:bg-[var(--accent-color)] hover:text-white"
+                                className="flex-1 bg-theme-primary border border-theme hover:border-[var(--accent-color)] text-[var(--accent-color)] font-bold py-2 rounded-xl transition-all flex items-center justify-center gap-2 hover:bg-[var(--accent-color)] hover:text-white"
                             >
-                                <Plus className="w-5 h-5" /> Add to Schedule
+                                <Plus className="w-4 h-4" /> Add to Schedule
                             </button>
                         </div>
 
-                        <div className="mt-4 pt-4 border-t border-theme" onClick={(e) => e.stopPropagation()}>
-                             <RecipeRatingUI recipeTitle={recipe.title} recipe={recipe} onRate={onRate} />
+                        <div className="mt-3 pt-3 border-t border-theme" onClick={(e) => e.stopPropagation()}>
+                             <RecipeRatingUI recipeTitle={recipe.title} recipe={recipe} onRate={onRate} user={user} />
                         </div>
                     </div>
                 </div>
@@ -801,9 +940,9 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
           <PremiumFeature
             feature="savedRecipes"
             user={user}
-            limit={25}
+            limit={10}
             currentCount={savedRecipes.length}
-            fallbackMessage="Upgrade to Premium to save more than 25 recipes"
+            fallbackMessage="Upgrade to Premium to save more than 10 recipes"
             onUpgrade={() => setActiveTab(Tab.SETTINGS)}
           >
             <div className="space-y-4">
@@ -813,7 +952,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                         <p>No saved recipes yet.</p>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-4 gap-4">
                         {savedRecipes.map(r => renderRecipeCard(r, true, true))}
                     </div>
                 )}
@@ -947,17 +1086,55 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                 </form>
             </div>
 
+            {loadingState === LoadingState.LOADING && (
+                <div className="animate-fade-in-up space-y-8 mt-8">
+                    <RecipeCardSkeleton />
+                    <RecipeCardSkeleton />
+                    <RecipeCardSkeleton />
+                </div>
+            )}
+
             {loadingState === LoadingState.ERROR && (
                 <div className="p-4 bg-red-900/20 border border-red-500 text-red-400 rounded-xl text-center font-medium">
                 <div>Search failed. Please try again.</div>
                 {searchError && (
                     <div className="text-xs mt-2 text-red-300">Error: {searchError}</div>
                 )}
+                <button
+                    onClick={() => {
+                        // Reset error state and show token confirmation for retry
+                        setSearchError(null);
+                        setLoadingState(LoadingState.IDLE);
+                        // Get the current form parameters and show confirmation
+                        const params = { 
+                            ingredients: inventoryString,
+                            strictMode: strictMode
+                        };
+                        const estimate = estimateTokens(params);
+                        setEstimatedTokens(estimate.tokens);
+                        setEstimatedCost(estimate.cost);
+                        setFreeTierNote(estimate.freeTierNote);
+                        setPendingSearchParams(params);
+                        setShowTokenConfirmation(true);
+                    }}
+                    className="mt-3 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors"
+                >
+                    Try Again
+                </button>
                 </div>
             )}
 
             {result && result.recipes && (
                     <div className="animate-fade-in-up space-y-8 mt-8">
+                        {/* Cache indicator */}
+                        {isResultFromCache && (
+                            <div className="flex justify-center mb-4">
+                                <div className="bg-green-900/20 border border-green-500 text-green-400 px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1">
+                                    <Zap className="w-3 h-3" />
+                                    Instant Results (Cached)
+                                </div>
+                            </div>
+                        )}
                             {result.recipes.map((recipe, idx) => renderRecipeCard(recipe))}
                     </div>
             )}
@@ -985,7 +1162,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                     </div>
                 </div>
                 
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-4 gap-4">
                     {csvRecipes
                         .filter(recipe => selectedCategory === 'All' || recipe.type === selectedCategory)
                         .map((recipe) => renderRecipeCard(recipe, false, true))}
@@ -995,21 +1172,31 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
         </>
       )}
 
+
+
       {/* Modal for full recipe details */}
       {showRecipeModal && modalRecipe && (
         <RecipeModal
           recipe={modalRecipe}
           isOpen={showRecipeModal}
           onClose={() => setShowRecipeModal(false)}
-          onAddToPlan={(r) => { onAddToPlan(r); }}
-          onSaveRecipe={(r) => { onSaveRecipe(r); }}
+          onAddToPlan={(r) => { 
+            onAddToPlan(r); 
+          }}
+          onSaveRecipe={(r) => {
+            AnalyticsService.trackRecipeSave(r.title || 'Untitled Recipe', r.title || 'Untitled Recipe');
+            onSaveRecipe(r);
+          }}
           onDeleteRecipe={(r) => { onDeleteRecipe(r); }}
           onRate={onRate}
-          onMarkAsMade={(r) => { if (onMarkAsMade) onMarkAsMade(r); }}
+          onMarkAsMade={(r) => { 
+            if (onMarkAsMade) onMarkAsMade(r); 
+          }}
           showSaveButton={!modalIsSavedView}
           showDeleteButton={modalIsSavedView}
           showMarkAsMade={true}
           showAddToPlan={true}
+          user={user}
         />
       )}
     </div>

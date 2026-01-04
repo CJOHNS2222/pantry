@@ -53,7 +53,17 @@ export const Community: React.FC<CommunityProps> = ({ ratings, onAddToPlan, onSa
       </div>
 
       <div className="space-y-4">
-        {(showAll ? sortedRecipes : sortedRecipes.slice(0,5)).map((stat, idx) => {
+        {sortedRecipes.length === 0 ? (
+          <div className="text-center py-12">
+            <Star className="w-16 h-16 text-amber-500/30 mx-auto mb-4" />
+            <h3 className="text-lg font-bold text-theme-secondary mb-2">No Community Ratings Yet</h3>
+            <p className="text-theme-secondary opacity-60 text-sm">
+              Be the first to rate a recipe! Community ratings will appear here.
+            </p>
+          </div>
+        ) : (
+          <>
+            {(showAll ? sortedRecipes : sortedRecipes.slice(0,5)).map((stat, idx) => {
            const avg = (stat.totalRating / stat.count).toFixed(1);
            const latestComment = stat.comments && stat.comments[0] ? stat.comments[0] : null;
            const fullRecipe = findRecipeForStat(stat);
@@ -120,13 +130,6 @@ export const Community: React.FC<CommunityProps> = ({ ratings, onAddToPlan, onSa
              </div>
            );
         })}
-
-        {sortedRecipes.length === 0 && (
-             <div className="text-center py-12 opacity-30 flex flex-col items-center">
-                <ChefHat className="w-12 h-12 mb-2" />
-                <p>No ratings yet. Be the first to rate a recipe!</p>
-             </div>
-        )}
           {sortedRecipes.length > 5 && (
             <div className="flex justify-center mt-4">
               <button onClick={() => setShowAll(prev => !prev)} className="px-4 py-2 rounded bg-[var(--accent-color)] text-white">
@@ -134,6 +137,8 @@ export const Community: React.FC<CommunityProps> = ({ ratings, onAddToPlan, onSa
               </button>
             </div>
           )}
+        </>
+        )}
       </div>
 
       {showModal && selectedRecipe && (() => {

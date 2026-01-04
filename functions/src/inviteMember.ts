@@ -3,6 +3,7 @@ import {onCall, onRequest, HttpsError} from "firebase-functions/v2/https";
 import admin from 'firebase-admin';
 import {getFirestore, FieldValue} from "firebase-admin/firestore";
 import { getAuth } from 'firebase-admin/auth';
+import { sendEmail } from './helpers/sendEmail.js';
 
 // Ensure the Admin SDK is initialized
 if (!admin.apps?.length) {
@@ -11,6 +12,7 @@ if (!admin.apps?.length) {
 
 // Core invite logic as a function so it can be used by both callable and HTTP handlers
 async function inviteMemberCore(inviterUid: string, email: string, householdId: string) {
+  console.log('inviteMemberCore called with:', { inviterUid, email, householdId });
   const db = getFirestore();
 
   const householdRef = db.collection("households").doc(householdId);
@@ -18,10 +20,16 @@ async function inviteMemberCore(inviterUid: string, email: string, householdId: 
   if (!householdDoc.exists) {
     throw new HttpsError("not-found", "The specified household does not exist.");
   }
-  const members = householdDoc.data()?.members || [];
+  const householdData = householdDoc.data();
+  const members = householdData?.members || [];
   if (!members.some((member: { id: string; }) => member.id === inviterUid)) {
     throw new HttpsError("permission-denied", "You are not a member of this household.");
   }
+
+  // Get inviter info
+  const inviter = members.find((member: { id: string; }) => member.id === inviterUid);
+  const inviterName = inviter?.name || 'Someone';
+  const householdName = householdData?.name || 'a household';
 
   let memberIdToStore = email;
   try {
@@ -37,8 +45,71 @@ async function inviteMemberCore(inviterUid: string, email: string, householdId: 
   if (memberIdToStore && memberIdToStore !== email) updatePayload.memberIds = FieldValue.arrayUnion(memberIdToStore);
   await householdRef.update(updatePayload);
 
+  // Set custom claim for the invited user if they have a UID
+  if (memberIdToStore && memberIdToStore !== email) {
+    try {
+      await admin.auth().setCustomUserClaims(memberIdToStore, { householdId });
+      console.log(`Custom claim 'householdId' set for user ${memberIdToStore} to ${householdId}`);
+    } catch (error) {
+      console.error('Error setting custom claims:', error);
+      // Don't fail the invite if claim setting fails
+    }
+  }
+
   const notificationsRef = db.collection('notifications');
-  await notificationsRef.add({ email, type: 'household_invite', householdId, message: `You've been added to a household (${householdId}).`, timestamp: FieldValue.serverTimestamp(), read: false });
+  await notificationsRef.add({ 
+    email, 
+    type: 'household_invite', 
+    householdId, 
+    householdName,
+    inviterName,
+    message: `${inviterName} has invited you to join the "${householdName}" household on Smart Pantry!`, 
+    timestamp: FieldValue.serverTimestamp(), 
+    read: false 
+  });
+
+  // Send email invitation
+  try {
+    const subject = `You're invited to join ${householdName} on Smart Pantry!`;
+    const body = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #a51401;">Household Invitation</h2>
+        <p>Hi there!</p>
+        <p><strong>${inviterName}</strong> has invited you to join their household <strong>"${householdName}"</strong> on Smart Pantry!</p>
+
+        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <h3>What you can do:</h3>
+          <ul>
+            <li>Share pantry inventory with family members</li>
+            <li>Collaborate on meal planning</li>
+            <li>View and rate community recipes</li>
+            <li>Keep shopping lists in sync</li>
+          </ul>
+        </div>
+
+        <p style="margin-top: 30px;">
+          <a href="https://smartpantry.app" style="background-color: #a51401; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">
+            Open Smart Pantry
+          </a>
+        </p>
+
+        <p style="color: #666; font-size: 14px; margin-top: 30px;">
+          If you don't have an account yet, you can sign up for free at <a href="https://smartpantry.app">smartpantry.app</a>
+        </p>
+
+        <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+        <p style="color: #999; font-size: 12px;">
+          This invitation was sent by ${inviterName}. If you believe this was sent in error, you can safely ignore this email.
+        </p>
+      </div>
+    `;
+
+    await sendEmail(email, subject, body);
+    console.log('Email invitation sent successfully to:', email);
+  } catch (emailError) {
+    console.error('Failed to send email invitation:', emailError);
+    // Don't fail the whole invite process if email fails
+  }
 
   return { success: true, newMember };
 }

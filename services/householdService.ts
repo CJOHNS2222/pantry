@@ -24,13 +24,10 @@ import { Household, Member, User } from '../types';
  */
 export const getOrCreateHousehold = async (user: User): Promise<Household | null> => {
   try {
-    // First, check if user belongs to any existing household
+    // First, check if user belongs to any existing household by memberIds
     const householdQuery = query(
       collection(db, 'households'),
-      where('members', 'array-contains', {
-        email: user.email,
-        id: user.id,
-      })
+      where('memberIds', 'array-contains', user.id)
     );
 
     const querySnapshot = await getDocs(householdQuery);
@@ -78,6 +75,7 @@ export const createHousehold = async (
         status: 'Active',
       },
     ],
+    memberIds: [user.id],
   };
 
   await setDoc(doc(db, 'households', householdId), {
@@ -98,6 +96,7 @@ export const addMemberToHousehold = async (
 ): Promise<void> => {
   await updateDoc(doc(db, 'households', householdId), {
     members: arrayUnion(member),
+    memberIds: arrayUnion(member.id),
     updatedAt: serverTimestamp(),
   });
 };

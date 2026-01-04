@@ -11,6 +11,11 @@ Smart Pantry Chef is a cross-platform pantry and meal management app built with 
 - Feedback form for user ideas and bug reports
 - Recipe sharing between households
 - Firebase Analytics for usage tracking
+- **Enhanced Grocery Price Estimator with Community Data**
+  - Real-time price updates from user contributions
+  - Price ranges and sample sizes for accuracy
+  - Community-driven pricing for current market rates
+  - Custom price overrides for personal preferences
 - **Subscription system with Stripe payment processing**
   - Free tier: Basic features with limits
   - Premium tier: Unlimited recipes, meal plans, and household members
@@ -65,6 +70,29 @@ STRIPE_FAMILY_PRICE_ID
 - Use sandbox credentials in your environment variables during development
 
 Both payment methods support test subscriptions that will automatically cancel after a short period.
+
+## Enhanced Grocery Price System
+
+The app now features a community-driven grocery price estimator that provides more accurate cost calculations:
+
+### Features
+- **Live Price Data**: Prices are updated from user contributions and show current market rates
+- **Price Ranges**: Displays min/max prices with sample sizes for transparency
+- **Community Contributions**: Users can submit current prices from their local stores
+- **Custom Overrides**: Set personal price preferences for specific ingredients
+- **Price History**: Track price trends over time (future feature)
+
+### How It Works
+1. **Automatic Updates**: The estimator fetches the latest community prices when opened
+2. **Contribute Prices**: Click "Contribute Price" on any ingredient to share current pricing
+3. **Price Validation**: Community votes help ensure price accuracy
+4. **Fallback System**: Uses updated default prices when community data isn't available
+
+### Data Sources
+- User-submitted prices from various stores and locations
+- Aggregated pricing data with confidence intervals
+- Regional price variations (future enhancement)
+- Integration with grocery APIs (planned)
 
 ## Recent Changes
 - Migrated inventory, shopping list, meal plan, and saved recipes to Firestore for household sharing

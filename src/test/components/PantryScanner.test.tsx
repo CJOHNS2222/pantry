@@ -26,8 +26,8 @@ describe('PantryScanner Component', () => {
   const mockAddToShoppingList = vi.fn();
 
   const initialInventory: PantryItem[] = [
-    { item: 'Milk', category: '', quantity_estimate: '2' },
-    { item: 'Bread', category: '', quantity_estimate: '1' },
+    { id: '1', item: 'Milk', category: '', quantity_estimate: '2' },
+    { id: '2', item: 'Bread', category: '', quantity_estimate: '1' },
   ];
 
   beforeEach(() => {

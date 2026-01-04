@@ -1,6 +1,12 @@
 import { onRequest } from "firebase-functions/https";
+import { defineSecret } from "firebase-functions/params";
 import * as admin from 'firebase-admin';
 import * as stripe from 'stripe';
+
+// Define secrets using the new params API
+const stripeSecretKey = defineSecret('STRIPE_SECRET_KEY');
+const stripePremiumPriceId = defineSecret('STRIPE_PREMIUM_PRICE_ID');
+const stripeFamilyPriceId = defineSecret('STRIPE_FAMILY_PRICE_ID');
 
 // Ensure the Admin SDK is initialized
 if (!admin.apps?.length) {
@@ -9,11 +15,13 @@ if (!admin.apps?.length) {
 
 // Lazy initialize Stripe client
 function getStripeClient(): stripe.Stripe {
-  return new stripe.Stripe(process.env.STRIPE_SECRET_KEY!);
+  return new stripe.Stripe(stripeSecretKey.value());
 }
 
 // Stripe subscription creation
-export const createSubscription = onRequest(async (req, res) => {
+export const createSubscription = onRequest(
+  { secrets: [stripeSecretKey, stripePremiumPriceId, stripeFamilyPriceId] },
+  async (req, res) => {
   const stripeClient = getStripeClient();
   // Enable CORS
   res.set('Access-Control-Allow-Origin', '*');
@@ -40,8 +48,8 @@ export const createSubscription = onRequest(async (req, res) => {
 
     // Map plan IDs to Stripe price IDs (you'll need to create these in Stripe)
     const priceMap: { [key: string]: string } = {
-      'premium': process.env.STRIPE_PREMIUM_PRICE_ID!,
-      'family': process.env.STRIPE_FAMILY_PRICE_ID!,
+      'premium': stripePremiumPriceId.value(),
+      'family': stripeFamilyPriceId.value(),
     };
 
     const priceId = priceMap[planId];

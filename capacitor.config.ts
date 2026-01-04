@@ -5,10 +5,16 @@ const config: CapacitorConfig = {
   appName: 'Smart Pantry',
   webDir: 'dist',
   plugins: {
-    CapacitorHttp: {
-      enabled: true,
-      excludePatterns: ["*firestore.googleapis.com*"]
+    App: {
+      // App plugin configuration
     },
+    Device: {
+      // Device plugin configuration
+    },
+    // CapacitorHttp: {
+    //   enabled: true,
+    //   excludePatterns: ["*firestore.googleapis.com*"]
+    // },
     // Browser: {
     //   toolbarColor: '#2A0A10'
     // }

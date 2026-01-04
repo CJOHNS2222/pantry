@@ -6,9 +6,15 @@ interface RecipeRatingUIProps {
   recipeTitle: string;
   recipe: StructuredRecipe;
   onRate: (rating: RecipeRating) => void;
+  user?: {
+    id: string;
+    name: string;
+    email: string;
+    avatar?: string;
+  };
 }
 
-export const RecipeRatingUI: React.FC<RecipeRatingUIProps> = ({ recipeTitle, recipe, onRate }) => {
+export const RecipeRatingUI: React.FC<RecipeRatingUIProps> = ({ recipeTitle, recipe, onRate, user }) => {
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -20,8 +26,7 @@ export const RecipeRatingUI: React.FC<RecipeRatingUIProps> = ({ recipeTitle, rec
       recipeTitle,
       rating,
       comment,
-      userName: 'Current User', // In a real app this would come from auth
-      date: new Date().toLocaleDateString(),
+      userName: user?.name || 'Anonymous User',
       recipe: recipe,
     });
     setIsSubmitted(true);

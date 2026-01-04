@@ -8,7 +8,7 @@ const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
  * Analyzes an image to identify pantry items.
  */
 export const analyzePantryImage = async (base64Image: string, mimeType: string): Promise<PantryItem[]> => {
-  const modelId = "gemini-2.5-flash"; 
+  const modelId = "gemini-2.0-flash-lite"; 
 
   const schema: Schema = {
     type: Type.ARRAY,
@@ -45,7 +45,24 @@ export const analyzePantryImage = async (base64Image: string, mimeType: string):
             },
           },
           {
-            text: "Analyze this image and provide a detailed inventory of the pantry items visible. Be precise with item names.",
+            text: `Analyze this image and provide a detailed inventory of the pantry items visible. Be precise with item names.
+
+For categorization, use these standard categories when possible:
+- Fruits & Vegetables (fresh produce, fruits, vegetables)
+- Dairy & Eggs (milk, cheese, yogurt, eggs, butter)
+- Meat & Poultry (beef, chicken, pork, turkey, bacon, sausage)
+- Seafood (fish, shrimp, crab, canned tuna)
+- Grains & Bread (rice, pasta, bread, cereals, flour, oats)
+- Canned Goods (canned vegetables, soups, beans, tomatoes)
+- Condiments & Sauces (ketchup, mustard, mayo, oils, vinegars, dressings)
+- Snacks (chips, cookies, nuts, crackers, candy)
+- Beverages (soda, juice, coffee, tea, water, alcohol)
+- Frozen Foods (frozen vegetables, meals, ice cream, pizza)
+- Baking Supplies (sugar, baking powder, vanilla, chocolate chips)
+- Spices & Herbs (salt, pepper, garlic, herbs, spices)
+- Breakfast Foods (cereal, oatmeal, pancake mix, syrup)
+
+If an item doesn't fit these categories, use "Uncategorized".`,
           },
         ],
       },
@@ -71,52 +88,47 @@ export const analyzePantryImage = async (base64Image: string, mimeType: string):
  * Searches for recipes using Google Search Grounding with enhanced filters and structured JSON output.
  */
 export const searchRecipes = async (params: RecipeSearchParams): Promise<RecipeSearchResult> => {
-  const modelId = "gemini-2.5-flash";
+  const modelId = "gemini-2.0-flash-lite";
+  
+  // Check if API key is available
+  if (!import.meta.env.VITE_GEMINI_API_KEY) {
+    throw new Error('Gemini API key not configured. Please check your environment variables.');
+  }
   
   let prompt = "";
 
   if (params.query) {
-    // Mode 1: Specific Search
-    prompt = `Find exactly 3 detailed recipes for "${params.query}". `;
-    if (params.restrictions) prompt += `Dietary restrictions: ${params.restrictions}. `;
+    // Mode 1: Specific Search - ultra-concise for cost efficiency
+    prompt = `2 recipes for "${params.query}"`;
+    if (params.restrictions) prompt += `. Restrictions: ${params.restrictions}`;
   } else {
-    // Mode 2: Generate from Pantry
-    prompt = `Suggest exactly 3 creative recipes based on these available ingredients: ${params.ingredients}. `;
+    // Mode 2: Generate from Pantry - ultra-concise
+    const limitedIngredients = params.ingredients.split(', ').slice(0, 25).join(', ');
+    prompt = `2 recipes using: ${limitedIngredients}`;
     
     if (params.strictMode) {
-      prompt += `STRICT MODE: Only use the provided ingredients. You may assume simple pantry staples like oil, salt, pepper, and water, but DO NOT include recipes that require buying other significant ingredients. `;
+      prompt += `. Only these + basics (oil, salt, pepper, water)`;
     } else {
-      prompt += `You may include recipes that use these ingredients but might require a few additional common items. `;
+      prompt += `. Can add common items`;
     }
 
-    if (params.restrictions) prompt += `Dietary restrictions: ${params.restrictions}. `;
-    if (params.maxCookTime) prompt += `Maximum cook time: ${params.maxCookTime} minutes. `;
-    if (params.maxIngredients) prompt += `Maximum number of ingredients: ${params.maxIngredients}. `;
+    if (params.restrictions) prompt += `. Restrictions: ${params.restrictions}`;
+    if (params.maxCookTime) prompt += `. Max ${params.maxCookTime}min`;
+    if (params.maxIngredients) prompt += `. Max ${params.maxIngredients} ingredients`;
   }
 
-  prompt += `Please use the ${params.measurementSystem} measurement system for all quantities. `;
+  prompt += `. Use ${params.measurementSystem} units`;
 
-  // Explicitly request JSON structure in the prompt since we cannot use responseSchema with tools
-  prompt += `
-  
-  Provide the result strictly as a valid JSON object matching this structure:
-  {
-    "recipes": [
-      {
-        "title": "string",
-        "description": "string",
-        "ingredients": ["string (ingredient with quantity)"],
-        "instructions": ["string (step by step)"],
-        "cookTime": "string"
-      }
-    ]
-  }
-  Ensure the "recipes" array contains exactly 3 distinct recipes.
-  Do not include any markdown formatting (like \`\`\`json). Just the raw JSON string.
-  `;
+  // Ultra-concise JSON structure - be very explicit
+  prompt += `. Respond ONLY with valid JSON in this exact format, no other text: {"recipes":[{"title":"string","description":"brief summary","ingredients":["concise ingredient with quantity"],"instructions":["3-5 key steps"],"cookTime":"string"}]}`;
 
   try {
-    const response = await ai.models.generateContent({
+    // Add timeout to prevent hanging requests
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Request timeout. Please try again.')), 35000); // 35 second timeout
+    });
+
+    const responsePromise = ai.models.generateContent({
       model: modelId,
       contents: {
         parts: [
@@ -128,7 +140,9 @@ export const searchRecipes = async (params: RecipeSearchParams): Promise<RecipeS
       },
     });
 
-    console.debug('Gemini raw response:', response);
+    const response = await Promise.race([responsePromise, timeoutPromise]) as any;
+
+        // console.debug('Gemini raw response:', response);
 
     const jsonText = response.text;
     let recipes: StructuredRecipe[] = [];
@@ -136,14 +150,32 @@ export const searchRecipes = async (params: RecipeSearchParams): Promise<RecipeS
     if (jsonText) {
       // Clean up markdown if present
       const cleanJson = jsonText.replace(/^```json\s*/, "").replace(/^```\s*/, "").replace(/\s*```$/, "").trim();
+      
       try {
+        // First try to parse as JSON
         const parsed = JSON.parse(cleanJson);
         recipes = parsed.recipes || [];
-      } catch (e) {
-        console.error("JSON Parse Error:", e);
-        console.log("Raw Text:", jsonText);
-        console.log('Cleaned JSON candidate:', cleanJson);
-        // Attempt to recover or return empty
+      } catch (jsonError) {
+        console.warn("JSON Parse Error, attempting to extract JSON from text:", jsonError);
+        // console.log("Raw Text:", jsonText);
+        
+        // Try to extract JSON from the text response
+        const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          try {
+            const extractedJson = JSON.parse(jsonMatch[0]);
+            recipes = extractedJson.recipes || [];
+            // console.log("Successfully extracted JSON from text");
+          } catch (extractError) {
+            console.warn("Failed to extract JSON, falling back to text parsing:", extractError);
+            
+            // Last resort: try to parse natural language response
+            recipes = parseNaturalLanguageRecipes(jsonText);
+          }
+        } else {
+          console.warn("No JSON found in response, falling back to text parsing");
+          recipes = parseNaturalLanguageRecipes(jsonText);
+        }
       }
     } else {
       console.warn('Gemini returned no text for recipe search.');
@@ -156,6 +188,102 @@ export const searchRecipes = async (params: RecipeSearchParams): Promise<RecipeS
 
   } catch (error) {
     console.error("Error searching recipes:", error);
-    throw error;
+    
+    // Provide more specific error messages
+    if (error.message?.includes('API_KEY')) {
+      throw new Error('API configuration error. Please check your Gemini API key.');
+    } else if (error.message?.includes('quota') || error.message?.includes('limit')) {
+      throw new Error('API quota exceeded. Please try again later.');
+    } else if (error.message?.includes('network') || error.message?.includes('fetch')) {
+      throw new Error('Network error. Please check your internet connection.');
+    } else {
+      throw new Error(`Recipe search failed: ${error.message || 'Unknown error'}`);
+    }
   }
 };
+
+/**
+ * Fallback parser for natural language recipe responses when JSON parsing fails
+ */
+function parseNaturalLanguageRecipes(text: string): StructuredRecipe[] {
+  const recipes: StructuredRecipe[] = [];
+  
+  try {
+    // Split text into potential recipe sections
+    const sections = text.split(/\n\s*(?=Recipe \d+|^\d+\.|Title:|Here are)/mi);
+    
+    for (const section of sections.slice(0, 2)) { // Limit to 2 recipes
+      const recipe: Partial<StructuredRecipe> = {};
+      
+      // Extract title
+      const titleMatch = section.match(/(?:Recipe \d+:?\s*|Title:\s*)([^\n]+)/i) || 
+                        section.match(/^([^\n]+?)(?:\n|$)/);
+      if (titleMatch) {
+        recipe.title = titleMatch[1].trim();
+      }
+      
+      // Extract description/summary
+      const descMatch = section.match(/(?:Description|Summary):\s*([^\n]+)/i);
+      if (descMatch) {
+        recipe.description = descMatch[1].trim();
+      }
+      
+      // Extract ingredients
+      const ingredientsSection = section.match(/(?:Ingredients?:?\s*)(.*?)(?:\n\s*(?:Instructions?|Steps?|Directions?))/is);
+      if (ingredientsSection) {
+        const ingredientsText = ingredientsSection[1];
+        recipe.ingredients = ingredientsText
+          .split(/\n-|\n\d+\.|\n•/)
+          .map(line => line.trim())
+          .filter(line => line.length > 0 && !line.match(/^\s*$/))
+          .slice(0, 10); // Limit ingredients
+      }
+      
+      // Extract instructions
+      const instructionsSection = section.match(/(?:Instructions?|Steps?|Directions?:?\s*)(.*?)(?:\n\s*(?:Cook time|Time|Prep)|$)/is);
+      if (instructionsSection) {
+        const instructionsText = instructionsSection[1];
+        recipe.instructions = instructionsText
+          .split(/\n\d+\.|\n-|\n•/)
+          .map(line => line.trim())
+          .filter(line => line.length > 0 && !line.match(/^\s*$/))
+          .slice(0, 5); // Limit steps
+      }
+      
+      // Extract cook time
+      const timeMatch = section.match(/(?:Cook time|Time|Prep time):\s*([^\n]+)/i);
+      if (timeMatch) {
+        recipe.cookTime = timeMatch[1].trim();
+      }
+      
+      // Only add recipe if we have at least a title
+      if (recipe.title) {
+        recipes.push(recipe as StructuredRecipe);
+      }
+    }
+    
+    // If no recipes were parsed, create a fallback
+    if (recipes.length === 0) {
+      recipes.push({
+        title: "Recipe Search Result",
+        description: "Please try rephrasing your search or check your ingredients",
+        ingredients: ["Ingredients not available"],
+        instructions: ["Instructions not available"],
+        cookTime: "Unknown"
+      });
+    }
+    
+  } catch (error) {
+    console.error("Error parsing natural language recipes:", error);
+    // Return a basic fallback recipe
+    recipes.push({
+      title: "Search Error",
+      description: "Unable to parse recipe results. Please try again.",
+      ingredients: ["Please try a different search"],
+      instructions: ["Please try again"],
+      cookTime: "Unknown"
+    });
+  }
+  
+  return recipes;
+}
