@@ -56,6 +56,12 @@ export const leaveHousehold = onCall(async (request) => {
 
     await householdRef.update(updatePayload);
 
+    // Update user's document to remove householdId
+    const userRef = db.collection("users").doc(userId);
+    await userRef.update({
+      householdId: FieldValue.delete()
+    });
+
     // Remove custom claim for the leaving user
     try {
       await admin.auth().setCustomUserClaims(userId, { householdId: null });
@@ -139,6 +145,12 @@ export const leaveHouseholdHttp = onRequest(async (req, res) => {
     }
 
     await householdRef.update(updatePayload);
+
+    // Update user's document to remove householdId
+    const userRef = db.collection("users").doc(userId);
+    await userRef.update({
+      householdId: FieldValue.delete()
+    });
 
     // Remove custom claim for the leaving user
     try {

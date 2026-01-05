@@ -8,13 +8,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.1.0] - 2026-01-04
 
 ### Added
+#### Major Features
 - **Item Cards UI**: Replaced cluttered inline controls with clean item cards for better pantry management
+- **Fixed Price Trends**: Complete Open Prices API integration with proper error handling and data visualization
 - **Original Quantity Preservation**: Added `originalQuantity` field to preserve recipe quantities (e.g., "1/2 cup", "4 oz") when moving items from shopping list to pantry
-- **Recipe Quantity Display**: Item detail modal now shows original recipe quantity alongside current pantry quantity
 - **Improved Quantity Controls**: Replaced text input with intuitive +/- buttons for quantity adjustment
-- **Smart Save Button**: Save/Cancel buttons only appear when quantity has actually changed
+- **Enhanced Theming Consistency**: Applied consistent theming throughout all components using CSS custom properties
+
+#### New Components (6 new)
+- **ItemDetailModal**: Complete pantry item management interface with quantity controls and theming
+- **PriceTrends**: Grocery price trend analysis and visualization component
+- **CategoryManager**: Component for managing pantry item categories
+- **GroceryCostEstimator**: Tool for estimating grocery costs based on pantry items
+- **ErrorBoundary**: Error handling component for graceful failure recovery
+- **GlobalUpdatePrompt**: Component for prompting users about app updates
+- **SkeletonLoader**: Loading state component for better UX
+- **VersionUpdate**: Component for handling version update notifications
+
+#### Services & Integrations (4 new)
+- **groceryPriceService**: Service for Open Prices API integration and price trend analysis
+- **analyticsService**: Service for Firebase Analytics integration and usage tracking
+- **usageService**: Service for tracking user usage patterns and app engagement
+- **versionService**: Service for managing app versioning and update checks
+
+#### Functions & Backend (3 new)
+- **leaveHousehold**: Firebase function for users to leave household groups
+- **migrateHouseholdClaims**: Function for migrating household ownership claims
+- **sendHouseholdInvitation**: Function for sending household invitation emails
+
+#### Assets (100+ new)
+- **35 Avatar Images**: Enhanced user profile customization options
+- **100+ Food Icons**: Comprehensive icon set for pantry items and recipes (converted from WebP to PNG for mobile compatibility)
+- **Enhanced Visual Experience**: Improved UI assets for better user engagement
+
+#### Testing (expanded)
+- **New Test Files**: Comprehensive test coverage for new components and services
+- **Hook Testing**: Added tests for custom React hooks (useAuth, useDataManagement, etc.)
+- **Component Validation**: Enhanced component testing with proper validation
+
+#### Infrastructure
+- **Android Build Updates**: Improved Capacitor configuration and build processes
+- **Firebase Enhancements**: Updated Firebase rules and configuration for better security
+- **Capacitor Improvements**: Enhanced mobile app build and deployment
+- **Performance Optimizations**: Code splitting and build optimizations for better performance
+- **Database Maintenance**: Added automatic cleanup of old meal plan entries to prevent database bloat
+- **Asset Management**: Improved image asset handling and mobile compatibility (WebP to PNG conversion)
 
 ### Fixed
+- **Image Loading Issues**: Fixed pantry item images not loading in Android Capacitor builds by converting WebP assets to PNG and correcting asset serving paths
+- **Shopping List Item Images**: Fixed items moved from shopping list to pantry not receiving proper image assignments
+- **Meal Plan Database Cleanup**: Added automatic cleanup of old meal plan entries to prevent database bloat and performance issues
+- **Milk Expiration Settings**: Updated milk expiration to 10 days with warning threshold at 3 days remaining (instead of 7 days)
 - **Price Trends Functionality**: Fixed Firebase permission errors, API network issues, and undefined data crashes
 - **Open Prices API Integration**: Corrected API URL from `api.open-prices.org` to `prices.openfoodfacts.org/api/v1`
 - **API Response Handling**: Updated response interfaces to match actual Open Prices API structure
@@ -31,6 +75,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Service Methods**: Added `getPriceTrendAnalysis()` method for comprehensive price trend data
 - **State Management**: Enhanced quantity editing state with change detection
 - **Build Optimization**: Successful builds with improved chunk management
+- **Build Status**: Project builds successfully with `npm run build`
+- **Test Status**: Tests currently failing (exit code 1), investigation needed
 
 ## [1.0.0] - 2025-12-XX
 

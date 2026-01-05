@@ -6,6 +6,7 @@ import { PremiumFeature } from './PremiumFeature';
 import { Tab } from '../types/app';
 import { addDoc, collection, doc, setDoc } from 'firebase/firestore';
 import { db, auth } from '../firebaseConfig';
+import { removeMemberFromHousehold } from '../services/householdService';
 
 interface HouseholdManagerProps {
   user: User;
@@ -82,12 +83,35 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
     }
   };
 
-  const removeMember = (id: string) => {
-    // This should also be a backend call in a real app
-    setHousehold(prev => ({
-      ...prev,
-      members: prev.members.filter(m => m.id !== id)
-    }));
+  const removeMember = async (id: string) => {
+    if (!confirm(`Are you sure you want to remove this member from the household?`)) {
+      return;
+    }
+
+    try {
+      await removeMemberFromHousehold(household.id, id, user.id);
+      
+      // Update local state
+      setHousehold(prev => ({
+        ...prev,
+        members: prev.members.filter(m => m.id !== id),
+        memberIds: prev.memberIds?.filter(mid => mid !== id)
+      }));
+
+      // If this was the last member, household will be deleted by the backend
+      // Check if household still exists
+      const updatedHousehold = { ...household };
+      updatedHousehold.members = updatedHousehold.members.filter(m => m.id !== id);
+      if (updatedHousehold.members.length === 1) {
+        // Household was deleted
+        setHousehold(null);
+        onClose();
+      }
+
+    } catch (error) {
+      console.error('Error removing member:', error);
+      alert('Failed to remove member. Please try again.');
+    }
   };
 
   const leaveHousehold = async () => {

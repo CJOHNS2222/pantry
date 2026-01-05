@@ -139,6 +139,15 @@ The app now features a community-driven grocery price estimator that provides mo
    ```
 7. **Build APK in Android Studio:**
    - Use Android Studio to build and test your APK.
+8. **Sync Release Notes (before releases):**
+   ```bash
+   npm run sync-release-notes
+   ```
+   Or use the release build command which syncs automatically:
+   ```bash
+   npm run build:release
+   ```
+   This automatically converts your `CHANGELOG.md` to plain text and updates `android/release-notes.txt` for Android app releases.
 
 ## Notifications
 - Daily notifications are scheduled using Capacitor Local Notifications.

@@ -89,6 +89,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
               alt={item.item}
               className="w-24 h-24 rounded-lg object-cover border-2 border-theme"
               onError={(e) => {
+                console.log('Image failed to load:', e.target.src);
                 const target = e.target as HTMLImageElement;
                 target.src = '/images/placeholder.svg';
               }}

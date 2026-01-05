@@ -36,6 +36,7 @@ This document explains how to use Firebase App Distribution to distribute your S
    ```bash
    cd android
    ./gradlew assembleRelease appDistributionUploadRelease
+npm run sync-release-notes && npm run build && cd android && ./gradlew assembleRelease appDistributionUploadRelease
    ```
 
 ### Method 2: Using Firebase Token (For CI/CD)

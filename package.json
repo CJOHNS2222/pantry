@@ -6,10 +6,12 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:release": "npm run sync-release-notes && npm run build",
     "preview": "vite preview",
     "test": "vitest",
     "test:ui": "vitest --ui",
-    "generate:icons": "npx pwa-asset-generator public/icons/icon512.png resources --manifest ./public/manifest.webmanifest --favicon --index --android --ios"
+    "generate:icons": "npx pwa-asset-generator public/icons/icon512.png resources --manifest ./public/manifest.webmanifest --favicon --index --android --ios",
+    "sync-release-notes": "node scripts/sync-release-notes.js"
   },
   "dependencies": {
     "@capacitor/android": "^7.4.4",

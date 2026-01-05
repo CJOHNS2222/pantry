@@ -189,7 +189,14 @@ export function getItemImage(itemName: string, category: string): string {
 
   const normalizedCat = cat === 'manual' || cat === 'uncategorized' ? inferCategoryFromName(cleanedName) : normalizeCategory(cat);
 
-  // Direct matches for item names - prefer PNG over SVG when available
+  // Priority function for image types: png > svg
+  const getImagePriority = (image: string): number => {
+    if (image.endsWith('.png')) return 2;
+    if (image.endsWith('.svg')) return 1;
+    return 0;
+  };
+
+  // Direct matches for item names - prefer thumb images, then webp, png, svg
   const itemMappings: Record<string, string> = {
     // Fruits
     'apple': 'apple.png',
@@ -221,30 +228,19 @@ export function getItemImage(itemName: string, category: string): string {
     'carrots': 'carrot.svg',
     'potato': 'potato.svg',
     'potatoes': 'potato.svg',
-    'onion': 'onion.svg',
-    'onions': 'onion.svg',
     'broccoli': 'broccoli.svg',
     'spinach': 'spinach.svg',
     'tomato': 'tomato.svg',
     'tomatoes': 'tomato.svg',
-    'pepper': 'pepper.png',
-    'peppers': 'pepper.png',
     'mushrooms': 'mushroom.svg',
     'green beans': 'green_beans.svg',
     'green bean': 'green_beans.svg',
     'chili pepper': 'chili-pepper.svg',
     'chili peppers': 'chili-pepper.svg',
     // Dairy & Eggs
-    'milk': 'milk.png',
-    'cheese': 'cheese.png',
-    'butter': 'butter.png',
     'egg': 'egg.png',
-    'eggs': 'eggs.svg',
 
     // Meat & Poultry
-    'chicken': 'chicken.svg',
-    'beef': 'beef.png',
-    'bacon': 'bacon.svg',
     'sausage': 'sausage.png',
     'ham': 'ham.png',
     'pork': 'pork.png',
@@ -259,54 +255,192 @@ export function getItemImage(itemName: string, category: string): string {
     'steamed lobster': 'steamed_lobster.png',
 
     // Grains & Bread
-    'bread': 'bread.png',
-    'sliced bread': 'sliced_bread.png',
-    'pasta': 'pasta.png',
-    'flour': 'flour.png',
     'muffin': 'muffin.png',
 
     // Condiments & Sauces
-    'ketchup': 'ketchup.png',
-    'mustard': 'mustard.png',
     'mayonnaise': 'mayonnaise.svg',
     'pickle': 'pickle.png',
 
     // Snacks & Nuts
-    'peanuts': 'peanuts.png',
     'almond': 'almond.png',
     'cashew nuts': 'cashew_nuts.png',
-    'peanut butter': 'peanuts_butter.png',
     'almond butter': 'almond-butter.svg',
     'popcorn': 'pop_corn.png',
     'walnut': 'walnut.png',
 
     // Beverages
-    'coffee': 'coffee.png',
     'tea bag': 'tea_bag.png',
     'apple juice': 'apple_juice.png',
-    'beer': 'beer.png',
     'scotch whisky': 'scotch_whisky.png',
 
     // Baking & Sweets
     'chocolate': 'chocolate-bar.svg',
-    'vanilla ice cream': 'vanilla_ice_cream.png',
 
     // Canned & Processed
     'tomato puree': 'tomato_puree.png',
-    'tomato soup': 'tomato_soup.png',
 
     // Spices & Herbs
-    'salt': 'salt.png',
     'cinnamon': 'cinnamon-sticks.svg',
-    'garlic': 'garlic.svg',
 
     // Other
-    'steak': 'steak.svg',
-    'ground beef': 'ground_beef.svg',
     'parmesan': 'parmesan.svg',
     'salami': 'salami.svg',
     'whipped cream': 'whipped-cream.svg',
-    'soy': 'soy.svg'
+    'soy': 'soy.svg',
+
+    // Thumb images (high priority)
+    'milk': '1galmilk.png',
+    '2% milk': '2percentmilk.png',
+    'almond milk': 'almondmilk.png',
+    'eggs': 'eggs.png',
+    'bacon': 'bacon.png',
+    'butter': 'buttersticks.png',
+    'cheese': 'slicedcheese.png',
+    'bread': 'wheatbread.png',
+    'pasta': 'spaghetti.png',
+    'chicken': 'frozenchicken.png',
+    'beef': 'groundbeef.png',
+    'fish': 'frozenfishfilet.png',
+    'shrimp': 'frozenshrimp.png',
+    'steak': 'steak.png',
+    'ketchup': 'ketchup.png',
+    'mustard': 'mustard.png',
+    'mayo': 'mayo.png',
+    'peanut butter': 'peanutbutter.png',
+    'coffee': 'folgerscoffee.png',
+    'ice cream': 'vanillaicecream.png',
+    'cookies': 'cookiesncreamicecream.png',
+    'soup': 'chickennoodlesoup.png',
+    'oatmeal': 'quakeroats.png',
+    'rice': 'rice.png',
+    'flour': 'flour.png',
+    'sugar': 'cakebox.png',
+    'salt': 'saltseason.png',
+    'pepper': 'blackpepperseason.png',
+    'garlic': 'mincedgarlicseason.png',
+    'onion': 'mincedonionseason.png',
+    'oil': 'oilnvinegar.png',
+    'vinegar': 'oilnvinegar.png',
+    'sauce': 'spaghetti.png',
+    'juice': 'applejuice.png',
+    'beer': 'beer.png',
+    'wine': 'oilnvinegar.png',
+    'chips': 'doritos.png',
+    'nuts': 'peanuts.png',
+    'candy': 'mnms.png',
+    'fruit': 'applejuice.png',
+    'vegetable': 'cannedcarrots.png',
+    'canned asparagus': 'cannedasparagus.png',
+    'canned carrots': 'cannedcarrots.png',
+    'canned collard greens': 'cannedcollardgreens.png',
+    'canned corn': 'cannedcorn.png',
+    'canned cream corn': 'cannedcreamcorn.png',
+    'canned diced tomatoes': 'canneddicedtomatos.png',
+    'canned field peas': 'cannedfielpeas.png',
+    'canned french style green beans': 'cannedfrenchstylegreenbeans.png',
+    'canned green beans': 'cannedgreenbeans.png',
+    'canned lima beans': 'cannedlimabeans.png',
+    'canned mixed vegetables': 'cannedmixedvegetables.png',
+    'canned mushrooms': 'cannedmushrooms.png',
+    'canned peas': 'cannedpeas.png',
+    'canned peas and carrots': 'cannedpeasandcarrots.png',
+    'canned potatoes': 'cannedpotatos.png',
+    'canned ravioli': 'cannedravioli.png',
+    'canned yams': 'cannedyams.png',
+    'chicken noodle soup': 'chickennoodlesoup.png',
+    'chicken nuggets': 'chickennuggets.png',
+    'chicken patties': 'chickenpatties.png',
+    'chili seasoning': 'chiliseaon.png',
+    'chocolate cake': 'chocolatecake.png',
+    'chocolate ice cream': 'chocolateicecream.png',
+    'chocolate milk': 'chocolatemilk.png',
+    'cocktail sauce': 'cocktailsauce.png',
+    'coffee creamer': 'coffeecreamer.png',
+    'condensed milk': 'condensedmilkcan.png',
+    'cookie dough': 'cookiedough.png',
+    'cookie dough ice cream': 'cookiedoughicecream.png',
+    'cookies and cream ice cream': 'cookiesncreamicecream.png',
+    'cream cheese': 'creamcheese.png',
+    'cream of chicken soup': 'creamofchickensoup.png',
+    'cream of mushroom soup': 'creamofmushroomsoup.png',
+    'creole seasoning': 'creoleseason.png',
+    'croissant': 'croissant.png',
+    'cupcake': 'cupcake.png',
+    'dinner rolls': 'dinnerrolls.png',
+    'doritos': 'doritos.png',
+    'easy spray cheese': 'easyspraycheese.png',
+    'english muffin': 'englishmuffin.png',
+    'evaporated milk': 'evaporatedmilk.png',
+    'fettuccine noodles': 'fettuccinenoodles.png',
+    'folgers coffee': 'folgerscoffee.png',
+    'french onion soup': 'frenchonionsoup.png',
+    'frozen chicken': 'frozenchicken.png',
+    'frozen chicken breast': 'frozenchickenbreast.png',
+    'frozen chicken tenderloins': 'frozenchickentenderloins.png',
+    'frozen fish filet': 'frozenfishfilet.png',
+    'frozen shrimp': 'frozenshrimp.png',
+    'frozen steak': 'frozensteak.png',
+    'garlic herb seasoning': 'garlicherbseason.png',
+    'garlic powder': 'garlicpowder.png',
+    'grape jelly': 'grapejelly.png',
+    'grated parmesan cheese': 'gratedparmesancheese.png',
+    'ground beef': 'groundbeef.png',
+    'ground cinnamon': 'groundcinnamonseason.png',
+    'half gallon whole milk': 'halfgallonwholemilk.png',
+    'hamburger buns': 'hamburgerbuns.png',
+    'hamburger helper': 'hamburgerhelper.png',
+    'hamburger helper philly cheesesteak': 'hamburgerhelperphillycheesesteak.png',
+    'honey mustard': 'honeymustard.png',
+    'hot dogs': 'hotdogs.png',
+    'hot sauce': 'hotsauce.png',
+    'ice cream fudge bar': 'icecreamfudgebar.png',
+    'ice cream sandwich': 'icecreamsandwich.png',
+    'italian loaf bread': 'italianloafbread.png',
+    'italian seasoning': 'itatlianseason.png',
+    'kraft mac and cheese': 'kraftmacandcheese.png',
+    'lasagna noodles': 'lasagnanoodles.png',
+    'lemon pepper seasoning': 'lemonpepperseason.png',
+    'minced garlic': 'mincedgarlicseason.png',
+    'minced onion': 'mincedonionseason.png',
+    'mint ice cream': 'minticecream.png',
+    'm&ms': 'mnms.png',
+    'parsley seasoning': 'parsleyseason.png',
+    'paprika seasoning': 'paprikaseason.png',
+    'penne noodles': 'pennenoodles.png',
+    'pickles': 'pickles.png',
+    'pinto beans': 'pintobeans.png',
+    'progresso chicken noodle soup': 'progressochickennoodlesoup.png',
+    'quaker oats': 'quakeroats.png',
+    'ramen noodles': 'ramennoodles.png',
+    'ranch dressing': 'ranchdressing.png',
+    'relish': 'relish.png',
+    'rigatoni noodles': 'rigatoninoodles.png',
+    'rotini noodles': 'rotininoodles.png',
+    'shell noodles': 'shellnoodles.png',
+    'shells and cheese': 'shellsandcheese.png',
+    'shredded cheddar cheese': 'shreddedcheddarcheese.png',
+    'shredded parmesan': 'shreddedparmesan.png',
+    'sriracha': 'siracha.png',
+    'sliced cheese': 'slicedcheese.png',
+    'sliced colby jack cheese': 'slicedcolbyjackcheese.png',
+    'sliced pepper jack cheese': 'slicedpepperjackcheese.png',
+    'sliced swiss cheese': 'slicedswisscheese.png',
+    'sour cream': 'sourcream.png',
+    'soy sauce': 'soysauce.png',
+    'spaghetti': 'spaghetti.png',
+    'spaghetti sauce': 'spegheatisauce.png',
+    'spicy mustard': 'spicymustard.png',
+    'steak sauce': 'steaksauce.png',
+    'string cheese': 'stringcheese.png',
+    'taco seasoning': 'tacoseason.png',
+    'tartar sauce': 'tartarsauce.png',
+    'tomato soup': 'tomatosoup.png',
+    'tortilla': 'tortilla.png',
+    'wheat bread': 'wheatbread.png',
+    'white bread': 'whitebread.png',
+    'white round top bread': 'whiteroundtopbread.png',
+    'whole pickles': 'wholepickles.png',
+    'yum yum sauce': 'yumyumsauce.png'
   };
 
   // Check for exact item name matches - prefer longest/most specific matches
@@ -320,10 +454,14 @@ export function getItemImage(itemName: string, category: string): string {
         bestMatch = key;
         bestImage = image;
       }
-      // If same length, prefer PNG over SVG
-      else if (key.length === bestMatch.length && image.endsWith('.png') && !bestImage.endsWith('.png')) {
-        bestMatch = key;
-        bestImage = image;
+      // If same length, prefer higher priority images
+      else if (key.length === bestMatch.length) {
+        const currentPriority = getImagePriority(image);
+        const bestPriority = getImagePriority(bestImage);
+        if (currentPriority > bestPriority) {
+          bestMatch = key;
+          bestImage = image;
+        }
       }
     }
   }
@@ -489,10 +627,10 @@ export function getAutoExpirationDate(itemName: string, category: string): strin
   const name = itemName.toLowerCase();
   const cat = category.toLowerCase();
   
-  // Milk and dairy products get 7 days
+  // Milk and dairy products get 10 days
   if (name.includes('milk') || cat === 'dairy') {
     const expirationDate = new Date();
-    expirationDate.setDate(expirationDate.getDate() + 7);
+    expirationDate.setDate(expirationDate.getDate() + 10);
     return expirationDate.toISOString().slice(0, 10); // YYYY-MM-DD format
   }
   
@@ -601,6 +739,10 @@ export function generateExpirationAlerts(inventory: PantryItem[]): ExpirationAle
     let alertLevel: 'expired' | 'critical' | 'warning' | 'info';
     let message: string;
 
+    // Special handling for milk - only warn when 3 days or less remain
+    const isMilk = item.item.toLowerCase().includes('milk') || item.category.toLowerCase() === 'dairy';
+    const warningThreshold = isMilk ? 3 : 7;
+
     if (daysRemaining < 0) {
       alertLevel = 'expired';
       message = `${item.item} has expired!`;
@@ -613,7 +755,7 @@ export function generateExpirationAlerts(inventory: PantryItem[]): ExpirationAle
     } else if (daysRemaining <= 3) {
       alertLevel = 'warning';
       message = `${item.item} expires in ${daysRemaining} days`;
-    } else if (daysRemaining <= 7) {
+    } else if (daysRemaining <= warningThreshold) {
       alertLevel = 'info';
       message = `${item.item} expires in ${daysRemaining} days`;
     } else {

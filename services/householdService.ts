@@ -137,6 +137,68 @@ export const updateMemberStatus = async (
 };
 
 /**
+ * Remove a member from household (admin action)
+ */
+export const removeMemberFromHousehold = async (
+  householdId: string,
+  memberId: string,
+  currentUserId: string
+): Promise<void> => {
+  try {
+    const householdRef = doc(db, 'households', householdId);
+    const householdSnap = await getDocs(
+      query(collection(db, 'households'), where('id', '==', householdId))
+    );
+
+    if (householdSnap.empty) {
+      throw new Error('Household not found');
+    }
+
+    const household = householdSnap.docs[0];
+    const householdData = household.data();
+    const members = householdData.members || [];
+
+    // Check if current user is admin
+    const currentUserMember = members.find((m: Member) => m.id === currentUserId);
+    if (!currentUserMember || currentUserMember.role !== 'Admin') {
+      throw new Error('Only admins can remove members');
+    }
+
+    // Find member to remove
+    const memberToRemove = members.find((m: Member) => m.id === memberId);
+    if (!memberToRemove) {
+      throw new Error('Member not found');
+    }
+
+    // Cannot remove yourself this way - use leaveHousehold
+    if (memberId === currentUserId) {
+      throw new Error('Use leave household to remove yourself');
+    }
+
+    // Remove member from members and memberIds
+    const updatedMembers = members.filter((m: Member) => m.id !== memberId);
+    const updatePayload: any = {
+      members: updatedMembers,
+      updatedAt: serverTimestamp(),
+    };
+
+    if (householdData.memberIds?.includes(memberId)) {
+      updatePayload.memberIds = FieldValue.arrayRemove(memberId);
+    }
+
+    await updateDoc(household.ref, updatePayload);
+
+    // If this was the last member besides the admin, delete the household
+    if (updatedMembers.length === 1) {
+      await householdRef.delete();
+    }
+  } catch (error) {
+    console.error('Error removing member from household:', error);
+    throw error;
+  }
+};
+
+/**
  * Find a household by invitation (user email and household ID from invite link)
  */
 export const findHouseholdByInvite = async (
@@ -208,6 +270,7 @@ export const joinHousehold = async (
 
       await updateDoc(householdSnap.docs[0].ref, {
         members: updatedMembers,
+        memberIds: arrayUnion(user.id),
         updatedAt: serverTimestamp(),
       });
     }

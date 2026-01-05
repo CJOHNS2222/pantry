@@ -16,7 +16,7 @@ import { useSettings } from './hooks/useSettings';
 import { useToasts } from './hooks/useToasts';
 import { useDataManagement } from './hooks/useDataManagement';
 import AnalyticsService from './services/analyticsService';
-import { isHouseholdMember, inferCategoryFromItemName, inferStorageLocationFromItemName, parseIngredientForShoppingList } from './utils/appUtils';
+import { isHouseholdMember, inferCategoryFromItemName, inferStorageLocationFromItemName, parseIngredientForShoppingList, getItemImage } from './utils/appUtils';
 import { GlobalUpdatePrompt } from './components/GlobalUpdatePrompt';
 
 type Theme = 'dark' | 'light';
@@ -334,6 +334,7 @@ const App: React.FC = () => {
                     category: inferCategoryFromItemName(i.item),
                     quantity_estimate: Math.abs(addQty).toString(),
                     storageLocation: inferStorageLocationFromItemName(i.item),
+                    image: getItemImage(i.item, inferCategoryFromItemName(i.item)),
                     originalQuantity: typeof i.quantity === 'string' ? i.quantity : undefined
                   });
                 }

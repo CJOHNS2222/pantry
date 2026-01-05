@@ -15,6 +15,17 @@ export function useDataManagement(user: User | null, addToast: (message: string,
   const [ratings, setRatings] = useState<RecipeRating[]>([]);
   const [customCategories, setCustomCategories] = useState<CustomCategory[]>([]);
 
+  // Helper function to clean objects by removing undefined fields (Firestore requirement)
+  const cleanObject = (obj: any): any => {
+    const cleaned: any = {};
+    for (const key in obj) {
+      if (obj[key] !== undefined) {
+        cleaned[key] = obj[key];
+      }
+    }
+    return cleaned;
+  };
+
   // Helper function to validate and sanitize meal plan data
   const validateMealPlan = (plan: DayPlan[]): DayPlan[] => {
     if (!Array.isArray(plan)) {
@@ -170,6 +181,25 @@ export function useDataManagement(user: User | null, addToast: (message: string,
       }, err => {
         console.error("User inventory listener failed:", err);
       }));
+    }
+
+    // Household query listener
+    if (user?.id) {
+      const householdQuery = query(collection(db, 'households'), where('memberIds', 'array-contains', user.id));
+      unsubs.push(
+        onSnapshot(
+          householdQuery,
+          (snap) => {
+            if (!snap.empty) {
+              const doc = snap.docs[0];
+              setHousehold({ id: doc.id, ...doc.data() } as Household);
+            } else {
+              setHousehold(null);
+            }
+          },
+          (err) => console.error("Household query listener failed:", err)
+        )
+      );
     }
 
     if (inHousehold) {
@@ -421,7 +451,6 @@ export function useDataManagement(user: User | null, addToast: (message: string,
       try {
         // Determine if we are in a valid household
         const inHousehold = household?.id && isHouseholdMember(household, user);
-        console.log('Data sync - user:', user?.id, 'household:', household?.id, 'inHousehold:', inHousehold);
         
         if (inHousehold) {
           // When in household, sync inventory to household collection
@@ -455,9 +484,10 @@ export function useDataManagement(user: User | null, addToast: (message: string,
           );
 
           // Save new/modified items
-          const householdSavePromises = householdInventoryToSave.map(item =>
-            setDoc(doc(db, householdInventoryPath, item.id), item).catch(err => ({ err, path: `${householdInventoryPath}/${item.id}` }))
-          );
+          const householdSavePromises = householdInventoryToSave.map(item => {
+            console.log('Saving household item:', cleanObject(item));
+            return setDoc(doc(db, householdInventoryPath, item.id), cleanObject(item)).catch(err => ({ err, path: `${householdInventoryPath}/${item.id}` }));
+          });
 
           const householdInventoryPromises = [...householdDeletePromises, ...householdSavePromises];
           console.log('Household inventory sync - toDelete:', householdInventoryToDelete.length, 'toSave:', householdInventoryToSave.length);
@@ -475,10 +505,34 @@ export function useDataManagement(user: User | null, addToast: (message: string,
           const householdWrites: Promise<any>[] = [];
           savedRecipes.filter(item => item && item.id).forEach(item => {
             householdWrites.push(
-              setDoc(doc(db, 'households', household.id, 'savedRecipes', item.id), item).catch(err => ({ err, path: `households/${household.id}/savedRecipes/${item.id}` }))
+              setDoc(doc(db, 'households', household.id, 'savedRecipes', item.id), cleanObject(item)).catch(err => ({ err, path: `households/${household.id}/savedRecipes/${item.id}` }))
             );
           });
           if (mealPlan) {
+            // Clean up old meal plan entries (older than today)
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const todayStr = today.toISOString().slice(0, 10);
+            
+            try {
+              const oldMealPlanDocs = await getDocs(query(
+                collection(db, 'households', household.id, 'mealPlan'),
+                where('date', '<', Timestamp.fromDate(today))
+              ));
+              
+              oldMealPlanDocs.docs.forEach(doc => {
+                householdWrites.push(
+                  deleteDoc(doc.ref).catch(err => ({ err, path: doc.ref.path }))
+                );
+              });
+              
+              if (oldMealPlanDocs.docs.length > 0) {
+                console.log(`Cleaning up ${oldMealPlanDocs.docs.length} old meal plan entries`);
+              }
+            } catch (err) {
+              console.error('Failed to query old meal plan entries:', err);
+            }
+            
             mealPlan.filter(item => item != null && item.date).forEach(item => {
               // Save all days to keep database current (even empty days overwrite old data)
               const docId = item.date; // expected 'YYYY-MM-DD'
@@ -547,9 +601,10 @@ export function useDataManagement(user: User | null, addToast: (message: string,
           );
 
           // Save new/modified items
-          const userSavePromises = userInventoryToSave.map(item =>
-            setDoc(doc(db, userInventoryPath, item.id), item).catch(err => ({ err, path: `${userInventoryPath}/${item.id}` }))
-          );
+          const userSavePromises = userInventoryToSave.map(item => {
+            console.log('Saving user item:', cleanObject(item));
+            return setDoc(doc(db, userInventoryPath, item.id), cleanObject(item)).catch(err => ({ err, path: `${userInventoryPath}/${item.id}` }));
+          });
 
           const userInventoryPromises = [...userDeletePromises, ...userSavePromises];
           console.log('User inventory sync - toDelete:', userInventoryToDelete.length, 'toSave:', userInventoryToSave.length);
@@ -568,10 +623,33 @@ export function useDataManagement(user: User | null, addToast: (message: string,
           
           savedRecipes.filter(item => item && item.id).forEach(item => {
             userWrites.push(
-              setDoc(doc(db, 'users', user.id, 'savedRecipes', item.id), item).catch(err => ({ err, path: `users/${user.id}/savedRecipes/${item.id}` }))
+              setDoc(doc(db, 'users', user.id, 'savedRecipes', item.id), cleanObject(item)).catch(err => ({ err, path: `users/${user.id}/savedRecipes/${item.id}` }))
             );
           });
           if (mealPlan) {
+            // Clean up old meal plan entries (older than today)
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            
+            try {
+              const oldMealPlanDocs = await getDocs(query(
+                collection(db, 'users', user.id, 'mealPlan'),
+                where('date', '<', Timestamp.fromDate(today))
+              ));
+              
+              oldMealPlanDocs.docs.forEach(doc => {
+                userWrites.push(
+                  deleteDoc(doc.ref).catch(err => ({ err, path: doc.ref.path }))
+                );
+              });
+              
+              if (oldMealPlanDocs.docs.length > 0) {
+                console.log(`Cleaning up ${oldMealPlanDocs.docs.length} old user meal plan entries`);
+              }
+            } catch (err) {
+              console.error('Failed to query old user meal plan entries:', err);
+            }
+            
             mealPlan.filter(item => item != null && item.date).forEach(item => {
               // Save all days to keep database current (even empty days overwrite old data)
               const docId = item.date; // expected 'YYYY-MM-DD'
