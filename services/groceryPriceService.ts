@@ -112,7 +112,7 @@ class GroceryPriceService {
     try {
       const ingredientKey = this.normalizeIngredientName(ingredient);
 
-      // Query for recent prices (last 30 days)
+      // Source 1: Query for recent user-submitted prices (last 30 days)
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
@@ -132,48 +132,66 @@ class GroceryPriceService {
         prices.push(data.price);
       });
 
-      if (prices.length === 0) {
-        // Try Open Prices API as fallback before using defaults
-        try {
-          const openPrices = await this.fetchOpenPrices(ingredient, location);
-          const openPriceData = this.convertOpenPricesToPriceData(openPrices);
-          if (openPriceData) {
-            console.log(`Using Open Prices data for ${ingredient}:`, openPriceData);
-            return openPriceData;
-          }
-        } catch (error) {
-          console.warn('Open Prices fallback failed:', error);
-        }
-
-        // Return default price if no data from any source
-        const defaultPrice = this.defaultPrices[ingredientKey];
-        if (defaultPrice) {
-          return {
-            averagePrice: defaultPrice.price,
-            minPrice: defaultPrice.price,
-            maxPrice: defaultPrice.price,
-            sampleSize: 1,
-            lastUpdated: new Date(),
-            unit: defaultPrice.unit
-          };
-        }
-        return null;
+      if (prices.length > 0) {
+        const averagePrice = prices.reduce((sum, price) => sum + price, 0) / prices.length;
+        const minPrice = Math.min(...prices);
+        const maxPrice = Math.max(...prices);
+        console.log(`Using user-submitted price data for ${ingredient}: $${averagePrice.toFixed(2)}`);
+        return {
+          averagePrice,
+          minPrice,
+          maxPrice,
+          sampleSize: prices.length,
+          lastUpdated: new Date(),
+          unit: 'lb' // Default unit, could be improved
+        };
       }
 
-      const averagePrice = prices.reduce((sum, price) => sum + price, 0) / prices.length;
-      const minPrice = Math.min(...prices);
-      const maxPrice = Math.max(...prices);
+      // Source 2: Try Open Prices API
+      try {
+        const openPrices = await this.fetchOpenPrices(ingredient, location);
+        const openPriceData = this.convertOpenPricesToPriceData(openPrices);
+        if (openPriceData) {
+          console.log(`Using Open Prices API data for ${ingredient}:`, openPriceData);
+          return openPriceData;
+        }
+      } catch (error) {
+        console.warn('Open Prices API fallback failed:', error);
+      }
 
-      return {
-        averagePrice,
-        minPrice,
-        maxPrice,
-        sampleSize: prices.length,
-        lastUpdated: new Date(),
-        unit: 'lb' // Default unit, could be improved
-      };
+      // Source 3: Use curated default prices as final fallback
+      const defaultPrice = this.defaultPrices[ingredientKey];
+      if (defaultPrice) {
+        console.log(`Using default price for ${ingredient}: $${defaultPrice.price.toFixed(2)}`);
+        return {
+          averagePrice: defaultPrice.price,
+          minPrice: defaultPrice.price,
+          maxPrice: defaultPrice.price,
+          sampleSize: 1,
+          lastUpdated: new Date(),
+          unit: defaultPrice.unit
+        };
+      }
+
+      // If nothing found, return null and let component handle it
+      console.warn(`No price data found for ${ingredient} from any source`);
+      return null;
     } catch (error) {
       console.error('Error fetching ingredient price:', error);
+      // Try to at least return default price on error
+      const ingredientKey = this.normalizeIngredientName(ingredient);
+      const defaultPrice = this.defaultPrices[ingredientKey];
+      if (defaultPrice) {
+        console.log(`Using default price (error fallback) for ${ingredient}: $${defaultPrice.price.toFixed(2)}`);
+        return {
+          averagePrice: defaultPrice.price,
+          minPrice: defaultPrice.price,
+          maxPrice: defaultPrice.price,
+          sampleSize: 1,
+          lastUpdated: new Date(),
+          unit: defaultPrice.unit
+        };
+      }
       return null;
     }
   }
@@ -302,20 +320,15 @@ class GroceryPriceService {
       const currentPrice = sortedTrends[0].price;
       const lastUpdated = sortedTrends[0].lastUpdated;
 
-      // Calculate price change from 30 days ago
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-      const recentPrices = sortedTrends.filter(trend => trend.lastUpdated >= thirtyDaysAgo);
-      const oldPrices = sortedTrends.filter(trend => trend.lastUpdated < thirtyDaysAgo);
-
+      // Calculate price change from the oldest available data point
       let priceChange = 0;
       let priceChangePercent = 0;
 
-      if (oldPrices.length > 0) {
-        const avgOldPrice = oldPrices.reduce((sum, trend) => sum + trend.price, 0) / oldPrices.length;
-        priceChange = currentPrice - avgOldPrice;
-        priceChangePercent = (priceChange / avgOldPrice) * 100;
+      if (sortedTrends.length > 1) {
+        // Get the oldest price point available
+        const oldestPrice = sortedTrends[sortedTrends.length - 1].price;
+        priceChange = currentPrice - oldestPrice;
+        priceChangePercent = (priceChange / oldestPrice) * 100;
       }
 
       // Build price history (last 10 entries)

@@ -90,8 +90,53 @@ export const MainContent: React.FC<MainContentProps> = ({
   onDeleteCustomCategory,
   onLogout,
 }) => {
+  // Handler for marking a recipe as made
+  const handleMarkAsMade = (recipe: StructuredRecipe, recipeInventory?: PantryItem[]) => {
+    // Calculate which inventory items to remove based on recipe ingredients
+    const ingredientsNeeded = recipe.ingredients || [];
+    const inventoryToRemove = inventoryNeeded(ingredientsNeeded, recipeInventory || inventory);
+    
+    // Remove used ingredients from inventory
+    const updatedInventory = inventory.filter(item => 
+      !inventoryToRemove.some(remove => remove.id === item.id)
+    );
+    
+    setInventory(updatedInventory);
+    alert(`Recipe marked as made! Removed used ingredients from your pantry.`);
+  };
+
+  // Helper function to match ingredients to inventory
+  const inventoryNeeded = (ingredients: string[], pantryInventory: PantryItem[]): PantryItem[] => {
+    const toRemove: PantryItem[] = [];
+    
+    ingredients.forEach(ingredient => {
+      const ingredientLower = ingredient.toLowerCase();
+      const match = pantryInventory.find(item => 
+        ingredientLower.includes(item.item.toLowerCase()) || 
+        item.item.toLowerCase().includes(ingredientLower.split(' ')[0])
+      );
+      
+      if (match && !toRemove.find(r => r.id === match.id)) {
+        toRemove.push(match);
+      }
+    });
+    
+    return toRemove;
+  };
+
+  // Handler for removing a recipe from meal plan
+  const handleRemoveFromMealPlan = (recipe: StructuredRecipe) => {
+    const recipeTitle = recipe.title;
+    const newMealPlan = mealPlan.map(day => ({
+      breakfast: day.breakfast?.filter(meal => meal.recipe.title !== recipeTitle),
+      lunch: day.lunch?.filter(meal => meal.recipe.title !== recipeTitle),
+      dinner: day.dinner?.filter(meal => meal.recipe.title !== recipeTitle),
+    }));
+    
+    setMealPlan(newMealPlan);
+  };
   return (
-    <main className="flex-1 overflow-y-auto p-4 pt-20 pb-24 scrollbar-hide bg-theme-primary relative">
+    <main className="flex-1 overflow-y-auto p-4 pt-32 pb-24 scrollbar-hide bg-theme-primary relative">
       {activeTab === Tab.PANTRY && (
         <Suspense fallback={<LoadingSpinner />}>
           <PantryScanner
@@ -116,7 +161,7 @@ export const MainContent: React.FC<MainContentProps> = ({
             addToShoppingList={onAddToShoppingList}
             onAddToPlan={onAddToPlan}
             onSaveRecipe={onSaveRecipe}
-            onMarkAsMade={()=>{}}
+            onMarkAsMade={handleMarkAsMade}
             user={user}
             setActiveTab={setActiveTab}
           />
@@ -137,7 +182,7 @@ export const MainContent: React.FC<MainContentProps> = ({
             onAddToPlan={onAddToPlan}
             onSaveRecipe={onSaveRecipe}
             onDeleteRecipe={onDeleteRecipe}
-            onMarkAsMade={()=>{}}
+            onMarkAsMade={handleMarkAsMade}
             inventory={inventory}
             ratings={ratings}
             onRate={onRateRecipe}
@@ -174,6 +219,7 @@ export const MainContent: React.FC<MainContentProps> = ({
             onUpdateCustomCategory={onUpdateCustomCategory}
             onDeleteCustomCategory={onDeleteCustomCategory}
             mealPlan={mealPlan}
+            inventory={inventory}
           />
         </Suspense>
       )}

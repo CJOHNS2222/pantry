@@ -4,6 +4,7 @@ interface ThemeSettings {
   mode: 'light' | 'dark';
   accentColor: string;
   backgroundColor?: string;
+  textColor?: string;
 }
 
 export function useTheme(themeSettings: ThemeSettings) {
@@ -21,6 +22,18 @@ export function useTheme(themeSettings: ThemeSettings) {
       document.body.style.backgroundColor = '';
       document.documentElement.style.removeProperty('--bg-primary');
       document.documentElement.style.removeProperty('--theme-background');
+    }
+
+    if (themeSettings.textColor) {
+      // Apply custom text color to document and override theme defaults
+      document.documentElement.style.setProperty('--text-primary', themeSettings.textColor);
+      document.documentElement.style.setProperty('--text-secondary', themeSettings.textColor);
+      document.documentElement.style.color = themeSettings.textColor;
+    } else {
+      // Reset to default text colors
+      document.documentElement.style.removeProperty('--text-primary');
+      document.documentElement.style.removeProperty('--text-secondary');
+      document.documentElement.style.removeProperty('color');
     }
   }, [themeSettings]);
 

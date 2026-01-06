@@ -187,31 +187,32 @@ export const GroceryCostEstimator: React.FC<GroceryCostEstimatorProps> = ({ meal
   const estimateCost = (ingredient: string): IngredientCost => {
     const parsed = parseIngredient(ingredient);
     const key = getIngredientKey(parsed.name);
+    const normalizedKey = key.toLowerCase();
 
-    // Check if user has set a custom price
+    // Priority 1: Check if user has set a custom price
     if (customPrices[key]) {
       return {
         ingredient: parsed.name,
         quantity: parsed.quantity,
         unit: parsed.unit,
         estimatedCost: customPrices[key] * parsed.quantity,
-        source: 'estimated'
+        source: 'known'
       };
     }
 
-    // Check real-time price data
-    const realTimeData = priceData[key.toLowerCase()];
+    // Priority 2: Check real-time price data from API/user submissions
+    const realTimeData = priceData[normalizedKey];
     if (realTimeData) {
       return {
         ingredient: parsed.name,
         quantity: parsed.quantity,
         unit: realTimeData.unit,
         estimatedCost: realTimeData.averagePrice * parsed.quantity,
-        source: 'estimated'
+        source: 'known'
       };
     }
 
-    // Check default prices (fallback)
+    // Priority 3: Check default prices (curated list)
     if (defaultPrices[key]) {
       const priceInfo = defaultPrices[key];
       return {
@@ -223,12 +224,38 @@ export const GroceryCostEstimator: React.FC<GroceryCostEstimatorProps> = ({ meal
       };
     }
 
-    // Default estimate
+    // Priority 4: Try to match partial ingredient names
+    const partialMatch = Object.keys(defaultPrices).find(
+      k => normalizedKey.includes(k) || k.includes(normalizedKey)
+    );
+    if (partialMatch) {
+      const priceInfo = defaultPrices[partialMatch];
+      return {
+        ingredient: parsed.name,
+        quantity: parsed.quantity,
+        unit: priceInfo.unit,
+        estimatedCost: priceInfo.price * parsed.quantity,
+        source: 'estimated'
+      };
+    }
+
+    // Final fallback: Generic estimate based on common ingredient types
+    let estimatePrice = 2.00;
+    if (normalizedKey.includes('meat') || normalizedKey.includes('chicken') || normalizedKey.includes('beef')) {
+      estimatePrice = 5.00;
+    } else if (normalizedKey.includes('fish') || normalizedKey.includes('salmon')) {
+      estimatePrice = 9.00;
+    } else if (normalizedKey.includes('dairy') || normalizedKey.includes('milk') || normalizedKey.includes('cheese')) {
+      estimatePrice = 4.00;
+    } else if (normalizedKey.includes('vegetable') || normalizedKey.includes('fruit')) {
+      estimatePrice = 2.00;
+    }
+
     return {
       ingredient: parsed.name,
       quantity: parsed.quantity,
       unit: parsed.unit,
-      estimatedCost: 2.00, // Default $2 per ingredient
+      estimatedCost: estimatePrice * parsed.quantity,
       source: 'estimated'
     };
   };

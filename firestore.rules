@@ -63,6 +63,12 @@ service cloud.firestore {
       allow read, write: if request.auth != null;
     }
 
+    // Global recipes collection: allow public read access, authenticated users can write
+    match /recipes/{recipeId} {
+      allow read: if true; // Public read access for recipe database
+      allow write: if true; // Allow writes for bulk upload
+    }
+
     // Default deny
     match /{document=**} {
       allow read, write: if false;

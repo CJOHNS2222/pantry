@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Search, Loader2, Sparkles, ExternalLink, Globe, Plus, Clock, List, ChefHat, ToggleLeft, ToggleRight, Star, Heart, Bookmark, Zap } from 'lucide-react';
 import { searchRecipes } from '../services/geminiService';
 import { RecipeSearchResult, LoadingState, RecipeRating, StructuredRecipe, PantryItem, SavedRecipe, User } from '../types';
@@ -829,7 +829,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
             const ratingInfo = getRatingInfo(recipe.title);
             const isSaved = savedRecipes.some(r => r.title === recipe.title);
             const titleKey = recipe.title || 'Untitled Recipe';
-            const imgUrl = `https://source.unsplash.com/600x400/?${encodeURIComponent((titleKey as string).split(' ').slice(0,2).join(','))},food`;
+            
             // Filter out staple items from ingredient list
             const filteredIngredients = recipe.ingredients.filter(ing => {
                 const ingLower = ing.toLowerCase();
@@ -838,54 +838,34 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
 
             if (isCompact) {
                 return (
-                    <div key={titleKey} className="bg-theme-secondary rounded-lg shadow-md border border-theme overflow-hidden group hover:shadow-lg transition-all cursor-pointer" onClick={() => openRecipeModal(recipe, isSavedView)}>
-                        <div className="h-16 relative bg-theme-primary overflow-hidden">
-                            <img
-                                src={imgUrl}
-                                alt={recipe.title}
-                                className="w-full h-full object-cover"
-                                loading="lazy"
-                                onError={(e) => {
-                                    const target = e.target as HTMLImageElement;
-                                    target.src = `https://source.unsplash.com/600x400/?food`;
-                                }}
-                            />
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent"></div>
-                            <div className="absolute bottom-2 left-2 right-2 text-white">
-                                <h4 className="text-xs font-bold leading-tight">{recipe.title}</h4>
-                            </div>
+                    <div key={`compact-${titleKey}`} className="bg-theme-secondary rounded-lg shadow-md border border-theme overflow-hidden group hover:shadow-lg transition-all cursor-pointer p-3" onClick={() => openRecipeModal(recipe, isSavedView)}>
+                        <h4 className="font-bold text-sm mb-2 line-clamp-2">{recipe.title}</h4>
+                        <div className="flex items-center gap-2 text-xs opacity-70">
+                            <Clock className="w-3 h-3" /> {recipe.cookTime}
+                            {ratingInfo && (
+                                <>
+                                    <Star className="w-3 h-3 text-yellow-400" /> {ratingInfo.avg}
+                                </>
+                            )}
                         </div>
                     </div>
                 );
             }
 
             return (
-                <div key={titleKey} className="bg-theme-secondary rounded-2xl shadow-xl border border-theme overflow-hidden group hover:shadow-2xl transition-all mb-6 cursor-pointer" onClick={() => openRecipeModal(recipe, isSavedView)}>
-                    {/* Recipe Image */}
-                    <div className="h-20 relative bg-gray-200 overflow-hidden">
-                        <img 
-                            src={imgUrl}
-                            alt={recipe.title}
-                            className="absolute inset-0 w-full h-full object-cover opacity-80 group-hover:scale-105 transition-transform duration-500"
-                            loading="lazy"
-                            onError={(e) => {
-                                const target = e.target as HTMLImageElement;
-                                target.src = `https://source.unsplash.com/600x400/?food`;
-                            }}
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/90 to-transparent"></div>
-                        <div className="absolute bottom-2 left-4 right-4 text-white">
-                            <h4 className="text-lg font-serif font-bold leading-tight mb-1 shadow-black drop-shadow-md">{recipe.title}</h4>
-                            <div className="flex items-center gap-2 text-xs font-medium opacity-90">
-                                <span className="bg-black/40 backdrop-blur px-2 py-1 rounded flex items-center gap-1">
-                                    <Clock className="w-3 h-3 text-[var(--accent-color)]" /> {recipe.cookTime}
+                <div key={`full-${titleKey}`} className="bg-theme-secondary rounded-2xl shadow-xl border border-theme overflow-hidden group hover:shadow-2xl transition-all mb-6 cursor-pointer" onClick={() => openRecipeModal(recipe, isSavedView)}>
+                    {/* Recipe Header */}
+                    <div className="bg-gradient-to-r from-theme-primary to-theme-primary/80 p-4 border-b border-theme">
+                        <h4 className="text-lg font-serif font-bold mb-2">{recipe.title}</h4>
+                        <div className="flex items-center gap-3 text-xs font-medium opacity-90">
+                            <span className="flex items-center gap-1">
+                                <Clock className="w-3 h-3 text-[var(--accent-color)]" /> {recipe.cookTime}
+                            </span>
+                            {ratingInfo && (
+                                <span className="flex items-center gap-1">
+                                    <Star className="w-3 h-3 text-yellow-400" /> {ratingInfo.avg} ({ratingInfo.count})
                                 </span>
-                                {ratingInfo && (
-                                    <span className="bg-black/40 backdrop-blur px-2 py-1 rounded flex items-center gap-1">
-                                        <Star className="w-3 h-3 text-yellow-400" /> {ratingInfo.avg} ({ratingInfo.count})
-                                    </span>
-                                )}
-                            </div>
+                            )}
                         </div>
                     </div>
 
@@ -913,6 +893,64 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
 
                         <div className="mt-3 pt-3 border-t border-theme" onClick={(e) => e.stopPropagation()}>
                              <RecipeRatingUI recipeTitle={recipe.title} recipe={recipe} onRate={onRate} user={user} />
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const renderRecipeTile = (recipe: StructuredRecipe) => {
+            const ratingInfo = getRatingInfo(recipe.title);
+            const titleKey = recipe.title || 'Untitled Recipe';
+
+            return (
+                <div
+                    key={`tile-${titleKey}`}
+                    className="bg-theme-secondary rounded-lg shadow-md border border-theme overflow-hidden group hover:shadow-lg transition-all cursor-pointer"
+                    onClick={() => openRecipeModal(recipe, false)}
+                >
+                    {/* Recipe Image */}
+                    <div className="aspect-square bg-theme-primary/20 relative overflow-hidden">
+                        {recipe.image ? (
+                            <img
+                                src={recipe.image}
+                                alt={recipe.title}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                onError={(e) => {
+                                    const target = e.target as HTMLImageElement;
+                                    target.style.display = 'none';
+                                    const parent = target.parentElement;
+                                    if (parent) {
+                                        parent.innerHTML = `
+                                            <div class="w-full h-full flex items-center justify-center bg-theme-primary/10">
+                                                <ChefHat class="w-8 h-8 text-theme-secondary opacity-50" />
+                                            </div>
+                                        `;
+                                    }
+                                }}
+                            />
+                        ) : (
+                            <div className="w-full h-full flex items-center justify-center bg-theme-primary/10">
+                                <ChefHat className="w-8 h-8 text-theme-secondary opacity-50" />
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Recipe Info */}
+                    <div className="p-3">
+                        <h4 className="font-bold text-sm mb-2 line-clamp-2 leading-tight">{recipe.title}</h4>
+
+                        <div className="flex items-center justify-between text-xs text-theme-secondary opacity-70">
+                            <div className="flex items-center gap-1">
+                                <Clock className="w-3 h-3" />
+                                {recipe.cookTime}
+                            </div>
+                            {ratingInfo && (
+                                <div className="flex items-center gap-1">
+                                    <Star className="w-3 h-3 text-yellow-400" />
+                                    {ratingInfo.avg}
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -1125,7 +1163,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
             )}
 
             {result && result.recipes && (
-                    <div className="animate-fade-in-up space-y-8 mt-8">
+                    <div className="animate-fade-in-up mt-8">
                         {/* Cache indicator */}
                         {isResultFromCache && (
                             <div className="flex justify-center mb-4">
@@ -1135,7 +1173,9 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                                 </div>
                             </div>
                         )}
-                            {result.recipes.map((recipe, idx) => renderRecipeCard(recipe))}
+                        <div className="grid grid-cols-4 gap-4">
+                            {result.recipes.map((recipe, idx) => renderRecipeTile(recipe))}
+                        </div>
                     </div>
             )}
 

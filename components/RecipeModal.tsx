@@ -1,6 +1,6 @@
-import React, { useState, useMemo } from 'react';
-import { Plus, Heart, Trash2, Minus, Users } from 'lucide-react';
-import { StructuredRecipe, RecipeRating, SavedRecipe } from '../types';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { Plus, Heart, Trash2, Minus, Users, CheckCircle2, Play, Pause, RotateCcw, AlertCircle } from 'lucide-react';
+import { StructuredRecipe, RecipeRating, SavedRecipe, PantryItem } from '../types';
 import { RecipeRatingUI } from './RecipeRating';
 
 interface RecipeModalProps {
@@ -11,11 +11,14 @@ interface RecipeModalProps {
   onSaveRecipe?: (recipe: StructuredRecipe) => void;
   onDeleteRecipe?: (recipe: SavedRecipe) => void;
   onRate?: (rating: any) => void;
-  onMarkAsMade?: (recipe: StructuredRecipe) => void;
+  onMarkAsMade?: (recipe: StructuredRecipe, inventory?: PantryItem[]) => void;
+  onRemoveFromMealPlan?: (recipe: StructuredRecipe) => void;
   showSaveButton?: boolean;
   showDeleteButton?: boolean;
   showMarkAsMade?: boolean;
   showAddToPlan?: boolean;
+  inventory?: PantryItem[];
+  isFromMealPlan?: boolean;
   user?: {
     id: string;
     name: string;
@@ -33,14 +36,158 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
   onDeleteRecipe,
   onRate,
   onMarkAsMade,
+  onRemoveFromMealPlan,
   showSaveButton = true,
   showDeleteButton = false,
   showMarkAsMade = false,
   showAddToPlan = true,
+  inventory = [],
+  isFromMealPlan = false,
   user
 }) => {
   const [servings, setServings] = useState(4); // Default to 4 servings
   const originalServings = 4; // Assume recipes are for 4 servings
+  const ratingRef = useRef<HTMLDivElement>(null);
+  const [showReviewPrompt, setShowReviewPrompt] = useState(false);
+  
+  // Cooking Timer State
+  const [timerActive, setTimerActive] = useState(false);
+  const [timeRemaining, setTimeRemaining] = useState(0);
+  const [totalTime, setTotalTime] = useState(0);
+  
+  // Smart Substitutions State
+  const [showSubstitutions, setShowSubstitutions] = useState(false);
+  const [missingIngredients, setMissingIngredients] = useState<{ingredient: string, suggestions: string[]}[]>([]);
+
+  // Parse cook time to seconds
+  const parseTimeToSeconds = (timeStr: string): number => {
+    if (!timeStr) return 0;
+    const match = timeStr.match(/(\d+)\s*(min|hour|hr|sec)/i);
+    if (!match) return 0;
+    const value = parseInt(match[1]);
+    const unit = match[2].toLowerCase();
+    if (unit.includes('h')) return value * 3600;
+    if (unit.includes('m')) return value * 60;
+    return value;
+  };
+
+  // Timer effect
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (timerActive && timeRemaining > 0) {
+      interval = setInterval(() => {
+        setTimeRemaining(prev => {
+          if (prev <= 1) {
+            setTimerActive(false);
+            // Play alert sound
+            const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAAB9AAACABAAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj==');
+            audio.play().catch(() => {});
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [timerActive, timeRemaining]);
+
+  // Start timer
+  const startTimer = () => {
+    const seconds = parseTimeToSeconds((recipe as StructuredRecipe).cookTime);
+    if (seconds > 0) {
+      setTotalTime(seconds);
+      setTimeRemaining(seconds);
+      setTimerActive(true);
+    }
+  };
+
+  // Format seconds to MM:SS
+  const formatTime = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Find missing ingredients and suggest substitutions
+  const findSubstitutions = () => {
+    const recipeIngredients = (recipe as StructuredRecipe).ingredients || [];
+    const inventoryLower = inventory.map(item => item.item.toLowerCase());
+    
+    const missing = recipeIngredients.filter(ing => {
+      const ingLower = ing.toLowerCase();
+      return !inventoryLower.some(inv => 
+        inv.includes(ingLower.split(/\s+/)[0]) || ingLower.split(/\s+/)[0].includes(inv)
+      );
+    });
+
+    if (missing.length === 0) {
+      alert('All ingredients are in your pantry! 🎉');
+      return;
+    }
+
+    // Generate substitution suggestions
+    const substitutions = missing.map(ing => ({
+      ingredient: ing,
+      suggestions: inventory
+        .filter(inv => {
+          const invLower = inv.item.toLowerCase();
+          const ingLower = ing.toLowerCase();
+          // Basic category matching for substitutions
+          const categories = {
+            'butter': ['oil', 'margarine', 'ghee'],
+            'milk': ['almond milk', 'coconut milk', 'cream'],
+            'egg': ['applesauce', 'banana', 'flax'],
+            'flour': ['almond flour', 'coconut flour', 'cornstarch'],
+            'sugar': ['honey', 'maple syrup', 'agave']
+          };
+          return Object.entries(categories).some(([key, subs]) => 
+            ingLower.includes(key) && subs.some(sub => invLower.includes(sub))
+          );
+        })
+        .slice(0, 2)
+        .map(inv => inv.item)
+    }));
+
+    setMissingIngredients(substitutions);
+    setShowSubstitutions(true);
+  };
+
+  const handleMarkAsMadeClick = async () => {
+    // Step 1: Confirm deletion of used inventory
+    const confirmDelete = window.confirm(
+      `Are you sure you want to mark this recipe as made? This will remove the used ingredients from your pantry inventory.`
+    );
+
+    if (!confirmDelete) return;
+
+    // Step 2: Call the onMarkAsMade handler with inventory info
+    if (onMarkAsMade) {
+      onMarkAsMade(recipe as StructuredRecipe, inventory);
+    }
+
+    // Step 3: If from meal plan, remove it from the meal plan
+    if (isFromMealPlan && onRemoveFromMealPlan) {
+      onRemoveFromMealPlan(recipe as StructuredRecipe);
+    }
+
+    // Step 4: Ask if user wants to submit a review
+    setTimeout(() => {
+      const submitReview = window.confirm(
+        `Would you like to submit a review of this recipe to the community? This helps other users find great recipes!`
+      );
+      
+      if (submitReview) {
+        // Scroll to rating section
+        if (ratingRef.current) {
+          ratingRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          setShowReviewPrompt(true);
+        }
+      } else {
+        // Close modal if no review
+        onClose();
+      }
+    }, 100);
+  };
 
   // Basic nutritional data per serving (estimates)
   const nutritionalInfo = useMemo(() => {
@@ -147,6 +294,108 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
         <div className="overflow-y-auto p-6 flex-1">
           <h2 className="text-2xl font-serif font-bold mb-2 text-[var(--accent-color)]">{recipe.title || 'Untitled'}</h2>
           {recipe.description && <p className="mb-4 text-theme-secondary opacity-70">{recipe.description}</p>}
+
+          {/* Cooking Timer Section */}
+          {(recipe as StructuredRecipe).cookTime && (
+            <div className="mb-6 p-4 bg-theme-secondary/10 rounded-lg border border-[var(--accent-color)]/20">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-xs font-bold text-[var(--accent-color)] uppercase">Cooking Timer</h4>
+                <span className="text-xs text-theme-secondary opacity-70">{(recipe as StructuredRecipe).cookTime}</span>
+              </div>
+              
+              {timerActive ? (
+                <div className="text-center">
+                  <div className="text-5xl font-bold font-mono text-[var(--accent-color)] mb-3 tracking-wider">
+                    {formatTime(timeRemaining)}
+                  </div>
+                  <div className="w-full bg-theme-secondary/20 rounded-full h-2 mb-4 overflow-hidden">
+                    <div 
+                      className="h-full bg-[var(--accent-color)] transition-all duration-300"
+                      style={{width: totalTime > 0 ? `${(timeRemaining / totalTime) * 100}%` : '0%'}}
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setTimerActive(false)}
+                      className="flex-1 py-2 px-3 bg-theme-secondary hover:bg-theme-secondary/80 text-theme-primary rounded-lg flex items-center justify-center gap-2 text-sm font-medium"
+                    >
+                      <Pause className="w-4 h-4" /> Pause
+                    </button>
+                    <button
+                      onClick={() => { setTimerActive(false); setTimeRemaining(0); setTotalTime(0); }}
+                      className="flex-1 py-2 px-3 bg-theme-secondary hover:bg-theme-secondary/80 text-theme-primary rounded-lg flex items-center justify-center gap-2 text-sm font-medium"
+                    >
+                      <RotateCcw className="w-4 h-4" /> Reset
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={startTimer}
+                  className="w-full py-2 px-4 bg-[var(--accent-color)] hover:bg-[var(--accent-color)]/90 text-white rounded-lg flex items-center justify-center gap-2 font-medium"
+                >
+                  <Play className="w-4 h-4" /> Start Timer
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Smart Substitutions Button */}
+          {inventory.length > 0 && (
+            <div className="mb-4">
+              <button
+                onClick={findSubstitutions}
+                className="w-full py-2 px-4 bg-theme-secondary/20 hover:bg-theme-secondary/30 border border-[var(--accent-color)]/20 rounded-lg flex items-center justify-center gap-2 text-sm font-medium text-theme-primary transition-colors"
+              >
+                <AlertCircle className="w-4 h-4" /> Check Substitutions
+              </button>
+            </div>
+          )}
+
+          {/* Substitutions Modal */}
+          {showSubstitutions && missingIngredients.length > 0 && (
+            <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4" onClick={() => setShowSubstitutions(false)}>
+              <div className="bg-theme-primary rounded-xl max-w-md w-full p-6 max-h-[80vh] overflow-y-auto shadow-2xl" onClick={e => e.stopPropagation()}>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-bold text-[var(--accent-color)]">Missing Ingredients</h3>
+                  <button
+                    onClick={() => setShowSubstitutions(false)}
+                    className="text-theme-secondary opacity-50 hover:opacity-100"
+                  >
+                    &times;
+                  </button>
+                </div>
+                
+                <div className="space-y-4">
+                  {missingIngredients.map((item, idx) => (
+                    <div key={idx} className="border-l-4 border-red-500 pl-3">
+                      <p className="text-sm font-medium text-red-500 mb-2">{item.ingredient}</p>
+                      {item.suggestions.length > 0 ? (
+                        <div className="space-y-1">
+                          <p className="text-xs text-theme-secondary opacity-70 mb-1">Available substitutes:</p>
+                          {item.suggestions.map((sugg, sidx) => (
+                            <span key={sidx} className="block text-xs bg-green-500/20 text-green-600 px-2 py-1 rounded">
+                              ✓ {sugg}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-theme-secondary opacity-70">No substitutes available in pantry</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  onClick={() => setShowSubstitutions(false)}
+                  className="w-full mt-6 py-2 px-4 bg-[var(--accent-color)] hover:bg-[var(--accent-color)]/90 text-white rounded-lg font-medium"
+                >
+                  Got it
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="mb-4">
             <div className="flex items-center justify-between mb-2">
               <h4 className="text-xs font-bold text-[var(--accent-color)] uppercase">Ingredients</h4>
@@ -217,20 +466,21 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
             </ol>
           </div>
           {onRate && (
-            <div className="mt-6 pt-4 border-t border-theme">
+            <div className={`mt-6 pt-4 border-t border-theme ${showReviewPrompt ? 'bg-[var(--accent-color)]/10 p-4 rounded-lg' : ''}`} ref={ratingRef}>
              <RecipeRatingUI
              recipeTitle={recipe.title}
              recipe={recipe}
              onRate={(rating) => {
               if (onRate) onRate(rating);
-              onClose(); // This will close the modal after submitting a rating
+              setShowReviewPrompt(false);
+              setTimeout(() => onClose(), 300); // Close modal after submitting a rating
             }}
             user={user}
           />
         </div>
       )}
         </div>
-        <div className="sticky bottom-0 z-20 w-full py-4 bg-theme-primary rounded-b-2xl flex items-center gap-2 p-4 pb-2.5">
+        <div className="sticky bottom-0 z-20 w-full py-4 bg-theme-primary rounded-b-2xl flex items-center gap-2 p-4 pb-12">
           <button className="flex-1 py-3 font-bold border border-[var(--accent-color)] rounded-lg flex items-center justify-center gap-2" onClick={onClose}>CLOSE</button>
           {showDeleteButton && onDeleteRecipe && (
             <button onClick={() => { onDeleteRecipe(recipe as SavedRecipe); onClose(); }} className="flex-1 py-3 font-bold bg-red-500 text-white rounded-lg flex items-center justify-center gap-2">
@@ -248,7 +498,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
             </button>
           )}
           {showMarkAsMade && onMarkAsMade && (
-            <button onClick={() => { onMarkAsMade(recipe as StructuredRecipe); onClose(); }} className="flex-1 py-3 font-bold bg-[var(--accent-color)] text-white rounded-lg">Mark as Made</button>
+            <button onClick={handleMarkAsMadeClick} className="flex-1 py-3 font-bold bg-[var(--accent-color)] text-white rounded-lg flex items-center justify-center gap-2"><CheckCircle2 className="w-4 h-4" /> Mark as Made</button>
           )}
         </div>
       </div>

@@ -1,6 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { getAuth, setPersistence, browserLocalPersistence, indexedDBLocalPersistence } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
+import { getStorage } from "firebase/storage";
 import { getAnalytics } from "firebase/analytics";
 import { Capacitor } from '@capacitor/core';
 import webFirebaseConfig from './VITE_firebaseConfig';
@@ -12,6 +13,7 @@ config = webFirebaseConfig;
 const app = initializeApp(config);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
+export const storage = getStorage(app);
 
 // Set auth persistence based on platform
 if (Capacitor.getPlatform() === 'web') {

@@ -18,6 +18,14 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ items, setItems, onM
     setItems(prev => prev.map(i => i.id === id ? { ...i, checked: !i.checked } : i));
   };
 
+  const selectAll = () => {
+    setItems(prev => prev.map(i => ({ ...i, checked: true })));
+  };
+
+  const deselectAll = () => {
+    setItems(prev => prev.map(i => ({ ...i, checked: false })));
+  };
+
   const remove = (id: string) => {
     setItems(prev => prev.filter(i => i.id !== id));
   };
@@ -119,7 +127,14 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ items, setItems, onM
       )}
 
       {items.length > 0 && (
-          <div className="flex justify-end">
+          <div className="flex gap-2 justify-between">
+              <button
+                onClick={items.every(i => i.checked) ? deselectAll : selectAll}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all bg-theme-secondary text-theme-secondary hover:bg-[var(--accent-color)] hover:text-white"
+              >
+                  <Check className="w-4 h-4" /> 
+                  {items.every(i => i.checked) ? 'Deselect All' : 'Select All'}
+              </button>
               <button 
                 onClick={handleCheckout}
                 disabled={!items.some(i => i.checked)}
@@ -139,13 +154,13 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ items, setItems, onM
           <div 
             key={item.id} 
             onClick={() => toggleCheck(item.id)}
-            className={`flex items-center justify-between p-2 rounded-xl border transition-all cursor-pointer group ${
+            className={`flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer group ${
               item.checked 
               ? 'bg-[var(--accent-color)]/10 border-[var(--accent-color)]/30' 
               : 'bg-theme-secondary border-theme hover:border-[var(--accent-color)]/50'
             }`}
           >
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-1">
               <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
                 item.checked ? 'bg-[var(--accent-color)] border-[var(--accent-color)]' : 'border-theme'
               }`}>
@@ -160,12 +175,19 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ items, setItems, onM
                 )}
               </div>
             </div>
-            <button 
-              onClick={(e) => { e.stopPropagation(); remove(item.id); }}
-              className="p-2 text-theme-secondary opacity-30 hover:opacity-100 hover:text-red-500 transition-opacity"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
+            <div className="flex items-center gap-2">
+              {item.quantity && item.quantity !== '1' && (
+                <div className="text-xs font-medium text-theme-secondary opacity-70 bg-theme-primary px-2 py-1 rounded">
+                  {item.quantity}
+                </div>
+              )}
+              <button 
+                onClick={(e) => { e.stopPropagation(); remove(item.id); }}
+                className="p-2 text-theme-secondary opacity-30 hover:opacity-100 hover:text-red-500 transition-opacity"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         ))}
         {items.length === 0 && (

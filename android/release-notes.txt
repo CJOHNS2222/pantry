@@ -5,6 +5,26 @@ All notable changes to Smart Pantry Chef will be documented in this file.
 The format is based on Keep a Changelog,
 and this project adheres to Semantic Versioning.
 
+[1.1.2] - 2026-01-05
+
+Added
+- Cooking Timer: Recipe timer feature in RecipeModal with MM:SS display, progress bar, and play/pause/reset controls
+- Smart Substitutions: Missing ingredient detection with category-based ingredient suggestions
+- Weekly Meal Prep Calendar: Dual-view meal planning with list and calendar view modes
+- Calendar View Toggle: Switch between traditional list view and new grid-based calendar layout
+- Pantry Analytics Dashboard: Statistics and visualization dashboard with charts and item metrics
+
+Changed
+- MealPlanner Calendar Layout: Optimized from 7-column grid to 3-column grid for better mobile/tablet display
+- Calendar Cell Height: Increased from 200px to 250px for improved meal content visibility
+- Calendar Header: Removed redundant day name labels above calendar grid (Mon, Tue, Wed, etc.)
+
+Removed
+- Batch Selection Feature: Removed multi-select/batch edit functionality from PantryScanner component for simplified UI
+
+Fixed
+- Calendar Feature: Re-implemented calendar functionality with proper state management and view toggling
+
 [1.1.0] - 2026-01-04
 
 Added
@@ -38,7 +58,7 @@ Functions & Backend (3 new)
 
 Assets (100+ new)
 - 35 Avatar Images: Enhanced user profile customization options
-- 100+ Food Icons: Comprehensive icon set for pantry items and recipes
+- 100+ Food Icons: Comprehensive icon set for pantry items and recipes (converted from WebP to PNG for mobile compatibility)
 - Enhanced Visual Experience: Improved UI assets for better user engagement
 
 Testing (expanded)
@@ -51,8 +71,14 @@ Infrastructure
 - Firebase Enhancements: Updated Firebase rules and configuration for better security
 - Capacitor Improvements: Enhanced mobile app build and deployment
 - Performance Optimizations: Code splitting and build optimizations for better performance
+- Database Maintenance: Added automatic cleanup of old meal plan entries to prevent database bloat
+- Asset Management: Improved image asset handling and mobile compatibility (WebP to PNG conversion)
 
 Fixed
+- Image Loading Issues: Fixed pantry item images not loading in Android Capacitor builds by converting WebP assets to PNG and correcting asset serving paths
+- Shopping List Item Images: Fixed items moved from shopping list to pantry not receiving proper image assignments
+- Meal Plan Database Cleanup: Added automatic cleanup of old meal plan entries to prevent database bloat and performance issues
+- Milk Expiration Settings: Updated milk expiration to 10 days with warning threshold at 3 days remaining (instead of 7 days)
 - Price Trends Functionality: Fixed Firebase permission errors, API network issues, and undefined data crashes
 - Open Prices API Integration: Corrected API URL from api.open-prices.org to prices.openfoodfacts.org/api/v1
 - API Response Handling: Updated response interfaces to match actual Open Prices API structure

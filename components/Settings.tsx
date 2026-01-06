@@ -3,10 +3,12 @@ import { db } from '../firebaseConfig';
 import { collection, addDoc, Timestamp, doc, updateDoc } from 'firebase/firestore';
 import { SubscriptionManager } from './SubscriptionManager';
 import { CategoryManager } from './CategoryManager';
+import { PantryAnalytics } from './PantryAnalytics';
 import { useNotifications } from '../hooks/useNotifications';
-import { UserProfile, CustomCategory } from '../types';
+import { UserProfile, CustomCategory, PantryItem } from '../types';
 import { VersionUpdate } from './VersionUpdate';
 import { DayPlan } from '../types';
+import { BarChart3 } from 'lucide-react';
 
 const defaultSettings = {
   notifications: {
@@ -40,6 +42,7 @@ interface SettingsProps {
   onUpdateCustomCategory?: (categoryId: string, updates: Partial<Pick<CustomCategory, 'name' | 'icon' | 'color'>>) => void;
   onDeleteCustomCategory?: (categoryId: string) => void;
   mealPlan?: DayPlan[];
+  inventory?: PantryItem[];
 }
 
 export const Settings: React.FC<SettingsProps> = ({ 
@@ -51,7 +54,8 @@ export const Settings: React.FC<SettingsProps> = ({
   onAddCustomCategory,
   onUpdateCustomCategory,
   onDeleteCustomCategory,
-  mealPlan
+  mealPlan,
+  inventory = []
 }) => {
   const [feedback, setFeedback] = useState('');
   const [sending, setSending] = useState(false);
@@ -61,6 +65,7 @@ export const Settings: React.FC<SettingsProps> = ({
   const [userProfile, setUserProfile] = useState(user?.profile || {});
   const [profileChanged, setProfileChanged] = useState(false);
   const [showCategoryManager, setShowCategoryManager] = useState(false);
+  const [showAnalytics, setShowAnalytics] = useState(false);
 
   // Update userProfile when user data loads
   React.useEffect(() => {
@@ -184,7 +189,38 @@ export const Settings: React.FC<SettingsProps> = ({
   };
 
   return (
-    <div className="p-6 pb-24 max-w-md mx-auto space-y-6">
+    <>
+      {/* Analytics Modal */}
+      {showAnalytics && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-start sm:items-center justify-center p-4 overflow-y-auto" onClick={() => setShowAnalytics(false)}>
+          <div className="bg-theme-primary rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto my-8" onClick={e => e.stopPropagation()}>
+            <div className="sticky top-0 z-10 bg-[var(--accent-color)] p-4 flex items-center justify-between rounded-t-2xl">
+              <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+                <BarChart3 className="w-6 h-6" /> Pantry Analytics
+              </h2>
+              <button
+                onClick={() => setShowAnalytics(false)}
+                className="text-white opacity-70 hover:opacity-100 text-2xl"
+              >
+                &times;
+              </button>
+            </div>
+            <div className="p-6">
+              <PantryAnalytics inventory={inventory} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="p-6 pb-24 max-w-md mx-auto space-y-6">
+
+      {/* Analytics Button */}
+      <button
+        onClick={() => setShowAnalytics(true)}
+        className="w-full bg-[var(--accent-color)] hover:bg-[var(--accent-color)]/90 text-white rounded-xl p-4 font-semibold flex items-center justify-center gap-2 transition-colors shadow-lg"
+      >
+        <BarChart3 className="w-5 h-5" /> View Pantry Analytics
+      </button>
 
       {/* Profile Section */}
       {user && onLogout && (
@@ -424,7 +460,25 @@ export const Settings: React.FC<SettingsProps> = ({
 
       {/* Theme Settings Section */}
       <div className="bg-theme-secondary rounded-xl border border-theme p-4">
-        <h3 className="font-semibold mb-3 text-theme-primary">Theme Settings</h3>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-semibold text-theme-primary">Theme Settings</h3>
+          <button
+            onClick={() => {
+              setSettings(prev => ({
+                ...prev,
+                theme: {
+                  mode: 'dark',
+                  accentColor: '#4CAF50',
+                  backgroundColor: undefined,
+                  textColor: undefined,
+                }
+              }));
+            }}
+            className="text-xs px-3 py-1 bg-theme-primary border border-theme rounded hover:bg-theme-secondary transition-colors text-theme-primary"
+          >
+            Reset to Default
+          </button>
+        </div>
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-sm text-theme-primary">Theme</span>
@@ -568,5 +622,6 @@ export const Settings: React.FC<SettingsProps> = ({
         />
       )}
     </div>
+    </>
   );
 };

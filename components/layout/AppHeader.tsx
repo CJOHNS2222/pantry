@@ -16,7 +16,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   onShowHousehold
 }) => {
   return (
-    <header className="bg-theme-secondary p-3 pt-5 fixed top-0 left-0 right-0 max-w-md mx-auto z-20 shadow-md border-b border-theme transition-colors duration-300">
+    <header className="bg-theme-secondary p-3 pt-5 pb-0 fixed top-0 left-0 right-0 max-w-md mx-auto z-20 shadow-md border-b border-theme transition-colors duration-300">
       <div className="flex justify-between items-center">
         <div className="flex flex-col items-start">
           <div className="text-sm font-medium text-theme-primary opacity-80">
