@@ -14,6 +14,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Recipe Search Integration**: "Add Recipe" buttons in empty meal slots open search modal
   - **Saved Recipes Access**: Search modal shows both AI-generated recipes and user's saved recipes
   - **Enhanced Meal Management**: View, add, and remove recipes directly from day detail modal
+- **Context-Aware Recipe Modal**: Dynamic button display based on usage context
+  - **Search Context**: Shows "Save Recipe" and "Add to Plan" buttons when browsing recipes
+  - **Scheduled Context**: Shows "Mark as Made" and "Remove from Plan" buttons for planned meals
+  - **Saved Recipes Context**: Shows "Add to Plan" and "Delete Recipe" buttons for saved recipes
+- **Enhanced Recipe Search UI**: Improved recipe discovery with tile-based layout
+  - **3-Column Tile Grid**: Recipes displayed in clean tiles with image, title, cook time, and calories
+  - **Clickable Recipe Tiles**: Click any tile to preview recipe details before adding
+  - **Unified Recipe Source**: Single search interface for both AI-generated and user-saved recipes
 - **Smart Ingredient Cleaning**: Automatic removal of descriptive preparation words from shopping list items
   - **Recipe Ingredients**: Ingredients like "2 chopped onions" become "Onion" in shopping lists
   - **Pantry Items**: Descriptive words like "chopped", "minced", "diced", "sliced", "finely" are removed when adding to shopping lists
