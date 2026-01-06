@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CalendarClock, Plus, Move, AlertCircle, ShoppingBasket, Trash2 } from 'lucide-react';
+import { CalendarClock, Plus, Move, AlertCircle, ShoppingBasket, Trash2, Grid3X3, List } from 'lucide-react';
 import { DayPlan, MealPlanItem, PantryItem, StructuredRecipe, User } from '../types';
 import RecipeModal from './RecipeModal';
 import { PremiumFeature } from './PremiumFeature';
@@ -29,6 +29,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
   const [modalRecipe, setModalRecipe] = useState<StructuredRecipe | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragOverTrash, setDragOverTrash] = useState(false);
+  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
 
   const getMissingIngredients = () => {
     const allNeededIngredients = mealPlan.flatMap(day => 
@@ -251,6 +252,102 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
 
         <GroceryCostEstimator mealPlan={mealPlan} inventory={inventory} />
 
+        <div className="flex gap-1 bg-theme-secondary rounded-xl p-1 mb-6">
+          <button
+            onClick={() => setViewMode('list')}
+            className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all flex items-center justify-center gap-2 text-sm ${
+              viewMode === 'list'
+                ? 'bg-[var(--accent-color)] text-white shadow-md'
+                : 'text-theme-primary opacity-70 hover:opacity-100'
+            }`}
+          >
+            <List className="w-4 h-4" /> List
+          </button>
+          <button
+            onClick={() => setViewMode('calendar')}
+            className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all flex items-center justify-center gap-2 text-sm ${
+              viewMode === 'calendar'
+                ? 'bg-[var(--accent-color)] text-white shadow-md'
+                : 'text-theme-primary opacity-70 hover:opacity-100'
+            }`}
+          >
+            <Grid3X3 className="w-4 h-4" /> Calendar
+          </button>
+        </div>
+
+        {/* Calendar View */}
+        {viewMode === 'calendar' && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-3 gap-2">
+              {mealPlan.map((day, dayIndex) => (
+                <div
+                  key={dayIndex}
+                  onDragOver={(e) => handleDragOver(e, dayIndex)}
+                  onDragLeave={handleDragLeave}
+                  onDrop={(e) => handleDrop(e, dayIndex)}
+                  className={`bg-theme-secondary rounded-lg p-3 min-h-[250px] border-2 transition-all cursor-move flex flex-col ${
+                    dragOverDay === dayIndex
+                      ? 'border-[var(--accent-color)] shadow-lg'
+                      : 'border-theme'
+                  }`}
+                >
+                  <div className="mb-2">
+                    <h3 className="text-sm font-bold text-theme-primary">{day.dayName}</h3>
+                    <p className="text-xs opacity-50 font-mono">{day.date}</p>
+                  </div>
+
+                  <div className="space-y-1 flex-1 overflow-y-auto text-xs">
+                    {['Breakfast', 'Lunch', 'Dinner'].map((mealType) => {
+                      const mealTypeKey = mealType.toLowerCase() as 'breakfast' | 'lunch' | 'dinner';
+                      const mealsForType = day[mealTypeKey] || [];
+
+                      return (
+                        <div key={mealType} className="space-y-1">
+                          <div className="text-[10px] font-semibold text-theme-primary opacity-60 uppercase">
+                            {mealType.slice(0, 1)}
+                          </div>
+                          <div className="space-y-1">
+                            {mealsForType.length === 0 ? (
+                              <div className="h-6 flex items-center text-[9px] opacity-30">
+                                —
+                              </div>
+                            ) : (
+                              mealsForType.map((meal, mealIndex) => (
+                                <div
+                                  key={meal.id}
+                                  draggable
+                                  onDragStart={(e) => {
+                                    e.dataTransfer.setData('text/plain', `${mealTypeKey}-${mealIndex}`);
+                                    handleDragStart(e, dayIndex, mealTypeKey, mealIndex);
+                                  }}
+                                  onDragEnd={handleDragEnd}
+                                  className={`bg-theme-primary border rounded p-1 text-[9px] cursor-move group shadow-sm active:cursor-grabbing transition-all truncate hover:opacity-50 ${
+                                    draggedMeal?.dayIndex === dayIndex && draggedMeal?.mealType === mealTypeKey && draggedMeal?.mealIndex === mealIndex
+                                      ? 'opacity-50 scale-95'
+                                      : ''
+                                  }`}
+                                  onClick={() => { setModalRecipe(meal.recipe); setShowRecipeModal(true); }}
+                                  title={meal.recipe.title}
+                                >
+                                  <span className="text-[var(--accent-color)] font-semibold truncate block">
+                                    {meal.recipe.title}
+                                  </span>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* List View */}
+        {viewMode === 'list' && (
         <div className="space-y-3">
           {mealPlan.map((day, dayIndex) => (
             <div 
@@ -367,6 +464,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
             </div>
           ))}
         </div>
+        )}
 
         {/* Trash can for removing meals */}
         {isDragging && (

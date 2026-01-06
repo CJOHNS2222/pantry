@@ -5,6 +5,26 @@ All notable changes to Smart Pantry Chef will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] - 2026-01-05
+
+### Added
+- **Cooking Timer**: Recipe timer feature in RecipeModal with MM:SS display, progress bar, and play/pause/reset controls
+- **Smart Substitutions**: Missing ingredient detection with category-based ingredient suggestions
+- **Weekly Meal Prep Calendar**: Dual-view meal planning with list and calendar view modes
+- **Calendar View Toggle**: Switch between traditional list view and new grid-based calendar layout
+- **Pantry Analytics Dashboard**: Statistics and visualization dashboard with charts and item metrics
+
+### Changed
+- **MealPlanner Calendar Layout**: Optimized from 7-column grid to 3-column grid for better mobile/tablet display
+- **Calendar Cell Height**: Increased from 200px to 250px for improved meal content visibility
+- **Calendar Header**: Removed redundant day name labels above calendar grid (Mon, Tue, Wed, etc.)
+
+### Removed
+- **Batch Selection Feature**: Removed multi-select/batch edit functionality from PantryScanner component for simplified UI
+
+### Fixed
+- **Calendar Feature**: Re-implemented calendar functionality with proper state management and view toggling
+
 ## [1.1.0] - 2026-01-04
 
 ### Added
