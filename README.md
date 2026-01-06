@@ -11,6 +11,23 @@ Smart Pantry Chef is a cross-platform pantry and meal management app built with 
 - Feedback form for user ideas and bug reports
 - Recipe sharing between households
 - Firebase Analytics for usage tracking
+- **AI-Powered Recipe Generation**: Create custom recipes using Google Gemini AI
+- **Community Recipe Ratings**: Rate and review recipes with community feedback
+- **Smart Meal Planner**: Weekly meal planning with interactive calendar interface
+  - Visual calendar view for planning meals across the week
+  - Drag-and-drop recipe assignment to meal slots
+  - Recipe search integration with context-aware recipe modal
+- **Smart Ingredient Cleaning**: Automatic removal of descriptive words from shopping list items
+  - Converts "2 chopped onions" to "Onion" for cleaner shopping lists
+  - Removes preparation descriptors like "minced", "diced", "finely chopped"
+- **Enhanced Recipe Search**: Discover recipes with tile-based grid layout
+  - 3-column responsive tile display with recipe images and details
+  - Search both AI-generated and user-saved recipes
+  - Context-aware recipe actions (save, add to plan, mark as made)
+- **Pantry Analytics Dashboard**: Comprehensive statistics and insights
+  - Inventory usage patterns and trends
+  - Shopping list analytics and cost tracking
+  - Recipe popularity and meal planning insights
 - **Enhanced Grocery Price Estimator with Community Data**
   - Real-time price updates from user contributions
   - Price ranges and sample sizes for accuracy
@@ -71,6 +88,22 @@ STRIPE_FAMILY_PRICE_ID
 
 Both payment methods support test subscriptions that will automatically cancel after a short period.
 
+## AI Recipe Generation
+
+The app features AI-powered recipe creation using Google Gemini API:
+
+### Features
+- **Custom Recipe Generation**: Create recipes based on available ingredients
+- **Ingredient-Based Suggestions**: AI analyzes your pantry inventory to suggest recipes
+- **Recipe Variations**: Generate different versions of recipes with dietary modifications
+- **Smart Ingredient Matching**: AI considers nutritional balance and flavor profiles
+
+### How It Works
+1. **Inventory Analysis**: AI scans your current pantry items
+2. **Recipe Generation**: Creates complete recipes with ingredients and instructions
+3. **Nutritional Information**: Provides estimated nutritional facts for generated recipes
+4. **Save & Rate**: Save AI-generated recipes and rate them with the community
+
 ## Enhanced Grocery Price System
 
 The app now features a community-driven grocery price estimator that provides more accurate cost calculations:
@@ -95,6 +128,13 @@ The app now features a community-driven grocery price estimator that provides mo
 - Integration with grocery APIs (planned)
 
 ## Recent Changes
+- **Meal Planner Redesign**: Complete overhaul with unified calendar interface, day detail modals, and integrated recipe search
+- **Context-Aware Recipe Modal**: Dynamic button display based on usage context (search/scheduled/saved recipes)
+- **Smart Ingredient Cleaning**: Automatic removal of descriptive preparation words from shopping list items
+- **Enhanced Recipe Search UI**: 3-column tile grid layout with clickable recipe previews
+- **AI Recipe Generation**: Integration with Google Gemini API for custom recipe creation
+- **Community Recipe Ratings**: User rating and review system for recipes
+- **Pantry Analytics Dashboard**: Comprehensive statistics and visualization features
 - Migrated inventory, shopping list, meal plan, and saved recipes to Firestore for household sharing
 - Added Settings screen for notifications, theme, and feedback
 - Integrated local notifications (Capacitor) for daily reminders
@@ -115,7 +155,7 @@ The app now features a community-driven grocery price estimator that provides mo
 3. **Add your API keys:**
    - Create a `.env.local` file in the root directory:
      ```
-     VITE_GEMINI_API_KEY=your_real_api_key
+     VITE_GEMINI_API_KEY=your_google_gemini_api_key
      VITE_STRIPE_PUBLISHABLE_KEY=pk_test_your_publishable_key_here
      STRIPE_SECRET_KEY=sk_test_your_secret_key_here
      VITE_STRIPE_PREMIUM_PRICE_ID=price_your_premium_price_id
