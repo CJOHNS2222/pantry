@@ -1,0 +1,100 @@
+plugins {
+    id 'com.android.application'
+    id 'com.google.gms.google-services'
+    id 'com.google.firebase.appdistribution'
+}
+
+
+android {
+    namespace "com.smart.pantry"
+    compileSdk rootProject.ext.compileSdkVersion
+    defaultConfig {
+        applicationId "com.smart.pantry"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode 2
+        versionName "1.1"
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        aaptOptions {
+             // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
+             // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
+            ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        }
+    }
+    signingConfigs {
+        release {
+            storeFile file('pantry-release.keystore')
+            storePassword '63789632aA!'
+            keyAlias 'pantry-key'
+            keyPassword '63789632aA!'
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.release
+            firebaseAppDistribution {
+                artifactType="APK"
+                releaseNotesFile="${rootDir}/release-notes.txt"
+                testersFile="${rootDir}/testers.txt"
+            }
+        }
+    }
+    }
+
+
+dependencies {
+  // Import the Firebase BoM
+  implementation platform('com.google.firebase:firebase-bom:34.6.0')
+
+
+  // TODO: Add the dependencies for Firebase products you want to use
+  // When using the BoM, don't specify versions in Firebase dependencies
+  implementation 'com.google.firebase:firebase-analytics'
+  implementation 'com.google.firebase:firebase-auth'
+  implementation 'com.google.firebase:firebase-firestore'
+  implementation 'com.google.firebase:firebase-functions'
+  implementation 'com.google.firebase:firebase-storage'
+  // End of Firebase dependencies
+  // Add the dependencies for any other desired Firebase products
+  // https://firebase.google.com/docs/android/setup#available-libraries
+
+  implementation fileTree(include: ['*.jar'], dir: 'libs')
+  implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
+  implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
+  implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+  implementation project(':capacitor-android')
+  testImplementation "junit:junit:$junitVersion"
+  androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
+  androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
+  implementation project(':capacitor-cordova-android-plugins')
+  implementation fileTree(include: ['*.jar'], dir: 'libs')
+  implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
+  implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
+  implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+  implementation project(':capacitor-android')
+  testImplementation "junit:junit:$junitVersion"
+  androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
+  androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
+  implementation project(':capacitor-cordova-android-plugins')
+
+
+}
+
+repositories {
+    flatDir{
+        dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
+    }
+}
+
+apply from: 'capacitor.build.gradle'
+
+try {
+    def servicesJSON = file('google-services.json')
+    if (servicesJSON.text) {
+        apply plugin: 'com.google.gms.google-services'
+    }
+} catch(Exception e) {
+    logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
+}
