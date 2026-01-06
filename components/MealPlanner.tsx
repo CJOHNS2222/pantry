@@ -521,19 +521,35 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-theme-primary rounded-xl max-w-2xl w-full max-h-[90vh] overflow-hidden shadow-2xl">
             <div className="p-6 border-b border-theme">
-              <div className="flex justify-between items-center">
-                <div>
+              <div className="flex items-center justify-between">
+                <button
+                  onClick={() => setSelectedDayIndex(Math.max(0, selectedDayIndex - 1))}
+                  disabled={selectedDayIndex === 0}
+                  className="text-theme-secondary opacity-60 hover:opacity-100 p-2 disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  ‹
+                </button>
+                <div className="text-center">
                   <h2 className="text-2xl font-bold text-theme-secondary">
                     {mealPlan[selectedDayIndex].dayName}
                   </h2>
                   <p className="text-theme-secondary opacity-60">{mealPlan[selectedDayIndex].date}</p>
                 </div>
-                <button
-                  onClick={() => setSelectedDayIndex(null)}
-                  className="text-theme-secondary opacity-60 hover:opacity-100 p-2"
-                >
-                  ✕
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setSelectedDayIndex(Math.min(mealPlan.length - 1, selectedDayIndex + 1))}
+                    disabled={selectedDayIndex === mealPlan.length - 1}
+                    className="text-theme-secondary opacity-60 hover:opacity-100 p-2 disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    ›
+                  </button>
+                  <button
+                    onClick={() => setSelectedDayIndex(null)}
+                    className="text-theme-secondary opacity-60 hover:opacity-100 p-2"
+                  >
+                    ✕
+                  </button>
+                </div>
               </div>
             </div>
             
