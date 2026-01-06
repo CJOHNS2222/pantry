@@ -5,7 +5,25 @@ All notable changes to Smart Pantry Chef will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.1.1] - 2026-01-05
+## [1.1.3] - 2026-01-06
+
+### Added
+- **MealPlanner Redesign**: Complete reconfiguration of meal planning interface
+  - **Unified Calendar View**: Removed list/calendar toggle, now uses calendar grid as primary interface
+  - **Day Detail Modal**: Click any day to open fullscreen modal showing detailed meal planning for that day
+  - **Recipe Search Integration**: "Add Recipe" buttons in empty meal slots open search modal
+  - **Saved Recipes Access**: Search modal shows both AI-generated recipes and user's saved recipes
+  - **Enhanced Meal Management**: View, add, and remove recipes directly from day detail modal
+
+### Changed
+- **MealPlanner UX**: Streamlined from dual-view system to single calendar-based workflow
+- **Recipe Addition Flow**: Now integrated directly into meal planning with contextual search
+
+### Removed
+- **List View Toggle**: Eliminated list/calendar view switching buttons for simplified interface
+- **Complex View State**: Removed viewMode state management in favor of modal-based interaction
+
+## [1.1.2] - 2026-01-05
 
 ### Added
 - **Cooking Timer**: Recipe timer feature in RecipeModal with MM:SS display, progress bar, and play/pause/reset controls
