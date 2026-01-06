@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
-import { X, TrendingUp, ShoppingBasket, Trash2, Edit3, Package, Minus, Plus } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, TrendingUp, ShoppingBasket, Trash2, Edit3, Package, Minus, Plus, Zap } from 'lucide-react';
 import { PantryItem } from '../types';
 import PriceTrends from './PriceTrends';
-import { getAllCategories, getExpirationColor } from '../utils/appUtils';
+import { getAllCategories, getExpirationColor, cleanItemNameForShopping } from '../utils/appUtils';
+import { getNutritionFactsWithFallback, NutritionFacts, formatNutrition } from '../services/nutritionService';
 
 interface ItemDetailModalProps {
   item: PantryItem;
@@ -27,6 +28,25 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   const [isEditing, setIsEditing] = useState(false);
   const [editQuantity, setEditQuantity] = useState(item.quantity_estimate || 1);
   const [hasQuantityChanged, setHasQuantityChanged] = useState(false);
+  const [nutrition, setNutrition] = useState<NutritionFacts | null>(null);
+  const [loadingNutrition, setLoadingNutrition] = useState(true);
+
+  // Fetch nutrition facts on component mount
+  useEffect(() => {
+    const fetchNutrition = async () => {
+      setLoadingNutrition(true);
+      try {
+        const nutritionData = await getNutritionFactsWithFallback(item.item, item.category || 'Manual');
+        setNutrition(nutritionData);
+      } catch (error) {
+        console.warn('Failed to fetch nutrition:', error);
+        setNutrition(null);
+      } finally {
+        setLoadingNutrition(false);
+      }
+    };
+    fetchNutrition();
+  }, [item.item, item.category]);
 
   const handleQuantityChange = (newQuantity: number) => {
     if (newQuantity >= 0) {
@@ -98,41 +118,41 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
 
           {/* Item Details */}
           <div className="px-4 space-y-4">
-            {/* Quantity Section */}
+            {/* Quantity Section - Compact */}
             <div className="bg-theme-secondary p-3 rounded-lg border border-theme">
               <label className="block text-sm font-medium text-theme-primary mb-2">
                 Quantity
               </label>
               {isEditing ? (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-center gap-4">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-center gap-2">
                     <button
                       onClick={handleQuantityDecrement}
-                      className="w-10 h-10 rounded-full bg-theme-primary border border-theme flex items-center justify-center text-theme-primary hover:bg-theme-secondary transition-colors"
+                      className="w-8 h-8 rounded-full bg-theme-primary border border-theme flex items-center justify-center text-theme-primary hover:bg-theme-secondary transition-colors"
                     >
-                      <Minus className="w-5 h-5" />
+                      <Minus className="w-4 h-4" />
                     </button>
-                    <span className="text-2xl font-bold text-theme-primary min-w-[3rem] text-center">
+                    <span className="text-xl font-bold text-theme-primary min-w-[2rem] text-center">
                       {editQuantity}
                     </span>
                     <button
                       onClick={handleQuantityIncrement}
-                      className="w-10 h-10 rounded-full bg-theme-primary border border-theme flex items-center justify-center text-theme-primary hover:bg-theme-secondary transition-colors"
+                      className="w-8 h-8 rounded-full bg-theme-primary border border-theme flex items-center justify-center text-theme-primary hover:bg-theme-secondary transition-colors"
                     >
-                      <Plus className="w-5 h-5" />
+                      <Plus className="w-4 h-4" />
                     </button>
                   </div>
                   {hasQuantityChanged && (
                     <div className="flex gap-2 justify-center">
                       <button
                         onClick={handleSaveQuantity}
-                        className="px-4 py-2 bg-[var(--accent-color)] text-white rounded-lg text-sm hover:bg-[var(--accent-color)]/80 transition-colors"
+                        className="px-3 py-1 text-sm bg-[var(--accent-color)] text-white rounded-lg hover:bg-[var(--accent-color)]/80 transition-colors"
                       >
                         Save
                       </button>
                       <button
                         onClick={handleCancelEdit}
-                        className="px-4 py-2 bg-theme-primary text-theme-primary border border-theme rounded-lg text-sm hover:bg-theme-secondary transition-colors"
+                        className="px-3 py-1 text-sm bg-theme-primary text-theme-primary border border-theme rounded-lg hover:bg-theme-secondary transition-colors"
                       >
                         Cancel
                       </button>
@@ -155,29 +175,26 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
             {/* Original Quantity (from recipe/shopping list) */}
             {item.originalQuantity && (
               <div className="bg-theme-secondary p-3 rounded-lg border border-theme">
-                <label className="block text-sm font-medium text-theme-primary mb-1">
-                  Recipe Quantity
+                <label className="block text-xs font-medium text-theme-primary mb-1 uppercase opacity-70">
+                  Recipe Qty
                 </label>
-                <div className="text-theme-primary">
+                <div className="text-sm text-theme-primary">
                   {item.originalQuantity}
                 </div>
-                <p className="text-xs text-theme-primary/70 mt-1">
-                  Original amount needed from recipe
-                </p>
               </div>
             )}
 
             {/* Expiration Date */}
             {item.expirationDate && (
               <div className="bg-theme-secondary p-3 rounded-lg border border-theme">
-                <label className="block text-sm font-medium text-theme-primary mb-2">
+                <label className="block text-xs font-medium text-theme-primary mb-1 uppercase opacity-70">
                   Expiration
                 </label>
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-theme-primary">
                     {new Date(item.expirationDate).toLocaleDateString()}
                   </span>
-                  <span className={`px-2 py-1 rounded text-xs font-medium ${
+                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${
                     getExpirationColor(item.expirationDate, item.expirationType) === 'red'
                       ? 'bg-red-100 text-red-800'
                       : getExpirationColor(item.expirationDate, item.expirationType) === 'yellow'
@@ -190,48 +207,108 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
               </div>
             )}
 
-            {/* Storage Location */}
-            <div className="bg-theme-secondary p-3 rounded-lg border border-theme">
-              <label className="block text-sm font-medium text-theme-primary mb-2">
-                Storage Location
-              </label>
-              <select
-                value={item.storageLocation || 'pantry'}
-                onChange={(e) => handleStorageChange(e.target.value)}
-                className="w-full px-3 py-2 border border-theme rounded-md bg-theme-primary text-theme-primary focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]"
-              >
-                <option value="pantry">Pantry</option>
-                <option value="fridge">Refrigerator</option>
-                <option value="freezer">Freezer</option>
-                <option value="spices">Spice Rack</option>
-                <option value="other">Other</option>
-              </select>
+            {/* Storage Location & Category - Side by Side */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-theme-secondary p-3 rounded-lg border border-theme">
+                <label className="block text-xs font-medium text-theme-primary mb-2 uppercase opacity-70">
+                  Storage
+                </label>
+                <select
+                  value={item.storageLocation || 'pantry'}
+                  onChange={(e) => handleStorageChange(e.target.value)}
+                  className="w-full px-2 py-1.5 text-sm border border-theme rounded-md bg-theme-primary text-theme-primary focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]"
+                >
+                  <option value="pantry">Pantry</option>
+                  <option value="fridge">Fridge</option>
+                  <option value="freezer">Freezer</option>
+                  <option value="spices">Spices</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+
+              <div className="bg-theme-secondary p-3 rounded-lg border border-theme">
+                <label className="block text-xs font-medium text-theme-primary mb-2 uppercase opacity-70">
+                  Category
+                </label>
+                <select
+                  value={item.category || 'Manual'}
+                  onChange={(e) => handleCategoryChange(e.target.value)}
+                  className="w-full px-2 py-1.5 text-sm border border-theme rounded-md bg-theme-primary text-theme-primary focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]"
+                >
+                  {getAllCategories(customCategories).map(category => (
+                    <option key={category} value={category}>
+                      {category}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
-            {/* Category */}
-            <div className="bg-theme-secondary p-3 rounded-lg border border-theme">
-              <label className="block text-sm font-medium text-theme-primary mb-2">
-                Category
-              </label>
-              <select
-                value={item.category || 'Manual'}
-                onChange={(e) => handleCategoryChange(e.target.value)}
-                className="w-full px-3 py-2 border border-theme rounded-md bg-theme-primary text-theme-primary focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]"
-              >
-                {getAllCategories(customCategories).map(category => (
-                  <option key={category} value={category}>
-                    {category}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {/* Nutrition Facts Section */}
+            {loadingNutrition ? (
+              <div className="bg-theme-secondary p-4 rounded-lg border border-theme">
+                <div className="flex items-center gap-2 text-sm text-theme-primary">
+                  <Zap className="w-4 h-4 opacity-50 animate-pulse" />
+                  <span className="opacity-70">Loading nutrition info...</span>
+                </div>
+              </div>
+            ) : nutrition ? (
+              <div className="bg-gradient-to-br from-theme-secondary to-theme-secondary/80 p-4 rounded-lg border border-theme">
+                <div className="flex items-center gap-2 mb-3">
+                  <Zap className="w-4 h-4 text-[var(--accent-color)]" />
+                  <h4 className="font-semibold text-theme-primary text-sm">Nutrition Facts</h4>
+                  <span className="text-xs text-theme-primary/70 ml-auto">{nutrition.servingSize}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  {nutrition.calories && (
+                    <div className="bg-theme-primary/30 p-2 rounded">
+                      <div className="text-xs text-theme-primary/70">Calories</div>
+                      <div className="text-sm font-bold text-theme-primary">{Math.round(nutrition.calories)}</div>
+                    </div>
+                  )}
+                  {nutrition.protein && (
+                    <div className="bg-theme-primary/30 p-2 rounded">
+                      <div className="text-xs text-theme-primary/70">Protein</div>
+                      <div className="text-sm font-bold text-theme-primary">{nutrition.protein.toFixed(1)}g</div>
+                    </div>
+                  )}
+                  {nutrition.carbs && (
+                    <div className="bg-theme-primary/30 p-2 rounded">
+                      <div className="text-xs text-theme-primary/70">Carbs</div>
+                      <div className="text-sm font-bold text-theme-primary">{nutrition.carbs.toFixed(1)}g</div>
+                    </div>
+                  )}
+                  {nutrition.fat && (
+                    <div className="bg-theme-primary/30 p-2 rounded">
+                      <div className="text-xs text-theme-primary/70">Fat</div>
+                      <div className="text-sm font-bold text-theme-primary">{nutrition.fat.toFixed(1)}g</div>
+                    </div>
+                  )}
+                  {nutrition.fiber && (
+                    <div className="bg-theme-primary/30 p-2 rounded">
+                      <div className="text-xs text-theme-primary/70">Fiber</div>
+                      <div className="text-sm font-bold text-theme-primary">{nutrition.fiber.toFixed(1)}g</div>
+                    </div>
+                  )}
+                  {nutrition.sugar && (
+                    <div className="bg-theme-primary/30 p-2 rounded">
+                      <div className="text-xs text-theme-primary/70">Sugar</div>
+                      <div className="text-sm font-bold text-theme-primary">{nutrition.sugar.toFixed(1)}g</div>
+                    </div>
+                  )}
+                </div>
+                <p className="text-xs text-theme-primary/60 mt-3">
+                  Source: USDA FoodData Central • Per {nutrition.servingSize}
+                </p>
+              </div>
+            ) : null}
           </div>
 
           {/* Action Buttons */}
           <div className="px-4 py-4 border-t border-theme space-y-2">
             <div className="grid grid-cols-2 gap-2">
               <button
-                onClick={() => onAddToShoppingList([item.item])}
+                onClick={() => onAddToShoppingList([cleanItemNameForShopping(item.item)])}
                 className="flex items-center justify-center gap-2 px-4 py-2 bg-[var(--accent-color)] text-[var(--text-theme-primary)] rounded-lg hover:bg-[var(--accent-color)]/80 transition-colors"
               >
                 <ShoppingBasket className="w-4 h-4" />

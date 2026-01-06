@@ -58,7 +58,7 @@ export function parseItemText(itemText: string): { quantity: number; description
     // Keep colors for distinguishing items (like red vs green apples)
     // .replace(/\b(red|green|yellow|blue|black|white|brown|orange|purple|pink)\s+/g, '')
     // Remove common preparation descriptors that don't affect core item identity
-    .replace(/\b(fresh|dried|canned|chopped|sliced|diced|minced|crushed|ground|cubed|grated)\s+/g, '')
+    .replace(/\b(fresh|dried|canned|chopped|sliced|diced|minced|crushed|ground|cubed|grated|finely)\s+/g, '')
     // Remove common quality descriptors
     .replace(/\b(ripe|raw|cooked|baked|fried|organic)\s+/g, '')
     // Remove trailing/leading whitespace
@@ -104,7 +104,7 @@ export function parseIngredientForShoppingList(ingredientText: string): { quanti
     .replace(/\b(large|medium|small|big|tiny|huge|giant)\s+/gi, '')
     // Keep colors for distinguishing items (like red vs green apples)
     // Remove common preparation descriptors that don't affect core item identity
-    .replace(/\b(fresh|dried|canned|chopped|sliced|diced|minced|crushed|ground|cubed|grated)\s+/gi, '')
+    .replace(/\b(fresh|dried|canned|chopped|sliced|diced|minced|crushed|ground|cubed|grated|finely)\s+/gi, '')
     // Remove common quality descriptors
     .replace(/\b(ripe|raw|cooked|baked|fried|organic)\s+/gi, '')
     // Remove trailing/leading whitespace
@@ -121,6 +121,32 @@ export function parseIngredientForShoppingList(ingredientText: string): { quanti
   return { quantity, itemName };
 }
 
+/**
+ * Cleans item names by removing descriptive words for shopping list display
+ * @param itemName Raw item name (e.g., "chopped onions", "minced garlic")
+ * @returns Cleaned item name (e.g., "Onions", "Garlic")
+ */
+export function cleanItemNameForShopping(itemName: string): string {
+  let cleaned = itemName.toLowerCase()
+    // Remove quantities at the beginning (e.g., "1 ", "2 ", "3 ", etc.)
+    .replace(/^\d+\s+/, '')
+    // Remove common size descriptors
+    .replace(/\b(large|medium|small|big|tiny|huge|giant)\s+/g, '')
+    // Remove common color descriptors
+    .replace(/\b(red|green|yellow|blue|black|white|brown|orange|purple|pink)\s+/g, '')
+    // Remove common preparation descriptors that don't affect core item identity
+    .replace(/\b(fresh|dried|canned|chopped|sliced|diced|minced|crushed|ground|cubed|grated|finely)\s+/g, '')
+    // Remove common quality descriptors
+    .replace(/\b(ripe|raw|cooked|baked|fried|organic)\s+/g, '')
+    // Remove trailing/leading whitespace
+    .trim();
+
+  // Capitalize first letter of each word for better display
+  cleaned = cleaned.replace(/\b\w/g, l => l.toUpperCase());
+
+  return cleaned;
+}
+
 export function getItemImage(itemName: string, category: string): string {
   const name = itemName.toLowerCase();
   const cat = category.toLowerCase();
@@ -135,7 +161,7 @@ export function getItemImage(itemName: string, category: string): string {
       // Remove common color descriptors
       .replace(/\b(red|green|yellow|blue|black|white|brown|orange|purple|pink)\s+/g, '')
       // Remove common preparation descriptors that don't affect core item identity
-      .replace(/\b(fresh|dried|canned|chopped|sliced|diced|minced|crushed|ground|cubed|grated)\s+/g, '')
+      .replace(/\b(fresh|dried|canned|chopped|sliced|diced|minced|crushed|ground|cubed|grated|finely)\s+/g, '')
       // Remove common quality descriptors
       .replace(/\b(ripe|raw|cooked|baked|fried|organic)\s+/g, '')
       // Remove trailing/leading whitespace
@@ -298,6 +324,23 @@ export function getItemImage(itemName: string, category: string): string {
     'cheese': 'slicedcheese.png',
     'bread': 'wheatbread.png',
     'pasta': 'spaghetti.png',
+    'angel hair': 'angelhairnoodles.png',
+    'angel hair pasta': 'angelhairnoodles.png',
+    'barilla angel hair': 'angelhairnoodles.png',
+    'barilla elbows': 'elbownoodles.png',
+    'elbows': 'elbownoodles.png',
+    'elbow pasta': 'elbownoodles.png',
+    'rotini': 'rotininoodles.png',
+    'tri-color rotini': 'rotininoodles.png',
+    'barilla tri-color rotini': 'rotininoodles.png',
+    'barilla': 'spaghetti.png',
+    'fettuccine': 'spaghetti.png',
+    'penne': 'spaghetti.png',
+    'rigatoni': 'spaghetti.png',
+    'ravioli': 'spaghetti.png',
+    'tortellini': 'spaghetti.png',
+    'ramen': 'spaghetti.png',
+    'udon': 'spaghetti.png',
     'chicken': 'frozenchicken.png',
     'beef': 'groundbeef.png',
     'fish': 'frozenfishfilet.png',
@@ -427,7 +470,6 @@ export function getItemImage(itemName: string, category: string): string {
     'sliced swiss cheese': 'slicedswisscheese.png',
     'sour cream': 'sourcream.png',
     'soy sauce': 'soysauce.png',
-    'spaghetti': 'spaghetti.png',
     'spaghetti sauce': 'spegheatisauce.png',
     'spicy mustard': 'spicymustard.png',
     'steak sauce': 'steaksauce.png',
@@ -477,6 +519,7 @@ export function getItemImage(itemName: string, category: string): string {
     'dairy': 'cheese.png',
     'meat': 'beef.png',
     'seafood': 'lobster.svg',
+    'pasta': 'spaghetti.png',
     'bakery': 'pasta.png',
     'condiments': 'ketchup.png',
     'spices': 'salt.png',

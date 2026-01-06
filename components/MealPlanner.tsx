@@ -6,8 +6,10 @@ import { PremiumFeature } from './PremiumFeature';
 import { GroceryCostEstimator } from './GroceryCostEstimator';
 import { Tab } from '../types/app';
 import { searchRecipes } from '../services/geminiService';
+import { getSavedRecipes } from '../services/recipeService';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
+import { parseIngredientForShoppingList } from '../utils/appUtils';
 
 interface MealPlannerProps {
   mealPlan: DayPlan[];
@@ -47,9 +49,25 @@ const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
   useEffect(() => {
     const loadSavedRecipes = async () => {
       try {
-        const saved = await getDocs(collection(db, 'users', user.id, 'savedRecipes'));
-        const recipes = saved.docs.map(doc => ({ id: doc.id, ...doc.data() } as SavedRecipe));
-        setSavedRecipes(recipes);
+        // Load user-specific saved recipes
+        const userSaved = await getDocs(collection(db, 'users', user.id, 'savedRecipes'));
+        const userRecipes = userSaved.docs.map(doc => ({ id: doc.id, ...doc.data() } as SavedRecipe));
+
+        // Load global recipe database
+        const globalRecipes = await getSavedRecipes();
+
+        // Combine and deduplicate recipes (user recipes take precedence)
+        const allRecipes = [...globalRecipes];
+        userRecipes.forEach(userRecipe => {
+          const existingIndex = allRecipes.findIndex(r => r.title === userRecipe.title);
+          if (existingIndex >= 0) {
+            allRecipes[existingIndex] = userRecipe; // Replace with user version
+          } else {
+            allRecipes.push(userRecipe);
+          }
+        });
+
+        setSavedRecipes(allRecipes);
       } catch (error) {
         console.error('Error loading saved recipes:', error);
       }
@@ -108,29 +126,73 @@ const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
       </div>
 
       {/* Results */}
-      <div className="max-h-96 overflow-y-auto space-y-2">
+      <div className="max-h-96 overflow-y-auto">
         {searchResults.length > 0 && (
           <div>
             <h4 className="text-sm font-semibold text-theme-secondary mb-2">Search Results</h4>
-            {searchResults.map((recipe, index) => (
-              <div key={index} className="bg-theme-secondary rounded-lg p-3 mb-2">
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
-                    <h5 className="font-semibold text-theme-primary">{recipe.title}</h5>
-                    <p className="text-sm text-theme-primary opacity-70">{recipe.cookTime}</p>
-                    <p className="text-xs text-theme-primary opacity-50 mt-1">
-                      {recipe.ingredients.length} ingredients
-                    </p>
+            <div className="grid grid-cols-3 gap-2">
+              {searchResults.map((recipe, index) => (
+                <div
+                  key={index}
+                  className="bg-theme-secondary rounded-lg overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
+                  onClick={() => {
+                    // Open recipe modal for preview
+                    const event = new CustomEvent('openRecipeModal', {
+                      detail: { recipe, isSavedView: false }
+                    });
+                    window.dispatchEvent(event);
+                  }}
+                >
+                  {/* Recipe Image */}
+                  <div className="aspect-square bg-theme-primary/20 relative overflow-hidden">
+                    {recipe.image ? (
+                      <img
+                        src={recipe.image}
+                        alt={recipe.title}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.style.display = 'none';
+                          const parent = target.parentElement;
+                          if (parent) {
+                            parent.innerHTML = `
+                              <div class="w-full h-full flex items-center justify-center bg-theme-primary/10">
+                                <svg class="w-6 h-6 text-theme-secondary opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                                </svg>
+                              </div>
+                            `;
+                          }
+                        }}
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-theme-primary/10">
+                        <svg className="w-6 h-6 text-theme-secondary opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                        </svg>
+                      </div>
+                    )}
                   </div>
-                  <button
-                    onClick={() => onAddRecipe(recipe)}
-                    className="px-3 py-1 bg-[var(--accent-color)] text-white rounded text-sm hover:bg-[var(--accent-color)]/90"
-                  >
-                    Add
-                  </button>
+
+                  {/* Recipe Info */}
+                  <div className="p-2">
+                    <h5 className="font-semibold text-xs text-theme-primary line-clamp-2 leading-tight mb-1">{recipe.title}</h5>
+                    <div className="flex items-center justify-between text-xs text-theme-secondary opacity-70">
+                      <span>{recipe.cookTime}</span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onAddRecipe(recipe);
+                        }}
+                        className="px-2 py-1 bg-[var(--accent-color)] text-white rounded text-xs hover:bg-[var(--accent-color)]/90"
+                      >
+                        Add
+                      </button>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         )}
 
@@ -189,7 +251,9 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
   const [selectedDayIndex, setSelectedDayIndex] = useState<number | null>(null);
   const [showRecipeSearch, setShowRecipeSearch] = useState(false);
   const [searchMealType, setSearchMealType] = useState<'breakfast' | 'lunch' | 'dinner' | null>(null);
+  const [modalContext, setModalContext] = useState<'search' | 'scheduled' | null>(null);
 
+  // Function to clean ingredient names by removing descriptive words
   const getMissingIngredients = () => {
     const allNeededIngredients = mealPlan.flatMap(day => 
       [...(day.breakfast || []), ...(day.lunch || []), ...(day.dinner || [])].flatMap(meal => meal.recipe.ingredients)
@@ -203,7 +267,9 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
         pantryItem.item.toLowerCase().includes(neededLower)
       );
     });
-    return [...new Set(missing)];
+
+    // Clean ingredient names before returning
+    return [...new Set(missing.map(ingredient => parseIngredientForShoppingList(ingredient).itemName))];
   };
 
   useEffect(() => {
@@ -268,6 +334,22 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
       }
     };
   }, [isDragging]);
+
+  // Handle recipe modal opening from search tiles
+  useEffect(() => {
+    const handleOpenRecipeModal = (event: CustomEvent) => {
+      const { recipe, isSavedView } = event.detail;
+      setModalRecipe(recipe);
+      setModalContext('search');
+      setShowRecipeModal(true);
+    };
+
+    window.addEventListener('openRecipeModal', handleOpenRecipeModal as EventListener);
+
+    return () => {
+      window.removeEventListener('openRecipeModal', handleOpenRecipeModal as EventListener);
+    };
+  }, []);
 
   const handleDragStart = (e: React.DragEvent, dayIndex: number, mealType: string, mealIndex: number) => {
     setDraggedMeal({ dayIndex, mealType, mealIndex });
@@ -464,7 +546,8 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
                                 }`}
                                 onClick={(e) => { 
                                   e.stopPropagation();
-                                  setModalRecipe(meal.recipe); 
+                                  setModalRecipe(meal.recipe);
+                                  setModalContext('scheduled');
                                   setShowRecipeModal(true); 
                                 }}
                                 title={meal.recipe.title}
@@ -593,6 +676,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
                                 <button
                                   onClick={() => {
                                     setModalRecipe(meal.recipe);
+                                    setModalContext('scheduled');
                                     setShowRecipeModal(true);
                                   }}
                                   className="text-theme-secondary opacity-60 hover:opacity-100 p-2"
@@ -691,12 +775,13 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
           recipe={modalRecipe}
           isOpen={showRecipeModal}
           onClose={() => setShowRecipeModal(false)}
-          onAddToPlan={onAddToPlan}
+          onAddToPlan={modalContext === 'search' ? onAddToPlan : undefined}
           onSaveRecipe={onSaveRecipe}
-          onMarkAsMade={onMarkAsMade}
+          onMarkAsMade={modalContext === 'scheduled' ? onMarkAsMade : undefined}
           showSaveButton={true}
-          showMarkAsMade={true}
-          showAddToPlan={true}
+          showMarkAsMade={modalContext === 'scheduled'}
+          showAddToPlan={modalContext === 'search'}
+          user={user}
         />
       )}
     </div>

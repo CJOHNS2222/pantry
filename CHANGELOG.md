@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Recipe Search Integration**: "Add Recipe" buttons in empty meal slots open search modal
   - **Saved Recipes Access**: Search modal shows both AI-generated recipes and user's saved recipes
   - **Enhanced Meal Management**: View, add, and remove recipes directly from day detail modal
+- **Smart Ingredient Cleaning**: Automatic removal of descriptive preparation words from shopping list items
+  - **Recipe Ingredients**: Ingredients like "2 chopped onions" become "Onion" in shopping lists
+  - **Pantry Items**: Descriptive words like "chopped", "minced", "diced", "sliced", "finely" are removed when adding to shopping lists
+  - **Enhanced Shopping Experience**: Cleaner, more actionable shopping list items for better grocery shopping
 
 ### Changed
 - **MealPlanner UX**: Streamlined from dual-view system to single calendar-based workflow
