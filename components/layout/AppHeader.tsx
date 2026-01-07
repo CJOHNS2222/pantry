@@ -23,6 +23,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             {user.email}
           </div>
           <button
+            data-tutorial="household-button"
             onClick={onShowHousehold}
             className="flex items-center space-x-2 px-2 py-1 rounded-full hover:bg-black/5 transition-colors mt-1"
           >
@@ -42,6 +43,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           <span className="text-[10px] uppercase tracking-widest text-theme-secondary opacity-60">AI Kitchen Assistant</span>
         </div>
         <button
+          data-tutorial="theme-toggle"
           onClick={() => setSettings(prev => ({
             ...prev,
             theme: {

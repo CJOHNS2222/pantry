@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CalendarClock, Plus, Move, AlertCircle, ShoppingBasket, Trash2 } from 'lucide-react';
+import { CalendarClock, Plus, Move, AlertCircle, ShoppingBasket, Trash2, Bell, BellOff } from 'lucide-react';
 import { DayPlan, MealPlanItem, PantryItem, StructuredRecipe, User, SavedRecipe } from '../types';
 import RecipeModal from './RecipeModal';
 import { PremiumFeature } from './PremiumFeature';
@@ -10,6 +10,7 @@ import { getSavedRecipes } from '../services/recipeService';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 import { parseIngredientForShoppingList } from '../utils/appUtils';
+import AnalyticsService from '../services/analyticsService';
 
 interface MealPlannerProps {
   mealPlan: DayPlan[];
@@ -22,6 +23,19 @@ interface MealPlannerProps {
   onRate?: (rating: any) => void;
   user: User;
   setActiveTab: (tab: Tab) => void;
+  settings?: {
+    notifications: {
+      enabled: boolean;
+      time: string;
+      types: {
+        shoppingList: boolean;
+        mealPlan: boolean;
+        cookingReminders?: boolean;
+      };
+      cookingReminderTime?: number;
+    };
+  };
+  onOpenRecipeSearch?: () => void;
 }
 
 interface RecipeSearchModalProps {
@@ -286,7 +300,7 @@ const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
   );
 };
 
-export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan, inventory, addToShoppingList, onAddToPlan, onSaveRecipe, onMarkAsMade, onRate, user, setActiveTab }) => {
+export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan, inventory, addToShoppingList, onAddToPlan, onSaveRecipe, onMarkAsMade, onRate, user, setActiveTab, settings, onOpenRecipeSearch }) => {
     // List of staple items to ignore
     const STAPLES = ['salt', 'pepper', 'oil', 'water', 'flour', 'sugar', 'butter', 'vinegar', 'baking powder', 'baking soda', 'spices', 'seasoning', 'soy sauce', 'cornstarch', 'yeast'];
   const [draggedMeal, setDraggedMeal] = useState<{ dayIndex: number, mealType: string, mealIndex: number } | null>(null);
@@ -295,12 +309,147 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
   const [missingItemsCount, setMissingItemsCount] = useState(0);
   const [showRecipeModal, setShowRecipeModal] = useState(false);
   const [modalRecipe, setModalRecipe] = useState<StructuredRecipe | null>(null);
+  const [modalContext, setModalContext] = useState<'search' | 'scheduled'>('search');
+
+  // Cooking reminders state
+  const [reminders, setReminders] = useState<{[key: string]: number}>({});
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
+
+  // Check notification permission on mount
+  useEffect(() => {
+    if ('Notification' in window) {
+      setNotificationPermission(Notification.permission);
+    }
+  }, []);
+
+  // Request notification permission
+  const requestNotificationPermission = async () => {
+    if ('Notification' in window) {
+      const permission = await Notification.requestPermission();
+      setNotificationPermission(permission);
+      return permission === 'granted';
+    }
+    return false;
+  };
+
+  // Schedule cooking reminder
+  const scheduleCookingReminder = (recipe: StructuredRecipe, dayIndex: number, mealType: string, prepTimeMinutes?: number) => {
+    const reminderTime = prepTimeMinutes || settings?.notifications?.cookingReminderTime || 30;
+    const reminderKey = `${dayIndex}-${mealType}-${recipe.title}`;
+    const now = new Date();
+    const reminderTimeObj = new Date(now.getTime() + (reminderTime * 60 * 1000));
+
+    // Track analytics
+    AnalyticsService.trackCookingReminderSet(recipe.id || recipe.title, recipe.title, reminderTime);
+
+    // Store reminder in localStorage
+    const reminderData = {
+      recipeTitle: recipe.title,
+      dayIndex,
+      mealType,
+      reminderTime: reminderTimeObj.getTime(),
+      prepTimeMinutes: reminderTime
+    };
+
+    localStorage.setItem(`cooking-reminder-${reminderKey}`, JSON.stringify(reminderData));
+
+    // Set timeout for notification
+    const timeoutId = setTimeout(() => {
+      if (notificationPermission === 'granted') {
+        new Notification(`Time to cook: ${recipe.title}`, {
+          body: `Your ${mealType} is scheduled in ${reminderTime} minutes. Start prepping now!`,
+          icon: '/icon-192.png',
+          tag: `cooking-${reminderKey}`
+        });
+        
+        // Track reminder trigger
+        AnalyticsService.trackCookingReminderTriggered(recipe.id || recipe.title, recipe.title);
+      }
+
+      // Remove from localStorage after notification
+      localStorage.removeItem(`cooking-reminder-${reminderKey}`);
+    }, reminderTime * 60 * 1000);
+
+    setReminders(prev => ({ ...prev, [reminderKey]: timeoutId }));
+
+    return timeoutId;
+  };
+
+  // Cancel cooking reminder
+  const cancelCookingReminder = (dayIndex: number, mealType: string, recipeTitle: string) => {
+    const reminderKey = `${dayIndex}-${mealType}-${recipeTitle}`;
+
+    if (reminders[reminderKey]) {
+      clearTimeout(reminders[reminderKey]);
+      setReminders(prev => {
+        const newReminders = { ...prev };
+        delete newReminders[reminderKey];
+        return newReminders;
+      });
+    }
+
+    // Track analytics
+    AnalyticsService.trackCookingReminderCancel(`reminder-${reminderKey}`, recipeTitle);
+
+    localStorage.removeItem(`cooking-reminder-${reminderKey}`);
+  };
+
+  // Load existing reminders on mount
+  useEffect(() => {
+    const loadReminders = () => {
+      const now = Date.now();
+      const loadedReminders: {[key: string]: number} = {};
+
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key?.startsWith('cooking-reminder-')) {
+          const data = JSON.parse(localStorage.getItem(key) || '{}');
+          if (data.reminderTime > now) {
+            const timeLeft = data.reminderTime - now;
+            const timeoutId = setTimeout(() => {
+              if (notificationPermission === 'granted') {
+                new Notification(`Time to cook: ${data.recipeTitle}`, {
+                  body: `Your ${data.mealType} is scheduled in ${data.prepTimeMinutes} minutes. Start prepping now!`,
+                  icon: '/icon-192.png',
+                  tag: `cooking-${key.replace('cooking-reminder-', '')}`
+                });
+              }
+              localStorage.removeItem(key);
+            }, timeLeft);
+
+            loadedReminders[key.replace('cooking-reminder-', '')] = timeoutId;
+          } else {
+            localStorage.removeItem(key);
+          }
+        }
+      }
+
+      setReminders(loadedReminders);
+    };
+
+    loadReminders();
+
+    return () => {
+      // Cleanup all timeouts on unmount
+      Object.values(reminders).forEach(timeoutId => clearTimeout(timeoutId));
+    };
+  }, [notificationPermission]);
+
+  // Tutorial trigger for opening recipe search modal
+  useEffect(() => {
+    if (onOpenRecipeSearch) {
+      const timer = setTimeout(() => {
+        setShowRecipeSearch(true);
+      }, 1000); // Delay to allow tab switch animation
+      return () => clearTimeout(timer);
+    }
+  }, [onOpenRecipeSearch]);
+
   const [isDragging, setIsDragging] = useState(false);
   const [dragOverTrash, setDragOverTrash] = useState(false);
   const [selectedDayIndex, setSelectedDayIndex] = useState<number | null>(null);
   const [showRecipeSearch, setShowRecipeSearch] = useState(false);
   const [searchMealType, setSearchMealType] = useState<'breakfast' | 'lunch' | 'dinner' | null>(null);
-  const [modalContext, setModalContext] = useState<'search' | 'scheduled' | null>(null);
 
   // Function to clean ingredient names by removing descriptive words
   const getMissingIngredients = () => {
@@ -508,6 +657,13 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
       const newPlan = [...mealPlan];
       const mealTypeKey = mealType as 'breakfast' | 'lunch' | 'dinner';
       if (!newPlan[dayIndex][mealTypeKey]) newPlan[dayIndex][mealTypeKey] = [];
+      
+      // Track analytics before removing
+      const mealToRemove = newPlan[dayIndex][mealTypeKey][mealIndex];
+      if (mealToRemove) {
+        AnalyticsService.trackMealPlanRemove(mealToRemove.recipe.id || mealToRemove.recipe.title, mealToRemove.recipe.title, mealType);
+      }
+      
       newPlan[dayIndex][mealTypeKey] = newPlan[dayIndex][mealTypeKey].filter((_, i) => i !== mealIndex);
       setMealPlan(newPlan);
   };
@@ -517,6 +673,29 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
       <div className="text-center mb-8">
         <h2 className="text-3xl font-serif font-bold text-theme-secondary">Meal Schedule</h2>
         <p className="text-theme-secondary opacity-60 text-sm mt-1">Plan your week ahead</p>
+        
+        {/* Notification permission prompt */}
+        {notificationPermission === 'default' && (
+          <div className="mt-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+            <p className="text-sm text-yellow-700 dark:text-yellow-300 mb-2">
+              Enable cooking reminders to get notified when it's time to start prepping your meals!
+            </p>
+            <button
+              onClick={requestNotificationPermission}
+              className="px-4 py-2 bg-yellow-500 text-white rounded-lg text-sm hover:bg-yellow-600 transition-colors"
+            >
+              Enable Notifications
+            </button>
+          </div>
+        )}
+        
+        {notificationPermission === 'denied' && (
+          <div className="mt-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+            <p className="text-sm text-red-700 dark:text-red-300">
+              Notifications are blocked. To use cooking reminders, please enable notifications in your browser settings.
+            </p>
+          </div>
+        )}
       </div>
 
       <PremiumFeature
@@ -579,33 +758,60 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
                               —
                             </div>
                           ) : (
-                            mealsForType.map((meal, mealIndex) => (
-                              <div
-                                key={meal.id}
-                                draggable
-                                onDragStart={(e) => {
-                                  e.dataTransfer.setData('text/plain', `${mealTypeKey}-${mealIndex}`);
-                                  handleDragStart(e, dayIndex, mealTypeKey, mealIndex);
-                                }}
-                                onDragEnd={handleDragEnd}
-                                className={`bg-theme-primary border rounded p-1 text-[9px] cursor-move group shadow-sm active:cursor-grabbing transition-all truncate hover:opacity-50 ${
-                                  draggedMeal?.dayIndex === dayIndex && draggedMeal?.mealType === mealTypeKey && draggedMeal?.mealIndex === mealIndex
-                                    ? 'opacity-50 scale-95'
-                                    : ''
-                                }`}
-                                onClick={(e) => { 
-                                  e.stopPropagation();
-                                  setModalRecipe(meal.recipe);
-                                  setModalContext('scheduled');
-                                  setShowRecipeModal(true); 
-                                }}
-                                title={meal.recipe.title}
-                              >
-                                <span className="text-[var(--accent-color)] font-semibold truncate block">
-                                  {meal.recipe.title}
-                                </span>
-                              </div>
-                            ))
+                            mealsForType.map((meal, mealIndex) => {
+                              const reminderKey = `${dayIndex}-${mealTypeKey}-${meal.recipe.title}`;
+                              const hasReminder = reminders[reminderKey] !== undefined;
+
+                              return (
+                                <div
+                                  key={meal.id}
+                                  draggable
+                                  onDragStart={(e) => {
+                                    e.dataTransfer.setData('text/plain', `${mealTypeKey}-${mealIndex}`);
+                                    handleDragStart(e, dayIndex, mealTypeKey, mealIndex);
+                                  }}
+                                  onDragEnd={handleDragEnd}
+                                  className={`bg-theme-primary border rounded p-1 text-[9px] cursor-move group shadow-sm active:cursor-grabbing transition-all truncate hover:opacity-50 flex items-center justify-between gap-1 ${
+                                    draggedMeal?.dayIndex === dayIndex && draggedMeal?.mealType === mealTypeKey && draggedMeal?.mealIndex === mealIndex
+                                      ? 'opacity-50 scale-95'
+                                      : ''
+                                  }`}
+                                  onClick={(e) => { 
+                                    e.stopPropagation();
+                                    setModalRecipe(meal.recipe);
+                                    setModalContext('scheduled');
+                                    setShowRecipeModal(true); 
+                                  }}
+                                  title={meal.recipe.title}
+                                >
+                                  <span className="text-[var(--accent-color)] font-semibold truncate flex-1">
+                                    {meal.recipe.title}
+                                  </span>
+                                  <button
+                                    onClick={async (e) => {
+                                      e.stopPropagation();
+                                      if (hasReminder) {
+                                        cancelCookingReminder(dayIndex, mealTypeKey, meal.recipe.title);
+                                      } else {
+                                        if (notificationPermission !== 'granted') {
+                                          const granted = await requestNotificationPermission();
+                                          if (!granted) return;
+                                        }
+                                        scheduleCookingReminder(meal.recipe, dayIndex, mealTypeKey);
+                                      }
+                                    }}
+                                    className={`p-0.5 rounded transition-colors flex-shrink-0 ${
+                                      hasReminder 
+                                        ? 'text-yellow-500 hover:text-yellow-600' 
+                                        : 'text-theme-secondary opacity-50 hover:opacity-70'
+                                    }`}
+                                    title={hasReminder ? 'Cancel cooking reminder' : 'Set cooking reminder'}
+                                  >
+                                    {hasReminder ? <Bell className="w-3 h-3" /> : <BellOff className="w-3 h-3" />}
+                                  </button>
+                                </div>
+                              );
+                            })
                           )}
                         </div>
                       </div>
@@ -701,6 +907,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
                             setSearchMealType(mealTypeKey);
                             setShowRecipeSearch(true);
                           }}
+                          data-tutorial="add-recipe-button"
                           className="w-full border-2 border-dashed border-theme/50 rounded-lg p-4 text-center hover:border-[var(--accent-color)] hover:bg-[var(--accent-color)]/5 transition-all"
                         >
                           <Plus className="w-8 h-8 mx-auto mb-2 text-theme-secondary opacity-50" />
@@ -746,6 +953,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
                               setSearchMealType(mealTypeKey);
                               setShowRecipeSearch(true);
                             }}
+                            data-tutorial="add-recipe-button"
                             className="w-full border border-theme/50 rounded-lg p-3 text-center hover:border-[var(--accent-color)] hover:bg-[var(--accent-color)]/5 transition-all"
                           >
                             <Plus className="w-5 h-5 mx-auto mb-1 text-theme-secondary opacity-50" />

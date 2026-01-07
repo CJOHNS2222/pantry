@@ -24,3 +24,21 @@
   max-width: 28rem;
   text-align: center;
 }
+
+/* Tutorial Glow Effect */
+.tutorial-glow {
+  animation: tutorial-glow 2s ease-in-out infinite alternate;
+  box-shadow: 0 0 20px rgba(76, 175, 80, 0.8), 0 0 40px rgba(76, 175, 80, 0.4), 0 0 60px rgba(76, 175, 80, 0.2);
+  border: 2px solid var(--accent-color) !important;
+  transform: scale(1.05);
+  transition: all 0.3s ease;
+}
+
+@keyframes tutorial-glow {
+  from {
+    box-shadow: 0 0 20px rgba(76, 175, 80, 0.8), 0 0 40px rgba(76, 175, 80, 0.4), 0 0 60px rgba(76, 175, 80, 0.2);
+  }
+  to {
+    box-shadow: 0 0 30px rgba(76, 175, 80, 1), 0 0 60px rgba(76, 175, 80, 0.6), 0 0 90px rgba(76, 175, 80, 0.3);
+  }
+}

@@ -5,6 +5,41 @@ All notable changes to Smart Pantry Chef will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.4] - 2026-01-07
+
+### Added
+- **Interactive Tutorial System**: Complete overhaul of user onboarding experience
+  - **15-Step Guided Tour**: Interactive walkthrough covering all major app features
+  - **Glow Highlighting**: Replaced circle overlays with smooth CSS glow effects on actual buttons
+  - **Dynamic Modal Positioning**: Tutorial modal automatically adjusts position to avoid navigation bar overlap
+  - **Smart Timing**: 2-second pause for household button to allow visual identification before auto-click
+  - **Theme Toggle Demo**: Automatic theme switching demonstration with return to dark theme
+  - **Context-Aware Descriptions**: Updated tutorial text to match actual app interface and features
+- **UI/UX Enhancements**: Comprehensive visual and interaction improvements
+  - **Hover Animations**: Smooth scale and shadow transitions on interactive elements
+  - **Progressive Loading**: Skeleton loaders and smooth content transitions throughout the app
+  - **Voice Search Integration**: Microphone button for voice-powered recipe and ingredient search
+  - **Accessibility Improvements**: Enhanced keyboard navigation, screen reader support, and focus management
+  - **Cooking Reminders**: Smart notification system for meal preparation timing
+  - **Enhanced Analytics Dashboard**: Improved Firebase Analytics integration with detailed usage insights
+- **Tutorial Navigation Improvements**:
+  - **Raised Modal Positioning**: Tutorial modal positioned 25px higher for navigation-related steps
+  - **Corrected Feature Descriptions**: Updated tutorial text to accurately reflect app functionality
+  - **Recipe Finder Clarification**: Tutorial now correctly references "Chef" tab and "Use Inventory Only" option
+  - **Meal Planning Guidance**: Clear instructions for adding recipes by clicking days in the meal planner
+
+### Changed
+- **Tutorial Descriptions**: Updated all tutorial step descriptions to match actual app interface and functionality
+- **Recipe Search Guidance**: Tutorial now explains clicking days to add recipes instead of non-existent search buttons
+- **AI Recipe Finder**: Tutorial references correct tab name ("Chef") and search option ("Use Inventory Only")
+
+### Fixed
+- **Tutorial Timing**: Added appropriate delays for user comprehension before automatic actions
+- **Theme Persistence**: Tutorial now returns to dark theme after theme toggle demonstration
+- **Modal Positioning**: Tutorial modal no longer overlaps navigation bar during navigation steps
+
+## [1.1.3] - 2026-01-06
+
 ## [1.1.3] - 2026-01-06
 
 ### Added

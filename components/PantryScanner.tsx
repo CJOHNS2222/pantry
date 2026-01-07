@@ -596,7 +596,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
         </div>
         
         {/* View Selector - Next to title */}
-        <div className="flex bg-theme-secondary rounded-lg p-1 border-2 border-[var(--accent-color)] shadow-lg">
+        <div data-tutorial="category-toggle" className="flex bg-theme-secondary rounded-lg p-1 border-2 border-[var(--accent-color)] shadow-lg">
           <button
             onClick={() => setViewMode('category')}
             className={`px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
