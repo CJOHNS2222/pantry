@@ -49,6 +49,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
   const originalServings = 4; // Assume recipes are for 4 servings
   const ratingRef = useRef<HTMLDivElement>(null);
   const [showReviewPrompt, setShowReviewPrompt] = useState(false);
+  const [showRatingModal, setShowRatingModal] = useState(false);
   
   // Cooking Timer State
   const [timerActive, setTimerActive] = useState(false);
@@ -173,15 +174,12 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
     // Step 4: Ask if user wants to submit a review
     setTimeout(() => {
       const submitReview = window.confirm(
-        `Would you like to submit a review of this recipe to the community? This helps other users find great recipes!`
+        `Would you like to rate this recipe? This helps other users find great recipes!`
       );
       
       if (submitReview) {
-        // Scroll to rating section
-        if (ratingRef.current) {
-          ratingRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          setShowReviewPrompt(true);
-        }
+        // Show rating modal
+        setShowRatingModal(true);
       } else {
         // Close modal if no review
         onClose();
@@ -502,6 +500,46 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
           )}
         </div>
       </div>
+
+      {/* Rating Modal */}
+      {showRatingModal && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+          onClick={() => setShowRatingModal(false)}
+        >
+          <div
+            className="bg-theme-primary rounded-2xl p-6 max-w-md w-full mx-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-xl font-bold text-theme-text mb-4 text-center">
+              Rate "{recipe.title}"
+            </h3>
+            <div className="mb-6">
+              <RecipeRatingUI
+                recipeTitle={recipe.title}
+                recipe={recipe}
+                onRate={(rating) => {
+                  if (onRate) onRate(rating);
+                  setShowRatingModal(false);
+                  setTimeout(() => onClose(), 300); // Close main modal after submitting a rating
+                }}
+                user={user}
+              />
+            </div>
+            <div className="flex justify-center">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowRatingModal(false);
+                }}
+                className="py-3 px-6 font-bold border border-theme rounded-lg hover:bg-theme-secondary transition-colors"
+              >
+                Skip for Now
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

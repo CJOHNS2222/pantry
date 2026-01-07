@@ -162,6 +162,7 @@ export const MainContent: React.FC<MainContentProps> = ({
             onAddToPlan={onAddToPlan}
             onSaveRecipe={onSaveRecipe}
             onMarkAsMade={handleMarkAsMade}
+            onRate={onRateRecipe}
             user={user}
             setActiveTab={setActiveTab}
           />

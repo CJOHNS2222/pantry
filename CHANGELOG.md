@@ -26,6 +26,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Recipe Ingredients**: Ingredients like "2 chopped onions" become "Onion" in shopping lists
   - **Pantry Items**: Descriptive words like "chopped", "minced", "diced", "sliced", "finely" are removed when adding to shopping lists
   - **Enhanced Shopping Experience**: Cleaner, more actionable shopping list items for better grocery shopping
+- **Recipe Ratings System**: Complete rating and review functionality for recipes
+  - **Post-Cooking Rating Prompt**: After marking a recipe as made, users are prompted to rate the recipe
+  - **Dedicated Rating Modal**: Clean, focused modal for rating recipes with star selection and optional comments
+  - **MealPlanner Integration**: Ratings functionality now available in MealPlanner recipe modals
+  - **Event Handling Fix**: Resolved modal closing issues when interacting with rating inputs
 
 ### Changed
 - **MealPlanner UX**: Streamlined from dual-view system to single calendar-based workflow

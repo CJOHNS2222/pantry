@@ -19,6 +19,7 @@ interface MealPlannerProps {
   onAddToPlan?: (recipe: StructuredRecipe) => void;
   onSaveRecipe?: (recipe: StructuredRecipe) => void;
   onMarkAsMade?: (recipe: StructuredRecipe) => void;
+  onRate?: (rating: any) => void;
   user: User;
   setActiveTab: (tab: Tab) => void;
 }
@@ -99,10 +100,14 @@ const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
     }
   };
 
-  const filteredSavedRecipes = savedRecipes.filter(recipe =>
-    recipe.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    recipe.ingredients.some(ing => ing.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  const filteredSavedRecipes = savedRecipes
+    .filter(recipe =>
+      recipe.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      recipe.ingredients.some(ing => ing.toLowerCase().includes(searchQuery.toLowerCase()))
+    )
+    .filter((recipe, index, self) =>
+      index === self.findIndex(r => r.title === recipe.title)
+    );
 
   return (
     <div className="space-y-4">
@@ -199,25 +204,69 @@ const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
         {filteredSavedRecipes.length > 0 && (
           <div>
             <h4 className="text-sm font-semibold text-theme-secondary mb-2">Saved Recipes</h4>
-            {filteredSavedRecipes.map((recipe) => (
-              <div key={recipe.id} className="bg-theme-secondary rounded-lg p-3 mb-2">
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
-                    <h5 className="font-semibold text-theme-primary">{recipe.title}</h5>
-                    <p className="text-sm text-theme-primary opacity-70">{recipe.cookTime}</p>
-                    <p className="text-xs text-theme-primary opacity-50 mt-1">
-                      {recipe.ingredients.length} ingredients
-                    </p>
+            <div className="grid grid-cols-3 gap-2">
+              {filteredSavedRecipes.map((recipe) => (
+                <div
+                  key={recipe.id}
+                  className="bg-theme-secondary rounded-lg overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
+                  onClick={() => {
+                    // Open recipe modal for preview
+                    const event = new CustomEvent('openRecipeModal', {
+                      detail: { recipe, isSavedView: false }
+                    });
+                    window.dispatchEvent(event);
+                  }}
+                >
+                  {/* Recipe Image */}
+                  <div className="aspect-square bg-theme-primary/20 relative overflow-hidden">
+                    {recipe.image ? (
+                      <img
+                        src={recipe.image}
+                        alt={recipe.title}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.style.display = 'none';
+                          const parent = target.parentElement;
+                          if (parent) {
+                            parent.innerHTML = `
+                              <div class="w-full h-full flex items-center justify-center bg-theme-primary/10">
+                                <svg class="w-6 h-6 text-theme-secondary opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                                </svg>
+                              </div>
+                            `;
+                          }
+                        }}
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-theme-primary/10">
+                        <svg className="w-6 h-6 text-theme-secondary opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                        </svg>
+                      </div>
+                    )}
                   </div>
-                  <button
-                    onClick={() => onAddRecipe(recipe)}
-                    className="px-3 py-1 bg-[var(--accent-color)] text-white rounded text-sm hover:bg-[var(--accent-color)]/90"
-                  >
-                    Add
-                  </button>
+
+                  {/* Recipe Info */}
+                  <div className="p-2">
+                    <h5 className="font-semibold text-xs text-theme-primary line-clamp-2 leading-tight mb-1">{recipe.title}</h5>
+                    <div className="flex items-center justify-between text-xs text-theme-secondary opacity-70">
+                      <span>{recipe.cookTime}</span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onAddRecipe(recipe);
+                        }}
+                        className="px-2 py-1 bg-[var(--accent-color)] text-white rounded text-xs hover:bg-[var(--accent-color)]/90"
+                      >
+                        Add
+                      </button>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         )}
 
@@ -237,7 +286,7 @@ const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
   );
 };
 
-export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan, inventory, addToShoppingList, onAddToPlan, onSaveRecipe, onMarkAsMade, user, setActiveTab }) => {
+export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan, inventory, addToShoppingList, onAddToPlan, onSaveRecipe, onMarkAsMade, onRate, user, setActiveTab }) => {
     // List of staple items to ignore
     const STAPLES = ['salt', 'pepper', 'oil', 'water', 'flour', 'sugar', 'butter', 'vinegar', 'baking powder', 'baking soda', 'spices', 'seasoning', 'soy sauce', 'cornstarch', 'yeast'];
   const [draggedMeal, setDraggedMeal] = useState<{ dayIndex: number, mealType: string, mealIndex: number } | null>(null);
@@ -777,6 +826,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
           onClose={() => setShowRecipeModal(false)}
           onAddToPlan={modalContext === 'search' ? onAddToPlan : undefined}
           onSaveRecipe={onSaveRecipe}
+          onRate={onRate}
           onMarkAsMade={modalContext === 'scheduled' ? onMarkAsMade : undefined}
           showSaveButton={true}
           showMarkAsMade={modalContext === 'scheduled'}

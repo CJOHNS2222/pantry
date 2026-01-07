@@ -47,17 +47,20 @@ export const RecipeRatingUI: React.FC<RecipeRatingUIProps> = ({ recipeTitle, rec
   }
 
   return (
-    <div className="bg-[#3F1016] rounded-xl p-4 border border-red-900/30 mt-4">
+    <div className="bg-[#3F1016] rounded-xl p-4 border border-red-900/30 mt-4" onClick={(e) => e.stopPropagation()}>
       <h4 className="text-amber-400 font-serif text-lg mb-3 flex items-center gap-2">
         <Star className="w-4 h-4" /> Rate this recipe
       </h4>
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} onClick={(e) => e.stopPropagation()}>
         <div className="flex gap-2 mb-4 justify-center">
           {[1, 2, 3, 4, 5].map((star) => (
             <button
               key={star}
               type="button"
-              onClick={() => setRating(star)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setRating(star);
+              }}
               className="focus:outline-none transition-transform hover:scale-110"
             >
               <Star 
@@ -71,6 +74,7 @@ export const RecipeRatingUI: React.FC<RecipeRatingUIProps> = ({ recipeTitle, rec
           <textarea
             value={comment}
             onChange={(e) => setComment(e.target.value)}
+            onClick={(e) => e.stopPropagation()}
             placeholder="Share your tips or modifications..."
             className="w-full bg-[#2A0A10] text-red-100 border border-red-900/50 rounded-lg p-3 text-sm focus:border-amber-500 focus:outline-none resize-none h-20 placeholder-red-900/50"
           />
@@ -80,6 +84,7 @@ export const RecipeRatingUI: React.FC<RecipeRatingUIProps> = ({ recipeTitle, rec
         <button 
           type="submit" 
           disabled={rating === 0}
+          onClick={(e) => e.stopPropagation()}
           className="w-full bg-amber-600/20 hover:bg-amber-600/30 text-amber-400 border border-amber-600/50 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Submit Review
