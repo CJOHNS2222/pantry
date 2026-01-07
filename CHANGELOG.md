@@ -31,6 +31,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Dedicated Rating Modal**: Clean, focused modal for rating recipes with star selection and optional comments
   - **MealPlanner Integration**: Ratings functionality now available in MealPlanner recipe modals
   - **Event Handling Fix**: Resolved modal closing issues when interacting with rating inputs
+- **Recipe Data Management Scripts**: New utility scripts for maintaining recipe database quality
+  - **Bulk Recipe Upload Enhancements**: Improved deduplication and duplicate description prevention
+  - **Incomplete Recipe Cleanup**: Script to remove recipes with missing instructions
+  - **Duplicate Description Cleanup**: Script to remove redundant descriptions matching instructions
+- **RecipeFinder Firebase Integration**: Replaced hardcoded recipes with dynamic Firebase data
+  - **4-Column Tile Layout**: Updated from 3-column to 4-column grid for better space utilization
+  - **Category Filtering**: Added filter buttons for different recipe categories
+  - **Real-time Firebase Data**: Popular recipes section now loads from user's saved recipes
+- **API Optimization**: Switched to free recipe API with paid fallback
+  - **TheMealDB Primary API**: Free, reliable recipe source as primary data provider
+  - **Spoonacular Fallback**: Paid API used only when free API is unavailable
+  - **Cost Reduction**: Significantly reduced API costs while maintaining functionality
+
+### Fixed
+- **MealPlanner Grid Display**: Resolved 3-column tile layout issues in recipe search modal
+- **Recipe Deduplication**: Added filtering to prevent duplicate recipes in saved recipes list
+- **Bulk Upload Optimization**: Enhanced to fetch unique recipes and prevent duplicate API calls
+- **Search Result Variety**: Improved query randomization to avoid repetitive recipe results
+- **Modal Event Handling**: Fixed rating modal closing when clicking input fields
 
 ### Changed
 - **MealPlanner UX**: Streamlined from dual-view system to single calendar-based workflow
