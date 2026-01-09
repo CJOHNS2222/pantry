@@ -19,6 +19,8 @@ interface RecipeModalProps {
   showAddToPlan?: boolean;
   inventory?: PantryItem[];
   isFromMealPlan?: boolean;
+  recipeSaveLimitExceeded?: boolean;
+  mealPlanLimitExceeded?: boolean;
   user?: {
     id: string;
     name: string;
@@ -43,6 +45,8 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
   showAddToPlan = true,
   inventory = [],
   isFromMealPlan = false,
+  recipeSaveLimitExceeded = false,
+  mealPlanLimitExceeded = false,
   user
 }) => {
   const [servings, setServings] = useState(4); // Default to 4 servings
@@ -486,13 +490,29 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
             </button>
           )}
           {showAddToPlan && onAddToPlan && (
-            <button onClick={() => { onAddToPlan(recipe as StructuredRecipe); onClose(); }} className="flex-1 py-3 font-bold bg-[var(--accent-color)] text-white rounded-lg flex items-center justify-center gap-2">
-              <Plus className="w-4 h-4" /> Add to Schedule
+            <button 
+              onClick={() => { onAddToPlan(recipe as StructuredRecipe); onClose(); }} 
+              disabled={mealPlanLimitExceeded}
+              className={`flex-1 py-3 font-bold rounded-lg flex items-center justify-center gap-2 ${
+                mealPlanLimitExceeded 
+                  ? 'bg-gray-400 text-gray-600 cursor-not-allowed opacity-50' 
+                  : 'bg-[var(--accent-color)] text-white'
+              }`}
+            >
+              <Plus className="w-4 h-4" /> {mealPlanLimitExceeded ? 'Limit Reached' : 'Add to Schedule'}
             </button>
           )}
           {showSaveButton && onSaveRecipe && (
-            <button onClick={() => { onSaveRecipe(recipe as StructuredRecipe); onClose(); }} className="flex-1 py-3 font-bold border border-[var(--accent-color)] rounded-lg flex items-center justify-center gap-2">
-              <Heart className="w-4 h-4" /> Save
+            <button 
+              onClick={() => { onSaveRecipe(recipe as StructuredRecipe); onClose(); }} 
+              disabled={recipeSaveLimitExceeded}
+              className={`flex-1 py-3 font-bold border rounded-lg flex items-center justify-center gap-2 ${
+                recipeSaveLimitExceeded 
+                  ? 'border-gray-400 text-gray-400 cursor-not-allowed opacity-50' 
+                  : 'border-[var(--accent-color)] hover:bg-[var(--accent-color)] hover:text-white'
+              }`}
+            >
+              <Heart className="w-4 h-4" /> {recipeSaveLimitExceeded ? 'Limit Reached' : 'Save'}
             </button>
           )}
           {showMarkAsMade && onMarkAsMade && (

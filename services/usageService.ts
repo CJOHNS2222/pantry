@@ -46,14 +46,14 @@ class UsageService {
       mealPlanning: { weeklyRecipes: 3, twoWeekPlanning: false }
     },
     premium: {
-      searches: { weekly: -1 }, // -1 means unlimited
-      recipes: { max: 25 },
-      mealPlanning: { weeklyRecipes: -1, twoWeekPlanning: true } // -1 means unlimited weekly recipes
+      searches: { weekly: 15 },
+      recipes: { max: 20 },
+      mealPlanning: { weeklyRecipes: -1, twoWeekPlanning: false } // 7-day planning with unlimited entries
     },
     family: {
-      searches: { weekly: -1 },
-      recipes: { max: 25 },
-      mealPlanning: { weeklyRecipes: -1, twoWeekPlanning: true }
+      searches: { weekly: -1 }, // unlimited searches
+      recipes: { max: -1 }, // unlimited saved recipes
+      mealPlanning: { weeklyRecipes: -1, twoWeekPlanning: true } // 2-week planning with unlimited entries
     }
   };
 
@@ -62,7 +62,7 @@ class UsageService {
       throw new Error('User required for usage tracking');
     }
 
-    const usageRef = doc(db, 'usage_limits', user.id);
+    const usageRef = doc(db, 'users', user.id, 'usage', 'limits');
     const usageDoc = await getDoc(usageRef);
 
     const now = new Date();
@@ -144,7 +144,7 @@ class UsageService {
   static async recordSearch(user: User): Promise<void> {
     if (!user?.id) return;
 
-    const usageRef = doc(db, 'usage_limits', user.id);
+    const usageRef = doc(db, 'users', user.id, 'usage', 'limits');
     await updateDoc(usageRef, {
       'searches.used': increment(1),
       lastUpdated: new Date()
@@ -161,21 +161,52 @@ class UsageService {
     return limits.mealPlanning.weeklyRecipes === -1 || currentWeeklyCount < limits.mealPlanning.weeklyRecipes;
   }
 
-  static async recordMealPlanAddition(user: User): Promise<void> {
+  static async recordRecipeSave(user: User): Promise<void> {
     if (!user?.id) return;
 
-    const usageRef = doc(db, 'usage_limits', user.id);
+    const usageRef = doc(db, 'users', user.id, 'usage', 'limits');
     await updateDoc(usageRef, {
-      'mealPlanning.weeklyUsed': increment(1),
+      'recipes.used': increment(1),
       lastUpdated: new Date()
     });
+  }
+
+  static async recordHouseholdMemberAdd(userId: string): Promise<void> {
+    if (!userId) return;
+
+    // Household member additions don't need usage tracking beyond the limit check
+    // The limit is enforced by canAddHouseholdMember based on subscription tier
+    // This method exists for consistency and potential future usage tracking
+  }
+
+  static async canAddHouseholdMember(userId: string): Promise<boolean> {
+    if (!userId) return false;
+
+    // Get user data to check subscription tier
+    const userRef = doc(db, 'users', userId);
+    const userDoc = await getDoc(userRef);
+    if (!userDoc.exists()) return false;
+    
+    const user = userDoc.data() as User;
+    
+    // Get current household member count
+    const householdRef = doc(db, 'households', user.householdId || '');
+    const householdDoc = await getDoc(householdRef);
+    const currentMemberCount = householdDoc.exists() ? householdDoc.data().members?.length || 0 : 0;
+    
+    // For free users: max 1 member (themselves)
+    // For premium: max 3 members
+    // For family: max 5 members (user + 4 family members)
+    const maxMembers = user.subscription?.tier === 'family' ? 5 : 
+                      user.subscription?.tier === 'premium' ? 3 : 1;
+    return currentMemberCount < maxMembers;
   }
 
   static async updatePlanLimits(user: User, plan: 'free' | 'premium' | 'family'): Promise<void> {
     if (!user?.id) return;
 
     const limits = this.PLAN_LIMITS[plan];
-    const usageRef = doc(db, 'usage_limits', user.id);
+    const usageRef = doc(db, 'users', user.id, 'usage', 'limits');
 
     await updateDoc(usageRef, {
       'searches.weekly': limits.searches.weekly,

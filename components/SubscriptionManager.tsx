@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Crown, Check, X, CreditCard, Users, ChefHat, Heart } from 'lucide-react';
 import { useSubscription } from '../hooks/useSubscription';
 import { User } from '../types';
 import { StripeCheckout } from './StripeCheckout';
 import { PayPalCheckout } from './PayPalCheckout';
+import { UsageService, UsageLimits } from '../services/usageService';
 
 interface SubscriptionManagerProps {
   user: User | null;
@@ -18,6 +19,22 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }
   const [showPlans, setShowPlans] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<any>(null);
   const [paymentMethod, setPaymentMethod] = useState<'stripe' | 'paypal'>('stripe');
+  const [usageLimits, setUsageLimits] = useState<UsageLimits | null>(null);
+
+  useEffect(() => {
+    const fetchUsageLimits = async () => {
+      if (user) {
+        try {
+          const limits = await UsageService.getUsageLimits(user);
+          setUsageLimits(limits);
+        } catch (error) {
+          console.error('Error fetching usage limits:', error);
+        }
+      }
+    };
+
+    fetchUsageLimits();
+  }, [user]);
 
   const handleUpgrade = (plan: any) => {
     // Temporarily disabled until Stripe payments are fully functional
@@ -64,9 +81,9 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }
       period: 'per month',
       description: 'Everything you need for meal planning',
       features: [
-        'Up to 25 saved recipes',
-        '2 weeks meal planning (unlimited entries)',
-        'Unlimited recipe searches',
+        'Up to 20 saved recipes',
+        '7 days meal planning (unlimited entries)',
+        '15 recipe searches per week',
         'Up to 3 household members',
         'Priority support',
         'Offline access',
@@ -82,8 +99,10 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }
       period: 'per month',
       description: 'Perfect for families and groups',
       features: [
-        'Everything in Premium',
-        'Up to 6 household members',
+        'Unlimited saved recipes',
+        '2 weeks meal planning (unlimited entries)',
+        'Unlimited recipe searches',
+        'Up to 5 household members (you + 4 family)',
         'Shared shopping lists',
         'Family meal planning',
         'Advanced analytics',
@@ -127,6 +146,32 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }
             <p className="text-sm text-green-800 dark:text-green-200">
               🎉 You're on a free trial! Enjoy all premium features.
             </p>
+          </div>
+        )}
+
+        {usageLimits && (
+          <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4 mb-4">
+            <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-3">Current Usage</h3>
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600 dark:text-gray-400">Saved Recipes</span>
+                <span className="text-sm font-medium text-gray-900 dark:text-white">
+                  {usageLimits.recipes.used} / {usageLimits.recipes.max === -1 ? '∞' : usageLimits.recipes.max}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600 dark:text-gray-400">Weekly Searches</span>
+                <span className="text-sm font-medium text-gray-900 dark:text-white">
+                  {usageLimits.searches.used} / {usageLimits.searches.weekly === -1 ? '∞' : usageLimits.searches.weekly}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600 dark:text-gray-400">Weekly Meal Plans</span>
+                <span className="text-sm font-medium text-gray-900 dark:text-white">
+                  {usageLimits.mealPlanning.weeklyUsed} / {usageLimits.mealPlanning.weeklyRecipes === -1 ? '∞' : usageLimits.mealPlanning.weeklyRecipes}
+                </span>
+              </div>
+            </div>
           </div>
         )}
 

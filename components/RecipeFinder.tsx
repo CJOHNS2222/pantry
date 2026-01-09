@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, Loader2, Sparkles, ExternalLink, Globe, Plus, Clock, List, ChefHat, ToggleLeft, ToggleRight, Star, Heart, Bookmark, Zap } from 'lucide-react';
+import { Search, Loader2, Sparkles, ExternalLink, Globe, Plus, Clock, List, ChefHat, ToggleLeft, ToggleRight, Star, Heart, Bookmark, Zap, Mic } from 'lucide-react';
 import { searchRecipes } from '../services/geminiService';
+import { getSavedRecipes } from '../services/recipeService';
 import { RecipeSearchResult, LoadingState, RecipeRating, StructuredRecipe, PantryItem, SavedRecipe, User } from '../types';
 import { Tab } from '../types/app';
 import { RecipeCardSkeleton } from './SkeletonLoader';
@@ -24,9 +25,12 @@ interface RecipeFinderProps {
     persistedResult?: RecipeSearchResult | null;
     setPersistedResult?: (result: RecipeSearchResult | null) => void;
     initialSearchQuery?: string;
+    // Usage limit states
+    recipeSaveLimitExceeded?: boolean;
+    mealPlanLimitExceeded?: boolean;
 }
 
-export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveRecipe, onDeleteRecipe, onMarkAsMade, inventory, ratings, onRate, savedRecipes, user, setActiveTab, persistedResult, setPersistedResult, initialSearchQuery }) => {
+export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveRecipe, onDeleteRecipe, onMarkAsMade, inventory, ratings, onRate, savedRecipes, user, setActiveTab, persistedResult, setPersistedResult, initialSearchQuery, recipeSaveLimitExceeded = false, mealPlanLimitExceeded = false }) => {
     // List of staple items to ignore
     const STAPLES = ['salt', 'pepper', 'oil', 'water', 'flour', 'sugar', 'butter', 'vinegar', 'baking powder', 'baking soda', 'spices', 'seasoning', 'soy sauce', 'cornstarch', 'yeast'];
     
@@ -47,12 +51,70 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
     const [loadingState, setLoadingState] = useState<LoadingState>(LoadingState.IDLE);
     const [searchError, setSearchError] = useState<string | null>(null);
     const [isResultFromCache, setIsResultFromCache] = useState(false);
+
+    // Firebase recipes state
+    const [firebaseRecipes, setFirebaseRecipes] = useState<SavedRecipe[]>([]);
+    const [firebaseRecipesLoading, setFirebaseRecipesLoading] = useState(true);
     
     // Recipe cache to avoid duplicate API calls
     const [recipeCache, setRecipeCache] = useState<Map<string, RecipeSearchResult>>(new Map());
     
     // Debounce state to prevent rapid successive searches
     const [lastSearchTime, setLastSearchTime] = useState<number>(0);
+
+    // Voice search state
+    const [isListening, setIsListening] = useState(false);
+    const [voiceSearchSupported, setVoiceSearchSupported] = useState(false);
+
+    // Check for speech recognition support
+    useEffect(() => {
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+            setVoiceSearchSupported(true);
+        }
+    }, []);
+
+    // Voice search function
+    const startVoiceSearch = () => {
+        if (!voiceSearchSupported) return;
+
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const recognition = new SpeechRecognition();
+
+        recognition.continuous = false;
+        recognition.interimResults = false;
+        recognition.lang = 'en-US';
+
+        recognition.onstart = () => {
+            setIsListening(true);
+        };
+
+        recognition.onresult = (event) => {
+            const transcript = event.results[0][0].transcript;
+            setSpecificQuery(transcript);
+            setIsListening(false);
+
+            // Track successful voice search
+            AnalyticsService.trackVoiceSearch(true);
+
+            // Auto-submit the search
+            setTimeout(() => {
+                const params = { query: transcript, ingredients: '' };
+                performSearch(params);
+            }, 500);
+        };
+
+        recognition.onerror = (event) => {
+            setIsListening(false);
+            // Track failed voice search
+            AnalyticsService.trackVoiceSearch(false, event.error);
+        };
+
+        recognition.onend = () => {
+            setIsListening(false);
+        };
+
+        recognition.start();
+    };
 
     // Generate cache key for search parameters
     const getCacheKey = (params: any): string => {
@@ -79,6 +141,48 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
             setSpecificQuery(initialSearchQuery);
         }
     }, [initialSearchQuery]);
+
+    // Surprise me feature
+    const handleSurpriseMe = async () => {
+        const allRecipes = firebaseRecipes.filter(recipe => selectedCategory === 'All' || recipe.type === selectedCategory);
+        if (allRecipes.length === 0) return;
+
+        const randomRecipe = allRecipes[Math.floor(Math.random() * allRecipes.length)];
+        openRecipeModal(randomRecipe, false);
+
+        // Track surprise me usage
+        AnalyticsService.trackSurpriseMeUsed(selectedCategory);
+        AnalyticsService.trackRecipeSearch('surprise_me', 1);
+
+        // Record search usage for limit tracking
+        if (user) {
+            try {
+                await UsageService.recordSearch(user);
+            } catch (error) {
+                console.error('Error recording surprise me search usage:', error);
+            }
+        }
+    };
+
+    // Load Firebase recipes on mount
+    useEffect(() => {
+        const loadFirebaseRecipes = async () => {
+            try {
+                setFirebaseRecipesLoading(true);
+                const recipes = await getSavedRecipes();
+                // Remove duplicates based on title
+                const uniqueRecipes = recipes.filter((recipe, index, self) => 
+                    index === self.findIndex(r => r.title === recipe.title)
+                );
+                setFirebaseRecipes(uniqueRecipes);
+            } catch (error) {
+                console.error('Error loading Firebase recipes:', error);
+            } finally {
+                setFirebaseRecipesLoading(false);
+            }
+        };
+        loadFirebaseRecipes();
+    }, []);
 
     // Popular recipes from CSV
     const csvRecipes: StructuredRecipe[] = [
@@ -675,7 +779,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
             try {
                 const canSearch = await UsageService.canPerformSearch(user);
                 if (!canSearch) {
-                    alert('You\'ve reached your weekly search limit. Upgrade to Premium for unlimited searches!');
+                    alert('You\'ve reached your weekly search limit. Upgrade to Premium for 15 searches per week or Family for unlimited searches!');
                     return;
                 }
             } catch (error) {
@@ -828,7 +932,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
         const renderRecipeCard = (recipe: StructuredRecipe, isSavedView = false, isCompact = false) => {
             const ratingInfo = getRatingInfo(recipe.title);
             const isSaved = savedRecipes.some(r => r.title === recipe.title);
-            const titleKey = recipe.title || 'Untitled Recipe';
+            const titleKey = `${recipe.title || 'Untitled Recipe'}-${recipe.id || Math.random()}`;
             
             // Filter out staple items from ingredient list
             const filteredIngredients = recipe.ingredients.filter(ing => {
@@ -885,9 +989,14 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                         <div className="flex gap-2">
                             <button 
                                 onClick={(e) => { e.stopPropagation(); onAddToPlan(recipe); }}
-                                className="flex-1 bg-theme-primary border border-theme hover:border-[var(--accent-color)] text-[var(--accent-color)] font-bold py-2 rounded-xl transition-all flex items-center justify-center gap-2 hover:bg-[var(--accent-color)] hover:text-white"
+                                disabled={mealPlanLimitExceeded}
+                                className={`flex-1 border font-bold py-2 rounded-xl transition-all flex items-center justify-center gap-2 ${
+                                    mealPlanLimitExceeded 
+                                        ? 'bg-gray-400 text-gray-600 cursor-not-allowed opacity-50 border-gray-400' 
+                                        : 'bg-theme-primary border-theme hover:border-[var(--accent-color)] text-[var(--accent-color)] hover:bg-[var(--accent-color)] hover:text-white'
+                                }`}
                             >
-                                <Plus className="w-4 h-4" /> Add to Schedule
+                                <Plus className="w-4 h-4" /> {mealPlanLimitExceeded ? 'Limit Reached' : 'Add to Schedule'}
                             </button>
                         </div>
 
@@ -906,8 +1015,17 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
             return (
                 <div
                     key={`tile-${titleKey}`}
-                    className="bg-theme-secondary rounded-lg shadow-md border border-theme overflow-hidden group hover:shadow-lg transition-all cursor-pointer"
+                    className="bg-theme-secondary rounded-lg shadow-md border border-theme overflow-hidden group hover:shadow-xl hover:shadow-theme/20 hover:-translate-y-1 transition-all duration-300 cursor-pointer"
                     onClick={() => openRecipeModal(recipe, false)}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`View recipe: ${recipe.title}, cooking time: ${recipe.cookTime}${ratingInfo ? `, rating: ${ratingInfo.avg} stars` : ''}`}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            openRecipeModal(recipe, false);
+                        }
+                    }}
                 >
                     {/* Recipe Image */}
                     <div className="aspect-square bg-theme-primary/20 relative overflow-hidden">
@@ -915,7 +1033,8 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                             <img
                                 src={recipe.image}
                                 alt={recipe.title}
-                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500 filter group-hover:brightness-110"
+                                loading="lazy"
                                 onError={(e) => {
                                     const target = e.target as HTMLImageElement;
                                     target.style.display = 'none';
@@ -937,10 +1056,10 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                     </div>
 
                     {/* Recipe Info */}
-                    <div className="p-3">
-                        <h4 className="font-bold text-sm mb-2 line-clamp-2 leading-tight">{recipe.title}</h4>
+                    <div className="p-3 group-hover:bg-theme-secondary/80 transition-colors duration-300">
+                        <h4 className="font-bold text-sm mb-2 line-clamp-2 leading-tight group-hover:text-theme-primary transition-colors duration-300">{recipe.title}</h4>
 
-                        <div className="flex items-center justify-between text-xs text-theme-secondary opacity-70">
+                        <div className="flex items-center justify-between text-xs text-theme-secondary opacity-70 group-hover:opacity-90 transition-opacity duration-300">
                             <div className="flex items-center gap-1">
                                 <Clock className="w-3 h-3" />
                                 {recipe.cookTime}
@@ -958,19 +1077,27 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
         };
 
   return (
-    <div className="space-y-6 pb-24 max-w-2xl mx-auto animate-fade-in">
-      <div className="flex justify-center gap-4 mb-2">
+    <div className="space-y-6 pb-24 max-w-2xl mx-auto animate-fade-in" role="main" aria-label="Recipe finder">
+      <div className="flex justify-center gap-4 mb-2" role="tablist" aria-label="Recipe finder tabs">
           <button 
             onClick={() => setActiveView('search')}
             className={`px-4 py-2 rounded-full text-sm font-bold transition-all ${activeView === 'search' ? 'bg-[var(--accent-color)] text-white' : 'text-theme-secondary opacity-50'}`}
+            role="tab"
+            aria-selected={activeView === 'search'}
+            aria-controls="search-panel"
+            id="search-tab"
           >
               Search & Generate
           </button>
           <button 
             onClick={() => setActiveView('saved')}
             className={`px-4 py-2 rounded-full text-sm font-bold transition-all flex items-center gap-2 ${activeView === 'saved' ? 'bg-[var(--accent-color)] text-white' : 'text-theme-secondary opacity-50'}`}
+            role="tab"
+            aria-selected={activeView === 'saved'}
+            aria-controls="saved-panel"
+            id="saved-tab"
           >
-              <Bookmark className="w-4 h-4" /> Saved ({savedRecipes.length})
+              <Bookmark className="w-4 h-4" aria-hidden="true" /> Saved ({savedRecipes.length})
           </button>
       </div>
 
@@ -1000,12 +1127,29 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
         <>
             <div className="bg-theme-secondary p-5 rounded-2xl border border-theme shadow-lg">
                 <form onSubmit={handleSpecificSearch} className="flex gap-2">
-                    <input
-                    value={specificQuery}
-                    onChange={(e) => setSpecificQuery(e.target.value)}
-                    placeholder="Search e.g. Pasta..."
-                    className="flex-1 bg-theme-primary border border-theme rounded-xl px-4 py-3 text-theme-primary focus:border-[var(--accent-color)] outline-none"
-                    />
+                    <div className="flex-1 relative">
+                        <input
+                        value={specificQuery}
+                        onChange={(e) => setSpecificQuery(e.target.value)}
+                        placeholder="Search e.g. Pasta..."
+                        className="w-full bg-theme-primary border border-theme rounded-xl px-4 py-3 pr-12 text-theme-primary focus:border-[var(--accent-color)] outline-none"
+                        />
+                        {voiceSearchSupported && (
+                            <button
+                                type="button"
+                                onClick={startVoiceSearch}
+                                disabled={loadingState === LoadingState.LOADING}
+                                className={`absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-lg transition-colors ${
+                                    isListening
+                                        ? 'bg-red-500 text-white animate-pulse'
+                                        : 'text-theme-secondary hover:text-[var(--accent-color)] hover:bg-theme-secondary'
+                                }`}
+                                title="Voice search"
+                            >
+                                <Mic className="w-4 h-4" />
+                            </button>
+                        )}
+                    </div>
                     <button
                         type="submit"
                         disabled={loadingState === LoadingState.LOADING || !specificQuery.trim()}
@@ -1182,9 +1326,9 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
             {/* Popular Recipes Section */}
             <div className="mt-12">
                 <h2 className="text-xl font-bold text-theme-primary mb-6">Popular Recipes</h2>
-                
-                {/* Category Filter */}
-                <div className="mb-6">
+
+                {/* Category Filter and Surprise Me */}
+                <div className="flex items-center justify-between mb-6">
                     <div className="flex flex-wrap gap-2">
                         {['All', 'Dinner', 'Lunch', 'Breakfast', 'Dessert', 'Appetizer', 'Salad', 'Soup', 'Drink'].map((category) => (
                             <button
@@ -1200,13 +1344,90 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                             </button>
                         ))}
                     </div>
+
+                    <button
+                        onClick={handleSurpriseMe}
+                        disabled={firebaseRecipesLoading || firebaseRecipes.length === 0}
+                        className="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-full text-sm font-medium hover:from-purple-600 hover:to-pink-600 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-lg hover:shadow-xl"
+                    >
+                        <Sparkles className="w-4 h-4" />
+                        Surprise Me
+                    </button>
                 </div>
-                
-                <div className="grid grid-cols-4 gap-4">
-                    {csvRecipes
-                        .filter(recipe => selectedCategory === 'All' || recipe.type === selectedCategory)
-                        .map((recipe) => renderRecipeCard(recipe, false, true))}
-                </div>
+
+                {firebaseRecipesLoading ? (
+                    <div className="text-center py-12 opacity-50">
+                        <Loader2 className="w-8 h-8 mx-auto mb-2 animate-spin" />
+                        <p>Loading recipes...</p>
+                    </div>
+                ) : firebaseRecipes.length === 0 ? (
+                    <div className="text-center py-12 opacity-30">
+                        <ChefHat className="w-12 h-12 mx-auto mb-2" />
+                        <p>No recipes available yet.</p>
+                        <p className="text-sm mt-2">Run the bulk upload to populate recipes.</p>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-4 gap-4">
+                        {firebaseRecipes
+                            .filter(recipe => selectedCategory === 'All' || recipe.type === selectedCategory)
+                            .map((recipe, index) => (
+                                <div
+                                    key={`firebase-${recipe.id || index}`}
+                                    className="bg-theme-secondary rounded-lg overflow-hidden cursor-pointer hover:shadow-xl hover:shadow-theme/20 hover:-translate-y-1 transition-all duration-300 group"
+                                    onClick={() => openRecipeModal(recipe, false)}
+                                    role="button"
+                                    tabIndex={0}
+                                    aria-label={`View recipe: ${recipe.title}, cooking time: ${recipe.cookTime}`}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' || e.key === ' ') {
+                                            e.preventDefault();
+                                            openRecipeModal(recipe, false);
+                                        }
+                                    }}
+                                >
+                                    {/* Recipe Image */}
+                                    <div className="aspect-square bg-theme-primary/20 relative overflow-hidden">
+                                        {recipe.image ? (
+                                            <img
+                                                src={recipe.image}
+                                                alt={recipe.title}
+                                                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500 filter group-hover:brightness-110"
+                                                loading="lazy"
+                                                onError={(e) => {
+                                                    const target = e.target as HTMLImageElement;
+                                                    target.style.display = 'none';
+                                                    const parent = target.parentElement;
+                                                    if (parent) {
+                                                        parent.innerHTML = `
+                                                            <div class="w-full h-full flex items-center justify-center bg-theme-primary/10">
+                                                                <svg class="w-6 h-6 text-theme-secondary opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                                                                </svg>
+                                                            </div>
+                                                        `;
+                                                    }
+                                                }}
+                                            />
+                                        ) : (
+                                            <div className="w-full h-full flex items-center justify-center bg-theme-primary/10">
+                                                <svg className="w-6 h-6 text-theme-secondary opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                                                </svg>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Recipe Info */}
+                                    <div className="p-2 group-hover:bg-theme-secondary/80 transition-colors duration-300">
+                                        <h5 className="font-semibold text-xs text-theme-primary line-clamp-2 leading-tight mb-1 group-hover:text-theme-primary transition-colors duration-300">{recipe.title}</h5>
+                                        <div className="flex items-center justify-between text-xs text-theme-secondary opacity-70 group-hover:opacity-90 transition-opacity duration-300">
+                                            <span>{recipe.cookTime}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                    </div>
+                )}
             </div>
 
         </>
@@ -1236,6 +1457,8 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
           showDeleteButton={modalIsSavedView}
           showMarkAsMade={true}
           showAddToPlan={true}
+          recipeSaveLimitExceeded={recipeSaveLimitExceeded}
+          mealPlanLimitExceeded={mealPlanLimitExceeded}
           user={user}
         />
       )}

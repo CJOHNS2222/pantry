@@ -7,6 +7,7 @@ import { Tab } from '../types/app';
 import { addDoc, collection, doc, setDoc } from 'firebase/firestore';
 import { db, auth } from '../firebaseConfig';
 import { removeMemberFromHousehold } from '../services/householdService';
+import { UsageService } from '../services/usageService';
 
 interface HouseholdManagerProps {
   user: User;
@@ -21,13 +22,37 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
   const [isInviting, setIsInviting] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [householdName, setHouseholdName] = useState('');
+  const [householdMemberLimitExceeded, setHouseholdMemberLimitExceeded] = useState(false);
+
+  const checkHouseholdMemberLimit = async () => {
+    try {
+      const canAdd = await UsageService.canAddHouseholdMember(user.id);
+      setHouseholdMemberLimitExceeded(!canAdd);
+      return canAdd;
+    } catch (error) {
+      console.error('Error checking household member limit:', error);
+      return false;
+    }
+  };
 
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inviteEmail || isInviting) return;
 
+    // Check if we've already determined the limit is exceeded
+    if (householdMemberLimitExceeded) {
+      alert('You have reached the maximum number of household members for your plan. Please upgrade to add more members.');
+      return;
+    }
+
     setIsInviting(true);
     try {
+      // Check household member limit (and update state)
+      const canAdd = await checkHouseholdMemberLimit();
+      if (!canAdd) {
+        alert('You have reached the maximum number of household members for your plan. Please upgrade to add more members.');
+        return;
+      }
       const functions = getFunctions();
       const inviteMember = httpsCallable(functions, 'inviteMember');
       
@@ -40,6 +65,9 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
         ...prev,
         members: [...prev.members, newMember]
       }));
+
+      // Record the household member addition for usage tracking
+      await UsageService.recordHouseholdMemberAdd(user.id);
 
       // Refresh the ID token to get updated custom claims
       await auth.currentUser?.getIdToken(true);
@@ -55,7 +83,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
         const token = await auth.currentUser?.getIdToken();
         if (!token) throw new Error('No auth token available');
 
-        const resp = await fetch(`https://us-central1-gen-lang-client-0893655267.cloudfunctions.net/inviteMemberHttp`, {
+        const resp = await fetch(`https://us-central1-ornate-compass-478504-e1.cloudfunctions.net/inviteMemberHttp`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -68,6 +96,9 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
         const json = await resp.json();
         if (json?.newMember) {
           setHousehold(prev => ({ ...prev, members: [...prev.members, json.newMember] }));
+          
+          // Record the household member addition for usage tracking
+          await UsageService.recordHouseholdMemberAdd(user.id);
           
           // Refresh the ID token to get updated custom claims
           await auth.currentUser?.getIdToken(true);
@@ -244,7 +275,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
             user={user}
             limit={3}
             currentCount={household.members.length}
-            fallbackMessage="Upgrade to Premium to add more than 3 household members"
+            fallbackMessage="Upgrade to Family plan to add more than 3 household members"
             onUpgrade={() => setActiveTab(Tab.SETTINGS)}
           >
             <div className="bg-[#2A0A10]/50 p-4 rounded-xl border border-red-900/30 mb-6">
@@ -264,7 +295,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
                 <button 
                   type="submit"
                   className="bg-amber-600 hover:bg-amber-500 text-white px-3 py-2 rounded-lg transition-colors disabled:bg-gray-500 disabled:cursor-not-allowed flex items-center justify-center w-12"
-                  disabled={isInviting}
+                  disabled={isInviting || householdMemberLimitExceeded}
                 >
                   {isInviting ? <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div> : <Plus className="w-5 h-5" />}
                 </button>

@@ -5,6 +5,66 @@ All notable changes to Smart Pantry Chef will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.7] - 2026-01-08
+
+### Features
+- **Usage Limit Enforcement**: Added button disabling when users hit weekly usage limits to prevent excessive database reads
+- **Subscription Tier Rebalance**: Updated Premium plan limits (15 searches/week, 20 recipes, 7-day planning) and Family plan (unlimited everything, 5 members)
+
+### Fixed
+- **Performance**: Prevented repeated API calls after hitting limits
+
+## [1.1.6] - 2026-01-07
+
+### Infrastructure
+- **Firebase Project Migration**: Complete migration from legacy project to new Firebase project
+  - **Project ID Change**: Migrated from `gen-lang-client-0893655267` to `ornate-compass-478504-e1`
+  - **Data Migration**: Successfully migrated 316 Firestore documents and 6 authentication users
+  - **Configuration Updates**: Updated all Firebase configuration files (.firebaserc, .env.local, firebaseConfig.ts)
+  - **Service Continuity**: Maintained all existing functionality during migration
+
+### Monitoring & Analytics
+- **Firebase Performance Monitoring**: Comprehensive performance tracking implementation
+  - **AI Operations**: Added traces for `analyze_pantry_image` and `search_recipes` with custom metrics
+  - **Database Operations**: Performance monitoring for Firestore read/write operations
+  - **External API Calls**: Tracking Spoonacular API response times and success rates
+  - **Image Processing**: Monitoring image upload operations and file sizes
+  - **Household Management**: Performance traces for user management and household operations
+  - **Utility Functions**: Ingredient parsing performance for shopping list generation
+
+### Technical
+- **Firebase Crashlytics**: Enhanced Android crash reporting setup
+  - **SDK Integration**: Added Crashlytics 3.0.6 dependency and plugin configuration
+  - **Debug Logging**: Enabled performance event logging in AndroidManifest.xml
+  - **Test Crash Button**: Added crash testing functionality in MainActivity.java
+- **Build Configuration**: Updated Android Gradle configuration for monitoring services
+- **Performance Metrics**: Custom attributes and metrics for detailed performance analysis
+
+## [1.1.5] - 2026-01-07
+
+### Performance
+- **Bundle Size Optimization**: 71% reduction in main bundle size through manual chunk splitting
+  - **Main Bundle**: Reduced from ~1MB to 273KB (82KB gzipped)
+  - **Firebase Vendor Chunk**: 670KB (157KB gzipped) - separated for independent loading
+  - **Gemini AI Service Chunk**: 225KB (41KB gzipped) - lazy-loaded for AI features
+  - **Analytics Service Chunk**: 13KB (5KB gzipped) - separated from AI services
+  - **Faster Initial Load**: Improved app startup performance and reduced memory usage
+
+### Fixed
+- **Infinite Saving Loops**: Resolved constant Firestore writes in shopping list and inventory
+  - **Data Change Detection**: Added JSON comparison checks in Firestore listeners
+  - **Performance Improvement**: Eliminated unnecessary database operations
+  - **Battery Life**: Reduced device battery drain from constant syncing
+- **External Image Fetching**: Implemented async image loading for all item creation paths
+  - **Pantry Scanner**: Async image fetching for scanned items
+  - **Manual Item Addition**: Async image fetching for manually added items
+  - **Shopping List Conversion**: Async image fetching when moving items to pantry
+
+### Technical
+- **Build Configuration**: Enhanced Vite config with manual chunk splitting strategy
+- **Code Splitting**: Separated vendor libraries into logical, cacheable chunks
+- **Lazy Loading**: Components and services load on-demand for better performance
+
 ## [1.1.4] - 2026-01-07
 
 ### Added
