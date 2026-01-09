@@ -212,13 +212,19 @@ const App: React.FC = () => {
         // Double tap detected - exit app
         CapacitorApp.exitApp();
       } else {
-        // Single tap - show message
+        // Single tap - show message and auto-dismiss after 2 seconds
+        const toastId = 'exit-app';
         addToast({
-          id: 'exit-app',
+          id: toastId,
           message: 'Press back again to exit',
           type: 'info'
         });
         setLastBackPress(currentTime);
+        
+        // Auto-dismiss the toast after 2 seconds
+        setTimeout(() => {
+          setToasts(prev => prev.filter(t => t.id !== toastId));
+        }, 2000);
       }
     };
 
@@ -474,15 +480,17 @@ const App: React.FC = () => {
           {toasts.map((toast) => (
             <div
               key={toast.id}
-              className={`max-w-sm p-4 rounded-lg shadow-lg border transition-all duration-300 ${
+              className={`max-w-sm rounded-lg shadow-lg border transition-all duration-300 ${
                 toast.type === 'error'
-                  ? 'bg-red-50 border-red-200 text-red-800'
-                  : 'bg-blue-50 border-blue-200 text-blue-800'
+                  ? 'bg-red-50 border-red-200 text-red-800 p-4'
+                  : toast.type === 'info'
+                  ? 'bg-gray-800 border-gray-700 text-white p-2 text-xs opacity-80'
+                  : 'bg-blue-50 border-blue-200 text-blue-800 p-4'
               }`}
             >
               <div className="flex items-start gap-3">
                 <div className="flex-1">
-                  <p className="text-sm font-medium">{toast.message}</p>
+                  <p className={`font-medium ${toast.type === 'info' ? 'text-xs' : 'text-sm'}`}>{toast.message}</p>
                   {toast.actionLabel && toast.action && (
                     <button
                       onClick={toast.action}
@@ -494,7 +502,7 @@ const App: React.FC = () => {
                 </div>
                 <button
                   onClick={() => setToasts(prev => prev.filter(t => t.id !== toast.id))}
-                  className="text-gray-400 hover:text-gray-600"
+                  className={`hover:text-gray-600 ${toast.type === 'info' ? 'text-gray-300 text-xs' : 'text-gray-400'}`}
                 >
                   ×
                 </button>
