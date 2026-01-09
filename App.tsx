@@ -179,6 +179,7 @@ const App: React.FC = () => {
   }, []);
 
   // Handle back button for mobile navigation
+  const [lastBackPress, setLastBackPress] = useState<number>(0);
   useEffect(() => {
     const handleBackButton = (event: BackButtonListenerEvent) => {
       // Close modals in priority order
@@ -203,8 +204,22 @@ const App: React.FC = () => {
         return;
       }
 
-      // If nothing else to do, let the system handle the back button (exit app)
-      // This will be handled automatically by not preventing default
+      // Handle double-tap to exit on pantry tab
+      const currentTime = Date.now();
+      const timeDiff = currentTime - lastBackPress;
+
+      if (timeDiff < 2000) { // 2 seconds window for double tap
+        // Double tap detected - exit app
+        CapacitorApp.exitApp();
+      } else {
+        // Single tap - show message
+        addToast({
+          id: 'exit-app',
+          message: 'Press back again to exit',
+          type: 'info'
+        });
+        setLastBackPress(currentTime);
+      }
     };
 
     // Add back button listener
@@ -213,7 +228,7 @@ const App: React.FC = () => {
     return () => {
       removeListener();
     };
-  }, [showNotificationsModal, showTutorial, showHousehold, activeTab]);
+  }, [showNotificationsModal, showTutorial, showHousehold, activeTab, lastBackPress, addToast]);
 
   // Track tab switches
   const [previousTab, setPreviousTab] = useState<Tab>(Tab.PANTRY);
