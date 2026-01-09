@@ -1,39 +1,44 @@
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { PantryItem, RecipeSearchResult, RecipeSearchParams, StructuredRecipe } from "../types";
+import { getPerformance, trace } from "firebase/performance";
 
 // Initialize Gemini Client
 const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
+const performance = getPerformance();
 
 /**
  * Analyzes an image to identify pantry items.
  */
 export const analyzePantryImage = async (base64Image: string, mimeType: string): Promise<PantryItem[]> => {
-  const modelId = "gemini-2.0-flash-lite"; 
-
-  const schema: Schema = {
-    type: Type.ARRAY,
-    description: "A comprehensive list of pantry items identified in the image.",
-    items: {
-      type: Type.OBJECT,
-      properties: {
-        item: {
-          type: Type.STRING,
-          description: "The specific name of the item.",
-        },
-        category: {
-          type: Type.STRING,
-          description: "The broad category.",
-        },
-        quantity_estimate: {
-          type: Type.STRING,
-          description: "Visual estimate of quantity.",
-        },
-      },
-      required: ["item", "category", "quantity_estimate"],
-    },
-  };
+  const perfTrace = trace(performance, 'analyze_pantry_image');
+  perfTrace.start();
 
   try {
+    const modelId = "gemini-2.0-flash-lite";
+
+    const schema: Schema = {
+      type: Type.ARRAY,
+      description: "A comprehensive list of pantry items identified in the image.",
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          item: {
+            type: Type.STRING,
+            description: "The specific name of the item.",
+          },
+          category: {
+            type: Type.STRING,
+            description: "The broad category.",
+          },
+          quantity_estimate: {
+            type: Type.STRING,
+            description: "Visual estimate of quantity.",
+          },
+        },
+        required: ["item", "category", "quantity_estimate"],
+      },
+    };
+
     const response = await ai.models.generateContent({
       model: modelId,
       contents: {
@@ -74,13 +79,20 @@ If an item doesn't fit these categories, use "Uncategorized".`,
 
     const jsonText = response.text;
     if (!jsonText) throw new Error("No data returned from Gemini.");
-    
-    const cleanJson = jsonText.replace(/^```json\s*/, "").replace(/\s*```$/, "");
-    return JSON.parse(cleanJson) as PantryItem[];
 
+    const cleanJson = jsonText.replace(/^```json\s*/, "").replace(/\s*```$/, "");
+    const items = JSON.parse(cleanJson) as PantryItem[];
+
+    // Add custom metrics
+    perfTrace.putMetric('image_size_kb', base64Image.length / 1024);
+    perfTrace.putMetric('items_detected', items.length);
+
+    return items;
   } catch (error) {
     console.error("Error analyzing pantry image:", error);
     throw error;
+  } finally {
+    perfTrace.stop();
   }
 };
 
@@ -88,7 +100,11 @@ If an item doesn't fit these categories, use "Uncategorized".`,
  * Searches for recipes using Google Search Grounding with enhanced filters and structured JSON output.
  */
 export const searchRecipes = async (params: RecipeSearchParams): Promise<RecipeSearchResult> => {
-  const modelId = "gemini-2.0-flash-lite";
+  const perfTrace = trace(performance, 'search_recipes');
+  perfTrace.start();
+
+  try {
+    const modelId = "gemini-2.0-flash-lite";
   
   // Check if API key is available
   if (!import.meta.env.VITE_GEMINI_API_KEY) {
@@ -181,10 +197,21 @@ export const searchRecipes = async (params: RecipeSearchParams): Promise<RecipeS
       console.warn('Gemini returned no text for recipe search.');
     }
 
+    // Add custom metrics
+    perfTrace.putMetric('query_length', params.query?.length || 0);
+    perfTrace.putMetric('ingredients_count', params.ingredients?.split(', ').length || 0);
+    perfTrace.putMetric('recipes_returned', recipes.length);
+    perfTrace.putAttribute('search_mode', params.query ? 'specific' : 'pantry_based');
+    perfTrace.putAttribute('strict_mode', params.strictMode ? 'true' : 'false');
+
     return {
       recipes: recipes,
       groundingChunks: response.candidates?.[0]?.groundingMetadata?.groundingChunks,
     };
+  } catch (timeoutError) {
+    console.error("Request timeout or API error:", timeoutError);
+    throw timeoutError;
+  }
 
   } catch (error) {
     console.error("Error searching recipes:", error);
@@ -199,6 +226,8 @@ export const searchRecipes = async (params: RecipeSearchParams): Promise<RecipeS
     } else {
       throw new Error(`Recipe search failed: ${error.message || 'Unknown error'}`);
     }
+  } finally {
+    perfTrace.stop();
   }
 };
 

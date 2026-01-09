@@ -62,6 +62,10 @@ class UsageService {
       throw new Error('User required for usage tracking');
     }
 
+    // Determine user's plan tier
+    const planTier = user.subscription?.tier || 'free';
+    const planLimits = this.PLAN_LIMITS[planTier];
+
     const usageRef = doc(db, 'users', user.id, 'usage', 'limits');
     const usageDoc = await getDoc(usageRef);
 
@@ -72,18 +76,18 @@ class UsageService {
       // Initialize usage tracking for new user
       const initialUsage: UsageLimits = {
         searches: {
-          weekly: 0,
+          weekly: planLimits.searches.weekly,
           used: 0,
           resetDate: weekStart
         },
         recipes: {
-          max: this.PLAN_LIMITS.free.recipes.max,
+          max: planLimits.recipes.max,
           used: 0
         },
         mealPlanning: {
-          weeklyRecipes: this.PLAN_LIMITS.free.mealPlanning.weeklyRecipes,
+          weeklyRecipes: planLimits.mealPlanning.weeklyRecipes,
           weeklyUsed: 0,
-          twoWeekPlanning: this.PLAN_LIMITS.free.mealPlanning.twoWeekPlanning,
+          twoWeekPlanning: planLimits.mealPlanning.twoWeekPlanning,
           resetDate: weekStart
         }
       };
@@ -119,18 +123,18 @@ class UsageService {
 
     return {
       searches: {
-        weekly: data.searches?.weekly || this.PLAN_LIMITS.free.searches.weekly,
+        weekly: planLimits.searches.weekly,
         used: data.searches?.used || 0,
         resetDate: resetDate
       },
       recipes: {
-        max: data.recipes?.max || this.PLAN_LIMITS.free.recipes.max,
+        max: planLimits.recipes.max,
         used: data.recipes?.used || 0
       },
       mealPlanning: {
-        weeklyRecipes: data.mealPlanning?.weeklyRecipes || this.PLAN_LIMITS.free.mealPlanning.weeklyRecipes,
+        weeklyRecipes: planLimits.mealPlanning.weeklyRecipes,
         weeklyUsed: data.mealPlanning?.weeklyUsed || 0,
-        twoWeekPlanning: data.mealPlanning?.twoWeekPlanning || this.PLAN_LIMITS.free.mealPlanning.twoWeekPlanning,
+        twoWeekPlanning: planLimits.mealPlanning.twoWeekPlanning,
         resetDate: resetDate
       }
     };

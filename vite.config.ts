@@ -48,6 +48,24 @@ export default defineConfig(({ mode }) => {
           '@': path.resolve(__dirname, '.'),
         }
       },
+      build: {
+        rollupOptions: {
+          output: {
+            manualChunks: {
+              // Firebase and database operations
+              'firebase-vendor': ['firebase/app', 'firebase/auth', 'firebase/firestore', 'firebase/analytics', 'firebase/storage'],
+              // AI and ML services - split Gemini separately as it's largest
+              'gemini-service': ['./services/geminiService'],
+              'analytics-service': ['./services/analyticsService'],
+              // Utility functions
+              'utils': ['./utils/appUtils'],
+              // UI components and icons
+              'ui-vendor': ['lucide-react']
+            }
+          }
+        },
+        chunkSizeWarningLimit: 1000 // Increase limit to 1000KB since our chunks are reasonably sized
+      },
       test: {
         globals: true,
         environment: 'jsdom',

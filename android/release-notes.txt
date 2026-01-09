@@ -5,6 +5,146 @@ All notable changes to Smart Pantry Chef will be documented in this file.
 The format is based on Keep a Changelog,
 and this project adheres to Semantic Versioning.
 
+[1.1.6] - 2026-01-07
+
+Infrastructure
+- Firebase Project Migration: Complete migration from legacy project to new Firebase project
+  - Project ID Change: Migrated from gen-lang-client-0893655267 to ornate-compass-478504-e1
+  - Data Migration: Successfully migrated 316 Firestore documents and 6 authentication users
+  - Configuration Updates: Updated all Firebase configuration files (.firebaserc, .env.local, firebaseConfig.ts)
+  - Service Continuity: Maintained all existing functionality during migration
+
+Monitoring & Analytics
+- Firebase Performance Monitoring: Comprehensive performance tracking implementation
+  - AI Operations: Added traces for analyze_pantry_image and search_recipes with custom metrics
+  - Database Operations: Performance monitoring for Firestore read/write operations
+  - External API Calls: Tracking Spoonacular API response times and success rates
+  - Image Processing: Monitoring image upload operations and file sizes
+  - Household Management: Performance traces for user management and household operations
+  - Utility Functions: Ingredient parsing performance for shopping list generation
+
+Technical
+- Firebase Crashlytics: Enhanced Android crash reporting setup
+  - SDK Integration: Added Crashlytics 3.0.6 dependency and plugin configuration
+  - Debug Logging: Enabled performance event logging in AndroidManifest.xml
+  - Test Crash Button: Added crash testing functionality in MainActivity.java
+- Build Configuration: Updated Android Gradle configuration for monitoring services
+- Performance Metrics: Custom attributes and metrics for detailed performance analysis
+
+[1.1.5] - 2026-01-07
+
+Performance
+- Bundle Size Optimization: 71% reduction in main bundle size through manual chunk splitting
+  - Main Bundle: Reduced from ~1MB to 273KB (82KB gzipped)
+  - Firebase Vendor Chunk: 670KB (157KB gzipped) - separated for independent loading
+  - Gemini AI Service Chunk: 225KB (41KB gzipped) - lazy-loaded for AI features
+  - Analytics Service Chunk: 13KB (5KB gzipped) - separated from AI services
+  - Faster Initial Load: Improved app startup performance and reduced memory usage
+
+Fixed
+- Infinite Saving Loops: Resolved constant Firestore writes in shopping list and inventory
+  - Data Change Detection: Added JSON comparison checks in Firestore listeners
+  - Performance Improvement: Eliminated unnecessary database operations
+  - Battery Life: Reduced device battery drain from constant syncing
+- External Image Fetching: Implemented async image loading for all item creation paths
+  - Pantry Scanner: Async image fetching for scanned items
+  - Manual Item Addition: Async image fetching for manually added items
+  - Shopping List Conversion: Async image fetching when moving items to pantry
+
+Technical
+- Build Configuration: Enhanced Vite config with manual chunk splitting strategy
+- Code Splitting: Separated vendor libraries into logical, cacheable chunks
+- Lazy Loading: Components and services load on-demand for better performance
+
+[1.1.4] - 2026-01-07
+
+Added
+- Interactive Tutorial System: Complete overhaul of user onboarding experience
+  - 15-Step Guided Tour: Interactive walkthrough covering all major app features
+  - Glow Highlighting: Replaced circle overlays with smooth CSS glow effects on actual buttons
+  - Dynamic Modal Positioning: Tutorial modal automatically adjusts position to avoid navigation bar overlap
+  - Smart Timing: 2-second pause for household button to allow visual identification before auto-click
+  - Theme Toggle Demo: Automatic theme switching demonstration with return to dark theme
+  - Context-Aware Descriptions: Updated tutorial text to match actual app interface and features
+- UI/UX Enhancements: Comprehensive visual and interaction improvements
+  - Hover Animations: Smooth scale and shadow transitions on interactive elements
+  - Progressive Loading: Skeleton loaders and smooth content transitions throughout the app
+  - Voice Search Integration: Microphone button for voice-powered recipe and ingredient search
+  - Accessibility Improvements: Enhanced keyboard navigation, screen reader support, and focus management
+  - Cooking Reminders: Smart notification system for meal preparation timing
+  - Enhanced Analytics Dashboard: Improved Firebase Analytics integration with detailed usage insights
+- Tutorial Navigation Improvements:
+  - Raised Modal Positioning: Tutorial modal positioned 25px higher for navigation-related steps
+  - Corrected Feature Descriptions: Updated tutorial text to accurately reflect app functionality
+  - Recipe Finder Clarification: Tutorial now correctly references "Chef" tab and "Use Inventory Only" option
+  - Meal Planning Guidance: Clear instructions for adding recipes by clicking days in the meal planner
+
+Changed
+- Tutorial Descriptions: Updated all tutorial step descriptions to match actual app interface and functionality
+- Recipe Search Guidance: Tutorial now explains clicking days to add recipes instead of non-existent search buttons
+- AI Recipe Finder: Tutorial references correct tab name ("Chef") and search option ("Use Inventory Only")
+
+Fixed
+- Tutorial Timing: Added appropriate delays for user comprehension before automatic actions
+- Theme Persistence: Tutorial now returns to dark theme after theme toggle demonstration
+- Modal Positioning: Tutorial modal no longer overlaps navigation bar during navigation steps
+
+[1.1.3] - 2026-01-06
+
+[1.1.3] - 2026-01-06
+
+Added
+- MealPlanner Redesign: Complete reconfiguration of meal planning interface
+  - Unified Calendar View: Removed list/calendar toggle, now uses calendar grid as primary interface
+  - Day Detail Modal: Click any day to open fullscreen modal showing detailed meal planning for that day
+  - Recipe Search Integration: "Add Recipe" buttons in empty meal slots open search modal
+  - Saved Recipes Access: Search modal shows both AI-generated recipes and user's saved recipes
+  - Enhanced Meal Management: View, add, and remove recipes directly from day detail modal
+- Context-Aware Recipe Modal: Dynamic button display based on usage context
+  - Search Context: Shows "Save Recipe" and "Add to Plan" buttons when browsing recipes
+  - Scheduled Context: Shows "Mark as Made" and "Remove from Plan" buttons for planned meals
+  - Saved Recipes Context: Shows "Add to Plan" and "Delete Recipe" buttons for saved recipes
+- Enhanced Recipe Search UI: Improved recipe discovery with tile-based layout
+  - 3-Column Tile Grid: Recipes displayed in clean tiles with image, title, cook time, and calories
+  - Clickable Recipe Tiles: Click any tile to preview recipe details before adding
+  - Unified Recipe Source: Single search interface for both AI-generated and user-saved recipes
+- Smart Ingredient Cleaning: Automatic removal of descriptive preparation words from shopping list items
+  - Recipe Ingredients: Ingredients like "2 chopped onions" become "Onion" in shopping lists
+  - Pantry Items: Descriptive words like "chopped", "minced", "diced", "sliced", "finely" are removed when adding to shopping lists
+  - Enhanced Shopping Experience: Cleaner, more actionable shopping list items for better grocery shopping
+- Recipe Ratings System: Complete rating and review functionality for recipes
+  - Post-Cooking Rating Prompt: After marking a recipe as made, users are prompted to rate the recipe
+  - Dedicated Rating Modal: Clean, focused modal for rating recipes with star selection and optional comments
+  - MealPlanner Integration: Ratings functionality now available in MealPlanner recipe modals
+  - Event Handling Fix: Resolved modal closing issues when interacting with rating inputs
+- Recipe Data Management Scripts: New utility scripts for maintaining recipe database quality
+  - Bulk Recipe Upload Enhancements: Improved deduplication and duplicate description prevention
+  - Incomplete Recipe Cleanup: Script to remove recipes with missing instructions
+  - Duplicate Description Cleanup: Script to remove redundant descriptions matching instructions
+- RecipeFinder Firebase Integration: Replaced hardcoded recipes with dynamic Firebase data
+  - 4-Column Tile Layout: Updated from 3-column to 4-column grid for better space utilization
+  - Category Filtering: Added filter buttons for different recipe categories
+  - Real-time Firebase Data: Popular recipes section now loads from user's saved recipes
+- API Optimization: Switched to free recipe API with paid fallback
+  - TheMealDB Primary API: Free, reliable recipe source as primary data provider
+  - Spoonacular Fallback: Paid API used only when free API is unavailable
+  - Cost Reduction: Significantly reduced API costs while maintaining functionality
+
+Fixed
+- MealPlanner Grid Display: Resolved 3-column tile layout issues in recipe search modal
+- Recipe Deduplication: Added filtering to prevent duplicate recipes in saved recipes list
+- Bulk Upload Optimization: Enhanced to fetch unique recipes and prevent duplicate API calls
+- Search Result Variety: Improved query randomization to avoid repetitive recipe results
+- Modal Event Handling: Fixed rating modal closing when clicking input fields
+
+Changed
+- MealPlanner UX: Streamlined from dual-view system to single calendar-based workflow
+- Recipe Addition Flow: Now integrated directly into meal planning with contextual search
+
+Removed
+- List View Toggle: Eliminated list/calendar view switching buttons for simplified interface
+- Complex View State: Removed viewMode state management in favor of modal-based interaction
+
 [1.1.2] - 2026-01-05
 
 Added

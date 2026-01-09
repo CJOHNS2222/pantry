@@ -4,6 +4,7 @@ import { db } from '../firebaseConfig';
 import { User, PantryItem, DayPlan, Household, ShoppingItem, SavedRecipe, RecipeRating, RecipeSearchResult, CustomCategory, RecipeSuggestion } from '../types';
 import { next7DateKeys, isHouseholdMember, generateConsumptionSuggestions, generateExpirationAlerts, generateRecipeSuggestions } from '../utils/appUtils';
 import { UsageService } from '../services/usageService';
+import AnalyticsService from '../services/analyticsService';
 
 export function useDataManagement(user: User | null, addToast: (message: string, type?: 'error' | 'info') => void, addToShoppingList?: (items: string[]) => void) {
   // Data States
@@ -14,6 +15,10 @@ export function useDataManagement(user: User | null, addToast: (message: string,
   const [savedRecipes, setSavedRecipes] = useState<SavedRecipe[]>([]);
   const [ratings, setRatings] = useState<RecipeRating[]>([]);
   const [customCategories, setCustomCategories] = useState<CustomCategory[]>([]);
+
+  // Usage limit states
+  const [recipeSaveLimitExceeded, setRecipeSaveLimitExceeded] = useState(false);
+  const [mealPlanLimitExceeded, setMealPlanLimitExceeded] = useState(false);
 
   // Helper function to clean objects by removing undefined fields (Firestore requirement)
   const cleanObject = (obj: any): any => {
@@ -159,15 +164,19 @@ export function useDataManagement(user: User | null, addToast: (message: string,
 
     const unsubs: (()=>void)[] = [];
 
-    // Determine if we are in a valid household
-    const inHousehold = isHouseholdMember(household, user) && household?.id;
+    // Determine if we are in a valid household (multi-member household)
+    const inHousehold = isHouseholdMember(household, user) && household?.id && 
+                       (Array.isArray(household.memberIds) ? household.memberIds.length > 1 : false);
 
     // Inventory listener - conditional based on household status
     if (inHousehold) {
       // Listen to household inventory when in household
       unsubs.push(onSnapshot(collection(db, 'households', household.id, 'inventory'), snap => {
         const serverData = snap.docs.map(d => ({ id: d.id, ...d.data() } as PantryItem));
-        setInventory(serverData);
+        // Only update if different to prevent infinite loops
+        if (JSON.stringify(serverData) !== JSON.stringify(inventory)) {
+          setInventory(serverData);
+        }
         initialDataLoadedRef.current = true;
       }, err => {
         console.error("Household inventory listener failed:", err);
@@ -176,14 +185,118 @@ export function useDataManagement(user: User | null, addToast: (message: string,
       // Listen to user inventory when not in household
       unsubs.push(onSnapshot(collection(db, 'users', user.id, 'inventory'), snap => {
         const serverData = snap.docs.map(d => ({ id: d.id, ...d.data() } as PantryItem));
-        setInventory(serverData);
+        // Only update if different to prevent infinite loops
+        if (JSON.stringify(serverData) !== JSON.stringify(inventory)) {
+          setInventory(serverData);
+        }
         initialDataLoadedRef.current = true;
       }, err => {
         console.error("User inventory listener failed:", err);
       }));
+
+      // User listeners when not in multi-member household
+      unsubs.push(onSnapshot(collection(db, 'users', user.id, 'shoppingList'), snap => {
+        const data = snap.docs.map(d => {
+          const docData = d.data();
+          return {
+            id: d.id,
+            item: docData.item || '',
+            category: docData.category || 'Manual',
+            checked: docData.checked || false,
+            quantity: docData.quantity
+          } as ShoppingItem;
+        });
+        // Only update if different to prevent infinite loops
+        if (JSON.stringify(data) !== JSON.stringify(shoppingList)) {
+          (window as any).__remoteShoppingListUpdate = true;
+          setShoppingList(data);
+          setTimeout(() => { (window as any).__remoteShoppingListUpdate = false; }, 100);
+        }
+      }, err => {
+        console.error("User shoppingList listener failed:", err);
+      }));
+
+      unsubs.push(onSnapshot(collection(db, 'users', user.id, 'savedRecipes'), snap => {
+        const data = snap.docs.map(d => ({ id: d.id, ...d.data() } as SavedRecipe));
+        // Remove duplicates based on title
+        const uniqueData = data.filter((recipe, index, self) => 
+          index === self.findIndex(r => r.title?.toLowerCase() === recipe.title?.toLowerCase())
+        );
+        // Only update if different to prevent infinite loops
+        if (JSON.stringify(uniqueData) !== JSON.stringify(savedRecipes)) {
+          setSavedRecipes(uniqueData);
+        }
+      }, err => {
+        console.error("User savedRecipes listener failed:", err);
+      }));
+
+      unsubs.push(onSnapshot(collection(db, 'users', user.id, 'mealPlan'), snap => {
+        // Create a 7-day (free) or 14-day (premium) template starting from today
+        const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const today = new Date();
+        const isPremium = user && (user.subscription?.tier === 'premium' || user.subscription?.tier === 'family');
+        const daysToShow = isPremium ? 14 : 7;
+        const fullWeekPlan: DayPlan[] = [];
+
+        for (let i = 0; i < daysToShow; i++) {
+          const d = new Date(today);
+          d.setDate(today.getDate() + i);
+          const iso = d.toISOString().slice(0, 10);
+          fullWeekPlan.push({
+            date: iso,
+            dayName: days[d.getDay()],
+            breakfast: [],
+            lunch: [],
+            dinner: []
+          });
+        }
+
+        // Merge Firestore data into the template
+        snap.docs.forEach(doc => {
+          const data = doc.data();
+          const dateStr = data.date.toDate().toISOString().slice(0, 10);
+          const existingDay = fullWeekPlan.find(day => day.date === dateStr);
+          if (existingDay) {
+            // Handle migration from old meals array to new structure
+            if (data.meals && Array.isArray(data.meals)) {
+              // Migrate old meals array to new structure
+              const validMeals = data.meals.filter((meal: any) => meal && meal.id && meal.recipe);
+              validMeals.forEach((meal: any) => {
+                const mealType = meal.type || 'dinner'; // Default to dinner if no type specified
+                switch (mealType) {
+                  case 'breakfast':
+                    existingDay.breakfast.push(meal);
+                    break;
+                  case 'lunch':
+                    existingDay.lunch.push(meal);
+                    break;
+                  case 'dinner':
+                  default:
+                    existingDay.dinner.push(meal);
+                    break;
+                }
+              });
+            } else {
+              // Handle new structure directly
+              existingDay.breakfast = data.breakfast || [];
+              existingDay.lunch = data.lunch || [];
+              existingDay.dinner = data.dinner || [];
+            }
+          }
+        });
+
+        // Only update if different from current
+        if (JSON.stringify(fullWeekPlan) !== JSON.stringify(mealPlan)) {
+          (window as any).__remoteMealPlanUpdateRef = { current: true };
+          setMealPlan(fullWeekPlan);
+          setTimeout(() => { (window as any).__remoteMealPlanUpdateRef = { current: false }; }, 100);
+        }
+      }, err => {
+        console.error("User mealPlan listener failed:", err);
+      }));
     }
 
-    // Household query listener
+    // Household query listener (always set up)
     if (user?.id) {
       const householdQuery = query(collection(db, 'households'), where('memberIds', 'array-contains', user.id));
       unsubs.push(
@@ -211,19 +324,31 @@ export function useDataManagement(user: User | null, addToast: (message: string,
             id: d.id,
             item: docData.item || '',
             category: docData.category || 'Manual',
-            checked: docData.checked || false
+            checked: docData.checked || false,
+            quantity: docData.quantity
           } as ShoppingItem;
         });
-        (window as any).__remoteShoppingListUpdate = true;
-        setShoppingList(data);
-        setTimeout(() => { (window as any).__remoteShoppingListUpdate = false; }, 100);
+        // Only update if different to prevent infinite loops
+        if (JSON.stringify(data) !== JSON.stringify(shoppingList)) {
+          (window as any).__remoteShoppingListUpdate = true;
+          setShoppingList(data);
+          setTimeout(() => { (window as any).__remoteShoppingListUpdate = false; }, 100);
+        }
       }, err => {
         console.error("Household shoppingList listener failed:", err);
 
       }));
 
       unsubs.push(onSnapshot(collection(db, 'households', household.id, 'savedRecipes'), snap => {
-        setSavedRecipes(snap.docs.map(d => ({ id: d.id, ...d.data() } as SavedRecipe)));
+        const data = snap.docs.map(d => ({ id: d.id, ...d.data() } as SavedRecipe));
+        // Remove duplicates based on title
+        const uniqueData = data.filter((recipe, index, self) => 
+          index === self.findIndex(r => r.title?.toLowerCase() === recipe.title?.toLowerCase())
+        );
+        // Only update if different to prevent infinite loops
+        if (JSON.stringify(uniqueData) !== JSON.stringify(savedRecipes)) {
+          setSavedRecipes(uniqueData);
+        }
       }, err => {
         console.error("Household savedRecipes listener failed:", err);
 
@@ -301,19 +426,31 @@ export function useDataManagement(user: User | null, addToast: (message: string,
             id: d.id,
             item: docData.item || '',
             category: docData.category || 'Manual',
-            checked: docData.checked || false
+            checked: docData.checked || false,
+            quantity: docData.quantity
           } as ShoppingItem;
         });
-        (window as any).__remoteShoppingListUpdate = true;
-        setShoppingList(data);
-        setTimeout(() => { (window as any).__remoteShoppingListUpdate = false; }, 100);
+        // Only update if different to prevent infinite loops
+        if (JSON.stringify(data) !== JSON.stringify(shoppingList)) {
+          (window as any).__remoteShoppingListUpdate = true;
+          setShoppingList(data);
+          setTimeout(() => { (window as any).__remoteShoppingListUpdate = false; }, 100);
+        }
       }, err => {
         console.error("User shoppingList listener failed:", err);
 
       }));
 
       unsubs.push(onSnapshot(collection(db, 'users', user.id, 'savedRecipes'), snap => {
-        setSavedRecipes(snap.docs.map(d => ({ id: d.id, ...d.data() } as SavedRecipe)));
+        const data = snap.docs.map(d => ({ id: d.id, ...d.data() } as SavedRecipe));
+        // Remove duplicates based on title
+        const uniqueData = data.filter((recipe, index, self) => 
+          index === self.findIndex(r => r.title?.toLowerCase() === recipe.title?.toLowerCase())
+        );
+        // Only update if different to prevent infinite loops
+        if (JSON.stringify(uniqueData) !== JSON.stringify(savedRecipes)) {
+          setSavedRecipes(uniqueData);
+        }
       }, err => {
         console.error("User savedRecipes listener failed:", err);
 
@@ -446,11 +583,15 @@ export function useDataManagement(user: User | null, addToast: (message: string,
       return;
     }
 
+    // Determine if we are in a valid household (multi-member household)
+    const inHousehold = household?.id && isHouseholdMember(household, user) && 
+                       (Array.isArray(household.memberIds) ? household.memberIds.length > 1 : false);
+
+    console.log('Inventory sync triggered - user:', user?.id, 'household:', household?.id, 'inventory length:', inventory.length, 'inHousehold:', inHousehold);
+
     (async () => {
       (window as any).__writingMealPlan = true;
       try {
-        // Determine if we are in a valid household
-        const inHousehold = household?.id && isHouseholdMember(household, user);
         
         if (inHousehold) {
           // When in household, sync inventory to household collection
@@ -691,7 +832,7 @@ export function useDataManagement(user: User | null, addToast: (message: string,
         (window as any).__writingMealPlan = false;
       }
     })();
-    }, [user?.id, household?.id, inventory, savedRecipes, mealPlan, shoppingList]);
+    }, [user?.id, household?.id, inventory, savedRecipes, mealPlan]);
 
   // Shopping list sync
   useEffect(() => {
@@ -702,7 +843,8 @@ export function useDataManagement(user: User | null, addToast: (message: string,
     // Debounce the sync to avoid running on every state change
     const timeoutId = setTimeout(async () => {
       try {
-        const collectionPath = household?.id && isHouseholdMember(household, user)
+        const collectionPath = household?.id && isHouseholdMember(household, user) && 
+                           (Array.isArray(household.memberIds) ? household.memberIds.length > 1 : false)
           ? `households/${household.id}/shoppingList`
           : `users/${user.id}/shoppingList`;
 
@@ -718,7 +860,7 @@ export function useDataManagement(user: User | null, addToast: (message: string,
         // Find items to add/update (in current state but not in DB, or different)
         const toSave = shoppingList.filter(current => {
           const existing = existingItems.find(item => item.id === current.id);
-          return !existing || existing.item !== current.item || existing.category !== current.category || existing.checked !== current.checked;
+          return !existing || existing.item !== current.item || existing.category !== current.category || existing.checked !== current.checked || existing.quantity !== current.quantity;
         });
 
         console.log('Shopping list sync - collection:', collectionPath, 'toDelete:', toDelete.length, 'toSave:', toSave.length);
@@ -734,6 +876,7 @@ export function useDataManagement(user: User | null, addToast: (message: string,
             item: item.item,
             category: item.category,
             checked: item.checked,
+            quantity: item.quantity,
             lastModifiedAt: serverTimestamp()
           }).catch(err => ({ err, path: `${collectionPath}/${item.id}` }))
         );
@@ -762,7 +905,8 @@ export function useDataManagement(user: User | null, addToast: (message: string,
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
         const cutoffDate = Timestamp.fromDate(sevenDaysAgo);
 
-        const collectionPath = household?.id && isHouseholdMember(household, user)
+        const collectionPath = household?.id && isHouseholdMember(household, user) && 
+                           (Array.isArray(household.memberIds) ? household.memberIds.length > 1 : false)
           ? `households/${household.id}/mealPlan`
           : `users/${user.id}/mealPlan`;
 
@@ -831,20 +975,17 @@ export function useDataManagement(user: User | null, addToast: (message: string,
   const handleAddToPlan = async (recipe: any) => {
     if (!mealPlan) return;
 
+    // Check if we've already determined the limit is exceeded
+    if (mealPlanLimitExceeded) {
+      addToast('You\'ve reached your weekly meal planning limit. Upgrade to Premium for unlimited meal planning!', 'error');
+      return;
+    }
+
     // Check meal planning limits for free users
     if (user) {
       try {
-        // Count recipes added to meal plan this week
-        const now = new Date();
-        const weekStart = new Date(now);
-        weekStart.setDate(now.getDate() - now.getDay()); // Start of week (Sunday)
-        weekStart.setHours(0, 0, 0, 0);
-
-        const weeklyRecipeCount = mealPlan
-          .filter(day => new Date(day.date) >= weekStart)
-          .reduce((count, day) => count + (day.breakfast?.length || 0) + (day.lunch?.length || 0) + (day.dinner?.length || 0), 0);
-
-        const canAdd = await UsageService.canAddMealPlanRecipe(user, weeklyRecipeCount);
+        // Use the checkMealPlanLimit function to update state
+        const canAdd = await checkMealPlanLimit();
         if (!canAdd) {
           addToast('You\'ve reached your weekly meal planning limit. Upgrade to Premium for unlimited meal planning!', 'error');
           return;
@@ -891,6 +1032,9 @@ export function useDataManagement(user: User | null, addToast: (message: string,
     setMealPlan(updatedPlan);
     addToast(`Added ${recipe.title} to today's meal plan!`);
 
+    // Track analytics
+    AnalyticsService.trackMealPlanAdd(recipe.id || recipe.title, recipe.title, 'breakfast', 0);
+
     // Record the meal planning usage
     if (user) {
       try {
@@ -902,10 +1046,53 @@ export function useDataManagement(user: User | null, addToast: (message: string,
     }
   };
 
+  // Usage limit checking functions
+  const checkRecipeSaveLimit = async () => {
+    if (!user) return false;
+    try {
+      const canSave = await UsageService.canSaveRecipe(user, savedRecipes.length);
+      setRecipeSaveLimitExceeded(!canSave);
+      return canSave;
+    } catch (error) {
+      console.error('Error checking recipe save limit:', error);
+      return false;
+    }
+  };
+
+  const checkMealPlanLimit = async () => {
+    if (!user) return false;
+    try {
+      // Count recipes added to meal plan this week
+      const now = new Date();
+      const weekStart = new Date(now);
+      weekStart.setDate(now.getDate() - now.getDay()); // Start of week (Sunday)
+      weekStart.setHours(0, 0, 0, 0);
+
+      const weeklyRecipeCount = mealPlan
+        .filter(day => new Date(day.date) >= weekStart)
+        .reduce((count, day) => count + (day.breakfast?.length || 0) + (day.lunch?.length || 0) + (day.dinner?.length || 0), 0);
+
+      const canAdd = await UsageService.canAddMealPlanRecipe(user, weeklyRecipeCount);
+      setMealPlanLimitExceeded(!canAdd);
+      return canAdd;
+    } catch (error) {
+      console.error('Error checking meal plan limit:', error);
+      return false;
+    }
+  };
+
   const handleSaveRecipe = async (recipe: any) => {
     if (!user?.id) return;
+    
+    // Check if we've already determined the limit is exceeded
+    if (recipeSaveLimitExceeded) {
+      addToast('You have reached the maximum number of saved recipes for your plan. Please upgrade to save more recipes.', 'error');
+      return;
+    }
+    
     try {
-      const inHousehold = isHouseholdMember(household, user) && household?.id;
+      const inHousehold = isHouseholdMember(household, user) && household?.id && 
+                         (Array.isArray(household.memberIds) ? household.memberIds.length > 1 : false);
       const collectionPath = inHousehold ? `households/${household.id}/savedRecipes` : `users/${user.id}/savedRecipes`;
       
       // Check for duplicate recipes
@@ -917,6 +1104,13 @@ export function useDataManagement(user: User | null, addToast: (message: string,
         addToast(`"${recipe.title}" is already saved in your recipes!`, 'info');
         return;
       }
+
+      // Check recipe save limit (and update state)
+      const canSave = await checkRecipeSaveLimit();
+      if (!canSave) {
+        addToast('You have reached the maximum number of saved recipes for your plan. Please upgrade to save more recipes.', 'error');
+        return;
+      }
       
       await addDoc(collection(db, collectionPath), {
         ...recipe,
@@ -924,6 +1118,14 @@ export function useDataManagement(user: User | null, addToast: (message: string,
         savedBy: user.name,
         userId: user.id
       });
+      
+      // Record recipe save usage
+      try {
+        await UsageService.recordRecipeSave(user);
+      } catch (error) {
+        console.error('Error recording recipe save usage:', error);
+        // Don't fail the operation if recording fails
+      }
       
       addToast(`Saved ${recipe.title} to your recipes!`);
     } catch (error) {
@@ -935,7 +1137,8 @@ export function useDataManagement(user: User | null, addToast: (message: string,
   const handleDeleteRecipe = async (recipe: SavedRecipe) => {
     if (!user?.id) return;
     try {
-      const inHousehold = isHouseholdMember(household, user) && household?.id;
+      const inHousehold = isHouseholdMember(household, user) && household?.id && 
+                         (Array.isArray(household.memberIds) ? household.memberIds.length > 1 : false);
       const collectionPath = inHousehold ? `households/${household.id}/savedRecipes` : `users/${user.id}/savedRecipes`;
       
       await deleteDoc(doc(db, collectionPath, recipe.id));
@@ -1114,5 +1317,11 @@ export function useDataManagement(user: User | null, addToast: (message: string,
     handleSaveRecipe,
     handleDeleteRecipe,
     handleRateRecipe,
+    // Usage limit states
+    recipeSaveLimitExceeded,
+    mealPlanLimitExceeded,
+    // Usage limit checking functions
+    checkRecipeSaveLimit,
+    checkMealPlanLimit,
   };
 }

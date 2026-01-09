@@ -233,7 +233,7 @@ export const Tutorial: React.FC<TutorialProps> = ({
       )}
 
       {/* Tutorial Modal */}
-      <div className={`fixed z-50 animate-fade-in right-4`} style={highlightedElement?.startsWith('nav-') ? { bottom: '105px' } : { bottom: '16px' }}>
+      <div className={`fixed z-50 animate-fade-in right-4`} style={highlightedElement?.startsWith('nav-') ? { bottom: '185px' } : { bottom: '66px' }}>
         <div className="bg-theme-secondary border border-theme w-80 rounded-2xl shadow-2xl relative overflow-hidden">
 
           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[var(--accent-color)] to-transparent"></div>

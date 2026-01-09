@@ -31,7 +31,7 @@ try {
 }
 
 import { initializeApp } from "firebase/app";
-import { getFirestore, collection, addDoc } from "firebase/firestore";
+import { getFirestore, collection, addDoc, getDocs, query, where } from "firebase/firestore";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 // Firebase config (same as in your app)
@@ -51,11 +51,52 @@ const storage = getStorage(app);
 
 const SPOONACULAR_API_KEY = process.env.VITE_SPOONACULAR_API_KEY;
 const SPOONACULAR_BASE_URL = "https://api.spoonacular.com";
+const MEALDB_BASE_URL = "https://www.themealdb.com/api/json/v1/1";
 
 /**
- * Fetch recipes from Spoonacular API
+ * Fetch recipes from TheMealDB API (primary)
  */
-async function fetchRecipesFromSpoonacular(query = "", number = 10, offset = 0) {
+async function fetchRecipesFromMealDB(query = "", category = "") {
+  let url = `${MEALDB_BASE_URL}/`;
+
+  if (query) {
+    url += `search.php?s=${encodeURIComponent(query)}`;
+  } else if (category) {
+    url += `filter.php?c=${encodeURIComponent(category)}`;
+  } else {
+    // Get multiple random recipes by making multiple requests
+    const randomRecipes = [];
+    for (let i = 0; i < 5; i++) { // Get 5 random recipes
+      try {
+        const randomResponse = await fetch(`${MEALDB_BASE_URL}/random.php`);
+        if (randomResponse.ok) {
+          const randomData = await randomResponse.json();
+          if (randomData.meals && randomData.meals.length > 0) {
+            randomRecipes.push(randomData.meals[0]);
+          }
+        }
+        // Small delay to be respectful
+        await new Promise(resolve => setTimeout(resolve, 200));
+      } catch (error) {
+        console.warn("Error fetching random recipe:", error.message);
+      }
+    }
+    return randomRecipes;
+  }
+
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`TheMealDB API error: ${response.status} ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  return data.meals || [];
+}
+
+/**
+ * Fetch recipes from Spoonacular API (fallback)
+ */
+async function fetchRecipesFromSpoonacular(query = "", number = 10, offset = 0, sort = "random") {
   if (!SPOONACULAR_API_KEY) {
     throw new Error("Spoonacular API key not configured");
   }
@@ -65,7 +106,8 @@ async function fetchRecipesFromSpoonacular(query = "", number = 10, offset = 0) 
     number: number.toString(),
     offset: offset.toString(),
     addRecipeInformation: "true",
-    fillIngredients: "true"
+    fillIngredients: "true",
+    sort: sort
   });
 
   if (query) {
@@ -86,18 +128,67 @@ async function fetchRecipesFromSpoonacular(query = "", number = 10, offset = 0) 
  * Convert Spoonacular recipe to our StructuredRecipe format
  */
 function convertSpoonacularToStructured(spoonacularRecipe) {
+  const description = spoonacularRecipe.summary?.replace(/<[^>]*>/g, '') || `${spoonacularRecipe.title} - A delicious recipe`;
+  const instructions = spoonacularRecipe.analyzedInstructions?.[0]?.steps?.map(step =>
+    step.step
+  ) || [spoonacularRecipe.instructions || "Instructions not available"];
+
+  // Check if description matches instructions
+  const instructionsText = instructions.join(' ').trim();
+  const isDuplicateDescription = description === instructionsText ||
+                                instructionsText.includes(description) ||
+                                description.includes(instructionsText.substring(0, 100));
+
   return {
     title: spoonacularRecipe.title,
-    description: spoonacularRecipe.summary?.replace(/<[^>]*>/g, '') || `${spoonacularRecipe.title} - A delicious recipe`,
+    description: isDuplicateDescription ? null : description,
     ingredients: spoonacularRecipe.extendedIngredients?.map(ing =>
       `${ing.amount} ${ing.unit} ${ing.name}`
     ) || [],
-    instructions: spoonacularRecipe.analyzedInstructions?.[0]?.steps?.map(step =>
-      step.step
-    ) || [spoonacularRecipe.instructions || "Instructions not available"],
+    instructions: instructions,
     cookTime: `${spoonacularRecipe.readyInMinutes} mins`,
     type: spoonacularRecipe.dishTypes?.[0] || "Dinner",
     image: spoonacularRecipe.image
+  };
+}
+
+/**
+ * Convert TheMealDB recipe to our StructuredRecipe format
+ */
+function convertMealDBToStructured(mealDBRecipe) {
+  // Skip recipes without instructions
+  if (!mealDBRecipe.strInstructions || mealDBRecipe.strInstructions.trim() === '') {
+    console.log(`⏭️  Skipping "${mealDBRecipe.strMeal}" - no instructions available`);
+    return null;
+  }
+
+  // Extract ingredients and measurements
+  const ingredients = [];
+  for (let i = 1; i <= 20; i++) {
+    const ingredient = mealDBRecipe[`strIngredient${i}`];
+    const measure = mealDBRecipe[`strMeasure${i}`];
+    if (ingredient && ingredient.trim()) {
+      ingredients.push(`${measure} ${ingredient}`.trim());
+    }
+  }
+
+  const description = mealDBRecipe.strInstructions || `${mealDBRecipe.strMeal} - A delicious recipe`;
+  const instructions = [mealDBRecipe.strInstructions];
+
+  // Check if description matches instructions (for MealDB, description is often set to instructions)
+  const instructionsText = instructions.join(' ').trim();
+  const isDuplicateDescription = description === instructionsText ||
+                                instructionsText.includes(description) ||
+                                description.includes(instructionsText.substring(0, 100));
+
+  return {
+    title: mealDBRecipe.strMeal,
+    description: isDuplicateDescription ? null : description,
+    ingredients: ingredients,
+    instructions: instructions,
+    cookTime: "30 mins", // TheMealDB doesn't provide cook time, using default
+    type: mealDBRecipe.strCategory || "Dinner",
+    image: mealDBRecipe.strMealThumb
   };
 }
 
@@ -128,6 +219,20 @@ async function uploadRecipeImage(imageUrl, recipeId) {
 }
 
 /**
+ * Check if a recipe with the given title already exists in Firestore
+ */
+async function recipeExists(title) {
+  try {
+    const q = query(collection(db, "recipes"), where("title", "==", title));
+    const querySnapshot = await getDocs(q);
+    return !querySnapshot.empty;
+  } catch (error) {
+    console.error("Error checking if recipe exists:", error);
+    return false; // If we can't check, assume it doesn't exist to avoid blocking
+  }
+}
+
+/**
  * Save recipe to Firestore
  */
 async function saveRecipeToFirestore(recipe) {
@@ -146,16 +251,7 @@ async function saveRecipeToFirestore(recipe) {
 }
 
 const SEARCH_QUERIES = [
-  "chicken",
-  "beef",
-  "pasta",
-  "vegetarian",
-  "fish",
-  "pork",
-  "turkey",
-  "lamb",
-  "seafood",
-  "salad",
+  // Basic proteins
   "soup",
   "stew",
   "curry",
@@ -170,14 +266,53 @@ const SEARCH_QUERIES = [
   "brunch",
   "lunch",
   "dinner",
-  "snack"
+  "snack",
+  // More specific combinations
+  "chicken breast",
+  "ground beef",
+  "salmon",
+  "shrimp",
+  "tofu",
+  "quinoa",
+  "rice",
+  "potatoes",
+  "pasta primavera",
+  "beef stew",
+  "chicken curry",
+  "fish tacos",
+  "vegetable stir fry",
+  "grilled vegetables",
+  "baked chicken",
+  "roasted vegetables",
+  "slow cooker chili",
+  "instant pot rice",
+  "air fryer wings",
+  "breakfast burrito",
+  "brunch casserole",
+  "lunch salad",
+  "dinner casserole",
+  "healthy snack",
+  // Dietary variations
+  "keto chicken",
+  "gluten free pasta",
+  "low carb dinner",
+  "high protein breakfast",
+  "mediterranean salad",
+  "asian stir fry",
+  "mexican beef",
+  "italian pasta",
+  "french roasted",
+  "thai curry"
 ];
 
-const RECIPES_PER_QUERY = 2; // Reduced to stay within 50 requests/day limit
+const SORT_OPTIONS = ["random", "popularity", "time", "calories", "protein", "fat", "carbs"];
+
+const RECIPES_PER_QUERY = 1; // Reduced to get more variety from different queries
 
 async function bulkUploadRecipes(searchQueries, recipesPerQuery, onProgress) {
   const result = {
     success: 0,
+    skipped: 0,
     failed: 0,
     errors: []
   };
@@ -189,13 +324,65 @@ async function bulkUploadRecipes(searchQueries, recipesPerQuery, onProgress) {
     try {
       console.log(`Fetching recipes for: ${searchQuery}`);
 
-      // Fetch recipes from Spoonacular
-      const spoonacularRecipes = await fetchRecipesFromSpoonacular(searchQuery, recipesPerQuery);
+      let recipes = [];
+      let usedMealDB = false;
 
-      for (const spoonacularRecipe of spoonacularRecipes) {
+      // Try TheMealDB first (free, no limits)
+      try {
+        console.log(`🔍 Trying TheMealDB for "${searchQuery}"...`);
+        const mealDBRecipes = await fetchRecipesFromMealDB(searchQuery);
+        if (mealDBRecipes.length > 0) {
+          recipes = mealDBRecipes;
+          usedMealDB = true;
+          console.log(`✅ Found ${mealDBRecipes.length} recipes from TheMealDB`);
+        } else {
+          console.log(`⚠️  No recipes found in TheMealDB for "${searchQuery}", trying Spoonacular...`);
+        }
+      } catch (mealDBError) {
+        console.log(`⚠️  TheMealDB failed for "${searchQuery}": ${mealDBError.message}, trying Spoonacular...`);
+      }
+
+      // Fall back to Spoonacular if TheMealDB didn't work or returned no results
+      if (recipes.length === 0 && SPOONACULAR_API_KEY) {
         try {
-          // Convert to our format
-          const structuredRecipe = convertSpoonacularToStructured(spoonacularRecipe);
+          const sortOption = SORT_OPTIONS[Math.floor(Math.random() * SORT_OPTIONS.length)];
+          console.log(`🔍 Falling back to Spoonacular for "${searchQuery}"...`);
+          const spoonacularRecipes = await fetchRecipesFromSpoonacular(searchQuery, recipesPerQuery, 0, sortOption);
+          recipes = spoonacularRecipes;
+          console.log(`✅ Found ${spoonacularRecipes.length} recipes from Spoonacular`);
+        } catch (spoonacularError) {
+          console.log(`❌ Spoonacular also failed for "${searchQuery}": ${spoonacularError.message}`);
+          completedQueries++;
+          onProgress?.(completedQueries, totalQueries);
+          continue;
+        }
+      } else if (recipes.length === 0) {
+        console.log(`❌ No API available for "${searchQuery}" (no Spoonacular key)`);
+        completedQueries++;
+        onProgress?.(completedQueries, totalQueries);
+        continue;
+      }
+
+      for (const recipe of recipes) {
+        try {
+          // Convert to our format based on API used
+          const structuredRecipe = usedMealDB
+            ? convertMealDBToStructured(recipe)
+            : convertSpoonacularToStructured(recipe);
+
+          // Skip if conversion returned null (no instructions)
+          if (!structuredRecipe) {
+            result.skipped++;
+            continue;
+          }
+
+          // Check if recipe already exists
+          const exists = await recipeExists(structuredRecipe.title);
+          if (exists) {
+            console.log(`⏭️  Skipping duplicate recipe: ${structuredRecipe.title}`);
+            result.skipped++;
+            continue;
+          }
 
           // Save to Firestore first to get ID
           const recipeId = await saveRecipeToFirestore(structuredRecipe);
@@ -210,12 +397,13 @@ async function bulkUploadRecipes(searchQueries, recipesPerQuery, onProgress) {
           }
 
           result.success++;
-          console.log(`Saved recipe: ${structuredRecipe.title}`);
+          console.log(`✅ Saved recipe: ${structuredRecipe.title} (${usedMealDB ? 'MealDB' : 'Spoonacular'})`);
 
         } catch (recipeError) {
           result.failed++;
-          result.errors.push(`Failed to save recipe "${spoonacularRecipe.title}": ${recipeError}`);
-          console.error(`Failed to save recipe:`, recipeError);
+          const recipeTitle = usedMealDB ? recipe.strMeal : recipe.title;
+          result.errors.push(`Failed to save recipe "${recipeTitle}": ${recipeError}`);
+          console.error(`❌ Failed to save recipe:`, recipeError);
         }
       }
 
@@ -238,9 +426,10 @@ async function bulkUploadRecipes(searchQueries, recipesPerQuery, onProgress) {
 
 async function main() {
   console.log('🚀 Starting bulk recipe upload...');
-  console.log(`📊 Will fetch ${RECIPES_PER_QUERY} recipes for each of ${SEARCH_QUERIES.length} search terms`);
-  console.log(`📈 Total estimated recipes: ${SEARCH_QUERIES.length * RECIPES_PER_QUERY}`);
-  console.log(`⏱️  Rate limit: 1 request/second (Spoonacular free tier)`);
+  console.log(`📊 Will fetch up to ${RECIPES_PER_QUERY} recipes for each of ${SEARCH_QUERIES.length} search terms`);
+  console.log(`📈 Total estimated recipes: up to ${SEARCH_QUERIES.length * RECIPES_PER_QUERY} (may be less due to duplicates)`);
+  console.log(`🔀 Using TheMealDB (free) as primary, Spoonacular as fallback`);
+  console.log(`⏱️  Rate limit: None for MealDB, 1 request/second for Spoonacular`);
 
   const startTime = Date.now();
 
@@ -259,6 +448,7 @@ async function main() {
     console.log('\n✅ Bulk upload completed!');
     console.log(`📊 Results:`);
     console.log(`   ✅ Successful: ${result.success}`);
+    console.log(`   ⏭️  Skipped (duplicates): ${result.skipped}`);
     console.log(`   ❌ Failed: ${result.failed}`);
     console.log(`   ⏱️  Duration: ${duration} seconds`);
 

@@ -2,9 +2,11 @@ import { collection, addDoc, getDocs, query, where, orderBy, limit, doc, getDoc,
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db, storage } from "../firebaseConfig";
 import { StructuredRecipe, SavedRecipe } from "../types";
+import { getPerformance, trace } from "firebase/performance";
 
 const SPOONACULAR_API_KEY = import.meta.env.VITE_SPOONACULAR_API_KEY;
 const SPOONACULAR_BASE_URL = "https://api.spoonacular.com";
+const performance = getPerformance();
 
 export interface SpoonacularRecipe {
   id: number;
@@ -60,30 +62,47 @@ export const fetchRecipesFromSpoonacular = async (
   number: number = 10,
   offset: number = 0
 ): Promise<SpoonacularRecipe[]> => {
-  if (!SPOONACULAR_API_KEY) {
-    throw new Error("Spoonacular API key not configured");
+  const perfTrace = trace(performance, 'fetch_spoonacular_recipes');
+  perfTrace.start();
+
+  try {
+    if (!SPOONACULAR_API_KEY) {
+      throw new Error("Spoonacular API key not configured");
+    }
+
+    const params = new URLSearchParams({
+      apiKey: SPOONACULAR_API_KEY,
+      number: number.toString(),
+      offset: offset.toString(),
+      addRecipeInformation: "true",
+      fillIngredients: "true"
+    });
+
+    if (query) {
+      params.append("query", query);
+    }
+
+    // Add custom metrics
+    perfTrace.putMetric('query_length', query.length);
+    perfTrace.putMetric('requested_count', number);
+    perfTrace.putMetric('offset', offset);
+
+    const response = await fetch(`${SPOONACULAR_BASE_URL}/recipes/complexSearch?${params}`);
+
+    if (!response.ok) {
+      throw new Error(`Spoonacular API error: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    const results = data.results || [];
+
+    // Add more metrics
+    perfTrace.putMetric('results_returned', results.length);
+
+    return results;
+  } finally {
+    perfTrace.stop();
   }
-
-  const params = new URLSearchParams({
-    apiKey: SPOONACULAR_API_KEY,
-    number: number.toString(),
-    offset: offset.toString(),
-    addRecipeInformation: "true",
-    fillIngredients: "true"
-  });
-
-  if (query) {
-    params.append("query", query);
-  }
-
-  const response = await fetch(`${SPOONACULAR_BASE_URL}/recipes/complexSearch?${params}`);
-
-  if (!response.ok) {
-    throw new Error(`Spoonacular API error: ${response.status} ${response.statusText}`);
-  }
-
-  const data = await response.json();
-  return data.results || [];
 };
 
 /**
@@ -109,6 +128,9 @@ export const convertSpoonacularToStructured = (spoonacularRecipe: SpoonacularRec
  * Download and upload image to Firebase Storage
  */
 export const uploadRecipeImage = async (imageUrl: string, recipeId: string): Promise<string> => {
+  const perfTrace = trace(performance, 'upload_recipe_image');
+  perfTrace.start();
+
   try {
     // Download image from Spoonacular
     const response = await fetch(imageUrl);
@@ -117,6 +139,9 @@ export const uploadRecipeImage = async (imageUrl: string, recipeId: string): Pro
     }
 
     const blob = await response.blob();
+
+    // Add custom metrics
+    perfTrace.putMetric('image_size_bytes', blob.size);
 
     // Upload to Firebase Storage
     const storageRef = ref(storage, `recipes/${recipeId}.jpg`);
@@ -127,7 +152,10 @@ export const uploadRecipeImage = async (imageUrl: string, recipeId: string): Pro
     return downloadURL;
   } catch (error) {
     console.error("Error uploading recipe image:", error);
+    perfTrace.putAttribute('result', 'fallback_to_original');
     return imageUrl; // Return original URL if upload fails
+  } finally {
+    perfTrace.stop();
   }
 };
 
@@ -135,17 +163,27 @@ export const uploadRecipeImage = async (imageUrl: string, recipeId: string): Pro
  * Save recipe to Firestore
  */
 export const saveRecipeToFirestore = async (recipe: StructuredRecipe): Promise<string> => {
+  const perfTrace = trace(performance, 'save_recipe_firestore');
+  perfTrace.start();
+
   try {
     const savedRecipe: Omit<SavedRecipe, 'id'> = {
       ...recipe,
       dateSaved: new Date().toISOString()
     };
 
+    // Add custom metrics
+    perfTrace.putMetric('ingredients_count', recipe.ingredients.length);
+    perfTrace.putMetric('instructions_count', recipe.instructions.length);
+    perfTrace.putAttribute('has_image', recipe.image ? 'true' : 'false');
+
     const docRef = await addDoc(collection(db, "recipes"), savedRecipe);
     return docRef.id;
   } catch (error) {
     console.error("Error saving recipe to Firestore:", error);
     throw error;
+  } finally {
+    perfTrace.stop();
   }
 };
 
@@ -157,68 +195,83 @@ export const bulkUploadRecipes = async (
   recipesPerQuery: number = 10,
   onProgress?: (completed: number, total: number) => void
 ): Promise<BulkUploadResult> => {
-  const result: BulkUploadResult = {
-    success: 0,
-    failed: 0,
-    errors: []
-  };
+  const perfTrace = trace(performance, 'bulk_upload_recipes');
+  perfTrace.start();
 
-  const totalQueries = searchQueries.length;
-  let completedQueries = 0;
+  try {
+    const result: BulkUploadResult = {
+      success: 0,
+      failed: 0,
+      errors: []
+    };
 
-  for (const searchQuery of searchQueries) {
-    try {
-      console.log(`Fetching recipes for: ${searchQuery}`);
+    const totalQueries = searchQueries.length;
+    let completedQueries = 0;
 
-      // Fetch recipes from Spoonacular
-      const spoonacularRecipes = await fetchRecipesFromSpoonacular(searchQuery, recipesPerQuery);
+    // Add custom metrics
+    perfTrace.putMetric('total_queries', totalQueries);
+    perfTrace.putMetric('recipes_per_query', recipesPerQuery);
 
-      for (const spoonacularRecipe of spoonacularRecipes) {
-        try {
-          // Convert to our format
-          const structuredRecipe = convertSpoonacularToStructured(spoonacularRecipe);
+    for (const searchQuery of searchQueries) {
+      try {
+        console.log(`Fetching recipes for: ${searchQuery}`);
 
-          // Save to Firestore first to get ID
-          const recipeId = await saveRecipeToFirestore(structuredRecipe);
+        // Fetch recipes from Spoonacular
+        const spoonacularRecipes = await fetchRecipesFromSpoonacular(searchQuery, recipesPerQuery);
 
-          // Upload image if available
-          if (structuredRecipe.image) {
-            const uploadedImageUrl = await uploadRecipeImage(structuredRecipe.image, recipeId);
+        for (const spoonacularRecipe of spoonacularRecipes) {
+          try {
+            // Convert to our format
+            const structuredRecipe = convertSpoonacularToStructured(spoonacularRecipe);
 
-            // Update recipe with uploaded image URL
-            await setDoc(doc(db, "recipes", recipeId), {
-              ...structuredRecipe,
-              id: recipeId,
-              dateSaved: new Date().toISOString(),
-              image: uploadedImageUrl
-            }, { merge: true });
+            // Save to Firestore first to get ID
+            const recipeId = await saveRecipeToFirestore(structuredRecipe);
+
+            // Upload image if available
+            if (structuredRecipe.image) {
+              const uploadedImageUrl = await uploadRecipeImage(structuredRecipe.image, recipeId);
+
+              // Update recipe with uploaded image URL
+              await setDoc(doc(db, "recipes", recipeId), {
+                ...structuredRecipe,
+                id: recipeId,
+                dateSaved: new Date().toISOString(),
+                image: uploadedImageUrl
+              }, { merge: true });
+            }
+
+            result.success++;
+            console.log(`Saved recipe: ${structuredRecipe.title}`);
+
+          } catch (recipeError) {
+            result.failed++;
+            result.errors.push(`Failed to save recipe "${spoonacularRecipe.title}": ${recipeError}`);
+            console.error(`Failed to save recipe:`, recipeError);
           }
-
-          result.success++;
-          console.log(`Saved recipe: ${structuredRecipe.title}`);
-
-        } catch (recipeError) {
-          result.failed++;
-          result.errors.push(`Failed to save recipe "${spoonacularRecipe.title}": ${recipeError}`);
-          console.error(`Failed to save recipe:`, recipeError);
         }
+
+        completedQueries++;
+        onProgress?.(completedQueries, totalQueries);
+
+        // Small delay to respect API rate limits
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+      } catch (queryError) {
+        result.errors.push(`Failed to fetch recipes for "${searchQuery}": ${queryError}`);
+        console.error(`Failed to fetch recipes for ${searchQuery}:`, queryError);
+        completedQueries++;
+        onProgress?.(completedQueries, totalQueries);
       }
-
-      completedQueries++;
-      onProgress?.(completedQueries, totalQueries);
-
-      // Small delay to respect API rate limits
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-    } catch (queryError) {
-      result.errors.push(`Failed to fetch recipes for "${searchQuery}": ${queryError}`);
-      console.error(`Failed to fetch recipes for ${searchQuery}:`, queryError);
-      completedQueries++;
-      onProgress?.(completedQueries, totalQueries);
     }
-  }
 
-  return result;
+    // Add final metrics
+    perfTrace.putMetric('total_success', result.success);
+    perfTrace.putMetric('total_failed', result.failed);
+
+    return result;
+  } finally {
+    perfTrace.stop();
+  }
 };
 
 /**
@@ -243,6 +296,9 @@ export const getSavedRecipes = async (): Promise<SavedRecipe[]> => {
  * Search recipes in Firestore
  */
 export const searchRecipesInFirestore = async (searchTerm: string): Promise<SavedRecipe[]> => {
+  const perfTrace = trace(performance, 'search_recipes_firestore');
+  perfTrace.start();
+
   try {
     // Note: Firestore doesn't support full-text search natively
     // This is a simple implementation - you might want to use Algolia or Elastic Search for better search
@@ -255,13 +311,22 @@ export const searchRecipesInFirestore = async (searchTerm: string): Promise<Save
     } as SavedRecipe));
 
     // Filter by search term (case-insensitive)
-    return allRecipes.filter(recipe =>
+    const filteredRecipes = allRecipes.filter(recipe =>
       recipe.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       recipe.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
       recipe.ingredients.some(ing => ing.toLowerCase().includes(searchTerm.toLowerCase()))
     );
+
+    // Add custom metrics
+    perfTrace.putMetric('search_term_length', searchTerm.length);
+    perfTrace.putMetric('total_recipes_searched', allRecipes.length);
+    perfTrace.putMetric('results_found', filteredRecipes.length);
+
+    return filteredRecipes;
   } catch (error) {
     console.error("Error searching recipes:", error);
     return [];
+  } finally {
+    perfTrace.stop();
   }
 };

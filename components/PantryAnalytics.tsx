@@ -1,13 +1,16 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { PantryItem } from '../types';
 import { TrendingUp, Package, Flame, AlertTriangle } from 'lucide-react';
+import AnalyticsService from '../services/analyticsService';
 
 interface PantryAnalyticsProps {
   inventory: PantryItem[];
 }
 
-export const PantryAnalytics: React.FC<PantryAnalyticsProps> = ({ inventory }) => {
-  // Chart Colors
+export const PantryAnalytics: React.FC<PantryAnalyticsProps> = ({ inventory }) => {  // Track analytics view
+  useEffect(() => {
+    AnalyticsService.trackAnalyticsView('pantry_overview');
+  }, []);  // Chart Colors
 
   // Items by Category
   const categoryData = useMemo(() => {

@@ -23,6 +23,8 @@ interface MealPlannerProps {
   onRate?: (rating: any) => void;
   user: User;
   setActiveTab: (tab: Tab) => void;
+  recipeSaveLimitExceeded?: boolean;
+  mealPlanLimitExceeded?: boolean;
   settings?: {
     notifications: {
       enabled: boolean;
@@ -300,7 +302,7 @@ const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
   );
 };
 
-export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan, inventory, addToShoppingList, onAddToPlan, onSaveRecipe, onMarkAsMade, onRate, user, setActiveTab, settings, onOpenRecipeSearch }) => {
+export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan, inventory, addToShoppingList, onAddToPlan, onSaveRecipe, onMarkAsMade, onRate, user, setActiveTab, recipeSaveLimitExceeded = false, mealPlanLimitExceeded = false, settings, onOpenRecipeSearch }) => {
     // List of staple items to ignore
     const STAPLES = ['salt', 'pepper', 'oil', 'water', 'flour', 'sugar', 'butter', 'vinegar', 'baking powder', 'baking soda', 'spices', 'seasoning', 'soy sauce', 'cornstarch', 'yeast'];
   const [draggedMeal, setDraggedMeal] = useState<{ dayIndex: number, mealType: string, mealIndex: number } | null>(null);
@@ -1039,6 +1041,8 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
           showSaveButton={true}
           showMarkAsMade={modalContext === 'scheduled'}
           showAddToPlan={modalContext === 'search'}
+          recipeSaveLimitExceeded={recipeSaveLimitExceeded}
+          mealPlanLimitExceeded={mealPlanLimitExceeded}
           user={user}
         />
       )}

@@ -148,17 +148,178 @@ class AnalyticsService {
     });
   }
 
-  // Track household events
-  static trackHouseholdJoin(householdId: string, role: string = 'member') {
-    this.logEvent('join_group', {
-      group_id: householdId,
-      role: role
+  // Track meal planning events
+  static trackMealPlanAdd(recipeId: string, recipeName: string, mealType: string, dayIndex: number) {
+    this.logEvent('add_to_meal_plan', {
+      content_type: 'recipe',
+      item_id: recipeId,
+      item_name: recipeName,
+      meal_type: mealType,
+      day_index: dayIndex
     });
   }
 
-  static trackHouseholdCreate(householdId: string) {
-    this.logEvent('create_group', {
+  static trackMealPlanRemove(recipeId: string, recipeName: string, mealType: string) {
+    this.logEvent('remove_from_meal_plan', {
+      content_type: 'recipe',
+      item_id: recipeId,
+      item_name: recipeName,
+      meal_type: mealType
+    });
+  }
+
+  static trackMealPlanView(dayIndex: number, totalMeals: number) {
+    this.logEvent('view_meal_plan', {
+      content_type: 'meal_plan',
+      day_index: dayIndex,
+      total_meals: totalMeals
+    });
+  }
+
+  // Track cooking reminder events
+  static trackCookingReminderSet(recipeId: string, recipeName: string, reminderTime: number) {
+    this.logEvent('set_cooking_reminder', {
+      content_type: 'cooking_reminder',
+      item_id: recipeId,
+      item_name: recipeName,
+      reminder_minutes: reminderTime
+    });
+  }
+
+  static trackCookingReminderCancel(recipeId: string, recipeName: string) {
+    this.logEvent('cancel_cooking_reminder', {
+      content_type: 'cooking_reminder',
+      item_id: recipeId,
+      item_name: recipeName
+    });
+  }
+
+  static trackCookingReminderTriggered(recipeId: string, recipeName: string) {
+    this.logEvent('cooking_reminder_triggered', {
+      content_type: 'cooking_reminder',
+      item_id: recipeId,
+      item_name: recipeName
+    });
+  }
+
+  // Track notification settings events
+  static trackNotificationSettingsUpdate(settings: Record<string, any>) {
+    this.logEvent('update_notification_settings', {
+      content_type: 'settings',
+      ...settings
+    });
+  }
+
+  // Track grocery cost estimation
+  static trackGroceryCostEstimate(totalCost: number, itemCount: number) {
+    this.logEvent('estimate_grocery_cost', {
+      content_type: 'grocery_cost',
+      value: totalCost,
+      currency: 'USD',
+      item_count: itemCount
+    });
+  }
+
+  // Track recipe rating events
+  static trackRecipeRating(recipeId: string, recipeName: string, rating: number, previousRating?: number) {
+    this.logEvent('rate_recipe', {
+      content_type: 'recipe_rating',
+      item_id: recipeId,
+      item_name: recipeName,
+      rating: rating,
+      previous_rating: previousRating
+    });
+  }
+
+  // Track recipe completion/mark as made
+  static trackRecipeCompleted(recipeId: string, recipeName: string, cookTime: number) {
+    this.logEvent('complete_recipe', {
+      content_type: 'recipe',
+      item_id: recipeId,
+      item_name: recipeName,
+      cook_time: cookTime
+    });
+  }
+
+  // Track premium feature usage
+  static trackPremiumFeatureUsed(featureName: string, planType?: string) {
+    this.logEvent('use_premium_feature', {
+      content_type: 'premium_feature',
+      feature_name: featureName,
+      plan_type: planType || 'unknown'
+    });
+  }
+
+  // Track tutorial and onboarding events
+  static trackTutorialStart(step?: string) {
+    this.logEvent('tutorial_begin', {
+      content_type: 'tutorial',
+      step: step || 'start'
+    });
+  }
+
+  static trackTutorialComplete() {
+    this.logEvent('tutorial_complete', {
+      content_type: 'tutorial'
+    });
+  }
+
+  static trackTutorialStep(stepNumber: number, stepName: string) {
+    this.logEvent('tutorial_step', {
+      content_type: 'tutorial',
+      step_number: stepNumber,
+      step_name: stepName
+    });
+  }
+
+  // Track theme and customization events
+  static trackThemeChange(theme: string, accentColor?: string) {
+    this.logEvent('change_theme', {
+      content_type: 'theme',
+      theme_name: theme,
+      accent_color: accentColor
+    });
+  }
+
+  // Track household management events
+  static trackHouseholdInviteSent(inviteeEmail: string) {
+    this.logEvent('send_household_invite', {
+      content_type: 'household',
+      invitee_email: inviteeEmail
+    });
+  }
+
+  static trackHouseholdInviteAccepted(householdId: string) {
+    this.logEvent('accept_household_invite', {
+      content_type: 'household',
       group_id: householdId
+    });
+  }
+
+  // Track analytics dashboard usage
+  static trackAnalyticsView(section: string) {
+    this.logEvent('view_analytics', {
+      content_type: 'analytics',
+      section: section
+    });
+  }
+
+  // Track voice search events
+  static trackVoiceSearch(success: boolean, errorMessage?: string) {
+    this.logEvent('voice_search', {
+      content_type: 'search',
+      method: 'voice',
+      success: success,
+      error_message: errorMessage
+    });
+  }
+
+  // Track surprise me feature usage
+  static trackSurpriseMeUsed(category?: string) {
+    this.logEvent('use_surprise_me', {
+      content_type: 'recipe_discovery',
+      feature: 'surprise_me',
+      category: category || 'all'
     });
   }
 

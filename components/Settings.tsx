@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { db } from '../firebaseConfig';
 import { collection, addDoc, Timestamp, doc, updateDoc } from 'firebase/firestore';
 import { SubscriptionManager } from './SubscriptionManager';
@@ -9,6 +9,7 @@ import { UserProfile, CustomCategory, PantryItem } from '../types';
 import { VersionUpdate } from './VersionUpdate';
 import { DayPlan } from '../types';
 import { BarChart3 } from 'lucide-react';
+import AnalyticsService from '../services/analyticsService';
 
 const defaultSettings = {
   notifications: {
@@ -17,7 +18,9 @@ const defaultSettings = {
     types: {
       shoppingList: true,
       mealPlan: true,
+      cookingReminders: true,
     },
+    cookingReminderTime: 30, // minutes before meal
   },
   theme: {
     mode: 'dark',
@@ -43,6 +46,7 @@ interface SettingsProps {
   onDeleteCustomCategory?: (categoryId: string) => void;
   mealPlan?: DayPlan[];
   inventory?: PantryItem[];
+  onShowTutorial?: () => void;
 }
 
 export const Settings: React.FC<SettingsProps> = ({ 
@@ -55,7 +59,8 @@ export const Settings: React.FC<SettingsProps> = ({
   onUpdateCustomCategory,
   onDeleteCustomCategory,
   mealPlan,
-  inventory = []
+  inventory = [],
+  onShowTutorial
 }) => {
   const [feedback, setFeedback] = useState('');
   const [sending, setSending] = useState(false);
@@ -68,7 +73,7 @@ export const Settings: React.FC<SettingsProps> = ({
   const [showAnalytics, setShowAnalytics] = useState(false);
 
   // Update userProfile when user data loads
-  React.useEffect(() => {
+  useEffect(() => {
     if (user?.profile) {
       setUserProfile(user.profile);
     }
@@ -111,6 +116,9 @@ export const Settings: React.FC<SettingsProps> = ({
       notifications: pendingNotifications
     }));
     setNotifChanged(true);
+    
+    // Track notification settings update
+    AnalyticsService.trackNotificationSettingsUpdate(pendingNotifications);
   };
 
   const handleProfileChange = (field: string, value: any) => {
@@ -563,6 +571,38 @@ export const Settings: React.FC<SettingsProps> = ({
             </div>
           )}
 
+          {pendingNotifications.enabled && pendingNotifications.types.cookingReminders !== undefined && (
+            <div className="space-y-2 border-t border-theme pt-3 mt-3">
+              <div className="flex items-center justify-between">
+                <label className="flex items-center gap-2">
+                  <span className="text-sm text-theme-primary">Cooking Reminders</span>
+                  <input
+                    type="checkbox"
+                    checked={pendingNotifications.types.cookingReminders}
+                    onChange={e => handleNotifChange('types', { cookingReminders: e.target.checked })}
+                  />
+                </label>
+              </div>
+              {pendingNotifications.types.cookingReminders && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-theme-secondary">Remind me</span>
+                  <select
+                    value={pendingNotifications.cookingReminderTime || 30}
+                    onChange={e => handleNotifChange('cookingReminderTime', parseInt(e.target.value))}
+                    className="border rounded px-2 py-1 text-black bg-white text-xs"
+                  >
+                    <option value={15}>15 minutes</option>
+                    <option value={30}>30 minutes</option>
+                    <option value={45}>45 minutes</option>
+                    <option value={60}>1 hour</option>
+                    <option value={120}>2 hours</option>
+                  </select>
+                  <span className="text-xs text-theme-secondary">before cooking</span>
+                </div>
+              )}
+            </div>
+          )}
+
           {notifChanged && (
             <button
               onClick={confirmNotifChanges}
@@ -603,6 +643,22 @@ export const Settings: React.FC<SettingsProps> = ({
           <SubscriptionManager />
         </div>
       )}
+
+      {/* Help & Support Section */}
+      <div className="bg-theme-secondary rounded-xl border border-theme p-4">
+        <h3 className="font-semibold mb-3 text-theme-primary">Help & Support</h3>
+        <div className="space-y-3">
+          <p className="text-sm text-theme-secondary">
+            Need help getting started or want to see the app features again?
+          </p>
+          <button
+            onClick={onShowTutorial}
+            className="bg-[var(--accent-color)] text-white px-4 py-2 rounded font-medium text-sm hover:bg-opacity-90 transition-colors"
+          >
+            Watch Tutorial
+          </button>
+        </div>
+      </div>
 
       {/* App Updates Section */}
       <div className="bg-theme-secondary rounded-xl border border-theme p-4">

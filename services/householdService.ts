@@ -16,6 +16,9 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 import { Household, Member, User } from '../types';
+import { getPerformance, trace } from "firebase/performance";
+
+const performance = getPerformance();
 
 /**
  * Get or create a household for a user
@@ -23,6 +26,9 @@ import { Household, Member, User } from '../types';
  * If user is creating their own, create a new one
  */
 export const getOrCreateHousehold = async (user: User): Promise<Household | null> => {
+  const perfTrace = trace(performance, 'get_or_create_household');
+  perfTrace.start();
+
   try {
     // First, check if user belongs to any existing household by memberIds
     const householdQuery = query(
@@ -35,6 +41,7 @@ export const getOrCreateHousehold = async (user: User): Promise<Household | null
     if (!querySnapshot.empty) {
       // User is already in a household
       const doc = querySnapshot.docs[0];
+      perfTrace.putAttribute('action', 'existing_household_found');
       return {
         id: doc.id,
         ...doc.data(),
@@ -42,6 +49,7 @@ export const getOrCreateHousehold = async (user: User): Promise<Household | null
     }
 
     // User is not in any household, create a new one
+    perfTrace.putAttribute('action', 'creating_new_household');
     const newHousehold = await createHousehold(
       `${user.name}'s Family`,
       user
@@ -51,6 +59,8 @@ export const getOrCreateHousehold = async (user: User): Promise<Household | null
   } catch (error) {
     console.error('Error getting/creating household:', error);
     return null;
+  } finally {
+    perfTrace.stop();
   }
 };
 
@@ -61,30 +71,40 @@ export const createHousehold = async (
   householdName: string,
   user: User
 ): Promise<Household> => {
-  const householdId = `household_${Date.now()}`;
+  const perfTrace = trace(performance, 'create_household');
+  perfTrace.start();
 
-  const newHousehold: Household = {
-    id: householdId,
-    name: householdName,
-    members: [
-      {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: 'Admin',
-        status: 'Active',
-      },
-    ],
-    memberIds: [user.id],
-  };
+  try {
+    const householdId = `household_${Date.now()}`;
 
-  await setDoc(doc(db, 'households', householdId), {
-    ...newHousehold,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  });
+    const newHousehold: Household = {
+      id: householdId,
+      name: householdName,
+      members: [
+        {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: 'Admin',
+          status: 'Active',
+        },
+      ],
+      memberIds: [user.id],
+    };
 
-  return newHousehold;
+    // Add custom metrics
+    perfTrace.putMetric('household_name_length', householdName.length);
+
+    await setDoc(doc(db, 'households', householdId), {
+      ...newHousehold,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+
+    return newHousehold;
+  } finally {
+    perfTrace.stop();
+  }
 };
 
 /**
@@ -94,11 +114,22 @@ export const addMemberToHousehold = async (
   householdId: string,
   member: Member
 ): Promise<void> => {
-  await updateDoc(doc(db, 'households', householdId), {
-    members: arrayUnion(member),
-    memberIds: arrayUnion(member.id),
-    updatedAt: serverTimestamp(),
-  });
+  const perfTrace = trace(performance, 'add_member_household');
+  perfTrace.start();
+
+  try {
+    // Add custom metrics
+    perfTrace.putAttribute('member_role', member.role);
+    perfTrace.putAttribute('member_status', member.status);
+
+    await updateDoc(doc(db, 'households', householdId), {
+      members: arrayUnion(member),
+      memberIds: arrayUnion(member.id),
+      updatedAt: serverTimestamp(),
+    });
+  } finally {
+    perfTrace.stop();
+  }
 };
 
 /**
@@ -237,13 +268,19 @@ export const joinHousehold = async (
   householdId: string,
   user: User
 ): Promise<Household | null> => {
+  const perfTrace = trace(performance, 'join_household');
+  perfTrace.start();
+
   try {
     // Check if user is invited
     const household = await findHouseholdByInvite(householdId, user.email);
 
     if (!household) {
+      perfTrace.putAttribute('result', 'not_invited');
       throw new Error('You are not invited to this household');
     }
+
+    perfTrace.putAttribute('result', 'joining');
 
     // Update status to Active
     await updateMemberStatus(householdId, user.email, 'Active');
@@ -285,6 +322,8 @@ export const joinHousehold = async (
   } catch (error) {
     console.error('Error joining household:', error);
     throw error;
+  } finally {
+    perfTrace.stop();
   }
 };
 

@@ -10,9 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Features
 - **Usage Limit Enforcement**: Added button disabling when users hit weekly usage limits to prevent excessive database reads
 - **Subscription Tier Rebalance**: Updated Premium plan limits (15 searches/week, 20 recipes, 7-day planning) and Family plan (unlimited everything, 5 members)
+- **Mobile Back Button Support**: Implemented hardware back button functionality for Android devices to close modals and navigate between tabs
 
 ### Fixed
 - **Performance**: Prevented repeated API calls after hitting limits
+- **Free Tier Limits**: Fixed issue where free users showed 0 available searches instead of 5
 
 ## [1.1.6] - 2026-01-07
 

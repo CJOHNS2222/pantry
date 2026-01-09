@@ -16,8 +16,9 @@ import { useSettings } from './hooks/useSettings';
 import { useToasts } from './hooks/useToasts';
 import { useDataManagement } from './hooks/useDataManagement';
 import AnalyticsService from './services/analyticsService';
-import { isHouseholdMember, inferCategoryFromItemName, inferStorageLocationFromItemName, parseIngredientForShoppingList, getItemImage } from './utils/appUtils';
+import { isHouseholdMember, inferCategoryFromItemName, inferStorageLocationFromItemName, parseIngredientForShoppingList, getItemImage, fetchExternalItemImage } from './utils/appUtils';
 import { GlobalUpdatePrompt } from './components/GlobalUpdatePrompt';
+import { App as CapacitorApp, BackButtonListenerEvent } from '@capacitor/app';
 
 type Theme = 'dark' | 'light';
 
@@ -77,6 +78,12 @@ const App: React.FC = () => {
     handleSaveRecipe,
     handleDeleteRecipe,
     handleRateRecipe,
+    // Usage limit states
+    recipeSaveLimitExceeded,
+    mealPlanLimitExceeded,
+    // Usage limit checking functions
+    checkRecipeSaveLimit,
+    checkMealPlanLimit,
   } = useDataManagement(user, addToast, addToShoppingList);
 
   // Listen for notifications while user is logged in
@@ -171,6 +178,43 @@ const App: React.FC = () => {
     };
   }, []);
 
+  // Handle back button for mobile navigation
+  useEffect(() => {
+    const handleBackButton = (event: BackButtonListenerEvent) => {
+      // Close modals in priority order
+      if (showNotificationsModal) {
+        setShowNotificationsModal(false);
+        return;
+      }
+
+      if (showTutorial) {
+        setShowTutorial(false);
+        return;
+      }
+
+      if (showHousehold) {
+        setShowHousehold(false);
+        return;
+      }
+
+      // Navigate back to default tab if not already there
+      if (activeTab !== Tab.PANTRY) {
+        setActiveTab(Tab.PANTRY);
+        return;
+      }
+
+      // If nothing else to do, let the system handle the back button (exit app)
+      // This will be handled automatically by not preventing default
+    };
+
+    // Add back button listener
+    const removeListener = CapacitorApp.addListener('backButton', handleBackButton);
+
+    return () => {
+      removeListener();
+    };
+  }, [showNotificationsModal, showTutorial, showHousehold, activeTab]);
+
   // Track tab switches
   const [previousTab, setPreviousTab] = useState<Tab>(Tab.PANTRY);
   useEffect(() => {
@@ -197,15 +241,34 @@ const App: React.FC = () => {
         )}
 
         {showTutorial && (
-          <Tutorial onClose={async () => {
-            setShowTutorial(false);
-            // Mark tutorial as seen
-            if (user) {
-              const { doc, updateDoc } = await import('firebase/firestore');
-              await updateDoc(doc(db, 'users', user.id), { hasSeenTutorial: true });
-              setUser({ ...user, hasSeenTutorial: true });
-            }
-          }} />
+          <Tutorial
+            onClose={async () => {
+              setShowTutorial(false);
+              // Mark tutorial as seen
+              if (user) {
+                const { doc, updateDoc } = await import('firebase/firestore');
+                await updateDoc(doc(db, 'users', user.id), { hasSeenTutorial: true });
+                setUser({ ...user, hasSeenTutorial: true });
+              }
+            }}
+            onSwitchTab={setActiveTab}
+            onOpenHousehold={() => setShowHousehold(true)}
+            onCloseHousehold={() => setShowHousehold(false)}
+            onToggleTheme={() => setSettings(prev => ({
+              ...prev,
+              theme: {
+                ...prev.theme,
+                mode: prev.theme.mode === 'dark' ? 'light' : 'dark'
+              }
+            }))}
+            onOpenRecipeSearch={() => {
+              // Switch to meals tab and trigger recipe search modal
+              setActiveTab(Tab.MEALS);
+              // The tutorial will handle opening the modal after a delay
+            }}
+            onOpenAnalytics={() => setActiveTab(Tab.SETTINGS)}
+            currentTab={activeTab}
+          />
         )}
 
         {/* Notifications Modal */}
@@ -317,26 +380,47 @@ const App: React.FC = () => {
           onSaveRecipe={handleSaveRecipe}
           onDeleteRecipe={handleDeleteRecipe}
           onRateRecipe={handleRateRecipe}
-          onMoveToPantry={(items) => {
+          onMoveToPantry={async (items) => {
+            // Process items and fetch external images for new items that don't have local images
+            const processedItems = await Promise.all(items.map(async (i) => {
+              const category = inferCategoryFromItemName(i.item);
+              let image = getItemImage(i.item, category);
+              
+              // If it's a placeholder, try to fetch an external image
+              if (image === '/images/placeholder.svg') {
+                try {
+                  const externalImage = await fetchExternalItemImage(i.item);
+                  if (externalImage) {
+                    image = externalImage;
+                  }
+                } catch (error) {
+                  console.log('Failed to fetch external image for', i.item, error);
+                }
+              }
+              
+              let addQty = typeof i.quantity === 'number' ? i.quantity : 1;
+              if (addQty < 1) addQty = 1;
+              
+              return {
+                id: Math.random().toString(36).substr(2,9),
+                item: i.item,
+                category,
+                quantity_estimate: Math.abs(addQty).toString(),
+                storageLocation: inferStorageLocationFromItemName(i.item),
+                image,
+                originalQuantity: typeof i.quantity === 'string' ? i.quantity : undefined
+              };
+            }));
+            
             setInventory(prev => {
               const updated = [...prev];
-              items.forEach(i => {
+              processedItems.forEach(i => {
                 const idx = updated.findIndex(p => p.item.toLowerCase() === i.item.toLowerCase());
-                let addQty = typeof i.quantity === 'number' ? i.quantity : 1;
-                if (addQty < 1) addQty = 1;
                 if (idx !== -1) {
                   const prevQty = parseInt(updated[idx].quantity_estimate) || 1;
-                  updated[idx].quantity_estimate = (prevQty + Math.abs(addQty)).toString();
+                  updated[idx].quantity_estimate = (prevQty + parseInt(i.quantity_estimate)).toString();
                 } else {
-                  updated.push({
-                    id: Math.random().toString(36).substr(2,9),
-                    item: i.item,
-                    category: inferCategoryFromItemName(i.item),
-                    quantity_estimate: Math.abs(addQty).toString(),
-                    storageLocation: inferStorageLocationFromItemName(i.item),
-                    image: getItemImage(i.item, inferCategoryFromItemName(i.item)),
-                    originalQuantity: typeof i.quantity === 'string' ? i.quantity : undefined
-                  });
+                  updated.push(i);
                 }
               });
               const merged: { [key: string]: PantryItem } = {};
@@ -360,6 +444,13 @@ const App: React.FC = () => {
           onUpdateCustomCategory={updateCustomCategory}
           onDeleteCustomCategory={deleteCustomCategory}
           onLogout={handleLogout}
+          onShowTutorial={() => setShowTutorial(true)}
+          // Usage limit states
+          recipeSaveLimitExceeded={recipeSaveLimitExceeded}
+          mealPlanLimitExceeded={mealPlanLimitExceeded}
+          // Usage limit checking functions
+          checkRecipeSaveLimit={checkRecipeSaveLimit}
+          checkMealPlanLimit={checkMealPlanLimit}
         />
         <AppNavigation activeTab={activeTab} setActiveTab={setActiveTab} />
         

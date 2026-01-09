@@ -55,6 +55,13 @@ interface MainContentProps {
   onUpdateCustomCategory?: (categoryId: string, updates: Partial<Pick<CustomCategory, 'name' | 'icon' | 'color'>>) => void;
   onDeleteCustomCategory?: (categoryId: string) => void;
   onLogout: () => void;
+  onShowTutorial: () => void;
+  // Usage limit states
+  recipeSaveLimitExceeded: boolean;
+  mealPlanLimitExceeded: boolean;
+  // Usage limit checking functions
+  checkRecipeSaveLimit: () => Promise<boolean>;
+  checkMealPlanLimit: () => Promise<boolean>;
 }
 
 export const MainContent: React.FC<MainContentProps> = ({
@@ -89,6 +96,13 @@ export const MainContent: React.FC<MainContentProps> = ({
   onUpdateCustomCategory,
   onDeleteCustomCategory,
   onLogout,
+  onShowTutorial,
+  // Usage limit states
+  recipeSaveLimitExceeded,
+  mealPlanLimitExceeded,
+  // Usage limit checking functions
+  checkRecipeSaveLimit,
+  checkMealPlanLimit,
 }) => {
   // Handler for marking a recipe as made
   const handleMarkAsMade = (recipe: StructuredRecipe, recipeInventory?: PantryItem[]) => {
@@ -165,6 +179,13 @@ export const MainContent: React.FC<MainContentProps> = ({
             onRate={onRateRecipe}
             user={user}
             setActiveTab={setActiveTab}
+            recipeSaveLimitExceeded={recipeSaveLimitExceeded}
+            mealPlanLimitExceeded={mealPlanLimitExceeded}
+            settings={settings}
+            onOpenRecipeSearch={() => {
+              // This will be called by the tutorial to open recipe search modal
+              // The MealPlanner component handles this internally
+            }}
           />
         </Suspense>
       )}
@@ -196,6 +217,8 @@ export const MainContent: React.FC<MainContentProps> = ({
             persistedResult={persistedRecipeResult}
             setPersistedResult={setPersistedRecipeResult}
             initialSearchQuery={initialSearchQuery}
+            recipeSaveLimitExceeded={recipeSaveLimitExceeded}
+            mealPlanLimitExceeded={mealPlanLimitExceeded}
           />
         </Suspense>
       )}
@@ -221,6 +244,7 @@ export const MainContent: React.FC<MainContentProps> = ({
             onDeleteCustomCategory={onDeleteCustomCategory}
             mealPlan={mealPlan}
             inventory={inventory}
+            onShowTutorial={onShowTutorial}
           />
         </Suspense>
       )}

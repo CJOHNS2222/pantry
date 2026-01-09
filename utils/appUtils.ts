@@ -2,6 +2,9 @@ import { doc, Timestamp, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 import { DayPlan } from '../types';
 import { ConsumptionSuggestion, ExpirationAlert, RecipeSuggestion, PantryItem, CustomCategory } from '../types';
+import { getPerformance, trace } from "firebase/performance";
+
+const performance = getPerformance();
 
 export async function saveDayPlan(householdId: string, day: DayPlan) {
   const id = day.date; // 'YYYY-MM-DD'
@@ -76,49 +79,67 @@ export function parseItemText(itemText: string): { quantity: number; description
  * @returns Object with quantity string and cleaned item name
  */
 export function parseIngredientForShoppingList(ingredientText: string): { quantity: string; itemName: string } {
-  const text = ingredientText.trim();
-  
-  // Match common quantity patterns at the beginning
-  // This regex matches: number + optional fraction + unit (cup, tbsp, tsp, etc.) + optional "s"
-  const quantityRegex = /^(\d+(?:\/\d+)?(?:\s*\d+\/\d+)?)\s*(cup|tbsp|tsp|tablespoon|teaspoon|oz|ounce|pound|lb|gram|g|kg|liter|l|ml|quart|qt|pint|pt|gallon|gal|can|bottle|package|pkg|box|bag|slice|piece|clove|head|stalk|bunch|sprig|dash|pinch)s?\b/i;
-  
-  const match = text.match(quantityRegex);
-  let quantity = '';
-  let itemName = text;
-  
-  if (match) {
-    quantity = match[0].trim();
-    itemName = text.substring(match[0].length).trim();
-  } else {
-    // Fallback: try to match just a number at the beginning
-    const numberMatch = text.match(/^(\d+(?:\/\d+)?)\s+/);
-    if (numberMatch) {
-      quantity = numberMatch[1];
-      itemName = text.substring(numberMatch[0].length).trim();
+  const perfTrace = trace(performance, 'parse_ingredient_shopping_list');
+  perfTrace.start();
+
+  try {
+    const text = ingredientText.trim();
+
+    // Add custom metrics
+    perfTrace.putMetric('input_length', text.length);
+
+    // Match common quantity patterns at the beginning
+    // This regex matches: number + optional fraction + unit (cup, tbsp, tsp, etc.) + optional "s"
+    const quantityRegex = /^(\d+(?:\/\d+)?(?:\s*\d+\/\d+)?)\s*(cup|tbsp|tsp|tablespoon|teaspoon|oz|ounce|pound|lb|gram|g|kg|liter|l|ml|quart|qt|pint|pt|gallon|gal|can|bottle|package|pkg|box|bag|slice|piece|clove|head|stalk|bunch|sprig|dash|pinch)s?\b/i;
+
+    const match = text.match(quantityRegex);
+    let quantity = '';
+    let itemName = text;
+
+    if (match) {
+      quantity = match[0].trim();
+      itemName = text.substring(match[0].length).trim();
+      perfTrace.putAttribute('parsing_method', 'regex_match');
+    } else {
+      // Fallback: try to match just a number at the beginning
+      const numberMatch = text.match(/^(\d+(?:\/\d+)?)\s+/);
+      if (numberMatch) {
+        quantity = numberMatch[1];
+        itemName = text.substring(numberMatch[0].length).trim();
+        perfTrace.putAttribute('parsing_method', 'number_fallback');
+      } else {
+        perfTrace.putAttribute('parsing_method', 'no_quantity');
+      }
     }
+
+    // Clean the item name by removing common descriptors
+    itemName = itemName
+      // Remove common size descriptors
+      .replace(/\b(large|medium|small|big|tiny|huge|giant)\s+/gi, '')
+      // Keep colors for distinguishing items (like red vs green apples)
+      // Remove common preparation descriptors that don't affect core item identity
+      .replace(/\b(fresh|dried|canned|chopped|sliced|diced|minced|crushed|ground|cubed|grated|finely)\s+/gi, '')
+      // Remove common quality descriptors
+      .replace(/\b(ripe|raw|cooked|baked|fried|organic)\s+/gi, '')
+      // Remove trailing/leading whitespace
+      .trim();
+
+    // Capitalize first letter of each word for better display
+    itemName = itemName.replace(/\b\w/g, l => l.toUpperCase());
+
+    // If no quantity was found, set default to "1"
+    if (!quantity) {
+      quantity = '1';
+    }
+
+    // Add output metrics
+    perfTrace.putMetric('output_quantity_length', quantity.length);
+    perfTrace.putMetric('output_item_length', itemName.length);
+
+    return { quantity, itemName };
+  } finally {
+    perfTrace.stop();
   }
-  
-  // Clean the item name by removing common descriptors
-  itemName = itemName
-    // Remove common size descriptors
-    .replace(/\b(large|medium|small|big|tiny|huge|giant)\s+/gi, '')
-    // Keep colors for distinguishing items (like red vs green apples)
-    // Remove common preparation descriptors that don't affect core item identity
-    .replace(/\b(fresh|dried|canned|chopped|sliced|diced|minced|crushed|ground|cubed|grated|finely)\s+/gi, '')
-    // Remove common quality descriptors
-    .replace(/\b(ripe|raw|cooked|baked|fried|organic)\s+/gi, '')
-    // Remove trailing/leading whitespace
-    .trim();
-  
-  // Capitalize first letter of each word for better display
-  itemName = itemName.replace(/\b\w/g, l => l.toUpperCase());
-  
-  // If no quantity was found, set default to "1"
-  if (!quantity) {
-    quantity = '1';
-  }
-  
-  return { quantity, itemName };
 }
 
 /**
@@ -540,6 +561,12 @@ export function getItemImage(itemName: string, category: string): string {
 
   // Default placeholder
   return '/images/placeholder.svg';
+}
+
+export async function fetchExternalItemImage(itemName: string): Promise<string | null> {
+  // Import the service dynamically to avoid circular dependencies
+  const { fetchGroceryItemImage } = await import('../services/imageService');
+  return await fetchGroceryItemImage(itemName);
 }
 
 export function getStorageLocationImage(location: string): string {

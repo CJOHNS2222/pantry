@@ -4,16 +4,20 @@ This guide explains how to populate your app with recipes using the Spoonacular 
 
 ## Prerequisites
 
-1. **Get a Spoonacular API Key**
+1. **Firebase Configuration** (required)
+   - Firebase project set up with Firestore and Storage enabled
+
+2. **Spoonacular API Key** (optional, for fallback)
    - Visit [https://spoonacular.com/food-api](https://spoonacular.com/food-api)
-   - Sign up for a free account
+   - Sign up for a free account (10,000 requests/month)
    - Get your API key from the dashboard
 
-2. **Configure Environment Variables**
-   - Add your API key to `.env.local`:
+3. **Environment Variables**
+   - Add to `.env.local`:
    ```
    VITE_SPOONACULAR_API_KEY=your_actual_api_key_here
    ```
+   - Spoonacular key is optional - the script will work with just TheMealDB
 
 ## Spoonacular Free Tier Limits
 
@@ -46,22 +50,26 @@ npm run bulk-upload-recipes
 
 ### What it does:
 
-1. **Fetches recipes** from Spoonacular API for 50+ search terms
-2. **Converts format** from Spoonacular to your app's recipe structure
-3. **Uploads images** to Firebase Storage
-4. **Stores recipes** in Firestore under the `recipes` collection
+1. **Fetches recipes** from TheMealDB (free, unlimited) as primary API
+2. **Falls back** to Spoonacular API if TheMealDB doesn't have results
+3. **Checks for duplicates** by title before saving (skips existing recipes)
+4. **Converts format** from both APIs to your app's recipe structure
+5. **Uploads images** to Firebase Storage
+6. **Stores recipes** in Firestore under the `recipes` collection
 
 ### Categories included:
 - Proteins: chicken, beef, fish, pork, turkey, lamb, seafood
 - Cuisines: italian, mexican, asian, indian, thai, french, greek
 - Meal types: breakfast, lunch, dinner, snack, appetizer, dessert
-- Cooking methods: grilled, baked, roasted, slow cooker, stir fry
-- Dietary: vegetarian, vegan, keto, gluten free, healthy
+- Cooking methods: grilled, baked, roasted, slow cooker, stir fry, air fryer
+- Dietary: vegetarian, vegan, keto, gluten free, healthy, mediterranean
+- Specific combinations: chicken breast, beef stew, fish tacos, etc.
 
 ### Expected Results:
-- **~50 recipes** (2 recipes × 25 categories)
+- **~50 recipes** (1 recipe × 50+ categories, minus any duplicates)
 - **Storage usage**: ~10-20MB (recipes + images)
-- **Time**: ~30-45 seconds (with API rate limiting)
+- **Time**: ~50-70 seconds (with API rate limiting)
+- **APIs used**: Primarily TheMealDB (free), falls back to Spoonacular if needed
 
 ## Firebase Storage Structure
 
@@ -113,7 +121,7 @@ To add more recipes later:
 
 1. Edit `SEARCH_QUERIES` array in `scripts/bulk-upload-recipes.js`
 2. Add new search terms
-3. Run the script again (it will add new recipes without duplicating)
+3. Run the script again (it will add new recipes without duplicating existing ones)
 
 ## Manual Recipe Addition
 

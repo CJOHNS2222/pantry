@@ -1,36 +1,26 @@
 {
   "project_info": {
-    "project_number": "651327126572",
-    "project_id": "gen-lang-client-0893655267",
-    "storage_bucket": "gen-lang-client-0893655267.firebasestorage.app"
+    "project_number": "13848266518",
+    "project_id": "ornate-compass-478504-e1",
+    "storage_bucket": "ornate-compass-478504-e1.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:651327126572:android:df9a284cff89eedaff6589",
+        "mobilesdk_app_id": "1:13848266518:android:96e5f6d1e36b53a0c8b237",
         "android_client_info": {
           "package_name": "com.smart.pantry"
         }
       },
-      "oauth_client": [
-        {
-          "client_id": "651327126572-5ksm7tip13vbe8lmr5r087b1le3h56ar.apps.googleusercontent.com",
-          "client_type": 3
-        }
-      ],
+      "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyBqF8bfPIAhLS3eaN_MArjxdlB1DqE0QWY"
+          "current_key": "AIzaSyDMCRMqLNYC0Y2sM74Ie8LFrnBUK2ftyfY"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": [
-            {
-              "client_id": "651327126572-5ksm7tip13vbe8lmr5r087b1le3h56ar.apps.googleusercontent.com",
-              "client_type": 3
-            }
-          ]
+          "other_platform_oauth_client": []
         }
       }
     }

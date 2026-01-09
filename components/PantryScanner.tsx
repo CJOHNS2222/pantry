@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { Camera as CapacitorCamera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { Camera, Upload, Loader2, Plus, Trash2, CheckCircle2, ShoppingBasket, X, Barcode, ChevronDown, ChevronRight, ChevronUp, Image, ChefHat, TrendingUp } from 'lucide-react';
 import { analyzePantryImage } from '../services/geminiService';
-import { getItemImage, inferCategoryFromItemName, inferStorageLocationFromItemName, getStorageLocationImage, getAutoExpirationDate, getExpirationColor, getAllCategories, getCategoryIcon, parseItemText } from '../utils/appUtils';
+import { getItemImage, inferCategoryFromItemName, inferStorageLocationFromItemName, getStorageLocationImage, getAutoExpirationDate, getExpirationColor, getAllCategories, getCategoryIcon, parseItemText, fetchExternalItemImage } from '../utils/appUtils';
 import { PantryItem, LoadingState, ConsumptionSuggestion, ExpirationAlert, CustomCategory, RecipeSuggestion } from '../types';
 import { Tab } from '../types/app';
 import AnalyticsService from '../services/analyticsService';
@@ -162,17 +162,32 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
     try {
       const items = await analyzePantryImage(rawBase64, mimeType);
       if (items.length > 0) {
-        setInventory(prev => [...prev, ...items.map(item => {
+        // Process items and fetch external images for placeholders
+        const processedItems = await Promise.all(items.map(async (item) => {
           // Parse the item text to extract quantity and clean description
           const { quantity, description } = parseItemText(item.item);
           const category = inferCategoryFromItemName(description);
           const now = new Date().toISOString();
+          let image = getItemImage(description, category);
+
+          // If it's a placeholder, try to fetch an external image
+          if (image === '/images/placeholder.svg') {
+            try {
+              const externalImage = await fetchExternalItemImage(description);
+              if (externalImage) {
+                image = externalImage;
+              }
+            } catch (error) {
+              console.log('Failed to fetch external image for', description, error);
+            }
+          }
+
           return {
             ...item,
             item: description, // Use cleaned description
             quantity_estimate: quantity.toString(), // Use extracted quantity
             id: crypto.randomUUID(),
-            image: getItemImage(description, category), // Use cleaned description for image matching
+            image,
             storageLocation: inferStorageLocationFromItemName(description), // Use cleaned description for storage
             expirationDate: getAutoExpirationDate(description, category), // Use cleaned description for expiration
             expirationType: 'best-by', // Default to best-by for auto-detected items
@@ -180,7 +195,12 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
             lastRestocked: now,
             consumptionHistory: [now] // Add current date to consumption history
           };
-        })]);
+        }));
+
+        setInventory(prev => [...prev, ...processedItems]);
+        // Track pantry scan results
+        AnalyticsService.trackPantryScan(items.length, items.length);
+        setLoadingState(LoadingState.SUCCESS);
         // Track pantry scan results
         AnalyticsService.trackPantryScan(items.length, items.length);
         setLoadingState(LoadingState.SUCCESS);
@@ -204,7 +224,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
     setInventory(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleManualAdd = (e: React.FormEvent) => {
+  const handleManualAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     
     const itemName = newItemText.trim();
@@ -239,6 +259,25 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
       return;
     }
     
+    // Prepare the new item data
+    const category = inferCategoryFromItemName(newItemText.trim());
+    const now = new Date().toISOString();
+    
+    // Try to get local image first
+    let image = getItemImage(newItemText.trim(), category);
+    
+    // If it's a placeholder, try to fetch an external image
+    if (image === '/images/placeholder.svg') {
+      try {
+        const externalImage = await fetchExternalItemImage(newItemText.trim());
+        if (externalImage) {
+          image = externalImage;
+        }
+      } catch (error) {
+        console.log('Failed to fetch external image for', newItemText.trim(), error);
+      }
+    }
+    
     setInventory(prev => {
       const idx = prev.findIndex(p => p.item.toLowerCase() === itemName.toLowerCase());
       if (idx !== -1) {
@@ -252,14 +291,12 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
       } else {
         // Track pantry item addition (new item)
         AnalyticsService.trackPantryItemAdd(itemName, 'Manual', newQty, 'manual');
-        const category = inferCategoryFromItemName(newItemText.trim());
-        const now = new Date().toISOString();
         return [...prev, {
           id: crypto.randomUUID(),
           item: newItemText.trim(),
           category: category,
           quantity_estimate: newQty.toString(),
-          image: getItemImage(newItemText.trim(), category),
+          image,
           storageLocation: inferStorageLocationFromItemName(newItemText.trim()),
           expirationDate: getAutoExpirationDate(newItemText.trim(), category),
           expirationType: 'best-by', // Default to best-by for manual additions

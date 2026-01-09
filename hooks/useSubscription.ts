@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 import { User, Subscription } from '../types';
+import { UsageService } from '../services/usageService';
 
 export function useSubscription(user: User | null) {
   const [subscription, setSubscription] = useState<Subscription | null>(null);
@@ -36,9 +37,15 @@ export function useSubscription(user: User | null) {
     if (!user?.id) return;
 
     try {
+      const newSubscription = { ...subscription, ...updates };
       await updateDoc(doc(db, 'users', user.id), {
-        subscription: { ...subscription, ...updates }
+        subscription: newSubscription
       });
+
+      // Update usage limits if tier changed
+      if (updates.tier && updates.tier !== subscription?.tier) {
+        await UsageService.updatePlanLimits(user, updates.tier);
+      }
     } catch (error) {
       console.error('Error updating subscription:', error);
       throw error;
