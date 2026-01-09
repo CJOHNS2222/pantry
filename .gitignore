@@ -22,3 +22,8 @@ firebase-debug.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Service account credentials
+*-service-account.json
+new-service-account.json
+old-service-account.json
