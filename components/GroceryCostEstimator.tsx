@@ -43,8 +43,8 @@ export const GroceryCostEstimator: React.FC<GroceryCostEstimatorProps> = ({ meal
       const uniqueIngredients = [...new Set(allIngredients.map(ing => parseIngredient(ing).name))];
 
       const pricePromises = uniqueIngredients.map(async (ingredient) => {
-        const data = await groceryPriceService.getIngredientPrice(ingredient);
-        return { ingredient: ingredient.toLowerCase(), data };
+        const data = await groceryPriceService.getIngredientPrice(ingredient as string);
+        return { ingredient: (ingredient as string).toLowerCase(), data };
       });
 
       const results = await Promise.all(pricePromises);

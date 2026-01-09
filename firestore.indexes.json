@@ -1,0 +1,33 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "groceryPrices",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "ingredient",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "lastUpdated",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "priceHistory",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "ingredient",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "lastUpdated",
+          "order": "DESCENDING"
+        }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

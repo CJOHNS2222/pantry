@@ -230,8 +230,10 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
           {success && <div className="text-green-400 text-xs mb-2">{success}</div>}
           {isSignup && (
             <div>
-              <label className="block text-xs font-bold text-amber-500 uppercase mb-1 ml-1">Name</label>
+              <label htmlFor="name" className="block text-xs font-bold text-amber-500 uppercase mb-1 ml-1">Name</label>
               <input
+                id="name"
+                name="name"
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -242,8 +244,10 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
             </div>
           )}
           <div>
-            <label className="block text-xs font-bold text-amber-500 uppercase mb-1 ml-1">Email</label>
+            <label htmlFor="email" className="block text-xs font-bold text-amber-500 uppercase mb-1 ml-1">Email</label>
             <input
+              id="email"
+              name="email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -253,8 +257,10 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
             />
           </div>
           <div>
-            <label className="block text-xs font-bold text-amber-500 uppercase mb-1 ml-1">Password</label>
+            <label htmlFor="password" className="block text-xs font-bold text-amber-500 uppercase mb-1 ml-1">Password</label>
             <input
+              id="password"
+              name="password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -274,8 +280,10 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
           </div>
           {isSignup && (
             <div>
-              <label className="block text-xs font-bold text-amber-500 uppercase mb-1 ml-1">Confirm Password</label>
+              <label htmlFor="confirmPassword" className="block text-xs font-bold text-amber-500 uppercase mb-1 ml-1">Confirm Password</label>
               <input
+                id="confirmPassword"
+                name="confirmPassword"
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}

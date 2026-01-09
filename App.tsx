@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { doc, onSnapshot, collection, addDoc, serverTimestamp, query, where } from 'firebase/firestore';
 import { db } from './firebaseConfig';
 import { Login } from './components/Login';
@@ -32,6 +32,9 @@ const App: React.FC = () => {
   const [showHousehold, setShowHousehold] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [showNotificationsModal, setShowNotificationsModal] = useState(false);
+
+  // Ref to store the back button listener
+  const backButtonListenerRef = useRef<any>(null);
 
   // Custom hooks
   const { user, setUser, handleLogout } = useAuth();
@@ -214,25 +217,23 @@ const App: React.FC = () => {
       } else {
         // Single tap - show message and auto-dismiss after 2 seconds
         const toastId = 'exit-app';
-        addToast({
-          id: toastId,
-          message: 'Press back again to exit',
-          type: 'info'
-        });
+        addToast('Press back again to exit', 'info', 2000);
         setLastBackPress(currentTime);
-        
-        // Auto-dismiss the toast after 2 seconds
-        setTimeout(() => {
-          setToasts(prev => prev.filter(t => t.id !== toastId));
-        }, 2000);
       }
     };
 
     // Add back button listener
-    const removeListener = CapacitorApp.addListener('backButton', handleBackButton);
+    CapacitorApp.addListener('backButton', handleBackButton).then((listener) => {
+      backButtonListenerRef.current = listener;
+    }).catch((error) => {
+      console.error('Failed to add back button listener:', error);
+    });
 
     return () => {
-      removeListener();
+      if (backButtonListenerRef.current && backButtonListenerRef.current.remove) {
+        backButtonListenerRef.current.remove();
+        backButtonListenerRef.current = null;
+      }
     };
   }, [showNotificationsModal, showTutorial, showHousehold, activeTab, lastBackPress, addToast]);
 
@@ -466,6 +467,7 @@ const App: React.FC = () => {
           onDeleteCustomCategory={deleteCustomCategory}
           onLogout={handleLogout}
           onShowTutorial={() => setShowTutorial(true)}
+          addToast={addToast}
           // Usage limit states
           recipeSaveLimitExceeded={recipeSaveLimitExceeded}
           mealPlanLimitExceeded={mealPlanLimitExceeded}

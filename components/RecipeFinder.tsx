@@ -66,6 +66,36 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
     const [isListening, setIsListening] = useState(false);
     const [voiceSearchSupported, setVoiceSearchSupported] = useState(false);
 
+    // Token estimation state
+    const [estimatedTokens, setEstimatedTokens] = useState<number>(0);
+    const [estimatedCost, setEstimatedCost] = useState<number>(0);
+    const [freeTierNote, setFreeTierNote] = useState<string>('');
+    const [pendingSearchParams, setPendingSearchParams] = useState<any>(null);
+    const [showTokenConfirmation, setShowTokenConfirmation] = useState<boolean>(false);
+
+    // Token estimation function
+    const estimateTokens = (params: any) => {
+        // Simple estimation based on ingredients count
+        const ingredients = params.ingredients || '';
+        const ingredientCount = ingredients.split(',').length;
+        const estimatedTokens = Math.max(100, ingredientCount * 50); // Rough estimate
+        const costPerToken = 0.00015; // Approximate cost
+        const estimatedCost = estimatedTokens * costPerToken;
+        
+        let freeTierNote = '';
+        if (estimatedTokens < 1000) {
+            freeTierNote = 'This search is within the free tier limit.';
+        } else {
+            freeTierNote = `This search may incur costs. Estimated: $${estimatedCost.toFixed(4)}`;
+        }
+        
+        return {
+            tokens: estimatedTokens,
+            cost: estimatedCost,
+            freeTierNote
+        };
+    };
+
     // Check for speech recognition support
     useEffect(() => {
         if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
@@ -77,7 +107,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
     const startVoiceSearch = () => {
         if (!voiceSearchSupported) return;
 
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
         const recognition = new SpeechRecognition();
 
         recognition.continuous = false;
@@ -932,7 +962,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
         const renderRecipeCard = (recipe: StructuredRecipe, isSavedView = false, isCompact = false) => {
             const ratingInfo = getRatingInfo(recipe.title);
             const isSaved = savedRecipes.some(r => r.title === recipe.title);
-            const titleKey = `${recipe.title || 'Untitled Recipe'}-${recipe.id || Math.random()}`;
+            const titleKey = `${recipe.title || 'Untitled Recipe'}-${Math.random()}`;
             
             // Filter out staple items from ingredient list
             const filteredIngredients = recipe.ingredients.filter(ing => {
@@ -1129,6 +1159,8 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                 <form onSubmit={handleSpecificSearch} className="flex gap-2">
                     <div className="flex-1 relative">
                         <input
+                        id="specificQuery"
+                        name="specificQuery"
                         value={specificQuery}
                         onChange={(e) => setSpecificQuery(e.target.value)}
                         placeholder="Search e.g. Pasta..."
@@ -1220,8 +1252,10 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                     {/* Recipe Type Selector & Inputs Row */}
                                         <div className="grid grid-cols-4 gap-3">
                                                 <div>
-                                                        <label className="text-[10px] text-[var(--accent-color)] font-bold uppercase mb-1 block">Type</label>
+                                                        <label htmlFor="recipeType" className="text-[10px] text-[var(--accent-color)] font-bold uppercase mb-1 block">Type</label>
                                                         <select
+                                                            id="recipeType"
+                                                            name="recipeType"
                                                             value={recipeType}
                                                             onChange={e => setRecipeType(e.target.value as 'Snack' | 'Dinner' | 'Dessert' | '')}
                                                             className="w-full p-2.5 rounded-lg border border-theme bg-theme-primary text-theme-primary focus:border-[var(--accent-color)] outline-none text-sm"
@@ -1235,9 +1269,11 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                                                 {/* Dietary restrictions removed */}
                                                 <div></div>
                                                 <div>
-                                                        <label className="text-[10px] text-[var(--accent-color)] font-bold uppercase mb-1 block">Max Time</label>
+                                                        <label htmlFor="maxCookTime" className="text-[10px] text-[var(--accent-color)] font-bold uppercase mb-1 block">Max Time</label>
                                                         <div className="relative">
                                                                 <input
+                                                                id="maxCookTime"
+                                                                name="maxCookTime"
                                                                 type="number"
                                                                 value={maxCookTime}
                                                                 onChange={(e) => setMaxCookTime(e.target.value)}
@@ -1247,8 +1283,10 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                                                         </div>
                                                 </div>
                                                 <div>
-                                                        <label className="text-[10px] text-[var(--accent-color)] font-bold uppercase mb-1 block">Max Items</label>
+                                                        <label htmlFor="maxIngredients" className="text-[10px] text-[var(--accent-color)] font-bold uppercase mb-1 block">Max Items</label>
                                                         <input
+                                                                id="maxIngredients"
+                                                                name="maxIngredients"
                                                                 type="number"
                                                                 value={maxIngredients}
                                                                 onChange={(e) => setMaxIngredients(e.target.value)}

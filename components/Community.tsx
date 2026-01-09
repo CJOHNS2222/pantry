@@ -9,6 +9,13 @@ interface CommunityProps {
   onSaveRecipe?: (recipe: StructuredRecipe) => void;
 }
 
+interface RecipeStats {
+  title: string;
+  totalRating: number;
+  count: number;
+  comments: RecipeRating[];
+}
+
 export const Community: React.FC<CommunityProps> = ({ ratings, onAddToPlan, onSaveRecipe }) => {
     // List of staple items to ignore in ingredient display
     const STAPLES = ['salt', 'pepper', 'oil', 'water', 'flour', 'sugar', 'butter', 'vinegar', 'baking powder', 'baking soda', 'spices', 'seasoning', 'soy sauce', 'cornstarch', 'yeast'];
@@ -34,10 +41,14 @@ export const Community: React.FC<CommunityProps> = ({ ratings, onAddToPlan, onSa
     acc[key].count += 1;
     if (curr.comment) acc[key].comments.push(curr);
     return acc;
-  }, {} as Record<string, { title: string, totalRating: number, count: number, comments: RecipeRating[] }>);
+  }, {} as Record<string, RecipeStats>);
 
   const sortedRecipes = Object.values(recipeStats)
-    .filter(stat => stat.count > 0 && stat.title && stat.title !== 'Untitled') // Only show recipes with ratings and valid titles
+    .filter((stat): stat is RecipeStats => {
+      const s = stat as RecipeStats;
+      return s && typeof s === 'object' && 'count' in s && 'title' in s &&
+             s.count > 0 && s.title && s.title !== 'Untitled';
+    }) // Only show recipes with ratings and valid titles
     .sort((a, b) => (b.totalRating / Math.max(1, b.count)) - (a.totalRating / Math.max(1, a.count)));
   const [showAll, setShowAll] = useState(false);
   const findRecipeForStat = (stat: { comments: RecipeRating[] }) => {

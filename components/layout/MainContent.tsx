@@ -14,6 +14,7 @@ const Settings = React.lazy(() => import('../Settings').then(module => ({ defaul
 import { Login } from '../Login';
 import { Tutorial } from '../Tutorial';
 import { HouseholdManager } from '../Household';
+import { parseIngredientForShoppingList, parseQuantity, subtractQuantities } from '../../utils/appUtils';
 
 // Loading component for lazy-loaded components
 const LoadingSpinner: React.FC = () => (
@@ -47,6 +48,7 @@ interface MainContentProps {
   onRateRecipe: (rating: any) => void;
   onMoveToPantry: (items: ShoppingItem[]) => void;
   onAddToShoppingList: (items: string[]) => void;
+  addToast: (message: string, type?: 'error' | 'info', ttl?: number, actionLabel?: string, action?: () => void) => void;
   consumptionSuggestions: any[];
   expirationAlerts: any[];
   recipeSuggestions: any[];
@@ -88,6 +90,7 @@ export const MainContent: React.FC<MainContentProps> = ({
   onRateRecipe,
   onMoveToPantry,
   onAddToShoppingList,
+  addToast,
   consumptionSuggestions,
   expirationAlerts,
   recipeSuggestions,
@@ -106,17 +109,49 @@ export const MainContent: React.FC<MainContentProps> = ({
 }) => {
   // Handler for marking a recipe as made
   const handleMarkAsMade = (recipe: StructuredRecipe, recipeInventory?: PantryItem[]) => {
-    // Calculate which inventory items to remove based on recipe ingredients
+    const pantryInventory = recipeInventory || inventory;
     const ingredientsNeeded = recipe.ingredients || [];
-    const inventoryToRemove = inventoryNeeded(ingredientsNeeded, recipeInventory || inventory);
-    
-    // Remove used ingredients from inventory
-    const updatedInventory = inventory.filter(item => 
-      !inventoryToRemove.some(remove => remove.id === item.id)
-    );
-    
+    const updatedInventory = [...pantryInventory];
+
+    ingredientsNeeded.forEach(ingredientText => {
+      const parsedIngredient = parseIngredientForShoppingList(ingredientText);
+      const ingredientQuantity = parseQuantity(parsedIngredient.quantity);
+
+      if (!ingredientQuantity) return; // Skip if we can't parse the quantity
+
+      // Find matching inventory item
+      const itemIndex = updatedInventory.findIndex(item => {
+        const itemName = item.item.toLowerCase();
+        const ingredientName = parsedIngredient.itemName.toLowerCase();
+        return itemName.includes(ingredientName) || ingredientName.includes(itemName.split(' ')[0]);
+      });
+
+      if (itemIndex >= 0) {
+        const item = updatedInventory[itemIndex];
+
+        // Use new quantity system if available
+        if (item.quantity) {
+          const remaining = subtractQuantities(item.quantity, ingredientQuantity);
+          if (remaining) {
+            // Update quantity
+            updatedInventory[itemIndex] = {
+              ...item,
+              quantity: remaining,
+              consumptionHistory: [...(item.consumptionHistory || []), new Date().toISOString()]
+            };
+          } else {
+            // Remove item entirely if nothing left
+            updatedInventory.splice(itemIndex, 1);
+          }
+        } else {
+          // Fallback to old system - remove item
+          updatedInventory.splice(itemIndex, 1);
+        }
+      }
+    });
+
     setInventory(updatedInventory);
-    alert(`Recipe marked as made! Removed used ingredients from your pantry.`);
+    addToast(`Recipe marked as made! Updated pantry quantities.`);
   };
 
   // Helper function to match ingredients to inventory

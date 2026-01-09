@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { Camera as CapacitorCamera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { Camera, Upload, Loader2, Plus, Trash2, CheckCircle2, ShoppingBasket, X, Barcode, ChevronDown, ChevronRight, ChevronUp, Image, ChefHat, TrendingUp } from 'lucide-react';
 import { analyzePantryImage } from '../services/geminiService';
-import { getItemImage, inferCategoryFromItemName, inferStorageLocationFromItemName, getStorageLocationImage, getAutoExpirationDate, getExpirationColor, getAllCategories, getCategoryIcon, parseItemText, fetchExternalItemImage } from '../utils/appUtils';
+import { getItemImage, inferCategoryFromItemName, inferStorageLocationFromItemName, getStorageLocationImage, getAutoExpirationDate, getExpirationColor, getAllCategories, getCategoryIcon, parseItemText, fetchExternalItemImage, combineQuantities, formatItemQuantity } from '../utils/appUtils';
 import { PantryItem, LoadingState, ConsumptionSuggestion, ExpirationAlert, CustomCategory, RecipeSuggestion } from '../types';
 import { Tab } from '../types/app';
 import AnalyticsService from '../services/analyticsService';
@@ -119,7 +119,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
               setIsAddModalOpen(true);
               
               // Track barcode scan
-              AnalyticsService.trackPantryScan('barcode', 1);
+              AnalyticsService.trackPantryScan(1, 1);
             } else {
               alert('No barcode detected. Try taking a clearer photo or use manual entry.');
             }
@@ -281,10 +281,25 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
     setInventory(prev => {
       const idx = prev.findIndex(p => p.item.toLowerCase() === itemName.toLowerCase());
       if (idx !== -1) {
-        // Merge quantity
+        // Merge quantity with existing item
         const updated = [...prev];
-        const prevQty = parseInt(updated[idx].quantity_estimate) || 1;
-        updated[idx].quantity_estimate = (prevQty + newQty).toString();
+        const existingItem = updated[idx];
+        
+        if (existingItem.quantity) {
+          // Use new quantity system - combine quantities
+          const newQuantity = { amount: newQty, unit: 'count' }; // Default to count for manual additions
+          const combined = combineQuantities(existingItem.quantity, newQuantity);
+          updated[idx] = {
+            ...existingItem,
+            quantity: combined,
+            lastRestocked: now
+          };
+        } else {
+          // Fallback to old system for backward compatibility
+          const prevQty = parseInt(existingItem.quantity_estimate) || 1;
+          updated[idx].quantity_estimate = (prevQty + newQty).toString();
+        }
+        
         // Track pantry item addition (update existing)
         AnalyticsService.trackPantryItemAdd(itemName, 'Manual', newQty, 'manual');
         return updated;
@@ -295,7 +310,8 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
           id: crypto.randomUUID(),
           item: newItemText.trim(),
           category: category,
-          quantity_estimate: newQty.toString(),
+          quantity_estimate: newQty.toString(), // Keep for backward compatibility
+          quantity: { amount: newQty, unit: 'count' }, // New quantity system
           image,
           storageLocation: inferStorageLocationFromItemName(newItemText.trim()),
           expirationDate: getAutoExpirationDate(newItemText.trim(), category),
@@ -366,7 +382,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   const bulkMoveToShoppingList = () => {
     if (selectedItems.size === 0) return;
     
-    const itemsToMove = Array.from(selectedItems).map(idx => inventory[idx].item);
+    const itemsToMove = Array.from(selectedItems).map((idx: number) => inventory[idx].item);
     addToShoppingList(itemsToMove);
     setInventory(prev => prev.filter((_, idx) => !selectedItems.has(idx)));
     setSelectedItems(new Set());
@@ -519,7 +535,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <div className="font-medium text-theme-primary">{item.item}</div>
-                      <div className="text-xs text-theme-secondary opacity-70 bg-theme-secondary px-1 py-0.5 rounded">Qty: {item.quantity_estimate || 1}</div>
+                      <div className="text-xs text-theme-secondary opacity-70 bg-theme-secondary px-1 py-0.5 rounded">Qty: {formatItemQuantity(item)}</div>
                       {item.expirationDate && (
                         <div className={`text-xs px-1 py-0.5 rounded font-medium ${
                           getExpirationColor(item.expirationDate, item.expirationType) === 'red' ? 'bg-red-100 text-red-800' :
@@ -597,7 +613,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <div className="font-medium text-theme-primary">{item.item}</div>
-                      <div className="text-xs text-theme-secondary opacity-70 bg-theme-secondary px-1 py-0.5 rounded">Qty: {item.quantity_estimate || 1}</div>
+                      <div className="text-xs text-theme-secondary opacity-70 bg-theme-secondary px-1 py-0.5 rounded">Qty: {formatItemQuantity(item)}</div>
                       {item.expirationDate && (
                         <div className={`text-xs px-1 py-0.5 rounded font-medium ${
                           getExpirationColor(item.expirationDate, item.expirationType) === 'red' ? 'bg-red-100 text-red-800' :

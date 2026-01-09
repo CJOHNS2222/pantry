@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, setDoc, getDoc, onSnapshot } from 'firebase/firestore';
+import { logEvent } from 'firebase/analytics';
 import { User } from '../types';
 import { analytics, db } from '../firebaseConfig';
 import AnalyticsService from '../services/analyticsService';

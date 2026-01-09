@@ -96,6 +96,8 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ items, setItems, onM
               <form onSubmit={addItem} className="space-y-4">
                 <div className="space-y-4">
                   <input 
+                    id="newItem"
+                    name="newItem"
                     type="text"
                     value={newItem}
                     onChange={(e) => setNewItem(e.target.value)}
@@ -105,6 +107,8 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ items, setItems, onM
                   />
                   <div className="flex gap-3">
                     <input
+                      id="newQty"
+                      name="newQty"
                       type="text"
                       value={newQty}
                       onChange={e => setNewQty(e.target.value)}

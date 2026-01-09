@@ -41,7 +41,7 @@ const CheckoutForm: React.FC<StripeCheckoutProps> = ({ planId, planName, planPri
       const { error: paymentMethodError, paymentMethod } = await stripe.createPaymentMethod({
         type: 'card',
         card: cardElement,
-      });
+      } as any);
 
       if (paymentMethodError) {
         setError(paymentMethodError.message || 'Payment method creation failed');

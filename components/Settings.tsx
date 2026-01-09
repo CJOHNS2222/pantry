@@ -300,6 +300,8 @@ export const Settings: React.FC<SettingsProps> = ({
                 <div className="flex gap-2">
                   <div className="flex-1">
                     <input
+                      id="heightFeet"
+                      name="heightFeet"
                       type="number"
                       value={userProfile.height ? Math.floor(userProfile.height / 12) : ''}
                       onChange={(e) => {
@@ -316,6 +318,8 @@ export const Settings: React.FC<SettingsProps> = ({
                   </div>
                   <div className="flex-1">
                     <input
+                      id="heightInches"
+                      name="heightInches"
                       type="number"
                       value={userProfile.height ? userProfile.height % 12 : ''}
                       onChange={(e) => {
@@ -333,8 +337,10 @@ export const Settings: React.FC<SettingsProps> = ({
                 </div>
               </div>
               <div>
-                <label className="block text-xs text-theme-secondary mb-1">Weight (lbs)</label>
+                <label htmlFor="weight" className="block text-xs text-theme-secondary mb-1">Weight (lbs)</label>
                 <input
+                  id="weight"
+                  name="weight"
                   type="number"
                   value={userProfile.weight || ''}
                   onChange={(e) => handleProfileChange('weight', e.target.value ? parseInt(e.target.value) : undefined)}
@@ -346,8 +352,10 @@ export const Settings: React.FC<SettingsProps> = ({
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs text-theme-secondary mb-1">Age</label>
+                <label htmlFor="age" className="block text-xs text-theme-secondary mb-1">Age</label>
                 <input
+                  id="age"
+                  name="age"
                   type="number"
                   value={userProfile.age || ''}
                   onChange={(e) => handleProfileChange('age', e.target.value ? parseInt(e.target.value) : undefined)}
@@ -356,8 +364,10 @@ export const Settings: React.FC<SettingsProps> = ({
                 />
               </div>
               <div>
-                <label className="block text-xs text-theme-secondary mb-1">Gender</label>
+                <label htmlFor="gender" className="block text-xs text-theme-secondary mb-1">Gender</label>
                 <select
+                  id="gender"
+                  name="gender"
                   value={userProfile.gender || ''}
                   onChange={(e) => handleProfileChange('gender', e.target.value || undefined)}
                   className="w-full p-2 border rounded text-sm text-black bg-white"
@@ -372,8 +382,10 @@ export const Settings: React.FC<SettingsProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs text-theme-secondary mb-1">Diet Goal</label>
+              <label htmlFor="dietGoal" className="block text-xs text-theme-secondary mb-1">Diet Goal</label>
               <select
+                id="dietGoal"
+                name="dietGoal"
                 value={userProfile.dietGoal || ''}
                 onChange={(e) => handleProfileChange('dietGoal', e.target.value || undefined)}
                 className="w-full p-2 border rounded text-sm text-black bg-white"
@@ -388,8 +400,10 @@ export const Settings: React.FC<SettingsProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs text-theme-secondary mb-1">Activity Level</label>
+              <label htmlFor="activityLevel" className="block text-xs text-theme-secondary mb-1">Activity Level</label>
               <select
+                id="activityLevel"
+                name="activityLevel"
                 value={userProfile.activityLevel || ''}
                 onChange={(e) => handleProfileChange('activityLevel', e.target.value || undefined)}
                 className="w-full p-2 border rounded text-sm text-black bg-white"
@@ -404,8 +418,10 @@ export const Settings: React.FC<SettingsProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs text-theme-secondary mb-1">Dietary Restrictions (comma-separated)</label>
+              <label htmlFor="dietaryRestrictions" className="block text-xs text-theme-secondary mb-1">Dietary Restrictions (comma-separated)</label>
               <input
+                id="dietaryRestrictions"
+                name="dietaryRestrictions"
                 type="text"
                 value={userProfile.dietaryRestrictions?.join(', ') || ''}
                 onChange={(e) => handleProfileChange('dietaryRestrictions', e.target.value ? e.target.value.split(',').map(s => s.trim()) : undefined)}
@@ -415,8 +431,10 @@ export const Settings: React.FC<SettingsProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs text-theme-secondary mb-1">Allergies (comma-separated)</label>
+              <label htmlFor="allergies" className="block text-xs text-theme-secondary mb-1">Allergies (comma-separated)</label>
               <input
+                id="allergies"
+                name="allergies"
                 type="text"
                 value={userProfile.allergies?.join(', ') || ''}
                 onChange={(e) => handleProfileChange('allergies', e.target.value ? e.target.value.split(',').map(s => s.trim()) : undefined)}
@@ -491,6 +509,8 @@ export const Settings: React.FC<SettingsProps> = ({
           <div className="flex items-center justify-between">
             <span className="text-sm text-theme-primary">Theme</span>
             <select
+              id="themeMode"
+              name="themeMode"
               value={settings.theme.mode}
               onChange={(e) => handleThemeChange('mode', e.target.value)}
               className="border rounded px-2 py-1 text-black bg-white text-sm"
@@ -500,6 +520,8 @@ export const Settings: React.FC<SettingsProps> = ({
             </select>
             <span className="text-sm text-theme-primary ml-4">Accent</span>
             <input
+              id="accentColor"
+              name="accentColor"
               type="color"
               value={settings.theme.accentColor}
               onChange={(e) => handleThemeChange('accentColor', e.target.value)}
@@ -510,6 +532,8 @@ export const Settings: React.FC<SettingsProps> = ({
           <div className="flex items-center justify-between">
             <span className="text-sm text-theme-primary">Background</span>
             <input
+              id="backgroundColor"
+              name="backgroundColor"
               type="color"
               value={settings.theme.backgroundColor || '#ffffff'}
               onChange={(e) => handleThemeChange('backgroundColor', e.target.value)}
@@ -517,6 +541,8 @@ export const Settings: React.FC<SettingsProps> = ({
             />
             <span className="text-sm text-theme-primary ml-4">Text</span>
             <input
+              id="textColor"
+              name="textColor"
               type="color"
               value={settings.theme.textColor || '#000000'}
               onChange={(e) => handleThemeChange('textColor', e.target.value)}
@@ -531,9 +557,11 @@ export const Settings: React.FC<SettingsProps> = ({
         <h3 className="font-semibold mb-3 text-theme-primary">Notifications</h3>
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <label className="flex items-center gap-2">
+            <label htmlFor="enableNotifications" className="flex items-center gap-2">
               <span className="text-sm text-theme-primary">Enable Notifications</span>
               <input
+                id="enableNotifications"
+                name="enableNotifications"
                 type="checkbox"
                 checked={pendingNotifications.enabled}
                 onChange={e => handleNotifChange('enabled', e.target.checked)}
@@ -542,6 +570,8 @@ export const Settings: React.FC<SettingsProps> = ({
             </label>
             {pendingNotifications.enabled && (
               <input
+                id="notificationTime"
+                name="notificationTime"
                 type="time"
                 value={pendingNotifications.time}
                 onChange={e => handleNotifChange('time', e.target.value)}
@@ -552,17 +582,21 @@ export const Settings: React.FC<SettingsProps> = ({
 
           {pendingNotifications.enabled && (
             <div className="flex items-center justify-between">
-              <label className="flex items-center gap-2">
+              <label htmlFor="shoppingListNotif" className="flex items-center gap-2">
                 <span className="text-sm text-theme-primary">Shopping List</span>
                 <input
+                  id="shoppingListNotif"
+                  name="shoppingListNotif"
                   type="checkbox"
                   checked={pendingNotifications.types.shoppingList}
                   onChange={e => handleNotifChange('types', { shoppingList: e.target.checked })}
                 />
               </label>
-              <label className="flex items-center gap-2">
+              <label htmlFor="mealPlanNotif" className="flex items-center gap-2">
                 <span className="text-sm text-theme-primary">Meal Reminders</span>
                 <input
+                  id="mealPlanNotif"
+                  name="mealPlanNotif"
                   type="checkbox"
                   checked={pendingNotifications.types.mealPlan}
                   onChange={e => handleNotifChange('types', { mealPlan: e.target.checked })}

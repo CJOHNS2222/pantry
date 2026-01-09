@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, ChevronRight, ChevronLeft, Sparkles, ShoppingBasket, CalendarDays, UtensilsCrossed, Users, Grid3X3, User, ChefHat, Settings, BarChart3, Mic, Bell } from 'lucide-react';
+import { X, ChevronRight, ChevronLeft, Sparkles, ShoppingBasket, CalendarDays, UtensilsCrossed, Users, Grid3X3, User, ChefHat, Settings, BarChart3, Mic } from 'lucide-react';
 import { Tab } from '../types/app';
 import AnalyticsService from '../services/analyticsService';
 
@@ -90,14 +90,6 @@ export const Tutorial: React.FC<TutorialProps> = ({
       icon: <UtensilsCrossed className="w-6 h-6 text-[var(--accent-color)]" />,
       action: () => onSwitchTab(Tab.MEALS),
       highlight: 'nav-meals',
-      autoAdvance: false
-    },
-    {
-      title: "Cooking Reminders",
-      description: "See the bell icons next to meals? Click them to set cooking reminders. You can customize reminder times in Settings.",
-      icon: <Bell className="w-6 h-6 text-[var(--accent-color)]" />,
-      action: null,
-      highlight: 'cooking-reminder',
       autoAdvance: false
     },
     {

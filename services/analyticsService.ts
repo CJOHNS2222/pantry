@@ -114,6 +114,15 @@ class AnalyticsService {
     });
   }
 
+  // Track household events
+  static trackHouseholdJoin(householdId: string, role: 'owner' | 'member') {
+    this.logEvent('join_group', {
+      content_type: 'household',
+      group_id: householdId,
+      role: role
+    });
+  }
+
   // Track navigation and engagement
   static trackTabSwitch(fromTab: string, toTab: string) {
     this.logEvent('screen_view', {

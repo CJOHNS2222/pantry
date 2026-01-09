@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { doc, onSnapshot, collection, addDoc, getDocs, setDoc, serverTimestamp, query, where, orderBy, Timestamp, writeBatch, deleteDoc } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
-import { User, PantryItem, DayPlan, Household, ShoppingItem, SavedRecipe, RecipeRating, RecipeSearchResult, CustomCategory, RecipeSuggestion } from '../types';
+import { User, PantryItem, DayPlan, Household, ShoppingItem, SavedRecipe, RecipeRating, RecipeSearchResult, CustomCategory, RecipeSuggestion, MealPlanItem } from '../types';
 import { next7DateKeys, isHouseholdMember, generateConsumptionSuggestions, generateExpirationAlerts, generateRecipeSuggestions } from '../utils/appUtils';
 import { UsageService } from '../services/usageService';
 import AnalyticsService from '../services/analyticsService';
 
-export function useDataManagement(user: User | null, addToast: (message: string, type?: 'error' | 'info') => void, addToShoppingList?: (items: string[]) => void) {
+export function useDataManagement(user: User | null, addToast: (message: string, type?: 'error' | 'info', ttl?: number, actionLabel?: string, action?: () => void) => void, addToShoppingList?: (items: string[]) => void) {
   // Data States
   const [mealPlanState, setMealPlanState] = useState<DayPlan[]>([]);
   const [household, setHousehold] = useState<Household | null>(null);
@@ -76,7 +76,7 @@ export function useDataManagement(user: User | null, addToast: (message: string,
           
           // Distribute meals to appropriate arrays based on meal type
           validMeals.forEach(meal => {
-            const mealType = meal.type || 'dinner'; // Default to dinner if no type specified
+            const mealType = meal.mealType || 'dinner'; // Default to dinner if no type specified
             switch (mealType) {
               case 'breakfast':
                 breakfast.push(meal);
@@ -369,7 +369,9 @@ export function useDataManagement(user: User | null, addToast: (message: string,
           fullWeekPlan.push({
             date: iso,
             dayName: days[d.getDay()],
-            meals: []
+            breakfast: [],
+            lunch: [],
+            dinner: []
           });
         }
 

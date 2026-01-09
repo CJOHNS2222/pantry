@@ -5,6 +5,20 @@ All notable changes to Smart Pantry Chef will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.8] - 2026-01-09
+
+### Fixed
+- **Capacitor App Listener**: Fixed runtime error "removeListener is not a function" by implementing proper async listener cleanup with useRef
+- **TypeScript Compilation**: Resolved 77 TypeScript errors across the application including missing interfaces, methods, and type declarations
+- **Form Accessibility**: Added proper id/name attributes and htmlFor labels to all form inputs for WCAG compliance
+- **Visual Inventory Levels**: Fixed quantity display to show fractional amounts (½ gal, ¼ cup) when using visual fill level selector
+- **Quantity Formatting**: Enhanced formatItemQuantity function to display common fractions (¼, ½, ¾) instead of decimals
+
+### Technical
+- **Type Definitions**: Added Member interface, visualLevel field to PantryItem type, and comprehensive Vite environment declarations
+- **Service Methods**: Added trackHouseholdJoin and recordMealPlanAddition methods to analytics and usage services
+- **Firebase Exports**: Added missing functions export to firebaseConfig.ts for cloud functions integration
+
 ## [1.1.7] - 2026-01-08
 
 ### Features
@@ -12,6 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Subscription Tier Rebalance**: Updated Premium plan limits (15 searches/week, 20 recipes, 7-day planning) and Family plan (unlimited everything, 5 members)
 - **Mobile Back Button Support**: Implemented hardware back button functionality for Android devices to close modals and navigate between tabs
 - **Double-Tap Exit**: Enhanced back button with double-tap to exit app, showing a toast message on first press
+- **Meal Planner Help**: Added help icon (?) with tooltip explaining drag & drop and day-clicking functionality
+
+### Removed
+- **Cooking Reminders**: Removed bell icon notifications from meal planner to reduce UI clutter
 
 ### Fixed
 - **Performance**: Prevented repeated API calls after hitting limits

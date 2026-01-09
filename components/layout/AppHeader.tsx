@@ -1,6 +1,6 @@
 import React from 'react';
 import { Sun, Moon } from 'lucide-react';
-import { User } from '../types';
+import { User } from '../../types';
 
 interface AppHeaderProps {
   user: User;

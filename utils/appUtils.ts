@@ -1,4 +1,4 @@
-import { doc, Timestamp, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, Timestamp, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 import { DayPlan } from '../types';
 import { ConsumptionSuggestion, ExpirationAlert, RecipeSuggestion, PantryItem, CustomCategory } from '../types';
@@ -9,7 +9,7 @@ const performance = getPerformance();
 export async function saveDayPlan(householdId: string, day: DayPlan) {
   const id = day.date; // 'YYYY-MM-DD'
   const ref = doc(db, 'households', householdId, 'mealPlan', id);
-  await ref.set({
+  await setDoc(ref, {
     date: Timestamp.fromDate(new Date(day.date)),
     breakfast: day.breakfast || [],
     lunch: day.lunch || [],
@@ -1126,4 +1126,260 @@ export function validateCustomCategory(name: string, icon: string, customCategor
   }
 
   return { valid: true };
+}
+
+// Enhanced quantity management utilities
+export interface ParsedQuantity {
+  amount: number;
+  unit: string;
+}
+
+export interface QuantityResult {
+  amount: number;
+  unit: string;
+  normalizedGrams?: number; // For comparison
+}
+
+// Unit conversion factors (to grams or milliliters)
+const UNIT_CONVERSIONS = {
+  // Weight
+  'g': 1,
+  'gram': 1,
+  'grams': 1,
+  'kg': 1000,
+  'kilogram': 1000,
+  'kilograms': 1000,
+  'oz': 28.35,
+  'ounce': 28.35,
+  'ounces': 28.35,
+  'lb': 453.59,
+  'pound': 453.59,
+  'pounds': 453.59,
+
+  // Volume (approximate conversions to ml)
+  'ml': 1,
+  'milliliter': 1,
+  'milliliters': 1,
+  'l': 1000,
+  'liter': 1000,
+  'liters': 1000,
+  'cup': 236.59,
+  'cups': 236.59,
+  'tbsp': 14.79,
+  'tablespoon': 14.79,
+  'tablespoons': 14.79,
+  'tsp': 4.93,
+  'teaspoon': 4.93,
+  'teaspoons': 4.93,
+  'qt': 946.35,
+  'quart': 946.35,
+  'quarts': 946.35,
+  'pt': 473.18,
+  'pint': 473.18,
+  'pints': 473.18,
+  'gal': 3785.41,
+  'gallon': 3785.41,
+  'gallons': 3785.41,
+
+  // Count units (no conversion)
+  'count': 1,
+  'piece': 1,
+  'pieces': 1,
+  'slice': 1,
+  'slices': 1,
+  'clove': 1,
+  'cloves': 1,
+  'can': 1,
+  'cans': 1,
+  'bottle': 1,
+  'bottles': 1,
+  'package': 1,
+  'packages': 1,
+  'pkg': 1,
+  'box': 1,
+  'boxes': 1,
+  'bag': 1,
+  'bags': 1,
+  'bunch': 1,
+  'bunches': 1,
+  'head': 1,
+  'heads': 1,
+  'stalk': 1,
+  'stalks': 1,
+  'sprig': 1,
+  'sprigs': 1,
+  'dash': 1,
+  'pinch': 1,
+};
+
+/**
+ * Parse a quantity string like "1 1/2 cups" or "2.5 oz" into structured data
+ */
+export function parseQuantity(quantityText: string): ParsedQuantity | null {
+  if (!quantityText || typeof quantityText !== 'string') {
+    return null;
+  }
+
+  const text = quantityText.trim().toLowerCase();
+
+  // Handle fractions like "1 1/2" -> 1.5
+  const fractionRegex = /(\d+)\s+(\d+)\/(\d+)/;
+  let processedText = text;
+  const fractionMatch = text.match(fractionRegex);
+  if (fractionMatch) {
+    const whole = parseInt(fractionMatch[1]);
+    const numerator = parseInt(fractionMatch[2]);
+    const denominator = parseInt(fractionMatch[3]);
+    const decimal = whole + (numerator / denominator);
+    processedText = text.replace(fractionMatch[0], decimal.toString());
+  }
+
+  // Handle simple fractions like "1/2"
+  const simpleFractionRegex = /(\d+)\/(\d+)/;
+  const simpleMatch = processedText.match(simpleFractionRegex);
+  if (simpleMatch && !fractionMatch) {
+    const numerator = parseInt(simpleMatch[1]);
+    const denominator = parseInt(simpleMatch[2]);
+    const decimal = numerator / denominator;
+    processedText = processedText.replace(simpleMatch[0], decimal.toString());
+  }
+
+  // Extract number and unit
+  const match = processedText.match(/^(\d+(?:\.\d+)?)\s*(.+)$/);
+  if (!match) {
+    return null;
+  }
+
+  const amount = parseFloat(match[1]);
+  const unit = match[2].trim();
+
+  // Validate unit exists in our conversions
+  if (!UNIT_CONVERSIONS[unit] && !UNIT_CONVERSIONS[unit + 's']) {
+    return null;
+  }
+
+  return {
+    amount,
+    unit: UNIT_CONVERSIONS[unit] ? unit : unit + 's'
+  };
+}
+
+/**
+ * Convert quantity to normalized grams/ml for comparison
+ */
+export function normalizeQuantity(quantity: ParsedQuantity): QuantityResult {
+  const conversionFactor = UNIT_CONVERSIONS[quantity.unit.toLowerCase()];
+  if (!conversionFactor) {
+    return { ...quantity };
+  }
+
+  // For weight/volume units, convert to grams/ml
+  if (['g', 'gram', 'grams', 'kg', 'kilogram', 'kilograms', 'oz', 'ounce', 'ounces', 'lb', 'pound', 'pounds'].includes(quantity.unit.toLowerCase())) {
+    return {
+      ...quantity,
+      normalizedGrams: quantity.amount * conversionFactor
+    };
+  }
+
+  if (['ml', 'milliliter', 'milliliters', 'l', 'liter', 'liters', 'cup', 'cups', 'tbsp', 'tablespoon', 'tablespoons', 'tsp', 'teaspoon', 'teaspoons', 'qt', 'quart', 'quarts', 'pt', 'pint', 'pints', 'gal', 'gallon', 'gallons'].includes(quantity.unit.toLowerCase())) {
+    return {
+      ...quantity,
+      normalizedGrams: quantity.amount * conversionFactor // Using grams field for volume too
+    };
+  }
+
+  // For count units, no normalization needed
+  return { ...quantity };
+}
+
+/**
+ * Check if two quantities can be combined (same unit type)
+ */
+export function canCombineQuantities(q1: ParsedQuantity, q2: ParsedQuantity): boolean {
+  const n1 = normalizeQuantity(q1);
+  const n2 = normalizeQuantity(q2);
+
+  // Both have normalization (weight/volume) or both don't (count)
+  return (n1.normalizedGrams !== undefined) === (n2.normalizedGrams !== undefined);
+}
+
+/**
+ * Combine two quantities of the same type
+ */
+export function combineQuantities(q1: ParsedQuantity, q2: ParsedQuantity): ParsedQuantity {
+  if (!canCombineQuantities(q1, q2)) {
+    throw new Error('Cannot combine quantities of different types');
+  }
+
+  const n1 = normalizeQuantity(q1);
+  const n2 = normalizeQuantity(q2);
+
+  if (n1.normalizedGrams !== undefined && n2.normalizedGrams !== undefined) {
+    // Convert both to grams/ml, add, then convert back to first unit
+    const totalGrams = n1.normalizedGrams + n2.normalizedGrams;
+    const amountInOriginalUnit = totalGrams / UNIT_CONVERSIONS[q1.unit.toLowerCase()];
+    return {
+      amount: Math.round(amountInOriginalUnit * 100) / 100, // Round to 2 decimal places
+      unit: q1.unit
+    };
+  }
+
+  // For count units, just add amounts
+  return {
+    amount: q1.amount + q2.amount,
+    unit: q1.unit
+  };
+}
+
+/**
+ * Subtract one quantity from another
+ */
+export function subtractQuantities(total: ParsedQuantity, used: ParsedQuantity): ParsedQuantity | null {
+  if (!canCombineQuantities(total, used)) {
+    return null; // Cannot subtract different types
+  }
+
+  const nTotal = normalizeQuantity(total);
+  const nUsed = normalizeQuantity(used);
+
+  if (nTotal.normalizedGrams !== undefined && nUsed.normalizedGrams !== undefined) {
+    const remainingGrams = nTotal.normalizedGrams - nUsed.normalizedGrams;
+    if (remainingGrams <= 0) return null; // All used up
+
+    const amountInOriginalUnit = remainingGrams / UNIT_CONVERSIONS[total.unit.toLowerCase()];
+    return {
+      amount: Math.round(amountInOriginalUnit * 100) / 100,
+      unit: total.unit
+    };
+  }
+
+  // For count units
+  const remaining = total.amount - used.amount;
+  if (remaining <= 0) return null;
+
+  return {
+    amount: remaining,
+    unit: total.unit
+  };
+}
+
+/**
+ * Format quantity for display, handling both old and new quantity systems
+ */
+export function formatItemQuantity(item: PantryItem): string {
+  if (item.quantity) {
+    let amount = item.quantity.amount;
+    const unit = item.quantity.unit;
+
+    // Format common fractions nicely
+    let displayAmount: string;
+    if (amount === 0.25) displayAmount = '¼';
+    else if (amount === 0.5) displayAmount = '½';
+    else if (amount === 0.75) displayAmount = '¾';
+    else displayAmount = amount.toString();
+
+    return `${displayAmount} ${unit}`;
+  }
+  // Fallback to old system
+  return item.quantity_estimate || '1';
 }

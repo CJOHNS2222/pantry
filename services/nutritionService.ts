@@ -112,7 +112,13 @@ const searchWithFallbacks = async (itemName: string): Promise<any[] | null> => {
         }
       }
     } catch (error) {
-      continue;
+      // Check if this is a CORS error - if so, don't try other terms
+      if (error instanceof TypeError && 
+          (error.message.includes('CORS') || error.message.includes('Failed to fetch'))) {
+        console.warn('CORS error detected - USDA API not accessible from browser:', error.message);
+        return null; // Don't try other terms, CORS will affect all requests
+      }
+      continue; // For other errors, try next term
     }
   }
   
@@ -155,17 +161,27 @@ export const getNutritionFacts = async (itemName: string): Promise<NutritionFact
     const foodFdcId = foodItem.fdcId;
 
     // Get detailed nutrition information
-    const detailResponse = await fetch(
-      `https://fdc.nal.usda.gov/api/foods/${foodFdcId}`,
-      { headers: { 'Content-Type': 'application/json' } }
-    );
+    let foodDetail;
+    try {
+      const detailResponse = await fetch(
+        `https://fdc.nal.usda.gov/api/foods/${foodFdcId}`,
+        { headers: { 'Content-Type': 'application/json' } }
+      );
 
-    if (!detailResponse.ok) {
-      console.warn('Nutrition detail fetch failed:', detailResponse.statusText);
-      return null;
+      if (!detailResponse.ok) {
+        console.warn('Nutrition detail fetch failed:', detailResponse.statusText);
+        return null;
+      }
+
+      foodDetail = await detailResponse.json();
+    } catch (error) {
+      if (error instanceof TypeError && 
+          (error.message.includes('CORS') || error.message.includes('Failed to fetch'))) {
+        console.warn('CORS error on nutrition detail fetch - USDA API not accessible from browser:', error.message);
+        return null;
+      }
+      throw error; // Re-throw other errors
     }
-
-    const foodDetail = await detailResponse.json();
     const nutrients = foodDetail.foodNutrients || [];
 
     // Extract key nutrients (per 100g standard serving)

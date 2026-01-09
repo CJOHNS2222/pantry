@@ -175,6 +175,16 @@ class UsageService {
     });
   }
 
+  static async recordMealPlanAddition(user: User): Promise<void> {
+    if (!user?.id) return;
+
+    const usageRef = doc(db, 'users', user.id, 'usage', 'limits');
+    await updateDoc(usageRef, {
+      'mealPlanning.weeklyUsed': increment(1),
+      lastUpdated: new Date()
+    });
+  }
+
   static async recordHouseholdMemberAdd(userId: string): Promise<void> {
     if (!userId) return;
 

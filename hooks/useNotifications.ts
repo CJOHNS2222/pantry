@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { Capacitor } from '@capacitor/core';
 import { DayPlan } from '../types';
@@ -13,11 +13,24 @@ interface NotificationSettings {
 }
 
 export function useNotifications(settings: NotificationSettings, userEmail?: string, mealPlan?: DayPlan[]) {
+  const [notificationPermission, setNotificationPermission] = useState<'default' | 'granted' | 'denied'>('default');
+
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) {
       // Skip notification setup on web
       return;
     }
+
+    const checkPermissions = async () => {
+      try {
+        const permission = await LocalNotifications.checkPermissions();
+        setNotificationPermission(permission.display);
+      } catch (error) {
+        console.error('Error checking notification permissions:', error);
+      }
+    };
+
+    checkPermissions();
 
     const setupNotifications = async () => {
       try {
@@ -29,7 +42,7 @@ export function useNotifications(settings: NotificationSettings, userEmail?: str
         }
 
         // Cancel existing notifications
-        await LocalNotifications.cancelAll();
+        await LocalNotifications.cancel({ notifications: [] });
 
         if (settings.enabled && userEmail) {
           await scheduleNotifications(settings, mealPlan);
@@ -41,6 +54,17 @@ export function useNotifications(settings: NotificationSettings, userEmail?: str
 
     setupNotifications();
   }, [settings.enabled, settings.time, settings.types, userEmail, mealPlan]);
+
+  const requestNotificationPermission = async () => {
+    try {
+      const permission = await LocalNotifications.requestPermissions();
+      setNotificationPermission(permission.display);
+      return permission.display;
+    } catch (error) {
+      console.error('Error requesting notification permissions:', error);
+      return 'denied';
+    }
+  };
 
   const scheduleNotifications = async (settings: NotificationSettings, mealPlan?: DayPlan[]) => {
     const [hours, minutes] = settings.time.split(':').map(Number);
@@ -117,5 +141,8 @@ export function useNotifications(settings: NotificationSettings, userEmail?: str
     }
   };
 
-  return {};
+  return {
+    notificationPermission,
+    requestNotificationPermission
+  };
 }

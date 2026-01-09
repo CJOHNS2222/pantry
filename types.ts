@@ -2,7 +2,7 @@ export interface PantryItem {
   id: string;
   item: string;
   category: string;
-  quantity_estimate: string;
+  quantity_estimate: string; // Legacy field, keep for compatibility
   image?: string;
   storageLocation?: 'pantry' | 'freezer' | 'fridge' | 'spices' | 'other';
   expirationDate?: string; // ISO date string (YYYY-MM-DD)
@@ -10,7 +10,17 @@ export interface PantryItem {
   dateAdded?: string; // ISO date string when item was first added
   lastRestocked?: string; // ISO date string when item was last restocked
   consumptionHistory?: string[]; // Array of ISO dates when item was consumed/replaced
-  originalQuantity?: string; // Original quantity from recipe/shopping list (e.g., "1/2 cup", "4 oz")
+
+  // Enhanced quantity tracking
+  quantity?: {
+    amount: number;        // Numeric amount (e.g., 2.5)
+    unit: string;          // Unit (cups, lbs, oz, etc.)
+    originalAmount?: number; // Original purchase amount
+    originalUnit?: string;   // Original purchase unit
+  };
+
+  // Visual quantity estimation
+  visualLevel?: 'empty' | 'quarter' | 'half' | 'threeQuarter' | 'full';
 }
 
 export interface ShoppingItem {
@@ -62,6 +72,7 @@ export interface DayPlan {
   breakfast: MealPlanItem[];
   lunch: MealPlanItem[];
   dinner: MealPlanItem[];
+  meals?: MealPlanItem[]; // Legacy support for migration
 }
 
 export interface RecipeRating {
@@ -102,6 +113,7 @@ export interface User {
   subscription?: Subscription;
   profile?: UserProfile;
   customCategories?: CustomCategory[];
+  householdId?: string;
 }
 
 export interface UserProfile {
@@ -164,4 +176,14 @@ export interface Household {
   name: string;
   members: Member[];
   memberIds?: string[]; // convenience array of member UIDs for fast rule checks
+}
+
+export interface Member {
+  id: string;
+  name: string;
+  email: string;
+  avatar?: string;
+  role: 'owner' | 'member';
+  status?: 'Active' | 'Invited' | 'Inactive';
+  joinedAt: string;
 }

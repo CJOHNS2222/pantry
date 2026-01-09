@@ -653,6 +653,13 @@ class GroceryPriceService {
       return false;
     }
   }
+
+  private async fetchOpenPrices(ingredient: string, location?: string): Promise<any> {
+    // TODO: Implement Open Prices API integration
+    // This is a placeholder for future Open Prices API implementation
+    console.log(`Open Prices API not implemented yet for ${ingredient}`);
+    return null;
+  }
 }
 
 export const groceryPriceService = new GroceryPriceService();

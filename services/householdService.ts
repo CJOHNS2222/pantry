@@ -12,7 +12,9 @@ import {
   setDoc,
   updateDoc,
   arrayUnion,
+  arrayRemove,
   serverTimestamp,
+  deleteDoc,
 } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 import { Household, Member, User } from '../types';
@@ -85,8 +87,9 @@ export const createHousehold = async (
           id: user.id,
           name: user.name,
           email: user.email,
-          role: 'Admin',
+          role: 'owner',
           status: 'Active',
+          joinedAt: new Date().toISOString(),
         },
       ],
       memberIds: [user.id],
@@ -214,14 +217,14 @@ export const removeMemberFromHousehold = async (
     };
 
     if (householdData.memberIds?.includes(memberId)) {
-      updatePayload.memberIds = FieldValue.arrayRemove(memberId);
+      updatePayload.memberIds = arrayRemove(memberId);
     }
 
     await updateDoc(household.ref, updatePayload);
 
     // If this was the last member besides the admin, delete the household
     if (updatedMembers.length === 1) {
-      await householdRef.delete();
+      await deleteDoc(householdRef);
     }
   } catch (error) {
     console.error('Error removing member from household:', error);

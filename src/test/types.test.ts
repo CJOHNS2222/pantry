@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { PantryItem, ShoppingItem, StructuredRecipe, SavedRecipe, DayPlan, MealPlanItem } from '../../../types';
+import { PantryItem, ShoppingItem, StructuredRecipe, SavedRecipe, DayPlan, MealPlanItem } from '../../types';
 
 describe('Type Definitions', () => {
   it('should create a valid PantryItem', () => {
@@ -91,6 +91,7 @@ describe('Type Definitions', () => {
     const mealItem: MealPlanItem = {
       id: 'meal-123',
       recipe: recipe,
+      mealType: 'dinner',
     };
 
     expect(mealItem.id).toBe('meal-123');
