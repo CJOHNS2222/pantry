@@ -62,11 +62,15 @@ describe('PantryScanner Component', () => {
   it('shows the scan prompt', () => {
     render(
       <PantryScanner
-        inventory={initialInventory}
+        inventory={[]} // Empty inventory to show scan prompt
         setInventory={mockSetInventory}
         addToShoppingList={mockAddToShoppingList}
       />
     );
+
+    // The scan prompt is in the Add Items modal, so we need to open the modal first
+    const addButton = screen.getByLabelText('Add items to pantry');
+    fireEvent.click(addButton);
 
     expect(screen.getByText('Scan receipt or pantry')).toBeInTheDocument();
   });

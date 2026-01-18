@@ -1,7 +1,7 @@
 import React from 'react';
 import { ShoppingBasket, Check, Trash2, Archive, Plus, X } from 'lucide-react';
 import { ShoppingItem } from '../types';
-import { inferCategoryFromItemName } from '../utils/appUtils';
+import { inferCategoryFromItemName, getItemImage } from '../utils/appUtils';
 
 interface ShoppingListProps {
   items: ShoppingItem[];
@@ -13,6 +13,55 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ items, setItems, onM
   const [newItem, setNewItem] = React.useState('');
   const [newQty, setNewQty] = React.useState<string>('1');
   const [isAddModalOpen, setIsAddModalOpen] = React.useState(false);
+
+  // Suggested items for quick adding
+  const suggestedItems = [
+    'Milk', 'Bread', 'Eggs', 'Cheese', 'Bananas', 'Apples', 'Chicken', 'Pasta', 
+    'Rice', 'Tomatoes', 'Lettuce', 'Onions', 'Potatoes', 'Carrots', 'Butter', 'Yogurt'
+  ];
+
+  const addSuggestedItem = (itemName: string) => {
+    // Check if item already exists
+    const exists = items.some(item => item.item.toLowerCase() === itemName.toLowerCase());
+    if (exists) {
+      alert(`${itemName} is already in your shopping list!`);
+      return;
+    }
+
+    setItems(prev => [...prev, {
+      id: Math.random().toString(36).substr(2, 9),
+      item: itemName,
+      category: inferCategoryFromItemName(itemName),
+      checked: false,
+      quantity: '1',
+      source: 'suggested'
+    }]);
+  };
+
+  const addRecipeItem = (itemName: string, requiredQuantity: string, recipeName: string) => {
+    // Check if item already exists
+    const existingItem = items.find(item => item.item.toLowerCase() === itemName.toLowerCase());
+    if (existingItem) {
+      // Update the existing item with recipe info if it doesn't already have it
+      if (!existingItem.source || !existingItem.source.includes('recipe')) {
+        setItems(prev => prev.map(item => 
+          item.id === existingItem.id 
+            ? { ...item, source: `recipe: ${recipeName} (${requiredQuantity})` }
+            : item
+        ));
+      }
+      return;
+    }
+
+    setItems(prev => [...prev, {
+      id: Math.random().toString(36).substr(2, 9),
+      item: itemName,
+      category: inferCategoryFromItemName(itemName),
+      checked: false,
+      quantity: requiredQuantity,
+      source: `recipe: ${recipeName}`
+    }]);
+  };
 
   const toggleCheck = (id: string) => {
     setItems(prev => prev.map(i => i.id === id ? { ...i, checked: !i.checked } : i));
@@ -38,7 +87,8 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ items, setItems, onM
         item: newItem,
         category: inferCategoryFromItemName(newItem),
         checked: false,
-        quantity: newQty
+        quantity: newQty,
+        source: 'manual'
     }]);
     setNewItem('');
     setNewQty('1');
@@ -55,6 +105,13 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ items, setItems, onM
     const purchased = items.filter(i => i.checked);
     if (purchased.length === 0) return;
     
+    // Validate that all checked items have purchased quantities
+    const missingQuantities = purchased.filter(i => !i.purchasedQuantity);
+    if (missingQuantities.length > 0) {
+      alert(`Please select purchased quantities for: ${missingQuantities.map(i => i.item).join(', ')}`);
+      return;
+    }
+    
     if (confirm(`Move ${purchased.length} items to pantry?`)) {
         onMoveToPantry(purchased);
         setItems(prev => prev.filter(i => !i.checked));
@@ -66,6 +123,36 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ items, setItems, onM
       <div className="text-center mb-6">
         <h2 className="text-3xl font-serif font-bold text-theme-secondary">Shopping List</h2>
         <p className="text-theme-secondary opacity-60 text-sm mt-1">Items to purchase</p>
+      </div>
+
+      {/* Suggested Items */}
+      <div className="bg-theme-secondary rounded-xl p-4 border border-theme">
+        <h3 className="text-sm font-semibold text-theme-primary mb-3 flex items-center gap-2">
+          <Plus className="w-4 h-4" />
+          Quick Add Suggestions
+        </h3>
+        <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide flex-nowrap">
+          {suggestedItems.map((itemName) => (
+            <button
+              key={itemName}
+              onClick={() => addSuggestedItem(itemName)}
+              className="flex-shrink-0 flex flex-col items-center gap-2 p-3 bg-theme-primary rounded-lg border border-theme hover:border-[var(--accent-color)] hover:bg-[var(--accent-color)]/5 transition-all group min-w-[80px]"
+            >
+              <img
+                src={getItemImage(itemName, inferCategoryFromItemName(itemName))}
+                alt={itemName}
+                className="w-10 h-10 rounded-lg object-cover bg-theme-secondary border border-theme"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement;
+                  target.src = '/images/placeholder.svg';
+                }}
+              />
+              <span className="text-xs font-medium text-theme-primary text-center leading-tight group-hover:text-[var(--accent-color)] transition-colors">
+                {itemName}
+              </span>
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Floating Action Button */}
@@ -170,12 +257,75 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ items, setItems, onM
               }`}>
                 {item.checked && <Check className="w-3 h-3 text-white" />}
               </div>
-              <div>
+              <div className="flex-1">
                 <span className={`font-medium ${item.checked ? 'line-through opacity-50' : 'text-theme-primary'}`}>
                   {item.item}
                 </span>
+                {item.source && (
+                  <div className="text-xs text-theme-secondary opacity-60 mt-1">
+                    {item.source === 'suggested' && '💡 Suggested item'}
+                    {item.source === 'manual' && '✏️ Manually added'}
+                    {item.source?.startsWith('recipe:') && `🍳 ${item.source}`}
+                  </div>
+                )}
                 {item.quantity && item.quantity !== '1' && (
-                  <div className="text-xs text-theme-secondary opacity-70">Qty: {item.quantity}</div>
+                  <div className="text-xs text-theme-secondary opacity-70">Needed: {item.quantity}</div>
+                )}
+                {item.checked && (
+                  <div className="mt-2">
+                    <select
+                      value={item.purchasedQuantity ? `${item.purchasedQuantity.amount} ${item.purchasedQuantity.unit}` : ''}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        const [amount, unit] = e.target.value.split(' ');
+                        setItems(prev => prev.map(i => 
+                          i.id === item.id 
+                            ? { ...i, purchasedQuantity: { amount: parseFloat(amount), unit } }
+                            : i
+                        ));
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-xs bg-theme-primary border border-theme rounded px-2 py-1 text-theme-primary"
+                    >
+                      <option value="">Select purchased quantity</option>
+                      {/* Common quantity options based on item type */}
+                      {item.item.toLowerCase().includes('milk') && (
+                        <>
+                          <option value="0.5 gal">½ gallon</option>
+                          <option value="1 gal">1 gallon</option>
+                          <option value="2 gal">2 gallons</option>
+                        </>
+                      )}
+                      {(item.item.toLowerCase().includes('meat') || item.item.toLowerCase().includes('chicken') || item.item.toLowerCase().includes('beef') || item.item.toLowerCase().includes('pork')) && (
+                        <>
+                          <option value="0.5 lb">½ lb</option>
+                          <option value="1 lb">1 lb</option>
+                          <option value="2 lb">2 lbs</option>
+                          <option value="3 lb">3 lbs</option>
+                        </>
+                      )}
+                      {(item.item.toLowerCase().includes('bread') || item.item.toLowerCase().includes('loaf')) && (
+                        <>
+                          <option value="1 loaf">1 loaf</option>
+                          <option value="2 loaf">2 loaves</option>
+                        </>
+                      )}
+                      {(item.item.toLowerCase().includes('egg') || item.item.toLowerCase().includes('eggs')) && (
+                        <>
+                          <option value="6 count">6 eggs</option>
+                          <option value="12 count">12 eggs</option>
+                          <option value="18 count">18 eggs</option>
+                          <option value="24 count">24 eggs</option>
+                        </>
+                      )}
+                      {/* Generic options */}
+                      <option value="1 count">1 item</option>
+                      <option value="2 count">2 items</option>
+                      <option value="3 count">3 items</option>
+                      <option value="6 count">6 items</option>
+                      <option value="12 count">12 items</option>
+                    </select>
+                  </div>
                 )}
               </div>
             </div>

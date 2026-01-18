@@ -34,6 +34,60 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
     // List of staple items to ignore
     const STAPLES = ['salt', 'pepper', 'oil', 'water', 'flour', 'sugar', 'butter', 'vinegar', 'baking powder', 'baking soda', 'spices', 'seasoning', 'soy sauce', 'cornstarch', 'yeast'];
     
+    // Recipe suggestion logic
+    const calculateRecipeFeasibility = (recipe: SavedRecipe, inventory: PantryItem[]) => {
+        const recipeIngredients = recipe.ingredients.map(ing => ing.toLowerCase());
+        const availableItems = inventory
+            .filter(item => !STAPLES.some(staple => item.item.toLowerCase().includes(staple)))
+            .map(item => item.item.toLowerCase());
+        
+        let matchedIngredients = 0;
+        const missingIngredients: string[] = [];
+        
+        recipeIngredients.forEach(ing => {
+            const isMatched = availableItems.some(item => 
+                ing.includes(item) || item.includes(ing) || 
+                // Simple fuzzy matching for common variations
+                ing.includes(item.split(' ')[0]) || item.includes(ing.split(' ')[0])
+            );
+            
+            if (isMatched) {
+                matchedIngredients++;
+            } else {
+                missingIngredients.push(ing);
+            }
+        });
+        
+        const matchPercentage = recipeIngredients.length > 0 ? (matchedIngredients / recipeIngredients.length) * 100 : 0;
+        const canMake = matchPercentage >= 70; // Can make with 70%+ ingredients
+        
+        return {
+            matchPercentage,
+            matchedIngredients,
+            totalIngredients: recipeIngredients.length,
+            missingIngredients,
+            canMake
+        };
+    };
+    
+    // Get recipe suggestions based on inventory
+    const getRecipeSuggestions = useMemo(() => {
+        if (!savedRecipes.length || !inventory.length) return { canMake: [], needMore: [] };
+        
+        const suggestions = savedRecipes
+            .map(recipe => ({
+                recipe,
+                feasibility: calculateRecipeFeasibility(recipe, inventory)
+            }))
+            .filter(item => item.feasibility.matchPercentage > 30) // Only show recipes with >30% match
+            .sort((a, b) => b.feasibility.matchPercentage - a.feasibility.matchPercentage);
+        
+        return {
+            canMake: suggestions.filter(item => item.feasibility.canMake).slice(0, 8),
+            needMore: suggestions.filter(item => !item.feasibility.canMake).slice(0, 8)
+        };
+    }, [savedRecipes, inventory]);
+    
     // Extract search logic to custom hook
     const [activeView, setActiveView] = useState<'search' | 'saved'>('search');
     const [selectedCategory, setSelectedCategory] = useState<string>('All');
@@ -1155,6 +1209,69 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
           </PremiumFeature>
       ) : (
         <>
+            {/* Recipe Suggestions - Show above search when there are suggestions */}
+            {(getRecipeSuggestions.canMake.length > 0 || getRecipeSuggestions.needMore.length > 0) && (
+                <div className="space-y-3">
+                    {/* Can Make Now Section */}
+                    {getRecipeSuggestions.canMake.length > 0 && (
+                        <div className="bg-theme-secondary rounded-lg p-3 border border-theme">
+                            <h3 className="text-xs font-semibold text-theme-primary mb-2 flex items-center gap-1">
+                                <span className="text-green-500 text-sm">✅</span>
+                                Can Make Now
+                            </h3>
+                            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide flex-nowrap">
+                                {getRecipeSuggestions.canMake.slice(0, 6).map(({ recipe, feasibility }) => (
+                                    <button
+                                        key={`can-make-${recipe.id}`}
+                                        onClick={() => openRecipeModal(recipe, true)}
+                                        className="flex-shrink-0 flex flex-col items-center gap-1 p-2 bg-theme-primary rounded-md border border-theme hover:border-green-500 hover:bg-green-500/5 transition-all group min-w-[65px]"
+                                    >
+                                        <div className="w-7 h-7 rounded-md bg-theme-secondary border border-theme flex items-center justify-center">
+                                            <ChefHat className="w-3.5 h-3.5 text-theme-primary opacity-60" />
+                                        </div>
+                                        <span className="text-[10px] font-medium text-theme-primary text-center leading-tight group-hover:text-green-500 transition-colors line-clamp-2">
+                                            {recipe.title}
+                                        </span>
+                                        <div className="text-[8px] text-green-500 font-medium">
+                                            {Math.round(feasibility.matchPercentage)}%
+                                        </div>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Need More Items Section */}
+                    {getRecipeSuggestions.needMore.length > 0 && (
+                        <div className="bg-theme-secondary rounded-lg p-3 border border-theme">
+                            <h3 className="text-xs font-semibold text-theme-primary mb-2 flex items-center gap-1">
+                                <span className="text-orange-500 text-sm">🛒</span>
+                                Almost There
+                            </h3>
+                            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide flex-nowrap">
+                                {getRecipeSuggestions.needMore.slice(0, 6).map(({ recipe, feasibility }) => (
+                                    <button
+                                        key={`need-more-${recipe.id}`}
+                                        onClick={() => openRecipeModal(recipe, true)}
+                                        className="flex-shrink-0 flex flex-col items-center gap-1 p-2 bg-theme-primary rounded-md border border-theme hover:border-orange-500 hover:bg-orange-500/5 transition-all group min-w-[65px]"
+                                    >
+                                        <div className="w-7 h-7 rounded-md bg-theme-secondary border border-theme flex items-center justify-center">
+                                            <ChefHat className="w-3.5 h-3.5 text-theme-primary opacity-60" />
+                                        </div>
+                                        <span className="text-[10px] font-medium text-theme-primary text-center leading-tight group-hover:text-orange-500 transition-colors line-clamp-2">
+                                            {recipe.title}
+                                        </span>
+                                        <div className="text-[8px] text-orange-500 font-medium">
+                                            +{feasibility.missingIngredients.length}
+                                        </div>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+
             <div className="bg-theme-secondary p-5 rounded-2xl border border-theme shadow-lg">
                 <form onSubmit={handleSpecificSearch} className="flex gap-2">
                     <div className="flex-1 relative">

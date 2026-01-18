@@ -1,3 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 /* Premium Feature Overlay Styles */
 .premium-overlay-container {
   position: relative;
@@ -41,4 +45,18 @@
   to {
     box-shadow: 0 0 30px rgba(76, 175, 80, 1), 0 0 60px rgba(76, 175, 80, 0.6), 0 0 90px rgba(76, 175, 80, 0.3);
   }
+}
+
+/* Hide scrollbar for horizontal scrolling */
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* Internet Explorer 10+ */
+  scrollbar-width: none;  /* Firefox */
+  -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+  scroll-behavior: smooth; /* Smooth scrolling */
+  touch-action: pan-x; /* Allow horizontal touch scrolling */
+  overscroll-behavior-x: contain; /* Prevent overscroll on sides */
+  flex-wrap: nowrap; /* Prevent wrapping */
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;  /* Safari and Chrome */
 }

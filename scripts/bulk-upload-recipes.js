@@ -33,6 +33,8 @@ try {
 import { initializeApp } from "firebase/app";
 import { getFirestore, collection, addDoc, getDocs, query, where } from "firebase/firestore";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { initializeApp as initializeAdminApp, cert } from "firebase-admin/app";
+import { getStorage as getAdminStorage } from "firebase-admin/storage";
 
 // Firebase config (same as in your app)
 const firebaseConfig = {
@@ -45,9 +47,19 @@ const firebaseConfig = {
   measurementId: process.env.VITE_MEASUREMENT_ID
 };
 
+// Initialize Firebase client app
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
-const storage = getStorage(app);
+
+// Initialize Firebase Admin app for server-side operations
+const serviceAccount = JSON.parse(readFileSync(join(__dirname, '..', 'new-service-account.json'), 'utf8'));
+const adminApp = initializeAdminApp({
+  credential: cert(serviceAccount),
+  storageBucket: process.env.VITE_STORAGE_BUCKET
+});
+
+// Use admin storage for uploads (authenticated)
+const storage = getAdminStorage(adminApp);
 
 const SPOONACULAR_API_KEY = process.env.VITE_SPOONACULAR_API_KEY;
 const SPOONACULAR_BASE_URL = "https://api.spoonacular.com";
@@ -203,14 +215,24 @@ async function uploadRecipeImage(imageUrl, recipeId) {
       throw new Error(`Failed to download image: ${response.status}`);
     }
 
-    const blob = await response.blob();
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
 
-    // Upload to Firebase Storage
-    const storageRef = ref(storage, `recipes/${recipeId}.jpg`);
-    await uploadBytes(storageRef, blob);
+    // Upload to Firebase Storage using admin SDK
+    const bucket = storage.bucket();
+    const file = bucket.file(`recipes/${recipeId}.jpg`);
+    await file.save(buffer, {
+      metadata: {
+        contentType: 'image/jpeg',
+      },
+    });
 
     // Get download URL
-    const downloadURL = await getDownloadURL(storageRef);
+    const [downloadURL] = await file.getSignedUrl({
+      action: 'read',
+      expires: '03-09-2491', // Far future date for permanent access
+    });
+
     return downloadURL;
   } catch (error) {
     console.error("Error uploading recipe image:", error);
@@ -233,7 +255,7 @@ async function recipeExists(title) {
 }
 
 /**
- * Save recipe to Firestore
+ * Save recipe to Firestore (without uploading images to Firebase Storage)
  */
 async function saveRecipeToFirestore(recipe) {
   try {
@@ -243,6 +265,7 @@ async function saveRecipeToFirestore(recipe) {
     };
 
     const docRef = await addDoc(collection(db, "recipes"), savedRecipe);
+    console.log(`✅ Saved recipe: ${recipe.title} (${recipe.source})`);
     return docRef.id;
   } catch (error) {
     console.error("Error saving recipe to Firestore:", error);
@@ -384,17 +407,8 @@ async function bulkUploadRecipes(searchQueries, recipesPerQuery, onProgress) {
             continue;
           }
 
-          // Save to Firestore first to get ID
-          const recipeId = await saveRecipeToFirestore(structuredRecipe);
-
-          // Upload image if available
-          if (structuredRecipe.image) {
-            const uploadedImageUrl = await uploadRecipeImage(structuredRecipe.image, recipeId);
-
-            // Update recipe with uploaded image URL (we'll do this by saving again with the new image URL)
-            const updatedRecipe = { ...structuredRecipe, image: uploadedImageUrl };
-            await saveRecipeToFirestore(updatedRecipe);
-          }
+          // Save to Firestore (keeping original external image URL)
+          await saveRecipeToFirestore(structuredRecipe);
 
           result.success++;
           console.log(`✅ Saved recipe: ${structuredRecipe.title} (${usedMealDB ? 'MealDB' : 'Spoonacular'})`);

@@ -2,6 +2,7 @@ import React, { useMemo, useEffect } from 'react';
 import { PantryItem } from '../types';
 import { TrendingUp, Package, Flame, AlertTriangle } from 'lucide-react';
 import AnalyticsService from '../services/analyticsService';
+import { formatItemQuantity } from '../utils/appUtils';
 
 interface PantryAnalyticsProps {
   inventory: PantryItem[];
@@ -242,7 +243,7 @@ export const PantryAnalytics: React.FC<PantryAnalyticsProps> = ({ inventory }) =
                   <div key={idx} className="space-y-1">
                     <div className="flex justify-between text-xs">
                       <span className="text-theme-primary font-medium truncate" title={item.fullName}>{item.name}</span>
-                      <span className="text-theme-secondary opacity-70 ml-2 flex-shrink-0">{item.quantity}</span>
+                      <span className="text-theme-secondary opacity-70 ml-2 flex-shrink-0">{formatItemQuantity(item)}</span>
                     </div>
                     <div className="w-full bg-theme-primary rounded-full h-2">
                       <div 

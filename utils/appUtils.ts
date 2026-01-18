@@ -696,28 +696,131 @@ export function inferStorageLocationFromItemName(itemName: string): 'pantry' | '
 export function getAutoExpirationDate(itemName: string, category: string): string | undefined {
   const name = itemName.toLowerCase();
   const cat = category.toLowerCase();
-  
-  // Milk and dairy products get 10 days
+
+  // Dairy products
   if (name.includes('milk') || cat === 'dairy') {
     const expirationDate = new Date();
     expirationDate.setDate(expirationDate.getDate() + 10);
     return expirationDate.toISOString().slice(0, 10); // YYYY-MM-DD format
   }
-  
-  // Sour cream gets 3 weeks (21 days)
-  if (name.includes('sour cream')) {
+
+  // Yogurt (7-14 days depending on type)
+  if (name.includes('yogurt') || name.includes('yoghurt')) {
+    const expirationDate = new Date();
+    expirationDate.setDate(expirationDate.getDate() + 10);
+    return expirationDate.toISOString().slice(0, 10);
+  }
+
+  // Cheese (varies by type, but generally 7-21 days once opened)
+  if (name.includes('cheese') && !name.includes('processed') && !name.includes('american')) {
+    const expirationDate = new Date();
+    expirationDate.setDate(expirationDate.getDate() + 14);
+    return expirationDate.toISOString().slice(0, 10);
+  }
+
+  // Sour cream and similar dairy spreads
+  if (name.includes('sour cream') || name.includes('cream cheese') || name.includes('cottage cheese')) {
     const expirationDate = new Date();
     expirationDate.setDate(expirationDate.getDate() + 21);
-    return expirationDate.toISOString().slice(0, 10); // YYYY-MM-DD format
+    return expirationDate.toISOString().slice(0, 10);
   }
-  
+
+  // Bakery items
+  if (name.includes('bread') || cat === 'bakery') {
+    const expirationDate = new Date();
+    expirationDate.setDate(expirationDate.getDate() + 3);
+    return expirationDate.toISOString().slice(0, 10);
+  }
+
+  // Pastries and baked goods
+  if (name.includes('pastry') || name.includes('croissant') || name.includes('muffin') ||
+      name.includes('danish') || name.includes('donut') || name.includes('doughnut')) {
+    const expirationDate = new Date();
+    expirationDate.setDate(expirationDate.getDate() + 2);
+    return expirationDate.toISOString().slice(0, 10);
+  }
+
+  // Tortillas and flatbreads
+  if (name.includes('tortilla') || name.includes('pita') || name.includes('naan')) {
+    const expirationDate = new Date();
+    expirationDate.setDate(expirationDate.getDate() + 7);
+    return expirationDate.toISOString().slice(0, 10);
+  }
+
+  // Fresh meat and poultry
+  if ((name.includes('chicken') || name.includes('turkey') || name.includes('duck') ||
+       name.includes('beef') || name.includes('pork') || name.includes('lamb') ||
+       name.includes('veal') || name.includes('fish') || name.includes('salmon') ||
+       name.includes('tuna') || name.includes('shrimp')) &&
+      !name.includes('canned') && !name.includes('soup') && cat !== 'canned') {
+    const expirationDate = new Date();
+    // Fresh meat: 3-5 days, fish: 2 days
+    const days = name.includes('fish') || name.includes('shrimp') || name.includes('salmon') ? 2 : 4;
+    expirationDate.setDate(expirationDate.getDate() + days);
+    return expirationDate.toISOString().slice(0, 10);
+  }
+
+  // Fresh produce - fruits
+  if (name.includes('apple') || name.includes('orange') || name.includes('banana') ||
+      name.includes('grape') || name.includes('strawberr') || name.includes('blueberr') ||
+      name.includes('raspberr') || name.includes('blackberr') || name.includes('peach') ||
+      name.includes('pear') || name.includes('plum') || name.includes('kiwi') ||
+      name.includes('mango') || name.includes('pineapple') || name.includes('watermelon') ||
+      name.includes('cantaloupe') || name.includes('honeydew')) {
+    const expirationDate = new Date();
+    // Most fruits: 5-7 days
+    const days = name.includes('banana') ? 5 : 7;
+    expirationDate.setDate(expirationDate.getDate() + days);
+    return expirationDate.toISOString().slice(0, 10);
+  }
+
+  // Fresh produce - vegetables
+  if (name.includes('lettuce') || name.includes('spinach') || name.includes('kale') ||
+      name.includes('broccoli') || name.includes('cauliflower') || name.includes('carrot') ||
+      name.includes('celery') || name.includes('cucumber') || name.includes('tomato') ||
+      name.includes('pepper') || name.includes('onion') || name.includes('garlic') ||
+      name.includes('potato') || name.includes('cabbage') || name.includes('zucchini') ||
+      name.includes('eggplant') || name.includes('mushroom')) {
+    const expirationDate = new Date();
+    // Leafy greens: 3-5 days, root vegetables: 7-14 days
+    const days = (name.includes('lettuce') || name.includes('spinach') || name.includes('kale')) ? 4 :
+                 (name.includes('carrot') || name.includes('potato') || name.includes('onion')) ? 14 : 7;
+    expirationDate.setDate(expirationDate.getDate() + days);
+    return expirationDate.toISOString().slice(0, 10);
+  }
+
+  // Eggs
+  if (name.includes('egg')) {
+    const expirationDate = new Date();
+    expirationDate.setDate(expirationDate.getDate() + 21);
+    return expirationDate.toISOString().slice(0, 10);
+  }
+
+  // Fresh herbs
+  if (name.includes('basil') || name.includes('cilantro') || name.includes('parsley') ||
+      name.includes('mint') || name.includes('dill') || name.includes('chives') ||
+      name.includes('rosemary') || name.includes('thyme') || name.includes('oregano') ||
+      name.includes('sage')) {
+    const expirationDate = new Date();
+    expirationDate.setDate(expirationDate.getDate() + 7);
+    return expirationDate.toISOString().slice(0, 10);
+  }
+
+  // Deli meats and prepared foods
+  if (name.includes('deli') || name.includes('cold cut') || name.includes('lunch meat') ||
+      name.includes('bologna') || name.includes('salami') || name.includes('pepperoni')) {
+    const expirationDate = new Date();
+    expirationDate.setDate(expirationDate.getDate() + 5);
+    return expirationDate.toISOString().slice(0, 10);
+  }
+
   // Could add more auto-expiration rules here for other items
-  // if (name.includes('bread') || cat === 'bakery') {
+  // if (name.includes('leftovers') || cat === 'prepared') {
   //   const expirationDate = new Date();
   //   expirationDate.setDate(expirationDate.getDate() + 3);
   //   return expirationDate.toISOString().slice(0, 10);
   // }
-  
+
   return undefined;
 }
 

@@ -45,6 +45,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [categoryOrder, setCategoryOrder] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<'category' | 'storage'>('storage');
+  const [sortBy, setSortBy] = useState<'name' | 'lastAdded' | 'expiration' | 'category' | 'location'>('location');
   const [storageOrder, setStorageOrder] = useState<string[]>(['pantry', 'fridge', 'freezer', 'spices', 'other']);
   const [storageSectionOrder, setStorageSectionOrder] = useState<string[]>(['pantry', 'fridge', 'freezer', 'spices', 'other']);
   const [showPriceTrends, setShowPriceTrends] = useState<string | null>(null);
@@ -418,23 +419,48 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
     setExpandedCategories(new Set());
   };
 
+  // Sort inventory based on selected criteria
+  const sortedInventory = inventory.map((item, idx) => ({ ...item, originalIndex: idx })).sort((a, b) => {
+    switch (sortBy) {
+      case 'name':
+        return a.item.localeCompare(b.item);
+      case 'lastAdded':
+        const aDate = a.lastRestocked || a.dateAdded || '';
+        const bDate = b.lastRestocked || b.dateAdded || '';
+        return new Date(bDate).getTime() - new Date(aDate).getTime(); // Most recent first
+      case 'expiration':
+        const aExp = a.expirationDate || '9999-12-31';
+        const bExp = b.expirationDate || '9999-12-31';
+        return new Date(aExp).getTime() - new Date(bExp).getTime(); // Soonest first
+      case 'category':
+        return (a.category || '').localeCompare(b.category || '');
+      case 'location':
+        const locationOrder = { pantry: 1, fridge: 2, freezer: 3, spices: 4, other: 5 };
+        const aLoc = a.storageLocation || 'pantry';
+        const bLoc = b.storageLocation || 'pantry';
+        return locationOrder[aLoc] - locationOrder[bLoc];
+      default:
+        return 0;
+    }
+  });
+
   // Group inventory by category
-  const groupedItems = inventory.reduce((acc, item, idx) => {
+  const groupedItems = sortedInventory.reduce((acc, item) => {
     const category = item.category || 'Uncategorized';
     if (!acc[category]) {
       acc[category] = [];
     }
-    acc[category].push({ ...item, originalIndex: idx });
+    acc[category].push(item);
     return acc;
   }, {} as Record<string, (PantryItem & { originalIndex: number })[]>);
 
   // Group inventory by storage location
-  const groupedByStorage = inventory.reduce((acc, item, idx) => {
+  const groupedByStorage = sortedInventory.reduce((acc, item) => {
     const location = item.storageLocation || 'pantry'; // Default to pantry if not set
     if (!acc[location]) {
       acc[location] = [];
     }
-    acc[location].push({ ...item, originalIndex: idx });
+    acc[location].push(item);
     return acc;
   }, {} as Record<string, (PantryItem & { originalIndex: number })[]>);
 
@@ -647,29 +673,29 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
           <h2 className="text-3xl font-serif font-bold text-theme-secondary">My Pantry</h2>
           <p className="text-theme-secondary opacity-60 text-sm mt-1">Items currently in stock</p>
         </div>
-        
-        {/* View Selector - Next to title */}
-        <div data-tutorial="category-toggle" className="flex bg-theme-secondary rounded-lg p-1 border-2 border-[var(--accent-color)] shadow-lg">
-          <button
-            onClick={() => setViewMode('category')}
-            className={`px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
-              viewMode === 'category'
-                ? 'bg-[var(--accent-color)] text-white shadow-md transform scale-105'
-                : 'text-theme-primary hover:bg-theme-primary hover:scale-105'
-            }`}
+        {/* Sort Dropdown */}
+        <div className="relative">
+          <select
+            value={sortBy}
+            onChange={(e) => {
+              const value = e.target.value as typeof sortBy;
+              setSortBy(value);
+              // Also change view mode for category/location sorts
+              if (value === 'category') {
+                setViewMode('category');
+              } else if (value === 'location') {
+                setViewMode('storage');
+              }
+            }}
+            className="appearance-none bg-theme-secondary border-2 border-[var(--accent-color)] rounded-lg px-3 py-2 pr-8 text-sm font-medium text-theme-primary shadow-lg focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/50"
           >
-            Categories
-          </button>
-          <button
-            onClick={() => setViewMode('storage')}
-            className={`px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
-              viewMode === 'storage'
-                ? 'bg-[var(--accent-color)] text-white shadow-md transform scale-105'
-                : 'text-theme-primary hover:bg-theme-primary hover:scale-105'
-            }`}
-          >
-            Storage
-          </button>
+            <option value="name">Sort by Name</option>
+            <option value="lastAdded">Sort by Last Added</option>
+            <option value="expiration">Sort by Expiration</option>
+            <option value="category">Sort by Category</option>
+            <option value="location">Sort by Location</option>
+          </select>
+          <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-theme-primary pointer-events-none" />
         </div>
       </div>
 
