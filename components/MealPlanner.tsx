@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { CalendarClock, Plus, Move, AlertCircle, ShoppingBasket, Trash2, HelpCircle } from 'lucide-react';
 import { DayPlan, MealPlanItem, PantryItem, StructuredRecipe, User, SavedRecipe } from '../types';
 import RecipeModal from './RecipeModal';
-import { PremiumFeature } from './PremiumFeature';
-import { GroceryCostEstimator } from './GroceryCostEstimator';
+import { MealPrepPlanner } from './MealPrepPlanner';
 import { Tab } from '../types/app';
 import { searchRecipes } from '../services/geminiService';
 import { getSavedRecipes } from '../services/recipeService';
@@ -11,7 +10,6 @@ import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 import { parseIngredientForShoppingList } from '../utils/appUtils';
 import AnalyticsService from '../services/analyticsService';
-import { useNotifications } from '../hooks/useNotifications';
 
 interface MealPlannerProps {
   mealPlan: DayPlan[];
@@ -317,24 +315,25 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
   const [modalContext, setModalContext] = useState<'search' | 'scheduled'>('search');
   const [showHelpTooltip, setShowHelpTooltip] = useState(false);
 
-  // Tutorial trigger for opening recipe search modal
+  // Load saved recipes for meal prep planning
   useEffect(() => {
-    if (onOpenRecipeSearch) {
-      const timer = setTimeout(() => {
-        setShowRecipeSearch(true);
-      }, 1000); // Delay to allow tab switch animation
-      return () => clearTimeout(timer);
-    }
-  }, [onOpenRecipeSearch]);
+    const loadSavedRecipes = async () => {
+      try {
+        const recipes = await getSavedRecipes();
+        setSavedRecipes(recipes);
+      } catch (error) {
+        console.error('Error loading saved recipes:', error);
+      }
+    };
+    loadSavedRecipes();
+  }, []);
 
   const [isDragging, setIsDragging] = useState(false);
   const [dragOverTrash, setDragOverTrash] = useState(false);
-  const [selectedDayIndex, setSelectedDayIndex] = useState<number | null>(null);
   const [showRecipeSearch, setShowRecipeSearch] = useState(false);
   const [searchMealType, setSearchMealType] = useState<'breakfast' | 'lunch' | 'dinner' | null>(null);
-
-  // Notification hook
-  const { notificationPermission, requestNotificationPermission } = useNotifications(settings?.notifications, user.email, mealPlan);
+  const [showMealPrepPlanner, setShowMealPrepPlanner] = useState(false);
+  const [savedRecipes, setSavedRecipes] = useState<SavedRecipe[]>([]);
 
   // Function to clean ingredient names by removing descriptive words
   const getMissingIngredients = () => {
@@ -590,29 +589,6 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
             </ul>
           </div>
         )}
-        
-        {/* Notification permission prompt */}
-        {notificationPermission === 'default' && (
-          <div className="mt-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
-            <p className="text-sm text-yellow-700 dark:text-yellow-300 mb-2">
-              Enable cooking reminders to get notified when it's time to start prepping your meals!
-            </p>
-            <button
-              onClick={requestNotificationPermission}
-              className="px-4 py-2 bg-yellow-500 text-white rounded-lg text-sm hover:bg-yellow-600 transition-colors"
-            >
-              Enable Notifications
-            </button>
-          </div>
-        )}
-        
-        {notificationPermission === 'denied' && (
-          <div className="mt-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
-            <p className="text-sm text-red-700 dark:text-red-300">
-              Notifications are blocked. To use cooking reminders, please enable notifications in your browser settings.
-            </p>
-          </div>
-        )}
       </div>
 
       {/* Help Button - positioned absolutely on the right */}
@@ -622,6 +598,15 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
         title="Help"
       >
         <HelpCircle className="w-5 h-5 text-theme-secondary opacity-60 hover:opacity-100" />
+      </button>
+
+      {/* Meal Prep Planner Button */}
+      <button
+        onClick={() => setShowMealPrepPlanner(true)}
+        className="absolute top-4 right-16 p-2 rounded-full hover:bg-theme-secondary/10 transition-colors z-10"
+        title="Smart Meal Prep Planner"
+      >
+        <CalendarClock className="w-5 h-5 text-theme-secondary opacity-60 hover:opacity-100" />
       </button>
 
       <PremiumFeature
@@ -943,6 +928,16 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
           recipeSaveLimitExceeded={recipeSaveLimitExceeded}
           mealPlanLimitExceeded={mealPlanLimitExceeded}
           user={user}
+        />
+      )}
+
+      {/* Meal Prep Planner Modal */}
+      {showMealPrepPlanner && (
+        <MealPrepPlanner
+          savedRecipes={savedRecipes}
+          inventory={inventory}
+          onAddToPlan={onAddToPlan!}
+          onClose={() => setShowMealPrepPlanner(false)}
         />
       )}
     </div>

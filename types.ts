@@ -29,6 +29,11 @@ export interface ShoppingItem {
   category: string;
   checked: boolean;
   quantity?: number | string; // Can be a number or string like "2 cups", "1 tbsp"
+  source?: string; // How the item was added (e.g., "suggested", "recipe: Chicken Stir Fry")
+  purchasedQuantity?: {
+    amount: number;
+    unit: string;
+  }; // Quantity actually purchased
 }
 
 export interface GroundingChunk {
@@ -114,6 +119,7 @@ export interface User {
   profile?: UserProfile;
   customCategories?: CustomCategory[];
   householdId?: string;
+  householdMembers?: HouseholdMember[];
 }
 
 export interface UserProfile {
@@ -125,6 +131,14 @@ export interface UserProfile {
   activityLevel?: 'sedentary' | 'lightly-active' | 'moderately-active' | 'very-active' | 'extremely-active';
   dietaryRestrictions?: string[];
   allergies?: string[];
+}
+
+export interface HouseholdMember {
+  name: string;
+  dietaryRestrictions?: string[];
+  allergies?: string[];
+  dietGoal?: 'lose-weight' | 'maintain-weight' | 'gain-weight' | 'build-muscle' | 'improve-health';
+  favoriteCuisines?: string[];
 }
 
 export interface Subscription {

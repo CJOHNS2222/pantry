@@ -59,6 +59,9 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
   const [timerActive, setTimerActive] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [totalTime, setTotalTime] = useState(0);
+  const [customTime, setCustomTime] = useState(0); // User-set custom time in minutes
+  const [showCustomTimer, setShowCustomTimer] = useState(false);
+  const [timerLabel, setTimerLabel] = useState('Cooking Timer');
   
   // Smart Substitutions State
   const [showSubstitutions, setShowSubstitutions] = useState(false);
@@ -96,14 +99,30 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
     return () => clearInterval(interval);
   }, [timerActive, timeRemaining]);
 
-  // Start timer
-  const startTimer = () => {
-    const seconds = parseTimeToSeconds((recipe as StructuredRecipe).cookTime);
+  // Start timer with recipe time or custom time
+  const startTimer = (useCustomTime = false) => {
+    let seconds = 0;
+    if (useCustomTime && customTime > 0) {
+      seconds = customTime * 60; // Convert minutes to seconds
+    } else {
+      seconds = parseTimeToSeconds((recipe as StructuredRecipe).cookTime);
+    }
     if (seconds > 0) {
       setTotalTime(seconds);
       setTimeRemaining(seconds);
       setTimerActive(true);
+      setTimerLabel(useCustomTime ? `Custom Timer (${customTime} min)` : 'Cooking Timer');
     }
+  };
+
+  // Quick timer presets
+  const startQuickTimer = (minutes: number) => {
+    setCustomTime(minutes);
+    setTimerLabel(`${minutes} Minute Timer`);
+    setTotalTime(minutes * 60);
+    setTimeRemaining(minutes * 60);
+    setTimerActive(true);
+    setShowCustomTimer(false);
   };
 
   // Format seconds to MM:SS
@@ -191,72 +210,90 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
     }, 100);
   };
 
-  // Basic nutritional data per serving (estimates)
+  // Enhanced nutritional analysis with dietary goals
   const nutritionalInfo = useMemo(() => {
     if (!recipe.ingredients) return null;
-    
+
     // Simple nutritional estimation based on common ingredients
     const estimates = {
       calories: 0,
       protein: 0,
       carbs: 0,
       fat: 0,
-      fiber: 0
+      fiber: 0,
+      sodium: 0,
+      sugar: 0
     };
-    
+
     const ingredientText = recipe.ingredients.join(' ').toLowerCase();
-    
-    // Very basic estimation - could be enhanced with a proper nutrition database
-    if (ingredientText.includes('chicken')) {
-      estimates.calories += 165;
-      estimates.protein += 31;
-      estimates.fat += 3.6;
-    }
-    if (ingredientText.includes('beef')) {
-      estimates.calories += 250;
-      estimates.protein += 26;
-      estimates.fat += 17;
-    }
-    if (ingredientText.includes('rice')) {
-      estimates.calories += 130;
-      estimates.carbs += 28;
-      estimates.protein += 2.7;
-    }
-    if (ingredientText.includes('pasta')) {
-      estimates.calories += 157;
-      estimates.carbs += 31;
-      estimates.protein += 5.8;
-    }
-    if (ingredientText.includes('flour')) {
-      estimates.calories += 361;
-      estimates.carbs += 76;
-      estimates.protein += 10;
-    }
-    if (ingredientText.includes('butter') || ingredientText.includes('oil')) {
-      estimates.calories += 100;
-      estimates.fat += 11;
-    }
-    if (ingredientText.includes('cheese')) {
-      estimates.calories += 113;
-      estimates.protein += 7;
-      estimates.fat += 9;
-      estimates.carbs += 1;
-    }
-    if (ingredientText.includes('vegetable') || ingredientText.includes('lettuce') || ingredientText.includes('tomato')) {
-      estimates.calories += 25;
-      estimates.carbs += 5;
+
+    // Enhanced estimation with more ingredients
+    const nutritionMap = {
+      'chicken': { calories: 165, protein: 31, fat: 3.6, carbs: 0 },
+      'beef': { calories: 250, protein: 26, fat: 17, carbs: 0 },
+      'pork': { calories: 143, protein: 21, fat: 5, carbs: 0 },
+      'fish': { calories: 120, protein: 25, fat: 2, carbs: 0 },
+      'rice': { calories: 130, protein: 2.7, carbs: 28, fat: 0.3 },
+      'pasta': { calories: 157, protein: 5.8, carbs: 31, fat: 0.9 },
+      'bread': { calories: 79, protein: 3, carbs: 15, fat: 1 },
+      'flour': { calories: 361, protein: 10, carbs: 76, fat: 1 },
+      'butter': { calories: 100, protein: 0, carbs: 0, fat: 11 },
+      'oil': { calories: 120, protein: 0, carbs: 0, fat: 14 },
+      'cheese': { calories: 113, protein: 7, carbs: 1, fat: 9 },
+      'milk': { calories: 61, protein: 3.3, carbs: 5, fat: 3.3 },
+      'egg': { calories: 70, protein: 6, carbs: 0.6, fat: 5 },
+      'potato': { calories: 77, protein: 2, carbs: 17, fat: 0.1 },
+      'tomato': { calories: 18, protein: 0.9, carbs: 3.9, fat: 0.2 },
+      'onion': { calories: 40, protein: 1.1, carbs: 9.3, fat: 0.1 },
+      'garlic': { calories: 4, protein: 0.2, carbs: 1, fat: 0 },
+      'lettuce': { calories: 5, protein: 0.5, carbs: 1, fat: 0 },
+      'broccoli': { calories: 34, protein: 2.8, carbs: 7, fat: 0.4 },
+      'carrot': { calories: 25, protein: 0.6, carbs: 6, fat: 0.1 },
+      'apple': { calories: 52, protein: 0.3, carbs: 14, fat: 0.2 },
+      'banana': { calories: 89, protein: 1.1, carbs: 23, fat: 0.3 },
+      'sugar': { calories: 387, protein: 0, carbs: 100, fat: 0 },
+      'salt': { calories: 0, protein: 0, carbs: 0, fat: 0, sodium: 1000 }
+    };
+
+    // Calculate nutrition based on ingredients found
+    Object.entries(nutritionMap).forEach(([ingredient, nutrition]) => {
+      if (ingredientText.includes(ingredient)) {
+        estimates.calories += nutrition.calories;
+        estimates.protein += nutrition.protein || 0;
+        estimates.carbs += nutrition.carbs || 0;
+        estimates.fat += nutrition.fat || 0;
+        estimates.sodium += nutrition.sodium || 0;
+      }
+    });
+
+    // Add some fiber for vegetables
+    if (ingredientText.includes('vegetable') || ingredientText.includes('lettuce') ||
+        ingredientText.includes('broccoli') || ingredientText.includes('carrot')) {
       estimates.fiber += 2;
     }
-    
-    // Nutrition is always per serving, not scaled by servings
+
+    // Determine dietary compatibility
+    const isKeto = estimates.carbs < 20;
+    const isLowCarb = estimates.carbs < 50;
+    const isHighProtein = estimates.protein > 20;
+    const isLowFat = estimates.fat < 10;
+
     return {
       calories: Math.round(estimates.calories),
       protein: Math.round(estimates.protein * 10) / 10,
       carbs: Math.round(estimates.carbs * 10) / 10,
       fat: Math.round(estimates.fat * 10) / 10,
-      fiber: Math.round(estimates.fiber * 10) / 10
+      fiber: Math.round(estimates.fiber * 10) / 10,
+      sodium: Math.round(estimates.sodium),
+      sugar: Math.round(estimates.sugar),
+      dietaryGoals: {
+        keto: isKeto,
+        lowCarb: isLowCarb,
+        highProtein: isHighProtein,
+        lowFat: isLowFat
+      }
     };
-  }, [recipe.ingredients, servings]);
+  }, [recipe.ingredients]);
 
   // Scale ingredients based on servings
   const scaledIngredients = useMemo(() => {
@@ -297,31 +334,67 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
           <h2 className="text-2xl font-serif font-bold mb-2 text-[var(--accent-color)]">{recipe.title || 'Untitled'}</h2>
           {recipe.description && <p className="mb-4 text-theme-secondary opacity-70">{recipe.description}</p>}
 
-          {/* Cooking Timer Section */}
+          {/* Enhanced Cooking Timer Section */}
           {(recipe as StructuredRecipe).cookTime && (
             <div className="mb-6 p-4 bg-theme-secondary/10 rounded-lg border border-[var(--accent-color)]/20">
               <div className="flex items-center justify-between mb-3">
-                <h4 className="text-xs font-bold text-[var(--accent-color)] uppercase">Cooking Timer</h4>
-                <span className="text-xs text-theme-secondary opacity-70">{(recipe as StructuredRecipe).cookTime}</span>
+                <h4 className="text-xs font-bold text-[var(--accent-color)] uppercase">{timerLabel}</h4>
+                <span className="text-xs text-theme-secondary opacity-70">
+                  {timerActive ? formatTime(timeRemaining) : (recipe as StructuredRecipe).cookTime}
+                </span>
               </div>
-              
-              {timerActive ? (
+
+              {showCustomTimer ? (
+                <div className="space-y-3">
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      min="1"
+                      max="180"
+                      value={customTime}
+                      onChange={(e) => setCustomTime(parseInt(e.target.value) || 0)}
+                      placeholder="Minutes"
+                      className="flex-1 px-3 py-2 bg-theme-secondary/20 border border-[var(--accent-color)]/20 rounded-lg text-theme-primary text-sm"
+                    />
+                    <button
+                      onClick={() => startTimer(true)}
+                      disabled={customTime <= 0}
+                      className="px-4 py-2 bg-[var(--accent-color)] hover:bg-[var(--accent-color)]/90 disabled:bg-theme-secondary/50 text-white rounded-lg text-sm font-medium"
+                    >
+                      Start
+                    </button>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => startQuickTimer(5)} className="flex-1 py-1 px-2 bg-theme-secondary/20 hover:bg-theme-secondary/30 rounded text-xs">5 min</button>
+                    <button onClick={() => startQuickTimer(10)} className="flex-1 py-1 px-2 bg-theme-secondary/20 hover:bg-theme-secondary/30 rounded text-xs">10 min</button>
+                    <button onClick={() => startQuickTimer(15)} className="flex-1 py-1 px-2 bg-theme-secondary/20 hover:bg-theme-secondary/30 rounded text-xs">15 min</button>
+                    <button onClick={() => startQuickTimer(30)} className="flex-1 py-1 px-2 bg-theme-secondary/20 hover:bg-theme-secondary/30 rounded text-xs">30 min</button>
+                  </div>
+                  <button
+                    onClick={() => setShowCustomTimer(false)}
+                    className="w-full py-1 px-2 bg-theme-secondary/10 hover:bg-theme-secondary/20 rounded text-xs text-theme-secondary"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : timerActive ? (
                 <div className="text-center">
                   <div className="text-5xl font-bold font-mono text-[var(--accent-color)] mb-3 tracking-wider">
                     {formatTime(timeRemaining)}
                   </div>
                   <div className="w-full bg-theme-secondary/20 rounded-full h-2 mb-4 overflow-hidden">
-                    <div 
+                    <div
                       className="h-full bg-[var(--accent-color)] transition-all duration-300"
                       style={{width: totalTime > 0 ? `${(timeRemaining / totalTime) * 100}%` : '0%'}}
                     />
                   </div>
                   <div className="flex gap-2">
                     <button
-                      onClick={() => setTimerActive(false)}
+                      onClick={() => setTimerActive(!timerActive)}
                       className="flex-1 py-2 px-3 bg-theme-secondary hover:bg-theme-secondary/80 text-theme-primary rounded-lg flex items-center justify-center gap-2 text-sm font-medium"
                     >
-                      <Pause className="w-4 h-4" /> Pause
+                      {timerActive ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                      {timerActive ? 'Pause' : 'Resume'}
                     </button>
                     <button
                       onClick={() => { setTimerActive(false); setTimeRemaining(0); setTotalTime(0); }}
@@ -332,12 +405,20 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
                   </div>
                 </div>
               ) : (
-                <button
-                  onClick={startTimer}
-                  className="w-full py-2 px-4 bg-[var(--accent-color)] hover:bg-[var(--accent-color)]/90 text-white rounded-lg flex items-center justify-center gap-2 font-medium"
-                >
-                  <Play className="w-4 h-4" /> Start Timer
-                </button>
+                <div className="space-y-2">
+                  <button
+                    onClick={() => startTimer(false)}
+                    className="w-full py-2 px-4 bg-[var(--accent-color)] hover:bg-[var(--accent-color)]/90 text-white rounded-lg flex items-center justify-center gap-2 font-medium"
+                  >
+                    <Play className="w-4 h-4" /> Start Recipe Timer
+                  </button>
+                  <button
+                    onClick={() => setShowCustomTimer(true)}
+                    className="w-full py-2 px-4 bg-theme-secondary/20 hover:bg-theme-secondary/30 border border-[var(--accent-color)]/20 rounded-lg flex items-center justify-center gap-2 text-sm font-medium text-theme-primary"
+                  >
+                    ⏱️ Custom Timer
+                  </button>
+                </div>
               )}
             </div>
           )}
@@ -433,7 +514,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
           {nutritionalInfo && (
             <div className="mb-4">
               <h4 className="text-xs font-bold text-[var(--accent-color)] uppercase mb-2">Nutrition (per serving)</h4>
-              <div className="grid grid-cols-2 gap-2 text-sm">
+              <div className="grid grid-cols-2 gap-2 text-sm mb-3">
                 <div className="bg-theme-secondary/20 p-2 rounded">
                   <span className="font-medium text-theme-primary">{nutritionalInfo.calories}</span>
                   <span className="text-theme-secondary opacity-70 ml-1">calories</span>
@@ -450,8 +531,38 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
                   <span className="font-medium text-theme-primary">{nutritionalInfo.fat}g</span>
                   <span className="text-theme-secondary opacity-70 ml-1">fat</span>
                 </div>
+                {nutritionalInfo.fiber > 0 && (
+                  <div className="bg-theme-secondary/20 p-2 rounded">
+                    <span className="font-medium text-theme-primary">{nutritionalInfo.fiber}g</span>
+                    <span className="text-theme-secondary opacity-70 ml-1">fiber</span>
+                  </div>
+                )}
               </div>
-              <p className="text-xs text-theme-secondary opacity-50 mt-2">
+
+              {/* Dietary Goal Compatibility */}
+              <div className="mb-2">
+                <h5 className="text-xs font-semibold text-theme-primary mb-1">Dietary Goals:</h5>
+                <div className="flex flex-wrap gap-1">
+                  {nutritionalInfo.dietaryGoals.keto && (
+                    <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">Keto</span>
+                  )}
+                  {nutritionalInfo.dietaryGoals.lowCarb && (
+                    <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">Low Carb</span>
+                  )}
+                  {nutritionalInfo.dietaryGoals.highProtein && (
+                    <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-full">High Protein</span>
+                  )}
+                  {nutritionalInfo.dietaryGoals.lowFat && (
+                    <span className="px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded-full">Low Fat</span>
+                  )}
+                  {!nutritionalInfo.dietaryGoals.keto && !nutritionalInfo.dietaryGoals.lowCarb &&
+                   !nutritionalInfo.dietaryGoals.highProtein && !nutritionalInfo.dietaryGoals.lowFat && (
+                    <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">Balanced</span>
+                  )}
+                </div>
+              </div>
+
+              <p className="text-xs text-theme-secondary opacity-50">
                 * Estimates based on common ingredients. Actual values may vary.
               </p>
             </div>

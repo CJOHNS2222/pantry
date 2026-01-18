@@ -67,7 +67,8 @@ export const Settings: React.FC<SettingsProps> = ({
   const [pendingNotifications, setPendingNotifications] = useState(settings.notifications);
   const [notifChanged, setNotifChanged] = useState(false);
   const [showAvatarSelection, setShowAvatarSelection] = useState(false);
-  const [userProfile, setUserProfile] = useState(user?.profile || {});
+  const [householdMembers, setHouseholdMembers] = useState(user?.householdMembers || []);
+  const [showHouseholdManager, setShowHouseholdManager] = useState(false);
   const [profileChanged, setProfileChanged] = useState(false);
   const [showCategoryManager, setShowCategoryManager] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
@@ -460,6 +461,172 @@ export const Settings: React.FC<SettingsProps> = ({
           >
             Logout
           </button>
+        </div>
+      )}
+
+      {/* Household Members Section */}
+      {user && (
+        <div className="bg-theme-secondary rounded-xl border border-theme p-4">
+          <h3 className="font-semibold mb-3 text-theme-primary">Household Members</h3>
+          <div className="space-y-3">
+            <p className="text-sm text-theme-secondary">
+              Manage dietary preferences and restrictions for each household member to get personalized recipe suggestions.
+            </p>
+            <button
+              onClick={() => setShowHouseholdManager(true)}
+              className="bg-[var(--accent-color)] text-white px-4 py-2 rounded font-medium text-sm hover:bg-opacity-90 transition-colors"
+            >
+              Manage Household
+            </button>
+            <div className="text-xs text-theme-secondary">
+              {householdMembers.length} household member{householdMembers.length === 1 ? '' : 's'}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Household Members Modal */}
+      {showHouseholdManager && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-theme-primary rounded-xl border border-theme p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-theme-primary">Household Members</h3>
+              <button
+                onClick={() => setShowHouseholdManager(false)}
+                className="text-theme-secondary hover:text-theme-primary"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {householdMembers.map((member, index) => (
+                <div key={index} className="border border-theme-secondary/20 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-medium text-theme-primary">{member.name}</h4>
+                    <button
+                      onClick={() => {
+                        const updated = householdMembers.filter((_, i) => i !== index);
+                        setHouseholdMembers(updated);
+                      }}
+                      className="text-red-500 hover:text-red-700 text-sm"
+                    >
+                      Remove
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <label className="block text-xs text-theme-secondary mb-1">Dietary Restrictions</label>
+                      <input
+                        type="text"
+                        value={member.dietaryRestrictions?.join(', ') || ''}
+                        onChange={(e) => {
+                          const updated = [...householdMembers];
+                          updated[index].dietaryRestrictions = e.target.value ? e.target.value.split(',').map(s => s.trim()) : [];
+                          setHouseholdMembers(updated);
+                        }}
+                        placeholder="vegetarian, gluten-free"
+                        className="w-full p-2 border rounded text-sm text-black bg-white"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs text-theme-secondary mb-1">Allergies</label>
+                      <input
+                        type="text"
+                        value={member.allergies?.join(', ') || ''}
+                        onChange={(e) => {
+                          const updated = [...householdMembers];
+                          updated[index].allergies = e.target.value ? e.target.value.split(',').map(s => s.trim()) : [];
+                          setHouseholdMembers(updated);
+                        }}
+                        placeholder="nuts, dairy"
+                        className="w-full p-2 border rounded text-sm text-black bg-white"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs text-theme-secondary mb-1">Diet Goal</label>
+                      <select
+                        value={member.dietGoal || ''}
+                        onChange={(e) => {
+                          const updated = [...householdMembers];
+                          updated[index].dietGoal = e.target.value as any;
+                          setHouseholdMembers(updated);
+                        }}
+                        className="w-full p-2 border rounded text-sm text-black bg-white"
+                      >
+                        <option value="">No specific goal</option>
+                        <option value="lose-weight">Lose Weight</option>
+                        <option value="maintain-weight">Maintain Weight</option>
+                        <option value="gain-weight">Gain Weight</option>
+                        <option value="build-muscle">Build Muscle</option>
+                        <option value="improve-health">Improve Health</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs text-theme-secondary mb-1">Favorite Cuisines</label>
+                      <input
+                        type="text"
+                        value={member.favoriteCuisines?.join(', ') || ''}
+                        onChange={(e) => {
+                          const updated = [...householdMembers];
+                          updated[index].favoriteCuisines = e.target.value ? e.target.value.split(',').map(s => s.trim()) : [];
+                          setHouseholdMembers(updated);
+                        }}
+                        placeholder="italian, mexican, thai"
+                        className="w-full p-2 border rounded text-sm text-black bg-white"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              <button
+                onClick={() => {
+                  setHouseholdMembers([...householdMembers, {
+                    name: `Member ${householdMembers.length + 1}`,
+                    dietaryRestrictions: [],
+                    allergies: [],
+                    dietGoal: undefined,
+                    favoriteCuisines: []
+                  }]);
+                }}
+                className="w-full bg-theme-secondary/20 hover:bg-theme-secondary/30 border border-[var(--accent-color)]/20 rounded-lg py-2 text-sm font-medium text-theme-primary"
+              >
+                + Add Household Member
+              </button>
+
+              <div className="flex gap-2 pt-4">
+                <button
+                  onClick={async () => {
+                    if (!user) return;
+                    try {
+                      await updateDoc(doc(db, 'users', user.id), {
+                        householdMembers: householdMembers
+                      });
+                      setShowHouseholdManager(false);
+                      alert('Household members updated successfully!');
+                    } catch (error) {
+                      console.error('Error updating household:', error);
+                      alert('Failed to update household members. Please try again.');
+                    }
+                  }}
+                  className="flex-1 bg-green-500 text-white px-4 py-2 rounded font-medium hover:bg-green-600"
+                >
+                  Save Changes
+                </button>
+                <button
+                  onClick={() => setShowHouseholdManager(false)}
+                  className="flex-1 bg-theme-secondary text-theme-primary px-4 py-2 rounded font-medium hover:bg-theme-secondary/80"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
