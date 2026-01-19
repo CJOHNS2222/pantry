@@ -384,7 +384,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
     if (selectedItems.size === 0) return;
     
     const itemsToMove = Array.from(selectedItems).map((idx: number) => inventory[idx].item);
-    addToShoppingList(itemsToMove);
+    addToShoppingList(itemsToMove, 'pantry scanner');
     setInventory(prev => prev.filter((_, idx) => !selectedItems.has(idx)));
     setSelectedItems(new Set());
     setBulkMode(false);
@@ -931,7 +931,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                   <p className="text-xs text-blue-600">{suggestion.reason}</p>
                 </div>
                 <button
-                  onClick={() => addToShoppingList([suggestion.item])}
+                  onClick={() => addToShoppingList([suggestion.item], 'scanner suggestion')}
                   className="ml-3 px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors"
                 >
                   Add to List

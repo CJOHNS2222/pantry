@@ -26,5 +26,9 @@ if (Capacitor.getPlatform() === 'web') {
   setPersistence(auth, indexedDBLocalPersistence);
 }
 
-// Initialize analytics for all platforms (web and mobile)
-export const analytics = getAnalytics(app);
+// Initialize analytics only if measurementId is configured
+let analytics;
+if (config.measurementId) {
+  analytics = getAnalytics(app);
+}
+export { analytics };

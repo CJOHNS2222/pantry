@@ -7,21 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.1.8] - 2026-01-18
 
-### Features
-- **Enhanced Cooking Timer**: Complete timer system overhaul with custom time input, quick presets (5/10/15/30 min), pause/resume functionality, and recipe-based timers
-- **Advanced Nutrition Tracking**: Comprehensive nutritional analysis with calories, macros (protein/carbs/fat), fiber, and sodium tracking for all recipes
-- **Dietary Goal Compatibility**: Smart recipe filtering showing compatibility with keto, low-carb, high-protein, and low-fat diets
-- **Household Member Preferences**: Individual dietary profiles for family members including restrictions, allergies, diet goals, and favorite cuisines
-- **Smart Meal Prep Planning**: AI-powered meal prep suggestions that analyze recipe combinations for shared ingredients, minimizing waste and cooking time
-- **Recipe Voting System**: Family meal planning with collaborative recipe selection and voting capabilities
+### Fixed
+- **Critical Runtime Errors**: Resolved multiple TypeScript errors causing app crashes including `userProfile` undefined errors, missing `selectedDayIndex` state, and sodium property access issues
+- **Settings Component**: Added proper null checking and optional chaining for user profile data to prevent crashes
+- **MealPlanner Component**: Fixed missing state variable causing day selection modal errors
+- **RecipeModal**: Fixed nutrition calculation errors with proper type handling
+- **Bundle Optimization**: Resolved Vite dynamic import warning by consolidating householdService imports
+
+### Enhanced
+- **Saved Recipes UI**: Added beautiful thumbnail images to saved recipes tab for improved visual appeal
+- **Recipe Cards**: Enhanced compact recipe display with 16:9 aspect ratio images and hover effects
+- **Error Handling**: Improved image loading with fallback placeholders for missing recipe images
 
 ### Technical
-- **Recipe Database**: Populated with 430 high-quality recipes from TheMealDB and Spoonacular APIs
-- **Household Management**: Added HouseholdMember interface and Firebase integration for multi-user preferences
-- **Meal Prep Intelligence**: Implemented ingredient overlap algorithms and efficiency scoring for batch cooking optimization
-- **Nutrition Engine**: Enhanced recipe analysis with 20+ common ingredients and dietary compatibility detection
-
-## [1.1.7] - 2026-01-08
+- **Type Safety**: Added comprehensive optional chaining throughout Settings component
+- **Import Optimization**: Converted dynamic imports to static imports for better bundle splitting
+- **Build Process**: Cleaned up all TypeScript compilation errors and warnings
 
 ### Fixed
 - **Capacitor App Listener**: Fixed runtime error "removeListener is not a function" by implementing proper async listener cleanup with useRef

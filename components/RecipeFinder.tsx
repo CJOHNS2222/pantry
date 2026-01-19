@@ -1026,15 +1026,41 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
 
             if (isCompact) {
                 return (
-                    <div key={`compact-${titleKey}`} className="bg-theme-secondary rounded-lg shadow-md border border-theme overflow-hidden group hover:shadow-lg transition-all cursor-pointer p-3" onClick={() => openRecipeModal(recipe, isSavedView)}>
-                        <h4 className="font-bold text-sm mb-2 line-clamp-2">{recipe.title}</h4>
-                        <div className="flex items-center gap-2 text-xs opacity-70">
-                            <Clock className="w-3 h-3" /> {recipe.cookTime}
-                            {ratingInfo && (
-                                <>
-                                    <Star className="w-3 h-3 text-yellow-400" /> {ratingInfo.avg}
-                                </>
+                    <div key={`compact-${titleKey}`} className="bg-theme-secondary rounded-lg shadow-md border border-theme overflow-hidden group hover:shadow-lg transition-all cursor-pointer" onClick={() => openRecipeModal(recipe, isSavedView)}>
+                        {/* Recipe Image */}
+                        <div className="aspect-video bg-theme-primary/20 relative overflow-hidden">
+                            {recipe.image ? (
+                                <img
+                                    src={recipe.image}
+                                    alt={recipe.title}
+                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                    loading="lazy"
+                                    onError={(e) => {
+                                        const target = e.target as HTMLImageElement;
+                                        target.style.display = 'none';
+                                        const parent = target.parentElement;
+                                        if (parent) {
+                                            parent.innerHTML = '<div class="w-full h-full bg-theme-primary/10 flex items-center justify-center"><div class="text-theme-secondary/50 text-xs">No Image</div></div>';
+                                        }
+                                    }}
+                                />
+                            ) : (
+                                <div className="w-full h-full bg-theme-primary/10 flex items-center justify-center">
+                                    <div className="text-theme-secondary/50 text-xs">No Image</div>
+                                </div>
                             )}
+                        </div>
+                        
+                        <div className="p-3">
+                            <h4 className="font-bold text-sm mb-2 line-clamp-2">{recipe.title}</h4>
+                            <div className="flex items-center gap-2 text-xs opacity-70">
+                                <Clock className="w-3 h-3" /> {recipe.cookTime}
+                                {ratingInfo && (
+                                    <>
+                                        <Star className="w-3 h-3 text-yellow-400" /> {ratingInfo.avg}
+                                    </>
+                                )}
+                            </div>
                         </div>
                     </div>
                 );

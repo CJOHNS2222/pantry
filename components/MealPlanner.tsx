@@ -3,6 +3,8 @@ import { CalendarClock, Plus, Move, AlertCircle, ShoppingBasket, Trash2, HelpCir
 import { DayPlan, MealPlanItem, PantryItem, StructuredRecipe, User, SavedRecipe } from '../types';
 import RecipeModal from './RecipeModal';
 import { MealPrepPlanner } from './MealPrepPlanner';
+import { PremiumFeature } from './PremiumFeature';
+import { GroceryCostEstimator } from './GroceryCostEstimator';
 import { Tab } from '../types/app';
 import { searchRecipes } from '../services/geminiService';
 import { getSavedRecipes } from '../services/recipeService';
@@ -314,6 +316,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
   const [modalRecipe, setModalRecipe] = useState<StructuredRecipe | null>(null);
   const [modalContext, setModalContext] = useState<'search' | 'scheduled'>('search');
   const [showHelpTooltip, setShowHelpTooltip] = useState(false);
+  const [selectedDayIndex, setSelectedDayIndex] = useState<number | null>(null);
 
   // Load saved recipes for meal prep planning
   useEffect(() => {
@@ -337,12 +340,19 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
 
   // Function to clean ingredient names by removing descriptive words
   const getMissingIngredients = () => {
-    const allNeededIngredients = mealPlan.flatMap(day => 
-      [...(day.breakfast || []), ...(day.lunch || []), ...(day.dinner || [])].flatMap(meal => meal.recipe.ingredients)
+    const missingWithRecipes = mealPlan.flatMap(day => 
+      [...(day.breakfast || []), ...(day.lunch || []), ...(day.dinner || [])].flatMap(meal => 
+        meal.recipe.ingredients.map(ingredient => ({
+          ingredient,
+          recipeName: meal.recipe.title,
+          recipeId: meal.recipe.id
+        }))
+      )
     );
-    // Filter out staple items
-    const missing = allNeededIngredients.filter(needed => {
-      const neededLower = needed.toLowerCase();
+    
+    // Filter out staple items and duplicates
+    const missing = missingWithRecipes.filter(item => {
+      const neededLower = item.ingredient.toLowerCase();
       if (STAPLES.some(staple => neededLower.includes(staple))) return false;
       return !inventory.some(pantryItem => 
         neededLower.includes(pantryItem.item.toLowerCase()) || 
@@ -350,8 +360,24 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
       );
     });
 
-    // Clean ingredient names before returning
-    return [...new Set(missing.map(ingredient => parseIngredientForShoppingList(ingredient).itemName))];
+    // Group by ingredient and collect recipe info
+    const grouped = missing.reduce((acc, item) => {
+      const parsed = parseIngredientForShoppingList(item.ingredient);
+      const key = parsed.itemName;
+      if (!acc[key]) {
+        acc[key] = {
+          ingredient: parsed.itemName,
+          quantity: parsed.quantity,
+          recipes: []
+        };
+      }
+      if (!acc[key].recipes.some(r => r.id === item.recipeId)) {
+        acc[key].recipes.push({ name: item.recipeName, id: item.recipeId });
+      }
+      return acc;
+    }, {} as Record<string, { ingredient: string; quantity: string; recipes: { name: string; id: string }[] }>);
+
+    return Object.values(grouped);
   };
 
   useEffect(() => {
@@ -549,8 +575,19 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
   const handleAddMissingToShopping = () => {
     const missing = getMissingIngredients();
     if (missing.length > 0) {
-        addToShoppingList(missing);
-        alert(`Added ${missing.length} items to your shopping list.`);
+      const itemsToAdd = missing.flatMap((item: { ingredient: string; quantity: string; recipes: { name: string; id: string }[] }) => 
+        item.recipes.map(recipe => ({
+          ingredient: item.quantity ? `${item.quantity} ${item.ingredient}` : item.ingredient,
+          source: `recipe: need ${item.quantity || 'some'} for "${recipe.name}"`
+        }))
+      );
+      
+      // Add each item with its specific recipe source
+      itemsToAdd.forEach(item => {
+        addToShoppingList([item.ingredient], item.source);
+      });
+      
+      alert(`Added ${missing.length} items to your shopping list.`);
     }
   };
 

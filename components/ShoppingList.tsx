@@ -265,7 +265,10 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ items, setItems, onM
                   <div className="text-xs text-theme-secondary opacity-60 mt-1">
                     {item.source === 'suggested' && '💡 Suggested item'}
                     {item.source === 'manual' && '✏️ Manually added'}
-                    {item.source?.startsWith('recipe:') && `🍳 ${item.source}`}
+                    {item.source === 'meal planner' && '📅 From meal planner'}
+                    {item.source === 'pantry scanner' && '📷 From pantry scanner'}
+                    {item.source === 'scanner suggestion' && '🤖 Scanner suggestion'}
+                    {item.source?.startsWith('recipe:') && `🍳 ${item.source.substring(8)}`}
                   </div>
                 )}
                 {item.quantity && item.quantity !== '1' && (

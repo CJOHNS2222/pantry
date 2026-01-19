@@ -17,6 +17,7 @@ import { useToasts } from './hooks/useToasts';
 import { useDataManagement } from './hooks/useDataManagement';
 import AnalyticsService from './services/analyticsService';
 import { isHouseholdMember, inferCategoryFromItemName, inferStorageLocationFromItemName, parseIngredientForShoppingList, getItemImage, fetchExternalItemImage } from './utils/appUtils';
+import { getOrCreateHousehold } from './services/householdService';
 import { GlobalUpdatePrompt } from './components/GlobalUpdatePrompt';
 import { App as CapacitorApp, BackButtonListenerEvent } from '@capacitor/app';
 
@@ -43,7 +44,7 @@ const App: React.FC = () => {
   const { toasts, setToasts, addToast } = useToasts();
 
   // Function to add items to shopping list
-  const addToShoppingList = (items: string[]) => {
+  const addToShoppingList = (items: string[], source: string = 'manual') => {
     const newItems = items.map(i => {
       const parsed = parseIngredientForShoppingList(i);
       return { 
@@ -51,7 +52,8 @@ const App: React.FC = () => {
         item: parsed.itemName, 
         quantity: parsed.quantity,
         category: inferCategoryFromItemName(parsed.itemName), 
-        checked: false 
+        checked: false,
+        source: source
       };
     });
     setShoppingList(prev => [...prev, ...newItems]);
@@ -81,6 +83,7 @@ const App: React.FC = () => {
     handleSaveRecipe,
     handleDeleteRecipe,
     handleRateRecipe,
+    handleMarkAsMade,
     // Usage limit states
     recipeSaveLimitExceeded,
     mealPlanLimitExceeded,
@@ -127,8 +130,6 @@ const App: React.FC = () => {
       has_seen_tutorial: loggedInUser.hasSeenTutorial
     });
 
-    // Check if user belongs to a household
-    const { getOrCreateHousehold } = await import('./services/householdService');
     const userHousehold = await getOrCreateHousehold(loggedInUser);
     if (userHousehold) {
       setHousehold(userHousehold);
@@ -146,7 +147,6 @@ const App: React.FC = () => {
     if (user?.id) {
       const loadHousehold = async () => {
         try {
-          const { getOrCreateHousehold } = await import('./services/householdService');
           const userHousehold = await getOrCreateHousehold(user);
           if (userHousehold) {
             setHousehold(userHousehold);
@@ -420,8 +420,30 @@ const App: React.FC = () => {
                 }
               }
               
-              let addQty = typeof i.quantity === 'number' ? i.quantity : 1;
+              let addQty = i.purchasedQuantity ? i.purchasedQuantity.amount : (typeof i.quantity === 'number' ? i.quantity : 1);
               if (addQty < 1) addQty = 1;
+              
+              // Parse recipe reservations from source
+              let reservations: { recipeId: string; recipeName: string; quantity: number; unit: string }[] = [];
+              if (i.source?.startsWith('recipe: need ')) {
+                // Format: "recipe: need 1.5 oz for "Recipe Name""
+                const match = i.source.match(/recipe: need (.+?) for "(.+?)"/);
+                if (match) {
+                  const qtyStr = match[1];
+                  const recipeName = match[2];
+                  const qtyMatch = qtyStr.match(/(\d+(?:\.\d+)?)\s*(.+)/);
+                  if (qtyMatch) {
+                    const quantity = parseFloat(qtyMatch[1]);
+                    const unit = qtyMatch[2];
+                    reservations.push({
+                      recipeId: `recipe_${recipeName.replace(/\s+/g, '_').toLowerCase()}`,
+                      recipeName,
+                      quantity,
+                      unit
+                    });
+                  }
+                }
+              }
               
               return {
                 id: Math.random().toString(36).substr(2,9),
@@ -430,7 +452,8 @@ const App: React.FC = () => {
                 quantity_estimate: Math.abs(addQty).toString(),
                 storageLocation: inferStorageLocationFromItemName(i.item),
                 image,
-                originalQuantity: typeof i.quantity === 'string' ? i.quantity : undefined
+                originalQuantity: i.purchasedQuantity ? `${i.purchasedQuantity.amount} ${i.purchasedQuantity.unit}` : (typeof i.quantity === 'string' ? i.quantity : undefined),
+                reservations
               };
             }));
             
@@ -439,6 +462,13 @@ const App: React.FC = () => {
               processedItems.forEach(i => {
                 const idx = updated.findIndex(p => p.item.toLowerCase() === i.item.toLowerCase());
                 if (idx !== -1) {
+                  // Merge reservations
+                  const existing = updated[idx];
+                  const newReservations = [...(existing.reservations || []), ...(i.reservations || [])];
+                  updated[idx] = {
+                    ...existing,
+                    reservations: newReservations.length > 0 ? newReservations : undefined
+                  };
                   const prevQty = parseInt(updated[idx].quantity_estimate) || 1;
                   updated[idx].quantity_estimate = (prevQty + parseInt(i.quantity_estimate)).toString();
                 } else {
@@ -450,6 +480,10 @@ const App: React.FC = () => {
                 const key = p.item.toLowerCase();
                 if (merged[key]) {
                   merged[key].quantity_estimate = (parseInt(merged[key].quantity_estimate) + parseInt(p.quantity_estimate)).toString();
+                  // Merge reservations
+                  if (p.reservations) {
+                    merged[key].reservations = [...(merged[key].reservations || []), ...p.reservations];
+                  }
                 } else {
                   merged[key] = { ...p };
                 }
@@ -458,6 +492,7 @@ const App: React.FC = () => {
             });
           }}
           onAddToShoppingList={addToShoppingList}
+          handleMarkAsMade={handleMarkAsMade}
           consumptionSuggestions={consumptionSuggestions}
           expirationAlerts={expirationAlerts}
           recipeSuggestions={recipeSuggestions}

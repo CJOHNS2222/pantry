@@ -48,6 +48,7 @@ interface MainContentProps {
   onRateRecipe: (rating: any) => void;
   onMoveToPantry: (items: ShoppingItem[]) => void;
   onAddToShoppingList: (items: string[]) => void;
+  handleMarkAsMade: (recipe: StructuredRecipe) => void;
   addToast: (message: string, type?: 'error' | 'info', ttl?: number, actionLabel?: string, action?: () => void) => void;
   consumptionSuggestions: any[];
   expirationAlerts: any[];
@@ -90,6 +91,7 @@ export const MainContent: React.FC<MainContentProps> = ({
   onRateRecipe,
   onMoveToPantry,
   onAddToShoppingList,
+  handleMarkAsMade,
   addToast,
   consumptionSuggestions,
   expirationAlerts,
@@ -107,53 +109,6 @@ export const MainContent: React.FC<MainContentProps> = ({
   checkRecipeSaveLimit,
   checkMealPlanLimit,
 }) => {
-  // Handler for marking a recipe as made
-  const handleMarkAsMade = (recipe: StructuredRecipe, recipeInventory?: PantryItem[]) => {
-    const pantryInventory = recipeInventory || inventory;
-    const ingredientsNeeded = recipe.ingredients || [];
-    const updatedInventory = [...pantryInventory];
-
-    ingredientsNeeded.forEach(ingredientText => {
-      const parsedIngredient = parseIngredientForShoppingList(ingredientText);
-      const ingredientQuantity = parseQuantity(parsedIngredient.quantity);
-
-      if (!ingredientQuantity) return; // Skip if we can't parse the quantity
-
-      // Find matching inventory item
-      const itemIndex = updatedInventory.findIndex(item => {
-        const itemName = item.item.toLowerCase();
-        const ingredientName = parsedIngredient.itemName.toLowerCase();
-        return itemName.includes(ingredientName) || ingredientName.includes(itemName.split(' ')[0]);
-      });
-
-      if (itemIndex >= 0) {
-        const item = updatedInventory[itemIndex];
-
-        // Use new quantity system if available
-        if (item.quantity) {
-          const remaining = subtractQuantities(item.quantity, ingredientQuantity);
-          if (remaining) {
-            // Update quantity
-            updatedInventory[itemIndex] = {
-              ...item,
-              quantity: remaining,
-              consumptionHistory: [...(item.consumptionHistory || []), new Date().toISOString()]
-            };
-          } else {
-            // Remove item entirely if nothing left
-            updatedInventory.splice(itemIndex, 1);
-          }
-        } else {
-          // Fallback to old system - remove item
-          updatedInventory.splice(itemIndex, 1);
-        }
-      }
-    });
-
-    setInventory(updatedInventory);
-    addToast(`Recipe marked as made! Updated pantry quantities.`);
-  };
-
   // Helper function to match ingredients to inventory
   const inventoryNeeded = (ingredients: string[], pantryInventory: PantryItem[]): PantryItem[] => {
     const toRemove: PantryItem[] = [];

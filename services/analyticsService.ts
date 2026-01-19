@@ -335,7 +335,9 @@ class AnalyticsService {
   // Generic event logging
   static logEvent(eventName: string, parameters?: Record<string, any>) {
     try {
-      logEvent(analytics, eventName, parameters);
+      if (analytics) {
+        logEvent(analytics, eventName, parameters);
+      }
     } catch (error) {
       console.warn('Analytics event failed:', error);
     }

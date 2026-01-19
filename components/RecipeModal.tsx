@@ -262,7 +262,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
         estimates.protein += nutrition.protein || 0;
         estimates.carbs += nutrition.carbs || 0;
         estimates.fat += nutrition.fat || 0;
-        estimates.sodium += nutrition.sodium || 0;
+        estimates.sodium += (nutrition as any).sodium || 0;
       }
     });
 

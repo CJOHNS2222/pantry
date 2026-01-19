@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { doc, onSnapshot, collection, addDoc, getDocs, setDoc, serverTimestamp, query, where, orderBy, Timestamp, writeBatch, deleteDoc } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
-import { User, PantryItem, DayPlan, Household, ShoppingItem, SavedRecipe, RecipeRating, RecipeSearchResult, CustomCategory, RecipeSuggestion, MealPlanItem } from '../types';
-import { next7DateKeys, isHouseholdMember, generateConsumptionSuggestions, generateExpirationAlerts, generateRecipeSuggestions } from '../utils/appUtils';
+import { User, PantryItem, DayPlan, Household, ShoppingItem, SavedRecipe, RecipeRating, RecipeSearchResult, CustomCategory, RecipeSuggestion, MealPlanItem, StructuredRecipe } from '../types';
+import { next7DateKeys, isHouseholdMember, generateConsumptionSuggestions, generateExpirationAlerts, generateRecipeSuggestions, parseIngredientForShoppingList } from '../utils/appUtils';
 import { UsageService } from '../services/usageService';
 import AnalyticsService from '../services/analyticsService';
 
@@ -862,7 +862,7 @@ export function useDataManagement(user: User | null, addToast: (message: string,
         // Find items to add/update (in current state but not in DB, or different)
         const toSave = shoppingList.filter(current => {
           const existing = existingItems.find(item => item.id === current.id);
-          return !existing || existing.item !== current.item || existing.category !== current.category || existing.checked !== current.checked || existing.quantity !== current.quantity;
+          return !existing || existing.item !== current.item || existing.category !== current.category || existing.checked !== current.checked || existing.quantity !== current.quantity || existing.source !== current.source || JSON.stringify(existing.purchasedQuantity) !== JSON.stringify(current.purchasedQuantity);
         });
 
         console.log('Shopping list sync - collection:', collectionPath, 'toDelete:', toDelete.length, 'toSave:', toSave.length);
@@ -879,6 +879,8 @@ export function useDataManagement(user: User | null, addToast: (message: string,
             category: item.category,
             checked: item.checked,
             quantity: item.quantity,
+            source: item.source,
+            purchasedQuantity: item.purchasedQuantity,
             lastModifiedAt: serverTimestamp()
           }).catch(err => ({ err, path: `${collectionPath}/${item.id}` }))
         );
@@ -1296,6 +1298,66 @@ export function useDataManagement(user: User | null, addToast: (message: string,
     }
   };
 
+  const handleMarkAsMade = async (recipe: StructuredRecipe) => {
+    try {
+      // Parse recipe ingredients and subtract from inventory
+      const ingredientsToConsume = recipe.ingredients.map(ing => {
+        const parsed = parseIngredientForShoppingList(ing);
+        return {
+          item: parsed.itemName,
+          quantity: parsed.quantity,
+          unit: 'count'
+        };
+      });
+
+      // Update inventory by subtracting consumed ingredients and clearing reservations
+      setInventory(prev => {
+        return prev.map(item => {
+          const consumedIngredient = ingredientsToConsume.find(ing => 
+            ing.item.toLowerCase() === item.item.toLowerCase()
+          );
+          
+          if (consumedIngredient) {
+            // Clear reservations for this recipe
+            const updatedReservations = item.reservations?.filter(res => 
+              res.recipeName !== recipe.title
+            ) || [];
+            
+            // Subtract consumed quantity
+            const currentAmount = item.quantity ? item.quantity.amount : parseInt(item.quantity_estimate) || 1;
+            const consumedAmount = parseFloat(consumedIngredient.quantity) || 0;
+            const newAmount = Math.max(0, currentAmount - consumedAmount);
+            
+            if (item.quantity) {
+              return {
+                ...item,
+                quantity: {
+                  ...item.quantity,
+                  amount: newAmount
+                },
+                reservations: updatedReservations.length > 0 ? updatedReservations : undefined
+              };
+            } else {
+              return {
+                ...item,
+                quantity_estimate: newAmount.toString(),
+                reservations: updatedReservations.length > 0 ? updatedReservations : undefined
+              };
+            }
+          }
+          
+          return item;
+        });
+      });
+
+      addToast(`Marked "${recipe.title}" as made! Ingredients have been subtracted from your pantry.`);
+      
+    } catch (error) {
+      console.error('Error marking recipe as made:', error);
+      addToast('Failed to mark recipe as made. Please try again.', 'error');
+    }
+  };
+
   return {
     inventory,
     setInventory,
@@ -1319,6 +1381,7 @@ export function useDataManagement(user: User | null, addToast: (message: string,
     handleSaveRecipe,
     handleDeleteRecipe,
     handleRateRecipe,
+    handleMarkAsMade,
     // Usage limit states
     recipeSaveLimitExceeded,
     mealPlanLimitExceeded,

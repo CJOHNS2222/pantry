@@ -21,6 +21,14 @@ export interface PantryItem {
 
   // Visual quantity estimation
   visualLevel?: 'empty' | 'quarter' | 'half' | 'threeQuarter' | 'full';
+
+  // Recipe reservations
+  reservations?: {
+    recipeId: string;
+    recipeName: string;
+    quantity: number;
+    unit: string;
+  }[];
 }
 
 export interface ShoppingItem {

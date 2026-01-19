@@ -1468,21 +1468,35 @@ export function subtractQuantities(total: ParsedQuantity, used: ParsedQuantity):
 
 /**
  * Format quantity for display, handling both old and new quantity systems
+ * Shows available quantity (total - reserved)
  */
 export function formatItemQuantity(item: PantryItem): string {
-  if (item.quantity) {
-    let amount = item.quantity.amount;
-    const unit = item.quantity.unit;
+  let totalAmount = item.quantity ? item.quantity.amount : parseInt(item.quantity_estimate) || 1;
+  const unit = item.quantity?.unit || 'count';
 
-    // Format common fractions nicely
-    let displayAmount: string;
-    if (amount === 0.25) displayAmount = '¼';
-    else if (amount === 0.5) displayAmount = '½';
-    else if (amount === 0.75) displayAmount = '¾';
-    else displayAmount = amount.toString();
+  // Calculate reserved amount
+  const reservedAmount = item.reservations?.reduce((sum, res) => sum + res.quantity, 0) || 0;
+  const availableAmount = Math.max(0, totalAmount - reservedAmount);
 
-    return `${displayAmount} ${unit}`;
+  // Format common fractions nicely
+  let displayAmount: string;
+  if (availableAmount === 0.25) displayAmount = '¼';
+  else if (availableAmount === 0.5) displayAmount = '½';
+  else if (availableAmount === 0.75) displayAmount = '¾';
+  else displayAmount = availableAmount.toString();
+
+  const quantityText = `${displayAmount} ${unit}`;
+
+  // Add reservation info if there are reservations
+  if (reservedAmount > 0) {
+    let reservedDisplay: string;
+    if (reservedAmount === 0.25) reservedDisplay = '¼';
+    else if (reservedAmount === 0.5) reservedDisplay = '½';
+    else if (reservedAmount === 0.75) reservedDisplay = '¾';
+    else reservedDisplay = reservedAmount.toString();
+
+    return `${quantityText} (${reservedDisplay} reserved)`;
   }
-  // Fallback to old system
-  return item.quantity_estimate || '1';
+
+  return quantityText;
 }

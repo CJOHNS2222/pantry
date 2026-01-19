@@ -72,6 +72,7 @@ export const Settings: React.FC<SettingsProps> = ({
   const [profileChanged, setProfileChanged] = useState(false);
   const [showCategoryManager, setShowCategoryManager] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
+  const [userProfile, setUserProfile] = useState<UserProfile | undefined>(user?.profile);
 
   // Update userProfile when user data loads
   useEffect(() => {
@@ -131,7 +132,7 @@ export const Settings: React.FC<SettingsProps> = ({
   };
 
   const saveProfile = async () => {
-    if (!user) return;
+    if (!user || !userProfile) return;
     try {
       await updateDoc(doc(db, 'users', user.id), {
         profile: userProfile
@@ -304,10 +305,10 @@ export const Settings: React.FC<SettingsProps> = ({
                       id="heightFeet"
                       name="heightFeet"
                       type="number"
-                      value={userProfile.height ? Math.floor(userProfile.height / 12) : ''}
+                      value={userProfile?.height ? Math.floor(userProfile.height / 12) : ''}
                       onChange={(e) => {
                         const feet = parseInt(e.target.value) || 0;
-                        const inches = userProfile.height ? userProfile.height % 12 : 0;
+                        const inches = userProfile?.height ? userProfile.height % 12 : 0;
                         handleProfileChange('height', feet * 12 + inches);
                       }}
                       placeholder="5"
@@ -322,9 +323,9 @@ export const Settings: React.FC<SettingsProps> = ({
                       id="heightInches"
                       name="heightInches"
                       type="number"
-                      value={userProfile.height ? userProfile.height % 12 : ''}
+                      value={userProfile?.height ? userProfile.height % 12 : ''}
                       onChange={(e) => {
-                        const feet = userProfile.height ? Math.floor(userProfile.height / 12) : 0;
+                        const feet = userProfile?.height ? Math.floor(userProfile.height / 12) : 0;
                         const inches = parseInt(e.target.value) || 0;
                         handleProfileChange('height', feet * 12 + inches);
                       }}
@@ -343,7 +344,7 @@ export const Settings: React.FC<SettingsProps> = ({
                   id="weight"
                   name="weight"
                   type="number"
-                  value={userProfile.weight || ''}
+                  value={userProfile?.weight || ''}
                   onChange={(e) => handleProfileChange('weight', e.target.value ? parseInt(e.target.value) : undefined)}
                   placeholder="154"
                   className="w-full p-2 border rounded text-sm text-black bg-white"
@@ -358,7 +359,7 @@ export const Settings: React.FC<SettingsProps> = ({
                   id="age"
                   name="age"
                   type="number"
-                  value={userProfile.age || ''}
+                  value={userProfile?.age || ''}
                   onChange={(e) => handleProfileChange('age', e.target.value ? parseInt(e.target.value) : undefined)}
                   placeholder="30"
                   className="w-full p-2 border rounded text-sm text-black bg-white"
@@ -369,7 +370,7 @@ export const Settings: React.FC<SettingsProps> = ({
                 <select
                   id="gender"
                   name="gender"
-                  value={userProfile.gender || ''}
+                  value={userProfile?.gender || ''}
                   onChange={(e) => handleProfileChange('gender', e.target.value || undefined)}
                   className="w-full p-2 border rounded text-sm text-black bg-white"
                 >
@@ -387,7 +388,7 @@ export const Settings: React.FC<SettingsProps> = ({
               <select
                 id="dietGoal"
                 name="dietGoal"
-                value={userProfile.dietGoal || ''}
+                value={userProfile?.dietGoal || ''}
                 onChange={(e) => handleProfileChange('dietGoal', e.target.value || undefined)}
                 className="w-full p-2 border rounded text-sm text-black bg-white"
               >
@@ -405,7 +406,7 @@ export const Settings: React.FC<SettingsProps> = ({
               <select
                 id="activityLevel"
                 name="activityLevel"
-                value={userProfile.activityLevel || ''}
+                value={userProfile?.activityLevel || ''}
                 onChange={(e) => handleProfileChange('activityLevel', e.target.value || undefined)}
                 className="w-full p-2 border rounded text-sm text-black bg-white"
               >
@@ -424,7 +425,7 @@ export const Settings: React.FC<SettingsProps> = ({
                 id="dietaryRestrictions"
                 name="dietaryRestrictions"
                 type="text"
-                value={userProfile.dietaryRestrictions?.join(', ') || ''}
+                value={userProfile?.dietaryRestrictions?.join(', ') || ''}
                 onChange={(e) => handleProfileChange('dietaryRestrictions', e.target.value ? e.target.value.split(',').map(s => s.trim()) : undefined)}
                 placeholder="vegetarian, gluten-free, dairy-free"
                 className="w-full p-2 border rounded text-sm text-black bg-white"
@@ -437,7 +438,7 @@ export const Settings: React.FC<SettingsProps> = ({
                 id="allergies"
                 name="allergies"
                 type="text"
-                value={userProfile.allergies?.join(', ') || ''}
+                value={userProfile?.allergies?.join(', ') || ''}
                 onChange={(e) => handleProfileChange('allergies', e.target.value ? e.target.value.split(',').map(s => s.trim()) : undefined)}
                 placeholder="nuts, shellfish, dairy"
                 className="w-full p-2 border rounded text-sm text-black bg-white"
