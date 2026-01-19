@@ -219,3 +219,28 @@ The app now features a community-driven grocery price estimator that provides mo
 
 ## Contact
 For questions or feature requests, use the feedback form in the app or open an issue on GitHub.
+
+## Improvements & Implementation Roadmap
+
+The following user-friendly and productivity improvements were identified during a recent code review. Items marked **(Done)** have been implemented in the codebase; others include a short implementation note.
+
+- Scan review modal: Allow users to review and edit AI-parsed items before saving (local edit, no extra API usage). **(Done)**
+- Onboarding & First-run Flow: Add interactive first-run tutorial that highlights `PantryScanner`, adding items, and the meal planner. Implementation: small modal tour persisted to `user.hasSeenTutorial` in `useAuth`.
+- Barcode/Product Lookup: Integrate OpenFoodFacts or similar for barcode->product lookup to auto-fill nutrition and images. Implementation: add fallback in `handleScanBarcode` to call lookup API and populate fields.
+- Offline Support & Conflict Resolution: Queue writes locally (IndexedDB) when offline and present simple conflict-resolution UI on reconnect. Implementation: small write-queue service + UI to accept/merge remote changes.
+- Undo & Change History: Store recent actions per item and allow a one-step undo; add an item history view in `ItemDetailModal`.
+- Bulk Edit Actions (Move location, set expiration, add to shopping list, delete): UI available in `PantryScanner` bulk mode; implemented as a bulk-action toolbar. **(Done)**
+- Expiration Management: Add calendar view and scheduled reminders for soon-to-expire items; auto-suggest recipes for near-expiry items.
+- Smarter Shopping Lists: Auto-generate shopping lists from meal plan with per-store grouping and suggested quantities; allow export/share.
+- Household Roles & Permissions: Add household role model (admin/member) and guard UI + Firestore rules accordingly.
+- Performance: Virtualize long inventory lists to reduce DOM and memory. Implementation: use `react-window` for large lists. **(Done)**
+- Search & Filters: Add fuzzy search (Fuse.js), saved filters, and ingredient autocomplete.
+- Accessibility & Shortcuts: Add ARIA attributes, keyboard navigation, and a shortcuts help panel.
+- Import/Export & Backup: CSV/JSON import/export and one-click backup to Google Drive or local file.
+- Privacy & Data Controls: Add data export and account deletion from Settings.
+- Monetization UX: Clear messaging for premium limits and upgrade flow in `PremiumFeature`.
+- Testing & CI: Add unit tests for `useDataManagement` and `PantryScanner`, and Github Actions workflows for tests.
+- Monitoring & Alerts: Add Sentry for error reporting and monitor heavy DB write patterns in `DatabaseMonitoringService`.
+- Localization: Extract strings for translation (i18n-ready).
+
+As tasks are implemented, this section will be updated to mark them complete.

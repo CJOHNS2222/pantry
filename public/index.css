@@ -1,0 +1,58 @@
+/* Premium Feature Overlay Styles */
+.premium-overlay-container {
+  position: relative;
+}
+
+.premium-overlay-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(4px);
+  border-radius: 0.5rem;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.premium-upgrade-modal {
+  background: white;
+  border-radius: 0.5rem;
+  padding: 1rem;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  border: 1px solid #e5e7eb;
+  max-width: 28rem;
+  text-align: center;
+}
+
+/* Tutorial Glow Effect */
+.tutorial-glow {
+  animation: tutorial-glow 2s ease-in-out infinite alternate;
+  box-shadow: 0 0 20px rgba(76, 175, 80, 0.8), 0 0 40px rgba(76, 175, 80, 0.4), 0 0 60px rgba(76, 175, 80, 0.2);
+  border: 2px solid var(--accent-color) !important;
+  transform: scale(1.05);
+  transition: all 0.3s ease;
+}
+
+@keyframes tutorial-glow {
+  from {
+    box-shadow: 0 0 20px rgba(76, 175, 80, 0.8), 0 0 40px rgba(76, 175, 80, 0.4), 0 0 60px rgba(76, 175, 80, 0.2);
+  }
+  to {
+    box-shadow: 0 0 30px rgba(76, 175, 80, 1), 0 0 60px rgba(76, 175, 80, 0.6), 0 0 90px rgba(76, 175, 80, 0.3);
+  }
+}
+
+/* Hide scrollbar for horizontal scrolling */
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* Internet Explorer 10+ */
+  scrollbar-width: none;  /* Firefox */
+  -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+  scroll-behavior: smooth; /* Smooth scrolling */
+  touch-action: pan-x; /* Allow horizontal touch scrolling */
+  overscroll-behavior-x: contain; /* Prevent overscroll on sides */
+  flex-wrap: nowrap; /* Prevent wrapping */
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;  /* Safari and Chrome */
+}

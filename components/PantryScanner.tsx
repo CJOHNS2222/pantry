@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Camera as CapacitorCamera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { Camera, Upload, Loader2, Plus, Trash2, CheckCircle2, ShoppingBasket, X, Barcode, ChevronDown, ChevronRight, ChevronUp, Image, ChefHat, TrendingUp } from 'lucide-react';
+import { FixedSizeList as List } from 'react-window';
 import { analyzePantryImage } from '../services/geminiService';
 import { getItemImage, inferCategoryFromItemName, inferStorageLocationFromItemName, getStorageLocationImage, getAutoExpirationDate, getExpirationColor, getAllCategories, getCategoryIcon, parseItemText, fetchExternalItemImage, combineQuantities, formatItemQuantity } from '../utils/appUtils';
 import { PantryItem, LoadingState, ConsumptionSuggestion, ExpirationAlert, CustomCategory, RecipeSuggestion } from '../types';
@@ -50,6 +51,8 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   const [storageSectionOrder, setStorageSectionOrder] = useState<string[]>(['pantry', 'fridge', 'freezer', 'spices', 'other']);
   const [showPriceTrends, setShowPriceTrends] = useState<string | null>(null);
   const [selectedItemIndex, setSelectedItemIndex] = useState<number | null>(null);
+  const [scanResults, setScanResults] = useState<PantryItem[] | null>(null);
+  const [showScanReviewModal, setShowScanReviewModal] = useState(false);
   
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -198,7 +201,9 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
           };
         }));
 
-        setInventory(prev => [...prev, ...processedItems]);
+        // Instead of immediately saving, open a review modal so user can edit/confirm items
+        setScanResults(processedItems as PantryItem[]);
+        setShowScanReviewModal(true);
         // Track pantry scan results
         AnalyticsService.trackPantryScan(items.length, items.length);
         setLoadingState(LoadingState.SUCCESS);
@@ -405,6 +410,31 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
       const filtered = prev.filter(c => c !== category);
       return [category, ...filtered];
     });
+  };
+
+  // Bulk actions
+  const bulkChangeLocation = (newLocation: 'pantry' | 'fridge' | 'freezer' | 'spices' | 'other') => {
+    if (selectedItems.size === 0) return;
+    setInventory(prev => prev.map((item, idx) => selectedItems.has(idx) ? { ...item, storageLocation: newLocation } : item));
+    setSelectedItems(new Set());
+    setBulkMode(false);
+  };
+
+  const bulkSetExpiration = (isoDate: string) => {
+    if (selectedItems.size === 0) return;
+    setInventory(prev => prev.map((item, idx) => selectedItems.has(idx) ? { ...item, expirationDate: isoDate } : item));
+    setSelectedItems(new Set());
+    setBulkMode(false);
+  };
+
+  const bulkAddToShoppingListWithRemove = () => {
+    if (selectedItems.size === 0) return;
+    const itemsToMove = Array.from(selectedItems).map(idx => inventory[idx].item);
+    addToShoppingList(itemsToMove);
+    setInventory(prev => prev.filter((_, idx) => !selectedItems.has(idx)));
+    setSelectedItems(new Set());
+    setBulkMode(false);
+    alert(`Moved ${itemsToMove.length} items to shopping list.`);
   };
 
   const toggleStorageLocation = (location: string) => {
@@ -666,6 +696,54 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
     );
   });
 
+  // Virtualized flat list renderer for large inventories
+  const VIRTUALIZE_THRESHOLD = 80;
+  const renderRow = ({ index, style }: { index: number; style: React.CSSProperties }) => {
+    const item = sortedInventory[index];
+    if (!item) return null;
+    return (
+      <div style={style} key={item.originalIndex} className={`flex items-center justify-between px-2 py-1 border-b border-theme last:border-b-0 transition-all cursor-pointer ${
+        bulkMode && selectedItems.has(item.originalIndex)
+          ? 'bg-[var(--accent-color)]/10 border-[var(--accent-color)]/30'
+          : 'hover:bg-theme-primary/50'
+      }`} onClick={() => !bulkMode && setSelectedItemIndex(item.originalIndex)}>
+        {bulkMode && (
+          <input
+            type="checkbox"
+            checked={selectedItems.has(item.originalIndex)}
+            onChange={() => toggleItemSelection(item.originalIndex)}
+            className="mr-3 w-4 h-4 text-[var(--accent-color)] bg-theme-primary border-theme rounded focus:ring-[var(--accent-color)]"
+          />
+        )}
+
+        <div className="flex items-center gap-1 flex-1">
+          <img src={item.image} alt={item.item} className="w-10 h-10 rounded-lg object-cover bg-theme-primary border border-theme" onError={(e) => { (e.target as HTMLImageElement).src = '/images/placeholder.svg'; }} />
+          <div className="flex-1">
+            <div className="flex items-center gap-2">
+              <div className="font-medium text-theme-primary">{item.item}</div>
+              <div className="text-xs text-theme-secondary opacity-70 bg-theme-secondary px-1 py-0.5 rounded">Qty: {formatItemQuantity(item)}</div>
+              {item.expirationDate && (
+                <div className={`text-xs px-1 py-0.5 rounded font-medium ${
+                  getExpirationColor(item.expirationDate, item.expirationType) === 'red' ? 'bg-red-100 text-red-800' :
+                  getExpirationColor(item.expirationDate, item.expirationType) === 'yellow' ? 'bg-yellow-100 text-yellow-800' :
+                  'bg-green-100 text-green-800'
+                }`}>
+                  {Math.ceil((new Date(item.expirationDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))}d
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {!bulkMode && (
+          <div className="text-theme-secondary opacity-50">
+            <ChevronRight className="w-5 h-5" />
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6 pb-24 max-w-2xl mx-auto animate-fade-in relative">
       <div className="flex items-center justify-between mb-6">
@@ -698,6 +776,24 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
           <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-theme-primary pointer-events-none" />
         </div>
       </div>
+
+      {/* Bulk Action Toolbar */}
+      {bulkMode && (
+        <div className="bg-theme-secondary p-3 rounded-lg border border-theme mb-4 flex items-center gap-3">
+          <div className="text-sm text-theme-primary font-medium">Bulk Mode: {selectedItems.size} selected</div>
+          <select onChange={(e) => bulkChangeLocation(e.target.value as any)} className="px-2 py-1 rounded bg-theme-primary border border-theme text-theme-primary">
+            <option value="pantry">Move to Pantry</option>
+            <option value="fridge">Move to Fridge</option>
+            <option value="freezer">Move to Freezer</option>
+            <option value="spices">Move to Spices</option>
+            <option value="other">Move to Other</option>
+          </select>
+          <input type="date" onChange={(e) => bulkSetExpiration(e.target.value)} className="px-2 py-1 rounded bg-theme-primary border border-theme text-theme-primary" />
+          <button onClick={bulkAddToShoppingListWithRemove} className="px-3 py-1 bg-[var(--accent-color)] text-white rounded">Move to Shopping</button>
+          <button onClick={selectAllItems} className="px-3 py-1 bg-theme-primary border border-theme rounded">Toggle Select All</button>
+          <button onClick={bulkDelete} className="ml-auto px-3 py-1 bg-red-600 text-white rounded">Delete</button>
+        </div>
+      )}
 
       {/* Floating Action Button */}
       <button
@@ -912,6 +1008,72 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                 </form>
               </div>
             </div>
+
+            {/* Scan Review Modal (appears after analyze) */}
+            {showScanReviewModal && scanResults && (
+              <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                <div className="bg-theme-primary rounded-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto border border-theme p-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-bold text-theme-secondary">Review Scanned Items</h3>
+                    <button onClick={() => { setShowScanReviewModal(false); setScanResults(null); }} className="p-2 rounded hover:bg-theme-secondary">
+                      <X className="w-5 h-5 text-theme-secondary" />
+                    </button>
+                  </div>
+
+                  <div className="space-y-3">
+                    {scanResults.map((sItem, idx) => (
+                      <div key={sItem.id} className="bg-theme-secondary p-3 rounded-lg border border-theme flex items-center gap-3">
+                        <img src={sItem.image} alt={sItem.item} className="w-12 h-12 rounded object-cover" onError={(e) => { (e.target as HTMLImageElement).src = '/images/placeholder.svg'; }} />
+                        <div className="flex-1">
+                          <input value={sItem.item} onChange={(e) => {
+                            const updated = [...scanResults];
+                            updated[idx] = { ...updated[idx], item: e.target.value };
+                            setScanResults(updated);
+                          }} className="w-full px-2 py-1 rounded bg-theme-primary border border-theme text-theme-primary" />
+                          <div className="flex gap-2 mt-2">
+                            <input type="number" value={parseInt(sItem.quantity_estimate || '1')} onChange={(e) => {
+                              const updated = [...scanResults];
+                              updated[idx] = { ...updated[idx], quantity_estimate: e.target.value };
+                              setScanResults(updated);
+                            }} className="w-24 px-2 py-1 rounded bg-theme-primary border border-theme text-theme-primary" />
+                            <select value={sItem.category || 'Uncategorized'} onChange={(e) => {
+                              const updated = [...scanResults];
+                              updated[idx] = { ...updated[idx], category: e.target.value };
+                              setScanResults(updated);
+                            }} className="px-2 py-1 rounded bg-theme-primary border border-theme text-theme-primary">
+                              {getAllCategories(customCategories).map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                            </select>
+                            {('confidence' in sItem) && (
+                              <div className="text-sm text-theme-secondary opacity-80 ml-auto">Conf: {(sItem as any).confidence}</div>
+                            )}
+                          </div>
+                        </div>
+                        <button onClick={() => {
+                          const updated = scanResults.filter((_, i) => i !== idx);
+                          setScanResults(updated.length ? updated : null);
+                          if (updated.length === 0) setShowScanReviewModal(false);
+                        }} className="p-2 rounded bg-red-600 text-white">Remove</button>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="flex gap-2 mt-4">
+                    <button onClick={() => {
+                      // Confirm: add scanResults to inventory
+                      if (scanResults) {
+                        setInventory(prev => [...prev, ...scanResults]);
+                      }
+                      setShowScanReviewModal(false);
+                      setScanResults(null);
+                      setImagePreview(null);
+                      setRawBase64(null);
+                      setLoadingState(LoadingState.IDLE);
+                    }} className="px-4 py-2 bg-[var(--accent-color)] text-white rounded">Add All</button>
+                    <button onClick={() => { setShowScanReviewModal(false); setScanResults(null); }} className="px-4 py-2 bg-theme-primary border border-theme rounded">Cancel</button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1145,8 +1307,20 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
           )}
 
           {/* Render the appropriate view */}
-          {/* Render the appropriate view */}
-          {viewMode === 'category' ? categoryViewContent : storageViewContent}
+          {inventory.length > VIRTUALIZE_THRESHOLD ? (
+            <div className="bg-theme-secondary rounded-lg border border-theme overflow-hidden">
+              <List
+                height={Math.min(600, window.innerHeight - 300)}
+                itemCount={sortedInventory.length}
+                itemSize={64}
+                width={'100%'}
+              >
+                {renderRow}
+              </List>
+            </div>
+          ) : (
+            (viewMode === 'category' ? categoryViewContent : storageViewContent)
+          )}
 
         </div>
       </div>

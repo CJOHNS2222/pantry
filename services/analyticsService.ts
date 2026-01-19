@@ -343,6 +343,35 @@ class AnalyticsService {
     }
   }
 
+  // Track database operations
+  static trackDatabaseOperation(operation: 'read' | 'write' | 'delete', collection: string, documentCount: number = 1, details?: Record<string, any>) {
+    this.logEvent('database_operation', {
+      operation_type: operation,
+      collection_name: collection,
+      document_count: documentCount,
+      ...details
+    });
+  }
+
+  // Track Firestore query performance
+  static trackQueryPerformance(collection: string, queryType: string, resultCount: number, durationMs: number) {
+    this.logEvent('firestore_query', {
+      collection_name: collection,
+      query_type: queryType,
+      result_count: resultCount,
+      duration_ms: durationMs
+    });
+  }
+
+  // Track batch operations
+  static trackBatchOperation(operation: 'batch_write' | 'batch_delete', collection: string, documentCount: number) {
+    this.logEvent('batch_operation', {
+      operation_type: operation,
+      collection_name: collection,
+      document_count: documentCount
+    });
+  }
+
   // Track app lifecycle events
   static trackAppOpen() {
     this.logEvent('app_open');

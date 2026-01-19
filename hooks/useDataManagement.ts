@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { doc, onSnapshot, collection, addDoc, getDocs, setDoc, serverTimestamp, query, where, orderBy, Timestamp, writeBatch, deleteDoc } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
+import DatabaseMonitoringService from '../services/databaseMonitoringService';
 import { User, PantryItem, DayPlan, Household, ShoppingItem, SavedRecipe, RecipeRating, RecipeSearchResult, CustomCategory, RecipeSuggestion, MealPlanItem, StructuredRecipe } from '../types';
 import { next7DateKeys, isHouseholdMember, generateConsumptionSuggestions, generateExpirationAlerts, generateRecipeSuggestions, parseIngredientForShoppingList } from '../utils/appUtils';
 import { UsageService } from '../services/usageService';
@@ -594,11 +595,28 @@ export function useDataManagement(user: User | null, addToast: (message: string,
     (async () => {
       (window as any).__writingMealPlan = true;
       try {
+        // If offline, enqueue the inventory sync to IndexedDB for later processing
+        try {
+          if (typeof window !== 'undefined' && !navigator.onLine) {
+            const { enqueueInventorySync } = await import('../services/writeQueueService');
+            await enqueueInventorySync({ userId: user.id, householdId: household?.id || null, inHousehold, inventory });
+            addToast('Offline — changes queued and will sync when you are back online.', 'info');
+            return;
+          }
+        } catch (err) {
+          console.warn('Failed to enqueue offline sync, continuing without queue:', err);
+        }
         
         if (inHousehold) {
           // When in household, sync inventory to household collection
           const householdInventoryPath = `households/${household.id}/inventory`;
-          const existingHouseholdInventoryDocs = await getDocs(collection(db, householdInventoryPath));
+          // Option 1: Use direct Firestore (current)
+          // const existingHouseholdInventoryDocs = await getDocs(collection(db, householdInventoryPath));
+
+          // Option 2: Use DatabaseMonitoringService for tracking (recommended for analytics)
+          const householdInventoryRef = DatabaseMonitoringService.collection(householdInventoryPath);
+          const existingHouseholdInventoryDocs = await DatabaseMonitoringService.getDocs(query(householdInventoryRef));
+
           const existingHouseholdInventory = existingHouseholdInventoryDocs.docs.map(doc => ({ id: doc.id, ...doc.data() } as PantryItem));
 
           // Find items to delete (in DB but not in current state)
@@ -715,7 +733,13 @@ export function useDataManagement(user: User | null, addToast: (message: string,
         } else {
           // When not in household, sync inventory to user's collection
           const userInventoryPath = `users/${user.id}/inventory`;
-          const existingUserInventoryDocs = await getDocs(collection(db, userInventoryPath));
+          // Option 1: Use direct Firestore (current)
+          // const existingUserInventoryDocs = await getDocs(collection(db, userInventoryPath));
+
+          // Option 2: Use DatabaseMonitoringService for tracking (recommended for analytics)
+          const userInventoryRef = DatabaseMonitoringService.collection(userInventoryPath);
+          const existingUserInventoryDocs = await DatabaseMonitoringService.getDocs(query(userInventoryRef));
+
           const existingUserInventory = existingUserInventoryDocs.docs.map(doc => ({ id: doc.id, ...doc.data() } as PantryItem));
 
           // Find items to delete (in DB but not in current state)
@@ -851,7 +875,13 @@ export function useDataManagement(user: User | null, addToast: (message: string,
           : `users/${user.id}/shoppingList`;
 
         // Get existing documents
-        const existingDocs = await getDocs(collection(db, collectionPath));
+        // Option 1: Use direct Firestore (current)
+        // const existingDocs = await getDocs(collection(db, collectionPath));
+
+        // Option 2: Use DatabaseMonitoringService for tracking (recommended for analytics)
+        const shoppingListRef = DatabaseMonitoringService.collection(collectionPath);
+        const existingDocs = await DatabaseMonitoringService.getDocs(query(shoppingListRef));
+
         const existingItems = existingDocs.docs.map(doc => ({ id: doc.id, ...doc.data() } as ShoppingItem));
 
         // Find items to delete (in DB but not in current state)

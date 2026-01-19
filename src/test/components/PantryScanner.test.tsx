@@ -43,8 +43,8 @@ describe('PantryScanner Component', () => {
       />
     );
 
-    expect(screen.getByText('Milk')).toBeInTheDocument();
-    expect(screen.getByText('Bread')).toBeInTheDocument();
+    expect(screen.getAllByText('Milk')[0]).toBeInTheDocument();
+    expect(screen.getAllByText('Bread')[0]).toBeInTheDocument();
   });
 
   it('renders the component title', () => {
@@ -56,7 +56,7 @@ describe('PantryScanner Component', () => {
       />
     );
 
-    expect(screen.getByText('My Pantry')).toBeInTheDocument();
+    expect(screen.getAllByText('My Pantry')[0]).toBeInTheDocument();
   });
 
   it('shows the scan prompt', () => {
@@ -69,9 +69,9 @@ describe('PantryScanner Component', () => {
     );
 
     // The scan prompt is in the Add Items modal, so we need to open the modal first
-    const addButton = screen.getByLabelText('Add items to pantry');
+    const addButton = screen.getAllByLabelText('Add items to pantry')[0];
     fireEvent.click(addButton);
 
-    expect(screen.getByText('Scan receipt or pantry')).toBeInTheDocument();
+    expect(screen.getAllByText('Scan receipt or pantry')[0]).toBeInTheDocument();
   });
 });

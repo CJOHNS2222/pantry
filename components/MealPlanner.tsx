@@ -62,36 +62,44 @@ const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
   const [searchResults, setSearchResults] = useState<StructuredRecipe[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [savedRecipes, setSavedRecipes] = useState<SavedRecipe[]>([]);
+  const [recipesLoaded, setRecipesLoaded] = useState(false);
 
-  // Load saved recipes on mount
+  // Load saved recipes only when needed (lazy loading)
+  const loadSavedRecipes = async () => {
+    if (recipesLoaded) return; // Already loaded
+
+    try {
+      // Load user-specific saved recipes
+      const userSaved = await getDocs(collection(db, 'users', user.id, 'savedRecipes'));
+      const userRecipes = userSaved.docs.map(doc => ({ id: doc.id, ...doc.data() } as SavedRecipe));
+
+      // Load global recipe database (limited to prevent performance issues)
+      const globalRecipes = await getSavedRecipes(20); // Limit to 20 most recent
+
+      // Combine and deduplicate recipes (user recipes take precedence)
+      const allRecipes = [...globalRecipes];
+      userRecipes.forEach(userRecipe => {
+        const existingIndex = allRecipes.findIndex(r => r.title === userRecipe.title);
+        if (existingIndex >= 0) {
+          allRecipes[existingIndex] = userRecipe; // Replace with user version
+        } else {
+          allRecipes.push(userRecipe);
+        }
+      });
+
+      setSavedRecipes(allRecipes);
+      setRecipesLoaded(true);
+    } catch (error) {
+      console.error('Error loading saved recipes:', error);
+    }
+  };
+
+  // Load recipes when user starts typing or opens search
   useEffect(() => {
-    const loadSavedRecipes = async () => {
-      try {
-        // Load user-specific saved recipes
-        const userSaved = await getDocs(collection(db, 'users', user.id, 'savedRecipes'));
-        const userRecipes = userSaved.docs.map(doc => ({ id: doc.id, ...doc.data() } as SavedRecipe));
-
-        // Load global recipe database
-        const globalRecipes = await getSavedRecipes();
-
-        // Combine and deduplicate recipes (user recipes take precedence)
-        const allRecipes = [...globalRecipes];
-        userRecipes.forEach(userRecipe => {
-          const existingIndex = allRecipes.findIndex(r => r.title === userRecipe.title);
-          if (existingIndex >= 0) {
-            allRecipes[existingIndex] = userRecipe; // Replace with user version
-          } else {
-            allRecipes.push(userRecipe);
-          }
-        });
-
-        setSavedRecipes(allRecipes);
-      } catch (error) {
-        console.error('Error loading saved recipes:', error);
-      }
-    };
-    loadSavedRecipes();
-  }, [user.id]);
+    if (searchQuery.length > 0) {
+      loadSavedRecipes();
+    }
+  }, [searchQuery]);
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
@@ -182,7 +190,7 @@ const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
                             parent.innerHTML = `
                               <div class="w-full h-full flex items-center justify-center bg-theme-primary/10">
                                 <svg class="w-6 h-6 text-theme-secondary opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
                                 </svg>
                               </div>
                             `;
@@ -192,7 +200,7 @@ const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
                     ) : (
                       <div className="w-full h-full flex items-center justify-center bg-theme-primary/10">
                         <svg className="w-6 h-6 text-theme-secondary opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
                         </svg>
                       </div>
                     )}
@@ -251,7 +259,7 @@ const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
                             parent.innerHTML = `
                               <div class="w-full h-full flex items-center justify-center bg-theme-primary/10">
                                 <svg class="w-6 h-6 text-theme-secondary opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
                                 </svg>
                               </div>
                             `;
@@ -261,7 +269,7 @@ const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
                     ) : (
                       <div className="w-full h-full flex items-center justify-center bg-theme-primary/10">
                         <svg className="w-6 h-6 text-theme-secondary opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
                         </svg>
                       </div>
                     )}
@@ -318,18 +326,17 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
   const [showHelpTooltip, setShowHelpTooltip] = useState(false);
   const [selectedDayIndex, setSelectedDayIndex] = useState<number | null>(null);
 
-  // Load saved recipes for meal prep planning
-  useEffect(() => {
-    const loadSavedRecipes = async () => {
-      try {
-        const recipes = await getSavedRecipes();
-        setSavedRecipes(recipes);
-      } catch (error) {
-        console.error('Error loading saved recipes:', error);
-      }
-    };
-    loadSavedRecipes();
-  }, []);
+  // Load saved recipes only when meal prep planner is opened
+  const loadSavedRecipesForMealPrep = async () => {
+    if (savedRecipes.length > 0) return; // Already loaded
+
+    try {
+      const recipes = await getSavedRecipes();
+      setSavedRecipes(recipes);
+    } catch (error) {
+      console.error('Error loading saved recipes:', error);
+    }
+  };
 
   const [isDragging, setIsDragging] = useState(false);
   const [dragOverTrash, setDragOverTrash] = useState(false);
@@ -337,6 +344,13 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
   const [searchMealType, setSearchMealType] = useState<'breakfast' | 'lunch' | 'dinner' | null>(null);
   const [showMealPrepPlanner, setShowMealPrepPlanner] = useState(false);
   const [savedRecipes, setSavedRecipes] = useState<SavedRecipe[]>([]);
+
+  // Load saved recipes when meal prep planner opens
+  useEffect(() => {
+    if (showMealPrepPlanner) {
+      loadSavedRecipesForMealPrep();
+    }
+  }, [showMealPrepPlanner]);
 
   // Function to clean ingredient names by removing descriptive words
   const getMissingIngredients = () => {

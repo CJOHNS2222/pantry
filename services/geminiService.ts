@@ -1,17 +1,36 @@
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { PantryItem, RecipeSearchResult, RecipeSearchParams, StructuredRecipe } from "../types";
 import { getPerformance, trace } from "firebase/performance";
+import featureFlags from './featureFlags';
 
 // Initialize Gemini Client
 const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
-const performance = getPerformance();
+
+// Guard performance initialization in test or uninitialized app environments
+let performance: ReturnType<typeof getPerformance> | null = null;
+try {
+  performance = getPerformance();
+} catch (e) {
+  // Firebase app may not be initialized in tests or certain environments
+  performance = null;
+}
 
 /**
  * Analyzes an image to identify pantry items.
  */
 export const analyzePantryImage = async (base64Image: string, mimeType: string): Promise<PantryItem[]> => {
-  const perfTrace = trace(performance, 'analyze_pantry_image');
-  perfTrace.start();
+  // Gate Gemini usage: ensure global enabled + user opt-in + usage cap
+  if (!featureFlags.isGeminiGloballyEnabled()) {
+    throw new Error('Gemini integration is disabled by configuration.');
+  }
+
+  // Note: we expect the caller to set user opt-in before invoking this in UI flows.
+  if (!featureFlags.canUseGemini(undefined)) {
+    throw new Error('Gemini usage not permitted: opt-in required or daily cap reached.');
+  }
+
+  const perfTrace = performance ? trace(performance, 'analyze_pantry_image') : null;
+  perfTrace?.start();
 
   try {
     const modelId = "gemini-2.0-flash-lite";
@@ -83,16 +102,21 @@ If an item doesn't fit these categories, use "Uncategorized".`,
     const cleanJson = jsonText.replace(/^```json\s*/, "").replace(/\s*```$/, "");
     const items = JSON.parse(cleanJson) as PantryItem[];
 
-    // Add custom metrics
-    perfTrace.putMetric('image_size_kb', base64Image.length / 1024);
-    perfTrace.putMetric('items_detected', items.length);
+    // Add custom metrics (if performance available)
+    if (perfTrace) {
+      perfTrace.putMetric('image_size_kb', base64Image.length / 1024);
+      perfTrace.putMetric('items_detected', items.length);
+    }
+
+    // Track usage (local increment). Caller may provide user context in future.
+    try { featureFlags.incrementGeminiUsage(undefined, 1); } catch (e) { /* ignore */ }
 
     return items;
   } catch (error) {
     console.error("Error analyzing pantry image:", error);
     throw error;
   } finally {
-    perfTrace.stop();
+    perfTrace?.stop();
   }
 };
 
@@ -100,10 +124,17 @@ If an item doesn't fit these categories, use "Uncategorized".`,
  * Searches for recipes using Google Search Grounding with enhanced filters and structured JSON output.
  */
 export const searchRecipes = async (params: RecipeSearchParams): Promise<RecipeSearchResult> => {
-  const perfTrace = trace(performance, 'search_recipes');
-  perfTrace.start();
+    const perfTrace = performance ? trace(performance, 'search_recipes') : null;
+  perfTrace?.start();
 
-  try {
+    try {
+      // Gate Gemini usage for recipe search as well
+      if (!featureFlags.isGeminiGloballyEnabled()) {
+        throw new Error('Gemini integration is disabled by configuration.');
+      }
+      if (!featureFlags.canUseGemini(undefined)) {
+        throw new Error('Gemini usage not permitted: opt-in required or daily cap reached.');
+      }
     const modelId = "gemini-2.0-flash-lite";
   
   // Check if API key is available
@@ -197,12 +228,16 @@ export const searchRecipes = async (params: RecipeSearchParams): Promise<RecipeS
       console.warn('Gemini returned no text for recipe search.');
     }
 
-    // Add custom metrics
-    perfTrace.putMetric('query_length', params.query?.length || 0);
-    perfTrace.putMetric('ingredients_count', params.ingredients?.split(', ').length || 0);
-    perfTrace.putMetric('recipes_returned', recipes.length);
-    perfTrace.putAttribute('search_mode', params.query ? 'specific' : 'pantry_based');
-    perfTrace.putAttribute('strict_mode', params.strictMode ? 'true' : 'false');
+    // Add custom metrics (if performance available)
+    if (perfTrace) {
+      perfTrace.putMetric('query_length', params.query?.length || 0);
+      perfTrace.putMetric('ingredients_count', params.ingredients?.split(', ').length || 0);
+      perfTrace.putMetric('recipes_returned', recipes.length);
+      perfTrace.putAttribute('search_mode', params.query ? 'specific' : 'pantry_based');
+      perfTrace.putAttribute('strict_mode', params.strictMode ? 'true' : 'false');
+    }
+
+    try { featureFlags.incrementGeminiUsage(undefined, 1); } catch (e) { /* ignore */ }
 
     return {
       recipes: recipes,
@@ -227,7 +262,7 @@ export const searchRecipes = async (params: RecipeSearchParams): Promise<RecipeS
       throw new Error(`Recipe search failed: ${error.message || 'Unknown error'}`);
     }
   } finally {
-    perfTrace.stop();
+    perfTrace?.stop();
   }
 };
 

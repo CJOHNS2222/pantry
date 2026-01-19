@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Search, Loader2, Sparkles, ExternalLink, Globe, Plus, Clock, List, ChefHat, ToggleLeft, ToggleRight, Star, Heart, Bookmark, Zap, Mic } from 'lucide-react';
 import { searchRecipes } from '../services/geminiService';
-import { getSavedRecipes } from '../services/recipeService';
+import { getSavedRecipes, getCachedPopularRecipes } from '../services/recipeService';
 import { RecipeSearchResult, LoadingState, RecipeRating, StructuredRecipe, PantryItem, SavedRecipe, User } from '../types';
 import { Tab } from '../types/app';
 import { RecipeCardSkeleton } from './SkeletonLoader';
@@ -108,7 +108,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
 
     // Firebase recipes state
     const [firebaseRecipes, setFirebaseRecipes] = useState<SavedRecipe[]>([]);
-    const [firebaseRecipesLoading, setFirebaseRecipesLoading] = useState(true);
+    const [firebaseRecipesLoading, setFirebaseRecipesLoading] = useState(false);
     
     // Recipe cache to avoid duplicate API calls
     const [recipeCache, setRecipeCache] = useState<Map<string, RecipeSearchResult>>(new Map());
@@ -248,25 +248,23 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
         }
     };
 
-    // Load Firebase recipes on mount
+    // Load Firebase recipes on mount (for Popular Recipes section) - now cached for performance
     useEffect(() => {
         const loadFirebaseRecipes = async () => {
+            if (firebaseRecipes.length > 0 || !user) return; // Already loaded or user not authenticated
+
             try {
                 setFirebaseRecipesLoading(true);
-                const recipes = await getSavedRecipes();
-                // Remove duplicates based on title
-                const uniqueRecipes = recipes.filter((recipe, index, self) => 
-                    index === self.findIndex(r => r.title === recipe.title)
-                );
-                setFirebaseRecipes(uniqueRecipes);
+                const recipes = await getCachedPopularRecipes(); // Uses cached recipes (1 read vs 50+ reads)
+                setFirebaseRecipes(recipes);
             } catch (error) {
-                console.error('Error loading Firebase recipes:', error);
+                console.error('Error loading cached Firebase recipes:', error);
             } finally {
                 setFirebaseRecipesLoading(false);
             }
         };
         loadFirebaseRecipes();
-    }, []);
+    }, [user]); // Depend on user authentication
 
     // Popular recipes from CSV
     const csvRecipes: StructuredRecipe[] = [
@@ -1582,7 +1580,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                                                         parent.innerHTML = `
                                                             <div class="w-full h-full flex items-center justify-center bg-theme-primary/10">
                                                                 <svg class="w-6 h-6 text-theme-secondary opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
                                                                 </svg>
                                                             </div>
                                                         `;
@@ -1592,7 +1590,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                                         ) : (
                                             <div className="w-full h-full flex items-center justify-center bg-theme-primary/10">
                                                 <svg className="w-6 h-6 text-theme-secondary opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
                                                 </svg>
                                             </div>
                                         )}

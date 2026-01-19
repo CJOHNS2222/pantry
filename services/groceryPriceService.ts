@@ -1,5 +1,6 @@
 import { collection, doc, getDoc, setDoc, updateDoc, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
+import DatabaseMonitoringService from './databaseMonitoringService';
 import { PriceTrend } from '../types/app';
 
 export interface GroceryPrice {
@@ -124,7 +125,12 @@ class GroceryPriceService {
         limit(50)
       );
 
-      const querySnapshot = await getDocs(q);
+      // Option 1: Use direct Firestore (current)
+      // const querySnapshot = await getDocs(q);
+
+      // Option 2: Use DatabaseMonitoringService for tracking (recommended for analytics)
+      const querySnapshot = await DatabaseMonitoringService.getDocs(q);
+
       const prices: number[] = [];
 
       querySnapshot.forEach((doc) => {
@@ -249,7 +255,12 @@ class GroceryPriceService {
         orderBy('lastUpdated', 'desc')
       );
 
-      const querySnapshot = await getDocs(q);
+      // Option 1: Use direct Firestore (current)
+      // const querySnapshot = await getDocs(q);
+
+      // Option 2: Use DatabaseMonitoringService for tracking (recommended for analytics)
+      const querySnapshot = await DatabaseMonitoringService.getDocs(q);
+
       const userTrends: GroceryPrice[] = [];
 
       querySnapshot.forEach((doc) => {
@@ -422,7 +433,13 @@ class GroceryPriceService {
   // Get all available ingredients with price data
   async getAvailableIngredients(): Promise<string[]> {
     try {
-      const querySnapshot = await getDocs(collection(db, this.COLLECTION_NAME));
+      // Option 1: Use direct Firestore (current)
+      // const querySnapshot = await getDocs(collection(db, this.COLLECTION_NAME));
+
+      // Option 2: Use DatabaseMonitoringService for tracking (recommended for analytics)
+      const ingredientsRef = DatabaseMonitoringService.collection(this.COLLECTION_NAME);
+      const querySnapshot = await DatabaseMonitoringService.getDocs(query(ingredientsRef));
+
       const ingredients = new Set<string>();
 
       querySnapshot.forEach((doc) => {

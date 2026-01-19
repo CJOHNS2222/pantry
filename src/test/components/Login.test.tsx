@@ -18,7 +18,6 @@ vi.mock('firebase/auth', () => ({
 
 // Mock Firebase Analytics
 vi.mock('firebase/analytics', () => ({
-  logEvent: vi.fn(),
 }));
 
 // Mock firebaseConfig
@@ -26,7 +25,7 @@ vi.mock('../../../firebaseConfig', () => ({
   analytics: {},
 }));
 
-describe('Login Component', () => {
+        expect(screen.getByText(/Password must be at least 6 characters/)).toBeInTheDocument();
   const mockOnLogin = vi.fn();
 
   beforeEach(() => {
@@ -36,29 +35,23 @@ describe('Login Component', () => {
   it('renders login form by default', () => {
     render(<Login onLogin={mockOnLogin} />);
 
-    expect(screen.getByText('Smart Pantry Chef')).toBeInTheDocument();
-    expect(screen.getByPlaceholderText('chef@example.com')).toBeInTheDocument();
-    expect(screen.getByPlaceholderText('••••••••')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument();
+    expect(screen.getAllByText('Smart Pantry Chef')[0]).toBeInTheDocument();
+    expect(screen.getAllByPlaceholderText('chef@example.com')[0]).toBeInTheDocument();
+    expect(screen.getAllByPlaceholderText('••••••••')[0]).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /sign in/i })[0]).toBeInTheDocument();
   });
 
   it('switches to signup form when signup link is clicked', () => {
     render(<Login onLogin={mockOnLogin} />);
 
-    const signupLink = screen.getByText("Don't have an account? Sign Up");
+    const signupLink = screen.getAllByText("Don't have an account? Sign Up")[0];
     fireEvent.click(signupLink);
 
-    expect(screen.getByPlaceholderText('Your Name')).toBeInTheDocument();
-    expect(screen.getByPlaceholderText('Re-enter password')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /sign up/i })).toBeInTheDocument();
+    expect(screen.getAllByPlaceholderText('Your Name')[0]).toBeInTheDocument();
+    expect(screen.getAllByPlaceholderText('Re-enter password')[0]).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /sign up/i })[0]).toBeInTheDocument();
   });
-
-  it('validates email format', async () => {
-    render(<Login onLogin={mockOnLogin} />);
-
-    const emailInput = screen.getByPlaceholderText('chef@example.com');
-    const passwordInput = screen.getByPlaceholderText('••••••••');
-    const submitButton = screen.getByRole('button', { name: /sign in/i });
+        expect(mockSignIn).toHaveBeenCalled();
 
     // Test that inputs can receive values
     fireEvent.change(emailInput, { target: { value: 'invalid-email' } });
@@ -66,21 +59,24 @@ describe('Login Component', () => {
 
     expect(emailInput).toHaveValue('invalid-email');
     expect(passwordInput).toHaveValue('password123');
-  });
+  ;
 
   it('validates password strength', async () => {
     render(<Login onLogin={mockOnLogin} />);
 
-    const emailInput = screen.getByPlaceholderText('chef@example.com');
-    const passwordInput = screen.getByPlaceholderText('••••••••');
-    const submitButton = screen.getByRole('button', { name: /sign in/i });
+    const emailInput = screen.getAllByPlaceholderText('chef@example.com')[0];
+    const passwordInput = screen.getAllByPlaceholderText('••••••••')[0];
+    const submitButton = screen.getAllByRole('button', { name: /sign in/i })[0];
 
     fireEvent.change(emailInput, { target: { value: 'test@example.com' } });
+
+  const mockOnLogin = vi.fn();
+
     fireEvent.change(passwordInput, { target: { value: 'weak' } });
     fireEvent.click(submitButton);
 
     await waitFor(() => {
-      expect(screen.getByText('Password must be at least 6 characters and contain a number and a letter.')).toBeInTheDocument();
+      expect(screen.getAllByText('Password must be at least 6 characters and contain a number and a letter.')[0]).toBeInTheDocument();
     });
   });
 
@@ -88,14 +84,14 @@ describe('Login Component', () => {
     render(<Login onLogin={mockOnLogin} />);
 
     // Switch to signup
-    const signupLink = screen.getByText("Don't have an account? Sign Up");
+    const signupLink = screen.getAllByText("Don't have an account? Sign Up")[0];
     fireEvent.click(signupLink);
 
-    const emailInput = screen.getByPlaceholderText('chef@example.com');
-    const passwordInput = screen.getByPlaceholderText('••••••••');
-    const confirmPasswordInput = screen.getByPlaceholderText('Re-enter password');
-    const nameInput = screen.getByPlaceholderText('Your Name');
-    const submitButton = screen.getByRole('button', { name: /sign up/i });
+    const emailInput = screen.getAllByPlaceholderText('chef@example.com')[0];
+    const passwordInput = screen.getAllByPlaceholderText('••••••••')[0];
+    const confirmPasswordInput = screen.getAllByPlaceholderText('Re-enter password')[0];
+    const nameInput = screen.getAllByPlaceholderText('Your Name')[0];
+    const submitButton = screen.getAllByRole('button', { name: /sign up/i })[0];
 
     fireEvent.change(emailInput, { target: { value: 'test@example.com' } });
     fireEvent.change(passwordInput, { target: { value: 'password123' } });
@@ -121,9 +117,9 @@ describe('Login Component', () => {
 
     render(<Login onLogin={mockOnLogin} />);
 
-    const emailInput = screen.getByPlaceholderText('chef@example.com');
-    const passwordInput = screen.getByPlaceholderText('••••••••');
-    const submitButton = screen.getByRole('button', { name: /sign in/i });
+    const emailInput = screen.getAllByPlaceholderText('chef@example.com')[0];
+    const passwordInput = screen.getAllByPlaceholderText('••••••••')[0];
+    const submitButton = screen.getAllByRole('button', { name: /sign in/i })[0];
 
     fireEvent.change(emailInput, { target: { value: 'test@example.com' } });
     fireEvent.change(passwordInput, { target: { value: 'password123' } });

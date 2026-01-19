@@ -69,6 +69,12 @@ service cloud.firestore {
       allow write: if true; // Allow writes for bulk upload
     }
 
+    // System collection: allow public read access for cached data like popular recipes
+    match /system/{docId} {
+      allow read: if true; // Public read access for system data
+      allow write: if request.auth != null; // Allow authenticated users to write system data
+    }
+
     // Default deny
     match /{document=**} {
       allow read, write: if false;

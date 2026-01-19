@@ -20,6 +20,7 @@ import { isHouseholdMember, inferCategoryFromItemName, inferStorageLocationFromI
 import { getOrCreateHousehold } from './services/householdService';
 import { GlobalUpdatePrompt } from './components/GlobalUpdatePrompt';
 import { App as CapacitorApp, BackButtonListenerEvent } from '@capacitor/app';
+import DatabaseAnalytics from './components/DatabaseAnalytics';
 
 type Theme = 'dark' | 'light';
 
@@ -552,6 +553,9 @@ const App: React.FC = () => {
 
       {/* Global Update Prompt */}
       <GlobalUpdatePrompt />
+
+      {/* Database Analytics Dashboard */}
+      <DatabaseAnalytics />
     </>
   );
 }

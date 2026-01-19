@@ -1,6 +1,7 @@
 import { collection, addDoc, getDocs, query, where, orderBy, limit, doc, getDoc, setDoc } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db, storage } from "../firebaseConfig";
+import DatabaseMonitoringService from "./databaseMonitoringService";
 import { StructuredRecipe, SavedRecipe } from "../types";
 import { getPerformance, trace } from "firebase/performance";
 
@@ -277,10 +278,16 @@ export const bulkUploadRecipes = async (
 /**
  * Get all saved recipes from Firestore
  */
-export const getSavedRecipes = async (): Promise<SavedRecipe[]> => {
+export const getSavedRecipes = async (limitCount: number = 50): Promise<SavedRecipe[]> => {
   try {
-    const q = query(collection(db, "recipes"), orderBy("dateSaved", "desc"));
-    const querySnapshot = await getDocs(q);
+    // Option 1: Use direct Firestore (current)
+    // const q = query(collection(db, "recipes"), orderBy("dateSaved", "desc"), limit(limitCount));
+    // const querySnapshot = await getDocs(q);
+
+    // Option 2: Use DatabaseMonitoringService for tracking (recommended for analytics)
+    const recipesRef = DatabaseMonitoringService.collection("recipes");
+    const q = query(recipesRef, orderBy("dateSaved", "desc"), limit(limitCount));
+    const querySnapshot = await DatabaseMonitoringService.getDocs(q);
 
     return querySnapshot.docs.map(doc => ({
       id: doc.id,
@@ -289,6 +296,83 @@ export const getSavedRecipes = async (): Promise<SavedRecipe[]> => {
   } catch (error) {
     console.error("Error fetching saved recipes:", error);
     return [];
+  }
+};
+
+/**
+ * Get cached popular recipes from a single document (much more efficient - 1 read vs 50+ reads)
+ */
+/**
+ * Get cached popular recipes from a single document (much more efficient - 1 read vs 50+ reads)
+ */
+export const getCachedPopularRecipes = async (): Promise<SavedRecipe[]> => {
+  try {
+    const popularRecipesRef = doc(db, "system", "popular_recipes");
+    const docSnap = await DatabaseMonitoringService.getDoc(popularRecipesRef);
+
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      const recipes = data?.recipes || [];
+      // Remove duplicates based on title to ensure clean data
+      const uniqueRecipes = recipes.filter((recipe, index, self) =>
+        index === self.findIndex(r => r.title === recipe.title)
+      );
+      console.log(`✅ Loaded ${uniqueRecipes.length} cached recipes (1 database read)`);
+      return uniqueRecipes;
+    }
+
+    // If no cached recipes exist, fall back to the old method but cache the result
+    console.log("📥 No cached popular recipes found, loading and caching 50 recipes...");
+    const recipes = await getSavedRecipes(50);
+    // Remove duplicates before caching
+    const uniqueRecipes = recipes.filter((recipe, index, self) =>
+      index === self.findIndex(r => r.title === recipe.title)
+    );
+
+    // Try to cache for future use (don't fail if caching fails)
+    try {
+      await cachePopularRecipes(uniqueRecipes);
+      console.log(`💾 Cached ${uniqueRecipes.length} recipes for future fast loading`);
+    } catch (cacheError) {
+      console.warn("⚠️ Failed to cache recipes, but continuing with loaded recipes:", cacheError);
+    }
+
+    return uniqueRecipes;
+  } catch (error) {
+    console.error("❌ Error fetching cached popular recipes:", error);
+    // Fall back to direct loading if caching fails
+    console.log("🔄 Falling back to direct recipe loading...");
+    const recipes = await getSavedRecipes(50);
+    // Remove duplicates even in fallback
+    return recipes.filter((recipe, index, self) =>
+      index === self.findIndex(r => r.title === recipe.title)
+    );
+  }
+};
+
+/**
+ * Cache popular recipes in a single document for efficient loading
+ */
+export const cachePopularRecipes = async (recipes: SavedRecipe[]): Promise<void> => {
+  try {
+    // Only cache if user is authenticated (required by Firestore rules)
+    const { getAuth } = await import('firebase/auth');
+    const auth = getAuth();
+    if (!auth.currentUser) {
+      console.log("⚠️ User not authenticated, skipping recipe caching");
+      return;
+    }
+
+    const popularRecipesRef = doc(db, "system", "popular_recipes");
+    await DatabaseMonitoringService.setDoc(popularRecipesRef, {
+      recipes,
+      lastUpdated: new Date(),
+      version: 1
+    });
+    console.log(`💾 Cached ${recipes.length} popular recipes for efficient loading`);
+  } catch (error) {
+    console.error("❌ Error caching popular recipes:", error);
+    // Don't throw - caching failure shouldn't break the app
   }
 };
 
@@ -302,8 +386,14 @@ export const searchRecipesInFirestore = async (searchTerm: string): Promise<Save
   try {
     // Note: Firestore doesn't support full-text search natively
     // This is a simple implementation - you might want to use Algolia or Elastic Search for better search
-    const q = query(collection(db, "recipes"));
-    const querySnapshot = await getDocs(q);
+    // Option 1: Use direct Firestore (current)
+    // const q = query(collection(db, "recipes"));
+    // const querySnapshot = await getDocs(q);
+
+    // Option 2: Use DatabaseMonitoringService for tracking (recommended for analytics)
+    const recipesRef = DatabaseMonitoringService.collection("recipes");
+    const q = query(recipesRef);
+    const querySnapshot = await DatabaseMonitoringService.getDocs(q);
 
     const allRecipes = querySnapshot.docs.map(doc => ({
       id: doc.id,
@@ -329,4 +419,4 @@ export const searchRecipesInFirestore = async (searchTerm: string): Promise<Save
   } finally {
     perfTrace.stop();
   }
-};
+}

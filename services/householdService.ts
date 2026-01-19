@@ -17,6 +17,7 @@ import {
   deleteDoc,
 } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
+import DatabaseMonitoringService from './databaseMonitoringService';
 import { Household, Member, User } from '../types';
 import { getPerformance, trace } from "firebase/performance";
 
@@ -38,7 +39,11 @@ export const getOrCreateHousehold = async (user: User): Promise<Household | null
       where('memberIds', 'array-contains', user.id)
     );
 
-    const querySnapshot = await getDocs(householdQuery);
+    // Option 1: Use direct Firestore (current)
+    // const querySnapshot = await getDocs(householdQuery);
+
+    // Option 2: Use DatabaseMonitoringService for tracking (recommended for analytics)
+    const querySnapshot = await DatabaseMonitoringService.getDocs(householdQuery);
 
     if (!querySnapshot.empty) {
       // User is already in a household
@@ -340,7 +345,12 @@ export const getUserHouseholds = async (userEmail: string): Promise<Household[]>
       where('members', 'array-contains', { email: userEmail })
     );
 
-    const querySnapshot = await getDocs(householdQuery);
+    // Option 1: Use direct Firestore (current)
+    // const querySnapshot = await getDocs(householdQuery);
+
+    // Option 2: Use DatabaseMonitoringService for tracking (recommended for analytics)
+    const querySnapshot = await DatabaseMonitoringService.getDocs(householdQuery);
+
     return querySnapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),

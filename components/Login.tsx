@@ -188,21 +188,25 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
     checkRedirect();
 
     // Also listen for auth state changes in case the redirect happens while component is mounted
-    const unsubscribe = getAuth().onAuthStateChanged((user) => {
-      if (user && user.providerData.some(provider => provider.providerId === 'google.com')) {
-        // User is signed in with Google, trigger login callback
-        if (analytics) {
-          logEvent(analytics, 'login', { email: user.email, provider: 'google' });
+    const auth = getAuth();
+    let unsubscribe = () => {};
+    if (auth && typeof (auth as any).onAuthStateChanged === 'function') {
+      unsubscribe = auth.onAuthStateChanged((user) => {
+        if (user && user.providerData.some(provider => provider.providerId === 'google.com')) {
+          // User is signed in with Google, trigger login callback
+          if (analytics) {
+            logEvent(analytics, 'login', { email: user.email, provider: 'google' });
+          }
+          onLogin({
+            id: user.uid,
+            name: user.displayName || user.email?.split('@')[0] || '',
+            email: user.email || '',
+            provider: 'google',
+            hasSeenTutorial: false
+          });
         }
-        onLogin({
-          id: user.uid,
-          name: user.displayName || user.email?.split('@')[0] || '',
-          email: user.email || '',
-          provider: 'google',
-          hasSeenTutorial: false
-        });
-      }
-    });
+      });
+    }
 
     return unsubscribe;
   }, [onLogin]);

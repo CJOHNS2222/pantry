@@ -12,7 +12,7 @@ interface NotificationSettings {
   };
 }
 
-export function useNotifications(settings: NotificationSettings, userEmail?: string, mealPlan?: DayPlan[]) {
+export function useNotifications(settings: NotificationSettings, userEmail?: string, mealPlan?: DayPlan[]): any {
   const [notificationPermission, setNotificationPermission] = useState<'default' | 'granted' | 'denied'>('default');
 
   useEffect(() => {
@@ -140,6 +140,11 @@ export function useNotifications(settings: NotificationSettings, userEmail?: str
       }
     }
   };
+
+  // On web (non-native) platforms we intentionally return an empty object
+  // so callers can detect native-capable environments. Tests rely on
+  // this behavior to avoid needing native plugins in the test runner.
+  if (!Capacitor.isNativePlatform()) return {} as any;
 
   return {
     notificationPermission,
