@@ -4,6 +4,9 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Force include missing Tailwind utilities */
+.max-w-md { max-width: 28rem; }
+
 :root {
   /* Default Dark Theme (Burgundy) */
   --bg-primary: #2A0A10;

@@ -9,6 +9,9 @@ export default {
     "./utils/**/*.{js,ts,jsx,tsx}",
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
+  safelist: [
+    'max-w-md'
+  ],
   theme: {
     extend: {
       fontFamily: {
