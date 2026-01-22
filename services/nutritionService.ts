@@ -92,36 +92,31 @@ const searchWithFallbacks = async (itemName: string): Promise<any[] | null> => {
 
   for (const term of searchTerms) {
     if (!term || term.length < 2) continue;
-    
-    try {
-      const searchResponse = await fetch(
-        `https://fdc.nal.usda.gov/api/foods/search?query=${encodeURIComponent(term)}&pageSize=5`,
-        { headers: { 'Content-Type': 'application/json' } }
-      );
 
-      if (searchResponse.ok) {
-        const data = await searchResponse.json();
-        if (data.foods && data.foods.length > 0) {
-          // Sort by fuzzy match score
-          data.foods.sort((a: any, b: any) => {
-            const scoreA = fuzzyMatch(itemName, a.description);
-            const scoreB = fuzzyMatch(itemName, b.description);
-            return scoreB - scoreA;
-          });
-          return data.foods;
-        }
+    try {
+      // Use Firebase Function to proxy the USDA API call (solves CORS issues)
+      const { getFunctions, httpsCallable } = await import('firebase/functions');
+      const functions = getFunctions();
+      const getNutritionData = httpsCallable(functions, 'getNutritionData');
+
+      const result = await getNutritionData({ query: term, pageSize: 5 });
+      const data = result.data as any;
+
+      if (data.foods && data.foods.length > 0) {
+        // Sort by fuzzy match score
+        data.foods.sort((a: any, b: any) => {
+          const scoreA = fuzzyMatch(itemName, a.description);
+          const scoreB = fuzzyMatch(itemName, b.description);
+          return scoreB - scoreA;
+        });
+        return data.foods;
       }
     } catch (error) {
-      // Check if this is a CORS error - if so, don't try other terms
-      if (error instanceof TypeError && 
-          (error.message.includes('CORS') || error.message.includes('Failed to fetch'))) {
-        console.warn('CORS error detected - USDA API not accessible from browser:', error.message);
-        return null; // Don't try other terms, CORS will affect all requests
-      }
-      continue; // For other errors, try next term
+      console.warn('Error fetching nutrition data via Firebase Function:', error);
+      continue; // Try next term
     }
   }
-  
+
   return null;
 };
 
@@ -160,27 +155,18 @@ export const getNutritionFacts = async (itemName: string): Promise<NutritionFact
     const foodItem = foods[0];
     const foodFdcId = foodItem.fdcId;
 
-    // Get detailed nutrition information
+    // Get detailed nutrition information via Firebase Function
     let foodDetail;
     try {
-      const detailResponse = await fetch(
-        `https://fdc.nal.usda.gov/api/foods/${foodFdcId}`,
-        { headers: { 'Content-Type': 'application/json' } }
-      );
+      const { getFunctions, httpsCallable } = await import('firebase/functions');
+      const functions = getFunctions();
+      const getNutritionData = httpsCallable(functions, 'getNutritionData');
 
-      if (!detailResponse.ok) {
-        console.warn('Nutrition detail fetch failed:', detailResponse.statusText);
-        return null;
-      }
-
-      foodDetail = await detailResponse.json();
+      const result = await getNutritionData({ fdcId: foodFdcId });
+      foodDetail = result.data as any;
     } catch (error) {
-      if (error instanceof TypeError && 
-          (error.message.includes('CORS') || error.message.includes('Failed to fetch'))) {
-        console.warn('CORS error on nutrition detail fetch - USDA API not accessible from browser:', error.message);
-        return null;
-      }
-      throw error; // Re-throw other errors
+      console.warn('Error fetching nutrition details via Firebase Function:', error);
+      return null;
     }
     const nutrients = foodDetail.foodNutrients || [];
 

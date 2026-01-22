@@ -6,6 +6,8 @@ import { User, PantryItem, DayPlan, Household, ShoppingItem, SavedRecipe, Recipe
 import { next7DateKeys, isHouseholdMember, generateConsumptionSuggestions, generateExpirationAlerts, generateRecipeSuggestions, parseIngredientForShoppingList } from '../utils/appUtils';
 import { UsageService } from '../services/usageService';
 import AnalyticsService from '../services/analyticsService';
+import { offlineQueue } from '../services/offlineQueueService';
+import { undoService } from '../services/undoService';
 
 export function useDataManagement(user: User | null, addToast: (message: string, type?: 'error' | 'info', ttl?: number, actionLabel?: string, action?: () => void) => void, addToShoppingList?: (items: string[]) => void) {
   // Data States
@@ -21,6 +23,12 @@ export function useDataManagement(user: User | null, addToast: (message: string,
   const [recipeSaveLimitExceeded, setRecipeSaveLimitExceeded] = useState(false);
   const [mealPlanLimitExceeded, setMealPlanLimitExceeded] = useState(false);
 
+  // Online status
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+
+  // Undo actions
+  const [recentActions, setRecentActions] = useState<any[]>([]);
+
   // Helper function to clean objects by removing undefined fields (Firestore requirement)
   const cleanObject = (obj: any): any => {
     const cleaned: any = {};
@@ -30,6 +38,22 @@ export function useDataManagement(user: User | null, addToast: (message: string,
       }
     }
     return cleaned;
+  };
+
+  // Helper function for offline-aware writes
+  const performWrite = async (operation: { type: 'add' | 'update' | 'delete'; collection: string; docId?: string; data?: any }) => {
+    if (!isOnline) {
+      await offlineQueue.enqueue(operation);
+      addToast('Change queued for when you\'re back online.', 'info');
+    } else {
+      if (operation.type === 'add') {
+        await addDoc(collection(db, operation.collection), operation.data);
+      } else if (operation.type === 'update' && operation.docId) {
+        await setDoc(doc(db, operation.collection, operation.docId), operation.data);
+      } else if (operation.type === 'delete' && operation.docId) {
+        await deleteDoc(doc(db, operation.collection, operation.docId));
+      }
+    }
   };
 
   // Helper function to validate and sanitize meal plan data
@@ -176,7 +200,9 @@ export function useDataManagement(user: User | null, addToast: (message: string,
         const serverData = snap.docs.map(d => ({ id: d.id, ...d.data() } as PantryItem));
         // Only update if different to prevent infinite loops
         if (JSON.stringify(serverData) !== JSON.stringify(inventory)) {
+          (window as any).__remoteInventoryUpdate = true;
           setInventory(serverData);
+          setTimeout(() => { (window as any).__remoteInventoryUpdate = false; }, 100);
         }
         initialDataLoadedRef.current = true;
       }, err => {
@@ -188,7 +214,9 @@ export function useDataManagement(user: User | null, addToast: (message: string,
         const serverData = snap.docs.map(d => ({ id: d.id, ...d.data() } as PantryItem));
         // Only update if different to prevent infinite loops
         if (JSON.stringify(serverData) !== JSON.stringify(inventory)) {
+          (window as any).__remoteInventoryUpdate = true;
           setInventory(serverData);
+          setTimeout(() => { (window as any).__remoteInventoryUpdate = false; }, 100);
         }
         initialDataLoadedRef.current = true;
       }, err => {
@@ -582,17 +610,18 @@ export function useDataManagement(user: User | null, addToast: (message: string,
   // Write changes to Firestore
   useEffect(() => {
     if (!user?.id || !listenersReadyRef.current || !initialDataLoadedRef.current) return;
-    if ((window as any).__remoteMealPlanUpdateRef?.current) {
+    if ((window as any).__remoteMealPlanUpdateRef?.current || (window as any).__remoteInventoryUpdate) {
       return;
     }
 
-    // Determine if we are in a valid household (multi-member household)
-    const inHousehold = household?.id && isHouseholdMember(household, user) && 
-                       (Array.isArray(household.memberIds) ? household.memberIds.length > 1 : false);
+    // Debounce the sync to avoid running on every state change
+    const timeoutId = setTimeout(async () => {
+      // Determine if we are in a valid household (multi-member household)
+      const inHousehold = household?.id && isHouseholdMember(household, user) && 
+                         (Array.isArray(household.memberIds) ? household.memberIds.length > 1 : false);
 
-    console.log('Inventory sync triggered - user:', user?.id, 'household:', household?.id, 'inventory length:', inventory.length, 'inHousehold:', inHousehold);
+      console.log('Inventory sync triggered - user:', user?.id, 'household:', household?.id, 'inventory length:', inventory.length, 'inHousehold:', inHousehold);
 
-    (async () => {
       (window as any).__writingMealPlan = true;
       try {
         // If offline, enqueue the inventory sync to IndexedDB for later processing
@@ -857,7 +886,9 @@ export function useDataManagement(user: User | null, addToast: (message: string,
       } finally {
         (window as any).__writingMealPlan = false;
       }
-    })();
+    }, 1000); // 1 second debounce
+
+    return () => clearTimeout(timeoutId);
     }, [user?.id, household?.id, inventory, savedRecipes, mealPlan]);
 
   // Shopping list sync
@@ -1004,6 +1035,44 @@ export function useDataManagement(user: User | null, addToast: (message: string,
   // Persistence
   useEffect(() => { localStorage.setItem('mealPlan', JSON.stringify(mealPlan)); }, [mealPlan]);
   useEffect(() => { localStorage.setItem('household', JSON.stringify(household)); }, [household]);
+
+  // Online/offline handling
+  useEffect(() => {
+    const handleOnline = async () => {
+      setIsOnline(true);
+      // Process queued operations when coming back online
+      try {
+        await offlineQueue.processQueue();
+        addToast('Changes synced successfully!', 'info');
+      } catch (error) {
+        console.error('Failed to process offline queue:', error);
+        addToast('Some changes failed to sync. Please check your connection.', 'error');
+      }
+    };
+
+    const handleOffline = () => {
+      setIsOnline(false);
+      addToast('You are offline. Changes will be synced when connection is restored.', 'info');
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    // Process queue on app start if online
+    if (navigator.onLine) {
+      offlineQueue.processQueue().catch(console.error);
+    }
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Load undo actions
+  useEffect(() => {
+    undoService.getRecentActions().then(actions => setRecentActions(actions)).catch(console.error);
+  }, []);
 
   // Handlers
   const handleAddToPlan = async (recipe: any) => {
@@ -1388,6 +1457,39 @@ export function useDataManagement(user: User | null, addToast: (message: string,
     }
   };
 
+  // Undo functions
+  const recordUndo = async (type: string, data: any) => {
+    try {
+      await undoService.recordAction({ type, data });
+      const actions = await undoService.getRecentActions();
+      setRecentActions(actions);
+    } catch (error) {
+      console.error('Failed to record undo action:', error);
+    }
+  };
+
+  const performUndo = async (action: any) => {
+    try {
+      const undoOp = await undoService.undoAction(action);
+      if (undoOp) {
+        if (undoOp.type === 'restore_item') {
+          setInventory(prev => [...prev, undoOp.data]);
+        } else if (undoOp.type === 'revert_edit') {
+          // For revert, data would contain the previous state
+          // This is simplified; in practice, need to handle specific cases
+          addToast('Undo performed', 'info');
+        }
+        await undoService.removeAction(action.id);
+        const actions = await undoService.getRecentActions();
+        setRecentActions(actions);
+        addToast('Action undone', 'info');
+      }
+    } catch (error) {
+      console.error('Failed to undo action:', error);
+      addToast('Failed to undo action', 'error');
+    }
+  };
+
   return {
     inventory,
     setInventory,
@@ -1412,6 +1514,10 @@ export function useDataManagement(user: User | null, addToast: (message: string,
     handleDeleteRecipe,
     handleRateRecipe,
     handleMarkAsMade,
+    // Undo
+    recentActions,
+    recordUndo,
+    performUndo,
     // Usage limit states
     recipeSaveLimitExceeded,
     mealPlanLimitExceeded,

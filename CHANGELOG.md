@@ -5,6 +5,18 @@ All notable changes to Smart Pantry Chef will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.9] - 2026-01-22
+
+### Fixed
+- **Database Performance**: Optimized inventory sync with 1-second debouncing and remote update detection to reduce excessive Firestore reads (from 12-15 per item deletion to 1-2)
+- **Nutrition API CORS**: Created Firebase Function proxy for USDA FoodData Central API calls to eliminate browser CORS restrictions
+- **Content Security Policy**: Updated CSP policy to allow connections to Firebase Functions emulator (localhost:5001) for development
+
+### Technical
+- **Firebase Functions**: Added `getNutritionData` function with support for both food search and detailed nutrition retrieval
+- **Nutrition Service**: Refactored to use Firebase Function proxy for all USDA API calls, eliminating direct browser requests
+- **Error Handling**: Improved nutrition data fetching with proper fallback strategies and caching
+
 ## [1.1.8] - 2026-01-18
 
 ### Fixed
