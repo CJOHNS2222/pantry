@@ -111,7 +111,7 @@ export const fetchRecipesFromSpoonacular = async (
 export const convertSpoonacularToStructured = (spoonacularRecipe: SpoonacularRecipe): StructuredRecipe => {
   return {
     title: spoonacularRecipe.title,
-    description: spoonacularRecipe.summary?.replace(/<[^>]*>/g, '') || `${spoonacularRecipe.title} - A delicious recipe`,
+    description: spoonacularRecipe.summary?.replace(/[<>]/g, '') || `${spoonacularRecipe.title} - A delicious recipe`,
     ingredients: spoonacularRecipe.extendedIngredients?.map(ing =>
       `${ing.amount} ${ing.unit} ${ing.name}`
     ) || [],
