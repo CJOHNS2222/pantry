@@ -30,3 +30,5 @@ old-service-account.json
 
 # Sentry Config File
 sentry.properties
+sentry-wizard.exe
+.sentryclirc
