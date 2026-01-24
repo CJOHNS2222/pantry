@@ -88,37 +88,54 @@ export function parseIngredientForShoppingList(ingredientText: string): { quanti
     // Add custom metrics
     perfTrace.putMetric('input_length', text.length);
 
-    // Match common quantity patterns at the beginning
-    // This regex matches: number + optional fraction + unit (cup, tbsp, tsp, etc.) + optional "s"
-    const quantityRegex = /^(\d+(?:\/\d+)?(?:\s*\d+\/\d+)?)\s*(cup|tbsp|tsp|tablespoon|teaspoon|oz|ounce|pound|lb|gram|g|kg|liter|l|ml|quart|qt|pint|pt|gallon|gal|can|bottle|package|pkg|box|bag|slice|piece|clove|head|stalk|bunch|sprig|dash|pinch)s?\b/i;
-
-    const match = text.match(quantityRegex);
+    // Split the text into words to analyze
+    const words = text.split(/\s+/);
     let quantity = '';
     let itemName = text;
 
-    if (match) {
-      quantity = match[0].trim();
-      itemName = text.substring(match[0].length).trim();
-      perfTrace.putAttribute('parsing_method', 'regex_match');
-    } else {
-      // Fallback: try to match just a number at the beginning
-      const numberMatch = text.match(/^(\d+(?:\/\d+)?)\s+/);
-      if (numberMatch) {
-        quantity = numberMatch[1];
-        itemName = text.substring(numberMatch[0].length).trim();
-        perfTrace.putAttribute('parsing_method', 'number_fallback');
+    // Check if first word/part is a quantity (number/fraction with optional unit)
+    if (words.length > 0) {
+      const firstPart = words[0];
+      // Check if it's a number/fraction with optional unit attached (like "200g", "1.5kg", "1/2")
+      if (/^\d+(\/\d+)?(\.\d+)?[a-zA-Z]*$/.test(firstPart)) {
+        quantity = firstPart;
+        // Check if next word is a unit
+        if (words.length > 1) {
+          const potentialUnit = words[1].toLowerCase();
+          // Common units that should be included in quantity
+          const units = ['tbs', 'tbsp', 'tsp', 'cup', 'cups', 'oz', 'ounce', 'ounces', 'lb', 'pound', 'pounds', 
+                        'g', 'gram', 'grams', 'kg', 'liter', 'l', 'ml', 'clove', 'cloves', 'bunch', 'bunches', 
+                        'sprig', 'sprigs', 'head', 'heads', 'stalk', 'stalks', 'slice', 'slices', 'piece', 'pieces',
+                        'can', 'cans', 'bottle', 'bottles', 'package', 'packages', 'box', 'boxes', 'bag', 'bags',
+                        'dash', 'dashes', 'pinch', 'pinches', 'teaspoon', 'teaspoons', 'tablespoon', 'tablespoons'];
+          
+          if (units.includes(potentialUnit) || potentialUnit.endsWith('s')) {
+            // Check if it's a plural of a known unit
+            const singular = potentialUnit.replace(/s$/, '');
+            if (units.includes(singular)) {
+              quantity += ' ' + words[1];
+              itemName = words.slice(2).join(' ');
+            } else {
+              itemName = words.slice(1).join(' ');
+            }
+          } else {
+            itemName = words.slice(1).join(' ');
+          }
+        } else {
+          itemName = words.slice(1).join(' ');
+        }
+        perfTrace.putAttribute('parsing_method', 'word_analysis');
       } else {
         perfTrace.putAttribute('parsing_method', 'no_quantity');
       }
     }
 
-    // Clean the item name by removing common descriptors
+    // Clean the item name by removing common descriptors, but keep preparation methods for shopping list display
     itemName = itemName
       // Remove common size descriptors
       .replace(/\b(large|medium|small|big|tiny|huge|giant)\s+/gi, '')
       // Keep colors for distinguishing items (like red vs green apples)
-      // Remove common preparation descriptors that don't affect core item identity
-      .replace(/\b(fresh|dried|canned|chopped|sliced|diced|minced|crushed|ground|cubed|grated|finely)\s+/gi, '')
+      // Keep preparation descriptors for shopping list clarity (user wants to see "chopped", "minced", etc.)
       // Remove common quality descriptors
       .replace(/\b(ripe|raw|cooked|baked|fried|organic)\s+/gi, '')
       // Remove trailing/leading whitespace

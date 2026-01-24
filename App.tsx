@@ -491,6 +491,25 @@ const App: React.FC = () => {
               });
               return Object.values(merged);
             });
+
+            // Show toast for bulk quantity editing if multiple items were added
+            if (items.length > 1) {
+              // Set a flag to indicate bulk quantity editing should be triggered
+              localStorage.setItem('bulkQuantityEditPending', 'true');
+              localStorage.setItem('bulkQuantityEditCount', items.length.toString());
+              
+              addToast(
+                `Added ${items.length} items to pantry. Edit quantities?`,
+                'info',
+                8000,
+                'Edit Quantities',
+                () => {
+                  // Switch to pantry tab and trigger bulk editing workflow
+                  setActiveTab(Tab.PANTRY);
+                  // The PantryScanner component will handle the bulk editing
+                }
+              );
+            }
           }}
           onAddToShoppingList={addToShoppingList}
           handleMarkAsMade={handleMarkAsMade}

@@ -53,9 +53,29 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   const [selectedItemIndex, setSelectedItemIndex] = useState<number | null>(null);
   const [scanResults, setScanResults] = useState<PantryItem[] | null>(null);
   const [showScanReviewModal, setShowScanReviewModal] = useState(false);
+  const [bulkQuantityEditItems, setBulkQuantityEditItems] = useState<PantryItem[]>([]);
+  const [showBulkQuantityEdit, setShowBulkQuantityEdit] = useState(false);
   
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Check for bulk quantity editing trigger
+  React.useEffect(() => {
+    const bulkEditPending = localStorage.getItem('bulkQuantityEditPending');
+    if (bulkEditPending === 'true') {
+      // Clear the flag
+      localStorage.removeItem('bulkQuantityEditPending');
+      const count = parseInt(localStorage.getItem('bulkQuantityEditCount') || '0');
+      localStorage.removeItem('bulkQuantityEditCount');
+      
+      if (count > 1) {
+        // Get the most recently added items (assuming they were just added)
+        const recentlyAdded = inventory.slice(-count);
+        setBulkQuantityEditItems(recentlyAdded);
+        setShowBulkQuantityEdit(true);
+      }
+    }
+  }, [inventory]);
 
   // Use Capacitor Camera for mobile
   const handleTakePhoto = async () => {
@@ -1331,6 +1351,102 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
           ingredient={showPriceTrends}
           onClose={() => setShowPriceTrends(null)}
         />
+      )}
+
+      {/* Bulk Quantity Edit Modal */}
+      {showBulkQuantityEdit && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center p-4">
+          <div className="bg-theme-primary rounded-t-3xl max-w-md w-full max-h-[80vh] overflow-y-auto shadow-xl animate-slide-up">
+            <div className="p-6 pb-2.5">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-bold text-theme-secondary">Edit Quantities</h3>
+                <button
+                  onClick={() => {
+                    setShowBulkQuantityEdit(false);
+                    setBulkQuantityEditItems([]);
+                  }}
+                  className="p-2 hover:bg-theme-secondary rounded-full transition-colors"
+                >
+                  <X className="w-5 h-5 text-theme-secondary" />
+                </button>
+              </div>
+
+              <p className="text-sm text-theme-secondary opacity-70 mb-4">
+                Update quantities for the items you just added:
+              </p>
+
+              <div className="space-y-4">
+                {bulkQuantityEditItems.map((item, index) => (
+                  <div key={item.id} className="flex items-center gap-3 p-3 bg-theme-secondary rounded-lg">
+                    <img
+                      src={item.image}
+                      alt={item.item}
+                      className="w-10 h-10 rounded-lg object-cover"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.src = '/images/placeholder.svg';
+                      }}
+                    />
+                    <div className="flex-1">
+                      <span className="font-medium text-theme-primary">{item.item}</span>
+                      <div className="flex items-center gap-2 mt-1">
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.1"
+                          value={parseInt(item.quantity_estimate) || 1}
+                          onChange={(e) => {
+                            const newQty = parseFloat(e.target.value) || 1;
+                            const updatedItems = [...bulkQuantityEditItems];
+                            updatedItems[index] = {
+                              ...updatedItems[index],
+                              quantity_estimate: newQty.toString()
+                            };
+                            setBulkQuantityEditItems(updatedItems);
+                          }}
+                          className="w-20 px-2 py-1 text-sm bg-theme-primary border border-theme rounded text-theme-primary"
+                        />
+                        <span className="text-xs text-theme-secondary">items</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() => {
+                    setShowBulkQuantityEdit(false);
+                    setBulkQuantityEditItems([]);
+                  }}
+                  className="flex-1 py-3 rounded-lg font-bold text-sm uppercase tracking-wider bg-theme-secondary text-theme-secondary hover:bg-theme-primary transition-colors"
+                >
+                  Skip
+                </button>
+                <button
+                  onClick={() => {
+                    // Update all items with their new quantities
+                    bulkQuantityEditItems.forEach(item => {
+                      const inventoryIndex = inventory.findIndex(i => i.id === item.id);
+                      if (inventoryIndex !== -1) {
+                        setInventory(prev => {
+                          const updated = [...prev];
+                          updated[inventoryIndex] = { ...updated[inventoryIndex], quantity_estimate: item.quantity_estimate };
+                          return updated;
+                        });
+                      }
+                    });
+                    setShowBulkQuantityEdit(false);
+                    setBulkQuantityEditItems([]);
+                  }}
+                  className="flex-1 py-3 rounded-lg font-bold text-sm uppercase tracking-wider bg-[var(--accent-color)] text-white shadow-lg hover:bg-[var(--accent-color)]/90 transition-colors"
+                >
+                  Save All
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Item Detail Modal */}

@@ -10,6 +10,9 @@ include ':capacitor-cordova-android-plugins'
 
 project(':capacitor-cordova-android-plugins').projectDir = new File('./capacitor-cordova-android-plugins/')
 
+// Set AndroidX property for capacitor-cordova-android-plugins
+gradle.ext.set("android.useAndroidX", true)
+
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
     repositories {
