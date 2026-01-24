@@ -5,7 +5,26 @@ All notable changes to Smart Pantry Chef will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.1.9] - 2026-01-22
+## [1.1.9] - 2026-01-24
+
+### Enhanced
+- **Interactive Tutorial System**: Complete overhaul of the onboarding tutorial with robust click detection
+  - **Theme Toggle Tutorial**: Fixed click detection reliability for theme button interactions
+  - **Add Item Tutorial**: Added data-tutorial attribute to pantry floating action button for proper click detection
+  - **Voice Search Tutorial**: Added data-tutorial attribute to microphone button in recipe finder
+  - **Click Detection Engine**: Implemented stable ref-based event handling to prevent race conditions and missed clicks
+  - **Tutorial Flow**: Improved step completion logic with manual DOM traversal for reliable element detection
+
+### Fixed
+- **Tutorial Reliability**: Resolved issues where interactive tutorial steps required multiple clicks to register
+- **User Experience**: Ensured smooth onboarding flow without getting stuck on tutorial steps
+
+### Technical
+- **Event Handling**: Enhanced click detection with refs and manual DOM traversal for consistent behavior
+- **Component Attributes**: Added data-tutorial attributes to interactive elements (theme-toggle, add-item-button, voice-search)
+- **State Management**: Improved tutorial state handling to prevent re-render interference with click detection
+
+## [1.1.8] - 2026-01-22
 
 ### Fixed
 - **Database Performance**: Optimized inventory sync with 1-second debouncing and remote update detection to reduce excessive Firestore reads (from 12-15 per item deletion to 1-2)

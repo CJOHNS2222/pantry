@@ -1,5 +1,86 @@
 import { db } from '../firebaseConfig';
 import { setDoc, deleteDoc, doc } from 'firebase/firestore';
+import { reportSyncIssue } from './sentryService';
+
+// Enhanced retry configuration
+const RETRY_CONFIG = {
+  maxAttempts: 5,
+  baseDelay: 1000, // 1 second
+  maxDelay: 30000, // 30 seconds
+  backoffMultiplier: 2,
+  jitter: 0.1 // Add 10% jitter to prevent thundering herd
+};
+
+// Utility functions for retry logic
+export function calculateRetryDelay(attempt: number): number {
+  const delay = Math.min(
+    RETRY_CONFIG.baseDelay * Math.pow(RETRY_CONFIG.backoffMultiplier, attempt - 1),
+    RETRY_CONFIG.maxDelay
+  );
+
+  // Add jitter to prevent thundering herd
+  const jitter = delay * RETRY_CONFIG.jitter * (Math.random() * 2 - 1);
+  return Math.max(1000, delay + jitter);
+}
+
+export function isRetryableError(error: any): boolean {
+  // Network errors
+  if (!navigator.onLine) return false;
+
+  // Firebase specific errors
+  if (error?.code) {
+    const retryableCodes = [
+      'unavailable',
+      'deadline-exceeded',
+      'resource-exhausted',
+      'cancelled',
+      'internal',
+      'unknown'
+    ];
+    return retryableCodes.includes(error.code);
+  }
+
+  // Network-related errors
+  if (error?.message) {
+    const retryableMessages = [
+      'network',
+      'timeout',
+      'connection',
+      'fetch',
+      'failed to fetch'
+    ];
+    return retryableMessages.some(msg => error.message.toLowerCase().includes(msg));
+  }
+
+  return false;
+}
+
+export async function withRetry<T>(
+  operation: () => Promise<T>,
+  operationName: string,
+  maxAttempts: number = RETRY_CONFIG.maxAttempts
+): Promise<T> {
+  let lastError: Error;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error as Error;
+
+      if (attempt === maxAttempts || !isRetryableError(error)) {
+        throw error;
+      }
+
+      const delay = calculateRetryDelay(attempt);
+      console.warn(`${operationName} failed (attempt ${attempt}/${maxAttempts}), retrying in ${delay}ms:`, error);
+
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+
+  throw lastError!;
+}
 
 type BaseOp = {
   id?: number;
@@ -10,6 +91,7 @@ type BaseOp = {
   attempts?: number;
   nextAttempt?: number; // timestamp
   timestamp: number;
+  lastError?: string;
 };
 
 type InventorySyncOp = BaseOp & {
@@ -123,11 +205,43 @@ export async function processQueue() {
 
       if (op.id) await deleteOp(op.id);
     } catch (err) {
-      console.warn('Processing op failed, will schedule retry:', err);
-      // increment attempts and set exponential backoff nextAttempt
+      const error = err as Error;
       const attempts = (op.attempts || 0) + 1;
-      const backoffMs = Math.min(60_000 * Math.pow(2, attempts - 1), 1000 * 60 * 60); // max 1 hour
-      const nextAttempt = Date.now() + backoffMs;
+
+      if (attempts >= RETRY_CONFIG.maxAttempts || !isRetryableError(error)) {
+        console.error(`Operation ${op.type} failed permanently after ${attempts} attempts:`, error);
+        // Mark for permanent failure - could move to dead letter queue
+        if (op.id) await deleteOp(op.id);
+      } else {
+        // Schedule retry with exponential backoff
+        const delay = calculateRetryDelay(attempts);
+        const nextAttempt = Date.now() + delay;
+
+        console.warn(`Operation ${op.type} failed, scheduling retry ${attempts}/${RETRY_CONFIG.maxAttempts} in ${delay}ms:`, error);
+
+        // Update operation with retry info
+        const dbInst = await open();
+        const tx = dbInst.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        const updatedOp = {
+          ...op,
+          attempts,
+          nextAttempt,
+          lastError: error.message
+        };
+        store.put(updatedOp);
+      }
+
+      // Report sync issues to Sentry for monitoring
+      reportSyncIssue(op.type, error, attempts, {
+        operation_id: op.id,
+        user_id: op.userId,
+        household_id: op.householdId,
+        timestamp: op.timestamp,
+        is_retryable: isRetryableError(error),
+        will_retry: attempts < RETRY_CONFIG.maxAttempts && isRetryableError(error)
+      });
+
       try {
         // update op in storage
         const dbInst = await open();
@@ -144,6 +258,11 @@ export async function processQueue() {
         };
       } catch (e) {
         console.error('Failed to schedule retry for op:', e);
+        // Report this secondary error as well
+        reportSyncIssue('retry_scheduling', e as Error, attempts, {
+          original_operation: op.type,
+          operation_id: op.id
+        });
       }
       // continue with next op rather than stop processing
     }

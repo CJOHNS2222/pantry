@@ -15,7 +15,8 @@ service cloud.firestore {
         && request.auth.uid in request.resource.data.memberIds;
 
       // Reading/updating/deleting household top-level doc requires membership
-      // Allow authenticated users to read only if they are members
+      // Note: Role-based permissions for destructive operations (like removing members)
+      // are enforced at the service layer, not in Firestore rules
       allow read: if request.auth != null && request.auth.uid in resource.data.memberIds;
       allow update, delete: if request.auth != null
         && request.auth.uid in resource.data.memberIds;

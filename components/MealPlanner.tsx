@@ -6,12 +6,13 @@ import { MealPrepPlanner } from './MealPrepPlanner';
 import { PremiumFeature } from './PremiumFeature';
 import { GroceryCostEstimator } from './GroceryCostEstimator';
 import { Tab } from '../types/app';
-import { searchRecipes } from '../services/geminiService';
+import { searchRecipes as searchRecipesGemini } from '../services/geminiService';
 import { getSavedRecipes } from '../services/recipeService';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 import { parseIngredientForShoppingList } from '../utils/appUtils';
 import AnalyticsService from '../services/analyticsService';
+import { searchRecipes } from '../utils/searchUtils';
 
 interface MealPlannerProps {
   mealPlan: DayPlan[];
@@ -107,7 +108,7 @@ const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
     setIsSearching(true);
     try {
       const pantryIngredients = inventory.map(item => item.item.toLowerCase()).join(', ');
-      const result = await searchRecipes({
+      const result = await searchRecipesGemini({
         query: searchQuery,
         ingredients: pantryIngredients,
         restrictions: '',
@@ -125,11 +126,7 @@ const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
     }
   };
 
-  const filteredSavedRecipes = savedRecipes
-    .filter(recipe =>
-      recipe.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      recipe.ingredients.some(ing => ing.toLowerCase().includes(searchQuery.toLowerCase()))
-    )
+  const filteredSavedRecipes = searchRecipes(savedRecipes, searchQuery)
     .filter((recipe, index, self) =>
       index === self.findIndex(r => r.title === recipe.title)
     );
@@ -314,8 +311,9 @@ const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
 };
 
 export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan, inventory, addToShoppingList, onAddToPlan, onSaveRecipe, onMarkAsMade, onRate, user, setActiveTab, recipeSaveLimitExceeded = false, mealPlanLimitExceeded = false, settings, onOpenRecipeSearch }) => {
-    // List of staple items to ignore
+    // List of staple items to ignore (unless user wants them included)
     const STAPLES = ['salt', 'pepper', 'oil', 'water', 'flour', 'sugar', 'butter', 'vinegar', 'baking powder', 'baking soda', 'spices', 'seasoning', 'soy sauce', 'cornstarch', 'yeast'];
+    const includeStaples = settings?.shopping?.includeStaples || false;
   const [draggedMeal, setDraggedMeal] = useState<{ dayIndex: number, mealType: string, mealIndex: number } | null>(null);
   const [dragOverDay, setDragOverDay] = useState<number | null>(null);
   const [dragOverMealType, setDragOverMealType] = useState<{ dayIndex: number, mealType: string } | null>(null);
@@ -364,32 +362,48 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
       )
     );
     
-    // Filter out staple items and duplicates
+    // Filter out staple items and duplicates (unless user wants staples included)
     const missing = missingWithRecipes.filter(item => {
       const neededLower = item.ingredient.toLowerCase();
-      if (STAPLES.some(staple => neededLower.includes(staple))) return false;
+      if (!includeStaples && STAPLES.some(staple => neededLower.includes(staple))) return false;
       return !inventory.some(pantryItem => 
         neededLower.includes(pantryItem.item.toLowerCase()) || 
         pantryItem.item.toLowerCase().includes(neededLower)
       );
     });
 
-    // Group by ingredient and collect recipe info
+    // Group by ingredient and aggregate quantities
     const grouped = missing.reduce((acc, item) => {
       const parsed = parseIngredientForShoppingList(item.ingredient);
       const key = parsed.itemName;
+      
       if (!acc[key]) {
         acc[key] = {
           ingredient: parsed.itemName,
-          quantity: parsed.quantity,
+          quantity: 0, // Will be calculated
+          unit: parsed.quantity.includes(' ') ? parsed.quantity.split(' ')[1] : 'count',
           recipes: []
         };
       }
+      
+      // Add quantity (parse numeric value)
+      const qtyValue = parseFloat(parsed.quantity.split(' ')[0]) || 1;
+      acc[key].quantity += qtyValue;
+      
+      // Track recipes
       if (!acc[key].recipes.some(r => r.id === item.recipeId)) {
         acc[key].recipes.push({ name: item.recipeName, id: item.recipeId });
       }
       return acc;
-    }, {} as Record<string, { ingredient: string; quantity: string; recipes: { name: string; id: string }[] }>);
+    }, {} as Record<string, { ingredient: string; quantity: number; unit: string; recipes: { name: string; id: string }[] }>);
+
+    // Format quantities back to strings
+    Object.values(grouped).forEach(item => {
+      if (item.unit === 'count' && item.quantity % 1 === 0) {
+        item.quantity = item.quantity; // Keep as number for count items
+      }
+      // For other units, keep as number for now, will format when displaying
+    });
 
     return Object.values(grouped);
   };
@@ -589,10 +603,12 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
   const handleAddMissingToShopping = () => {
     const missing = getMissingIngredients();
     if (missing.length > 0) {
-      const itemsToAdd = missing.flatMap((item: { ingredient: string; quantity: string; recipes: { name: string; id: string }[] }) => 
+      const itemsToAdd = missing.flatMap((item: { ingredient: string; quantity: number; unit: string; recipes: { name: string; id: string }[] }) => 
         item.recipes.map(recipe => ({
-          ingredient: item.quantity ? `${item.quantity} ${item.ingredient}` : item.ingredient,
-          source: `recipe: need ${item.quantity || 'some'} for "${recipe.name}"`
+          ingredient: item.unit === 'count' 
+            ? `${item.quantity} ${item.ingredient}` 
+            : `${item.quantity} ${item.unit} ${item.ingredient}`,
+          source: `recipe: need ${item.quantity} ${item.unit} for "${recipe.name}"`
         }))
       );
       

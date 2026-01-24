@@ -13,6 +13,9 @@ export function useSettings() {
         types: { shoppingList: true, mealPlan: true },
       },
       theme: { mode: 'dark', accentColor: '#4CAF50' },
+      shopping: {
+        includeStaples: false, // Whether to include staple items in shopping lists
+      },
     };
   });
 

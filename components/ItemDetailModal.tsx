@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, TrendingUp, ShoppingBasket, Trash2, Edit3, Package, Minus, Plus, Zap } from 'lucide-react';
+import { X, TrendingUp, ShoppingBasket, Trash2, Edit3, Package, Minus, Plus, Zap, History } from 'lucide-react';
 import { PantryItem } from '../types';
 import PriceTrends from './PriceTrends';
 import { getAllCategories, getExpirationColor, cleanItemNameForShopping, formatItemQuantity, parseQuantity } from '../utils/appUtils';
@@ -433,6 +433,31 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                 </p>
               </div>
             ) : null}
+
+            {/* Consumption History Section */}
+            {item.consumptionHistory && item.consumptionHistory.length > 0 && (
+              <div className="bg-theme-secondary p-4 rounded-lg border border-theme">
+                <div className="flex items-center gap-2 mb-3">
+                  <History className="w-4 h-4 text-[var(--accent-color)]" />
+                  <h4 className="font-semibold text-theme-primary text-sm">Consumption History</h4>
+                </div>
+                <div className="space-y-2">
+                  {item.consumptionHistory.slice(-5).reverse().map((date, index) => (
+                    <div key={index} className="flex items-center justify-between text-sm">
+                      <span className="text-theme-primary/70">Consumed</span>
+                      <span className="text-theme-primary font-medium">
+                        {new Date(date).toLocaleDateString()}
+                      </span>
+                    </div>
+                  ))}
+                  {item.consumptionHistory.length > 5 && (
+                    <div className="text-xs text-theme-primary/60 text-center mt-2">
+                      +{item.consumptionHistory.length - 5} more entries
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Action Buttons */}

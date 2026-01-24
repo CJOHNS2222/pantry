@@ -92,7 +92,7 @@ export const createHousehold = async (
           id: user.id,
           name: user.name,
           email: user.email,
-          role: 'owner',
+          role: 'admin',
           status: 'Active',
           joinedAt: new Date().toISOString(),
         },
@@ -199,7 +199,7 @@ export const removeMemberFromHousehold = async (
 
     // Check if current user is admin
     const currentUserMember = members.find((m: Member) => m.id === currentUserId);
-    if (!currentUserMember || currentUserMember.role !== 'Admin') {
+    if (!currentUserMember || currentUserMember.role !== 'admin') {
       throw new Error('Only admins can remove members');
     }
 

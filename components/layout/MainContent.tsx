@@ -14,6 +14,7 @@ const Settings = React.lazy(() => import('../Settings').then(module => ({ defaul
 import { Login } from '../Login';
 import { Tutorial } from '../Tutorial';
 import { HouseholdManager } from '../Household';
+import { UsageIndicator } from '../UsageIndicator';
 import { parseIngredientForShoppingList, parseQuantity, subtractQuantities } from '../../utils/appUtils';
 
 // Loading component for lazy-loaded components
@@ -30,6 +31,8 @@ interface MainContentProps {
   user: User;
   inventory: PantryItem[];
   setInventory: (inventory: PantryItem[]) => void;
+  updateItem: (index: number, updates: Partial<PantryItem>) => Promise<void>;
+  deleteItem: (index: number) => Promise<void>;
   shoppingList: ShoppingItem[];
   setShoppingList: (shoppingList: ShoppingItem[]) => void;
   mealPlan: DayPlan[];
@@ -73,6 +76,8 @@ export const MainContent: React.FC<MainContentProps> = ({
   user,
   inventory,
   setInventory,
+  updateItem,
+  deleteItem,
   shoppingList,
   setShoppingList,
   mealPlan,
@@ -141,11 +146,20 @@ export const MainContent: React.FC<MainContentProps> = ({
   };
   return (
     <main className="flex-1 overflow-y-auto p-4 pt-32 pb-24 scrollbar-hide bg-theme-primary relative">
+      {/* Usage Indicator - Show for free users */}
+      <UsageIndicator
+        user={user}
+        showUpgradeCTA={true}
+        onUpgrade={() => setActiveTab(Tab.SETTINGS)}
+      />
+
       {activeTab === Tab.PANTRY && (
         <Suspense fallback={<LoadingSpinner />}>
           <PantryScanner
             inventory={inventory}
             setInventory={setInventory}
+            updateItem={updateItem}
+            deleteItem={deleteItem}
             addToShoppingList={onAddToShoppingList}
             consumptionSuggestions={consumptionSuggestions}
             expirationAlerts={expirationAlerts}
@@ -201,6 +215,7 @@ export const MainContent: React.FC<MainContentProps> = ({
             savedRecipes={savedRecipes}
             user={user}
             setActiveTab={setActiveTab}
+            addToast={addToast}
             onShareRecipe={(recipe) => {
               alert(`Recipe shared: ${recipe.title}`);
             }}

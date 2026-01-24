@@ -1,11 +1,12 @@
 {
   "name": "smartpantry",
   "private": false,
-  "version": "1.1.8",
+  "version": "1.1.9",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:analyze": "vite build --mode analyze",
     "build:release": "npm run sync-release-notes && npm run build",
     "preview": "vite preview",
     "test": "vitest",
@@ -32,15 +33,19 @@
     "@capacitor/local-notifications": "^7.0.0",
     "@google/genai": "^1.31.0",
     "@paypal/react-paypal-js": "^8.9.2",
+    "@sentry/react": "^10.36.0",
+    "@sentry/tracing": "^7.120.4",
     "@stripe/react-stripe-js": "^5.4.1",
     "@stripe/stripe-js": "^8.5.3",
     "@zxing/library": "^0.21.3",
     "adb": "^0.2.0",
     "firebase": "^12.6.0",
     "firebase-admin": "^13.6.0",
+    "fuse.js": "^7.1.0",
     "lucide-react": "^0.555.0",
     "react": "^19.2.1",
     "react-dom": "^19.2.1",
+    "react-intl": "^8.1.1",
     "react-window": "^1.8.8"
   },
   "devDependencies": {

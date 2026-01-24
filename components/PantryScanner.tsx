@@ -1,19 +1,22 @@
 import React, { useState, useRef } from 'react';
 import { Camera as CapacitorCamera, CameraResultType, CameraSource } from '@capacitor/camera';
-import { Camera, Upload, Loader2, Plus, Trash2, CheckCircle2, ShoppingBasket, X, Barcode, ChevronDown, ChevronRight, ChevronUp, Image, ChefHat, TrendingUp } from 'lucide-react';
+import { Camera, Upload, Loader2, Plus, Trash2, CheckCircle2, ShoppingBasket, X, Barcode, ChevronDown, ChevronRight, ChevronUp, Image, ChefHat, TrendingUp, Search, Filter, Settings2 } from 'lucide-react';
 import { FixedSizeList as List } from 'react-window';
 import { analyzePantryImage } from '../services/geminiService';
 import { getItemImage, inferCategoryFromItemName, inferStorageLocationFromItemName, getStorageLocationImage, getAutoExpirationDate, getExpirationColor, getAllCategories, getCategoryIcon, parseItemText, fetchExternalItemImage, combineQuantities, formatItemQuantity } from '../utils/appUtils';
-import { PantryItem, LoadingState, ConsumptionSuggestion, ExpirationAlert, CustomCategory, RecipeSuggestion } from '../types';
+import { PantryItem, LoadingState, ConsumptionSuggestion, ExpirationAlert, CustomCategory, RecipeSuggestion, PantryFilter } from '../types';
 import { Tab } from '../types/app';
 import AnalyticsService from '../services/analyticsService';
 import { BrowserMultiFormatReader } from '@zxing/library';
 import PriceTrends from './PriceTrends';
 import ItemDetailModal from './ItemDetailModal';
+import { searchPantryItems, getAutocompleteSuggestions, filterPantryItems, savePantryFilter, loadPantryFilter, defaultPantryFilter } from '../utils/searchUtils';
 
 interface PantryScannerProps {
   inventory: PantryItem[];
   setInventory: React.Dispatch<React.SetStateAction<PantryItem[]>>;
+  updateItem: (index: number, updates: Partial<PantryItem>) => Promise<void>;
+  deleteItem: (index: number) => Promise<void>;
   addToShoppingList: (items: string[]) => void;
   consumptionSuggestions?: ConsumptionSuggestion[];
   expirationAlerts?: ExpirationAlert[];
@@ -26,6 +29,8 @@ interface PantryScannerProps {
 export const PantryScanner: React.FC<PantryScannerProps> = ({ 
   inventory, 
   setInventory, 
+  updateItem,
+  deleteItem,
   addToShoppingList,
   consumptionSuggestions = [],
   expirationAlerts = [],
@@ -56,6 +61,12 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   const [bulkQuantityEditItems, setBulkQuantityEditItems] = useState<PantryItem[]>([]);
   const [showBulkQuantityEdit, setShowBulkQuantityEdit] = useState(false);
   
+  // Search and filter state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+  const [pantryFilter, setPantryFilter] = useState<PantryFilter>(loadPantryFilter());
+  const [autocompleteSuggestions, setAutocompleteSuggestions] = useState<string[]>([]);
+  const [showAutocomplete, setShowAutocomplete] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -76,6 +87,33 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
       }
     }
   }, [inventory]);
+
+  // Update autocomplete suggestions when search query changes
+  React.useEffect(() => {
+    if (searchQuery.length >= 2) {
+      const suggestions = getAutocompleteSuggestions(inventory, searchQuery);
+      setAutocompleteSuggestions(suggestions);
+      setShowAutocomplete(suggestions.length > 0);
+    } else {
+      setShowAutocomplete(false);
+    }
+  }, [searchQuery, inventory]);
+
+  // Process inventory with search and filters
+  const processedInventory = React.useMemo(() => {
+    let filtered = [...inventory];
+
+    // Apply search
+    if (searchQuery.trim()) {
+      filtered = searchPantryItems(filtered, searchQuery);
+    }
+
+    // Apply filters
+    filtered = filterPantryItems(filtered, pantryFilter);
+
+    // Add original index for bulk operations
+    return filtered.map((item, idx) => ({ ...item, originalIndex: inventory.indexOf(item) }));
+  }, [inventory, searchQuery, pantryFilter]);
 
   // Use Capacitor Camera for mobile
   const handleTakePhoto = async () => {
@@ -470,7 +508,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   };
 
   // Sort inventory based on selected criteria
-  const sortedInventory = inventory.map((item, idx) => ({ ...item, originalIndex: idx })).sort((a, b) => {
+  const sortedInventory = processedInventory.sort((a, b) => {
     switch (sortBy) {
       case 'name':
         return a.item.localeCompare(b.item);
@@ -797,6 +835,181 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
         </div>
       </div>
 
+      {/* Search and Filter Bar */}
+      <div className="bg-theme-secondary p-4 rounded-2xl border border-theme shadow-lg mb-6">
+        <div className="flex gap-3 items-center">
+          {/* Search Input */}
+          <div className="flex-1 relative">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-theme-secondary opacity-50" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onFocus={() => setShowAutocomplete(searchQuery.length >= 2 && autocompleteSuggestions.length > 0)}
+                onBlur={() => setTimeout(() => setShowAutocomplete(false), 200)}
+                placeholder="Search pantry items..."
+                className="w-full pl-10 pr-4 py-2 bg-theme-primary border border-theme rounded-lg text-theme-primary placeholder-theme-primary/50 focus:border-[var(--accent-color)] focus:outline-none"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-theme-secondary opacity-50 hover:opacity-100"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+            
+            {/* Autocomplete Suggestions */}
+            {showAutocomplete && autocompleteSuggestions.length > 0 && (
+              <div className="absolute top-full left-0 right-0 bg-theme-primary border border-theme rounded-lg shadow-lg mt-1 z-10 max-h-40 overflow-y-auto">
+                {autocompleteSuggestions.map((suggestion, index) => (
+                  <button
+                    key={index}
+                    onClick={() => {
+                      setSearchQuery(suggestion);
+                      setShowAutocomplete(false);
+                    }}
+                    className="w-full text-left px-4 py-2 hover:bg-theme-secondary text-theme-primary"
+                  >
+                    {suggestion}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Filter Button */}
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className={`p-2 rounded-lg border transition-colors ${
+              showFilters || Object.values(pantryFilter).some(v => 
+                Array.isArray(v) ? v.length > 0 : v !== defaultPantryFilter[v as keyof PantryFilter]
+              )
+                ? 'bg-[var(--accent-color)] text-white border-[var(--accent-color)]'
+                : 'bg-theme-primary border-theme text-theme-secondary hover:bg-theme-secondary'
+            }`}
+          >
+            <Filter className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Filter Options */}
+        {showFilters && (
+          <div className="mt-4 pt-4 border-t border-theme space-y-4">
+            {/* Categories Filter */}
+            <div>
+              <label className="block text-sm font-medium text-theme-primary mb-2">Categories</label>
+              <div className="flex flex-wrap gap-2">
+                {Array.from(new Set(inventory.map(item => item.category).filter(Boolean))).map(category => (
+                  <button
+                    key={category}
+                    onClick={() => {
+                      const newFilter = { ...pantryFilter };
+                      if (newFilter.categories.includes(category!)) {
+                        newFilter.categories = newFilter.categories.filter(c => c !== category);
+                      } else {
+                        newFilter.categories.push(category!);
+                      }
+                      setPantryFilter(newFilter);
+                      savePantryFilter(newFilter);
+                    }}
+                    className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                      pantryFilter.categories.includes(category!)
+                        ? 'bg-[var(--accent-color)] text-white'
+                        : 'bg-theme-primary text-theme-secondary border border-theme hover:bg-theme-secondary'
+                    }`}
+                  >
+                    {category}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Locations Filter */}
+            <div>
+              <label className="block text-sm font-medium text-theme-primary mb-2">Locations</label>
+              <div className="flex flex-wrap gap-2">
+                {['pantry', 'fridge', 'freezer', 'spices', 'other'].map(location => (
+                  <button
+                    key={location}
+                    onClick={() => {
+                      const newFilter = { ...pantryFilter };
+                      if (newFilter.locations.includes(location)) {
+                        newFilter.locations = newFilter.locations.filter(l => l !== location);
+                      } else {
+                        newFilter.locations.push(location);
+                      }
+                      setPantryFilter(newFilter);
+                      savePantryFilter(newFilter);
+                    }}
+                    className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                      pantryFilter.locations.includes(location)
+                        ? 'bg-[var(--accent-color)] text-white'
+                        : 'bg-theme-primary text-theme-secondary border border-theme hover:bg-theme-secondary'
+                    }`}
+                  >
+                    {location.charAt(0).toUpperCase() + location.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Expiration Status Filter */}
+            <div>
+              <label className="block text-sm font-medium text-theme-primary mb-2">Expiration Status</label>
+              <select
+                value={pantryFilter.expirationStatus}
+                onChange={(e) => {
+                  const newFilter = { ...pantryFilter, expirationStatus: e.target.value as PantryFilter['expirationStatus'] };
+                  setPantryFilter(newFilter);
+                  savePantryFilter(newFilter);
+                }}
+                className="w-full px-3 py-2 bg-theme-primary border border-theme rounded-lg text-theme-primary focus:border-[var(--accent-color)] focus:outline-none"
+              >
+                <option value="all">All Items</option>
+                <option value="expiring-soon">Expiring Soon (7 days)</option>
+                <option value="expired">Expired</option>
+                <option value="fresh">Fresh</option>
+              </select>
+            </div>
+
+            {/* Quantity Status Filter */}
+            <div>
+              <label className="block text-sm font-medium text-theme-primary mb-2">Stock Status</label>
+              <select
+                value={pantryFilter.quantityStatus}
+                onChange={(e) => {
+                  const newFilter = { ...pantryFilter, quantityStatus: e.target.value as PantryFilter['quantityStatus'] };
+                  setPantryFilter(newFilter);
+                  savePantryFilter(newFilter);
+                }}
+                className="w-full px-3 py-2 bg-theme-primary border border-theme rounded-lg text-theme-primary focus:border-[var(--accent-color)] focus:outline-none"
+              >
+                <option value="all">All Items</option>
+                <option value="low-stock">Low Stock (&lt;1)</option>
+                <option value="out-of-stock">Out of Stock</option>
+                <option value="in-stock">In Stock (≥1)</option>
+              </select>
+            </div>
+
+            {/* Clear Filters Button */}
+            <div className="flex justify-end">
+              <button
+                onClick={() => {
+                  setPantryFilter(defaultPantryFilter);
+                  savePantryFilter(defaultPantryFilter);
+                }}
+                className="px-4 py-2 bg-theme-primary border border-theme rounded-lg text-theme-secondary hover:bg-theme-secondary transition-colors"
+              >
+                Clear Filters
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Bulk Action Toolbar */}
       {bulkMode && (
         <div className="bg-theme-secondary p-3 rounded-lg border border-theme mb-4 flex items-center gap-3">
@@ -821,6 +1034,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
         className="fixed bottom-28 right-6 z-50 bg-[var(--accent-color)] text-white p-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110"
         style={{ bottom: 'calc(7rem + 15px)' }}
         aria-label="Add items to pantry"
+        data-tutorial="add-item-button"
       >
         <Plus className="w-6 h-6" />
       </button>
@@ -1454,15 +1668,12 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
         <ItemDetailModal
           item={inventory[selectedItemIndex]}
           onClose={() => setSelectedItemIndex(null)}
-          onUpdateItem={(index, updates) => {
-            setInventory(prev => {
-              const updated = [...prev];
-              updated[index] = { ...updated[index], ...updates };
-              return updated;
-            });
+          onUpdateItem={async (index, updates) => {
+            await updateItem(index, updates);
           }}
-          onDeleteItem={(index) => {
-            setInventory(prev => prev.filter((_, i) => i !== index));
+          onDeleteItem={async (index) => {
+            await deleteItem(index);
+            setSelectedItemIndex(null);
           }}
           onAddToShoppingList={addToShoppingList}
           customCategories={customCategories}

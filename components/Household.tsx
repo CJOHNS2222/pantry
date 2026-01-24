@@ -182,7 +182,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
           id: user.id,
           name: user.name,
           email: user.email,
-          role: 'Admin',
+          role: 'admin',
           status: 'Active'
         }]
       };
@@ -270,41 +270,43 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
         </div>
 
         <div className="p-6 overflow-y-auto flex-1">
-          <PremiumFeature
-            feature="householdMembers"
-            user={user}
-            limit={3}
-            currentCount={household.members.length}
-            fallbackMessage="Upgrade to Family plan to add more than 3 household members"
-            onUpgrade={() => setActiveTab(Tab.SETTINGS)}
-          >
-            <div className="bg-[#2A0A10]/50 p-4 rounded-xl border border-red-900/30 mb-6">
-              <h3 className="text-sm font-bold text-amber-500 uppercase mb-3">Invite Family Member</h3>
-              <form onSubmit={handleInvite} className="flex gap-2">
-                <div className="relative flex-1">
-                  <Mail className="absolute left-3 top-3 w-4 h-4 text-red-900/50" />
-                  <input 
-                    type="email" 
-                    value={inviteEmail}
-                    onChange={(e) => setInviteEmail(e.target.value)}
-                    placeholder="Enter email address"
-                    className="w-full bg-[#2A0A10] border border-red-900/50 rounded-lg pl-9 pr-4 py-2 text-sm text-white focus:border-amber-500 outline-none"
-                    disabled={isInviting}
-                  />
-                </div>
-                <button 
-                  type="submit"
-                  className="bg-amber-600 hover:bg-amber-500 text-white px-3 py-2 rounded-lg transition-colors disabled:bg-gray-500 disabled:cursor-not-allowed flex items-center justify-center w-12"
-                  disabled={isInviting || householdMemberLimitExceeded}
-                >
-                  {isInviting ? <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div> : <Plus className="w-5 h-5" />}
-                </button>
-              </form>
-              <p className="text-xs text-red-200/40 mt-2">
-                Invited members can view inventory and edit the meal schedule.
-              </p>
-            </div>
-          </PremiumFeature>
+          {household.members.find(m => m.email === user.email)?.role === 'admin' && (
+            <PremiumFeature
+              feature="householdMembers"
+              user={user}
+              limit={3}
+              currentCount={household.members.length}
+              fallbackMessage="Upgrade to Family plan to add more than 3 household members"
+              onUpgrade={() => setActiveTab(Tab.SETTINGS)}
+            >
+              <div className="bg-[#2A0A10]/50 p-4 rounded-xl border border-red-900/30 mb-6">
+                <h3 className="text-sm font-bold text-amber-500 uppercase mb-3">Invite Family Member</h3>
+                <form onSubmit={handleInvite} className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Mail className="absolute left-3 top-3 w-4 h-4 text-red-900/50" />
+                    <input 
+                      type="email" 
+                      value={inviteEmail}
+                      onChange={(e) => setInviteEmail(e.target.value)}
+                      placeholder="Enter email address"
+                      className="w-full bg-[#2A0A10] border border-red-900/50 rounded-lg pl-9 pr-4 py-2 text-sm text-white focus:border-amber-500 outline-none"
+                      disabled={isInviting}
+                    />
+                  </div>
+                  <button 
+                    type="submit"
+                    className="bg-amber-600 hover:bg-amber-500 text-white px-3 py-2 rounded-lg transition-colors disabled:bg-gray-500 disabled:cursor-not-allowed flex items-center justify-center w-12"
+                    disabled={isInviting || householdMemberLimitExceeded}
+                  >
+                    {isInviting ? <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div> : <Plus className="w-5 h-5" />}
+                  </button>
+                </form>
+                <p className="text-xs text-red-200/40 mt-2">
+                  Invited members can view inventory and edit the meal schedule.
+                </p>
+              </div>
+            </PremiumFeature>
+          )}
 
           <h3 className="text-sm font-bold text-amber-500 uppercase mb-3 px-1">Group Members</h3>
           <div className="space-y-2">
@@ -324,7 +326,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
                     <div className="text-xs text-red-200/50">{member.role} • {member.status}</div>
                   </div>
                 </div>
-                {member.email !== user.email && (
+                {member.email !== user.email && household.members.find(m => m.email === user.email)?.role === 'admin' && (
                   <button 
                     onClick={() => removeMember(member.id)}
                     className="text-red-900/50 hover:text-red-400 p-2"
@@ -338,7 +340,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
         </div>
 
         <div className="p-4 pb-2.5 bg-[#2A0A10] border-t border-red-900/50">
-          {household.members.find(m => m.email === user.email)?.role !== 'Admin' && (
+          {household.members.find(m => m.email === user.email)?.role !== 'admin' && (
             <div className="mb-3">
               <button
                 onClick={leaveHousehold}

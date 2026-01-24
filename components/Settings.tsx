@@ -4,6 +4,8 @@ import { collection, addDoc, Timestamp, doc, updateDoc } from 'firebase/firestor
 import { SubscriptionManager } from './SubscriptionManager';
 import { CategoryManager } from './CategoryManager';
 import { PantryAnalytics } from './PantryAnalytics';
+import { MonitoringDashboard } from './MonitoringDashboard';
+import { LanguageSelector } from '../src/components/LanguageSelector';
 import { useNotifications } from '../hooks/useNotifications';
 import { UserProfile, CustomCategory, PantryItem } from '../types';
 import { VersionUpdate } from './VersionUpdate';
@@ -718,6 +720,14 @@ export const Settings: React.FC<SettingsProps> = ({
             />
           </div>
         </div>
+
+        {/* Language Selector */}
+        <div className="mt-4 pt-3 border-t border-theme">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-theme-primary">Language</span>
+            <LanguageSelector />
+          </div>
+        </div>
       </div>
 
       {/* Notifications Section */}
@@ -816,6 +826,34 @@ export const Settings: React.FC<SettingsProps> = ({
         </div>
       </div>
 
+      {/* Shopping Preferences Section */}
+      <div className="bg-theme-secondary rounded-xl border border-theme p-4">
+        <h3 className="font-semibold mb-3 text-theme-primary">Shopping Preferences</h3>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <label htmlFor="includeStaples" className="flex items-center gap-2">
+              <span className="text-sm text-theme-primary">Include Staples in Shopping Lists</span>
+              <input
+                id="includeStaples"
+                name="includeStaples"
+                type="checkbox"
+                checked={settings.shopping?.includeStaples || false}
+                onChange={e => setSettings(prev => ({
+                  ...prev,
+                  shopping: {
+                    ...prev.shopping,
+                    includeStaples: e.target.checked
+                  }
+                }))}
+              />
+            </label>
+          </div>
+          <p className="text-xs text-theme-secondary">
+            When enabled, common pantry staples (salt, pepper, oil, flour, etc.) will be included in shopping lists generated from meal plans.
+          </p>
+        </div>
+      </div>
+
       {/* Feedback Section */}
       <div className="bg-theme-secondary rounded-xl border border-theme p-4">
         <h3 className="font-semibold mb-3 text-theme-primary">Feedback</h3>
@@ -843,6 +881,14 @@ export const Settings: React.FC<SettingsProps> = ({
         <div className="bg-theme-secondary rounded-xl border border-theme p-4">
           <h3 className="font-semibold mb-3 text-theme-primary">Subscription</h3>
           <SubscriptionManager />
+        </div>
+      )}
+
+      {/* Database Monitoring Section - Developer/Admin Only */}
+      {user && process.env.NODE_ENV === 'development' && (
+        <div className="bg-theme-secondary rounded-xl border border-theme p-4">
+          <h3 className="font-semibold mb-3 text-theme-primary">Database Monitoring</h3>
+          <MonitoringDashboard user={user} />
         </div>
       )}
 

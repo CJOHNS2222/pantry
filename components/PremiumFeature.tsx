@@ -59,12 +59,17 @@ export const PremiumFeature: React.FC<PremiumFeatureProps> = ({
         <div className="premium-overlay-backdrop">
           <div className="premium-upgrade-modal">
             <Crown className="w-8 h-8 text-yellow-500 mx-auto mb-2" />
-            <h3 className="font-bold text-gray-900 mb-1">Limit Reached</h3>
+            <h3 className="font-bold text-gray-900 mb-1">Ready to Unlock More?</h3>
             <p className="text-sm text-gray-600 mb-3">
-              {fallbackMessage || `You've reached the ${limit} ${feature} limit. Upgrade to unlock unlimited access.`}
+              {fallbackMessage || `You've reached the ${limit} ${feature} limit. Join thousands of home chefs who upgraded for unlimited access!`}
             </p>
+            <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg mb-3">
+              <p className="text-xs text-blue-800 dark:text-blue-200 font-medium">
+                ✨ Premium users save 2+ hours per week on meal planning
+              </p>
+            </div>
             <button className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-4 py-2 rounded-lg font-medium hover:from-yellow-500 hover:to-orange-600 transition-all" onClick={onUpgrade || (() => alert('Upgrade functionality would navigate to subscription manager'))}>
-              Upgrade Now
+              Upgrade Now - Starting at $4.99/mo
             </button>
           </div>
         </div>
@@ -90,10 +95,15 @@ export const PremiumFeature: React.FC<PremiumFeatureProps> = ({
           <Crown className="w-8 h-8 text-yellow-500 mx-auto mb-2" />
           <h3 className="font-bold text-gray-900 mb-1">Premium Feature</h3>
           <p className="text-sm text-gray-600 mb-3">
-            Upgrade to unlock {feature}
+            Unlock {feature} and discover recipes tailored to your pantry. Join 10,000+ home chefs who save time and reduce food waste!
           </p>
+          <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg mb-3">
+            <p className="text-xs text-green-800 dark:text-green-200 font-medium">
+              🎯 Find recipes using ingredients you already have
+            </p>
+          </div>
           <button className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-4 py-2 rounded-lg font-medium hover:from-yellow-500 hover:to-orange-600 transition-all" onClick={onUpgrade || (() => alert('Upgrade functionality would navigate to subscription manager'))}>
-            Upgrade Now
+            Try Premium Free for 7 Days
           </button>
         </div>
       </div>

@@ -40,7 +40,7 @@ async function inviteMemberCore(inviterUid: string, email: string, householdId: 
     console.warn('Unable to resolve invited email to UID:', err);
   }
 
-  const newMember = { id: memberIdToStore, name: email.split('@')[0], email, role: 'Member', status: 'Active' };
+  const newMember = { id: memberIdToStore, name: email.split('@')[0], email, role: 'member', status: 'Active' };
   const updatePayload: any = { members: FieldValue.arrayUnion(newMember) };
   if (memberIdToStore && memberIdToStore !== email) updatePayload.memberIds = FieldValue.arrayUnion(memberIdToStore);
   await householdRef.update(updatePayload);

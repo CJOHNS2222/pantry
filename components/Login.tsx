@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { FormattedMessage } from 'react-intl';
 import { ChefHat, Mail, Chrome } from 'lucide-react';
 import { User } from '../types';
 import { Browser } from '@capacitor/browser';
@@ -35,20 +36,20 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
     setError(null);
     setSuccess(null);
     if (!validateEmail(email)) {
-      setError('Please enter a valid email address.');
+      setError(<FormattedMessage id="auth.error.invalidEmail" />);
       return;
     }
     if (!validatePassword(password)) {
-      setError('Password must be at least 6 characters and contain a number and a letter.');
+      setError(<FormattedMessage id="auth.error.weakPassword" />);
       return;
     }
     if (isSignup) {
       if (!name.trim()) {
-        setError('Please enter your name.');
+        setError(<FormattedMessage id="auth.error.missingName" />);
         return;
       }
       if (password !== confirmPassword) {
-        setError('Passwords do not match.');
+        setError(<FormattedMessage id="auth.error.passwordMismatch" />);
         return;
       }
     }
@@ -152,7 +153,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
       }
     } catch (error: any) {
       console.error('Google login error:', error);
-      setError('Google login failed: ' + error.message);
+      setError(<FormattedMessage id="auth.error.googleLoginFailed" values={{ message: error.message }} />);
     }
   };
 
@@ -179,7 +180,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
         console.log('Redirect result error:', error);
         // Only show error if it's not a "no redirect result" scenario
         if (error.code !== 'auth/null-user' && error.code !== 'auth/user-cancelled') {
-          setError('Google login failed: ' + error.message);
+          setError(<FormattedMessage id="auth.error.googleLoginFailed" values={{ message: error.message }} />);
         }
       }
     };
@@ -222,10 +223,10 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
             <ChefHat className="w-10 h-10 text-white" />
           </div>
           <h1 className="text-3xl font-bold font-serif tracking-wide text-amber-50">
-            Smart Pantry Chef
+            <FormattedMessage id="app.name" />
           </h1>
           <p className="text-red-200/60 mt-2 text-sm uppercase tracking-widest">
-            Your Personal AI Sous Chef
+            <FormattedMessage id="app.tagline" />
           </p>
         </div>
 
@@ -234,7 +235,9 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
           {success && <div className="text-green-400 text-xs mb-2">{success}</div>}
           {isSignup && (
             <div>
-              <label htmlFor="name" className="block text-xs font-bold text-amber-500 uppercase mb-1 ml-1">Name</label>
+              <label htmlFor="name" className="block text-xs font-bold text-amber-500 uppercase mb-1 ml-1">
+                <FormattedMessage id="auth.name" />
+              </label>
               <input
                 id="name"
                 name="name"
@@ -242,13 +245,15 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 className="w-full bg-[#2A0A10] border border-red-900/50 rounded-xl px-4 py-3 text-white placeholder-red-900/50 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none transition-all"
-                placeholder="Your Name"
+                placeholder={<FormattedMessage id="auth.yourName" />}
                 required
               />
             </div>
           )}
           <div>
-            <label htmlFor="email" className="block text-xs font-bold text-amber-500 uppercase mb-1 ml-1">Email</label>
+            <label htmlFor="email" className="block text-xs font-bold text-amber-500 uppercase mb-1 ml-1">
+              <FormattedMessage id="auth.email" />
+            </label>
             <input
               id="email"
               name="email"
@@ -256,12 +261,14 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full bg-[#2A0A10] border border-red-900/50 rounded-xl px-4 py-3 text-white placeholder-red-900/50 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none transition-all"
-              placeholder="chef@example.com"
+              placeholder={<FormattedMessage id="auth.emailPlaceholder" />}
               required
             />
           </div>
           <div>
-            <label htmlFor="password" className="block text-xs font-bold text-amber-500 uppercase mb-1 ml-1">Password</label>
+            <label htmlFor="password" className="block text-xs font-bold text-amber-500 uppercase mb-1 ml-1">
+              <FormattedMessage id="auth.password" />
+            </label>
             <input
               id="password"
               name="password"
@@ -269,7 +276,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full bg-[#2A0A10] border border-red-900/50 rounded-xl px-4 py-3 text-white placeholder-red-900/50 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none transition-all"
-              placeholder="••••••••"
+              placeholder={<FormattedMessage id="auth.passwordPlaceholder" />}
               required
             />
              {!isSignup && (
@@ -278,13 +285,15 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
                  onClick={handleForgotPassword}
                  className="w-full mt-2 text-amber-400 underline text-xs text-left hover:text-amber-500"
                >
-                 Forgot password?
+                 <FormattedMessage id="auth.forgotPassword" />
                </button>
              )}
           </div>
           {isSignup && (
             <div>
-              <label htmlFor="confirmPassword" className="block text-xs font-bold text-amber-500 uppercase mb-1 ml-1">Confirm Password</label>
+              <label htmlFor="confirmPassword" className="block text-xs font-bold text-amber-500 uppercase mb-1 ml-1">
+                <FormattedMessage id="auth.confirmPassword" />
+              </label>
               <input
                 id="confirmPassword"
                 name="confirmPassword"
@@ -292,7 +301,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 className="w-full bg-[#2A0A10] border border-red-900/50 rounded-xl px-4 py-3 text-white placeholder-red-900/50 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none transition-all"
-                placeholder="Re-enter password"
+                placeholder={<FormattedMessage id="auth.confirmPasswordPlaceholder" />}
                 required
               />
             </div>
@@ -301,20 +310,22 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
             type="submit"
             className="w-full bg-gradient-to-r from-amber-500 to-amber-700 text-white font-bold py-3.5 rounded-xl hover:shadow-lg hover:shadow-amber-900/20 transition-all transform active:scale-95 mt-2"
           >
-            {isSignup ? 'Sign Up' : 'Sign In'}
+            <FormattedMessage id={isSignup ? "auth.signUp" : "auth.signIn"} />
           </button>
           <button
             type="button"
             onClick={() => setIsSignup(!isSignup)}
             className="w-full mt-2 text-amber-500 underline text-sm"
           >
-            {isSignup ? 'Already have an account? Log In' : "Don't have an account? Sign Up"}
+            <FormattedMessage id={isSignup ? "auth.alreadyHaveAccount" : "auth.dontHaveAccount"} />
           </button>
         </form>
 
         <div className="my-6 flex items-center gap-4">
           <div className="h-px bg-red-900/30 flex-1"></div>
-          <span className="text-xs text-red-200/40 font-medium">OR CONTINUE WITH</span>
+          <span className="text-xs text-red-200/40 font-medium">
+            <FormattedMessage id="auth.orContinueWith" />
+          </span>
           <div className="h-px bg-red-900/30 flex-1"></div>
         </div>
 //

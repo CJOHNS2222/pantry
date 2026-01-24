@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { doc, onSnapshot, collection, addDoc, serverTimestamp, query, where } from 'firebase/firestore';
 import { db } from './firebaseConfig';
 import { Login } from './components/Login';
@@ -20,7 +20,16 @@ import { isHouseholdMember, inferCategoryFromItemName, inferStorageLocationFromI
 import { getOrCreateHousehold } from './services/householdService';
 import { GlobalUpdatePrompt } from './components/GlobalUpdatePrompt';
 import { App as CapacitorApp, BackButtonListenerEvent } from '@capacitor/app';
-import DatabaseAnalytics from './components/DatabaseAnalytics';
+
+// Lazy load monitoring components
+const DatabaseAnalytics = React.lazy(() => import('./components/DatabaseAnalytics').then(module => ({ default: module.default })));
+
+// Loading component for lazy-loaded components
+const LoadingSpinner: React.FC = () => (
+  <div className="flex items-center justify-center py-4">
+    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[var(--accent-color)]"></div>
+  </div>
+);
 
 type Theme = 'dark' | 'light';
 
@@ -85,6 +94,13 @@ const App: React.FC = () => {
     handleDeleteRecipe,
     handleRateRecipe,
     handleMarkAsMade,
+    // Item management with undo
+    updateItem,
+    deleteItem,
+    // Undo
+    recentActions,
+    recordUndo,
+    performUndo,
     // Usage limit states
     recipeSaveLimitExceeded,
     mealPlanLimitExceeded,
@@ -379,7 +395,14 @@ const App: React.FC = () => {
           </div>
         )}
 
-        <AppHeader user={user} settings={settings} setSettings={setSettings} onShowHousehold={() => setShowHousehold(true)} />
+        <AppHeader 
+          user={user} 
+          settings={settings} 
+          setSettings={setSettings} 
+          onShowHousehold={() => setShowHousehold(true)}
+          recentActions={recentActions}
+          onUndo={performUndo}
+        />
         
         <MainContent 
           activeTab={activeTab}
@@ -387,6 +410,8 @@ const App: React.FC = () => {
           user={user}
           inventory={inventory}
           setInventory={setInventory}
+          updateItem={updateItem}
+          deleteItem={deleteItem}
           shoppingList={shoppingList}
           setShoppingList={setShoppingList}
           mealPlan={mealPlan}
@@ -573,8 +598,10 @@ const App: React.FC = () => {
       {/* Global Update Prompt */}
       <GlobalUpdatePrompt />
 
-      {/* Database Analytics Dashboard */}
-      <DatabaseAnalytics />
+      {/* Database Analytics Dashboard - Lazy loaded */}
+      <Suspense fallback={<LoadingSpinner />}>
+        <DatabaseAnalytics />
+      </Suspense>
     </>
   );
 }

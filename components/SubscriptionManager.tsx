@@ -142,10 +142,25 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }
         </div>
 
         {subscription?.status === 'trialing' && (
-          <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3 mb-4">
-            <p className="text-sm text-green-800 dark:text-green-200">
-              🎉 You're on a free trial! Enjoy all premium features.
-            </p>
+          <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-2 border-green-300 dark:border-green-700 rounded-lg p-4 mb-4">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
+                <Crown className="w-4 h-4 text-white" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-green-800 dark:text-green-200">
+                  🎉 Free Trial Active!
+                </p>
+                <p className="text-xs text-green-700 dark:text-green-300">
+                  Enjoy unlimited access to all premium features
+                </p>
+              </div>
+            </div>
+            <div className="bg-white/50 dark:bg-black/20 rounded p-2">
+              <p className="text-xs text-green-800 dark:text-green-200">
+                Trial ends soon! Keep your premium access by upgrading today.
+              </p>
+            </div>
           </div>
         )}
 

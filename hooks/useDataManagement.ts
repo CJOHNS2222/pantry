@@ -1475,9 +1475,13 @@ export function useDataManagement(user: User | null, addToast: (message: string,
         if (undoOp.type === 'restore_item') {
           setInventory(prev => [...prev, undoOp.data]);
         } else if (undoOp.type === 'revert_edit') {
-          // For revert, data would contain the previous state
-          // This is simplified; in practice, need to handle specific cases
-          addToast('Undo performed', 'info');
+          // Revert the item to its previous state
+          const { index, previousState } = undoOp.data;
+          setInventory(prev => {
+            const updated = [...prev];
+            updated[index] = previousState;
+            return updated;
+          });
         }
         await undoService.removeAction(action.id);
         const actions = await undoService.getRecentActions();
@@ -1488,6 +1492,38 @@ export function useDataManagement(user: User | null, addToast: (message: string,
       console.error('Failed to undo action:', error);
       addToast('Failed to undo action', 'error');
     }
+  };
+
+  // Update item with undo recording
+  const updateItem = async (index: number, updates: Partial<PantryItem>) => {
+    const currentItem = inventory[index];
+    if (!currentItem) return;
+
+    // Record the undo action
+    await recordUndo('update_item', {
+      index,
+      previousState: currentItem,
+      updates
+    });
+
+    // Update the item
+    setInventory(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], ...updates };
+      return updated;
+    });
+  };
+
+  // Delete item with undo recording
+  const deleteItem = async (index: number) => {
+    const itemToDelete = inventory[index];
+    if (!itemToDelete) return;
+
+    // Record the undo action
+    await recordUndo('delete_item', itemToDelete);
+
+    // Remove the item
+    setInventory(prev => prev.filter((_, i) => i !== index));
   };
 
   return {
@@ -1514,6 +1550,9 @@ export function useDataManagement(user: User | null, addToast: (message: string,
     handleDeleteRecipe,
     handleRateRecipe,
     handleMarkAsMade,
+    // Item management with undo
+    updateItem,
+    deleteItem,
     // Undo
     recentActions,
     recordUndo,

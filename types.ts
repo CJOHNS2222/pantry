@@ -193,6 +193,15 @@ export interface CustomCategory {
   userId: string;
 }
 
+export interface PantryFilter {
+  categories: string[];
+  locations: string[];
+  expirationStatus: 'all' | 'expiring-soon' | 'expired' | 'fresh';
+  quantityStatus: 'all' | 'low-stock' | 'out-of-stock' | 'in-stock';
+  sortBy: 'name' | 'expiration' | 'quantity' | 'category' | 'location';
+  sortOrder: 'asc' | 'desc';
+}
+
 export interface Household {
   id: string;
   name: string;
@@ -205,7 +214,7 @@ export interface Member {
   name: string;
   email: string;
   avatar?: string;
-  role: 'owner' | 'member';
+  role: 'admin' | 'member';
   status?: 'Active' | 'Invited' | 'Inactive';
   joinedAt: string;
 }

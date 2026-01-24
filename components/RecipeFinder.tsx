@@ -25,12 +25,13 @@ interface RecipeFinderProps {
     persistedResult?: RecipeSearchResult | null;
     setPersistedResult?: (result: RecipeSearchResult | null) => void;
     initialSearchQuery?: string;
+    addToast?: (message: string, type?: 'error' | 'info', ttl?: number, actionLabel?: string, action?: () => void) => void;
     // Usage limit states
     recipeSaveLimitExceeded?: boolean;
     mealPlanLimitExceeded?: boolean;
 }
 
-export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveRecipe, onDeleteRecipe, onMarkAsMade, inventory, ratings, onRate, savedRecipes, user, setActiveTab, persistedResult, setPersistedResult, initialSearchQuery, recipeSaveLimitExceeded = false, mealPlanLimitExceeded = false }) => {
+export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveRecipe, onDeleteRecipe, onMarkAsMade, inventory, ratings, onRate, savedRecipes, user, setActiveTab, persistedResult, setPersistedResult, initialSearchQuery, addToast, recipeSaveLimitExceeded = false, mealPlanLimitExceeded = false }) => {
     // List of staple items to ignore
     const STAPLES = ['salt', 'pepper', 'oil', 'water', 'flour', 'sugar', 'butter', 'vinegar', 'baking powder', 'baking soda', 'spices', 'seasoning', 'soy sauce', 'cornstarch', 'yeast'];
     
@@ -859,10 +860,32 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
         // Check search limits for free users
         if (user) {
             try {
+                const limits = await UsageService.getUsageLimits(user);
                 const canSearch = await UsageService.canPerformSearch(user);
+
                 if (!canSearch) {
-                    alert('You\'ve reached your weekly search limit. Upgrade to Premium for 15 searches per week or Family for unlimited searches!');
+                    if (addToast) {
+                        addToast(
+                            'Search limit reached! Upgrade to Premium for 15 searches/week or Family for unlimited.',
+                            'error',
+                            6000,
+                            'Upgrade Now',
+                            () => setActiveTab(Tab.SETTINGS)
+                        );
+                    } else {
+                        alert('You\'ve reached your weekly search limit. Upgrade to Premium for 15 searches per week or Family for unlimited searches!');
+                    }
                     return;
+                }
+
+                // Show warning when approaching limit (80% used)
+                const searchLimit = limits.searches.weekly;
+                if (searchLimit !== -1 && limits.searches.used >= searchLimit * 0.8 && addToast) {
+                    addToast(
+                        `You've used ${limits.searches.used}/${searchLimit} searches this week. Consider upgrading for more!`,
+                        'info',
+                        4000
+                    );
                 }
             } catch (error) {
                 console.error('Error checking search limits:', error);
@@ -1318,6 +1341,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                                         : 'text-theme-secondary hover:text-[var(--accent-color)] hover:bg-theme-secondary'
                                 }`}
                                 title="Voice search"
+                                data-tutorial="voice-search"
                             >
                                 <Mic className="w-4 h-4" />
                             </button>

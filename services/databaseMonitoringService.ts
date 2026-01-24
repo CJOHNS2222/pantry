@@ -22,6 +22,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 import AnalyticsService from './analyticsService';
+import { reportDatabaseError, reportHeavyWritePattern, reportPerformanceIssue } from './sentryService';
 
 interface DatabaseMetrics {
   reads: number;
@@ -30,6 +31,13 @@ interface DatabaseMetrics {
   queries: number;
   batchOperations: number;
   realtimeSubscriptions: number;
+}
+
+interface WritePattern {
+  collection: string;
+  count: number;
+  startTime: number;
+  lastWrite: number;
 }
 
 class DatabaseMonitoringService {
@@ -43,6 +51,65 @@ class DatabaseMonitoringService {
   };
 
   private static sessionStartTime = Date.now();
+  private static writePatterns: Map<string, WritePattern> = new Map();
+  private static readonly HEAVY_WRITE_THRESHOLD = 50; // writes per minute
+  private static readonly HEAVY_WRITE_WINDOW = 60000; // 1 minute in milliseconds
+  private static readonly PERFORMANCE_THRESHOLD = 5000; // 5 seconds
+
+  // Track write patterns for heavy write detection
+  private static trackWritePattern(collection: string): void {
+    const now = Date.now();
+    const key = collection;
+
+    if (!this.writePatterns.has(key)) {
+      this.writePatterns.set(key, {
+        collection,
+        count: 1,
+        startTime: now,
+        lastWrite: now
+      });
+    } else {
+      const pattern = this.writePatterns.get(key)!;
+      pattern.count++;
+      pattern.lastWrite = now;
+
+      // Check if this is a heavy write pattern
+      const timeWindow = now - pattern.startTime;
+      if (timeWindow <= this.HEAVY_WRITE_WINDOW) {
+        const writesPerMinute = (pattern.count / timeWindow) * 60000;
+        if (writesPerMinute >= this.HEAVY_WRITE_THRESHOLD) {
+          console.warn(`🚨 Heavy write pattern detected: ${pattern.count} writes to ${collection} in ${timeWindow}ms`);
+
+          // Report to Sentry
+          reportHeavyWritePattern(collection, pattern.count, timeWindow, {
+            writes_per_minute: writesPerMinute,
+            session_duration: Date.now() - this.sessionStartTime
+          });
+
+          // Reset pattern after reporting
+          this.writePatterns.delete(key);
+        }
+      } else {
+        // Reset pattern if window has expired
+        this.writePatterns.set(key, {
+          collection,
+          count: 1,
+          startTime: now,
+          lastWrite: now
+        });
+      }
+    }
+  }
+
+  // Clean up old write patterns periodically
+  private static cleanupWritePatterns(): void {
+    const now = Date.now();
+    for (const [key, pattern] of this.writePatterns.entries()) {
+      if (now - pattern.lastWrite > this.HEAVY_WRITE_WINDOW * 2) {
+        this.writePatterns.delete(key);
+      }
+    }
+  }
 
   // Get current session metrics
   static getMetrics(): DatabaseMetrics & { sessionDuration: number } {
@@ -124,60 +191,121 @@ class DatabaseMonitoringService {
   }
 
   static async setDoc(ref: any, data: DocumentData): Promise<void> {
+    const startTime = Date.now();
     try {
       await setDoc(ref, data);
+      const duration = Date.now() - startTime;
+
       this.metrics.writes++;
+      this.trackWritePattern(ref.parent.id);
+
+      // Check for slow operations
+      if (duration > this.PERFORMANCE_THRESHOLD) {
+        reportPerformanceIssue('setDoc', duration, this.PERFORMANCE_THRESHOLD, {
+          collection: ref.parent.id,
+          document_id: ref.id
+        });
+      }
 
       AnalyticsService.trackDatabaseOperation('write', ref.parent.id, 1, {
         operation: 'setDoc',
-        success: true
+        success: true,
+        duration_ms: duration
       });
     } catch (error) {
+      const duration = Date.now() - startTime;
       AnalyticsService.trackDatabaseOperation('write', ref.parent.id, 1, {
         operation: 'setDoc',
         success: false,
-        error: error.message
+        error: error.message,
+        duration_ms: duration
       });
+
+      reportDatabaseError('setDoc', ref.parent.id, error as Error, {
+        document_id: ref.id,
+        duration_ms: duration
+      });
+
       throw error;
     }
   }
 
   static async updateDoc(ref: any, data: Partial<DocumentData>): Promise<void> {
+    const startTime = Date.now();
     try {
       await updateDoc(ref, data);
+      const duration = Date.now() - startTime;
+
       this.metrics.writes++;
+      this.trackWritePattern(ref.parent.id);
+
+      // Check for slow operations
+      if (duration > this.PERFORMANCE_THRESHOLD) {
+        reportPerformanceIssue('updateDoc', duration, this.PERFORMANCE_THRESHOLD, {
+          collection: ref.parent.id,
+          document_id: ref.id
+        });
+      }
 
       AnalyticsService.trackDatabaseOperation('write', ref.parent.id, 1, {
         operation: 'updateDoc',
-        success: true
+        success: true,
+        duration_ms: duration
       });
     } catch (error) {
+      const duration = Date.now() - startTime;
       AnalyticsService.trackDatabaseOperation('write', ref.parent.id, 1, {
         operation: 'updateDoc',
         success: false,
-        error: error.message
+        error: error.message,
+        duration_ms: duration
       });
+
+      reportDatabaseError('updateDoc', ref.parent.id, error as Error, {
+        document_id: ref.id,
+        duration_ms: duration
+      });
+
       throw error;
     }
   }
 
   static async addDoc(ref: any, data: DocumentData): Promise<any> {
+    const startTime = Date.now();
     try {
       const result = await addDoc(ref, data);
+      const duration = Date.now() - startTime;
+
       this.metrics.writes++;
+      this.trackWritePattern(ref.id);
+
+      // Check for slow operations
+      if (duration > this.PERFORMANCE_THRESHOLD) {
+        reportPerformanceIssue('addDoc', duration, this.PERFORMANCE_THRESHOLD, {
+          collection: ref.id
+        });
+      }
 
       AnalyticsService.trackDatabaseOperation('write', ref.id, 1, {
         operation: 'addDoc',
-        success: true
+        success: true,
+        duration_ms: duration
       });
 
       return result;
     } catch (error) {
+      const duration = Date.now() - startTime;
       AnalyticsService.trackDatabaseOperation('write', ref.id, 1, {
         operation: 'addDoc',
         success: false,
-        error: error.message
+        error: error.message,
+        duration_ms: duration
       });
+
+      reportDatabaseError('addDoc', ref.id, error as Error, {
+        duration_ms: duration
+      });
+
       throw error;
     }
   }
@@ -204,21 +332,60 @@ class DatabaseMonitoringService {
   // Enhanced batch operations
   static writeBatch(): any {
     const batch = writeBatch(db);
+    const startTime = Date.now();
+    let operationCount = 0;
+
     const originalCommit = batch.commit.bind(batch);
 
     batch.commit = async () => {
       try {
         const result = await originalCommit();
-        this.metrics.batchOperations++;
-        this.metrics.writes++; // Approximate - batch could contain multiple operations
+        const duration = Date.now() - startTime;
 
-        AnalyticsService.trackBatchOperation('batch_write', 'multiple_collections', 1);
+        this.metrics.batchOperations++;
+        this.metrics.writes += operationCount; // More accurate tracking
+
+        // Check for slow batch operations
+        if (duration > this.PERFORMANCE_THRESHOLD) {
+          reportPerformanceIssue('batch_commit', duration, this.PERFORMANCE_THRESHOLD, {
+            operation_count: operationCount
+          });
+        }
+
+        AnalyticsService.trackBatchOperation('batch_write', 'multiple_collections', operationCount);
 
         return result;
       } catch (error) {
+        const duration = Date.now() - startTime;
         AnalyticsService.trackBatchOperation('batch_write', 'multiple_collections', 0);
+
+        reportDatabaseError('batch_commit', 'multiple_collections', error as Error, {
+          operation_count: operationCount,
+          duration_ms: duration
+        });
+
         throw error;
       }
+    };
+
+    // Override batch operations to count them
+    const originalSet = batch.set.bind(batch);
+    const originalUpdate = batch.update.bind(batch);
+    const originalDelete = batch.delete.bind(batch);
+
+    batch.set = (...args) => {
+      operationCount++;
+      return originalSet(...args);
+    };
+
+    batch.update = (...args) => {
+      operationCount++;
+      return originalUpdate(...args);
+    };
+
+    batch.delete = (...args) => {
+      operationCount++;
+      return originalDelete(...args);
     };
 
     return batch;
@@ -256,11 +423,15 @@ class DatabaseMonitoringService {
 
   // Utility method to log current metrics
   static logCurrentMetrics(): void {
+    // Clean up old patterns before logging
+    this.cleanupWritePatterns();
+
     const metrics = this.getMetrics();
     console.log('🔥 Firestore Database Metrics:', {
       ...metrics,
       readsPerMinute: Math.round((metrics.reads / metrics.sessionDuration) * 60000),
-      writesPerMinute: Math.round((metrics.writes / metrics.sessionDuration) * 60000)
+      writesPerMinute: Math.round((metrics.writes / metrics.sessionDuration) * 60000),
+      activeWritePatterns: this.writePatterns.size
     });
   }
 
