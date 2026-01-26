@@ -172,11 +172,11 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
     ];
 
     return (
-      <div className="bg-theme-secondary p-3 rounded-lg border border-theme">
-        <label className="block text-sm font-medium text-theme-primary mb-3">
+      <div className="bg-theme-secondary p-2 rounded-lg border border-theme">
+        <label className="block text-sm font-medium text-theme-primary mb-2">
           Visual Quantity Estimate
         </label>
-        <p className="text-xs text-theme-secondary opacity-70 mb-3">
+        <p className="text-xs text-theme-secondary opacity-70 mb-2">
           Click the level that matches how full your container looks:
         </p>
         <div className="grid grid-cols-5 gap-2">
@@ -217,10 +217,10 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
 
   return (
     <>
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <div className="bg-theme-primary rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto border border-theme">
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 max-w-md mx-auto">
+        <div className="bg-theme-primary rounded-lg shadow-xl w-full max-h-[90vh] overflow-y-auto border border-theme pb-20">
           {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b border-theme">
+          <div className="flex items-center justify-between p-3 border-b border-theme">
             <h3 className="text-lg font-semibold text-theme-primary">{item.item}</h3>
             <button
               onClick={onClose}
@@ -231,11 +231,11 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
           </div>
 
           {/* Item Image */}
-          <div className="p-4 flex justify-center">
+          <div className="p-2 flex justify-center">
             <img
               src={item.image}
               alt={item.item}
-              className="w-24 h-24 rounded-lg object-cover border-2 border-theme"
+              className="w-20 h-20 rounded-lg object-cover border-2 border-theme"
               onError={(e) => {
                 console.log('Image failed to load:', e.target.src);
                 const target = e.target as HTMLImageElement;
@@ -245,9 +245,9 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
           </div>
 
           {/* Item Details */}
-          <div className="px-4 space-y-4">
+          <div className="px-3 space-y-2">
             {/* Quantity Section - Compact */}
-            <div className="bg-theme-secondary p-3 rounded-lg border border-theme">
+            <div className="bg-theme-secondary p-2 rounded-lg border border-theme">
               <label className="block text-sm font-medium text-theme-primary mb-2">
                 Quantity
               </label>
@@ -305,7 +305,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
 
             {/* Original Quantity (from recipe/shopping list) */}
             {item.originalQuantity && (
-              <div className="bg-theme-secondary p-3 rounded-lg border border-theme">
+              <div className="bg-theme-secondary p-2 rounded-lg border border-theme">
                 <label className="block text-xs font-medium text-theme-primary mb-1 uppercase opacity-70">
                   Recipe Qty
                 </label>
@@ -317,7 +317,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
 
             {/* Expiration Date */}
             {item.expirationDate && (
-              <div className="bg-theme-secondary p-3 rounded-lg border border-theme">
+              <div className="bg-theme-secondary p-2 rounded-lg border border-theme">
                 <label className="block text-xs font-medium text-theme-primary mb-1 uppercase opacity-70">
                   Expiration
                 </label>
@@ -339,9 +339,9 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
             )}
 
             {/* Storage Location & Category - Side by Side */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-theme-secondary p-3 rounded-lg border border-theme">
-                <label className="block text-xs font-medium text-theme-primary mb-2 uppercase opacity-70">
+            <div className="grid grid-cols-2 gap-2">
+              <div className="bg-theme-secondary p-2 rounded-lg border border-theme">
+                <label className="block text-xs font-medium text-theme-primary mb-1 uppercase opacity-70">
                   Storage
                 </label>
                 <select
@@ -357,8 +357,8 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                 </select>
               </div>
 
-              <div className="bg-theme-secondary p-3 rounded-lg border border-theme">
-                <label className="block text-xs font-medium text-theme-primary mb-2 uppercase opacity-70">
+              <div className="bg-theme-secondary p-2 rounded-lg border border-theme">
+                <label className="block text-xs font-medium text-theme-primary mb-1 uppercase opacity-70">
                   Category
                 </label>
                 <select
@@ -377,14 +377,14 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
 
             {/* Nutrition Facts Section */}
             {loadingNutrition ? (
-              <div className="bg-theme-secondary p-4 rounded-lg border border-theme">
+              <div className="bg-theme-secondary p-3 rounded-lg border border-theme">
                 <div className="flex items-center gap-2 text-sm text-theme-primary">
                   <Zap className="w-4 h-4 opacity-50 animate-pulse" />
                   <span className="opacity-70">Loading nutrition info...</span>
                 </div>
               </div>
             ) : nutrition ? (
-              <div className="bg-gradient-to-br from-theme-secondary to-theme-secondary/80 p-4 rounded-lg border border-theme">
+              <div className="bg-gradient-to-br from-theme-secondary to-theme-secondary/80 p-3 rounded-lg border border-theme">
                 <div className="flex items-center gap-2 mb-3">
                   <Zap className="w-4 h-4 text-[var(--accent-color)]" />
                   <h4 className="font-semibold text-theme-primary text-sm">Nutrition Facts</h4>
@@ -436,7 +436,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
 
             {/* Consumption History Section */}
             {item.consumptionHistory && item.consumptionHistory.length > 0 && (
-              <div className="bg-theme-secondary p-4 rounded-lg border border-theme">
+              <div className="bg-theme-secondary p-3 rounded-lg border border-theme">
                 <div className="flex items-center gap-2 mb-3">
                   <History className="w-4 h-4 text-[var(--accent-color)]" />
                   <h4 className="font-semibold text-theme-primary text-sm">Consumption History</h4>
@@ -461,7 +461,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
           </div>
 
           {/* Action Buttons */}
-          <div className="px-4 py-4 border-t border-theme space-y-2">
+          <div className="px-3 py-3 border-t border-theme space-y-2">
             <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={() => onAddToShoppingList([cleanItemNameForShopping(item.item)])}

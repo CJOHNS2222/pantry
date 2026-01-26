@@ -28,6 +28,18 @@ Smart Pantry Chef is a cross-platform pantry and meal management app built with 
   - Inventory usage patterns and trends
   - Shopping list analytics and cost tracking
   - Recipe popularity and meal planning insights
+- **User Behavior Analytics**: Advanced analytics dashboard with insights
+  - Feature usage tracking and conversion funnels
+  - User journey mapping and engagement metrics
+  - Performance monitoring and Core Web Vitals
+- **Smart Recommendations**: AI-powered personalized suggestions
+  - Recipe matching based on current inventory
+  - Feature adoption recommendations
+  - Time-based suggestions (dinner time, expiring items)
+- **Calendar Integration**: Export meal plans to device calendar
+  - All-day events for meal planning
+  - Cross-platform support (iOS/Android)
+  - Recipe details included in calendar events
 - **Enhanced Grocery Price Estimator with Community Data**
   - Real-time price updates from user contributions
   - Price ranges and sample sizes for accuracy
@@ -136,6 +148,113 @@ The app now features a community-driven grocery price estimator that provides mo
 - **Community Recipe Ratings**: User rating and review system for recipes
 - **Pantry Analytics Dashboard**: Comprehensive statistics and visualization features
 - Migrated inventory, shopping list, meal plan, and saved recipes to Firestore for household sharing
+
+## API Documentation
+
+### Core Services
+
+#### Analytics Service (`services/analyticsService.ts`)
+Tracks user interactions and app usage for insights and optimization.
+
+**Key Methods:**
+- `trackEvent(eventName, params)` - Track custom events with parameters
+- `trackScreenView(screenName)` - Track screen/page views
+- `trackUserAction(action, context)` - Track user actions with context
+- `trackFeatureUsage(feature, metadata)` - Track feature usage patterns
+
+**Event Categories:**
+- Authentication events (login, signup, logout)
+- Recipe interactions (search, save, view, rate)
+- Meal planning (add, remove, modify)
+- Shopping list operations
+- Pantry management
+- Navigation and UI interactions
+
+#### Calendar Service (`services/calendarService.ts`)
+Manages calendar integration for meal planning and reminders.
+
+**Key Methods:**
+- `createMealPlanEvent(dayPlan, date)` - Export meal plan to calendar
+- `createCookingReminder(recipeTitle, scheduledTime)` - Create cooking reminders
+- `openCalendarAtDate(date)` - Open device calendar at specific date
+- `checkPermissions()` - Check calendar access permissions
+
+**Features:**
+- Cross-platform calendar integration (iOS/Android)
+- All-day meal plan events
+- Recipe details in event descriptions
+- Automatic permission handling
+
+#### Recipe Service (`services/recipeService.ts`)
+Handles recipe data operations and AI-powered recipe generation.
+
+**Key Methods:**
+- `searchRecipes(query, filters)` - Search recipes with filters
+- `getSavedRecipes(limit)` - Get user's saved recipes
+- `saveRecipe(recipe)` - Save recipe to user's collection
+- `generateRecipe(prompt, preferences)` - AI recipe generation via Gemini
+
+#### Gemini Service (`services/geminiService.ts`)
+AI-powered recipe generation and content processing.
+
+**Key Methods:**
+- `generateRecipe(prompt, options)` - Generate recipes from text prompts
+- `analyzeIngredients(image)` - Extract ingredients from images
+- `suggestRecipes(inventory)` - Suggest recipes based on available ingredients
+
+### Data Management
+
+#### useDataManagement Hook (`hooks/useDataManagement.ts`)
+Centralized data management for all Firestore operations.
+
+**Features:**
+- Real-time Firestore subscriptions
+- Optimistic updates
+- Household-scoped data access
+- Automatic data synchronization
+- Error handling and retry logic
+
+**Managed Collections:**
+- `users/{userId}/inventory` - Personal pantry items
+- `users/{userId}/shoppingList` - Personal shopping lists
+- `users/{userId}/mealPlan` - Personal meal plans
+- `users/{userId}/savedRecipes` - Personal saved recipes
+- `households/{householdId}/inventory` - Shared household inventory
+- `households/{householdId}/shoppingList` - Shared shopping lists
+- `households/{householdId}/mealPlan` - Shared meal plans
+- `households/{householdId}/sharedRecipes` - Shared recipes
+
+### Component Architecture
+
+#### Key Components
+- **Settings**: Main settings hub with analytics, subscription, and preferences
+- **MealPlanner**: Interactive meal planning with calendar integration
+- **PantryAnalytics**: Inventory and usage analytics dashboard
+- **UserBehaviorAnalytics**: User engagement and behavior insights
+- **SmartRecommendations**: AI-powered personalized suggestions
+- **RecipeFinder**: Recipe discovery with search and filtering
+- **ShoppingList**: Shopping list management with smart features
+
+#### State Management
+- React hooks for local component state
+- Context providers for global app state
+- Firebase real-time listeners for data synchronization
+- Local storage for user preferences and cache
+
+### Capacitor Plugins
+
+#### Configured Plugins
+- **App**: App lifecycle and back button handling
+- **Device**: Device information and capabilities
+- **Camera**: Photo capture for pantry scanning
+- **Local Notifications**: Push notifications and reminders
+- **Calendar**: Calendar integration for meal planning
+
+#### Plugin Integration
+- Automatic permission handling
+- Cross-platform compatibility
+- Fallback behavior for web environments
+- Error handling and user feedback
 - Added Settings screen for notifications, theme, and feedback
 - Integrated local notifications (Capacitor) for daily reminders
 - Improved signup flow with validation and email verification

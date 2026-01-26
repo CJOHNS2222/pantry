@@ -5,6 +5,55 @@ All notable changes to Smart Pantry Chef will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-01-26
+
+### Added
+- **AI Features Opt-in System**: Comprehensive user consent management for Gemini AI-powered features
+  - **Settings AI Section**: New "AI Features" section with toggle to enable/disable AI-powered image analysis and smart suggestions
+  - **Usage Tracking**: Daily usage counter showing API requests (100/day limit) with clear visual feedback
+  - **Privacy Controls**: Explicit user opt-in required before accessing Gemini AI services
+  - **Graceful Degradation**: Clear error messages when AI features are disabled, preventing API errors
+
+### Enhanced
+- **Pantry Scanner Modal**: Improved modal positioning with 75px bottom padding for better screen centering
+- **Mobile Experience**: Resolved horizontal scrolling issues across all components with global overflow-x-hidden
+- **Component Architecture**: Updated PantryScanner and Settings components with proper user prop interfaces
+
+### Fixed
+- **Android Build System**: Upgraded Gradle Plugin (8.10.0) and Gradle (8.11.1) to resolve compatibility issues
+- **Syntax Errors**: Resolved multiple TypeScript compilation errors and code structure issues
+- **AI API Integration**: Added opt-in verification before Gemini API calls to prevent unauthorized usage
+
+### Enhanced
+- **Offline & Sync Experience**: Comprehensive offline capabilities and sync management
+  - **Enhanced Offline Queue Service**: Upgraded with conflict resolution, retry logic, and progress tracking
+  - **Sync Status Management**: Real-time sync status with pending operations counter and error handling
+  - **Visual Sync Indicators**: Header-integrated sync status showing online/offline state, progress bars, and conflict alerts
+  - **Automatic Background Sync**: Seamless data synchronization when connection is restored
+  - **Conflict Detection**: Intelligent handling of data conflicts with user resolution options
+- **Accessibility (a11y) Improvements**: Comprehensive accessibility enhancements across the application
+  - **ARIA Labels**: Added descriptive labels for all interactive elements (buttons, forms, navigation)
+  - **Keyboard Navigation**: Implemented full keyboard support with visible focus indicators
+  - **Screen Reader Support**: Enhanced compatibility with screen readers using semantic HTML and ARIA attributes
+  - **Focus Management**: Added proper focus rings and logical tab order for all components
+  - **Semantic HTML**: Improved document structure with proper roles and landmarks
+  - **Form Accessibility**: Added field labels, validation messages, and required field indicators
+
+### Enhanced
+- **Mobile Layout Optimization**: Comprehensive spacing improvements for mobile devices
+  - **Header Spacing**: Optimized 120px top padding for proper content positioning below fixed header
+  - **Navigation Spacing**: Minimized bottom gap to 8px minimum, eliminating excessive whitespace above navigation
+  - **Safe Area Integration**: Enhanced compatibility with device notches and navigation bars
+  - **Content Flow**: Improved vertical spacing throughout the application for better mobile UX
+
+### Fixed
+- **Mobile Layout Issues**: Resolved excessive padding and spacing problems in MainContent component
+- **Component Spacing**: Fixed inconsistent spacing between header, content, and navigation elements
+
+### Technical
+- **Layout Calculations**: Updated MainContent height calculations to properly account for fixed header and navigation heights
+- **Safe Area Service**: Improved mobile device compatibility with proper safe area handling
+
 ## [1.1.9] - 2026-01-24
 
 ### Enhanced

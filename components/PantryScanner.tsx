@@ -11,6 +11,7 @@ import { BrowserMultiFormatReader } from '@zxing/library';
 import PriceTrends from './PriceTrends';
 import ItemDetailModal from './ItemDetailModal';
 import { searchPantryItems, getAutocompleteSuggestions, filterPantryItems, savePantryFilter, loadPantryFilter, defaultPantryFilter } from '../utils/searchUtils';
+import { canUseGemini } from '../services/featureFlags';
 
 interface PantryScannerProps {
   inventory: PantryItem[];
@@ -24,6 +25,12 @@ interface PantryScannerProps {
   customCategories?: CustomCategory[];
   setActiveTab?: (tab: Tab) => void;
   setInitialSearchQuery?: (query: string) => void;
+  user?: {
+    id: string;
+    name: string;
+    email: string;
+    avatar?: string;
+  };
 }
 
 export const PantryScanner: React.FC<PantryScannerProps> = ({ 
@@ -37,7 +44,8 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   recipeSuggestions = [],
   customCategories = [],
   setActiveTab,
-  setInitialSearchQuery
+  setInitialSearchQuery,
+  user
 }) => {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [rawBase64, setRawBase64] = useState<string | null>(null);
@@ -219,6 +227,13 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
 
   const handleAnalyze = async () => {
     if (!rawBase64) return;
+    
+    // Check if user has opted in to AI features
+    if (!canUseGemini(user?.id)) {
+      alert('Please enable AI features in Settings to use image analysis.');
+      return;
+    }
+    
     setLoadingState(LoadingState.LOADING);
 
     try {
@@ -1031,19 +1046,19 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
       {/* Floating Action Button */}
       <button
         onClick={() => setIsAddModalOpen(true)}
-        className="fixed bottom-28 right-6 z-50 bg-[var(--accent-color)] text-white p-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110"
+        className="fixed bottom-28 right-6 z-50 bg-[var(--accent-color)] text-white p-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:ring-offset-2"
         style={{ bottom: 'calc(7rem + 15px)' }}
         aria-label="Add items to pantry"
         data-tutorial="add-item-button"
       >
-        <Plus className="w-6 h-6" />
+        <Plus className="w-6 h-6" aria-hidden="true" />
       </button>
 
       {/* Add Items Modal */}
       {isAddModalOpen && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center p-4">
           <div className="bg-theme-primary rounded-t-3xl max-w-md w-full max-h-[80vh] overflow-y-auto shadow-xl animate-slide-up">
-            <div className="p-6 pb-[45px]">
+            <div className="p-6 pb-[75px]">
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-xl font-bold text-theme-secondary">Add Items</h3>
                 <button
@@ -1111,9 +1126,10 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                         fileInputRef.current?.click();
                       }
                     }}
-                    className="flex-1 py-2 px-3 rounded-lg border border-theme text-theme-secondary hover:bg-theme-primary transition-colors flex items-center justify-center gap-2 text-sm"
+                    className="flex-1 py-2 px-3 rounded-lg border border-theme text-theme-secondary hover:bg-theme-primary transition-colors flex items-center justify-center gap-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:ring-offset-2"
+                    aria-label="Take photo with camera to scan pantry items"
                   >
-                    <Camera className="w-4 h-4" />
+                    <Camera className="w-4 h-4" aria-hidden="true" />
                     Photo
                   </button>
                   
@@ -1125,18 +1141,21 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                         fileInputRef.current?.click();
                       }
                     }}
-                    className="flex-1 py-2 px-3 rounded-lg border border-theme text-theme-secondary hover:bg-theme-primary transition-colors flex items-center justify-center gap-2 text-sm"
+                    className="flex-1 py-2 px-3 rounded-lg border border-theme text-theme-secondary hover:bg-theme-primary transition-colors flex items-center justify-center gap-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:ring-offset-2"
+                    aria-label="Select photo from gallery to scan pantry items"
                   >
-                    <Image className="w-4 h-4" />
+                    <Image className="w-4 h-4" aria-hidden="true" />
                     Gallery
                   </button>
                   
                   <button
                     onClick={handleScanBarcode}
                     disabled={loadingState === LoadingState.LOADING}
-                    className="flex-1 py-2 px-3 rounded-lg border border-theme text-theme-secondary hover:bg-theme-primary transition-colors flex items-center justify-center gap-2 text-sm"
+                    className="flex-1 py-2 px-3 rounded-lg border border-theme text-theme-secondary hover:bg-theme-primary transition-colors flex items-center justify-center gap-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    aria-label="Scan barcode to identify product"
+                    aria-disabled={loadingState === LoadingState.LOADING}
                   >
-                    <Barcode className="w-4 h-4" />
+                    <Barcode className="w-4 h-4" aria-hidden="true" />
                     Barcode
                   </button>
                 </div>
@@ -1145,16 +1164,18 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                   <button
                     onClick={handleAnalyze}
                     disabled={loadingState === LoadingState.LOADING}
-                    className="w-full mt-4 py-3 rounded-lg font-bold text-sm uppercase tracking-wider flex items-center justify-center gap-2 bg-[var(--accent-color)] text-white shadow-lg"
+                    className="w-full mt-4 py-3 rounded-lg font-bold text-sm uppercase tracking-wider flex items-center justify-center gap-2 bg-[var(--accent-color)] text-white shadow-lg hover:bg-[var(--accent-color)]/90 transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    aria-label="Process image with AI to identify pantry items"
+                    aria-disabled={loadingState === LoadingState.LOADING}
                   >
                     {loadingState === LoadingState.LOADING ? (
                       <>
-                        <Loader2 className="animate-spin w-4 h-4" />
+                        <Loader2 className="animate-spin w-4 h-4" aria-hidden="true" />
                         <span>Analyzing Image...</span>
                       </>
                     ) : (
                       <>
-                        <Image className="w-4 h-4" />
+                        <Image className="w-4 h-4" aria-hidden="true" />
                         <span>Process Image</span>
                       </>
                     )}
@@ -1196,47 +1217,57 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
               {/* Manual Add Section */}
               <div className="bg-theme-secondary p-4 rounded-2xl border border-theme shadow-lg">
                 <h4 className="text-lg font-semibold text-theme-secondary mb-4">Quick Add</h4>
-                <form onSubmit={handleManualAdd} className="space-y-4">
+                <form onSubmit={handleManualAdd} className="space-y-4" role="form" aria-label="Add item manually">
                   <div className="flex gap-3">
                     <input 
                       type="text"
                       value={newItemText}
                       onChange={(e) => setNewItemText(e.target.value)}
                       placeholder="Enter item name..."
-                      className="flex-1 max-w-[calc(100%-120px)] bg-theme-primary border border-theme rounded-lg px-4 py-3 text-theme-secondary shadow-sm outline-none focus:border-[var(--accent-color)]"
+                      className="flex-1 max-w-[calc(100%-120px)] bg-theme-primary border border-theme rounded-lg px-4 py-3 text-theme-secondary shadow-sm outline-none focus:border-[var(--accent-color)] focus:ring-2 focus:ring-[var(--accent-color)]/20"
+                      aria-label="Item name"
+                      aria-required="true"
+                      minLength={2}
+                      maxLength={50}
                     />
                     <div className="flex items-center gap-1">
                       <input
                         type="number"
                         min={1}
+                        max={999}
                         value={newQty}
                         onChange={e => setNewQty(Number(e.target.value))}
-                        className="w-12 bg-theme-primary border border-theme rounded-lg px-2 py-3 text-theme-secondary shadow-sm focus:border-[var(--accent-color)] outline-none text-center"
+                        className="w-12 bg-theme-primary border border-theme rounded-lg px-2 py-3 text-theme-secondary shadow-sm focus:border-[var(--accent-color)] outline-none text-center focus:ring-2 focus:ring-[var(--accent-color)]/20"
                         placeholder="Qty"
+                        aria-label="Quantity"
+                        aria-required="true"
                       />
                       <div className="flex flex-col gap-1">
                         <button
                           type="button"
                           onClick={incrementQty}
-                          className="p-1 bg-theme-secondary hover:bg-theme-primary border border-theme rounded text-theme-secondary hover:text-[var(--accent-color)] transition-colors"
+                          className="p-1 bg-theme-secondary hover:bg-theme-primary border border-theme rounded text-theme-secondary hover:text-[var(--accent-color)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:ring-offset-1"
+                          aria-label="Increase quantity by 1"
                         >
-                          <ChevronUp className="w-3 h-3" />
+                          <ChevronUp className="w-3 h-3" aria-hidden="true" />
                         </button>
                         <button
                           type="button"
                           onClick={decrementQty}
-                          className="p-1 bg-theme-secondary hover:bg-theme-primary border border-theme rounded text-theme-secondary hover:text-[var(--accent-color)] transition-colors"
+                          className="p-1 bg-theme-secondary hover:bg-theme-primary border border-theme rounded text-theme-secondary hover:text-[var(--accent-color)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:ring-offset-1"
+                          aria-label="Decrease quantity by 1"
                         >
-                          <ChevronDown className="w-3 h-3" />
+                          <ChevronDown className="w-3 h-3" aria-hidden="true" />
                         </button>
                       </div>
                     </div>
                   </div>
                   <button 
                     type="submit" 
-                    className="w-full py-3 rounded-lg font-bold text-sm uppercase tracking-wider flex items-center justify-center gap-2 bg-[var(--accent-color)] text-white shadow-lg hover:bg-[var(--accent-color)]/90 transition-colors"
+                    className="w-full py-3 rounded-lg font-bold text-sm uppercase tracking-wider flex items-center justify-center gap-2 bg-[var(--accent-color)] text-white shadow-lg hover:bg-[var(--accent-color)]/90 transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:ring-offset-2"
+                    aria-label="Add item to pantry"
                   >
-                    <Plus className="w-4 h-4" />
+                    <Plus className="w-4 h-4" aria-hidden="true" />
                     Add Item
                   </button>
                 </form>

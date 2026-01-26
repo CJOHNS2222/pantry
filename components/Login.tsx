@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FormattedMessage } from 'react-intl';
+import { FormattedMessage, useIntl } from 'react-intl';
 import { ChefHat, Mail, Chrome } from 'lucide-react';
 import { User } from '../types';
 import { Browser } from '@capacitor/browser';
@@ -14,6 +14,7 @@ interface LoginProps {
 }
 
 export const Login: React.FC<LoginProps> = ({ onLogin }) => {
+  const intl = useIntl();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -36,20 +37,20 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
     setError(null);
     setSuccess(null);
     if (!validateEmail(email)) {
-      setError(<FormattedMessage id="auth.error.invalidEmail" />);
+      setError('Please enter a valid email address.');
       return;
     }
     if (!validatePassword(password)) {
-      setError(<FormattedMessage id="auth.error.weakPassword" />);
+      setError('Password must be at least 6 characters and contain a number and a letter.');
       return;
     }
     if (isSignup) {
       if (!name.trim()) {
-        setError(<FormattedMessage id="auth.error.missingName" />);
+        setError('Please enter your name.');
         return;
       }
       if (password !== confirmPassword) {
-        setError(<FormattedMessage id="auth.error.passwordMismatch" />);
+        setError('Passwords do not match.');
         return;
       }
     }
@@ -213,9 +214,9 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
   }, [onLogin]);
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-[#2A0A10] text-white relative overflow-hidden">
+    <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-[#2A0A10] text-white relative overflow-auto">
       {/* Background Ambience */}
-      <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-red-900/20 via-[#2A0A10] to-[#2A0A10] z-0"></div>
+      <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-red-900/20 via-[#2A0A10] to-[#2A0A10] z-0 pointer-events-none"></div>
 
       <div className="w-full max-w-md bg-[#3F1016] border border-red-900/30 rounded-3xl p-8 shadow-2xl relative z-10">
         <div className="flex flex-col items-center mb-8">
@@ -245,7 +246,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 className="w-full bg-[#2A0A10] border border-red-900/50 rounded-xl px-4 py-3 text-white placeholder-red-900/50 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none transition-all"
-                placeholder={<FormattedMessage id="auth.yourName" />}
+                placeholder={intl.formatMessage({ id: "auth.yourName" })}
                 required
               />
             </div>
@@ -261,7 +262,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full bg-[#2A0A10] border border-red-900/50 rounded-xl px-4 py-3 text-white placeholder-red-900/50 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none transition-all"
-              placeholder={<FormattedMessage id="auth.emailPlaceholder" />}
+              placeholder={intl.formatMessage({ id: "auth.emailPlaceholder" })}
               required
             />
           </div>
@@ -276,7 +277,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full bg-[#2A0A10] border border-red-900/50 rounded-xl px-4 py-3 text-white placeholder-red-900/50 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none transition-all"
-              placeholder={<FormattedMessage id="auth.passwordPlaceholder" />}
+              placeholder={intl.formatMessage({ id: "auth.passwordPlaceholder" })}
               required
             />
              {!isSignup && (
@@ -301,7 +302,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 className="w-full bg-[#2A0A10] border border-red-900/50 rounded-xl px-4 py-3 text-white placeholder-red-900/50 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none transition-all"
-                placeholder={<FormattedMessage id="auth.confirmPasswordPlaceholder" />}
+                placeholder={intl.formatMessage({ id: "auth.confirmPasswordPlaceholder" })}
                 required
               />
             </div>

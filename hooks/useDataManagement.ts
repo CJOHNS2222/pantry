@@ -9,7 +9,7 @@ import AnalyticsService from '../services/analyticsService';
 import { offlineQueue } from '../services/offlineQueueService';
 import { undoService } from '../services/undoService';
 
-export function useDataManagement(user: User | null, addToast: (message: string, type?: 'error' | 'info', ttl?: number, actionLabel?: string, action?: () => void) => void, addToShoppingList?: (items: string[]) => void) {
+export function useDataManagement(user: User | null, addToast: (message: string, type?: 'error' | 'info', ttl?: number, actionLabel?: string, action?: () => void) => void, addToShoppingList?: (items: string[]) => void, updateSyncStatus?: (updates: any) => void) {
   // Data States
   const [mealPlanState, setMealPlanState] = useState<DayPlan[]>([]);
   const [household, setHousehold] = useState<Household | null>(null);
@@ -44,6 +44,12 @@ export function useDataManagement(user: User | null, addToast: (message: string,
   const performWrite = async (operation: { type: 'add' | 'update' | 'delete'; collection: string; docId?: string; data?: any }) => {
     if (!isOnline) {
       await offlineQueue.enqueue(operation);
+      if (updateSyncStatus) {
+        updateSyncStatus((prev: any) => ({
+          ...prev,
+          pendingOperations: prev.pendingOperations + 1
+        }));
+      }
       addToast('Change queued for when you\'re back online.', 'info');
     } else {
       if (operation.type === 'add') {
@@ -555,7 +561,17 @@ export function useDataManagement(user: User | null, addToast: (message: string,
 
       // Custom Categories listener
       unsubs.push(onSnapshot(collection(db, 'users', user.id, 'customCategories'), snap => {
-        const data = snap.docs.map(d => ({ id: d.id, ...d.data() } as CustomCategory));
+        const data = snap.docs.map(d => {
+          const docData = d.data();
+          return {
+            id: d.id,
+            name: docData.name,
+            icon: docData.icon,
+            color: docData.color,
+            createdAt: docData.createdAt?.toDate?.()?.toISOString() || docData.createdAt,
+            userId: docData.userId
+          } as CustomCategory;
+        });
         setCustomCategories(data);
       }, err => {
         console.error("User customCategories listener failed:", err);
@@ -1321,12 +1337,19 @@ export function useDataManagement(user: User | null, addToast: (message: string,
       
       // Save to Firestore
       const docRef = await addDoc(collection(db, 'users', user.id, 'customCategories'), {
-        ...newCategory,
-        createdAt: serverTimestamp()
+        name: newCategory.name,
+        icon: newCategory.icon,
+        color: newCategory.color,
+        createdAt: serverTimestamp(),
+        userId: newCategory.userId
       });
 
-      // Update local state
-      const categoryWithId = { ...newCategory, id: docRef.id };
+      // Update local state with the Firestore-generated ID and proper createdAt
+      const categoryWithId = {
+        ...newCategory,
+        id: docRef.id,
+        createdAt: new Date().toISOString() // Use current time for immediate display
+      };
       setCustomCategories(prev => [...prev, categoryWithId]);
       
       addToast(`Created category "${name}"!`);

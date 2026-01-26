@@ -334,6 +334,21 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
           <h2 className="text-2xl font-serif font-bold mb-2 text-[var(--accent-color)]">{recipe.title || 'Untitled'}</h2>
           {recipe.description && <p className="mb-4 text-theme-secondary opacity-70">{recipe.description}</p>}
 
+          {/* Recipe Image */}
+          {recipe.image && (
+            <div className="mb-6 rounded-lg overflow-hidden border border-theme">
+              <img
+                src={recipe.image}
+                alt={recipe.title}
+                className="w-full h-48 object-cover"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement;
+                  target.style.display = 'none';
+                }}
+              />
+            </div>
+          )}
+
           {/* Enhanced Cooking Timer Section */}
           {(recipe as StructuredRecipe).cookTime && (
             <div className="mb-6 p-4 bg-theme-secondary/10 rounded-lg border border-[var(--accent-color)]/20">

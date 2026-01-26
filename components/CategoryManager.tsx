@@ -231,7 +231,14 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({
                       <div>
                         <h4 className="font-medium text-theme-primary">{category.name}</h4>
                         <p className="text-sm text-theme-secondary">
-                          Created {new Date(category.createdAt).toLocaleDateString()}
+                          Created {(() => {
+                            try {
+                              const date = new Date(category.createdAt);
+                              return isNaN(date.getTime()) ? 'Unknown date' : date.toLocaleDateString();
+                            } catch {
+                              return 'Unknown date';
+                            }
+                          })()}
                         </p>
                       </div>
                     </div>

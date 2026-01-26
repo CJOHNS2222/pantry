@@ -145,7 +145,7 @@ export const MainContent: React.FC<MainContentProps> = ({
     setMealPlan(newMealPlan);
   };
   return (
-    <main className="flex-1 overflow-y-auto p-4 pt-32 pb-24 scrollbar-hide bg-theme-primary relative">
+    <main className="overflow-y-auto overflow-x-hidden pb-safe px-4 scrollbar-hide bg-theme-primary" style={{ paddingTop: '120px', height: 'calc(100vh - 5rem - max(0.5rem, var(--safe-area-inset-bottom, 0px)))', WebkitOverflowScrolling: 'touch', touchAction: 'auto' }}>
       {/* Usage Indicator - Show for free users */}
       <UsageIndicator
         user={user}
@@ -167,6 +167,7 @@ export const MainContent: React.FC<MainContentProps> = ({
             customCategories={customCategories}
             setActiveTab={setActiveTab}
             setInitialSearchQuery={setInitialSearchQuery}
+            user={user}
           />
         </Suspense>
       )}

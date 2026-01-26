@@ -11,6 +11,12 @@ const config: CapacitorConfig = {
     Device: {
       // Device plugin configuration
     },
+    Calendar: {
+      // Calendar plugin configuration
+    },
+    SafeArea: {
+      // Safe area plugin configuration
+    },
     // CapacitorHttp: {
     //   enabled: true,
     //   excludePatterns: ["*firestore.googleapis.com*"]

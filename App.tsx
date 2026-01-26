@@ -15,14 +15,16 @@ import { useTheme } from './hooks/useTheme';
 import { useSettings } from './hooks/useSettings';
 import { useToasts } from './hooks/useToasts';
 import { useDataManagement } from './hooks/useDataManagement';
+import { useOfflineStatus } from './hooks/useOfflineStatus';
 import AnalyticsService from './services/analyticsService';
 import { isHouseholdMember, inferCategoryFromItemName, inferStorageLocationFromItemName, parseIngredientForShoppingList, getItemImage, fetchExternalItemImage } from './utils/appUtils';
 import { getOrCreateHousehold } from './services/householdService';
 import { GlobalUpdatePrompt } from './components/GlobalUpdatePrompt';
 import { App as CapacitorApp, BackButtonListenerEvent } from '@capacitor/app';
+import SafeAreaService from './services/safeAreaService';
 
 // Lazy load monitoring components
-const DatabaseAnalytics = React.lazy(() => import('./components/DatabaseAnalytics').then(module => ({ default: module.default })));
+// const DatabaseAnalytics = React.lazy(() => import('./components/DatabaseAnalytics').then(module => ({ default: module.default })));
 
 // Loading component for lazy-loaded components
 const LoadingSpinner: React.FC = () => (
@@ -52,6 +54,7 @@ const App: React.FC = () => {
   const { settings, setSettings } = useSettings();
   const { theme } = useTheme(settings.theme);
   const { toasts, setToasts, addToast } = useToasts();
+  const { syncStatus, syncNow } = useOfflineStatus();
 
   // Function to add items to shopping list
   const addToShoppingList = (items: string[], source: string = 'manual') => {
@@ -107,7 +110,12 @@ const App: React.FC = () => {
     // Usage limit checking functions
     checkRecipeSaveLimit,
     checkMealPlanLimit,
-  } = useDataManagement(user, addToast, addToShoppingList);
+  } = useDataManagement(user, addToast, addToShoppingList, syncStatus.updateSyncStatus);
+
+  // Initialize safe area handling for mobile devices
+  useEffect(() => {
+    SafeAreaService.initialize().catch(console.error);
+  }, []);
 
   // Listen for notifications while user is logged in
   useEffect(() => {
@@ -268,7 +276,7 @@ const App: React.FC = () => {
   return (
     <>
       <ErrorBoundary>
-        <div className="min-h-screen flex flex-col max-w-md mx-auto shadow-2xl overflow-hidden relative border-x border-theme transition-colors duration-300">
+        <div className="h-screen flex flex-col max-w-md mx-auto shadow-2xl relative border-x border-theme transition-colors duration-300 overflow-x-hidden">
         {showHousehold && (
           <HouseholdManager 
               user={user} 
@@ -395,13 +403,15 @@ const App: React.FC = () => {
           </div>
         )}
 
-        <AppHeader 
-          user={user} 
-          settings={settings} 
-          setSettings={setSettings} 
+        <AppHeader
+          user={user}
+          settings={settings}
+          setSettings={setSettings}
           onShowHousehold={() => setShowHousehold(true)}
           recentActions={recentActions}
           onUndo={performUndo}
+          syncStatus={syncStatus}
+          onSyncClick={syncNow}
         />
         
         <MainContent 
@@ -558,7 +568,7 @@ const App: React.FC = () => {
         <AppNavigation activeTab={activeTab} setActiveTab={setActiveTab} />
         
         {/* Toast Notifications */}
-        <div className="fixed bottom-4 right-4 z-50 space-y-2">
+        <div className="fixed bottom-4 right-4 mb-safe z-50 space-y-2">
           {toasts.map((toast) => (
             <div
               key={toast.id}
@@ -599,9 +609,9 @@ const App: React.FC = () => {
       <GlobalUpdatePrompt />
 
       {/* Database Analytics Dashboard - Lazy loaded */}
-      <Suspense fallback={<LoadingSpinner />}>
+      {/* <Suspense fallback={<LoadingSpinner />}>
         <DatabaseAnalytics />
-      </Suspense>
+      </Suspense> */}
     </>
   );
 }

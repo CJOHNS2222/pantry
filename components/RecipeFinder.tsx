@@ -1572,7 +1572,30 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                 ) : (
                     <div className="grid grid-cols-4 gap-4">
                         {firebaseRecipes
-                            .filter(recipe => selectedCategory === 'All' || recipe.type === selectedCategory)
+                            .filter(recipe => {
+                                if (selectedCategory === 'All') return true;
+
+                                // Case-insensitive matching and handle variations
+                                const recipeType = recipe.type?.toLowerCase() || '';
+                                const filterCategory = selectedCategory.toLowerCase();
+
+                                // Direct match
+                                if (recipeType === filterCategory) return true;
+
+                                // Handle common variations
+                                const typeMappings: { [key: string]: string[] } = {
+                                    'dinner': ['dinner', 'main course', 'main dish', 'entree'],
+                                    'lunch': ['lunch', 'main course', 'main dish', 'entree'],
+                                    'breakfast': ['breakfast', 'morning meal', 'brunch'],
+                                    'dessert': ['dessert', 'sweet', 'cake', 'pie', 'cookie'],
+                                    'appetizer': ['appetizer', 'starter', 'snack', 'appetiser'],
+                                    'salad': ['salad', 'green salad', 'side salad'],
+                                    'soup': ['soup', 'stew', 'chowder'],
+                                    'drink': ['drink', 'beverage', 'cocktail', 'smoothie']
+                                };
+
+                                return typeMappings[filterCategory]?.some(type => recipeType.includes(type)) || false;
+                            })
                             .map((recipe, index) => (
                                 <div
                                     key={`firebase-${recipe.id || index}`}

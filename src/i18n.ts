@@ -16,8 +16,24 @@ export type Locale = keyof typeof LOCALES;
 // Import locale messages
 import enMessages from './locales/en.json';
 
+// Function to flatten nested messages
+const flattenMessages = (nestedMessages: any, prefix = ''): Record<string, string> => {
+  return Object.keys(nestedMessages).reduce((messages: Record<string, string>, key) => {
+    const value = nestedMessages[key];
+    const prefixedKey = prefix ? `${prefix}.${key}` : key;
+
+    if (typeof value === 'string') {
+      messages[prefixedKey] = value;
+    } else {
+      Object.assign(messages, flattenMessages(value, prefixedKey));
+    }
+
+    return messages;
+  }, {});
+};
+
 const messages: Record<Locale, any> = {
-  en: enMessages,
+  en: flattenMessages(enMessages),
 };
 
 // Create intl instance

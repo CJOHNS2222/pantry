@@ -4,6 +4,8 @@ import { collection, addDoc, Timestamp, doc, updateDoc } from 'firebase/firestor
 import { SubscriptionManager } from './SubscriptionManager';
 import { CategoryManager } from './CategoryManager';
 import { PantryAnalytics } from './PantryAnalytics';
+import UserBehaviorAnalytics from './UserBehaviorAnalytics';
+import SmartRecommendations from './SmartRecommendations';
 import { MonitoringDashboard } from './MonitoringDashboard';
 import { LanguageSelector } from '../src/components/LanguageSelector';
 import { useNotifications } from '../hooks/useNotifications';
@@ -12,6 +14,7 @@ import { VersionUpdate } from './VersionUpdate';
 import { DayPlan } from '../types';
 import { BarChart3 } from 'lucide-react';
 import AnalyticsService from '../services/analyticsService';
+import { userOptedInToGemini, setUserGeminiOptIn, getGeminiUsage } from '../services/featureFlags';
 
 const defaultSettings = {
   notifications: {
@@ -74,7 +77,10 @@ export const Settings: React.FC<SettingsProps> = ({
   const [profileChanged, setProfileChanged] = useState(false);
   const [showCategoryManager, setShowCategoryManager] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
+  const [analyticsTab, setAnalyticsTab] = useState<'pantry' | 'behavior' | 'recommendations'>('pantry');
   const [userProfile, setUserProfile] = useState<UserProfile | undefined>(user?.profile);
+  const [geminiOptedIn, setGeminiOptedIn] = useState(() => userOptedInToGemini(user?.id));
+  const [geminiUsage, setGeminiUsage] = useState(() => getGeminiUsage(user?.id));
 
   // Update userProfile when user data loads
   useEffect(() => {
@@ -97,15 +103,14 @@ export const Settings: React.FC<SettingsProps> = ({
     setNotifChanged(true);
   };
 
-    const handleThemeChange = (key: string, value: any) => {
-      setSettings(prev => ({
-        ...prev,
-        theme: {
-          ...prev.theme,
-          [key]: value
-        }
-      }));
-    };
+  const handleGeminiOptIn = (optedIn: boolean) => {
+    if (user?.id) {
+      setUserGeminiOptIn(user.id, optedIn);
+      setGeminiOptedIn(optedIn);
+      setGeminiUsage(getGeminiUsage(user.id));
+    }
+  };
+
   const handleNotifChange = (key: string, value: any) => {
     setPendingNotifications(prev => ({
       ...prev,
@@ -205,10 +210,10 @@ export const Settings: React.FC<SettingsProps> = ({
       {/* Analytics Modal */}
       {showAnalytics && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-start sm:items-center justify-center p-4 overflow-y-auto" onClick={() => setShowAnalytics(false)}>
-          <div className="bg-theme-primary rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto my-8" onClick={e => e.stopPropagation()}>
+          <div className="bg-theme-primary rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto my-8" onClick={e => e.stopPropagation()}>
             <div className="sticky top-0 z-10 bg-[var(--accent-color)] p-4 flex items-center justify-between rounded-t-2xl">
               <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-                <BarChart3 className="w-6 h-6" /> Pantry Analytics
+                <BarChart3 className="w-6 h-6" /> Analytics Dashboard
               </h2>
               <button
                 onClick={() => setShowAnalytics(false)}
@@ -218,7 +223,48 @@ export const Settings: React.FC<SettingsProps> = ({
               </button>
             </div>
             <div className="p-6">
-              <PantryAnalytics inventory={inventory} />
+              {/* Analytics Tabs */}
+              <div className="flex gap-2 mb-6">
+                <button
+                  onClick={() => setAnalyticsTab('pantry')}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                    analyticsTab === 'pantry'
+                      ? 'bg-[var(--accent-color)] text-white'
+                      : 'bg-theme-secondary text-theme-primary hover:bg-theme-primary'
+                  }`}
+                >
+                  Pantry Analytics
+                </button>
+                <button
+                  onClick={() => setAnalyticsTab('behavior')}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                    analyticsTab === 'behavior'
+                      ? 'bg-[var(--accent-color)] text-white'
+                      : 'bg-theme-secondary text-theme-primary hover:bg-theme-primary'
+                  }`}
+                >
+                  User Behavior
+                </button>
+                <button
+                  onClick={() => setAnalyticsTab('recommendations')}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                    analyticsTab === 'recommendations'
+                      ? 'bg-[var(--accent-color)] text-white'
+                      : 'bg-theme-secondary text-theme-primary hover:bg-theme-primary'
+                  }`}
+                >
+                  Smart Recommendations
+                </button>
+              </div>
+
+              {/* Analytics Content */}
+              {analyticsTab === 'pantry' ? (
+                <PantryAnalytics inventory={inventory} />
+              ) : analyticsTab === 'behavior' ? (
+                <UserBehaviorAnalytics />
+              ) : (
+                <SmartRecommendations />
+              )}
             </div>
           </div>
         </div>
@@ -231,7 +277,7 @@ export const Settings: React.FC<SettingsProps> = ({
         onClick={() => setShowAnalytics(true)}
         className="w-full bg-[var(--accent-color)] hover:bg-[var(--accent-color)]/90 text-white rounded-xl p-4 font-semibold flex items-center justify-center gap-2 transition-colors shadow-lg"
       >
-        <BarChart3 className="w-5 h-5" /> View Pantry Analytics
+        <BarChart3 className="w-5 h-5" /> View Analytics Dashboard
       </button>
 
       {/* Profile Section */}
@@ -823,6 +869,36 @@ export const Settings: React.FC<SettingsProps> = ({
               Save Notification Settings
             </button>
           )}
+        </div>
+      </div>
+
+      {/* AI Features Section */}
+      <div className="bg-theme-secondary rounded-xl border border-theme p-4">
+        <h3 className="font-semibold mb-3 text-theme-primary">AI Features</h3>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <label htmlFor="geminiOptIn" className="flex items-center gap-2 cursor-pointer">
+                <span className="text-sm text-theme-primary">Enable AI-Powered Features</span>
+                <input
+                  id="geminiOptIn"
+                  name="geminiOptIn"
+                  type="checkbox"
+                  checked={geminiOptedIn}
+                  onChange={e => handleGeminiOptIn(e.target.checked)}
+                  className="ml-2"
+                />
+              </label>
+              <p className="text-xs text-theme-secondary mt-1">
+                Allow the app to use AI for image analysis, recipe suggestions, and smart features.
+                {geminiUsage > 0 && (
+                  <span className="block mt-1">
+                    Today's usage: {geminiUsage}/100 requests
+                  </span>
+                )}
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 
