@@ -54,6 +54,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Layout Calculations**: Updated MainContent height calculations to properly account for fixed header and navigation heights
 - **Safe Area Service**: Improved mobile device compatibility with proper safe area handling
 
+### Fixed
+- **Shopping List Sync Issues**: Resolved purchased quantity deletion and reversion problems
+  - **Data Validation**: Added `cleanObject()` function to remove undefined fields before Firestore writes
+  - **Sync Logic**: Excluded `purchasedQuantity` from sync comparisons to prevent Firestore overwrites
+  - **User Experience**: Shopping list items now maintain state when modifying purchased quantities
+- **AI Image Processing Modal**: Fixed modal content being cut off behind header/navigation
+  - **Modal Positioning**: Increased z-index to `z-[100]` and adjusted top padding to `pt-20`
+  - **Modal Sizing**: Increased maximum height to `max-h-[90vh]` for better content visibility
+  - **UI Improvements**: Enhanced modal display for AI-powered pantry scanning confirmation
+- **Gemini API Rate Limiting**: Implemented automatic retry logic for API rate limit errors
+  - **Retry Mechanism**: Added exponential backoff retry (up to 3 attempts, max 10s delay) for 429 errors
+  - **Error Handling**: Improved error messages for rate limit scenarios with user-friendly feedback
+  - **Multi-Search Support**: Users can now perform multiple AI searches per session without immediate failures
+
 ## [1.1.9] - 2026-01-24
 
 ### Enhanced
