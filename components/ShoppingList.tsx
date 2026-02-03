@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { ShoppingBasket, Check, Trash2, Archive, Plus, X, Share2, Copy, Download, MessageSquare } from 'lucide-react';
 import { ShoppingItem } from '../types';
 import { inferCategoryFromItemName, getItemImage } from '../utils/appUtils';
+import { log } from '../services/logService';
 
 interface ShoppingListProps {
   items: ShoppingItem[];
@@ -147,7 +148,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ items, setItems, onM
     navigator.clipboard.writeText(uncheckedItemsText).then(() => {
       alert('Shopping list copied to clipboard!');
     }).catch(err => {
-      console.error('Failed to copy: ', err);
+      log.error('Failed to copy shopping list', { error: err }, 'ShoppingList');
       alert('Failed to copy to clipboard');
     });
   };
@@ -160,7 +161,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ items, setItems, onM
           text: uncheckedItemsText
         });
       } catch (err) {
-        console.log('Share cancelled or failed');
+        log.debug('Share cancelled or failed', { error: err }, 'ShoppingList');
       }
     } else {
       // Fallback to clipboard

@@ -3,6 +3,7 @@ import { Crown, AlertTriangle, TrendingUp } from 'lucide-react';
 import { useSubscription } from '../hooks/useSubscription';
 import { UsageService, UsageLimits } from '../services/usageService';
 import { User } from '../types';
+import { log } from '../services/logService';
 
 interface UsageIndicatorProps {
   user: User | null;
@@ -28,7 +29,7 @@ export const UsageIndicator: React.FC<UsageIndicatorProps> = ({
           const limits = await UsageService.getUsageLimits(user);
           setUsageLimits(limits);
         } catch (error) {
-          console.error('Error fetching usage limits:', error);
+          log.error('Error fetching usage limits', { error }, 'UsageIndicator');
         }
       }
       setLoading(false);

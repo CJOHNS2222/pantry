@@ -8,6 +8,7 @@ import { RecipeCardSkeleton } from './SkeletonLoader';
 import { PremiumFeature } from './PremiumFeature';
 import { RecipeRatingUI } from './RecipeRating';
 import { ProgressiveImage } from './ProgressiveImage';
+import { log } from '../services/logService';
 import { generateBlurDataURL } from '../utils/appUtils';
 import RecipeModal from './RecipeModal';
 import AnalyticsService from '../services/analyticsService';
@@ -289,7 +290,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
             try {
                 await UsageService.recordSearch(user);
             } catch (error) {
-                console.error('Error recording surprise me search usage:', error);
+                log.error('Error recording surprise me search usage', { error }, 'RecipeFinder');
             }
         }
     };
@@ -304,7 +305,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                 const recipes = await getCachedPopularRecipes(); // Uses cached recipes (1 read vs 50+ reads)
                 setFirebaseRecipes(recipes);
             } catch (error) {
-                console.error('Error loading cached Firebase recipes:', error);
+                log.error('Error loading cached Firebase recipes', { error }, 'RecipeFinder');
             } finally {
                 setFirebaseRecipesLoading(false);
             }
@@ -951,7 +952,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                     );
                 }
             } catch (error) {
-                console.error('Error checking search limits:', error);
+                log.error('Error checking search limits', { error }, 'RecipeFinder');
                 // Continue with search if limit check fails
             }
         }
@@ -1024,12 +1025,12 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                 try {
                     await UsageService.recordSearch(user);
                 } catch (error) {
-                    console.error('Error recording search usage:', error);
+                    log.error('Error recording search usage', { error }, 'RecipeFinder');
                     // Don't fail the search if recording fails
                 }
             }
         } catch (error: any) {
-            console.error('performSearch error:', error);
+            log.error('performSearch error', { error }, 'RecipeFinder');
             let errorMessage = error?.message ? String(error.message) : JSON.stringify(error);
             
             // Provide user-friendly error messages

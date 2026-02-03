@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import DatabaseMonitoringService from '../services/databaseMonitoringService';
+import { log } from '../services/logService';
 
 interface CoreWebVitals {
   lcp: number | null; // Largest Contentful Paint
@@ -105,7 +106,7 @@ const PerformanceMonitoringDashboard: React.FC = () => {
             navigationObserver.disconnect();
           };
         } catch (error) {
-          console.warn('Performance Observer not fully supported:', error);
+          log.warn('Performance Observer not fully supported', { error }, 'PerformanceMonitoringDashboard');
         }
       }
     };
@@ -131,7 +132,7 @@ const PerformanceMonitoringDashboard: React.FC = () => {
 
           return () => networkObserver.disconnect();
         } catch (error) {
-          console.warn('Network tracking not supported:', error);
+          log.warn('Network tracking not supported', { error }, 'PerformanceMonitoringDashboard');
         }
       }
     };
@@ -407,7 +408,7 @@ const PerformanceMonitoringDashboard: React.FC = () => {
         <button
           onClick={() => {
             DatabaseMonitoringService.logCurrentMetrics();
-            console.log('Core Web Vitals:', coreWebVitals);
+            log.info('Core Web Vitals', { coreWebVitals }, 'PerformanceMonitoringDashboard');
             console.log('Network Requests:', networkRequests);
           }}
           className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1 rounded text-xs"

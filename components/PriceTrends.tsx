@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { groceryPriceService } from '../services/groceryPriceService';
 import { PriceTrend } from '../types/app';
+import { log } from '../services/logService';
 
 interface PriceTrendsProps {
   ingredient: string;
@@ -19,7 +20,7 @@ const PriceTrends: React.FC<PriceTrendsProps> = ({ ingredient, onClose }) => {
         const trendData = await groceryPriceService.getPriceTrendAnalysis(ingredient);
         setTrends(trendData);
       } catch (err) {
-        console.error('Error loading price trends:', err);
+        log.error('Error loading price trends', { error: err }, 'PriceTrends');
         setError('Failed to load price trends');
       } finally {
         setLoading(false);

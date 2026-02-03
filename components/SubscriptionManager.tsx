@@ -5,6 +5,7 @@ import { User } from '../types';
 import { StripeCheckout } from './StripeCheckout';
 import { PayPalCheckout } from './PayPalCheckout';
 import { UsageService, UsageLimits } from '../services/usageService';
+import { log } from '../services/logService';
 
 interface SubscriptionManagerProps {
   user: User | null;
@@ -28,7 +29,7 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }
           const limits = await UsageService.getUsageLimits(user);
           setUsageLimits(limits);
         } catch (error) {
-          console.error('Error fetching usage limits:', error);
+          log.error('Error fetching usage limits', { error }, 'SubscriptionManager');
         }
       }
     };

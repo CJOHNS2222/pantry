@@ -8,6 +8,7 @@ import UserBehaviorAnalytics from './UserBehaviorAnalytics';
 import SmartRecommendations from './SmartRecommendations';
 import { MonitoringDashboard } from './MonitoringDashboard';
 import PerformanceMonitoringDashboard from './PerformanceMonitoringDashboard';
+import { log } from '../services/logService';
 import { LanguageSelector } from '../src/components/LanguageSelector';
 import { useNotifications } from '../hooks/useNotifications';
 import { UserProfile, CustomCategory, PantryItem } from '../types';
@@ -153,7 +154,7 @@ export const Settings: React.FC<SettingsProps> = ({
       setProfileChanged(false);
       alert('Profile updated successfully!');
     } catch (error) {
-      console.error('Error updating profile:', error);
+      log.error('Error updating profile', { error }, 'Settings');
       alert('Failed to update profile. Please try again.');
     } finally {
       setSavingProfile(false);
@@ -172,7 +173,7 @@ export const Settings: React.FC<SettingsProps> = ({
       setShowAvatarSelection(false);
       alert('Avatar updated successfully!');
     } catch (error) {
-      console.error('Error updating avatar:', error);
+      log.error('Error updating avatar', { error }, 'Settings');
       alert('Failed to update avatar. Please try again.');
     } finally {
       setUpdatingAvatar(false);
@@ -716,7 +717,7 @@ export const Settings: React.FC<SettingsProps> = ({
                       setShowHouseholdManager(false);
                       alert('Household members updated successfully!');
                     } catch (error) {
-                      console.error('Error updating household:', error);
+                      log.error('Error updating household', { error }, 'Settings');
                       alert('Failed to update household members. Please try again.');
                     }
                   }}
@@ -1045,12 +1046,12 @@ export const Settings: React.FC<SettingsProps> = ({
                 try {
                   const { BulkImageUpdateService } = await import('../services/bulkImageUpdateService');
                   const result = await BulkImageUpdateService.updateAllPantryItemImages(user, (completed, total) => {
-                    console.log(`Updated ${completed}/${total} items...`);
+                    log.info(`Updated ${completed}/${total} items`, { completed, total }, 'Settings');
                   });
 
                   alert(`Image update complete!\n\n${result.updatedItems} items updated\n${result.failedItems} items failed\n\nCheck the console for details.`);
                 } catch (error) {
-                  console.error('Bulk image update failed:', error);
+                  log.error('Bulk image update failed', { error }, 'Settings');
                   alert('Failed to update images. Check the console for details.');
                 } finally {
                   setUpdatingBulkImages(false);

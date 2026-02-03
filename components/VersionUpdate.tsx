@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { versionService, VersionCheckResult } from '../services/versionService';
 import { RefreshCw, Download, AlertTriangle, CheckCircle, X } from 'lucide-react';
+import { log } from '../services/logService';
 
 interface VersionUpdateProps {
   onUpdateAvailable?: (result: VersionCheckResult) => void;
@@ -35,7 +36,7 @@ export const VersionUpdate: React.FC<VersionUpdateProps> = ({ onUpdateAvailable,
       setCurrentVersion(version);
       setPlatform(platform.charAt(0).toUpperCase() + platform.slice(1));
     } catch (error) {
-      console.error('Failed to load version info:', error);
+      log.error('Failed to load version info', { error }, 'VersionUpdate');
       setCurrentVersion('Unknown');
       setPlatform('Unknown');
     }
@@ -67,7 +68,7 @@ export const VersionUpdate: React.FC<VersionUpdateProps> = ({ onUpdateAvailable,
         onUpdateAvailable?.(result);
       }
     } catch (error) {
-      console.error('Failed to check for updates:', error);
+      log.error('Failed to check for updates', { error }, 'VersionUpdate');
     } finally {
       setChecking(false);
     }
