@@ -13,7 +13,7 @@ import { generateBlurDataURL } from '../utils/appUtils';
 import RecipeModal from './RecipeModal';
 import AnalyticsService from '../services/analyticsService';
 import { UsageService } from '../services/usageService';
-import { debounce } from '../utils/debounceUtils';
+import { searchPantryItems, getEnhancedAutocompleteSuggestions, filterPantryItems, savePantryFilter, loadPantryFilter, defaultPantryFilter, saveSearchToHistory, getRecentSearchSuggestions, AutocompleteSuggestion } from '../utils/searchUtils';
 import { useKeyboardNavigation } from '../hooks/useKeyboardNavigation';
 
 interface RecipeFinderProps {
@@ -1002,6 +1002,11 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
             setResult({ ...data, recipes: filteredRecipes });
             setIsResultFromCache(false);
             if (setPersistedResult) setPersistedResult({ ...data, recipes: filteredRecipes });
+            
+            // Save search to history
+            if (params.query && params.query.trim()) {
+              saveSearchToHistory(params.query.trim(), 'recipe');
+            }
             
             // Cache the result to avoid duplicate API calls (limit cache to 20 entries)
             setRecipeCache(prev => {

@@ -50,36 +50,125 @@ export const searchRecipes = (
   return results.map(result => result.item);
 };
 
-// Get autocomplete suggestions based on existing pantry items
+// Get enhanced autocomplete suggestions with context
+export interface AutocompleteSuggestion {
+  text: string;
+  type: 'recent' | 'popular' | 'category' | 'match';
+  category?: string;
+  count?: number;
+}
+
+export const getEnhancedAutocompleteSuggestions = (
+  items: PantryItem[],
+  query: string,
+  maxSuggestions: number = 8,
+  householdId?: string
+): AutocompleteSuggestion[] => {
+  if (!query.trim() || query.length < 1) return [];
+
+  const suggestions: AutocompleteSuggestion[] = [];
+  const queryLower = query.toLowerCase();
+
+  // 1. Get direct matches first (highest priority)
+  const directMatches = items
+    .filter(item => item.item.toLowerCase().includes(queryLower))
+    .slice(0, 3)
+    .map(item => ({
+      text: item.item,
+      type: 'match' as const,
+      category: item.category
+    }));
+
+  suggestions.push(...directMatches);
+
+  // 2. Add recently added items (last 30 days) that match
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const recentItems = items
+    .filter(item => {
+      const addedDate = item.dateAdded ? new Date(item.dateAdded) : null;
+      return addedDate && addedDate > thirtyDaysAgo && item.item.toLowerCase().includes(queryLower);
+    })
+    .sort((a, b) => {
+      const aDate = new Date(a.dateAdded || 0).getTime();
+      const bDate = new Date(b.dateAdded || 0).getTime();
+      return bDate - aDate; // Most recent first
+    })
+    .slice(0, 2)
+    .map(item => ({
+      text: item.item,
+      type: 'recent' as const,
+      category: item.category
+    }));
+
+  // Only add recent items if they're not already in direct matches
+  recentItems.forEach(recent => {
+    if (!suggestions.some(s => s.text === recent.text)) {
+      suggestions.push(recent);
+    }
+  });
+
+  // 3. Add popular items in household (most frequently added)
+  const itemFrequency = new Map<string, { count: number; category: string; lastAdded: Date }>();
+  items.forEach(item => {
+    const existing = itemFrequency.get(item.item);
+    if (existing) {
+      existing.count++;
+      const itemDate = item.dateAdded ? new Date(item.dateAdded) : new Date(0);
+      if (itemDate > existing.lastAdded) {
+        existing.lastAdded = itemDate;
+      }
+    } else {
+      itemFrequency.set(item.item, {
+        count: 1,
+        category: item.category,
+        lastAdded: item.dateAdded ? new Date(item.dateAdded) : new Date(0)
+      });
+    }
+  });
+
+  const popularItems = Array.from(itemFrequency.entries())
+    .filter(([itemName]) => itemName.toLowerCase().includes(queryLower))
+    .sort(([, a], [, b]) => b.count - a.count)
+    .slice(0, 2)
+    .map(([itemName, data]) => ({
+      text: itemName,
+      type: 'popular' as const,
+      category: data.category,
+      count: data.count
+    }));
+
+  // Only add popular items if they're not already in suggestions
+  popularItems.forEach(popular => {
+    if (!suggestions.some(s => s.text === popular.text)) {
+      suggestions.push(popular);
+    }
+  });
+
+  // 4. Add category suggestions if query matches category names
+  const categories = [...new Set(items.map(item => item.category))];
+  const categoryMatches = categories
+    .filter(category => category.toLowerCase().includes(queryLower))
+    .slice(0, 2)
+    .map(category => ({
+      text: category,
+      type: 'category' as const,
+      category: category
+    }));
+
+  suggestions.push(...categoryMatches);
+
+  // Limit total suggestions and return
+  return suggestions.slice(0, maxSuggestions);
+};
+
+// Get autocomplete suggestions based on existing pantry items (legacy function for backward compatibility)
 export const getAutocompleteSuggestions = (
   items: PantryItem[],
   query: string,
   maxSuggestions: number = 5
 ): string[] => {
-  if (!query.trim() || query.length < 2) return [];
-
-  const fuse = new Fuse(items, {
-    keys: ['item'],
-    threshold: 0.6,
-    includeScore: true,
-    minMatchCharLength: 1
-  });
-
-  const results = fuse.search(query);
-  const suggestions = results
-    .slice(0, maxSuggestions)
-    .map(result => result.item.item);
-
-  // Also include partial matches for better suggestions
-  const partialMatches = items
-    .filter(item =>
-      item.item.toLowerCase().includes(query.toLowerCase()) &&
-      !suggestions.includes(item.item)
-    )
-    .slice(0, maxSuggestions - suggestions.length)
-    .map(item => item.item);
-
-  return [...suggestions, ...partialMatches];
+  const enhanced = getEnhancedAutocompleteSuggestions(items, query, maxSuggestions);
+  return enhanced.map(s => s.text);
 };
 
 // Filter pantry items based on saved filter preferences
@@ -192,21 +281,101 @@ export const filterPantryItems = (items: PantryItem[], filter: PantryFilter): Pa
   return filtered;
 };
 
-// Save filter preferences to localStorage
+// Search history management
+export interface SearchHistoryItem {
+  query: string;
+  timestamp: number;
+  resultCount?: number;
+  type: 'pantry' | 'recipe';
+}
+
+const SEARCH_HISTORY_KEY = 'smartpantry-search-history';
+const MAX_HISTORY_ITEMS = 20;
+
+// Save search to history
+export const saveSearchToHistory = (query: string, type: 'pantry' | 'recipe', resultCount?: number): void => {
+  if (!query.trim()) return;
+
+  try {
+    const history: SearchHistoryItem[] = loadSearchHistory();
+    const newItem: SearchHistoryItem = {
+      query: query.trim(),
+      timestamp: Date.now(),
+      resultCount,
+      type
+    };
+
+    // Remove duplicate queries (keep most recent)
+    const filtered = history.filter(item => item.query !== query || item.type !== type);
+
+    // Add new item at the beginning
+    filtered.unshift(newItem);
+
+    // Keep only recent items
+    const recentHistory = filtered.slice(0, MAX_HISTORY_ITEMS);
+
+    localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(recentHistory));
+  } catch (error) {
+    console.error('Failed to save search history:', error);
+  }
+};
+
+// Load search history
+export const loadSearchHistory = (type?: 'pantry' | 'recipe'): SearchHistoryItem[] => {
+  try {
+    const saved = localStorage.getItem(SEARCH_HISTORY_KEY);
+    if (saved) {
+      const history: SearchHistoryItem[] = JSON.parse(saved);
+      if (type) {
+        return history.filter(item => item.type === type);
+      }
+      return history;
+    }
+  } catch (error) {
+    console.error('Failed to load search history:', error);
+  }
+  return [];
+};
+
+// Get recent search suggestions
+export const getRecentSearchSuggestions = (type: 'pantry' | 'recipe', maxSuggestions: number = 5): string[] => {
+  const history = loadSearchHistory(type);
+  return history.slice(0, maxSuggestions).map(item => item.query);
+};
+
+// Clear search history
+export const clearSearchHistory = (type?: 'pantry' | 'recipe'): void => {
+  try {
+    if (type) {
+      const allHistory = loadSearchHistory();
+      const filtered = allHistory.filter(item => item.type !== type);
+      localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(filtered));
+    } else {
+      localStorage.removeItem(SEARCH_HISTORY_KEY);
+    }
+  } catch (error) {
+    console.error('Failed to clear search history:', error);
+  }
+};
+
+// Pantry filter persistence functions
+const PANTRY_FILTER_KEY = 'smartpantry_pantry_filter';
+
 export const savePantryFilter = (filter: PantryFilter): void => {
   try {
-    localStorage.setItem('pantry-filter', JSON.stringify(filter));
+    localStorage.setItem(PANTRY_FILTER_KEY, JSON.stringify(filter));
   } catch (error) {
     console.error('Failed to save pantry filter:', error);
   }
 };
 
-// Load filter preferences from localStorage
 export const loadPantryFilter = (): PantryFilter => {
   try {
-    const saved = localStorage.getItem('pantry-filter');
+    const saved = localStorage.getItem(PANTRY_FILTER_KEY);
     if (saved) {
-      return { ...defaultPantryFilter, ...JSON.parse(saved) };
+      const parsed = JSON.parse(saved);
+      // Merge with defaults to ensure all properties exist
+      return { ...defaultPantryFilter, ...parsed };
     }
   } catch (error) {
     console.error('Failed to load pantry filter:', error);

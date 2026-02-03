@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { Camera as CapacitorCamera, CameraResultType, CameraSource } from '@capacitor/camera';
-import { Camera, Upload, Loader2, Plus, Trash2, CheckCircle2, ShoppingBasket, X, Barcode, ChevronDown, ChevronRight, ChevronUp, Image, ChefHat, TrendingUp, Search, Filter, Settings2 } from 'lucide-react';
+import { Camera, Upload, Loader2, Plus, Trash2, CheckCircle2, ShoppingBasket, X, Barcode, ChevronDown, ChevronRight, ChevronUp, Image, ChefHat, TrendingUp, Search, Filter, Settings2, Clock, Tag } from 'lucide-react';
 import { FixedSizeList as List } from 'react-window';
 import { analyzePantryImage } from '../services/geminiService';
 import { getItemImage, inferCategoryFromItemName, inferStorageLocationFromItemName, getStorageLocationImage, getAutoExpirationDate, getExpirationColor, getAllCategories, getCategoryIcon, parseItemText, fetchExternalItemImage, combineQuantities, formatItemQuantity } from '../utils/appUtils';
@@ -11,7 +11,7 @@ import { BrowserMultiFormatReader } from '@zxing/library';
 import PriceTrends from './PriceTrends';
 import ItemDetailModal from './ItemDetailModal';
 import { ProgressiveImage } from './ProgressiveImage';
-import { searchPantryItems, getAutocompleteSuggestions, filterPantryItems, savePantryFilter, loadPantryFilter, defaultPantryFilter } from '../utils/searchUtils';
+import { searchPantryItems, getEnhancedAutocompleteSuggestions, filterPantryItems, savePantryFilter, loadPantryFilter, defaultPantryFilter, saveSearchToHistory, getRecentSearchSuggestions, AutocompleteSuggestion } from '../utils/searchUtils';
 import { PantryService } from '../services/pantryService';
 import { useKeyboardNavigation } from '../hooks/useKeyboardNavigation';
 import { PantryItemSkeleton } from './SkeletonLoader';
@@ -87,8 +87,9 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [pantryFilter, setPantryFilter] = useState<PantryFilter>(loadPantryFilter());
-  const [autocompleteSuggestions, setAutocompleteSuggestions] = useState<string[]>([]);
+  const [autocompleteSuggestions, setAutocompleteSuggestions] = useState<AutocompleteSuggestion[]>([]);
   const [showAutocomplete, setShowAutocomplete] = useState(false);
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -117,14 +118,25 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
 
   // Update autocomplete suggestions when search query changes
   React.useEffect(() => {
-    if (searchQuery.length >= 2) {
-      const suggestions = getAutocompleteSuggestions(inventory, searchQuery);
+    if (searchQuery.length >= 1) {
+      const suggestions = getEnhancedAutocompleteSuggestions(inventory, searchQuery, 8);
       setAutocompleteSuggestions(suggestions);
       setShowAutocomplete(suggestions.length > 0);
     } else {
-      setShowAutocomplete(false);
+      // Show recent searches when no query
+      const recent = getRecentSearchSuggestions('pantry', 5);
+      setRecentSearches(recent);
+      setShowAutocomplete(recent.length > 0);
+      setAutocompleteSuggestions([]);
     }
   }, [searchQuery, inventory]);
+
+  // Save search to history when user performs a meaningful search
+  React.useEffect(() => {
+    if (searchQuery.length >= 2) {
+      saveSearchToHistory(searchQuery, 'pantry');
+    }
+  }, [searchQuery]);
 
   // Keyboard navigation support for modals
   useKeyboardNavigation({
@@ -894,7 +906,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                onFocus={() => setShowAutocomplete(searchQuery.length >= 2 && autocompleteSuggestions.length > 0)}
+                onFocus={() => setShowAutocomplete((searchQuery.length >= 1 && autocompleteSuggestions.length > 0) || (searchQuery.length === 0 && recentSearches.length > 0))}
                 onBlur={() => setTimeout(() => setShowAutocomplete(false), 200)}
                 placeholder="Search pantry items..."
                 className="w-full pl-10 pr-4 py-2 bg-theme-primary border border-theme rounded-lg text-theme-primary placeholder-theme-primary/50 focus:border-[var(--accent-color)] focus:outline-none"
@@ -910,18 +922,77 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
             </div>
             
             {/* Autocomplete Suggestions */}
-            {showAutocomplete && autocompleteSuggestions.length > 0 && (
-              <div className="absolute top-full left-0 right-0 bg-theme-primary border border-theme rounded-lg shadow-lg mt-1 z-10 max-h-40 overflow-y-auto">
+            {showAutocomplete && (
+              <div className="absolute top-full left-0 right-0 bg-theme-primary border border-theme rounded-lg shadow-lg mt-1 z-10 max-h-60 overflow-y-auto">
+                {/* Recent Searches */}
+                {searchQuery.length === 0 && recentSearches.length > 0 && (
+                  <>
+                    <div className="px-4 py-2 text-xs font-semibold text-theme-secondary opacity-70 uppercase tracking-wider border-b border-theme">
+                      Recent Searches
+                    </div>
+                    {recentSearches.map((recentQuery, index) => (
+                      <button
+                        key={`recent-${index}`}
+                        onClick={() => {
+                          setSearchQuery(recentQuery);
+                          setShowAutocomplete(false);
+                        }}
+                        className="w-full text-left px-4 py-2 hover:bg-theme-secondary text-theme-primary flex items-center gap-2"
+                      >
+                        <Clock className="w-3 h-3 text-theme-secondary opacity-50" />
+                        <span>{recentQuery}</span>
+                      </button>
+                    ))}
+                    {autocompleteSuggestions.length > 0 && (
+                      <div className="px-4 py-2 text-xs font-semibold text-theme-secondary opacity-70 uppercase tracking-wider border-b border-theme">
+                        Suggestions
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* Enhanced Suggestions */}
                 {autocompleteSuggestions.map((suggestion, index) => (
                   <button
-                    key={index}
+                    key={`suggestion-${index}`}
                     onClick={() => {
-                      setSearchQuery(suggestion);
+                      setSearchQuery(suggestion.text);
+                      saveSearchToHistory(suggestion.text, 'pantry');
                       setShowAutocomplete(false);
                     }}
-                    className="w-full text-left px-4 py-2 hover:bg-theme-secondary text-theme-primary"
+                    className="w-full text-left px-4 py-2 hover:bg-theme-secondary text-theme-primary flex items-center gap-2"
                   >
-                    {suggestion}
+                    {/* Type indicator */}
+                    <div className="flex items-center gap-1 min-w-0 flex-1">
+                      {suggestion.type === 'recent' && (
+                        <Clock className="w-3 h-3 text-blue-500 flex-shrink-0" />
+                      )}
+                      {suggestion.type === 'popular' && (
+                        <TrendingUp className="w-3 h-3 text-green-500 flex-shrink-0" />
+                      )}
+                      {suggestion.type === 'category' && (
+                        <Tag className="w-3 h-3 text-purple-500 flex-shrink-0" />
+                      )}
+                      {suggestion.type === 'match' && (
+                        <Search className="w-3 h-3 text-theme-secondary opacity-50 flex-shrink-0" />
+                      )}
+
+                      <span className="truncate">{suggestion.text}</span>
+                    </div>
+
+                    {/* Additional info */}
+                    <div className="flex items-center gap-1 text-xs text-theme-secondary opacity-60">
+                      {suggestion.category && suggestion.type !== 'category' && (
+                        <span className="bg-theme-secondary px-1.5 py-0.5 rounded text-[10px]">
+                          {suggestion.category}
+                        </span>
+                      )}
+                      {suggestion.count && suggestion.count > 1 && (
+                        <span className="text-[10px]">
+                          ×{suggestion.count}
+                        </span>
+                      )}
+                    </div>
                   </button>
                 ))}
               </div>
