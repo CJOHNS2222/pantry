@@ -916,7 +916,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
         // Debounce: prevent searches within 2 seconds of each other
         const now = Date.now();
         if (now - lastSearchTime < 2000) {
-            console.debug('Search debounced - too soon after previous search');
+            log.debug('Search debounced - too soon after previous search');
             return;
         }
         setLastSearchTime(now);
@@ -961,7 +961,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
         const cacheKey = getCacheKey(params);
         const cachedResult = recipeCache.get(cacheKey);
         if (cachedResult) {
-            console.debug('Using cached recipe result');
+            log.debug('Using cached recipe result');
             setResult(cachedResult);
             setIsResultFromCache(true);
             if (setPersistedResult) setPersistedResult(cachedResult);
@@ -980,7 +980,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
         setSearchError(null);
         if (setPersistedResult) setPersistedResult(null);
         try {
-            console.debug('Recipe search params:', params);
+            log.debug('Recipe search params:', params);
             const data = await searchRecipes({
                 ...params,
                 maxCookTime: parseInt(maxCookTime),
