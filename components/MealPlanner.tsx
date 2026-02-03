@@ -909,6 +909,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
                   onClick={() => setSelectedDayIndex(Math.max(0, selectedDayIndex - 1))}
                   disabled={selectedDayIndex === 0}
                   className="text-theme-secondary opacity-60 hover:opacity-100 p-2 disabled:opacity-30 disabled:cursor-not-allowed"
+                  aria-label="Previous day"
                 >
                   ‹
                 </button>
@@ -923,12 +924,14 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
                     onClick={() => setSelectedDayIndex(Math.min(mealPlan.length - 1, selectedDayIndex + 1))}
                     disabled={selectedDayIndex === mealPlan.length - 1}
                     className="text-theme-secondary opacity-60 hover:opacity-100 p-2 disabled:opacity-30 disabled:cursor-not-allowed"
+                    aria-label="Next day"
                   >
                     ›
                   </button>
                   <button
                     onClick={() => setSelectedDayIndex(null)}
                     className="text-theme-secondary opacity-60 hover:opacity-100 p-2"
+                    aria-label="Close day details"
                   >
                     ✕
                   </button>
@@ -981,12 +984,14 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
                                     setShowRecipeModal(true);
                                   }}
                                   className="text-theme-secondary opacity-60 hover:opacity-100 p-2"
+                                  aria-label={`View recipe: ${meal.recipe.title}`}
                                 >
                                   👁
                                 </button>
                                 <button
                                   onClick={() => removeMeal(selectedDayIndex, mealTypeKey, mealIndex)}
                                   className="text-red-400 opacity-60 hover:opacity-100 p-2"
+                                  aria-label={`Remove ${meal.recipe.title} from ${mealTypeKey}`}
                                 >
                                   <Trash2 className="w-4 h-4" />
                                 </button>

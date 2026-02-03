@@ -83,6 +83,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({
           <button
             onClick={onClose}
             className="p-2 hover:bg-theme-secondary rounded-lg transition-colors"
+            aria-label="Close category manager"
           >
             <X className="w-5 h-5 text-theme-secondary" />
           </button>
@@ -248,6 +249,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({
                         onClick={() => startEditing(category)}
                         className="p-2 text-theme-secondary hover:text-theme-primary hover:bg-theme-primary rounded-lg transition-colors"
                         title="Edit category"
+                        aria-label={`Edit category: ${category.name}`}
                       >
                         <Edit2 className="w-4 h-4" />
                       </button>
@@ -255,6 +257,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({
                         onClick={() => onDeleteCategory(category.id)}
                         className="p-2 text-theme-secondary hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                         title="Delete category"
+                        aria-label={`Delete category: ${category.name}`}
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
