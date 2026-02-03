@@ -34,6 +34,10 @@ export function useDataManagement(user: User | null, addToast: (message: string,
   // Undo actions
   const [recentActions, setRecentActions] = useState<any[]>([]);
 
+  // Writing state refs to prevent concurrent operations
+  const writingMealPlanRef = useRef(false);
+  const mealPlanCleanupDoneRef = useRef(false);
+
   // Helper function to clean objects by removing undefined fields (Firestore requirement)
   const cleanObject = (obj: any): any => {
     const cleaned: any = {};
@@ -302,7 +306,7 @@ export function useDataManagement(user: User | null, addToast: (message: string,
 
       console.log('Inventory sync triggered - user:', user?.id, 'household:', household?.id, 'inventory length:', inventory.length, 'inHousehold:', inHousehold);
 
-      (window as any).__writingMealPlan = true;
+      writingMealPlanRef.current = true;
       try {
         // If offline, enqueue the inventory sync to IndexedDB for later processing
         try {
@@ -522,7 +526,7 @@ export function useDataManagement(user: User | null, addToast: (message: string,
           });
         }
       } finally {
-        (window as any).__writingMealPlan = false;
+        writingMealPlanRef.current = false;
       }
     }, 1000); // 1 second debounce
 
@@ -660,8 +664,8 @@ export function useDataManagement(user: User | null, addToast: (message: string,
     };
 
     // Only run cleanup once per session
-    if (!(window as any).__mealPlanCleanupDone) {
-      (window as any).__mealPlanCleanupDone = true;
+    if (!mealPlanCleanupDoneRef.current) {
+      mealPlanCleanupDoneRef.current = true;
       cleanupOldMealPlans();
     }
   }, [user?.id, household?.id]);
