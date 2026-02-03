@@ -15,6 +15,7 @@ import { searchPantryItems, getEnhancedAutocompleteSuggestions, filterPantryItem
 import { PantryService } from '../services/pantryService';
 import { useKeyboardNavigation } from '../hooks/useKeyboardNavigation';
 import { PantryItemSkeleton } from './SkeletonLoader';
+import { debounce } from '../utils/debounceUtils';
 
 // Constants for virtualization threshold
 
@@ -85,6 +86,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   
   // Search and filter state
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [pantryFilter, setPantryFilter] = useState<PantryFilter>(loadPantryFilter());
   const [autocompleteSuggestions, setAutocompleteSuggestions] = useState<AutocompleteSuggestion[]>([]);
@@ -138,6 +140,23 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
     }
   }, [searchQuery]);
 
+  // Debounced search for pantry items
+  const debouncedPantrySearch = React.useMemo(
+    () => debounce(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 300), // 300ms delay for pantry search
+    [searchQuery]
+  );
+
+  // Effect to trigger debounced search when query changes
+  React.useEffect(() => {
+    if (searchQuery.trim()) {
+      debouncedPantrySearch();
+    } else {
+      setDebouncedSearchQuery('');
+    }
+  }, [searchQuery, debouncedPantrySearch]);
+
   // Keyboard navigation support for modals
   useKeyboardNavigation({
     onEscape: () => {
@@ -157,9 +176,9 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   const processedInventory = React.useMemo(() => {
     let filtered = [...inventory];
 
-    // Apply search
-    if (searchQuery.trim()) {
-      filtered = searchPantryItems(filtered, searchQuery);
+    // Apply search (use debounced query for performance)
+    if (debouncedSearchQuery.trim()) {
+      filtered = searchPantryItems(filtered, debouncedSearchQuery);
     }
 
     // Apply filters
@@ -167,7 +186,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
 
     // Add original index for bulk operations
     return filtered.map((item, idx) => ({ ...item, originalIndex: inventory.indexOf(item) }));
-  }, [inventory, searchQuery, pantryFilter]);
+  }, [inventory, debouncedSearchQuery, pantryFilter]);
 
   // Use Capacitor Camera for mobile
   const handleTakePhoto = useCallback(async () => {

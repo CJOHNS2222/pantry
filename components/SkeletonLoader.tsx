@@ -4,11 +4,11 @@ interface SkeletonProps {
   className?: string;
 }
 
-export const Skeleton: React.FC<SkeletonProps> = ({ className = '' }) => (
+export const Skeleton: React.FC<SkeletonProps> = React.memo(({ className = '' }) => (
   <div className={`animate-pulse bg-theme-secondary rounded ${className}`} />
-);
+));
 
-export const RecipeCardSkeleton: React.FC = () => (
+export const RecipeCardSkeleton: React.FC = React.memo(() => (
   <div className="bg-theme-secondary rounded-2xl shadow-xl border border-theme overflow-hidden mb-6">
     {/* Image skeleton */}
     <Skeleton className="h-20 w-full" />
@@ -33,18 +33,18 @@ export const RecipeCardSkeleton: React.FC = () => (
       <Skeleton className="h-10 w-full rounded-xl" />
     </div>
   </div>
-);
+));
 
-export const CompactRecipeCardSkeleton: React.FC = () => (
+export const CompactRecipeCardSkeleton: React.FC = React.memo(() => (
   <div className="bg-theme-secondary rounded-lg shadow-md border border-theme overflow-hidden group">
     <Skeleton className="h-24 w-full" />
     <div className="absolute bottom-2 left-2 right-2">
       <Skeleton className="h-4 w-3/4 mb-1" />
     </div>
   </div>
-);
+));
 
-export const PantryItemSkeleton: React.FC = () => (
+export const PantryItemSkeleton: React.FC = React.memo(() => (
   <div className="bg-theme-secondary rounded-lg p-3 border border-theme">
     <div className="flex items-center gap-3">
       <Skeleton className="w-10 h-10 rounded-lg flex-shrink-0" />
@@ -55,9 +55,9 @@ export const PantryItemSkeleton: React.FC = () => (
       <Skeleton className="w-16 h-6 rounded" />
     </div>
   </div>
-);
+));
 
-export const ShoppingListItemSkeleton: React.FC = () => (
+export const ShoppingListItemSkeleton: React.FC = React.memo(() => (
   <div className="bg-theme-secondary rounded-lg p-3 border border-theme">
     <div className="flex items-center gap-3">
       <Skeleton className="w-5 h-5 rounded" />
@@ -72,9 +72,9 @@ export const ShoppingListItemSkeleton: React.FC = () => (
       </div>
     </div>
   </div>
-);
+));
 
-export const MealPlanSkeleton: React.FC = () => (
+export const MealPlanSkeleton: React.FC = React.memo(() => (
   <div className="bg-theme-secondary rounded-lg p-4 border border-theme">
     <Skeleton className="h-5 w-1/3 mb-3" />
     <div className="space-y-2">
@@ -92,4 +92,4 @@ export const MealPlanSkeleton: React.FC = () => (
       </div>
     </div>
   </div>
-);
+));
