@@ -1,6 +1,24 @@
 rules_version = '2';
+/**
+ * Firestore Security Rules for Smart Pantry Chef
+ *
+ * Security improvements implemented:
+ * - Admin-only access for system and app version collections
+ * - Data validation for user-generated content (recipes, ratings, prices)
+ * - User ownership validation for updates/deletes
+ * - Reasonable data limits to prevent abuse
+ */
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // Helper function to check if user is admin
+    function isAdmin() {
+      return request.auth != null && (
+        request.auth.uid == "admin-user-id-1" ||
+        request.auth.uid == "admin-user-id-2"
+        // Add actual admin UIDs here
+      );
+    }
 
     // A user can create their own user document and read/write to all of their own data (documents and subcollections)
     match /users/{userId}/{documents=**} {
@@ -28,10 +46,15 @@ service cloud.firestore {
         && request.auth.uid in get(/databases/$(database)/documents/households/$(householdId)).data.memberIds;
     }
 
-    // Public ratings collection (Community) - restrict to authenticated users only
+    // Public ratings collection (Community) - restrict to authenticated users with validation
     match /ratings/{docId} {
       allow read: if request.auth != null; // Require authentication for reading ratings
-      allow create: if request.auth != null;
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasAll(['recipeId', 'rating', 'userId'])
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.rating is number
+        && request.resource.data.rating >= 1
+        && request.resource.data.rating <= 5; // Valid rating range
       allow update, delete: if request.auth != null && request.auth.uid == resource.data.userId;
     }
 
@@ -48,32 +71,52 @@ service cloud.firestore {
       allow update: if request.auth != null && request.auth.token.email == resource.data.email; // Allow marking as read
     }
 
-    // App versions collection: allow read for all users, write only for authenticated users (for admin updates)
+    // App versions collection: allow read for all authenticated users, write only for admins
     match /app_versions/{platform} {
       allow read: if request.auth != null; // Require authentication for version checks
-      allow write: if request.auth != null; // Allow authenticated users to update version info
+      allow write: if isAdmin(); // Only admins can update version info
     }
 
-    // Grocery prices collection: allow authenticated users to read/write price data
+    // Grocery prices collection: allow authenticated users to contribute but validate data
     match /groceryPrices/{docId} {
-      allow read, write: if request.auth != null;
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasAll(['itemName', 'price', 'store', 'userId'])
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.price is number
+        && request.resource.data.price > 0
+        && request.resource.data.price < 1000; // Reasonable price limit
+      allow update, delete: if request.auth != null && request.auth.uid == resource.data.userId;
     }
 
-    // Price history collection: allow authenticated users to read/write historical price data
+    // Price history collection: allow authenticated users to contribute historical data
     match /priceHistory/{docId} {
-      allow read, write: if request.auth != null;
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasAll(['itemName', 'price', 'store', 'date', 'userId'])
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.price is number
+        && request.resource.data.price > 0
+        && request.resource.data.price < 1000;
+      allow update, delete: if request.auth != null && request.auth.uid == resource.data.userId;
     }
 
-    // Global recipes collection: restrict access to authenticated users only
+    // Global recipes collection: authenticated users can read, create recipes with validation
     match /recipes/{recipeId} {
       allow read: if request.auth != null; // Require authentication for recipe database
-      allow write: if request.auth != null; // Require authentication for recipe uploads
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasAll(['title', 'userId'])
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0
+        && request.resource.data.title.size() < 200; // Reasonable title length
+      allow update, delete: if request.auth != null && request.auth.uid == resource.data.userId;
     }
 
-    // System collection: restrict to authenticated users for cached data
+    // System collection: restrict to admin users only for security
     match /system/{docId} {
-      allow read: if request.auth != null; // Require authentication for system data
-      allow write: if request.auth != null; // Allow authenticated users to write system data
+      allow read: if request.auth != null; // Allow authenticated users to read system data
+      allow write: if isAdmin(); // Only admins can write system data
     }
 
     // Default deny
