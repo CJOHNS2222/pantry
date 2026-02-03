@@ -113,6 +113,10 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
     const [maxPrepTime, setMaxPrepTime] = useState<string>('30');
     const [servings, setServings] = useState<string>('4');
     
+    // Recent searches state
+    const [recentRecipeSearches, setRecentRecipeSearches] = useState<string[]>([]);
+    const [showRecipeAutocomplete, setShowRecipeAutocomplete] = useState(false);
+    
     // Search state
     const [result, setResult] = useState<RecipeSearchResult | null>(persistedResult || null);
     const [loadingState, setLoadingState] = useState<LoadingState>(LoadingState.IDLE);
@@ -168,6 +172,12 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
         if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
             setVoiceSearchSupported(true);
         }
+    }, []);
+
+    // Load recent recipe searches on mount
+    useEffect(() => {
+        const recent = getRecentSearchSuggestions('recipe', 5);
+        setRecentRecipeSearches(recent);
     }, []);
 
     // Voice search function
@@ -892,6 +902,13 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
     }
   }, [specificQuery, debouncedSpecificSearch]);
 
+  // Save recipe search to history when user performs a meaningful search
+  useEffect(() => {
+    if (specificQuery.length >= 2) {
+      saveSearchToHistory(specificQuery, 'recipe');
+    }
+  }, [specificQuery]);
+
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (inventory.length === 0) {
@@ -1395,6 +1412,8 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                         name="specificQuery"
                         value={specificQuery}
                         onChange={(e) => setSpecificQuery(e.target.value)}
+                        onFocus={() => setShowRecipeAutocomplete(specificQuery.length === 0 && recentRecipeSearches.length > 0)}
+                        onBlur={() => setTimeout(() => setShowRecipeAutocomplete(false), 200)}
                         placeholder="Search e.g. Pasta..."
                         className="w-full bg-theme-primary border border-theme rounded-xl px-4 py-3 pr-12 text-theme-primary focus:border-[var(--accent-color)] outline-none"
                         />
@@ -1413,6 +1432,34 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                             >
                                 <Mic className="w-4 h-4" />
                             </button>
+                        )}
+                        
+                        {/* Recipe Autocomplete Suggestions */}
+                        {showRecipeAutocomplete && (
+                            <div className="absolute top-full left-0 right-0 bg-theme-primary border border-theme rounded-lg shadow-lg mt-1 z-10 max-h-60 overflow-y-auto">
+                                {/* Recent Recipe Searches */}
+                                {specificQuery.length === 0 && recentRecipeSearches.length > 0 && (
+                                    <>
+                                        <div className="px-4 py-2 text-xs font-semibold text-theme-secondary opacity-70 uppercase tracking-wider border-b border-theme">
+                                            Recent Searches
+                                        </div>
+                                        {recentRecipeSearches.map((recentQuery, index) => (
+                                            <button
+                                                key={`recent-recipe-${index}`}
+                                                onClick={() => {
+                                                    setSpecificQuery(recentQuery);
+                                                    saveSearchToHistory(recentQuery, 'recipe');
+                                                    setShowRecipeAutocomplete(false);
+                                                }}
+                                                className="w-full text-left px-4 py-2 hover:bg-theme-secondary text-theme-primary flex items-center gap-2"
+                                            >
+                                                <Clock className="w-3 h-3 text-theme-secondary opacity-50" />
+                                                <span>{recentQuery}</span>
+                                            </button>
+                                        ))}
+                                    </>
+                                )}
+                            </div>
                         )}
                     </div>
                 </div>
