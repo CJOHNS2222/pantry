@@ -108,6 +108,11 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
     const [measurement, setMeasurement] = useState<'Metric' | 'Standard'>('Standard');
     const [strictMode, setStrictMode] = useState(false);
     
+    // New smart filters
+    const [dietaryRestrictions, setDietaryRestrictions] = useState<string[]>([]);
+    const [maxPrepTime, setMaxPrepTime] = useState<string>('30');
+    const [servings, setServings] = useState<string>('4');
+    
     // Search state
     const [result, setResult] = useState<RecipeSearchResult | null>(persistedResult || null);
     const [loadingState, setLoadingState] = useState<LoadingState>(LoadingState.IDLE);
@@ -989,6 +994,9 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                 maxIngredients: parseInt(maxIngredients),
                 measurementSystem: measurement,
                 type: recipeType,
+                dietaryRestrictions,
+                maxPrepTime: parseInt(maxPrepTime),
+                servings: parseInt(servings),
                 userId: user?.id
             }, user);
             // Filter results by type (quick meal, dinner, dessert)
@@ -1468,7 +1476,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                     </div>
 
                     {/* Recipe Type Selector & Inputs Row */}
-                                        <div className="grid grid-cols-4 gap-3">
+                                        <div className="grid grid-cols-6 gap-2">
                                                 <div>
                                                         <label htmlFor="recipeType" className="text-[10px] text-[var(--accent-color)] font-bold uppercase mb-1 block">Type</label>
                                                         <select
@@ -1476,18 +1484,59 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                                                             name="recipeType"
                                                             value={recipeType}
                                                             onChange={e => setRecipeType(e.target.value as 'Snack' | 'Dinner' | 'Dessert' | '')}
-                                                            className="w-full p-2.5 rounded-lg border border-theme bg-theme-primary text-theme-primary focus:border-[var(--accent-color)] outline-none text-sm"
+                                                            className="w-full p-2 rounded-lg border border-theme bg-theme-primary text-theme-primary focus:border-[var(--accent-color)] outline-none text-xs"
                                                         >
                                                             <option value="">Any</option>
-                                                            <option value="Snack">Quick Snack</option>
+                                                            <option value="Snack">Snack</option>
                                                             <option value="Dinner">Dinner</option>
                                                             <option value="Dessert">Dessert</option>
                                                         </select>
                                                 </div>
-                                                {/* Dietary restrictions removed */}
-                                                <div></div>
                                                 <div>
-                                                        <label htmlFor="maxCookTime" className="text-[10px] text-[var(--accent-color)] font-bold uppercase mb-1 block">Max Time</label>
+                                                        <label htmlFor="dietaryRestrictions" className="text-[10px] text-[var(--accent-color)] font-bold uppercase mb-1 block">Diet</label>
+                                                        <select
+                                                            id="dietaryRestrictions"
+                                                            name="dietaryRestrictions"
+                                                            value={dietaryRestrictions[0] || ''}
+                                                            onChange={(e) => setDietaryRestrictions(e.target.value ? [e.target.value] : [])}
+                                                            className="w-full p-2 rounded-lg border border-theme bg-theme-primary text-theme-primary focus:border-[var(--accent-color)] outline-none text-xs"
+                                                        >
+                                                            <option value="">Any</option>
+                                                            <option value="vegetarian">Veg</option>
+                                                            <option value="vegan">Vegan</option>
+                                                            <option value="gluten-free">GF</option>
+                                                            <option value="dairy-free">DF</option>
+                                                            <option value="keto">Keto</option>
+                                                            <option value="paleo">Paleo</option>
+                                                        </select>
+                                                </div>
+                                                <div>
+                                                        <label htmlFor="maxPrepTime" className="text-[10px] text-[var(--accent-color)] font-bold uppercase mb-1 block">Prep</label>
+                                                        <div className="relative">
+                                                                <input
+                                                                id="maxPrepTime"
+                                                                name="maxPrepTime"
+                                                                type="number"
+                                                                value={maxPrepTime}
+                                                                onChange={(e) => setMaxPrepTime(e.target.value)}
+                                                                className="w-14 p-2 rounded-lg border border-theme bg-theme-primary text-theme-primary focus:border-[var(--accent-color)] outline-none text-xs"
+                                                                />
+                                                                <span className="absolute right-1 top-1.5 opacity-50 text-[8px] font-bold">MIN</span>
+                                                        </div>
+                                                </div>
+                                                <div>
+                                                        <label htmlFor="servings" className="text-[10px] text-[var(--accent-color)] font-bold uppercase mb-1 block">Serves</label>
+                                                        <input
+                                                                id="servings"
+                                                                name="servings"
+                                                                type="number"
+                                                                value={servings}
+                                                                onChange={(e) => setServings(e.target.value)}
+                                                                className="w-14 p-2 rounded-lg border border-theme bg-theme-primary text-theme-primary focus:border-[var(--accent-color)] outline-none text-xs"
+                                                        />
+                                                </div>
+                                                <div>
+                                                        <label htmlFor="maxCookTime" className="text-[10px] text-[var(--accent-color)] font-bold uppercase mb-1 block">Cook</label>
                                                         <div className="relative">
                                                                 <input
                                                                 id="maxCookTime"
@@ -1495,20 +1544,20 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                                                                 type="number"
                                                                 value={maxCookTime}
                                                                 onChange={(e) => setMaxCookTime(e.target.value)}
-                                                                className="w-16 p-2.5 rounded-lg border border-theme bg-theme-primary text-theme-primary focus:border-[var(--accent-color)] outline-none text-sm"
+                                                                className="w-14 p-2 rounded-lg border border-theme bg-theme-primary text-theme-primary focus:border-[var(--accent-color)] outline-none text-xs"
                                                                 />
-                                                                <span className="absolute right-2 top-2.5 opacity-50 text-[10px] font-bold mt-1">MIN</span>
+                                                                <span className="absolute right-1 top-1.5 opacity-50 text-[8px] font-bold">MIN</span>
                                                         </div>
                                                 </div>
                                                 <div>
-                                                        <label htmlFor="maxIngredients" className="text-[10px] text-[var(--accent-color)] font-bold uppercase mb-1 block">Max Items</label>
+                                                        <label htmlFor="maxIngredients" className="text-[10px] text-[var(--accent-color)] font-bold uppercase mb-1 block">Items</label>
                                                         <input
                                                                 id="maxIngredients"
                                                                 name="maxIngredients"
                                                                 type="number"
                                                                 value={maxIngredients}
                                                                 onChange={(e) => setMaxIngredients(e.target.value)}
-                                                                className="w-16 p-2.5 rounded-lg border border-theme bg-theme-primary text-theme-primary focus:border-[var(--accent-color)] outline-none text-sm"
+                                                                className="w-14 p-2 rounded-lg border border-theme bg-theme-primary text-theme-primary focus:border-[var(--accent-color)] outline-none text-xs"
                                                         />
                                                 </div>
                                         </div>
