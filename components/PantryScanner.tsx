@@ -14,6 +14,7 @@ import { ProgressiveImage } from './ProgressiveImage';
 import { searchPantryItems, getAutocompleteSuggestions, filterPantryItems, savePantryFilter, loadPantryFilter, defaultPantryFilter } from '../utils/searchUtils';
 import { PantryService } from '../services/pantryService';
 import { useKeyboardNavigation } from '../hooks/useKeyboardNavigation';
+import { PantryItemSkeleton } from './SkeletonLoader';
 
 // Constants for virtualization threshold
 
@@ -31,6 +32,7 @@ interface PantryScannerProps {
   customCategories?: CustomCategory[];
   setActiveTab?: (tab: Tab) => void;
   setInitialSearchQuery?: (query: string) => void;
+  isLoadingInventory?: boolean;
   user?: {
     id: string;
     name: string;
@@ -53,6 +55,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   customCategories = [],
   setActiveTab,
   setInitialSearchQuery,
+  isLoadingInventory = false,
   user
 }) => {
   // Constants for virtualization threshold
@@ -1606,7 +1609,43 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
           )}
 
           {/* Render the appropriate view */}
-          {inventory.length > VIRTUALIZE_THRESHOLD ? (
+          {isLoadingInventory ? (
+            <div className="space-y-2">
+              {Array.from({ length: 6 }).map((_, index) => (
+                <PantryItemSkeleton key={index} />
+              ))}
+            </div>
+          ) : inventory.length === 0 ? (
+            <div className="text-center py-12 px-6">
+              <div className="bg-theme-secondary rounded-2xl p-8 border border-theme shadow-lg max-w-md mx-auto">
+                <div className="w-16 h-16 bg-gradient-to-br from-[var(--accent-color)]/20 to-[var(--accent-color)]/5 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Plus className="w-8 h-8 text-[var(--accent-color)]" />
+                </div>
+                <h3 className="text-xl font-bold text-theme-secondary mb-2">Your pantry is empty</h3>
+                <p className="text-theme-secondary opacity-70 mb-6 text-sm">
+                  Start building your pantry by scanning receipts, taking photos, or manually adding items.
+                </p>
+                <div className="flex flex-col gap-3">
+                  <button
+                    onClick={() => setIsAddModalOpen(true)}
+                    className="w-full py-3 px-4 bg-[var(--accent-color)] text-white rounded-xl font-semibold shadow-lg hover:bg-[var(--accent-color)]/90 transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:ring-offset-2"
+                  >
+                    <Plus className="w-4 h-4 inline mr-2" />
+                    Add Your First Items
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (setActiveTab) setActiveTab(Tab.RECIPES);
+                    }}
+                    className="w-full py-3 px-4 bg-theme-secondary text-theme-primary rounded-xl font-medium border border-theme hover:bg-theme-primary transition-colors focus:outline-none focus:ring-2 focus:ring-theme-secondary focus:ring-offset-2"
+                  >
+                    <ChefHat className="w-4 h-4 inline mr-2" />
+                    Browse Recipes
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : inventory.length > VIRTUALIZE_THRESHOLD ? (
             <div className="bg-theme-secondary rounded-lg border border-theme overflow-hidden">
               <List
                 height={Math.min(600, window.innerHeight - 300)}

@@ -34,9 +34,11 @@ interface RecipeFinderProps {
     // Usage limit states
     recipeSaveLimitExceeded?: boolean;
     mealPlanLimitExceeded?: boolean;
+    // Loading states
+    isLoadingSavedRecipes?: boolean;
 }
 
-export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveRecipe, onDeleteRecipe, onMarkAsMade, inventory, ratings, onRate, savedRecipes, user, setActiveTab, persistedResult, setPersistedResult, initialSearchQuery, addToast, recipeSaveLimitExceeded = false, mealPlanLimitExceeded = false }) => {
+export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveRecipe, onDeleteRecipe, onMarkAsMade, inventory, ratings, onRate, savedRecipes, user, setActiveTab, persistedResult, setPersistedResult, initialSearchQuery, addToast, recipeSaveLimitExceeded = false, mealPlanLimitExceeded = false, isLoadingSavedRecipes = false }) => {
     // List of staple items to ignore
     const STAPLES = ['salt', 'pepper', 'oil', 'water', 'flour', 'sugar', 'butter', 'vinegar', 'baking powder', 'baking soda', 'spices', 'seasoning', 'soy sauce', 'cornstarch', 'yeast'];
     
@@ -1289,7 +1291,13 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
             onUpgrade={() => setActiveTab(Tab.SETTINGS)}
           >
             <div className="space-y-4">
-                {savedRecipes.length === 0 ? (
+                {isLoadingSavedRecipes ? (
+                    <div className="grid grid-cols-4 gap-4">
+                        {Array.from({ length: 8 }).map((_, index) => (
+                            <RecipeCardSkeleton key={index} />
+                        ))}
+                    </div>
+                ) : savedRecipes.length === 0 ? (
                     <div className="text-center py-12 opacity-30">
                         <Bookmark className="w-12 h-12 mx-auto mb-2" />
                         <p>No saved recipes yet.</p>
@@ -1576,6 +1584,36 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                     </div>
             )}
 
+            {/* Search results empty state */}
+            {loadingState === LoadingState.SUCCESS && result && (!result.recipes || result.recipes.length === 0) && (
+                <div className="animate-fade-in-up mt-8 text-center py-12 opacity-60">
+                    <Search className="w-12 h-12 mx-auto mb-4 text-theme-secondary/50" />
+                    <h3 className="text-lg font-semibold text-theme-primary mb-2">No recipes found</h3>
+                    <p className="text-theme-secondary opacity-70 mb-4">Try adjusting your search terms or ingredients</p>
+                    <div className="flex flex-wrap justify-center gap-2 text-sm">
+                        <span className="text-theme-secondary/60">Suggestions:</span>
+                        <button 
+                            onClick={() => setSearchQuery('chicken')}
+                            className="px-3 py-1 bg-theme-secondary/50 rounded-full hover:bg-theme-secondary/70 transition-colors"
+                        >
+                            chicken
+                        </button>
+                        <button 
+                            onClick={() => setSearchQuery('pasta')}
+                            className="px-3 py-1 bg-theme-secondary/50 rounded-full hover:bg-theme-secondary/70 transition-colors"
+                        >
+                            pasta
+                        </button>
+                        <button 
+                            onClick={() => setSearchQuery('salad')}
+                            className="px-3 py-1 bg-theme-secondary/50 rounded-full hover:bg-theme-secondary/70 transition-colors"
+                        >
+                            salad
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* Popular Recipes Section */}
             <div className="mt-12">
                 <h2 className="text-xl font-bold text-theme-primary mb-6">Popular Recipes</h2>
@@ -1614,10 +1652,25 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                         <p>Loading recipes...</p>
                     </div>
                 ) : firebaseRecipes.length === 0 ? (
-                    <div className="text-center py-12 opacity-30">
-                        <ChefHat className="w-12 h-12 mx-auto mb-2" />
-                        <p>No recipes available yet.</p>
-                        <p className="text-sm mt-2">Run the bulk upload to populate recipes.</p>
+                    <div className="text-center py-12 opacity-60">
+                        <ChefHat className="w-12 h-12 mx-auto mb-4 text-theme-secondary/50" />
+                        <h3 className="text-lg font-semibold text-theme-primary mb-2">No recipes yet</h3>
+                        <p className="text-theme-secondary opacity-70 mb-4">Start building your recipe collection</p>
+                        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                            <button 
+                                onClick={() => setActiveView('search')}
+                                className="px-4 py-2 bg-[var(--accent-color)] text-white rounded-lg hover:bg-[var(--accent-color)]/90 transition-colors flex items-center gap-2"
+                            >
+                                <Search className="w-4 h-4" />
+                                Search for Recipes
+                            </button>
+                            <button 
+                                onClick={() => setActiveTab(Tab.PANTRY)}
+                                className="px-4 py-2 border border-theme rounded-lg hover:bg-theme-secondary/50 transition-colors"
+                            >
+                                Add Pantry Items First
+                            </button>
+                        </div>
                     </div>
                 ) : (
                     <div className="grid grid-cols-4 gap-4">

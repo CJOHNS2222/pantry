@@ -135,6 +135,7 @@ export const MainContent: React.FC = () => {
               customCategories={customCategories}
               setActiveTab={setActiveTab}
               setInitialSearchQuery={appActions.setInitialSearchQuery}
+              isLoadingInventory={isLoadingInventory}
               user={user}
             />
           </Suspense>
@@ -202,6 +203,7 @@ export const MainContent: React.FC = () => {
               initialSearchQuery={initialSearchQuery}
               recipeSaveLimitExceeded={recipeSaveLimitExceeded}
               mealPlanLimitExceeded={mealPlanLimitExceeded}
+              isLoadingSavedRecipes={isLoadingSavedRecipes}
             />
           </Suspense>
         </ComponentErrorBoundary>
