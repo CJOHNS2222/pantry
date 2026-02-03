@@ -7,12 +7,13 @@ import { PantryAnalytics } from './PantryAnalytics';
 import UserBehaviorAnalytics from './UserBehaviorAnalytics';
 import SmartRecommendations from './SmartRecommendations';
 import { MonitoringDashboard } from './MonitoringDashboard';
+import PerformanceMonitoringDashboard from './PerformanceMonitoringDashboard';
 import { LanguageSelector } from '../src/components/LanguageSelector';
 import { useNotifications } from '../hooks/useNotifications';
 import { UserProfile, CustomCategory, PantryItem } from '../types';
 import { VersionUpdate } from './VersionUpdate';
 import { DayPlan } from '../types';
-import { BarChart3 } from 'lucide-react';
+import { BarChart3, Loader2 } from 'lucide-react';
 import AnalyticsService from '../services/analyticsService';
 import { userOptedInToGemini, setUserGeminiOptIn, getGeminiUsage } from '../services/featureFlags';
 
@@ -69,6 +70,8 @@ export const Settings: React.FC<SettingsProps> = ({
 }) => {
   const [feedback, setFeedback] = useState('');
   const [sending, setSending] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [updatingAvatar, setUpdatingAvatar] = useState(false);
   const [pendingNotifications, setPendingNotifications] = useState(settings.notifications);
   const [notifChanged, setNotifChanged] = useState(false);
   const [showAvatarSelection, setShowAvatarSelection] = useState(false);
@@ -77,10 +80,12 @@ export const Settings: React.FC<SettingsProps> = ({
   const [profileChanged, setProfileChanged] = useState(false);
   const [showCategoryManager, setShowCategoryManager] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
-  const [analyticsTab, setAnalyticsTab] = useState<'pantry' | 'behavior' | 'recommendations'>('pantry');
+  const [analyticsTab, setAnalyticsTab] = useState<'pantry' | 'behavior' | 'recommendations' | 'performance'>('pantry');
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [userProfile, setUserProfile] = useState<UserProfile | undefined>(user?.profile);
   const [geminiOptedIn, setGeminiOptedIn] = useState(() => userOptedInToGemini(user?.id));
   const [geminiUsage, setGeminiUsage] = useState(() => getGeminiUsage(user?.id));
+  const [updatingBulkImages, setUpdatingBulkImages] = useState(false);
 
   // Update userProfile when user data loads
   useEffect(() => {
@@ -140,6 +145,7 @@ export const Settings: React.FC<SettingsProps> = ({
 
   const saveProfile = async () => {
     if (!user || !userProfile) return;
+    setSavingProfile(true);
     try {
       await updateDoc(doc(db, 'users', user.id), {
         profile: userProfile
@@ -149,6 +155,8 @@ export const Settings: React.FC<SettingsProps> = ({
     } catch (error) {
       console.error('Error updating profile:', error);
       alert('Failed to update profile. Please try again.');
+    } finally {
+      setSavingProfile(false);
     }
   };
 
@@ -156,6 +164,7 @@ export const Settings: React.FC<SettingsProps> = ({
 
   const handleAvatarSelect = async (avatarPath: string) => {
     if (!user) return;
+    setUpdatingAvatar(true);
     try {
       await updateDoc(doc(db, 'users', user.id), {
         avatar: avatarPath
@@ -165,12 +174,15 @@ export const Settings: React.FC<SettingsProps> = ({
     } catch (error) {
       console.error('Error updating avatar:', error);
       alert('Failed to update avatar. Please try again.');
+    } finally {
+      setUpdatingAvatar(false);
     }
   };
 
   const handleRemoveAvatar = async () => {
     if (!user) return;
     if (confirm('Remove your avatar?')) {
+      setUpdatingAvatar(true);
       try {
         await updateDoc(doc(db, 'users', user.id), {
           avatar: null
@@ -178,6 +190,8 @@ export const Settings: React.FC<SettingsProps> = ({
         alert('Avatar removed successfully!');
       } catch (error) {
         alert('Failed to remove avatar');
+      } finally {
+        setUpdatingAvatar(false);
       }
     }
   };
@@ -205,6 +219,16 @@ export const Settings: React.FC<SettingsProps> = ({
     setSending(false);
   };
 
+  const handleAnalyticsTabChange = async (tab: 'pantry' | 'behavior' | 'recommendations' | 'performance') => {
+    if (analyticsTab === tab) return; // Already on this tab
+    setAnalyticsLoading(true);
+    // Small delay to show loading state for better UX
+    setTimeout(() => {
+      setAnalyticsTab(tab);
+      setAnalyticsLoading(false);
+    }, 200);
+  };
+
   return (
     <>
       {/* Analytics Modal */}
@@ -226,44 +250,67 @@ export const Settings: React.FC<SettingsProps> = ({
               {/* Analytics Tabs */}
               <div className="flex gap-2 mb-6">
                 <button
-                  onClick={() => setAnalyticsTab('pantry')}
+                  onClick={() => handleAnalyticsTabChange('pantry')}
+                  disabled={analyticsLoading}
                   className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                     analyticsTab === 'pantry'
                       ? 'bg-[var(--accent-color)] text-white'
                       : 'bg-theme-secondary text-theme-primary hover:bg-theme-primary'
-                  }`}
+                  } ${analyticsLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                   Pantry Analytics
                 </button>
                 <button
-                  onClick={() => setAnalyticsTab('behavior')}
+                  onClick={() => handleAnalyticsTabChange('behavior')}
+                  disabled={analyticsLoading}
                   className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                     analyticsTab === 'behavior'
                       ? 'bg-[var(--accent-color)] text-white'
                       : 'bg-theme-secondary text-theme-primary hover:bg-theme-primary'
-                  }`}
+                  } ${analyticsLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                   User Behavior
                 </button>
                 <button
-                  onClick={() => setAnalyticsTab('recommendations')}
+                  onClick={() => handleAnalyticsTabChange('recommendations')}
+                  disabled={analyticsLoading}
                   className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                     analyticsTab === 'recommendations'
                       ? 'bg-[var(--accent-color)] text-white'
                       : 'bg-theme-secondary text-theme-primary hover:bg-theme-primary'
-                  }`}
+                  } ${analyticsLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                   Smart Recommendations
+                </button>
+                <button
+                  onClick={() => handleAnalyticsTabChange('performance')}
+                  disabled={analyticsLoading}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                    analyticsTab === 'performance'
+                      ? 'bg-[var(--accent-color)] text-white'
+                      : 'bg-theme-secondary text-theme-primary hover:bg-theme-primary'
+                  } ${analyticsLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  Performance
                 </button>
               </div>
 
               {/* Analytics Content */}
-              {analyticsTab === 'pantry' ? (
+              {analyticsLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="flex items-center gap-3 text-theme-secondary">
+                    <Loader2 className="w-6 h-6 animate-spin" />
+                    <span>Loading analytics...</span>
+                  </div>
+                </div>
+              ) : analyticsTab === 'pantry' ? (
                 <PantryAnalytics inventory={inventory} />
               ) : analyticsTab === 'behavior' ? (
                 <UserBehaviorAnalytics />
-              ) : (
+              ) : analyticsTab === 'recommendations' ? (
                 <SmartRecommendations />
+              ) : (
+                <PerformanceMonitoringDashboard />
               )}
             </div>
           </div>
@@ -311,9 +358,11 @@ export const Settings: React.FC<SettingsProps> = ({
               {user.avatar && (
                 <button
                   onClick={handleRemoveAvatar}
-                  className="bg-red-500 text-white px-3 py-2 rounded text-sm font-medium hover:bg-red-600"
+                  disabled={updatingAvatar}
+                  className="bg-red-500 text-white px-3 py-2 rounded text-sm font-medium hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
-                  Remove
+                  {updatingAvatar && <Loader2 className="w-4 h-4 animate-spin" />}
+                  {updatingAvatar ? 'Removing...' : 'Remove'}
                 </button>
               )}
             </div>
@@ -326,13 +375,19 @@ export const Settings: React.FC<SettingsProps> = ({
                     <button
                       key={avatarPath}
                       onClick={() => handleAvatarSelect(avatarPath)}
-                      className="w-12 h-12 rounded-full overflow-hidden border-2 border-gray-300 hover:border-blue-500 transition-colors"
+                      disabled={updatingAvatar}
+                      className="w-12 h-12 rounded-full overflow-hidden border-2 border-gray-300 hover:border-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed relative"
                     >
                       <img
                         src={avatarPath}
                         alt={`Avatar ${avatarPath.split('/').pop()?.split('.')[0]}`}
                         className="w-full h-full object-cover"
                       />
+                      {updatingAvatar && (
+                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                          <Loader2 className="w-4 h-4 animate-spin text-white" />
+                        </div>
+                      )}
                     </button>
                   ))}
                 </div>
@@ -496,9 +551,11 @@ export const Settings: React.FC<SettingsProps> = ({
             {profileChanged && (
               <button
                 onClick={saveProfile}
-                className="w-full bg-green-500 text-white px-4 py-2 rounded text-sm font-medium hover:bg-green-600"
+                disabled={savingProfile}
+                className="w-full bg-green-500 text-white px-4 py-2 rounded text-sm font-medium hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                Save Profile
+                {savingProfile && <Loader2 className="w-4 h-4 animate-spin" />}
+                {savingProfile ? 'Saving...' : 'Save Profile'}
               </button>
             )}
           </div>
@@ -965,6 +1022,50 @@ export const Settings: React.FC<SettingsProps> = ({
         <div className="bg-theme-secondary rounded-xl border border-theme p-4">
           <h3 className="font-semibold mb-3 text-theme-primary">Database Monitoring</h3>
           <MonitoringDashboard user={user} />
+        </div>
+      )}
+
+      {/* Bulk Image Update Section */}
+      {user && (
+        <div className="bg-theme-secondary rounded-xl border border-theme p-4">
+          <h3 className="font-semibold mb-3 text-theme-primary">Pantry Images</h3>
+          <div className="space-y-3">
+            <p className="text-sm text-theme-secondary">
+              Automatically fetch better images for pantry items that currently have placeholder images.
+              This will scan your inventory and update items with images from food databases and stock photos.
+              Images are cached locally for faster loading and offline access.
+            </p>
+            <button
+              onClick={async () => {
+                if (!confirm('This will scan all your pantry items and attempt to update images for items with placeholders. This may take a few minutes. Continue?')) {
+                  return;
+                }
+
+                setUpdatingBulkImages(true);
+                try {
+                  const { BulkImageUpdateService } = await import('../services/bulkImageUpdateService');
+                  const result = await BulkImageUpdateService.updateAllPantryItemImages(user, (completed, total) => {
+                    console.log(`Updated ${completed}/${total} items...`);
+                  });
+
+                  alert(`Image update complete!\n\n${result.updatedItems} items updated\n${result.failedItems} items failed\n\nCheck the console for details.`);
+                } catch (error) {
+                  console.error('Bulk image update failed:', error);
+                  alert('Failed to update images. Check the console for details.');
+                } finally {
+                  setUpdatingBulkImages(false);
+                }
+              }}
+              disabled={updatingBulkImages}
+              className="bg-blue-500 text-white px-4 py-2 rounded font-medium text-sm hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {updatingBulkImages && <Loader2 className="w-4 h-4 animate-spin" />}
+              {updatingBulkImages ? 'Updating Images...' : 'Update Pantry Images'}
+            </button>
+            <div className="text-xs text-theme-secondary">
+              This feature uses external APIs and may take time for large inventories.
+            </div>
+          </div>
         </div>
       )}
 

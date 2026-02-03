@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { CalendarClock, Plus, Move, AlertCircle, ShoppingBasket, Trash2, HelpCircle } from 'lucide-react';
 import { DayPlan, MealPlanItem, PantryItem, StructuredRecipe, User, SavedRecipe } from '../types';
 import RecipeModal from './RecipeModal';
@@ -13,7 +13,9 @@ import { db } from '../firebaseConfig';
 import { parseIngredientForShoppingList } from '../utils/appUtils';
 import AnalyticsService from '../services/analyticsService';
 import { searchRecipes } from '../utils/searchUtils';
-import CalendarService from '../services/calendarService';
+import { debounce } from '../utils/debounceUtils';
+import { CompactRecipeCardSkeleton } from './SkeletonLoader';
+// import CalendarService from '../services/calendarService'; // Temporarily disabled
 
 interface MealPlannerProps {
   mealPlan: DayPlan[];
@@ -46,7 +48,7 @@ interface MealPlannerProps {
 interface RecipeSearchModalProps {
   mealType: 'breakfast' | 'lunch' | 'dinner';
   dayIndex: number;
-  onAddRecipe: (recipe: StructuredRecipe) => void;
+  onAddRecipe: (recipe: StructuredRecipe, dayIndex: number) => void;
   onClose: () => void;
   inventory: PantryItem[];
   user: User;
@@ -116,8 +118,9 @@ const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
         maxCookTime: 60,
         maxIngredients: 15,
         measurementSystem: 'Standard',
-        strictMode: false
-      });
+        strictMode: false,
+        userId: user?.id
+      }, user);
       setSearchResults(result.recipes || []);
     } catch (error) {
       console.error('Search error:', error);
@@ -127,10 +130,30 @@ const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
     }
   };
 
-  const filteredSavedRecipes = searchRecipes(savedRecipes, searchQuery)
-    .filter((recipe, index, self) =>
-      index === self.findIndex(r => r.title === recipe.title)
-    );
+  // Debounced search function for input changes
+  const debouncedSearch = useMemo(
+    () => debounce(() => {
+      if (searchQuery.trim()) {
+        handleSearch();
+      }
+    }, 500), // 500ms delay
+    [searchQuery]
+  );
+
+  // Effect to trigger debounced search when query changes
+  useEffect(() => {
+    if (searchQuery.trim()) {
+      debouncedSearch();
+    }
+  }, [searchQuery, debouncedSearch]);
+
+  const filteredSavedRecipes = useMemo(() => 
+    searchRecipes(savedRecipes, searchQuery)
+      .filter((recipe, index, self) =>
+        index === self.findIndex(r => r.title === recipe.title)
+      ),
+    [savedRecipes, searchQuery]
+  );
 
   return (
     <div className="space-y-4">
@@ -142,7 +165,6 @@ const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
           placeholder={`Search for ${mealType} recipes...`}
           className="flex-1 px-4 py-2 bg-theme-secondary border border-theme rounded-lg text-theme-primary placeholder-theme-primary/50 focus:border-[var(--accent-color)] focus:outline-none"
         />
@@ -157,7 +179,17 @@ const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
 
       {/* Results */}
       <div className="max-h-96 overflow-y-auto">
-        {searchResults.length > 0 && (
+        {isSearching && (
+          <div>
+            <h4 className="text-sm font-semibold text-theme-secondary mb-2">Search Results</h4>
+            <div className="grid grid-cols-3 gap-2">
+              {Array.from({ length: 6 }).map((_, index) => (
+                <CompactRecipeCardSkeleton key={`search-skeleton-${index}`} />
+              ))}
+            </div>
+          </div>
+        )}
+        {searchResults.length > 0 && !isSearching && (
           <div>
             <h4 className="text-sm font-semibold text-theme-secondary mb-2">Search Results</h4>
             <div className="grid grid-cols-3 gap-2">
@@ -180,6 +212,7 @@ const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
                         src={recipe.image}
                         alt={recipe.title}
                         className="w-full h-full object-cover"
+                        loading="lazy"
                         onError={(e) => {
                           const target = e.target as HTMLImageElement;
                           target.style.display = 'none';
@@ -212,7 +245,7 @@ const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          onAddRecipe(recipe);
+                          onAddRecipe(recipe, dayIndex);
                         }}
                         className="px-2 py-1 bg-[var(--accent-color)] text-white rounded text-xs hover:bg-[var(--accent-color)]/90"
                       >
@@ -226,7 +259,17 @@ const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
           </div>
         )}
 
-        {filteredSavedRecipes.length > 0 && (
+        {!recipesLoaded && (
+          <div>
+            <h4 className="text-sm font-semibold text-theme-secondary mb-2">Saved Recipes</h4>
+            <div className="grid grid-cols-3 gap-2">
+              {Array.from({ length: 6 }).map((_, index) => (
+                <CompactRecipeCardSkeleton key={`saved-skeleton-${index}`} />
+              ))}
+            </div>
+          </div>
+        )}
+        {filteredSavedRecipes.length > 0 && recipesLoaded && (
           <div>
             <h4 className="text-sm font-semibold text-theme-secondary mb-2">Saved Recipes</h4>
             <div className="grid grid-cols-3 gap-2">
@@ -249,6 +292,7 @@ const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
                         src={recipe.image}
                         alt={recipe.title}
                         className="w-full h-full object-cover"
+                        loading="lazy"
                         onError={(e) => {
                           const target = e.target as HTMLImageElement;
                           target.style.display = 'none';
@@ -281,7 +325,7 @@ const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          onAddRecipe(recipe);
+                          onAddRecipe(recipe, dayIndex);
                         }}
                         className="px-2 py-1 bg-[var(--accent-color)] text-white rounded text-xs hover:bg-[var(--accent-color)]/90"
                       >
@@ -351,8 +395,8 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
     }
   }, [showMealPrepPlanner]);
 
-  // Function to clean ingredient names by removing descriptive words
-  const getMissingIngredients = () => {
+  // Memoized missing ingredients computation
+  const missingIngredients = useMemo(() => {
     const missingWithRecipes = mealPlan.flatMap(day => 
       [...(day.breakfast || []), ...(day.lunch || []), ...(day.dinner || [])].flatMap(meal => 
         meal.recipe.ingredients.map(ingredient => ({
@@ -401,17 +445,20 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
     // Format quantities back to strings
     Object.values(grouped).forEach(item => {
       if (item.unit === 'count' && item.quantity % 1 === 0) {
-        item.quantity = item.quantity; // Keep as number for count items
+        // Keep as number for count items
       }
       // For other units, keep as number for now, will format when displaying
     });
 
     return Object.values(grouped);
-  };
+  }, [mealPlan, inventory, includeStaples]);
+
+  // Legacy function for backward compatibility
+  const getMissingIngredients = () => missingIngredients;
 
   useEffect(() => {
-    setMissingItemsCount(getMissingIngredients().length);
-  }, [mealPlan, inventory]);
+    setMissingItemsCount(missingIngredients.length);
+  }, [missingIngredients]);
 
   // Close help tooltip when clicking outside
   useEffect(() => {
@@ -602,7 +649,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
   };
 
   const handleAddMissingToShopping = () => {
-    const missing = getMissingIngredients();
+    const missing = missingIngredients;
     if (missing.length > 0) {
       const itemsToAdd = missing.flatMap((item: { ingredient: string; quantity: number; unit: string; recipes: { name: string; id: string }[] }) => 
         item.recipes.map(recipe => ({
@@ -624,9 +671,11 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
 
   const handleCalendarExport = async () => {
     try {
-      let successCount = 0;
-      let totalEvents = 0;
+      const successCount = 0;
+      const totalEvents = 0;
 
+      // Temporarily disabled calendar integration due to plugin compatibility issues
+      /*
       for (const day of mealPlan) {
         if (day.meals.some(meal => meal.recipe)) {
           const date = new Date(day.date);
@@ -637,6 +686,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
           totalEvents++;
         }
       }
+      */
 
       if (successCount > 0) {
         alert(`Successfully added ${successCount} meal plan${successCount > 1 ? 's' : ''} to your calendar!`);
@@ -995,12 +1045,12 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
               <RecipeSearchModal
                 mealType={searchMealType}
                 dayIndex={selectedDayIndex!}
-                onAddRecipe={(recipe) => {
+                onAddRecipe={(recipe, dayIndex) => {
                   const newPlan = [...mealPlan];
-                  if (!newPlan[selectedDayIndex!][searchMealType]) {
-                    newPlan[selectedDayIndex!][searchMealType] = [];
+                  if (!newPlan[dayIndex][searchMealType]) {
+                    newPlan[dayIndex][searchMealType] = [];
                   }
-                  newPlan[selectedDayIndex!][searchMealType].push({
+                  newPlan[dayIndex][searchMealType].push({
                     id: Date.now().toString(),
                     recipe,
                     mealType: searchMealType

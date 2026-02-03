@@ -168,8 +168,8 @@ export const Community: React.FC<CommunityProps> = ({ ratings, onAddToPlan, onSa
             recipe={structured}
             isOpen={showModal}
             onClose={() => setShowModal(false)}
-            onAddToPlan={(r) => { onAddToPlan && onAddToPlan(r); }}
-            onSaveRecipe={(r) => { onSaveRecipe && onSaveRecipe(r); }}
+            onAddToPlan={(r) => { onAddToPlan(r); }}
+            onSaveRecipe={(r) => { onSaveRecipe(r); }}
             showSaveButton={true}
             showMarkAsMade={false}
             showAddToPlan={true}

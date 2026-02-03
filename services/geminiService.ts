@@ -1,7 +1,9 @@
 import { GoogleGenAI, Type, Schema } from "@google/genai";
-import { PantryItem, RecipeSearchResult, RecipeSearchParams, StructuredRecipe } from "../types";
+import { PantryItem, RecipeSearchResult, RecipeSearchParams, StructuredRecipe, User } from "../types";
 import { getPerformance, trace } from "firebase/performance";
 import featureFlags from './featureFlags';
+import { UsageService } from './usageService';
+import { log } from './logService';
 
 // Initialize Gemini Client
 const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
@@ -15,61 +17,211 @@ try {
   performance = null;
 }
 
+// Request batching and debouncing system
+interface QueuedRequest<T> {
+  id: string;
+  operation: () => Promise<T>;
+  resolve: (value: T) => void;
+  reject: (error: any) => void;
+  timestamp: number;
+  priority: number; // Higher priority = processed first
+}
+
+class GeminiRequestBatcher {
+  private queue: QueuedRequest<any>[] = [];
+  private isProcessing = false;
+  private debounceTimer: NodeJS.Timeout | null = null;
+  private readonly debounceDelay = 500; // 500ms debounce
+  private readonly maxBatchSize = 3; // Process up to 3 requests simultaneously
+  private readonly maxQueueSize = 10; // Maximum queue size
+  private requestCache = new Map<string, { result: any; timestamp: number }>();
+  private readonly cacheTTL = 5 * 60 * 1000; // 5 minutes cache
+
+  // Debounced processing
+  private scheduleProcessing(): void {
+    if (this.debounceTimer) {
+      clearTimeout(this.debounceTimer);
+    }
+
+    this.debounceTimer = setTimeout(() => {
+      this.processQueue();
+    }, this.debounceDelay);
+  }
+
+  // Process queued requests
+  private async processQueue(): Promise<void> {
+    if (this.isProcessing || this.queue.length === 0) {
+      return;
+    }
+
+    this.isProcessing = true;
+
+    try {
+      // Sort by priority (higher first) then by timestamp (older first)
+      this.queue.sort((a, b) => {
+        if (a.priority !== b.priority) {
+          return b.priority - a.priority;
+        }
+        return a.timestamp - b.timestamp;
+      });
+
+      // Take up to maxBatchSize requests
+      const batch = this.queue.splice(0, this.maxBatchSize);
+
+      log.info(`Processing Gemini batch: ${batch.length} requests`, {}, 'GeminiBatcher');
+
+      // Process batch concurrently
+      const promises = batch.map(async (request) => {
+        try {
+          const result = await request.operation();
+          request.resolve(result);
+          log.debug(`Completed Gemini request: ${request.id}`, {}, 'GeminiBatcher');
+        } catch (error) {
+          request.reject(error);
+          log.error(`Failed Gemini request: ${request.id}`, error, 'GeminiBatcher');
+        }
+      });
+
+      await Promise.allSettled(promises);
+
+    } finally {
+      this.isProcessing = false;
+
+      // Process remaining items if any
+      if (this.queue.length > 0) {
+        this.scheduleProcessing();
+      }
+    }
+  }
+
+  // Add request to queue
+  async enqueue<T>(
+    id: string,
+    operation: () => Promise<T>,
+    priority: number = 1
+  ): Promise<T> {
+    // Check cache first
+    const cached = this.requestCache.get(id);
+    if (cached && (Date.now() - cached.timestamp) < this.cacheTTL) {
+      log.debug(`Using cached Gemini result for: ${id}`, {}, 'GeminiBatcher');
+      return cached.result;
+    }
+
+    return new Promise<T>((resolve, reject) => {
+      // Check queue size limit
+      if (this.queue.length >= this.maxQueueSize) {
+        reject(new Error('Gemini request queue is full. Please try again later.'));
+        return;
+      }
+
+      const request: QueuedRequest<T> = {
+        id,
+        operation,
+        resolve: (result) => {
+          // Cache successful results
+          this.requestCache.set(id, { result, timestamp: Date.now() });
+          resolve(result);
+        },
+        reject,
+        timestamp: Date.now(),
+        priority
+      };
+
+      this.queue.push(request);
+      log.debug(`Queued Gemini request: ${id} (priority: ${priority})`, {}, 'GeminiBatcher');
+
+      this.scheduleProcessing();
+    });
+  }
+
+  // Clear cache
+  clearCache(): void {
+    this.requestCache.clear();
+    log.info('Cleared Gemini request cache', {}, 'GeminiBatcher');
+  }
+
+  // Get queue status
+  getStatus() {
+    return {
+      queueLength: this.queue.length,
+      isProcessing: this.isProcessing,
+      cacheSize: this.requestCache.size
+    };
+  }
+}
+
+// Create singleton batcher
+const geminiBatcher = new GeminiRequestBatcher();
+
 /**
  * Analyzes an image to identify pantry items.
  */
-export const analyzePantryImage = async (base64Image: string, mimeType: string): Promise<PantryItem[]> => {
+export const analyzePantryImage = async (base64Image: string, mimeType: string, user?: User): Promise<PantryItem[]> => {
   // Gate Gemini usage: ensure global enabled + user opt-in + usage cap
   if (!featureFlags.isGeminiGloballyEnabled()) {
     throw new Error('Gemini integration is disabled by configuration.');
   }
 
-  // Note: we expect the caller to set user opt-in before invoking this in UI flows.
-  if (!featureFlags.canUseGemini(undefined)) {
-    throw new Error('Gemini usage not permitted: opt-in required or daily cap reached.');
+  if (!user?.id) {
+    throw new Error('User authentication required for Gemini usage.');
   }
 
-  const perfTrace = performance ? trace(performance, 'analyze_pantry_image') : null;
-  perfTrace?.start();
+  // Note: we expect the caller to set user opt-in before invoking this in UI flows.
+  if (!featureFlags.userOptedInToGemini(user.id)) {
+    throw new Error('Gemini usage not permitted: opt-in required.');
+  }
 
-  try {
-    const modelId = "gemini-2.0-flash-lite";
+  // Check Firebase usage limits
+  if (!(await UsageService.canUseGemini(user))) {
+    throw new Error('Gemini usage not permitted: weekly limit reached.');
+  }
 
-    const schema: Schema = {
-      type: Type.ARRAY,
-      description: "A comprehensive list of pantry items identified in the image.",
-      items: {
-        type: Type.OBJECT,
-        properties: {
-          item: {
-            type: Type.STRING,
-            description: "The specific name of the item.",
-          },
-          category: {
-            type: Type.STRING,
-            description: "The broad category.",
-          },
-          quantity_estimate: {
-            type: Type.STRING,
-            description: "Visual estimate of quantity.",
-          },
-        },
-        required: ["item", "category", "quantity_estimate"],
-      },
-    };
+  // Create cache key based on image hash (simple hash for demo)
+  const imageHash = btoa(base64Image).slice(0, 16);
+  const requestId = `pantry_analysis_${user.id}_${imageHash}`;
 
-    const response = await ai.models.generateContent({
-      model: modelId,
-      contents: {
-        parts: [
-          {
-            inlineData: {
-              data: base64Image,
-              mimeType: mimeType,
+  return geminiBatcher.enqueue(requestId, async () => {
+    const perfTrace = performance ? trace(performance, 'analyze_pantry_image') : null;
+    perfTrace?.start();
+
+    try {
+      const modelId = "gemini-2.0-flash-lite";
+
+      const schema: Schema = {
+        type: Type.ARRAY,
+        description: "A comprehensive list of pantry items identified in the image.",
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            item: {
+              type: Type.STRING,
+              description: "The specific name of the item.",
+            },
+            category: {
+              type: Type.STRING,
+              description: "The broad category.",
+            },
+            quantity_estimate: {
+              type: Type.STRING,
+              description: "Visual estimate of quantity.",
             },
           },
-          {
-            text: `Analyze this image and provide a detailed inventory of the pantry items visible. Be precise with item names.
+          required: ["item", "category", "quantity_estimate"],
+        },
+      };
+
+      const response = await ai.models.generateContent({
+        model: modelId,
+        contents: {
+          parts: [
+            {
+              inlineData: {
+                data: base64Image,
+                mimeType: mimeType,
+              },
+            },
+            {
+              text: `Analyze this image and provide a detailed inventory of the pantry items visible. Be precise with item names.
 
 For categorization, use these standard categories when possible:
 - Fruits & Vegetables (fresh produce, fruits, vegetables)
@@ -87,54 +239,103 @@ For categorization, use these standard categories when possible:
 - Breakfast Foods (cereal, oatmeal, pancake mix, syrup)
 
 If an item doesn't fit these categories, use "Uncategorized".`,
-          },
-        ],
-      },
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: schema,
-      },
-    });
+            },
+          ],
+        },
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: schema,
+        },
+      });
 
-    const jsonText = response.text;
-    if (!jsonText) throw new Error("No data returned from Gemini.");
+      const jsonText = response.text;
+      if (!jsonText) throw new Error("No data returned from Gemini.");
 
-    const cleanJson = jsonText.replace(/^```json\s*/, "").replace(/\s*```$/, "");
-    const items = JSON.parse(cleanJson) as PantryItem[];
+      const cleanJson = jsonText.replace(/^```json\s*/, "").replace(/\s*```$/, "");
+      const items = JSON.parse(cleanJson) as PantryItem[];
 
-    // Add custom metrics (if performance available)
-    if (perfTrace) {
-      perfTrace.putMetric('image_size_kb', base64Image.length / 1024);
-      perfTrace.putMetric('items_detected', items.length);
+      // Add custom metrics (if performance available)
+      if (perfTrace) {
+        perfTrace.putMetric('image_size_kb', base64Image.length / 1024);
+        perfTrace.putMetric('items_detected', items.length);
+      }
+
+      // Record usage in Firebase
+      try {
+        await UsageService.recordGeminiUsage(user);
+      } catch (e) {
+        console.warn('Failed to record Gemini usage:', e);
+      }
+
+      return items;
+    } catch (error) {
+      console.error("Error analyzing pantry image:", error);
+      throw error;
+    } finally {
+      perfTrace?.stop();
     }
-
-    // Track usage (local increment). Caller may provide user context in future.
-    try { featureFlags.incrementGeminiUsage(undefined, 1); } catch (e) { /* ignore */ }
-
-    return items;
-  } catch (error) {
-    console.error("Error analyzing pantry image:", error);
-    throw error;
-  } finally {
-    perfTrace?.stop();
-  }
+  }, 2); // Higher priority for image analysis
 };
 
 /**
  * Searches for recipes using Google Search Grounding with enhanced filters and structured JSON output.
  */
-export const searchRecipes = async (params: RecipeSearchParams): Promise<RecipeSearchResult> => {
-    const perfTrace = performance ? trace(performance, 'search_recipes') : null;
+export const searchRecipes = async (params: RecipeSearchParams, user?: User): Promise<RecipeSearchResult> => {
+  const perfTrace = performance ? trace(performance, 'search_recipes') : null;
   perfTrace?.start();
 
+  // Retry logic for rate limits
+  const maxRetries = 3;
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      // Gate Gemini usage for recipe search as well
-      if (!featureFlags.isGeminiGloballyEnabled()) {
-        throw new Error('Gemini integration is disabled by configuration.');
+      // Wait with exponential backoff on retries
+      if (attempt > 0) {
+        const delay = Math.min(1000 * Math.pow(2, attempt - 1), 10000); // Max 10 seconds
+        console.log(`Retrying Gemini request in ${delay}ms (attempt ${attempt}/${maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, delay));
       }
-      if (!featureFlags.canUseGemini(undefined)) {
-        throw new Error('Gemini usage not permitted: opt-in required or daily cap reached.');
+
+      return await performSearch(params, user, perfTrace);
+    } catch (error) {
+      lastError = error as Error;
+      
+      // Only retry on 429/rate limit errors
+      if (attempt < maxRetries && (error.message?.includes('429') || error.message?.includes('Too Many Requests') || error.message?.includes('Resource exhausted'))) {
+        console.warn(`Gemini rate limit hit, retrying (attempt ${attempt + 1}/${maxRetries}):`, error.message);
+        continue;
       }
+      
+      // For other errors or max retries reached, throw the error
+      throw error;
+    }
+  }
+
+  throw lastError;
+};
+
+// Internal function to perform the actual search
+const performSearch = async (params: RecipeSearchParams, user: User | undefined, perfTrace: any): Promise<RecipeSearchResult> => {
+  try {
+    // Gate Gemini usage for recipe search as well
+    if (!featureFlags.isGeminiGloballyEnabled()) {
+      throw new Error('Gemini integration is disabled by configuration.');
+    }
+
+    if (!user?.id) {
+      throw new Error('User authentication required for Gemini usage.');
+    }
+
+    // Note: we expect the caller to set user opt-in before invoking this in UI flows.
+    if (!featureFlags.userOptedInToGemini(user.id)) {
+      throw new Error('Gemini usage not permitted: opt-in required.');
+    }
+
+    // Check Firebase usage limits
+    if (!(await UsageService.canUseGemini(user))) {
+      throw new Error('Gemini usage not permitted: weekly limit reached.');
+    }
     const modelId = "gemini-2.0-flash-lite";
   
   // Check if API key is available
@@ -237,7 +438,12 @@ export const searchRecipes = async (params: RecipeSearchParams): Promise<RecipeS
       perfTrace.putAttribute('strict_mode', params.strictMode ? 'true' : 'false');
     }
 
-    try { featureFlags.incrementGeminiUsage(undefined, 1); } catch (e) { /* ignore */ }
+    // Record usage in Firebase
+    try {
+      await UsageService.recordGeminiUsage(user);
+    } catch (e) {
+      console.warn('Failed to record Gemini usage:', e);
+    }
 
     return {
       recipes: recipes,
@@ -254,6 +460,8 @@ export const searchRecipes = async (params: RecipeSearchParams): Promise<RecipeS
     // Provide more specific error messages
     if (error.message?.includes('API_KEY')) {
       throw new Error('API configuration error. Please check your Gemini API key.');
+    } else if (error.message?.includes('429') || error.message?.includes('Too Many Requests') || error.message?.includes('Resource exhausted')) {
+      throw new Error('API rate limit exceeded. Please wait a moment and try again.');
     } else if (error.message?.includes('quota') || error.message?.includes('limit')) {
       throw new Error('API quota exceeded. Please try again later.');
     } else if (error.message?.includes('network') || error.message?.includes('fetch')) {

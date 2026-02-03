@@ -5,6 +5,179 @@ All notable changes to Smart Pantry Chef will be documented in this file.
 The format is based on Keep a Changelog,
 and this project adheres to Semantic Versioning.
 
+[1.2.1] - 2026-01-28
+
+Fixed
+- Modal Header Positioning: Fixed ItemDetailModal and RecipeModal headers to prevent overlap with app header
+  - Headers now use fixed positioning at top-[100px] with proper z-index stacking
+  - Added padding adjustments to ensure content scrolls correctly under fixed headers
+  - Improved close button accessibility and modal usability
+- Scan Review Modal Positioning: Fixed oversized display and navigation overlap issues
+  - Adjusted modal positioning to account for app header (pt-24) and bottom navigation (pb-20)
+  - Changed max height from 80vh to calc(100vh-160px) for proper viewport sizing
+  - Added responsive width constraints (max-w-sm on mobile, max-w-2xl on larger screens)
+  - Improved item layout with stacked remove buttons to ensure all controls are visible
+  - Modal now displays correctly within screen bounds without cutting off top or bottom
+- Scan Review Modal: Identified need for fixed header positioning (pending implementation)
+  - AI image analysis confirmation modal should use same fixed header pattern
+  - Will prevent header from scrolling away during item review process
+
+Enhanced
+- Android Build Compatibility: Upgraded Java runtime to version 21 LTS for improved Android build stability
+- Shopping List Transfer: Fixed quantity handling when transferring items from shopping list to pantry
+  - Added default purchased quantities to prevent transfer failures
+  - Improved data consistency during checkout operations
+
+Fixed
+- Nutrition API Integration: Resolved USDA FoodData Central API loading issues
+  - Changed from process.env to import.meta.env for proper Vite environment variable access
+  - Prioritized survey and foundation food data for better nutrition information quality
+  - Enhanced nutrient value extraction and display formatting
+
+Enhanced
+- Item Detail Modal: Increased image size from w-20 h-20 to w-24 h-24 for better visual space utilization
+
+[1.2.0] - 2026-01-26
+
+Added
+- AI Features Opt-in System: Comprehensive user consent management for Gemini AI-powered features
+  - Settings AI Section: New "AI Features" section with toggle to enable/disable AI-powered image analysis and smart suggestions
+  - Usage Tracking: Daily usage counter showing API requests (100/day limit) with clear visual feedback
+  - Privacy Controls: Explicit user opt-in required before accessing Gemini AI services
+  - Graceful Degradation: Clear error messages when AI features are disabled, preventing API errors
+
+Enhanced
+- Pantry Scanner Modal: Improved modal positioning with 75px bottom padding for better screen centering
+- Mobile Experience: Resolved horizontal scrolling issues across all components with global overflow-x-hidden
+- Component Architecture: Updated PantryScanner and Settings components with proper user prop interfaces
+
+Fixed
+- Android Build System: Upgraded Gradle Plugin (8.10.0) and Gradle (8.11.1) to resolve compatibility issues
+- Syntax Errors: Resolved multiple TypeScript compilation errors and code structure issues
+- AI API Integration: Added opt-in verification before Gemini API calls to prevent unauthorized usage
+
+Enhanced
+- Offline & Sync Experience: Comprehensive offline capabilities and sync management
+  - Enhanced Offline Queue Service: Upgraded with conflict resolution, retry logic, and progress tracking
+  - Sync Status Management: Real-time sync status with pending operations counter and error handling
+  - Visual Sync Indicators: Header-integrated sync status showing online/offline state, progress bars, and conflict alerts
+  - Automatic Background Sync: Seamless data synchronization when connection is restored
+  - Conflict Detection: Intelligent handling of data conflicts with user resolution options
+- Accessibility (a11y) Improvements: Comprehensive accessibility enhancements across the application
+  - ARIA Labels: Added descriptive labels for all interactive elements (buttons, forms, navigation)
+  - Keyboard Navigation: Implemented full keyboard support with visible focus indicators
+  - Screen Reader Support: Enhanced compatibility with screen readers using semantic HTML and ARIA attributes
+  - Focus Management: Added proper focus rings and logical tab order for all components
+  - Semantic HTML: Improved document structure with proper roles and landmarks
+  - Form Accessibility: Added field labels, validation messages, and required field indicators
+
+Enhanced
+- Mobile Layout Optimization: Comprehensive spacing improvements for mobile devices
+  - Header Spacing: Optimized 120px top padding for proper content positioning below fixed header
+  - Navigation Spacing: Minimized bottom gap to 8px minimum, eliminating excessive whitespace above navigation
+  - Safe Area Integration: Enhanced compatibility with device notches and navigation bars
+  - Content Flow: Improved vertical spacing throughout the application for better mobile UX
+
+Fixed
+- Mobile Layout Issues: Resolved excessive padding and spacing problems in MainContent component
+- Component Spacing: Fixed inconsistent spacing between header, content, and navigation elements
+
+Technical
+- Layout Calculations: Updated MainContent height calculations to properly account for fixed header and navigation heights
+- Safe Area Service: Improved mobile device compatibility with proper safe area handling
+
+Fixed
+- Shopping List Sync Issues: Resolved purchased quantity deletion and reversion problems
+  - Data Validation: Added cleanObject() function to remove undefined fields before Firestore writes
+  - Sync Logic: Excluded purchasedQuantity from sync comparisons to prevent Firestore overwrites
+  - User Experience: Shopping list items now maintain state when modifying purchased quantities
+- AI Image Processing Modal: Fixed modal content being cut off behind header/navigation
+  - Modal Positioning: Increased z-index to z-[100] and adjusted top padding to pt-20
+  - Modal Sizing: Increased maximum height to max-h-[90vh] for better content visibility
+  - UI Improvements: Enhanced modal display for AI-powered pantry scanning confirmation
+- Gemini API Rate Limiting: Implemented automatic retry logic for API rate limit errors
+  - Retry Mechanism: Added exponential backoff retry (up to 3 attempts, max 10s delay) for 429 errors
+  - Error Handling: Improved error messages for rate limit scenarios with user-friendly feedback
+  - Multi-Search Support: Users can now perform multiple AI searches per session without immediate failures
+
+[1.1.9] - 2026-01-24
+
+Enhanced
+- Interactive Tutorial System: Complete overhaul of the onboarding tutorial with robust click detection
+  - Theme Toggle Tutorial: Fixed click detection reliability for theme button interactions
+  - Add Item Tutorial: Added data-tutorial attribute to pantry floating action button for proper click detection
+  - Voice Search Tutorial: Added data-tutorial attribute to microphone button in recipe finder
+  - Click Detection Engine: Implemented stable ref-based event handling to prevent race conditions and missed clicks
+  - Tutorial Flow: Improved step completion logic with manual DOM traversal for reliable element detection
+
+Fixed
+- Tutorial Reliability: Resolved issues where interactive tutorial steps required multiple clicks to register
+- User Experience: Ensured smooth onboarding flow without getting stuck on tutorial steps
+
+Technical
+- Event Handling: Enhanced click detection with refs and manual DOM traversal for consistent behavior
+- Component Attributes: Added data-tutorial attributes to interactive elements (theme-toggle, add-item-button, voice-search)
+- State Management: Improved tutorial state handling to prevent re-render interference with click detection
+
+[1.1.8] - 2026-01-22
+
+Fixed
+- Database Performance: Optimized inventory sync with 1-second debouncing and remote update detection to reduce excessive Firestore reads (from 12-15 per item deletion to 1-2)
+- Nutrition API CORS: Created Firebase Function proxy for USDA FoodData Central API calls to eliminate browser CORS restrictions
+- Content Security Policy: Updated CSP policy to allow connections to Firebase Functions emulator (localhost:5001) for development
+
+Technical
+- Firebase Functions: Added getNutritionData function with support for both food search and detailed nutrition retrieval
+- Nutrition Service: Refactored to use Firebase Function proxy for all USDA API calls, eliminating direct browser requests
+- Error Handling: Improved nutrition data fetching with proper fallback strategies and caching
+
+[1.1.8] - 2026-01-18
+
+Fixed
+- Critical Runtime Errors: Resolved multiple TypeScript errors causing app crashes including userProfile undefined errors, missing selectedDayIndex state, and sodium property access issues
+- Settings Component: Added proper null checking and optional chaining for user profile data to prevent crashes
+- MealPlanner Component: Fixed missing state variable causing day selection modal errors
+- RecipeModal: Fixed nutrition calculation errors with proper type handling
+- Bundle Optimization: Resolved Vite dynamic import warning by consolidating householdService imports
+
+Enhanced
+- Saved Recipes UI: Added beautiful thumbnail images to saved recipes tab for improved visual appeal
+- Recipe Cards: Enhanced compact recipe display with 16:9 aspect ratio images and hover effects
+- Error Handling: Improved image loading with fallback placeholders for missing recipe images
+
+Technical
+- Type Safety: Added comprehensive optional chaining throughout Settings component
+- Import Optimization: Converted dynamic imports to static imports for better bundle splitting
+- Build Process: Cleaned up all TypeScript compilation errors and warnings
+
+Fixed
+- Capacitor App Listener: Fixed runtime error "removeListener is not a function" by implementing proper async listener cleanup with useRef
+- TypeScript Compilation: Resolved 77 TypeScript errors across the application including missing interfaces, methods, and type declarations
+- Form Accessibility: Added proper id/name attributes and htmlFor labels to all form inputs for WCAG compliance
+- Visual Inventory Levels: Fixed quantity display to show fractional amounts (½ gal, ¼ cup) when using visual fill level selector
+- Quantity Formatting: Enhanced formatItemQuantity function to display common fractions (¼, ½, ¾) instead of decimals
+
+Technical
+- Type Definitions: Added Member interface, visualLevel field to PantryItem type, and comprehensive Vite environment declarations
+- Service Methods: Added trackHouseholdJoin and recordMealPlanAddition methods to analytics and usage services
+- Firebase Exports: Added missing functions export to firebaseConfig.ts for cloud functions integration
+
+[1.1.7] - 2026-01-08
+
+Features
+- Usage Limit Enforcement: Added button disabling when users hit weekly usage limits to prevent excessive database reads
+- Subscription Tier Rebalance: Updated Premium plan limits (15 searches/week, 20 recipes, 7-day planning) and Family plan (unlimited everything, 5 members)
+- Mobile Back Button Support: Implemented hardware back button functionality for Android devices to close modals and navigate between tabs
+- Double-Tap Exit: Enhanced back button with double-tap to exit app, showing a toast message on first press
+- Meal Planner Help: Added help icon (?) with tooltip explaining drag & drop and day-clicking functionality
+
+Removed
+- Cooking Reminders: Removed bell icon notifications from meal planner to reduce UI clutter
+
+Fixed
+- Performance: Prevented repeated API calls after hitting limits
+- Free Tier Limits: Fixed issue where free users showed 0 available searches instead of 5
+
 [1.1.6] - 2026-01-07
 
 Infrastructure

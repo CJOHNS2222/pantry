@@ -4,6 +4,7 @@ import { PantryItem } from '../types';
 import PriceTrends from './PriceTrends';
 import { getAllCategories, getExpirationColor, cleanItemNameForShopping, formatItemQuantity, parseQuantity } from '../utils/appUtils';
 import { getNutritionFactsWithFallback, NutritionFacts, formatNutrition } from '../services/nutritionService';
+import { useKeyboardNavigation } from '../hooks/useKeyboardNavigation';
 
 interface ItemDetailModalProps {
   item: PantryItem;
@@ -35,6 +36,9 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   const [hasQuantityChanged, setHasQuantityChanged] = useState(false);
   const [nutrition, setNutrition] = useState<NutritionFacts | null>(null);
   const [loadingNutrition, setLoadingNutrition] = useState(true);
+  const [isEditingExpiration, setIsEditingExpiration] = useState(false);
+  const [editExpirationDate, setEditExpirationDate] = useState(() => item.expirationDate || '');
+  const [editExpirationType, setEditExpirationType] = useState(() => item.expirationType || 'best-by');
 
   // Fetch nutrition facts on component mount
   useEffect(() => {
@@ -52,6 +56,12 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
     };
     fetchNutrition();
   }, [item.item, item.category]);
+
+  // Keyboard navigation support
+  useKeyboardNavigation({
+    onEscape: onClose,
+    enabled: true
+  });
 
   const handleQuantityChange = (newQuantity: number) => {
     if (newQuantity >= 0) {
@@ -102,6 +112,21 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
     setEditQuantity(item.quantity_estimate || 1);
     setHasQuantityChanged(false);
     setIsEditing(false);
+  };
+
+  const handleSaveExpiration = () => {
+    const updates: Partial<PantryItem> = {
+      expirationDate: editExpirationDate || undefined,
+      expirationType: editExpirationType
+    };
+    onUpdateItem(originalIndex, updates);
+    setIsEditingExpiration(false);
+  };
+
+  const handleCancelExpirationEdit = () => {
+    setEditExpirationDate(item.expirationDate || '');
+    setEditExpirationType(item.expirationType || 'best-by');
+    setIsEditingExpiration(false);
   };
 
   const handleStorageChange = (storageLocation: string) => {
@@ -217,10 +242,10 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
 
   return (
     <>
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 max-w-md mx-auto">
-        <div className="bg-theme-primary rounded-lg shadow-xl w-full max-h-[90vh] overflow-y-auto border border-theme pb-20">
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-60 p-4">
+        <div className="bg-theme-primary rounded-lg shadow-xl w-full max-w-md mx-auto max-h-[80vh] overflow-y-auto border border-theme pb-20 pt-20">
           {/* Header */}
-          <div className="flex items-center justify-between p-3 border-b border-theme">
+          <div className="flex items-center justify-between p-3 border-b border-theme fixed top-[100px] left-0 right-0 max-w-md mx-auto z-[100] bg-theme-primary">
             <h3 className="text-lg font-semibold text-theme-primary">{item.item}</h3>
             <button
               onClick={onClose}
@@ -235,7 +260,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
             <img
               src={item.image}
               alt={item.item}
-              className="w-20 h-20 rounded-lg object-cover border-2 border-theme"
+              className="w-24 h-24 rounded-lg object-cover border-2 border-theme"
               onError={(e) => {
                 console.log('Image failed to load:', e.target.src);
                 const target = e.target as HTMLImageElement;
@@ -316,27 +341,72 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
             )}
 
             {/* Expiration Date */}
-            {item.expirationDate && (
-              <div className="bg-theme-secondary p-2 rounded-lg border border-theme">
-                <label className="block text-xs font-medium text-theme-primary mb-1 uppercase opacity-70">
-                  Expiration
-                </label>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-theme-primary">
-                    {new Date(item.expirationDate).toLocaleDateString()}
-                  </span>
-                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                    getExpirationColor(item.expirationDate, item.expirationType) === 'red'
-                      ? 'bg-red-100 text-red-800'
-                      : getExpirationColor(item.expirationDate, item.expirationType) === 'yellow'
-                      ? 'bg-yellow-100 text-yellow-800'
-                      : 'bg-green-100 text-green-800'
-                  }`}>
-                    {Math.ceil((new Date(item.expirationDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} days
-                  </span>
+            <div className="bg-theme-secondary p-2 rounded-lg border border-theme">
+              <label className="block text-xs font-medium text-theme-primary mb-1 uppercase opacity-70">
+                Expiration
+              </label>
+              {isEditingExpiration ? (
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <input
+                      type="date"
+                      value={editExpirationDate}
+                      onChange={(e) => setEditExpirationDate(e.target.value)}
+                      className="flex-1 px-2 py-1 text-sm border border-theme rounded-md bg-theme-primary text-theme-primary focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]"
+                    />
+                    <select
+                      value={editExpirationType}
+                      onChange={(e) => setEditExpirationType(e.target.value as 'use-by' | 'best-by')}
+                      className="px-2 py-1 text-sm border border-theme rounded-md bg-theme-primary text-theme-primary focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]"
+                    >
+                      <option value="best-by">Best By</option>
+                      <option value="use-by">Use By</option>
+                    </select>
+                  </div>
+                  <div className="flex gap-2 justify-end">
+                    <button
+                      onClick={handleSaveExpiration}
+                      className="px-3 py-1 text-sm bg-[var(--accent-color)] text-white rounded-lg hover:bg-[var(--accent-color)]/80 transition-colors"
+                    >
+                      Save
+                    </button>
+                    <button
+                      onClick={handleCancelExpirationEdit}
+                      className="px-3 py-1 text-sm bg-theme-primary text-theme-primary border border-theme rounded-lg hover:bg-theme-secondary transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )}
+              ) : (
+                <div className="flex items-center justify-between">
+                  {item.expirationDate ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-theme-primary">
+                        {new Date(item.expirationDate).toLocaleDateString()}
+                      </span>
+                      <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                        getExpirationColor(item.expirationDate, item.expirationType) === 'red'
+                          ? 'bg-red-100 text-red-800'
+                          : getExpirationColor(item.expirationDate, item.expirationType) === 'yellow'
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : 'bg-green-100 text-green-800'
+                      }`}>
+                        {Math.ceil((new Date(item.expirationDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} days
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="text-sm text-theme-secondary opacity-70">No expiration set</span>
+                  )}
+                  <button
+                    onClick={() => setIsEditingExpiration(true)}
+                    className="text-[var(--accent-color)] hover:text-[var(--accent-color)]/80"
+                  >
+                    <Edit3 className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+            </div>
 
             {/* Storage Location & Category - Side by Side */}
             <div className="grid grid-cols-2 gap-2">

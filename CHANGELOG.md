@@ -5,6 +5,78 @@ All notable changes to Smart Pantry Chef will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-02-02
+
+### Enhanced
+- **Performance Optimizations**: Comprehensive performance improvements across the application
+  - **Critical Fixes**: Replaced JSON.stringify with direct object comparison, deduplicated Firestore listeners, implemented batch operations
+  - **Memory Management**: Added useCallback optimizations, list memoization, lazy loading for components
+  - **UI Performance**: Implemented virtual scrolling for large lists, search debouncing (300ms), optimized re-renders
+  - **Data Operations**: Enhanced Firestore batch operations and optimistic updates
+
+### Enhanced
+- **Code Architecture**: Major refactoring for maintainability and performance
+  - **Service Layer**: Extracted business logic to dedicated services (pantryService.ts)
+  - **State Management**: Implemented Context API to eliminate prop drilling (AppContext, AppActionsContext)
+  - **Listener Management**: Created generic hooks (useDataListener) to remove duplicate Firestore listeners
+  - **Error Handling**: Added comprehensive error boundaries for component resilience
+
+### Enhanced
+- **TypeScript Strict Mode**: Enabled strict TypeScript compiler options for better type safety
+  - **Compiler Configuration**: Added "strict": true, "noImplicitAny": true, "strictNullChecks": true, and other strict options
+  - **Type Safety**: Improved code reliability with compile-time error detection
+
+### Enhanced
+- **Progressive Image Loading**: Implemented blur-up technique for recipe images
+  - **ProgressiveImage Component**: Created reusable component with blur placeholder and smooth transitions
+  - **Blur Data URLs**: Added utility function to generate SVG-based blur placeholders
+  - **Recipe Images**: Updated RecipeModal and RecipeFinder to use progressive loading
+  - **Loading States**: Added loading indicators during image transitions
+
+### Enhanced
+- **Loading States**: Comprehensive loading indicators for all async operations
+  - **Settings Component**: Added loading states for profile updates, avatar changes, and bulk image operations
+  - **RecipeFinder**: Enhanced loading states with skeleton loaders during recipe searches
+  - **User Feedback**: Visual loading indicators with disabled states and spinner animations
+
+### Enhanced
+- **Skeleton Loaders**: Data-dependent components now show skeleton placeholders
+  - **SkeletonLoader Components**: Added PantryItemSkeleton, ShoppingListItemSkeleton, and MealPlanSkeleton
+  - **RecipeFinder**: Shows skeleton recipe cards while loading search results
+  - **Improved UX**: Better perceived performance with structured content placeholders
+
+## [1.2.1] - 2026-01-28
+
+### Fixed
+- **Modal Header Positioning**: Fixed ItemDetailModal and RecipeModal headers to prevent overlap with app header
+  - Headers now use fixed positioning at top-[100px] with proper z-index stacking
+  - Added padding adjustments to ensure content scrolls correctly under fixed headers
+  - Improved close button accessibility and modal usability
+- **Scan Review Modal Positioning**: Fixed oversized display and navigation overlap issues
+  - Adjusted modal positioning to account for app header (pt-24) and bottom navigation (pb-20)
+  - Changed max height from 80vh to calc(100vh-160px) for proper viewport sizing
+  - Added responsive width constraints (max-w-sm on mobile, max-w-2xl on larger screens)
+  - Improved item layout with stacked remove buttons to ensure all controls are visible
+  - Modal now displays correctly within screen bounds without cutting off top or bottom
+- **Scan Review Modal**: Identified need for fixed header positioning (pending implementation)
+  - AI image analysis confirmation modal should use same fixed header pattern
+  - Will prevent header from scrolling away during item review process
+
+### Enhanced
+- **Android Build Compatibility**: Upgraded Java runtime to version 21 LTS for improved Android build stability
+- **Shopping List Transfer**: Fixed quantity handling when transferring items from shopping list to pantry
+  - Added default purchased quantities to prevent transfer failures
+  - Improved data consistency during checkout operations
+
+### Fixed
+- **Nutrition API Integration**: Resolved USDA FoodData Central API loading issues
+  - Changed from process.env to import.meta.env for proper Vite environment variable access
+  - Prioritized survey and foundation food data for better nutrition information quality
+  - Enhanced nutrient value extraction and display formatting
+
+### Enhanced
+- **Item Detail Modal**: Increased image size from w-20 h-20 to w-24 h-24 for better visual space utilization
+
 ## [1.2.0] - 2026-01-26
 
 ### Added

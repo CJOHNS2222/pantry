@@ -407,16 +407,6 @@ class GroceryPriceService {
     }
   }
 
-  // Normalize ingredient names for better matching
-  private normalizeIngredientName(ingredient: string): string {
-    return ingredient
-      .toLowerCase()
-      .trim()
-      .replace(/s$/, '') // Remove plural 's'
-      .replace(/[^a-z0-9\s]/g, '') // Remove special characters
-      .split(' ')[0]; // Take first word
-  }
-
   // Store price in history collection
   private async storePriceHistory(priceData: GroceryPrice): Promise<void> {
     try {
@@ -676,6 +666,43 @@ class GroceryPriceService {
     // This is a placeholder for future Open Prices API implementation
     console.log(`Open Prices API not implemented yet for ${ingredient}`);
     return null;
+  }
+
+  async saveGroceryPrice(priceData: GroceryPrice): Promise<void> {
+    try {
+      const priceRef = doc(collection(db, 'prices'), priceData.id);
+      await DatabaseMonitoringService.setDoc(priceRef, {
+        ...priceData,
+        lastUpdated: new Date()
+      });
+    } catch (error) {
+      console.error('Error saving grocery price:', error);
+      throw error;
+    }
+  }
+
+  calculatePriceStats(prices: number[]): PriceData | null {
+    if (prices.length === 0) {
+      return null;
+    }
+
+    const sum = prices.reduce((acc, price) => acc + price, 0);
+    const averagePrice = sum / prices.length;
+    const minPrice = Math.min(...prices);
+    const maxPrice = Math.max(...prices);
+
+    return {
+      averagePrice,
+      minPrice,
+      maxPrice,
+      sampleSize: prices.length,
+      lastUpdated: new Date(),
+      unit: 'lb' // Default unit
+    };
+  }
+
+  normalizeIngredientName(name: string): string {
+    return name.toLowerCase().trim();
   }
 }
 

@@ -84,7 +84,7 @@ describe('AppNavigation', () => {
     render(<AppNavigation {...defaultProps} />);
 
     // Check that SVG icons are present (they contain 'svg' elements)
-    const buttons = screen.getAllByRole('button');
+    const buttons = screen.getAllByRole('tab');
     buttons.forEach(button => {
       const svg = button.querySelector('svg');
       expect(svg).toBeInTheDocument();

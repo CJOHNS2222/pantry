@@ -35,11 +35,22 @@ describe('AppHeader', () => {
   const mockOnShowHousehold = vi.fn();
   const mockOnUndo = vi.fn();
 
+  const mockSyncStatus = {
+    isOnline: true,
+    isSyncing: false,
+    lastSyncTime: new Date(),
+    pendingOperations: 0,
+    syncError: null,
+    syncProgress: null,
+    hasConflicts: false
+  };
+
   const defaultProps = {
     user: mockUser,
     settings: mockSettings,
     setSettings: mockSetSettings,
-    onShowHousehold: mockOnShowHousehold
+    onShowHousehold: mockOnShowHousehold,
+    syncStatus: mockSyncStatus
   };
 
   it('renders user information', () => {
@@ -53,7 +64,7 @@ describe('AppHeader', () => {
   it('renders user avatar when available', () => {
     render(<AppHeader {...defaultProps} />);
 
-    const avatar = screen.getByAltText('profile');
+    const avatar = screen.getByAltText("Test User's profile picture");
     expect(avatar).toBeInTheDocument();
     expect(avatar).toHaveAttribute('src', 'avatar.jpg');
   });
@@ -68,7 +79,7 @@ describe('AppHeader', () => {
   it('calls onShowHousehold when household button is clicked', () => {
     render(<AppHeader {...defaultProps} />);
 
-    const householdButton = screen.getByRole('button', { name: /profile/ });
+    const householdButton = screen.getByLabelText('Switch household or account. Current user: Test User');
     fireEvent.click(householdButton);
 
     expect(mockOnShowHousehold).toHaveBeenCalled();

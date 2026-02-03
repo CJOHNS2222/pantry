@@ -11,9 +11,9 @@ const config: CapacitorConfig = {
     Device: {
       // Device plugin configuration
     },
-    Calendar: {
-      // Calendar plugin configuration
-    },
+    // Calendar: {
+    //   // Calendar plugin configuration - temporarily disabled due to build compatibility
+    // },
     SafeArea: {
       // Safe area plugin configuration
     },

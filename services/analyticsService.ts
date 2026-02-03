@@ -24,6 +24,51 @@ class AnalyticsService {
     }
   }
 
+  static setUserProperties(properties: Record<string, any> | null) {
+    if (properties) {
+      setUserProperties(analytics, properties);
+    }
+  }
+
+  // Track error events
+  static trackUnhandledRejection(reason: string) {
+    this.logEvent('exception', {
+      description: `Unhandled promise rejection: ${reason}`,
+      fatal: false
+    });
+  }
+
+  // Track performance events
+  static trackPageLoad(pageName: string, loadTime: number) {
+    this.logEvent('page_load', {
+      page_name: pageName,
+      load_time: loadTime
+    });
+  }
+
+  static trackApiCall(endpoint: string, responseTime: number, success: boolean) {
+    this.logEvent('api_call', {
+      endpoint,
+      response_time: responseTime,
+      success
+    });
+  }
+
+  // Track subscription events
+  static trackSubscriptionPurchase(plan: string, price: number) {
+    this.logEvent('purchase', {
+      currency: 'USD',
+      value: price,
+      items: [{ item_name: plan }]
+    });
+  }
+
+  static trackSubscriptionCancel(plan: string) {
+    this.logEvent('cancel_subscription', {
+      plan
+    });
+  }
+
   // Track recipe-related events
   static trackRecipeSearch(query: string, resultsCount: number) {
     this.logEvent('search', {

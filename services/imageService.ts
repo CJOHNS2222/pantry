@@ -15,6 +15,13 @@ export async function fetchRecipeImage(recipeTitle: string): Promise<string | nu
 
 export async function fetchGroceryItemImage(itemName: string): Promise<string | null> {
   try {
+    // Check cache first
+    const { getCachedImageUrl } = await import('./imageCacheService');
+    const cachedUrl = await getCachedImageUrl(itemName);
+    if (cachedUrl) {
+      return cachedUrl;
+    }
+
     // Clean the item name for better search results
     const cleanName = itemName.toLowerCase()
       .replace(/^\d+\s+/, '') // Remove leading quantities
@@ -39,14 +46,25 @@ export async function fetchGroceryItemImage(itemName: string): Promise<string | 
           ).length;
 
           if (matchCount > 0 || productName.includes(cleanName) || cleanName.includes(productName)) {
-            return product.image_url;
+            // Cache the image for future use
+            const { cacheImageFromUrl } = await import('./imageCacheService');
+            const cachedUrl = await cacheImageFromUrl(product.image_url, itemName);
+            return cachedUrl || product.image_url;
           }
         }
       }
     }
 
     // Fallback to Unsplash if Open Food Facts doesn't have a good match
-    return await fetchUnsplashImage(cleanName);
+    const unsplashUrl = await fetchUnsplashImage(cleanName);
+    if (unsplashUrl) {
+      // Cache the Unsplash image too
+      const { cacheImageFromUrl } = await import('./imageCacheService');
+      const cachedUrl = await cacheImageFromUrl(unsplashUrl, itemName);
+      return cachedUrl || unsplashUrl;
+    }
+
+    return null;
   } catch (error) {
     console.error('Error fetching grocery item image:', error);
     return null;
@@ -70,7 +88,11 @@ async function fetchUnsplashImage(query: string): Promise<string | null> {
     const data = await response.json();
 
     if (data.results && data.results.length > 0) {
-      return data.results[0].urls.regular;
+      const imageUrl = data.results[0].urls.regular;
+      // Cache the Unsplash image
+      const { cacheImageFromUrl } = await import('./imageCacheService');
+      const cachedUrl = await cacheImageFromUrl(imageUrl, query);
+      return cachedUrl || imageUrl;
     }
   } catch (error) {
     console.error('Error fetching from Unsplash:', error);

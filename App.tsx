@@ -21,10 +21,12 @@ import { isHouseholdMember, inferCategoryFromItemName, inferStorageLocationFromI
 import { getOrCreateHousehold } from './services/householdService';
 import { GlobalUpdatePrompt } from './components/GlobalUpdatePrompt';
 import { App as CapacitorApp, BackButtonListenerEvent } from '@capacitor/app';
+import { AppProvider, useApp } from './contexts/AppContext';
+import { AppActionsProvider, useAppActions } from './contexts/AppActionsContext';
 import SafeAreaService from './services/safeAreaService';
 
 // Lazy load monitoring components
-// const DatabaseAnalytics = React.lazy(() => import('./components/DatabaseAnalytics').then(module => ({ default: module.default })));
+const DatabaseAnalytics = React.lazy(() => import('./components/DatabaseAnalytics').then(module => ({ default: module.default })));
 
 // Loading component for lazy-loaded components
 const LoadingSpinner: React.FC = () => (
@@ -100,6 +102,8 @@ const App: React.FC = () => {
     // Item management with undo
     updateItem,
     deleteItem,
+    addItem,
+    addItems,
     // Undo
     recentActions,
     recordUndo,
@@ -189,6 +193,13 @@ const App: React.FC = () => {
 
   // Track app lifecycle events
   useEffect(() => {
+    // Initialize image cache system
+    import('./services/imageCacheService').then(({ initializeImageCache }) => {
+      initializeImageCache().catch(error => {
+        console.error('Failed to initialize image cache:', error);
+      });
+    });
+
     AnalyticsService.trackAppOpen();
 
     const handleVisibilityChange = () => {
@@ -414,157 +425,158 @@ const App: React.FC = () => {
           onSyncClick={syncNow}
         />
         
-        <MainContent 
-          activeTab={activeTab}
-          setActiveTab={setActiveTab}
-          user={user}
-          inventory={inventory}
-          setInventory={setInventory}
-          updateItem={updateItem}
-          deleteItem={deleteItem}
-          shoppingList={shoppingList}
-          setShoppingList={setShoppingList}
-          mealPlan={mealPlan}
-          setMealPlan={setMealPlan}
-          savedRecipes={savedRecipes}
-          ratings={ratings}
-          settings={settings}
-          setSettings={setSettings}
-          persistedRecipeResult={persistedRecipeResult}
-          setPersistedRecipeResult={setPersistedRecipeResult}
-          initialSearchQuery={initialSearchQuery}
-          setInitialSearchQuery={setInitialSearchQuery}
-          onAddToPlan={handleAddToPlan}
-          onSaveRecipe={handleSaveRecipe}
-          onDeleteRecipe={handleDeleteRecipe}
-          onRateRecipe={handleRateRecipe}
-          onMoveToPantry={async (items) => {
-            // Process items and fetch external images for new items that don't have local images
-            const processedItems = await Promise.all(items.map(async (i) => {
-              const category = inferCategoryFromItemName(i.item);
-              let image = getItemImage(i.item, category);
-              
-              // If it's a placeholder, try to fetch an external image
-              if (image === '/images/placeholder.svg') {
-                try {
-                  const externalImage = await fetchExternalItemImage(i.item);
-                  if (externalImage) {
-                    image = externalImage;
-                  }
-                } catch (error) {
-                  console.log('Failed to fetch external image for', i.item, error);
-                }
-              }
-              
-              let addQty = i.purchasedQuantity ? i.purchasedQuantity.amount : (typeof i.quantity === 'number' ? i.quantity : 1);
-              if (addQty < 1) addQty = 1;
-              
-              // Parse recipe reservations from source
-              let reservations: { recipeId: string; recipeName: string; quantity: number; unit: string }[] = [];
-              if (i.source?.startsWith('recipe: need ')) {
-                // Format: "recipe: need 1.5 oz for "Recipe Name""
-                const match = i.source.match(/recipe: need (.+?) for "(.+?)"/);
-                if (match) {
-                  const qtyStr = match[1];
-                  const recipeName = match[2];
-                  const qtyMatch = qtyStr.match(/(\d+(?:\.\d+)?)\s*(.+)/);
-                  if (qtyMatch) {
-                    const quantity = parseFloat(qtyMatch[1]);
-                    const unit = qtyMatch[2];
-                    reservations.push({
-                      recipeId: `recipe_${recipeName.replace(/\s+/g, '_').toLowerCase()}`,
-                      recipeName,
-                      quantity,
-                      unit
-                    });
-                  }
-                }
-              }
-              
-              return {
-                id: Math.random().toString(36).substr(2,9),
-                item: i.item,
-                category,
-                quantity_estimate: Math.abs(addQty).toString(),
-                storageLocation: inferStorageLocationFromItemName(i.item),
-                image,
-                originalQuantity: i.purchasedQuantity ? `${i.purchasedQuantity.amount} ${i.purchasedQuantity.unit}` : (typeof i.quantity === 'string' ? i.quantity : undefined),
-                reservations
-              };
-            }));
-            
-            setInventory(prev => {
-              const updated = [...prev];
-              processedItems.forEach(i => {
-                const idx = updated.findIndex(p => p.item.toLowerCase() === i.item.toLowerCase());
-                if (idx !== -1) {
-                  // Merge reservations
-                  const existing = updated[idx];
-                  const newReservations = [...(existing.reservations || []), ...(i.reservations || [])];
-                  updated[idx] = {
-                    ...existing,
-                    reservations: newReservations.length > 0 ? newReservations : undefined
-                  };
-                  const prevQty = parseInt(updated[idx].quantity_estimate) || 1;
-                  updated[idx].quantity_estimate = (prevQty + parseInt(i.quantity_estimate)).toString();
-                } else {
-                  updated.push(i);
-                }
-              });
-              const merged: { [key: string]: PantryItem } = {};
-              updated.forEach(p => {
-                const key = p.item.toLowerCase();
-                if (merged[key]) {
-                  merged[key].quantity_estimate = (parseInt(merged[key].quantity_estimate) + parseInt(p.quantity_estimate)).toString();
-                  // Merge reservations
-                  if (p.reservations) {
-                    merged[key].reservations = [...(merged[key].reservations || []), ...p.reservations];
-                  }
-                } else {
-                  merged[key] = { ...p };
-                }
-              });
-              return Object.values(merged);
-            });
-
-            // Show toast for bulk quantity editing if multiple items were added
-            if (items.length > 1) {
-              // Set a flag to indicate bulk quantity editing should be triggered
-              localStorage.setItem('bulkQuantityEditPending', 'true');
-              localStorage.setItem('bulkQuantityEditCount', items.length.toString());
-              
-              addToast(
-                `Added ${items.length} items to pantry. Edit quantities?`,
-                'info',
-                8000,
-                'Edit Quantities',
-                () => {
-                  // Switch to pantry tab and trigger bulk editing workflow
-                  setActiveTab(Tab.PANTRY);
-                  // The PantryScanner component will handle the bulk editing
-                }
-              );
-            }
+        <AppProvider
+          value={{
+            activeTab,
+            setActiveTab,
+            user,
+            inventory,
+            setInventory,
+            shoppingList,
+            setShoppingList,
+            mealPlan,
+            setMealPlan,
+            savedRecipes,
+            ratings,
+            persistedRecipeResult,
+            setPersistedRecipeResult,
+            initialSearchQuery,
+            setInitialSearchQuery,
+            settings,
+            setSettings,
+            customCategories,
+            recipeSaveLimitExceeded,
+            mealPlanLimitExceeded,
+            consumptionSuggestions,
+            expirationAlerts,
+            recipeSuggestions
           }}
-          onAddToShoppingList={addToShoppingList}
-          handleMarkAsMade={handleMarkAsMade}
-          consumptionSuggestions={consumptionSuggestions}
-          expirationAlerts={expirationAlerts}
-          recipeSuggestions={recipeSuggestions}
-          customCategories={customCategories}
-          onAddCustomCategory={addCustomCategory}
-          onUpdateCustomCategory={updateCustomCategory}
-          onDeleteCustomCategory={deleteCustomCategory}
-          onLogout={handleLogout}
-          onShowTutorial={() => setShowTutorial(true)}
-          addToast={addToast}
-          // Usage limit states
-          recipeSaveLimitExceeded={recipeSaveLimitExceeded}
-          mealPlanLimitExceeded={mealPlanLimitExceeded}
-          // Usage limit checking functions
-          checkRecipeSaveLimit={checkRecipeSaveLimit}
-          checkMealPlanLimit={checkMealPlanLimit}
-        />
+        >
+          <AppActionsProvider
+            value={{
+              setActiveTab,
+              updateItem,
+              deleteItem,
+              addItem,
+              addItems,
+              setInventory,
+              setShoppingList,
+              setMealPlan,
+              onAddToPlan: handleAddToPlan,
+              onSaveRecipe: handleSaveRecipe,
+              onDeleteRecipe: handleDeleteRecipe,
+              onRateRecipe: handleRateRecipe,
+              handleMarkAsMade,
+              onMoveToPantry: async (items) => {
+                // Process items and fetch external images for new items that don't have local images
+                const processedItems = await Promise.all(items.map(async (i) => {
+                  const category = inferCategoryFromItemName(i.item);
+                  let image = getItemImage(i.item, category);
+                  
+                  // If it's a placeholder, try to fetch an external image
+                  if (image === '/images/placeholder.svg') {
+                    try {
+                      const externalImage = await fetchExternalItemImage(i.item);
+                      if (externalImage) {
+                        image = externalImage;
+                      }
+                    } catch (error) {
+                      console.log('Failed to fetch external image for', i.item, error);
+                    }
+                  }
+                  
+                  let addQty = i.purchasedQuantity ? i.purchasedQuantity.amount : (i.quantity ? parseFloat(i.quantity.toString()) || 1 : 1);
+                  if (addQty < 1) addQty = 1;
+                  
+                  // Parse recipe reservations from source
+                  const reservations: { recipeId: string; recipeName: string; quantity: number; unit: string }[] = [];
+                  if (i.source?.startsWith('recipe: need ')) {
+                    // Format: "recipe: need 1.5 oz for "Recipe Name""
+                    const match = i.source.match(/recipe: need (.+?) for "(.+?)"/);
+                    if (match) {
+                      const qtyStr = match[1];
+                      const recipeName = match[2];
+                      const qtyMatch = qtyStr.match(/(\d+(?:\.\d+)?)\s*(.+)/);
+                      if (qtyMatch) {
+                        const quantity = parseFloat(qtyMatch[1]);
+                        const unit = qtyMatch[2];
+                        reservations.push({
+                          recipeId: `recipe_${recipeName.replace(/\s+/g, '_').toLowerCase()}`,
+                          recipeName,
+                          quantity,
+                          unit
+                        });
+                      }
+                    }
+                  }
+                  
+                  return {
+                    id: Math.random().toString(36).substr(2,9),
+                    item: i.item,
+                    category,
+                    quantity_estimate: Math.abs(addQty).toString(),
+                    storageLocation: inferStorageLocationFromItemName(i.item),
+                    image,
+                    originalQuantity: i.purchasedQuantity ? `${i.purchasedQuantity.amount} ${i.purchasedQuantity.unit}` : (typeof i.quantity === 'string' ? i.quantity : undefined),
+                    reservations
+                  };
+                }));
+                
+                // Group processed items by name for merging (in case shopping list has duplicates)
+                const mergedItems: { [key: string]: PantryItem } = {};
+                processedItems.forEach(i => {
+                  const key = i.item.toLowerCase();
+                  if (mergedItems[key]) {
+                    mergedItems[key].quantity_estimate = (parseInt(mergedItems[key].quantity_estimate) + parseInt(i.quantity_estimate)).toString();
+                    // Merge reservations
+                    if (i.reservations) {
+                      mergedItems[key].reservations = [...(mergedItems[key].reservations || []), ...i.reservations];
+                    }
+                  } else {
+                    mergedItems[key] = { ...i };
+                  }
+                });
+                
+                // Add all merged items (addItems will handle merging with existing inventory)
+                await addItems(Object.values(mergedItems));
+
+                // Show toast for bulk quantity editing if multiple items were added
+                if (items.length > 1) {
+                  // Set a flag to indicate bulk quantity editing should be triggered
+                  localStorage.setItem('bulkQuantityEditPending', 'true');
+                  // Store the actual processed items for the modal to edit
+                  localStorage.setItem('bulkQuantityEditItems', JSON.stringify(Object.values(mergedItems)));
+                  
+                  addToast(
+                    `Added ${items.length} items to pantry. Edit quantities?`,
+                    'info',
+                    8000,
+                    'Edit Quantities',
+                    () => {
+                      // Switch to pantry tab and trigger bulk editing workflow
+                      setActiveTab(Tab.PANTRY);
+                      // The PantryScanner component will handle the bulk editing
+                    }
+                  );
+                }
+              },
+              onAddToShoppingList: addToShoppingList,
+              setSettings,
+              onAddCustomCategory: addCustomCategory,
+              onUpdateCustomCategory: updateCustomCategory,
+              onDeleteCustomCategory: deleteCustomCategory,
+              addToast,
+              setInitialSearchQuery,
+              setPersistedRecipeResult,
+              onLogout: handleLogout,
+              onShowTutorial: () => setShowTutorial(true),
+              checkRecipeSaveLimit,
+              checkMealPlanLimit
+            }}
+          >
+            <MainContent />
+          </AppActionsProvider>
+        </AppProvider>
         <AppNavigation activeTab={activeTab} setActiveTab={setActiveTab} />
         
         {/* Toast Notifications */}
@@ -609,9 +621,9 @@ const App: React.FC = () => {
       <GlobalUpdatePrompt />
 
       {/* Database Analytics Dashboard - Lazy loaded */}
-      {/* <Suspense fallback={<LoadingSpinner />}>
+      <Suspense fallback={<LoadingSpinner />}>
         <DatabaseAnalytics />
-      </Suspense> */}
+      </Suspense>
     </>
   );
 }

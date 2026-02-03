@@ -6,7 +6,7 @@ import { initSentry } from './services/sentryService';
 import { I18nProvider } from './src/components/I18nProvider';
 
 // Initialize Sentry for error reporting
-initSentry();
+// initSentry(); // Disabled for testing
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {

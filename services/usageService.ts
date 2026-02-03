@@ -1,4 +1,4 @@
-import { doc, getDoc, setDoc, updateDoc, increment } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, increment, Timestamp } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 import { User } from '../types';
 
@@ -18,6 +18,11 @@ export interface UsageLimits {
     twoWeekPlanning: boolean;
     resetDate: Date;
   };
+  gemini: {
+    weekly: number;
+    used: number;
+    resetDate: Date;
+  };
 }
 
 export interface PlanLimits {
@@ -25,35 +30,57 @@ export interface PlanLimits {
     searches: { weekly: number };
     recipes: { max: number };
     mealPlanning: { weeklyRecipes: number; twoWeekPlanning: boolean };
+    gemini: { weekly: number };
   };
   premium: {
     searches: { weekly: number };
     recipes: { max: number };
     mealPlanning: { weeklyRecipes: number; twoWeekPlanning: boolean };
+    gemini: { weekly: number };
   };
   family: {
     searches: { weekly: number };
     recipes: { max: number };
     mealPlanning: { weeklyRecipes: number; twoWeekPlanning: boolean };
+    gemini: { weekly: number };
   };
 }
 
 class UsageService {
+  // Helper function to safely convert Firestore timestamps or Date objects to Date
+  private static toDate(value: any): Date | null {
+    if (!value) return null;
+    if (value instanceof Date) return value;
+    if (value && typeof value.toDate === 'function') return value.toDate();
+    if (value instanceof Timestamp) return value.toDate();
+    // If it's a number (timestamp), convert it
+    if (typeof value === 'number') return new Date(value);
+    // If it's a string, try to parse it
+    if (typeof value === 'string') {
+      const parsed = new Date(value);
+      return isNaN(parsed.getTime()) ? null : parsed;
+    }
+    return null;
+  }
+
   private static readonly PLAN_LIMITS: PlanLimits = {
     free: {
       searches: { weekly: 5 },
       recipes: { max: 10 },
-      mealPlanning: { weeklyRecipes: 3, twoWeekPlanning: false }
+      mealPlanning: { weeklyRecipes: 3, twoWeekPlanning: false },
+      gemini: { weekly: 5 }
     },
     premium: {
       searches: { weekly: 15 },
       recipes: { max: 20 },
-      mealPlanning: { weeklyRecipes: -1, twoWeekPlanning: false } // 7-day planning with unlimited entries
+      mealPlanning: { weeklyRecipes: -1, twoWeekPlanning: false }, // 7-day planning with unlimited entries
+      gemini: { weekly: 15 }
     },
     family: {
       searches: { weekly: -1 }, // unlimited searches
       recipes: { max: -1 }, // unlimited saved recipes
-      mealPlanning: { weeklyRecipes: -1, twoWeekPlanning: true } // 2-week planning with unlimited entries
+      mealPlanning: { weeklyRecipes: -1, twoWeekPlanning: true }, // 2-week planning with unlimited entries
+      gemini: { weekly: -1 } // unlimited Gemini usage
     }
   };
 
@@ -89,6 +116,11 @@ class UsageService {
           weeklyUsed: 0,
           twoWeekPlanning: planLimits.mealPlanning.twoWeekPlanning,
           resetDate: weekStart
+        },
+        gemini: {
+          weekly: planLimits.gemini.weekly,
+          used: 0,
+          resetDate: weekStart
         }
       };
 
@@ -103,29 +135,45 @@ class UsageService {
     }
 
     const data = usageDoc.data() as any;
-    const resetDate = data.searches?.resetDate?.toDate() || weekStart;
 
-    // Reset weekly counters if week has changed
-    if (now > resetDate) {
+    // Get the earliest reset date from all weekly limits, or use weekStart if none exist
+    const searchResetDate = this.toDate(data.searches?.resetDate);
+    const mealPlanningResetDate = this.toDate(data.mealPlanning?.resetDate);
+    const geminiResetDate = this.toDate(data.gemini?.resetDate);
+
+    const earliestResetDate = [searchResetDate, mealPlanningResetDate, geminiResetDate]
+      .filter(date => date instanceof Date)
+      .sort((a, b) => a.getTime() - b.getTime())[0] || weekStart;
+
+    // Reset weekly counters if the earliest reset date is in the past
+    if (now > earliestResetDate) {
       await updateDoc(usageRef, {
         'searches.used': 0,
         'searches.resetDate': weekStart,
         'mealPlanning.weeklyUsed': 0,
         'mealPlanning.resetDate': weekStart,
+        'gemini.used': 0,
+        'gemini.resetDate': weekStart,
         lastUpdated: now
       });
 
+      // Update local data for return
+      data.searches = data.searches || {};
       data.searches.used = 0;
       data.searches.resetDate = weekStart;
+      data.mealPlanning = data.mealPlanning || {};
       data.mealPlanning.weeklyUsed = 0;
       data.mealPlanning.resetDate = weekStart;
+      data.gemini = data.gemini || {};
+      data.gemini.used = 0;
+      data.gemini.resetDate = weekStart;
     }
 
     return {
       searches: {
         weekly: planLimits.searches.weekly,
         used: data.searches?.used || 0,
-        resetDate: resetDate
+        resetDate: this.toDate(data.searches?.resetDate) || weekStart
       },
       recipes: {
         max: planLimits.recipes.max,
@@ -135,7 +183,12 @@ class UsageService {
         weeklyRecipes: planLimits.mealPlanning.weeklyRecipes,
         weeklyUsed: data.mealPlanning?.weeklyUsed || 0,
         twoWeekPlanning: planLimits.mealPlanning.twoWeekPlanning,
-        resetDate: resetDate
+        resetDate: this.toDate(data.mealPlanning?.resetDate) || weekStart
+      },
+      gemini: {
+        weekly: planLimits.gemini.weekly,
+        used: data.gemini?.used || 0,
+        resetDate: this.toDate(data.gemini?.resetDate) || weekStart
       }
     };
   }
@@ -181,6 +234,21 @@ class UsageService {
     const usageRef = doc(db, 'users', user.id, 'usage', 'limits');
     await updateDoc(usageRef, {
       'mealPlanning.weeklyUsed': increment(1),
+      lastUpdated: new Date()
+    });
+  }
+
+  static async canUseGemini(user: User): Promise<boolean> {
+    const limits = await this.getUsageLimits(user);
+    return limits.gemini.weekly === -1 || limits.gemini.used < limits.gemini.weekly;
+  }
+
+  static async recordGeminiUsage(user: User): Promise<void> {
+    if (!user?.id) return;
+
+    const usageRef = doc(db, 'users', user.id, 'usage', 'limits');
+    await updateDoc(usageRef, {
+      'gemini.used': increment(1),
       lastUpdated: new Date()
     });
   }
@@ -238,6 +306,10 @@ class UsageService {
     d.setDate(diff);
     d.setHours(0, 0, 0, 0);
     return d;
+  }
+
+  static getPlanLimits(): PlanLimits {
+    return this.PLAN_LIMITS;
   }
 }
 

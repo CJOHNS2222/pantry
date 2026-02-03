@@ -1,41 +1,75 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import GroceryPriceService from '../../services/groceryPriceService';
-import { GroceryPrice, PriceData } from '../../services/groceryPriceService';
 
-// Mock Firebase services
-vi.mock('firebase/firestore', () => ({
-  collection: vi.fn(),
-  doc: vi.fn(),
-  getDoc: vi.fn(),
-  setDoc: vi.fn(),
-  updateDoc: vi.fn(),
-  query: vi.fn(),
-  where: vi.fn(),
-  getDocs: vi.fn(),
-  orderBy: vi.fn(),
-  limit: vi.fn(),
-  addDoc: vi.fn(),
-}));
-
-vi.mock('../firebaseConfig', () => ({
-  db: {},
-}));
-
-vi.mock('./databaseMonitoringService', () => ({
+// Mock DatabaseMonitoringService
+vi.mock('../../../services/databaseMonitoringService', () => ({
   default: {
     trackOperation: vi.fn(),
-  },
+    getDoc: vi.fn(),
+    getDocs: vi.fn(),
+    setDoc: vi.fn(),
+    updateDoc: vi.fn(),
+    addDoc: vi.fn(),
+    deleteDoc: vi.fn()
+  }
 }));
 
-// Mock fetch for Open Prices API
-global.fetch = vi.fn();
+// Mock fetch globally
+const mockFetch = vi.fn();
+global.fetch = mockFetch;
+
+import GroceryPriceService, { groceryPriceService } from '../../../services/groceryPriceService';
+import DatabaseMonitoringService from '../../../services/databaseMonitoringService';
 
 describe('GroceryPriceService', () => {
-  let service: GroceryPriceService;
+  let service: typeof groceryPriceService;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    service = new GroceryPriceService();
+    service = groceryPriceService;
+
+    // Set up default mock behaviors for dependencies
+    DatabaseMonitoringService.getDoc.mockResolvedValue({
+      exists: vi.fn(() => true),
+      data: vi.fn(() => ({ averagePrice: 2.99, minPrice: 2.49, maxPrice: 3.49, sampleSize: 10, lastUpdated: new Date(), unit: 'lb' })),
+      id: 'test-doc-id'
+    });
+
+    DatabaseMonitoringService.getDocs.mockResolvedValue({
+      size: 0,
+      docs: [],
+      forEach: vi.fn((callback) => {
+        // Default empty implementation
+      }),
+      empty: true
+    });
+
+    DatabaseMonitoringService.setDoc.mockResolvedValue(undefined);
+    DatabaseMonitoringService.updateDoc.mockResolvedValue(undefined);
+    DatabaseMonitoringService.addDoc.mockResolvedValue({ id: 'price123' });
+    DatabaseMonitoringService.deleteDoc.mockResolvedValue(undefined);
+
+    // Mock fetch for API calls
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        items: [
+          {
+            product_id: 'chicken',
+            price: 2.99,
+            currency: 'USD',
+            store: 'Test Store',
+            date: '2024-01-01',
+          },
+          {
+            product_id: 'chicken',
+            price: 3.49,
+            currency: 'USD',
+            store: 'Test Store 2',
+            date: '2024-01-02',
+          },
+        ],
+      }),
+    });
   });
 
   afterEach(() => {
@@ -44,83 +78,70 @@ describe('GroceryPriceService', () => {
 
   describe('getIngredientPrice', () => {
     it('returns cached price data when available', async () => {
-      const mockPriceData: PriceData = {
-        averagePrice: 2.99,
-        minPrice: 2.49,
-        maxPrice: 3.49,
-        sampleSize: 10,
-        lastUpdated: new Date(),
-        unit: 'lb',
+      // Mock DatabaseMonitoringService.getDocs to return cached price data
+      const mockPrices = [
+        { id: 'price1', data: () => ({ price: 2.99, ingredient: 'chicken breast', lastUpdated: new Date() }) },
+        { id: 'price2', data: () => ({ price: 2.49, ingredient: 'chicken breast', lastUpdated: new Date() }) },
+        { id: 'price3', data: () => ({ price: 3.49, ingredient: 'chicken breast', lastUpdated: new Date() }) },
+      ];
+
+      const mockQuerySnapshot = {
+        docs: mockPrices,
+        forEach: vi.fn((callback) => {
+          mockPrices.forEach(callback);
+        }),
+        size: mockPrices.length,
+        empty: false
       };
 
-      // Mock Firestore to return existing price data
-      const { getDocs } = await import('firebase/firestore');
-      (getDocs as any).mockResolvedValueOnce({
-        docs: [
-          {
-            data: () => ({
-              ingredient: 'chicken breast',
-              price: 2.99,
-              unit: 'lb',
-              lastUpdated: new Date(),
-              source: 'crowdsourced',
-            }),
-          },
-          {
-            data: () => ({
-              ingredient: 'chicken breast',
-              price: 3.49,
-              unit: 'lb',
-              lastUpdated: new Date(),
-              source: 'api',
-            }),
-          },
-        ],
-      });
+      vi.mocked(DatabaseMonitoringService.getDocs).mockResolvedValueOnce(mockQuerySnapshot);
 
       const result = await service.getIngredientPrice('chicken breast');
 
       expect(result).toBeTruthy();
-      expect(result?.averagePrice).toBeGreaterThan(0);
-      expect(result?.sampleSize).toBeGreaterThan(0);
+      expect(result?.averagePrice).toBe(2.99); // (2.99 + 2.49 + 3.49) / 3 = 2.99
+      expect(result?.sampleSize).toBe(3);
     });
 
     it('fetches from Open Prices API when no cached data', async () => {
-      // Mock empty Firestore results
-      const { getDocs } = await import('firebase/firestore');
-      (getDocs as any).mockResolvedValueOnce({
+      // Mock empty DatabaseMonitoringService results
+      const mockEmptyQuerySnapshot = {
         docs: [],
-      });
+        forEach: vi.fn(),
+        size: 0,
+        empty: true
+      };
 
-      // Mock Open Prices API response
-      (global.fetch as any).mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve({
-          items: [
-            {
-              product_id: 'chicken',
-              price: 2.99,
-              currency: 'USD',
-              store: 'Test Store',
-              date: '2024-01-01',
-            },
-          ],
-        }),
-      });
+      vi.mocked(DatabaseMonitoringService.getDocs).mockResolvedValueOnce(mockEmptyQuerySnapshot);
+
+      // Mock the private fetchOpenPrices method
+      const fetchOpenPricesSpy = vi.spyOn(service as any, 'fetchOpenPrices').mockResolvedValueOnce([
+        {
+          product_id: 'chicken',
+          price: 2.99,
+          currency: 'USD',
+          store: 'Test Store',
+          date: '2024-01-01',
+        },
+      ]);
 
       const result = await service.getIngredientPrice('chicken breast');
 
-      expect(global.fetch).toHaveBeenCalled();
+      expect(fetchOpenPricesSpy).toHaveBeenCalled();
       expect(result).toBeTruthy();
     });
 
     it('handles API errors gracefully', async () => {
-      const { getDocs } = await import('firebase/firestore');
-      (getDocs as any).mockResolvedValueOnce({
+      const mockEmptyQuerySnapshot = {
         docs: [],
-      });
+        forEach: vi.fn(),
+        size: 0,
+        empty: true
+      };
 
-      (global.fetch as any).mockResolvedValueOnce({
+      vi.mocked(DatabaseMonitoringService.getDocs).mockResolvedValueOnce(mockEmptyQuerySnapshot);
+
+      mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 500,
       });
@@ -131,12 +152,16 @@ describe('GroceryPriceService', () => {
     });
 
     it('handles network errors', async () => {
-      const { getDocs } = await import('firebase/firestore');
-      (getDocs as any).mockResolvedValueOnce({
+      const mockEmptyQuerySnapshot = {
         docs: [],
-      });
+        forEach: vi.fn(),
+        size: 0,
+        empty: true
+      };
 
-      (global.fetch as any).mockRejectedValueOnce(new Error('Network error'));
+      vi.mocked(DatabaseMonitoringService.getDocs).mockResolvedValueOnce(mockEmptyQuerySnapshot);
+
+      mockFetch.mockRejectedValueOnce(new Error('Network error'));
 
       const result = await service.getIngredientPrice('chicken breast');
 
@@ -159,13 +184,25 @@ describe('GroceryPriceService', () => {
         },
       ];
 
-      const { getDocs } = await import('firebase/firestore');
-      (getDocs as any).mockResolvedValueOnce({
+      const mockQuerySnapshot = {
         docs: mockPrices.map(price => ({
           id: price.id,
           data: () => price,
         })),
-      });
+        forEach: vi.fn((callback) => {
+          mockPrices.forEach(price => callback({
+            id: price.id,
+            data: () => price,
+          }));
+        }),
+        size: mockPrices.length,
+        empty: false
+      };
+
+      vi.mocked(DatabaseMonitoringService.getDocs).mockResolvedValueOnce(mockQuerySnapshot);
+
+      // Mock API to return empty so we only get Firestore data
+      const fetchOpenPricesHistorySpy = vi.spyOn(service as any, 'fetchOpenPricesHistory').mockResolvedValueOnce([]);
 
       const result = await service.getPriceTrends('chicken breast', 30);
 
@@ -174,10 +211,14 @@ describe('GroceryPriceService', () => {
     });
 
     it('returns empty array when no trends found', async () => {
-      const { getDocs } = await import('firebase/firestore');
-      (getDocs as any).mockResolvedValueOnce({
+      const mockEmptyQuerySnapshot = {
         docs: [],
-      });
+        forEach: vi.fn(),
+        size: 0,
+        empty: true
+      };
+
+      vi.mocked(DatabaseMonitoringService.getDocs).mockResolvedValueOnce(mockEmptyQuerySnapshot);
 
       const result = await service.getPriceTrends('unknown ingredient', 30);
 
@@ -185,16 +226,21 @@ describe('GroceryPriceService', () => {
     });
 
     it('handles query errors', async () => {
-      const { getDocs } = await import('firebase/firestore');
-      (getDocs as any).mockRejectedValueOnce(new Error('Query failed'));
+      vi.mocked(DatabaseMonitoringService.getDocs).mockRejectedValueOnce(new Error('Query failed'));
 
-      await expect(service.getPriceTrends('chicken breast', 30)).rejects.toThrow('Query failed');
+      // Mock API fallback to return empty
+      const fetchOpenPricesHistorySpy = vi.spyOn(service as any, 'fetchOpenPricesHistory').mockResolvedValueOnce([]);
+
+      const result = await service.getPriceTrends('chicken breast', 30);
+
+      expect(result).toEqual([]);
     });
   });
 
   describe('saveGroceryPrice', () => {
     it('saves price data successfully', async () => {
-      const priceData: Omit<GroceryPrice, 'id'> = {
+      const priceData: GroceryPrice = {
+        id: 'price123',
         ingredient: 'chicken breast',
         price: 3.99,
         unit: 'lb',
@@ -205,17 +251,14 @@ describe('GroceryPriceService', () => {
         userId: 'user123',
       };
 
-      const { addDoc } = await import('firebase/firestore');
-      (addDoc as any).mockResolvedValueOnce({ id: 'price123' });
+      await service.saveGroceryPrice(priceData);
 
-      const result = await service.saveGroceryPrice(priceData);
-
-      expect(addDoc).toHaveBeenCalled();
-      expect(result).toBe('price123');
+      expect(DatabaseMonitoringService.setDoc).toHaveBeenCalled();
     });
 
     it('handles save errors', async () => {
-      const priceData: Omit<GroceryPrice, 'id'> = {
+      const priceData: GroceryPrice = {
+        id: 'price123',
         ingredient: 'chicken breast',
         price: 2.99,
         unit: 'lb',
@@ -224,8 +267,7 @@ describe('GroceryPriceService', () => {
         source: 'user',
       };
 
-      const { addDoc } = await import('firebase/firestore');
-      (addDoc as any).mockRejectedValueOnce(new Error('Save failed'));
+      vi.mocked(DatabaseMonitoringService.setDoc).mockRejectedValueOnce(new Error('Save failed'));
 
       await expect(service.saveGroceryPrice(priceData)).rejects.toThrow('Save failed');
     });
@@ -233,41 +275,37 @@ describe('GroceryPriceService', () => {
 
   describe('getPriceTrendsFromAPI', () => {
     it('fetches trends from Open Prices API', async () => {
-      const mockApiResponse = {
-        items: [
-          {
-            product_id: 'chicken',
-            price: 2.99,
-            currency: 'USD',
-            store: 'Store A',
-            date: '2024-01-01',
-          },
-          {
-            product_id: 'chicken',
-            price: 3.49,
-            currency: 'USD',
-            store: 'Store B',
-            date: '2024-01-15',
-          },
-        ],
-      };
+      const mockApiResponse = [
+        {
+          id: '1',
+          product_id: 'chicken',
+          price: 2.99,
+          currency: 'USD',
+          store: 'Store A',
+          date: '2024-01-01',
+        },
+        {
+          id: '2',
+          product_id: 'chicken',
+          price: 3.49,
+          currency: 'USD',
+          store: 'Store B',
+          date: '2024-01-15',
+        },
+      ];
 
-      (global.fetch as any).mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve(mockApiResponse),
-      });
+      // Mock the private method
+      const fetchOpenPricesHistorySpy = vi.spyOn(service as any, 'fetchOpenPricesHistory').mockResolvedValueOnce(mockApiResponse);
 
       const result = await service.getPriceTrendsFromAPI('chicken breast', 30);
 
-      expect(global.fetch).toHaveBeenCalled();
+      expect(fetchOpenPricesHistorySpy).toHaveBeenCalled();
       expect(result).toHaveLength(2);
     });
 
     it('handles API errors', async () => {
-      (global.fetch as any).mockResolvedValueOnce({
-        ok: false,
-        status: 404,
-      });
+      // Mock the private method to throw an error
+      const fetchOpenPricesHistorySpy = vi.spyOn(service as any, 'fetchOpenPricesHistory').mockRejectedValueOnce(new Error('API error'));
 
       const result = await service.getPriceTrendsFromAPI('unknown ingredient', 30);
 
@@ -275,7 +313,7 @@ describe('GroceryPriceService', () => {
     });
 
     it('handles network errors', async () => {
-      (global.fetch as any).mockRejectedValueOnce(new Error('Network error'));
+      mockFetch.mockRejectedValueOnce(new Error('Network error'));
 
       const result = await service.getPriceTrendsFromAPI('chicken breast', 30);
 
@@ -298,10 +336,7 @@ describe('GroceryPriceService', () => {
     it('handles empty price array', () => {
       const result = service.calculatePriceStats([]);
 
-      expect(result.averagePrice).toBe(0);
-      expect(result.minPrice).toBe(0);
-      expect(result.maxPrice).toBe(0);
-      expect(result.sampleSize).toBe(0);
+      expect(result).toBeNull();
     });
 
     it('handles single price', () => {

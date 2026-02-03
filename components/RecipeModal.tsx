@@ -2,6 +2,9 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Plus, Heart, Trash2, Minus, Users, CheckCircle2, Play, Pause, RotateCcw, AlertCircle } from 'lucide-react';
 import { StructuredRecipe, RecipeRating, SavedRecipe, PantryItem } from '../types';
 import { RecipeRatingUI } from './RecipeRating';
+import { ProgressiveImage } from './ProgressiveImage';
+import { generateBlurDataURL } from '../utils/appUtils';
+import { useKeyboardNavigation } from '../hooks/useKeyboardNavigation';
 
 interface RecipeModalProps {
   recipe: StructuredRecipe | SavedRecipe;
@@ -98,6 +101,12 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
     }
     return () => clearInterval(interval);
   }, [timerActive, timeRemaining]);
+
+  // Keyboard navigation support
+  useKeyboardNavigation({
+    onEscape: onClose,
+    enabled: isOpen
+  });
 
   // Start timer with recipe time or custom time
   const startTimer = (useCustomTime = false) => {
@@ -327,24 +336,22 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
         <button className="absolute top-3 right-3 text-theme-secondary opacity-50 hover:opacity-100 z-20" onClick={onClose}>
           &times;
         </button>
-        <div className="sticky top-0 z-10 w-full py-4 text-3xl font-bold text-white bg-[var(--accent-color)] rounded-t-2xl flex items-center justify-center">
+        <div className="fixed top-[100px] left-0 right-0 max-w-lg mx-auto z-[100] py-4 text-3xl font-bold text-white bg-[var(--accent-color)] rounded-t-2xl flex items-center justify-center">
           <span className="sr-only">Recipe Details</span>
         </div>
-        <div className="overflow-y-auto p-6 flex-1">
+        <div className="overflow-y-auto p-6 pt-20 flex-1">
           <h2 className="text-2xl font-serif font-bold mb-2 text-[var(--accent-color)]">{recipe.title || 'Untitled'}</h2>
           {recipe.description && <p className="mb-4 text-theme-secondary opacity-70">{recipe.description}</p>}
 
           {/* Recipe Image */}
           {recipe.image && (
             <div className="mb-6 rounded-lg overflow-hidden border border-theme">
-              <img
+              <ProgressiveImage
                 src={recipe.image}
                 alt={recipe.title}
-                className="w-full h-48 object-cover"
-                onError={(e) => {
-                  const target = e.target as HTMLImageElement;
-                  target.style.display = 'none';
-                }}
+                className="w-full h-48"
+                blurDataURL={generateBlurDataURL(400, 192)}
+                placeholderSrc="/images/placeholder.svg"
               />
             </div>
           )}
@@ -586,11 +593,32 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
           <div>
             <h4 className="text-xs font-bold text-[var(--accent-color)] uppercase mb-2">Instructions</h4>
             <ol className="list-decimal list-inside text-theme-secondary opacity-80 space-y-1">
-              {Array.isArray(recipe.instructions) && recipe.instructions.length > 0 ? (
-                recipe.instructions.map((step, i) => <li key={i}>{step}</li>)
-              ) : (
-                <li>No instructions available</li>
-              )}
+              {(() => {
+                // Process instructions - some recipes have them as arrays with concatenated steps
+                let processedSteps: string[] = [];
+
+                if (Array.isArray(recipe.instructions) && recipe.instructions.length > 0) {
+                  recipe.instructions.forEach(instruction => {
+                    // Split by "step X", "X.", or numbered patterns to separate individual steps
+                    const steps = instruction.split(/(?=step \d+|STEP \d+|\d+\.)/i).filter(step => step.trim());
+                    processedSteps.push(...steps);
+                  });
+                }
+
+                return processedSteps.length > 0 ? (
+                  processedSteps.map((step, i) => {
+                    // Clean up step text by removing "step X", "X.", prefixes and extra whitespace
+                    const cleanStep = step
+                      .replace(/^step\s+\d+\s*[-.]?\s*/i, '') // Remove "step 1", "step 1 -", etc.
+                      .replace(/^STEP\s+\d+\s*[-.]?\s*/i, '') // Remove "STEP 1", etc.
+                      .replace(/^\d+\.\s*/, '') // Remove "1.", "2.", etc.
+                      .trim();
+                    return <li key={i}>{cleanStep}</li>;
+                  })
+                ) : (
+                  <li>No instructions available</li>
+                );
+              })()}
             </ol>
           </div>
           {onRate && (

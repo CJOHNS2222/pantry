@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { X, ChevronRight, ChevronLeft, Sparkles, ShoppingBasket, CalendarDays, UtensilsCrossed, Users, Grid3X3, User, ChefHat, Settings, BarChart3, Mic, CheckCircle, Play, Pause, RotateCcw } from 'lucide-react';
 import { Tab } from '../types/app';
 import AnalyticsService from '../services/analyticsService';
@@ -197,8 +197,11 @@ export const Tutorial: React.FC<TutorialProps> = ({
     }
   ];
 
-  // Filter steps based on user progress
-  const activeSteps = steps.filter(step => !step.skipIf || !step.skipIf(userProgress));
+  // Filter steps based on user progress (memoized for performance)
+  const activeSteps = useMemo(() => 
+    steps.filter(step => !step.skipIf || !step.skipIf(userProgress)),
+    [userProgress]
+  );
 
   const currentStepData = activeSteps[step];
   const isCompleted = completedSteps.has(step);

@@ -1,28 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import AnalyticsService from '../../services/analyticsService';
-
-// Mock Firebase Analytics
-vi.mock('firebase/analytics', () => ({
-  getAnalytics: vi.fn(() => ({})),
-  logEvent: vi.fn(),
-  setUserProperties: vi.fn(),
-  setUserId: vi.fn(),
-}));
-
-// Mock localStorage
-const localStorageMock = {
-  getItem: vi.fn(),
-  setItem: vi.fn(),
-  removeItem: vi.fn(),
-  clear: vi.fn(),
-};
-Object.defineProperty(window, 'localStorage', { value: localStorageMock });
+import AnalyticsService from '../../../services/analyticsService';
 
 describe('AnalyticsService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    localStorageMock.clear();
+    (global as any).localStorageMock.clear();
   });
 
   afterEach(() => {
@@ -44,7 +27,7 @@ describe('AnalyticsService', () => {
     });
 
     it('tracks tab changes', () => {
-      AnalyticsService.trackTabChange('pantry');
+      AnalyticsService.trackTabSwitch('pantry', 'shopping');
 
       expect(true).toBe(true);
     });

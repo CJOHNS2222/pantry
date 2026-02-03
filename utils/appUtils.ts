@@ -191,7 +191,7 @@ export function getItemImage(itemName: string, category: string): string {
 
   // Clean the item name by removing quantities and common descriptors
   const cleanItemName = (itemName: string): string => {
-    let cleaned = itemName.toLowerCase()
+    const cleaned = itemName.toLowerCase()
       // Remove quantities at the beginning (e.g., "1 ", "2 ", "3 ", etc.)
       .replace(/^\d+\s+/, '')
       // Remove common size descriptors
@@ -713,6 +713,12 @@ export function inferStorageLocationFromItemName(itemName: string): 'pantry' | '
 export function getAutoExpirationDate(itemName: string, category: string): string | undefined {
   const name = itemName.toLowerCase();
   const cat = category.toLowerCase();
+
+  // Long-term storage items should not have expiration dates
+  const longTermCategories = ['pasta & noodles', 'grains & bread', 'canned goods', 'baking supplies', 'condiments & sauces', 'spices & herbs', 'snacks', 'beverages'];
+  if (longTermCategories.includes(cat)) {
+    return undefined;
+  }
 
   // Dairy products
   if (name.includes('milk') || cat === 'dairy') {
@@ -1488,7 +1494,7 @@ export function subtractQuantities(total: ParsedQuantity, used: ParsedQuantity):
  * Shows available quantity (total - reserved)
  */
 export function formatItemQuantity(item: PantryItem): string {
-  let totalAmount = item.quantity ? item.quantity.amount : parseInt(item.quantity_estimate) || 1;
+  const totalAmount = item.quantity ? item.quantity.amount : parseInt(item.quantity_estimate) || 1;
   const unit = item.quantity?.unit || 'count';
 
   // Calculate reserved amount
@@ -1516,4 +1522,25 @@ export function formatItemQuantity(item: PantryItem): string {
   }
 
   return quantityText;
+}
+
+/**
+ * Generates a blur data URL for progressive image loading
+ * Creates a simple colored rectangle as a placeholder
+ * @param width Image width
+ * @param height Image height
+ * @param color Background color (hex format, defaults to theme color)
+ * @returns Data URL for blurred placeholder
+ */
+export function generateBlurDataURL(width: number = 400, height: number = 300, color: string = '#f3f4f6'): string {
+  // Create a simple SVG with the specified color
+  const svg = `
+    <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+      <rect width="100%" height="100%" fill="${color}"/>
+    </svg>
+  `;
+
+  // Convert SVG to base64 data URL
+  const encoded = btoa(svg);
+  return `data:image/svg+xml;base64,${encoded}`;
 }

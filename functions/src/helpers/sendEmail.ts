@@ -6,7 +6,7 @@ let cachedGmailEmail: string | null = null;
 
 const getTransporter = () => {
   if (!transporter) {
-    // @ts-ignore - functions.config() is available at runtime
+    // @ts-expect-error - functions.config() is available at runtime
     const gmailConfig = functions.config().gmail;
     if (!gmailConfig?.email || !gmailConfig?.password) {
       throw new Error("Gmail credentials not configured. Please run: firebase functions:config:set gmail.email=YOUR_EMAIL gmail.password=YOUR_PASSWORD");
@@ -30,7 +30,7 @@ export const sendEmail = async (
 ) => {
   const transporter = getTransporter();
   if (!cachedGmailEmail) {
-    // @ts-ignore - functions.config() is available at runtime
+    // @ts-expect-error - functions.config() is available at runtime
     const gmailConfig = functions.config().gmail;
     cachedGmailEmail = gmailConfig?.email || "noreply@smartpantry.com";
   }

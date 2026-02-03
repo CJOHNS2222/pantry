@@ -66,7 +66,7 @@ npm run build:release          # Production build with synced notes
 ```typescript
 // User-scoped data (Firestore collections under /users/{userId}/)
 userMealPlan: DayPlan[]        // /users/{userId}/mealPlan
-userInventory: PantryItem[]    // /users/{userId}/inventory  
+userInventory: PantryItem[]    // /users/{userId}/inventory
 userShoppingList: ShoppingItem[] // /users/{userId}/shoppingList
 userSavedRecipes: SavedRecipe[] // /users/{userId}/savedRecipes
 userUsage: UsageLimits         // /users/{userId}/usage
@@ -102,13 +102,13 @@ interface ComponentProps {
   // Data props first
   data: DataType;
   onDataChange: (data: DataType) => void;
-  
+
   // Callback props
   onAction: () => void;
-  
+
   // Configuration
   settings?: SettingsType;
-  
+
   // User context
   user: User;
 }
@@ -139,7 +139,7 @@ useEffect(() => {
       event.preventDefault();
     }
   };
-  
+
   App.addListener('backButton', handleBackButton);
   return () => App.removeListener('backButton', handleBackButton);
 }, [hasOpenModal]);
@@ -185,7 +185,7 @@ await UsageService.trackRecipeSave(user.id);
 // User-scoped subscription pattern
 useEffect(() => {
   if (!user?.id) return;
-  
+
   const unsubscribe = onSnapshot(
     collection(db, 'users', user.id, 'inventory'),
     (snapshot) => {
@@ -193,14 +193,14 @@ useEffect(() => {
       setInventory(items);
     }
   );
-  
+
   return unsubscribe;
 }, [user?.id]);
 
 // Household-scoped subscription pattern
 useEffect(() => {
   if (!user?.householdId) return;
-  
+
   const unsubscribe = onSnapshot(
     collection(db, 'households', user.householdId, 'inventory'),
     (snapshot) => {
@@ -208,7 +208,7 @@ useEffect(() => {
       setSharedInventory(items);
     }
   );
-  
+
   return unsubscribe;
 }, [user?.householdId]);
 ```
@@ -262,23 +262,6 @@ jest.mock('../services/firebaseConfig');
 - Use `useEffect` dependencies carefully
 - Validate data before saving to Firestore
 
-## Common Gotchas
-
-### Firestore Data Types
-- Use `Timestamp` for dates, not ISO strings
-- Clean undefined fields: `cleanObject(obj)` before saving
-- Household-scoped collections: `/households/{householdId}/collection`
-
-### Mobile Navigation
-- Always handle back button in modals
-- Use `setActiveTab()` for navigation, not direct routing
-- Test double-tap exit on Android
-
-### State Synchronization
-- Real-time updates can cause race conditions
-- Use `useEffect` dependencies carefully
-- Validate data before saving to Firestore
-
 ### Performance
 - Lazy load components in MainContent.tsx
 - Use `React.memo` for expensive re-renders
@@ -290,6 +273,57 @@ jest.mock('../services/firebaseConfig');
 - Use `subtractQuantities()` for recipe consumption
 - Use `formatItemQuantity()` for display
 - Visual quantity selector in ItemDetailModal for easy estimation
+
+### AI Integration Patterns
+```typescript
+// Gemini service for recipe generation
+import { analyzePantryImage } from '../services/geminiService';
+
+// Check feature availability before AI operations
+if (canUseGemini()) {
+  const recipes = await analyzePantryImage(imageData);
+}
+```
+
+### Search & Filtering
+```typescript
+// Use searchUtils for pantry item filtering
+import { searchPantryItems, filterPantryItems } from '../utils/searchUtils';
+
+// Persist filter state
+const filter = loadPantryFilter();
+savePantryFilter(updatedFilter);
+```
+
+### Bulk Operations
+```typescript
+// Bulk item management in PantryScanner
+const [bulkMode, setBulkMode] = useState(false);
+const [selectedItems, setSelectedItems] = useState<Set<number>>(new Set());
+
+// Bulk quantity editing workflow
+const [bulkQuantityEditItems, setBulkQuantityEditItems] = useState<PantryItem[]>([]);
+```
+
+## Cost Considerations
+
+### Billing Awareness
+- **AI Utilization**: Maintain low overhead costs on Google Gemini API usage
+- **Firebase Monetization**: Be mindful of Firestore read/write operations and storage costs
+- **Billing Limits**: Any changes affecting usage limits, API calls, or storage should be discussed
+- **Subscription Features**: Premium features should respect usage limits to avoid unexpected costs
+
+## Environment Setup
+```bash
+# Required environment variables (.env.local)
+VITE_GEMINI_API_KEY=...
+VITE_STRIPE_PUBLISHABLE_KEY=...
+STRIPE_SECRET_KEY=...
+VITE_PAYPAL_CLIENT_ID=...
+PAYPAL_CLIENT_SECRET=...
+```
+
+## Directory Structure
 ```
 components/          # UI components
   layout/           # AppHeader, AppNavigation, MainContent
@@ -309,16 +343,6 @@ utils/              # Helper functions
 
 public/             # Static assets
 dist/               # Build output (gitignored)
-```
-
-## Environment Setup
-```bash
-# Required environment variables (.env.local)
-VITE_GEMINI_API_KEY=...
-VITE_STRIPE_PUBLISHABLE_KEY=...
-STRIPE_SECRET_KEY=...
-VITE_PAYPAL_CLIENT_ID=...
-PAYPAL_CLIENT_SECRET=...
 ```
 
 Remember: This app prioritizes real-time collaboration and mobile-first UX. Always test changes on both web and mobile platforms.

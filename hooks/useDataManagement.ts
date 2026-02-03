@@ -1,13 +1,18 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { doc, onSnapshot, collection, addDoc, getDocs, setDoc, serverTimestamp, query, where, orderBy, Timestamp, writeBatch, deleteDoc } from 'firebase/firestore';
+import { doc, onSnapshot, collection, addDoc, getDocs, setDoc, serverTimestamp, query, where, Timestamp, deleteDoc, writeBatch } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 import DatabaseMonitoringService from '../services/databaseMonitoringService';
-import { User, PantryItem, DayPlan, Household, ShoppingItem, SavedRecipe, RecipeRating, RecipeSearchResult, CustomCategory, RecipeSuggestion, MealPlanItem, StructuredRecipe } from '../types';
-import { next7DateKeys, isHouseholdMember, generateConsumptionSuggestions, generateExpirationAlerts, generateRecipeSuggestions, parseIngredientForShoppingList } from '../utils/appUtils';
-import { UsageService } from '../services/usageService';
 import AnalyticsService from '../services/analyticsService';
+import { UsageService } from '../services/usageService';
+import { User, PantryItem, DayPlan, Household, ShoppingItem, SavedRecipe, RecipeRating, CustomCategory, MealPlanItem, StructuredRecipe, ConsumptionSuggestion, ExpirationAlert, RecipeSuggestion } from '../types';
+import { hasPantryItemsChanged, hasShoppingItemsChanged, hasSavedRecipesChanged, hasMealPlansChanged, hasArraysChanged } from '../utils/comparisonUtils';
+import { setRemoteInventoryUpdate, isRemoteInventoryUpdate, setRemoteShoppingListUpdate, isRemoteShoppingListUpdate, setRemoteMealPlanUpdate, isRemoteMealPlanUpdate } from '../services/syncStateService';
+import { generateConsumptionSuggestions, generateExpirationAlerts, generateRecipeSuggestions, isHouseholdMember } from '../utils/appUtils';
 import { offlineQueue } from '../services/offlineQueueService';
 import { undoService } from '../services/undoService';
+import { createShoppingListListener, createSavedRecipesListener, createMealPlanListener } from '../utils/listenerFactories';
+import { useScopedDataListener } from './useDataListener';
+import { firestoreCache } from '../services/cacheService';
 
 export function useDataManagement(user: User | null, addToast: (message: string, type?: 'error' | 'info', ttl?: number, actionLabel?: string, action?: () => void) => void, addToShoppingList?: (items: string[]) => void, updateSyncStatus?: (updates: any) => void) {
   // Data States
@@ -59,6 +64,9 @@ export function useDataManagement(user: User | null, addToast: (message: string,
       } else if (operation.type === 'delete' && operation.docId) {
         await deleteDoc(doc(db, operation.collection, operation.docId));
       }
+      
+      // Invalidate cache for the affected collection
+      firestoreCache.invalidateCollection(operation.collection);
     }
   };
 
@@ -205,10 +213,9 @@ export function useDataManagement(user: User | null, addToast: (message: string,
       unsubs.push(onSnapshot(collection(db, 'households', household.id, 'inventory'), snap => {
         const serverData = snap.docs.map(d => ({ id: d.id, ...d.data() } as PantryItem));
         // Only update if different to prevent infinite loops
-        if (JSON.stringify(serverData) !== JSON.stringify(inventory)) {
-          (window as any).__remoteInventoryUpdate = true;
+        if (hasPantryItemsChanged(serverData, inventory)) {
+          setRemoteInventoryUpdate(true);
           setInventory(serverData);
-          setTimeout(() => { (window as any).__remoteInventoryUpdate = false; }, 100);
         }
         initialDataLoadedRef.current = true;
       }, err => {
@@ -219,364 +226,21 @@ export function useDataManagement(user: User | null, addToast: (message: string,
       unsubs.push(onSnapshot(collection(db, 'users', user.id, 'inventory'), snap => {
         const serverData = snap.docs.map(d => ({ id: d.id, ...d.data() } as PantryItem));
         // Only update if different to prevent infinite loops
-        if (JSON.stringify(serverData) !== JSON.stringify(inventory)) {
-          (window as any).__remoteInventoryUpdate = true;
+        if (hasPantryItemsChanged(serverData, inventory)) {
+          setRemoteInventoryUpdate(true);
           setInventory(serverData);
-          setTimeout(() => { (window as any).__remoteInventoryUpdate = false; }, 100);
         }
         initialDataLoadedRef.current = true;
       }, err => {
         console.error("User inventory listener failed:", err);
       }));
-
-      // User listeners when not in multi-member household
-      unsubs.push(onSnapshot(collection(db, 'users', user.id, 'shoppingList'), snap => {
-        const data = snap.docs.map(d => {
-          const docData = d.data();
-          return {
-            id: d.id,
-            item: docData.item || '',
-            category: docData.category || 'Manual',
-            checked: docData.checked || false,
-            quantity: docData.quantity
-          } as ShoppingItem;
-        });
-        // Only update if different to prevent infinite loops
-        if (JSON.stringify(data) !== JSON.stringify(shoppingList)) {
-          (window as any).__remoteShoppingListUpdate = true;
-          setShoppingList(data);
-          setTimeout(() => { (window as any).__remoteShoppingListUpdate = false; }, 100);
-        }
-      }, err => {
-        console.error("User shoppingList listener failed:", err);
-      }));
-
-      unsubs.push(onSnapshot(collection(db, 'users', user.id, 'savedRecipes'), snap => {
-        const data = snap.docs.map(d => ({ id: d.id, ...d.data() } as SavedRecipe));
-        // Remove duplicates based on title
-        const uniqueData = data.filter((recipe, index, self) => 
-          index === self.findIndex(r => r.title?.toLowerCase() === recipe.title?.toLowerCase())
-        );
-        // Only update if different to prevent infinite loops
-        if (JSON.stringify(uniqueData) !== JSON.stringify(savedRecipes)) {
-          setSavedRecipes(uniqueData);
-        }
-      }, err => {
-        console.error("User savedRecipes listener failed:", err);
-      }));
-
-      unsubs.push(onSnapshot(collection(db, 'users', user.id, 'mealPlan'), snap => {
-        // Create a 7-day (free) or 14-day (premium) template starting from today
-        const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-        const today = new Date();
-        const isPremium = user && (user.subscription?.tier === 'premium' || user.subscription?.tier === 'family');
-        const daysToShow = isPremium ? 14 : 7;
-        const fullWeekPlan: DayPlan[] = [];
-
-        for (let i = 0; i < daysToShow; i++) {
-          const d = new Date(today);
-          d.setDate(today.getDate() + i);
-          const iso = d.toISOString().slice(0, 10);
-          fullWeekPlan.push({
-            date: iso,
-            dayName: days[d.getDay()],
-            breakfast: [],
-            lunch: [],
-            dinner: []
-          });
-        }
-
-        // Merge Firestore data into the template
-        snap.docs.forEach(doc => {
-          const data = doc.data();
-          const dateStr = data.date.toDate().toISOString().slice(0, 10);
-          const existingDay = fullWeekPlan.find(day => day.date === dateStr);
-          if (existingDay) {
-            // Handle migration from old meals array to new structure
-            if (data.meals && Array.isArray(data.meals)) {
-              // Migrate old meals array to new structure
-              const validMeals = data.meals.filter((meal: any) => meal && meal.id && meal.recipe);
-              validMeals.forEach((meal: any) => {
-                const mealType = meal.type || 'dinner'; // Default to dinner if no type specified
-                switch (mealType) {
-                  case 'breakfast':
-                    existingDay.breakfast.push(meal);
-                    break;
-                  case 'lunch':
-                    existingDay.lunch.push(meal);
-                    break;
-                  case 'dinner':
-                  default:
-                    existingDay.dinner.push(meal);
-                    break;
-                }
-              });
-            } else {
-              // Handle new structure directly
-              existingDay.breakfast = data.breakfast || [];
-              existingDay.lunch = data.lunch || [];
-              existingDay.dinner = data.dinner || [];
-            }
-          }
-        });
-
-        // Only update if different from current
-        if (JSON.stringify(fullWeekPlan) !== JSON.stringify(mealPlan)) {
-          (window as any).__remoteMealPlanUpdateRef = { current: true };
-          setMealPlan(fullWeekPlan);
-          setTimeout(() => { (window as any).__remoteMealPlanUpdateRef = { current: false }; }, 100);
-        }
-      }, err => {
-        console.error("User mealPlan listener failed:", err);
-      }));
     }
 
-    // Household query listener (always set up)
-    if (user?.id) {
-      const householdQuery = query(collection(db, 'households'), where('memberIds', 'array-contains', user.id));
-      unsubs.push(
-        onSnapshot(
-          householdQuery,
-          (snap) => {
-            if (!snap.empty) {
-              const doc = snap.docs[0];
-              setHousehold({ id: doc.id, ...doc.data() } as Household);
-            } else {
-              setHousehold(null);
-            }
-          },
-          (err) => console.error("Household query listener failed:", err)
-        )
-      );
-    }
-
-    if (inHousehold) {
-      // Household listeners
-      unsubs.push(onSnapshot(collection(db, 'households', household.id, 'shoppingList'), snap => {
-        const data = snap.docs.map(d => {
-          const docData = d.data();
-          return {
-            id: d.id,
-            item: docData.item || '',
-            category: docData.category || 'Manual',
-            checked: docData.checked || false,
-            quantity: docData.quantity
-          } as ShoppingItem;
-        });
-        // Only update if different to prevent infinite loops
-        if (JSON.stringify(data) !== JSON.stringify(shoppingList)) {
-          (window as any).__remoteShoppingListUpdate = true;
-          setShoppingList(data);
-          setTimeout(() => { (window as any).__remoteShoppingListUpdate = false; }, 100);
-        }
-      }, err => {
-        console.error("Household shoppingList listener failed:", err);
-
-      }));
-
-      unsubs.push(onSnapshot(collection(db, 'households', household.id, 'savedRecipes'), snap => {
-        const data = snap.docs.map(d => ({ id: d.id, ...d.data() } as SavedRecipe));
-        // Remove duplicates based on title
-        const uniqueData = data.filter((recipe, index, self) => 
-          index === self.findIndex(r => r.title?.toLowerCase() === recipe.title?.toLowerCase())
-        );
-        // Only update if different to prevent infinite loops
-        if (JSON.stringify(uniqueData) !== JSON.stringify(savedRecipes)) {
-          setSavedRecipes(uniqueData);
-        }
-      }, err => {
-        console.error("Household savedRecipes listener failed:", err);
-
-      }));
-
-      unsubs.push(onSnapshot(collection(db, 'households', household.id, 'mealPlan'), snap => {
-        // Create a 7-day (free) or 14-day (premium) template starting from today
-        const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-        const today = new Date();
-        const isPremium = user && (user.subscription?.tier === 'premium' || user.subscription?.tier === 'family');
-        const daysToShow = isPremium ? 14 : 7;
-        const fullWeekPlan: DayPlan[] = [];
-
-        for (let i = 0; i < daysToShow; i++) {
-          const d = new Date(today);
-          d.setDate(today.getDate() + i);
-          const iso = d.toISOString().slice(0, 10);
-          fullWeekPlan.push({
-            date: iso,
-            dayName: days[d.getDay()],
-            breakfast: [],
-            lunch: [],
-            dinner: []
-          });
-        }
-
-        // Merge Firestore data into the template
-        snap.docs.forEach(doc => {
-          const data = doc.data();
-          const dateStr = data.date.toDate().toISOString().slice(0, 10);
-          const existingDay = fullWeekPlan.find(day => day.date === dateStr);
-          if (existingDay) {
-            // Handle migration from old meals array to new structure
-            if (data.meals && Array.isArray(data.meals)) {
-              // Migrate old meals array to new structure
-              const validMeals = data.meals.filter((meal: any) => meal && meal.id && meal.recipe);
-              validMeals.forEach((meal: any) => {
-                const mealType = meal.type || 'dinner'; // Default to dinner if no type specified
-                switch (mealType) {
-                  case 'breakfast':
-                    existingDay.breakfast.push(meal);
-                    break;
-                  case 'lunch':
-                    existingDay.lunch.push(meal);
-                    break;
-                  case 'dinner':
-                  default:
-                    existingDay.dinner.push(meal);
-                    break;
-                }
-              });
-            } else {
-              // Handle new structure directly
-              existingDay.breakfast = data.breakfast || [];
-              existingDay.lunch = data.lunch || [];
-              existingDay.dinner = data.dinner || [];
-            }
-          }
-        });
-
-        // Only update if different from current
-        if (JSON.stringify(fullWeekPlan) !== JSON.stringify(mealPlan)) {
-          (window as any).__remoteMealPlanUpdateRef = { current: true };
-          setMealPlan(fullWeekPlan);
-          setTimeout(() => { (window as any).__remoteMealPlanUpdateRef = { current: false }; }, 100);
-        }
-      }, err => {
-        console.error("Household mealPlan listener failed:", err);
-
-      }));
-    } else {
-      // Individual user listeners
-      unsubs.push(onSnapshot(collection(db, 'users', user.id, 'shoppingList'), snap => {
-        const data = snap.docs.map(d => {
-          const docData = d.data();
-          return {
-            id: d.id,
-            item: docData.item || '',
-            category: docData.category || 'Manual',
-            checked: docData.checked || false,
-            quantity: docData.quantity
-          } as ShoppingItem;
-        });
-        // Only update if different to prevent infinite loops
-        if (JSON.stringify(data) !== JSON.stringify(shoppingList)) {
-          (window as any).__remoteShoppingListUpdate = true;
-          setShoppingList(data);
-          setTimeout(() => { (window as any).__remoteShoppingListUpdate = false; }, 100);
-        }
-      }, err => {
-        console.error("User shoppingList listener failed:", err);
-
-      }));
-
-      unsubs.push(onSnapshot(collection(db, 'users', user.id, 'savedRecipes'), snap => {
-        const data = snap.docs.map(d => ({ id: d.id, ...d.data() } as SavedRecipe));
-        // Remove duplicates based on title
-        const uniqueData = data.filter((recipe, index, self) => 
-          index === self.findIndex(r => r.title?.toLowerCase() === recipe.title?.toLowerCase())
-        );
-        // Only update if different to prevent infinite loops
-        if (JSON.stringify(uniqueData) !== JSON.stringify(savedRecipes)) {
-          setSavedRecipes(uniqueData);
-        }
-      }, err => {
-        console.error("User savedRecipes listener failed:", err);
-
-      }));
-
-      unsubs.push(onSnapshot(collection(db, 'users', user.id, 'mealPlan'), snap => {
-        // Create a 7-day (free) or 14-day (premium) template starting from today
-        const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-        const today = new Date();
-        const isPremium = user && (user.subscription?.tier === 'premium' || user.subscription?.tier === 'family');
-        const daysToShow = isPremium ? 14 : 7;
-        const fullWeekPlan: DayPlan[] = [];
-
-        for (let i = 0; i < daysToShow; i++) {
-          const d = new Date(today);
-          d.setDate(today.getDate() + i);
-          const iso = d.toISOString().slice(0, 10);
-          fullWeekPlan.push({
-            date: iso,
-            dayName: days[d.getDay()],
-            breakfast: [],
-            lunch: [],
-            dinner: []
-          });
-        }
-
-        // Merge Firestore data into the template
-        snap.docs.forEach(doc => {
-          const data = doc.data();
-          const dateStr = data.date.toDate().toISOString().slice(0, 10);
-          const existingDay = fullWeekPlan.find(day => day.date === dateStr);
-          if (existingDay) {
-            // Handle migration from old meals array to new structure
-            if (data.meals && Array.isArray(data.meals)) {
-              // Migrate old meals array to new structure
-              const validMeals = data.meals.filter((meal: any) => meal && meal.id && meal.recipe);
-              validMeals.forEach((meal: any) => {
-                const mealType = meal.type || 'dinner'; // Default to dinner if no type specified
-                switch (mealType) {
-                  case 'breakfast':
-                    existingDay.breakfast.push(meal);
-                    break;
-                  case 'lunch':
-                    existingDay.lunch.push(meal);
-                    break;
-                  case 'dinner':
-                  default:
-                    existingDay.dinner.push(meal);
-                    break;
-                }
-              });
-            } else {
-              // Handle new structure directly
-              existingDay.breakfast = data.breakfast || [];
-              existingDay.lunch = data.lunch || [];
-              existingDay.dinner = data.dinner || [];
-            }
-          }
-        });
-
-        // Only update if different from current
-        if (JSON.stringify(fullWeekPlan) !== JSON.stringify(mealPlan)) {
-          (window as any).__remoteMealPlanUpdateRef = { current: true };
-          setMealPlan(fullWeekPlan);
-          setTimeout(() => { (window as any).__remoteMealPlanUpdateRef = { current: false }; }, 100);
-        }
-      }, err => {
-        console.error("User mealPlan listener failed:", err);
-
-      }));
-
-      // Custom Categories listener
-      unsubs.push(onSnapshot(collection(db, 'users', user.id, 'customCategories'), snap => {
-        const data = snap.docs.map(d => {
-          const docData = d.data();
-          return {
-            id: d.id,
-            name: docData.name,
-            icon: docData.icon,
-            color: docData.color,
-            createdAt: docData.createdAt?.toDate?.()?.toISOString() || docData.createdAt,
-            userId: docData.userId
-          } as CustomCategory;
-        });
-        setCustomCategories(data);
-      }, err => {
-        console.error("User customCategories listener failed:", err);
-      }));
-    }
+    // Scoped listeners for shopping list, saved recipes, and meal plans
+    // These automatically choose between user and household collections
+    unsubs.push(createShoppingListListener(user, household, inHousehold, setShoppingList));
+    unsubs.push(createSavedRecipesListener(user, household, inHousehold, setSavedRecipes));
+    unsubs.push(createMealPlanListener(user, household, inHousehold, setMealPlan));
 
     return () => {
       unsubs.forEach(unsub => unsub());
@@ -626,7 +290,7 @@ export function useDataManagement(user: User | null, addToast: (message: string,
   // Write changes to Firestore
   useEffect(() => {
     if (!user?.id || !listenersReadyRef.current || !initialDataLoadedRef.current) return;
-    if ((window as any).__remoteMealPlanUpdateRef?.current || (window as any).__remoteInventoryUpdate) {
+    if (isRemoteMealPlanUpdate() || isRemoteInventoryUpdate()) {
       return;
     }
 
@@ -655,56 +319,35 @@ export function useDataManagement(user: User | null, addToast: (message: string,
         if (inHousehold) {
           // When in household, sync inventory to household collection
           const householdInventoryPath = `households/${household.id}/inventory`;
-          // Option 1: Use direct Firestore (current)
-          // const existingHouseholdInventoryDocs = await getDocs(collection(db, householdInventoryPath));
 
-          // Option 2: Use DatabaseMonitoringService for tracking (recommended for analytics)
-          const householdInventoryRef = DatabaseMonitoringService.collection(householdInventoryPath);
-          const existingHouseholdInventoryDocs = await DatabaseMonitoringService.getDocs(query(householdInventoryRef));
+          // Use batch operations to minimize round trips
+          // Note: This approach writes all current items but doesn't delete removed items
+          // to avoid reading all documents. Removed items will be cleaned up by the
+          // periodic cleanup mechanism or when the collection is next fully synced.
+          const batch = writeBatch(db);
 
-          const existingHouseholdInventory = existingHouseholdInventoryDocs.docs.map(doc => ({ id: doc.id, ...doc.data() } as PantryItem));
-
-          // Find items to delete (in DB but not in current state)
-          const householdInventoryToDelete = existingHouseholdInventory.filter(existing =>
-            !inventory.some(current => current.id === existing.id)
-          );
-
-          // Find items to add/update (in current state but not in DB, or different)
-          const householdInventoryToSave = inventory.filter(current => {
-            const existing = existingHouseholdInventory.find(item => item.id === current.id);
-            return !existing ||
-                   existing.item !== current.item ||
-                   existing.category !== current.category ||
-                   existing.quantity_estimate !== current.quantity_estimate ||
-                   existing.storageLocation !== current.storageLocation ||
-                   existing.expirationDate !== current.expirationDate ||
-                   existing.expirationType !== current.expirationType ||
-                   existing.dateAdded !== current.dateAdded ||
-                   existing.lastRestocked !== current.lastRestocked ||
-                   JSON.stringify(existing.consumptionHistory || []) !== JSON.stringify(current.consumptionHistory || []);
+          inventory.forEach(item => {
+            batch.set(doc(db, householdInventoryPath, item.id), cleanObject(item));
           });
 
-          // Delete removed items
-          const householdDeletePromises = householdInventoryToDelete.map(item =>
-            deleteDoc(doc(db, householdInventoryPath, item.id)).catch(err => ({ err, path: `${householdInventoryPath}/${item.id}` }))
-          );
+          // Periodic cleanup of orphaned items (run occasionally)
+          if (Math.random() < 0.1) { // 10% chance to run cleanup
+            try {
+              const allDocs = await getDocs(collection(db, householdInventoryPath));
+              const currentIds = new Set(inventory.map(item => item.id));
+              const orphanedDocs = allDocs.docs.filter(doc => !currentIds.has(doc.id));
 
-          // Save new/modified items
-          const householdSavePromises = householdInventoryToSave.map(item => {
-            console.log('Saving household item:', cleanObject(item));
-            return setDoc(doc(db, householdInventoryPath, item.id), cleanObject(item)).catch(err => ({ err, path: `${householdInventoryPath}/${item.id}` }));
-          });
-
-          const householdInventoryPromises = [...householdDeletePromises, ...householdSavePromises];
-          console.log('Household inventory sync - toDelete:', householdInventoryToDelete.length, 'toSave:', householdInventoryToSave.length);
-          if (householdInventoryPromises.length > 0) {
-            const results: any[] = await Promise.allSettled(householdInventoryPromises);
-            results.forEach((res, idx) => {
-              if (res.status === 'rejected' || (res.status === 'fulfilled' && (res.value as any)?.err)) {
-                console.error('Household inventory sync failed:', res);
-                addToast(`Failed to sync inventory item`, 'error');
+              if (orphanedDocs.length > 0) {
+                console.log(`Cleaning up ${orphanedDocs.length} orphaned household inventory items`);
+                const cleanupBatch = writeBatch(db);
+                orphanedDocs.forEach(doc => {
+                  cleanupBatch.delete(doc.ref);
+                });
+                await cleanupBatch.commit();
               }
-            });
+            } catch (err) {
+              console.warn('Failed to cleanup orphaned household inventory items:', err);
+            }
           }
           
           // Sync other household data (saved recipes, meal plan)
@@ -778,56 +421,35 @@ export function useDataManagement(user: User | null, addToast: (message: string,
         } else {
           // When not in household, sync inventory to user's collection
           const userInventoryPath = `users/${user.id}/inventory`;
-          // Option 1: Use direct Firestore (current)
-          // const existingUserInventoryDocs = await getDocs(collection(db, userInventoryPath));
 
-          // Option 2: Use DatabaseMonitoringService for tracking (recommended for analytics)
-          const userInventoryRef = DatabaseMonitoringService.collection(userInventoryPath);
-          const existingUserInventoryDocs = await DatabaseMonitoringService.getDocs(query(userInventoryRef));
+          // Use batch operations to minimize round trips
+          // Note: This approach writes all current items but doesn't delete removed items
+          // to avoid reading all documents. Removed items will be cleaned up by the
+          // periodic cleanup mechanism or when the collection is next fully synced.
+          const batch = writeBatch(db);
 
-          const existingUserInventory = existingUserInventoryDocs.docs.map(doc => ({ id: doc.id, ...doc.data() } as PantryItem));
-
-          // Find items to delete (in DB but not in current state)
-          const userInventoryToDelete = existingUserInventory.filter(existing =>
-            !inventory.some(current => current.id === existing.id)
-          );
-
-          // Find items to add/update (in current state but not in DB, or different)
-          const userInventoryToSave = inventory.filter(current => {
-            const existing = existingUserInventory.find(item => item.id === current.id);
-            return !existing ||
-                   existing.item !== current.item ||
-                   existing.category !== current.category ||
-                   existing.quantity_estimate !== current.quantity_estimate ||
-                   existing.storageLocation !== current.storageLocation ||
-                   existing.expirationDate !== current.expirationDate ||
-                   existing.expirationType !== current.expirationType ||
-                   existing.dateAdded !== current.dateAdded ||
-                   existing.lastRestocked !== current.lastRestocked ||
-                   JSON.stringify(existing.consumptionHistory || []) !== JSON.stringify(current.consumptionHistory || []);
+          inventory.forEach(item => {
+            batch.set(doc(db, userInventoryPath, item.id), cleanObject(item));
           });
 
-          // Delete removed items
-          const userDeletePromises = userInventoryToDelete.map(item =>
-            deleteDoc(doc(db, userInventoryPath, item.id)).catch(err => ({ err, path: `${userInventoryPath}/${item.id}` }))
-          );
+          // Periodic cleanup of orphaned items (run occasionally)
+          if (Math.random() < 0.1) { // 10% chance to run cleanup
+            try {
+              const allDocs = await getDocs(collection(db, userInventoryPath));
+              const currentIds = new Set(inventory.map(item => item.id));
+              const orphanedDocs = allDocs.docs.filter(doc => !currentIds.has(doc.id));
 
-          // Save new/modified items
-          const userSavePromises = userInventoryToSave.map(item => {
-            console.log('Saving user item:', cleanObject(item));
-            return setDoc(doc(db, userInventoryPath, item.id), cleanObject(item)).catch(err => ({ err, path: `${userInventoryPath}/${item.id}` }));
-          });
-
-          const userInventoryPromises = [...userDeletePromises, ...userSavePromises];
-          console.log('User inventory sync - toDelete:', userInventoryToDelete.length, 'toSave:', userInventoryToSave.length);
-          if (userInventoryPromises.length > 0) {
-            const results: any[] = await Promise.allSettled(userInventoryPromises);
-            results.forEach((res, idx) => {
-              if (res.status === 'rejected' || (res.status === 'fulfilled' && (res.value as any)?.err)) {
-                console.error('User inventory sync failed:', res);
-                addToast(`Failed to sync inventory item`, 'error');
+              if (orphanedDocs.length > 0) {
+                console.log(`Cleaning up ${orphanedDocs.length} orphaned user inventory items`);
+                const cleanupBatch = writeBatch(db);
+                orphanedDocs.forEach(doc => {
+                  cleanupBatch.delete(doc.ref);
+                });
+                await cleanupBatch.commit();
               }
-            });
+            } catch (err) {
+              console.warn('Failed to cleanup orphaned user inventory items:', err);
+            }
           }
           
           // Individual user collections (when not in household)
@@ -909,7 +531,7 @@ export function useDataManagement(user: User | null, addToast: (message: string,
 
   // Shopping list sync
   useEffect(() => {
-    if (!user?.id || !listenersReadyRef.current || !shoppingList || (window as any).__remoteShoppingListUpdate) {
+    if (!user?.id || !listenersReadyRef.current || !shoppingList || isRemoteShoppingListUpdate()) {
       return;
     }
 
@@ -921,37 +543,56 @@ export function useDataManagement(user: User | null, addToast: (message: string,
           ? `households/${household.id}/shoppingList`
           : `users/${user.id}/shoppingList`;
 
-        // Get existing documents
-        // Option 1: Use direct Firestore (current)
-        // const existingDocs = await getDocs(collection(db, collectionPath));
+        // Calculate changes using batch operations to minimize Firestore reads/writes
+        const calculateShoppingListChanges = async () => {
+          // Get existing documents to determine what changed
+          const shoppingListRef = DatabaseMonitoringService.collection(collectionPath);
+          const existingDocs = await DatabaseMonitoringService.getDocs(query(shoppingListRef));
+          const existingItems = existingDocs.docs.map(doc => ({ id: doc.id, ...doc.data() } as ShoppingItem));
 
-        // Option 2: Use DatabaseMonitoringService for tracking (recommended for analytics)
-        const shoppingListRef = DatabaseMonitoringService.collection(collectionPath);
-        const existingDocs = await DatabaseMonitoringService.getDocs(query(shoppingListRef));
+          // Create change sets
+          const currentIds = new Set(shoppingList.map(item => item.id));
+          const existingIds = new Set(existingItems.map(item => item.id));
 
-        const existingItems = existingDocs.docs.map(doc => ({ id: doc.id, ...doc.data() } as ShoppingItem));
+          const toDelete = existingItems.filter(item => !currentIds.has(item.id));
+          const toAdd = shoppingList.filter(item => !existingIds.has(item.id));
+          const potentiallyModified = shoppingList.filter(item => existingIds.has(item.id));
 
-        // Find items to delete (in DB but not in current state)
-        const toDelete = existingItems.filter(existing =>
-          !shoppingList.some(current => current.id === existing.id)
-        );
+          // Check which existing items have actually changed
+          const toUpdate: ShoppingItem[] = [];
+          for (const current of potentiallyModified) {
+            const existing = existingItems.find(item => item.id === current.id);
+            if (existing &&
+                (existing.item !== current.item ||
+                 existing.category !== current.category ||
+                 existing.checked !== current.checked ||
+                 existing.quantity !== current.quantity ||
+                 existing.source !== current.source)) {
+              toUpdate.push(current);
+            }
+          }
 
-        // Find items to add/update (in current state but not in DB, or different)
-        const toSave = shoppingList.filter(current => {
-          const existing = existingItems.find(item => item.id === current.id);
-          return !existing || existing.item !== current.item || existing.category !== current.category || existing.checked !== current.checked || existing.quantity !== current.quantity || existing.source !== current.source || JSON.stringify(existing.purchasedQuantity) !== JSON.stringify(current.purchasedQuantity);
-        });
+          return { toDelete, toAdd, toUpdate };
+        };
 
-        console.log('Shopping list sync - collection:', collectionPath, 'toDelete:', toDelete.length, 'toSave:', toSave.length);
+        const changeSet = await calculateShoppingListChanges();
+
+        console.log('Shopping list sync - collection:', collectionPath,
+                   'toDelete:', changeSet.toDelete.length,
+                   'toAdd:', changeSet.toAdd.length,
+                   'toUpdate:', changeSet.toUpdate.length);
+
+        // Use batch operations for all changes
+        const batch = writeBatch(db);
 
         // Delete removed items
-        const deletePromises = toDelete.map(item =>
-          deleteDoc(doc(db, collectionPath, item.id)).catch(err => ({ err, path: `${collectionPath}/${item.id}` }))
-        );
+        changeSet.toDelete.forEach(item => {
+          batch.delete(doc(db, collectionPath, item.id));
+        });
 
-        // Save new/modified items
-        const savePromises = toSave.map(item =>
-          setDoc(doc(db, collectionPath, item.id), {
+        // Add new items
+        changeSet.toAdd.forEach(item => {
+          batch.set(doc(db, collectionPath, item.id), cleanObject({
             item: item.item,
             category: item.category,
             checked: item.checked,
@@ -959,14 +600,25 @@ export function useDataManagement(user: User | null, addToast: (message: string,
             source: item.source,
             purchasedQuantity: item.purchasedQuantity,
             lastModifiedAt: serverTimestamp()
-          }).catch(err => ({ err, path: `${collectionPath}/${item.id}` }))
-        );
+          }));
+        });
 
-        const allPromises = [...deletePromises, ...savePromises];
-        if (allPromises.length > 0) {
-          const results = await Promise.allSettled(allPromises);
-          const failures = results.filter((res, idx) => res.status === 'rejected' || (res.status === 'fulfilled' && (res.value as any)?.err));
-        }
+        // Update modified items
+        changeSet.toUpdate.forEach(item => {
+          batch.set(doc(db, collectionPath, item.id), cleanObject({
+            item: item.item,
+            category: item.category,
+            checked: item.checked,
+            quantity: item.quantity,
+            source: item.source,
+            purchasedQuantity: item.purchasedQuantity,
+            lastModifiedAt: serverTimestamp()
+          }), { merge: true });
+        });
+
+        // Commit all changes in one batch
+        await batch.commit();
+
       } catch (error) {
         console.error('Error syncing shopping list:', error);
       }
@@ -1529,11 +1181,24 @@ export function useDataManagement(user: User | null, addToast: (message: string,
       updates
     });
 
-    // Update the item
+    // Update the item in local state
     setInventory(prev => {
       const updated = [...prev];
       updated[index] = { ...updated[index], ...updates };
       return updated;
+    });
+
+    // Save to database
+    const collectionPath = household?.id && isHouseholdMember(household, user) &&
+                          (Array.isArray(household.memberIds) ? household.memberIds.length > 1 : false)
+      ? `households/${household.id}/inventory`
+      : `users/${user.id}/inventory`;
+
+    await performWrite({
+      type: 'update',
+      collection: collectionPath,
+      docId: currentItem.id,
+      data: cleanObject({ ...currentItem, ...updates })
     });
   };
 
@@ -1545,8 +1210,100 @@ export function useDataManagement(user: User | null, addToast: (message: string,
     // Record the undo action
     await recordUndo('delete_item', itemToDelete);
 
-    // Remove the item
+    // Remove the item from local state
     setInventory(prev => prev.filter((_, i) => i !== index));
+
+    // Delete from database
+    const collectionPath = household?.id && isHouseholdMember(household, user) &&
+                          (Array.isArray(household.memberIds) ? household.memberIds.length > 1 : false)
+      ? `households/${household.id}/inventory`
+      : `users/${user.id}/inventory`;
+
+    await performWrite({
+      type: 'delete',
+      collection: collectionPath,
+      docId: itemToDelete.id
+    });
+  };
+
+  // Add item to inventory
+  const addItem = async (item: PantryItem) => {
+    // Add to local state
+    setInventory(prev => [...prev, item]);
+
+    // Save to database
+    const collectionPath = household?.id && isHouseholdMember(household, user) &&
+                          (Array.isArray(household.memberIds) ? household.memberIds.length > 1 : false)
+      ? `households/${household.id}/inventory`
+      : `users/${user.id}/inventory`;
+
+    await performWrite({
+      type: 'add',
+      collection: collectionPath,
+      data: cleanObject(item)
+    });
+  };
+
+  // Add multiple items to inventory
+  const addItems = async (items: PantryItem[]) => {
+    // Process items: merge with existing items by name
+    const itemsToAdd: PantryItem[] = [];
+    const itemsToUpdate: { index: number, updates: Partial<PantryItem> }[] = [];
+
+    items.forEach(item => {
+      const existingIndex = inventory.findIndex(i => i.item.toLowerCase() === item.item.toLowerCase());
+      if (existingIndex !== -1) {
+        // Update existing item
+        const existing = inventory[existingIndex];
+        const newQty = (parseInt(existing.quantity_estimate) || 1) + (parseInt(item.quantity_estimate) || 1);
+        const newReservations = [...(existing.reservations || []), ...(item.reservations || [])];
+        itemsToUpdate.push({
+          index: existingIndex,
+          updates: {
+            quantity_estimate: newQty.toString(),
+            reservations: newReservations.length > 0 ? newReservations : undefined
+          }
+        });
+      } else {
+        // Add as new item
+        itemsToAdd.push(item);
+      }
+    });
+
+    // Update local state
+    setInventory(prev => {
+      const updated = [...prev];
+      itemsToUpdate.forEach(({ index, updates }) => {
+        updated[index] = { ...updated[index], ...updates };
+      });
+      return [...updated, ...itemsToAdd];
+    });
+
+    // Update database
+    const collectionPath = household?.id && isHouseholdMember(household, user) &&
+                          (Array.isArray(household.memberIds) ? household.memberIds.length > 1 : false)
+      ? `households/${household.id}/inventory`
+      : `users/${user.id}/inventory`;
+
+    // Update existing items
+    const updatePromises = itemsToUpdate.map(async ({ index, updates }) => {
+      const currentItem = inventory[index];
+      await performWrite({
+        type: 'update',
+        collection: collectionPath,
+        docId: currentItem.id,
+        data: cleanObject({ ...currentItem, ...updates })
+      });
+    });
+
+    // Add new items
+    const addPromises = itemsToAdd.map(item => performWrite({
+      type: 'add',
+      collection: collectionPath,
+      data: cleanObject(item)
+    }));
+
+    await Promise.all([...updatePromises, ...addPromises]);
   };
 
   return {
@@ -1576,6 +1333,8 @@ export function useDataManagement(user: User | null, addToast: (message: string,
     // Item management with undo
     updateItem,
     deleteItem,
+    addItem,
+    addItems,
     // Undo
     recentActions,
     recordUndo,

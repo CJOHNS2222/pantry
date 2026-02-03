@@ -1,13 +1,14 @@
 {
   "name": "smartpantry",
   "private": false,
-  "version": "1.1.9",
+  "version": "1.2.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "build:analyze": "vite build --mode analyze",
     "build:release": "npm run sync-release-notes && npm run build",
+    "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest",
     "type-check": "tsc --noEmit",
@@ -39,7 +40,6 @@
     "@stripe/stripe-js": "^8.5.3",
     "@zxing/library": "^0.21.3",
     "adb": "^0.2.0",
-    "capacitor-calendar": "^1.0.6",
     "capacitor-plugin-safe-area": "^4.0.0",
     "firebase": "^12.6.0",
     "firebase-admin": "^13.6.0",
@@ -51,6 +51,7 @@
     "react-window": "^1.8.8"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.2",
     "@playwright/test": "^1.57.0",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.9.1",
@@ -58,9 +59,15 @@
     "@testing-library/user-event": "^14.6.1",
     "@types/node": "^22.14.0",
     "@vitejs/plugin-react": "^5.0.0",
+    "eslint": "^9.39.2",
     "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-react": "^7.37.5",
+    "globals": "^17.2.0",
+    "jiti": "^2.6.1",
     "jsdom": "^27.3.0",
+    "ts-node": "^10.9.2",
     "typescript": "~5.8.2",
+    "typescript-eslint": "^8.54.0",
     "vite": "^6.4.1",
     "vite-plugin-pwa": "^1.2.0",
     "vitest": "^4.0.15"

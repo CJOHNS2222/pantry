@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Search, Loader2, Sparkles, ExternalLink, Globe, Plus, Clock, List, ChefHat, ToggleLeft, ToggleRight, Star, Heart, Bookmark, Zap, Mic } from 'lucide-react';
 import { searchRecipes } from '../services/geminiService';
 import { getSavedRecipes, getCachedPopularRecipes } from '../services/recipeService';
@@ -7,9 +7,13 @@ import { Tab } from '../types/app';
 import { RecipeCardSkeleton } from './SkeletonLoader';
 import { PremiumFeature } from './PremiumFeature';
 import { RecipeRatingUI } from './RecipeRating';
+import { ProgressiveImage } from './ProgressiveImage';
+import { generateBlurDataURL } from '../utils/appUtils';
 import RecipeModal from './RecipeModal';
 import AnalyticsService from '../services/analyticsService';
 import { UsageService } from '../services/usageService';
+import { debounce } from '../utils/debounceUtils';
+import { useKeyboardNavigation } from '../hooks/useKeyboardNavigation';
 
 interface RecipeFinderProps {
     onAddToPlan: (recipe: StructuredRecipe) => void;
@@ -220,6 +224,17 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
     const [modalRecipe, setModalRecipe] = useState<StructuredRecipe | null>(null);
     const [modalIsSavedView, setModalIsSavedView] = useState(false);
 
+    // Keyboard navigation support
+    useKeyboardNavigation({
+      onEscape: () => {
+        if (showRecipeModal) {
+          setShowRecipeModal(false);
+          setModalRecipe(null);
+        }
+      },
+      enabled: showRecipeModal
+    });
+
     // Set initial search query if provided
     useEffect(() => {
         if (initialSearchQuery && !specificQuery) {
@@ -229,7 +244,37 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
 
     // Surprise me feature
     const handleSurpriseMe = async () => {
-        const allRecipes = firebaseRecipes.filter(recipe => selectedCategory === 'All' || recipe.type === selectedCategory);
+        const allRecipes = firebaseRecipes.filter(recipe => {
+            if (selectedCategory === 'All') return true;
+
+            // Case-insensitive matching and handle variations
+            const recipeType = recipe.type?.toLowerCase() || '';
+            const filterCategory = selectedCategory.toLowerCase();
+
+            // Direct match
+            if (recipeType === filterCategory) return true;
+
+            // Check if recipe type contains the filter category (e.g., "italian dinner" contains "dinner")
+            if (recipeType.includes(filterCategory)) return true;
+
+            // Handle common variations and map recipe types to categories
+            const typeMappings: { [key: string]: string[] } = {
+                'dinner': ['dinner', 'main course', 'main dish', 'entree', 'chicken', 'beef', 'pork', 'seafood', 'miscellaneous'],
+                'lunch': ['lunch', 'main course', 'main dish', 'entree', 'chicken', 'beef', 'pork', 'seafood', 'miscellaneous', 'vegetarian'],
+                'breakfast': ['breakfast', 'morning meal', 'brunch'],
+                'dessert': ['dessert', 'sweet', 'cake', 'pie', 'cookie'],
+                'appetizer': ['appetizer', 'starter', 'snack', 'appetiser'],
+                'salad': ['salad', 'green salad', 'side salad', 'vegetarian'],
+                'soup': ['soup', 'stew', 'chowder', 'vegetarian'],
+                'drink': ['drink', 'beverage', 'cocktail', 'smoothie']
+            };
+
+            // Check if the recipe type maps to the selected category
+            const mappedTypes = typeMappings[filterCategory] || [];
+            if (mappedTypes.some(type => recipeType.includes(type))) return true;
+
+            return false;
+        });
         if (allRecipes.length === 0) return;
 
         const randomRecipe = allRecipes[Math.floor(Math.random() * allRecipes.length)];
@@ -816,10 +861,28 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
       alert('Please enter at least 2 characters for your search.');
       return;
     }
-    
+
     const params = { query: specificQuery, ingredients: '' };
     await performSearch(params);
   };
+
+  // Debounced search for specific query input
+  const debouncedSpecificSearch = useMemo(
+    () => debounce(async () => {
+      if (specificQuery.trim() && specificQuery.trim().length >= 2) {
+        const params = { query: specificQuery, ingredients: '' };
+        await performSearch(params);
+      }
+    }, 800), // 800ms delay for recipe search
+    [specificQuery]
+  );
+
+  // Effect to trigger debounced search when query changes
+  useEffect(() => {
+    if (specificQuery.trim() && specificQuery.trim().length >= 2) {
+      debouncedSpecificSearch();
+    }
+  }, [specificQuery, debouncedSpecificSearch]);
 
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -922,8 +985,9 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                 maxCookTime: parseInt(maxCookTime),
                 maxIngredients: parseInt(maxIngredients),
                 measurementSystem: measurement,
-                type: recipeType
-            });
+                type: recipeType,
+                userId: user?.id
+            }, user);
             // Filter results by type (quick meal, dinner, dessert)
             let filteredRecipes = data.recipes;
             if (recipeType) {
@@ -1051,19 +1115,12 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                         {/* Recipe Image */}
                         <div className="aspect-video bg-theme-primary/20 relative overflow-hidden">
                             {recipe.image ? (
-                                <img
+                                <ProgressiveImage
                                     src={recipe.image}
                                     alt={recipe.title}
-                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                                    loading="lazy"
-                                    onError={(e) => {
-                                        const target = e.target as HTMLImageElement;
-                                        target.style.display = 'none';
-                                        const parent = target.parentElement;
-                                        if (parent) {
-                                            parent.innerHTML = '<div class="w-full h-full bg-theme-primary/10 flex items-center justify-center"><div class="text-theme-secondary/50 text-xs">No Image</div></div>';
-                                        }
-                                    }}
+                                    className="w-full h-full group-hover:scale-105 transition-transform duration-300"
+                                    blurDataURL={generateBlurDataURL(300, 200)}
+                                    placeholderSrc="/images/placeholder.svg"
                                 />
                             ) : (
                                 <div className="w-full h-full bg-theme-primary/10 flex items-center justify-center">
@@ -1161,23 +1218,12 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                     {/* Recipe Image */}
                     <div className="aspect-square bg-theme-primary/20 relative overflow-hidden">
                         {recipe.image ? (
-                            <img
+                            <ProgressiveImage
                                 src={recipe.image}
                                 alt={recipe.title}
-                                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500 filter group-hover:brightness-110"
-                                loading="lazy"
-                                onError={(e) => {
-                                    const target = e.target as HTMLImageElement;
-                                    target.style.display = 'none';
-                                    const parent = target.parentElement;
-                                    if (parent) {
-                                        parent.innerHTML = `
-                                            <div class="w-full h-full flex items-center justify-center bg-theme-primary/10">
-                                                <ChefHat class="w-8 h-8 text-theme-secondary opacity-50" />
-                                            </div>
-                                        `;
-                                    }
-                                }}
+                                className="w-full h-full group-hover:scale-110 transition-transform duration-500 filter group-hover:brightness-110"
+                                blurDataURL={generateBlurDataURL(300, 300)}
+                                placeholderSrc="/images/placeholder.svg"
                             />
                         ) : (
                             <div className="w-full h-full flex items-center justify-center bg-theme-primary/10">
@@ -1320,7 +1366,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
             )}
 
             <div className="bg-theme-secondary p-5 rounded-2xl border border-theme shadow-lg">
-                <form onSubmit={handleSpecificSearch} className="flex gap-2">
+                <div className="flex gap-2">
                     <div className="flex-1 relative">
                         <input
                         id="specificQuery"
@@ -1347,14 +1393,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                             </button>
                         )}
                     </div>
-                    <button
-                        type="submit"
-                        disabled={loadingState === LoadingState.LOADING || !specificQuery.trim()}
-                        className="bg-[var(--accent-color)] text-white px-4 rounded-xl font-bold"
-                    >
-                        <Search className="w-5 h-5" />
-                    </button>
-                </form>
+                </div>
             </div>
 
             <div className="flex items-center gap-4">
@@ -1509,6 +1548,16 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                 </div>
             )}
 
+            {loadingState === LoadingState.LOADING && (
+                <div className="animate-fade-in-up mt-8">
+                    <div className="grid grid-cols-4 gap-4">
+                        {Array.from({ length: 8 }).map((_, idx) => (
+                            <RecipeCardSkeleton key={`skeleton-${idx}`} />
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {result && result.recipes && (
                     <div className="animate-fade-in-up mt-8">
                         {/* Cache indicator */}
@@ -1582,19 +1631,26 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                                 // Direct match
                                 if (recipeType === filterCategory) return true;
 
-                                // Handle common variations
+                                // Check if recipe type contains the filter category (e.g., "italian dinner" contains "dinner")
+                                if (recipeType.includes(filterCategory)) return true;
+
+                                // Handle common variations and map recipe types to categories
                                 const typeMappings: { [key: string]: string[] } = {
-                                    'dinner': ['dinner', 'main course', 'main dish', 'entree'],
-                                    'lunch': ['lunch', 'main course', 'main dish', 'entree'],
+                                    'dinner': ['dinner', 'main course', 'main dish', 'entree', 'chicken', 'beef', 'pork', 'seafood', 'miscellaneous'],
+                                    'lunch': ['lunch', 'main course', 'main dish', 'entree', 'chicken', 'beef', 'pork', 'seafood', 'miscellaneous', 'vegetarian'],
                                     'breakfast': ['breakfast', 'morning meal', 'brunch'],
                                     'dessert': ['dessert', 'sweet', 'cake', 'pie', 'cookie'],
                                     'appetizer': ['appetizer', 'starter', 'snack', 'appetiser'],
-                                    'salad': ['salad', 'green salad', 'side salad'],
-                                    'soup': ['soup', 'stew', 'chowder'],
+                                    'salad': ['salad', 'green salad', 'side salad', 'vegetarian'],
+                                    'soup': ['soup', 'stew', 'chowder', 'vegetarian'],
                                     'drink': ['drink', 'beverage', 'cocktail', 'smoothie']
                                 };
 
-                                return typeMappings[filterCategory]?.some(type => recipeType.includes(type)) || false;
+                                // Check if the recipe type maps to the selected category
+                                const mappedTypes = typeMappings[filterCategory] || [];
+                                if (mappedTypes.some(type => recipeType.includes(type))) return true;
+
+                                return false;
                             })
                             .map((recipe, index) => (
                                 <div
@@ -1614,25 +1670,12 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                                     {/* Recipe Image */}
                                     <div className="aspect-square bg-theme-primary/20 relative overflow-hidden">
                                         {recipe.image ? (
-                                            <img
+                                            <ProgressiveImage
                                                 src={recipe.image}
                                                 alt={recipe.title}
-                                                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500 filter group-hover:brightness-110"
-                                                loading="lazy"
-                                                onError={(e) => {
-                                                    const target = e.target as HTMLImageElement;
-                                                    target.style.display = 'none';
-                                                    const parent = target.parentElement;
-                                                    if (parent) {
-                                                        parent.innerHTML = `
-                                                            <div class="w-full h-full flex items-center justify-center bg-theme-primary/10">
-                                                                <svg class="w-6 h-6 text-theme-secondary opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
-                                                                </svg>
-                                                            </div>
-                                                        `;
-                                                    }
-                                                }}
+                                                className="w-full h-full group-hover:scale-110 transition-transform duration-500 filter group-hover:brightness-110"
+                                                blurDataURL={generateBlurDataURL(200, 200)}
+                                                placeholderSrc="/images/placeholder.svg"
                                             />
                                         ) : (
                                             <div className="w-full h-full flex items-center justify-center bg-theme-primary/10">

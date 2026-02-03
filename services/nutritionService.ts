@@ -90,21 +90,53 @@ const searchWithFallbacks = async (itemName: string): Promise<any[] | null> => {
     itemName.replace(/brand names/i, '').trim(), // Remove brand names (Barilla, etc)
   ];
 
+  // USDA FoodData Central API requires an API key
+  // Get your free API key at: https://fdc.nal.usda.gov/api-key-signup.html
+  const USDA_API_KEY = import.meta.env.VITE_USDA_API_KEY || '';
+
+  if (!USDA_API_KEY) {
+    console.warn('USDA API key not found. Please set VITE_USDA_API_KEY environment variable.');
+    return null;
+  }
+
   for (const term of searchTerms) {
     if (!term || term.length < 2) continue;
 
     try {
-      // Use Firebase Function to proxy the USDA API call (solves CORS issues)
-      const { getFunctions, httpsCallable } = await import('firebase/functions');
-      const functions = getFunctions();
-      const getNutritionData = httpsCallable(functions, 'getNutritionData');
+      // Direct call to USDA FoodData Central API with API key
+      const apiUrl = `https://api.nal.usda.gov/fdc/v1/foods/search?query=${encodeURIComponent(term)}&pageSize=5&api_key=${USDA_API_KEY}`;
 
-      const result = await getNutritionData({ query: term, pageSize: 5 });
-      const data = result.data as any;
+      const response = await fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'SmartPantry/1.0'
+        }
+      });
+
+      if (!response.ok) {
+        console.warn('USDA API error:', response.status, response.statusText);
+        continue;
+      }
+
+      const data = await response.json();
 
       if (data.foods && data.foods.length > 0) {
-        // Sort by fuzzy match score
+        // Sort by data type priority (Survey > Foundation > Branded), then by fuzzy match score
+        const getPriority = (dataType: string) => {
+          if (dataType.includes('Survey')) return 3;
+          if (dataType.includes('Foundation')) return 2;
+          if (dataType.includes('Branded')) return 1;
+          return 0;
+        };
+
         data.foods.sort((a: any, b: any) => {
+          const priorityA = getPriority(a.dataType);
+          const priorityB = getPriority(b.dataType);
+          if (priorityA !== priorityB) {
+            return priorityB - priorityA; // Higher priority first
+          }
+          // Same priority, sort by fuzzy match score
           const scoreA = fuzzyMatch(itemName, a.description);
           const scoreB = fuzzyMatch(itemName, b.description);
           return scoreB - scoreA;
@@ -112,7 +144,7 @@ const searchWithFallbacks = async (itemName: string): Promise<any[] | null> => {
         return data.foods;
       }
     } catch (error) {
-      console.warn('Error fetching nutrition data via Firebase Function:', error);
+      console.warn('Error fetching nutrition data from USDA API:', error);
       continue; // Try next term
     }
   }
@@ -155,17 +187,34 @@ export const getNutritionFacts = async (itemName: string): Promise<NutritionFact
     const foodItem = foods[0];
     const foodFdcId = foodItem.fdcId;
 
-    // Get detailed nutrition information via Firebase Function
+    // Get detailed nutrition information directly from USDA API
     let foodDetail;
     try {
-      const { getFunctions, httpsCallable } = await import('firebase/functions');
-      const functions = getFunctions();
-      const getNutritionData = httpsCallable(functions, 'getNutritionData');
+      const USDA_API_KEY = import.meta.env.VITE_USDA_API_KEY || '';
 
-      const result = await getNutritionData({ fdcId: foodFdcId });
-      foodDetail = result.data as any;
+      if (!USDA_API_KEY) {
+        console.warn('USDA API key not found. Please set VITE_USDA_API_KEY environment variable.');
+        return null;
+      }
+
+      const detailUrl = `https://api.nal.usda.gov/fdc/v1/food/${foodFdcId}?api_key=${USDA_API_KEY}`;
+
+      const response = await fetch(detailUrl, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'SmartPantry/1.0'
+        }
+      });
+
+      if (!response.ok) {
+        console.warn('USDA API detail error:', response.status, response.statusText);
+        return null;
+      }
+
+      foodDetail = await response.json();
     } catch (error) {
-      console.warn('Error fetching nutrition details via Firebase Function:', error);
+      console.warn('Error fetching nutrition details from USDA API:', error);
       return null;
     }
     const nutrients = foodDetail.foodNutrients || [];
@@ -175,7 +224,7 @@ export const getNutritionFacts = async (itemName: string): Promise<NutritionFact
       const nutrient = nutrients.find((n: any) =>
         n.nutrient?.name?.toLowerCase().includes(nutrientName.toLowerCase())
       );
-      return nutrient?.value || null;
+      return nutrient?.amount || null;
     };
 
     const nutritionData: NutritionFacts = {

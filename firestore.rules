@@ -28,9 +28,9 @@ service cloud.firestore {
         && request.auth.uid in get(/databases/$(database)/documents/households/$(householdId)).data.memberIds;
     }
 
-    // Public ratings collection (Community)
+    // Public ratings collection (Community) - restrict to authenticated users only
     match /ratings/{docId} {
-      allow read: if true;
+      allow read: if request.auth != null; // Require authentication for reading ratings
       allow create: if request.auth != null;
       allow update, delete: if request.auth != null && request.auth.uid == resource.data.userId;
     }
@@ -50,7 +50,7 @@ service cloud.firestore {
 
     // App versions collection: allow read for all users, write only for authenticated users (for admin updates)
     match /app_versions/{platform} {
-      allow read: if true; // Allow all users to check for updates
+      allow read: if request.auth != null; // Require authentication for version checks
       allow write: if request.auth != null; // Allow authenticated users to update version info
     }
 
@@ -64,15 +64,15 @@ service cloud.firestore {
       allow read, write: if request.auth != null;
     }
 
-    // Global recipes collection: allow public read access, authenticated users can write
+    // Global recipes collection: restrict access to authenticated users only
     match /recipes/{recipeId} {
-      allow read: if true; // Public read access for recipe database
-      allow write: if true; // Allow writes for bulk upload
+      allow read: if request.auth != null; // Require authentication for recipe database
+      allow write: if request.auth != null; // Require authentication for recipe uploads
     }
 
-    // System collection: allow public read access for cached data like popular recipes
+    // System collection: restrict to authenticated users for cached data
     match /system/{docId} {
-      allow read: if true; // Public read access for system data
+      allow read: if request.auth != null; // Require authentication for system data
       allow write: if request.auth != null; // Allow authenticated users to write system data
     }
 

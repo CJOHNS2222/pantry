@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { Camera as CapacitorCamera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { Camera, Upload, Loader2, Plus, Trash2, CheckCircle2, ShoppingBasket, X, Barcode, ChevronDown, ChevronRight, ChevronUp, Image, ChefHat, TrendingUp, Search, Filter, Settings2 } from 'lucide-react';
 import { FixedSizeList as List } from 'react-window';
@@ -10,14 +10,20 @@ import AnalyticsService from '../services/analyticsService';
 import { BrowserMultiFormatReader } from '@zxing/library';
 import PriceTrends from './PriceTrends';
 import ItemDetailModal from './ItemDetailModal';
+import { ProgressiveImage } from './ProgressiveImage';
 import { searchPantryItems, getAutocompleteSuggestions, filterPantryItems, savePantryFilter, loadPantryFilter, defaultPantryFilter } from '../utils/searchUtils';
-import { canUseGemini } from '../services/featureFlags';
+import { PantryService } from '../services/pantryService';
+import { useKeyboardNavigation } from '../hooks/useKeyboardNavigation';
+
+// Constants for virtualization threshold
 
 interface PantryScannerProps {
   inventory: PantryItem[];
   setInventory: React.Dispatch<React.SetStateAction<PantryItem[]>>;
   updateItem: (index: number, updates: Partial<PantryItem>) => Promise<void>;
   deleteItem: (index: number) => Promise<void>;
+  addItem: (item: PantryItem) => Promise<void>;
+  addItems: (items: PantryItem[]) => Promise<void>;
   addToShoppingList: (items: string[]) => void;
   consumptionSuggestions?: ConsumptionSuggestion[];
   expirationAlerts?: ExpirationAlert[];
@@ -38,6 +44,8 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   setInventory, 
   updateItem,
   deleteItem,
+  addItem,
+  addItems,
   addToShoppingList,
   consumptionSuggestions = [],
   expirationAlerts = [],
@@ -47,6 +55,9 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   setInitialSearchQuery,
   user
 }) => {
+  // Constants for virtualization threshold
+  const CATEGORY_VIRTUALIZE_THRESHOLD = 20;
+
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [rawBase64, setRawBase64] = useState<string | null>(null);
   const [mimeType, setMimeType] = useState<string>("");
@@ -84,17 +95,22 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
     if (bulkEditPending === 'true') {
       // Clear the flag
       localStorage.removeItem('bulkQuantityEditPending');
-      const count = parseInt(localStorage.getItem('bulkQuantityEditCount') || '0');
-      localStorage.removeItem('bulkQuantityEditCount');
+      const storedItems = localStorage.getItem('bulkQuantityEditItems');
+      localStorage.removeItem('bulkQuantityEditItems');
       
-      if (count > 1) {
-        // Get the most recently added items (assuming they were just added)
-        const recentlyAdded = inventory.slice(-count);
-        setBulkQuantityEditItems(recentlyAdded);
-        setShowBulkQuantityEdit(true);
+      if (storedItems) {
+        try {
+          const itemsToEdit = JSON.parse(storedItems);
+          if (itemsToEdit.length > 1) {
+            setBulkQuantityEditItems(itemsToEdit);
+            setShowBulkQuantityEdit(true);
+          }
+        } catch (error) {
+          console.error('Failed to parse bulk quantity edit items:', error);
+        }
       }
     }
-  }, [inventory]);
+  }, []);
 
   // Update autocomplete suggestions when search query changes
   React.useEffect(() => {
@@ -106,6 +122,21 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
       setShowAutocomplete(false);
     }
   }, [searchQuery, inventory]);
+
+  // Keyboard navigation support for modals
+  useKeyboardNavigation({
+    onEscape: () => {
+      if (showScanReviewModal) {
+        setShowScanReviewModal(false);
+        setScanResults(null);
+      } else if (isAddModalOpen) {
+        closeModal();
+      } else if (selectedItemIndex !== null) {
+        setSelectedItemIndex(null);
+      }
+    },
+    enabled: showScanReviewModal || isAddModalOpen || selectedItemIndex !== null
+  });
 
   // Process inventory with search and filters
   const processedInventory = React.useMemo(() => {
@@ -124,7 +155,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   }, [inventory, searchQuery, pantryFilter]);
 
   // Use Capacitor Camera for mobile
-  const handleTakePhoto = async () => {
+  const handleTakePhoto = useCallback(async () => {
     try {
       const photo = await CapacitorCamera.getPhoto({
         resultType: CameraResultType.DataUrl,
@@ -140,10 +171,10 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
     } catch (err) {
       // User cancelled or error
     }
-  };
+  }, []);
 
   // Select photo from gallery
-  const handleSelectFromGallery = async () => {
+  const handleSelectFromGallery = useCallback(async () => {
     try {
       const photo = await CapacitorCamera.getPhoto({
         resultType: CameraResultType.DataUrl,
@@ -159,10 +190,10 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
     } catch (err) {
       // User cancelled or error
     }
-  };
+  }, []);
 
   // Barcode scanning with camera
-  const handleScanBarcode = async () => {
+  const handleScanBarcode = useCallback(async () => {
     try {
       const photo = await CapacitorCamera.getPhoto({
         resultType: CameraResultType.DataUrl,
@@ -206,9 +237,9 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
       console.error('Camera error:', err);
       setLoadingState(LoadingState.IDLE);
     }
-  };
+  }, []);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -223,190 +254,53 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
       setRawBase64(base64Data);
     };
     reader.readAsDataURL(file);
-  };
+  }, []);
 
-  const handleAnalyze = async () => {
+  const handleAnalyze = useCallback(async () => {
     if (!rawBase64) return;
-    
-    // Check if user has opted in to AI features
-    if (!canUseGemini(user?.id)) {
-      alert('Please enable AI features in Settings to use image analysis.');
-      return;
-    }
-    
+
     setLoadingState(LoadingState.LOADING);
 
     try {
-      const items = await analyzePantryImage(rawBase64, mimeType);
-      if (items.length > 0) {
-        // Process items and fetch external images for placeholders
-        const processedItems = await Promise.all(items.map(async (item) => {
-          // Parse the item text to extract quantity and clean description
-          const { quantity, description } = parseItemText(item.item);
-          const category = inferCategoryFromItemName(description);
-          const now = new Date().toISOString();
-          let image = getItemImage(description, category);
+      const processedItems = await PantryService.analyzePantryImage(rawBase64, mimeType, user);
 
-          // If it's a placeholder, try to fetch an external image
-          if (image === '/images/placeholder.svg') {
-            try {
-              const externalImage = await fetchExternalItemImage(description);
-              if (externalImage) {
-                image = externalImage;
-              }
-            } catch (error) {
-              console.log('Failed to fetch external image for', description, error);
-            }
-          }
+      // Instead of immediately saving, open a review modal so user can edit/confirm items
+      setScanResults(processedItems);
+      setShowScanReviewModal(true);
+      setLoadingState(LoadingState.SUCCESS);
 
-          return {
-            ...item,
-            item: description, // Use cleaned description
-            quantity_estimate: quantity.toString(), // Use extracted quantity
-            id: crypto.randomUUID(),
-            image,
-            storageLocation: inferStorageLocationFromItemName(description), // Use cleaned description for storage
-            expirationDate: getAutoExpirationDate(description, category), // Use cleaned description for expiration
-            expirationType: 'best-by', // Default to best-by for auto-detected items
-            dateAdded: now,
-            lastRestocked: now,
-            consumptionHistory: [now] // Add current date to consumption history
-          };
-        }));
-
-        // Instead of immediately saving, open a review modal so user can edit/confirm items
-        setScanResults(processedItems as PantryItem[]);
-        setShowScanReviewModal(true);
-        // Track pantry scan results
-        AnalyticsService.trackPantryScan(items.length, items.length);
-        setLoadingState(LoadingState.SUCCESS);
-        // Track pantry scan results
-        AnalyticsService.trackPantryScan(items.length, items.length);
-        setLoadingState(LoadingState.SUCCESS);
-        
-        // Auto-close the modal after showing success message
-        setTimeout(() => {
-          setImagePreview(null);
-          setRawBase64(null);
-          setLoadingState(LoadingState.IDLE);
-        }, 3000);
-      } else {
-          setLoadingState(LoadingState.ERROR);
-      }
+      // Auto-close the modal after showing success message
+      setTimeout(() => {
+        setImagePreview(null);
+        setRawBase64(null);
+        setLoadingState(LoadingState.IDLE);
+      }, 3000);
     } catch (err) {
-      console.error(err);
+      console.error('Image analysis failed:', err);
+      alert(err instanceof Error ? err.message : 'Failed to analyze image. Please try again.');
       setLoadingState(LoadingState.ERROR);
     }
-  };
+  }, [rawBase64, mimeType, user]);
 
-  const removeItem = (index: number) => {
+  const removeItem = useCallback((index: number) => {
     setInventory(prev => prev.filter((_, i) => i !== index));
-  };
+  }, [setInventory]);
 
-  const handleManualAdd = async (e: React.FormEvent) => {
+  const handleManualAdd = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    const itemName = newItemText.trim();
-    if (!itemName) {
-      alert('Please enter an item name.');
-      return;
-    }
-    
-    if (itemName.length < 2) {
-      alert('Item name must be at least 2 characters long.');
-      return;
-    }
-    
-    if (itemName.length > 50) {
-      alert('Item name must be less than 50 characters.');
-      return;
-    }
-    
-    if (newQty < 1) {
-      alert('Quantity must be at least 1.');
-      return;
-    }
-    
-    if (newQty > 999) {
-      alert('Quantity cannot exceed 999.');
-      return;
-    }
-    
-    // Check for duplicate items
-    const existingItem = inventory.find(p => p.item.toLowerCase() === itemName.toLowerCase());
-    if (existingItem && !confirm(`"${itemName}" already exists in your pantry. Add ${newQty} more?`)) {
-      return;
-    }
-    
-    // Prepare the new item data
-    const category = inferCategoryFromItemName(newItemText.trim());
-    const now = new Date().toISOString();
-    
-    // Try to get local image first
-    let image = getItemImage(newItemText.trim(), category);
-    
-    // If it's a placeholder, try to fetch an external image
-    if (image === '/images/placeholder.svg') {
-      try {
-        const externalImage = await fetchExternalItemImage(newItemText.trim());
-        if (externalImage) {
-          image = externalImage;
-        }
-      } catch (error) {
-        console.log('Failed to fetch external image for', newItemText.trim(), error);
-      }
-    }
-    
-    setInventory(prev => {
-      const idx = prev.findIndex(p => p.item.toLowerCase() === itemName.toLowerCase());
-      if (idx !== -1) {
-        // Merge quantity with existing item
-        const updated = [...prev];
-        const existingItem = updated[idx];
-        
-        if (existingItem.quantity) {
-          // Use new quantity system - combine quantities
-          const newQuantity = { amount: newQty, unit: 'count' }; // Default to count for manual additions
-          const combined = combineQuantities(existingItem.quantity, newQuantity);
-          updated[idx] = {
-            ...existingItem,
-            quantity: combined,
-            lastRestocked: now
-          };
-        } else {
-          // Fallback to old system for backward compatibility
-          const prevQty = parseInt(existingItem.quantity_estimate) || 1;
-          updated[idx].quantity_estimate = (prevQty + newQty).toString();
-        }
-        
-        // Track pantry item addition (update existing)
-        AnalyticsService.trackPantryItemAdd(itemName, 'Manual', newQty, 'manual');
-        return updated;
-      } else {
-        // Track pantry item addition (new item)
-        AnalyticsService.trackPantryItemAdd(itemName, 'Manual', newQty, 'manual');
-        return [...prev, {
-          id: crypto.randomUUID(),
-          item: newItemText.trim(),
-          category: category,
-          quantity_estimate: newQty.toString(), // Keep for backward compatibility
-          quantity: { amount: newQty, unit: 'count' }, // New quantity system
-          image,
-          storageLocation: inferStorageLocationFromItemName(newItemText.trim()),
-          expirationDate: getAutoExpirationDate(newItemText.trim(), category),
-          expirationType: 'best-by', // Default to best-by for manual additions
-          dateAdded: now,
-          lastRestocked: now,
-          consumptionHistory: [now] // Add current date to consumption history
-        }];
-      }
-    });
-    setNewItemText('');
-    setNewQty(1);
-    setIsAddModalOpen(false); // Close modal after adding
-  };
 
-  const closeModal = () => {
+    try {
+      const newItem = PantryService.createManualItem(newItemText, newQty, inventory);
+      await addItem(newItem);
+      setNewItemText('');
+      setNewQty(1);
+      setIsAddModalOpen(false); // Close modal after adding
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to add item. Please try again.');
+    }
+  }, [newItemText, newQty, inventory, addItem, setIsAddModalOpen]);
+
+  const closeModal = useCallback(() => {
     setIsAddModalOpen(false);
     setImagePreview(null);
     setRawBase64(null);
@@ -414,23 +308,23 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
     setLoadingState(LoadingState.IDLE);
     setNewItemText('');
     setNewQty(1);
-  };
+  }, []);
 
-  const incrementQty = () => {
+  const incrementQty = useCallback(() => {
     setNewQty(prev => prev + 1);
-  };
+  }, [setNewQty]);
 
-  const decrementQty = () => {
+  const decrementQty = useCallback(() => {
     setNewQty(prev => Math.max(1, prev - 1));
-  };
+  }, [setNewQty]);
 
   // Bulk operations
-  const toggleBulkMode = () => {
+  const toggleBulkMode = useCallback(() => {
     setBulkMode(!bulkMode);
     setSelectedItems(new Set());
-  };
+  }, [bulkMode, setBulkMode, setSelectedItems]);
 
-  const toggleItemSelection = (index: number) => {
+  const toggleItemSelection = useCallback((index: number) => {
     const newSelected = new Set(selectedItems);
     if (newSelected.has(index)) {
       newSelected.delete(index);
@@ -438,38 +332,40 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
       newSelected.add(index);
     }
     setSelectedItems(newSelected);
-  };
+  }, [selectedItems, setSelectedItems]);
 
-  const selectAllItems = () => {
+  const selectAllItems = useCallback(() => {
     if (selectedItems.size === inventory.length) {
       setSelectedItems(new Set());
     } else {
       setSelectedItems(new Set(inventory.map((_, idx) => idx)));
     }
-  };
+  }, [selectedItems.size, inventory.length, setSelectedItems]);
 
-  const bulkDelete = () => {
+  const bulkDelete = useCallback(() => {
     if (selectedItems.size === 0) return;
-    
+
     if (confirm(`Delete ${selectedItems.size} selected item(s)?`)) {
-      setInventory(prev => prev.filter((_, idx) => !selectedItems.has(idx)));
+      const indicesToDelete = Array.from(selectedItems);
+      setInventory(prev => PantryService.bulkDeleteItems(prev, indicesToDelete));
       setSelectedItems(new Set());
       setBulkMode(false);
     }
-  };
+  }, [selectedItems, setInventory, setSelectedItems, setBulkMode]);
 
-  const bulkMoveToShoppingList = () => {
+  const bulkMoveToShoppingList = useCallback(() => {
     if (selectedItems.size === 0) return;
-    
-    const itemsToMove = Array.from(selectedItems).map((idx: number) => inventory[idx].item);
+
+    const indicesToMove = Array.from(selectedItems);
+    const itemsToMove = PantryService.bulkMoveToShoppingList(inventory, indicesToMove);
     addToShoppingList(itemsToMove, 'pantry scanner');
-    setInventory(prev => prev.filter((_, idx) => !selectedItems.has(idx)));
+    setInventory(prev => PantryService.bulkDeleteItems(prev, indicesToMove));
     setSelectedItems(new Set());
     setBulkMode(false);
     alert(`Moved ${selectedItems.size} items to shopping list.`);
-  };
+  }, [selectedItems, inventory, addToShoppingList, setInventory, setSelectedItems, setBulkMode]);
 
-  const toggleCategory = (category: string) => {
+  const toggleCategory = useCallback((category: string) => {
     const newExpanded = new Set(expandedCategories);
     if (newExpanded.has(category)) {
       newExpanded.delete(category);
@@ -477,50 +373,53 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
       newExpanded.add(category);
     }
     setExpandedCategories(newExpanded);
-    
+
     // Bring clicked category to the top
     setCategoryOrder(prev => {
       const filtered = prev.filter(c => c !== category);
       return [category, ...filtered];
     });
-  };
+  }, [expandedCategories, setExpandedCategories, setCategoryOrder]);
 
   // Bulk actions
-  const bulkChangeLocation = (newLocation: 'pantry' | 'fridge' | 'freezer' | 'spices' | 'other') => {
+  const bulkChangeLocation = useCallback((newLocation: 'pantry' | 'fridge' | 'freezer' | 'spices' | 'other') => {
     if (selectedItems.size === 0) return;
-    setInventory(prev => prev.map((item, idx) => selectedItems.has(idx) ? { ...item, storageLocation: newLocation } : item));
+    const indicesToUpdate = Array.from(selectedItems);
+    setInventory(prev => PantryService.bulkChangeLocation(prev, indicesToUpdate, newLocation));
     setSelectedItems(new Set());
     setBulkMode(false);
-  };
+  }, [selectedItems, setInventory, setSelectedItems, setBulkMode]);
 
-  const bulkSetExpiration = (isoDate: string) => {
+  const bulkSetExpiration = useCallback((isoDate: string) => {
     if (selectedItems.size === 0) return;
-    setInventory(prev => prev.map((item, idx) => selectedItems.has(idx) ? { ...item, expirationDate: isoDate } : item));
+    const indicesToUpdate = Array.from(selectedItems);
+    setInventory(prev => PantryService.bulkSetExpiration(prev, indicesToUpdate, isoDate, 'best-by'));
     setSelectedItems(new Set());
     setBulkMode(false);
-  };
+  }, [selectedItems, setInventory, setSelectedItems, setBulkMode]);
 
-  const bulkAddToShoppingListWithRemove = () => {
+  const bulkAddToShoppingListWithRemove = useCallback(() => {
     if (selectedItems.size === 0) return;
-    const itemsToMove = Array.from(selectedItems).map(idx => inventory[idx].item);
+    const indicesToMove = Array.from(selectedItems);
+    const itemsToMove = PantryService.bulkMoveToShoppingList(inventory, indicesToMove);
     addToShoppingList(itemsToMove);
-    setInventory(prev => prev.filter((_, idx) => !selectedItems.has(idx)));
+    setInventory(prev => PantryService.bulkDeleteItems(prev, indicesToMove));
     setSelectedItems(new Set());
     setBulkMode(false);
     alert(`Moved ${itemsToMove.length} items to shopping list.`);
-  };
+  }, [selectedItems, inventory, addToShoppingList, setInventory, setSelectedItems, setBulkMode]);
 
-  const toggleStorageLocation = (location: string) => {
+  const toggleStorageLocation = useCallback((location: string) => {
     // Bring clicked storage location section to the top
     setStorageSectionOrder(prev => {
       const filtered = prev.filter(l => l !== location);
       return [location, ...filtered];
     });
-  };
+  }, [setStorageSectionOrder]);
 
-  const collapseAllCategories = () => {
+  const collapseAllCategories = useCallback(() => {
     setExpandedCategories(new Set());
-  };
+  }, [setExpandedCategories]);
 
   // Sort inventory based on selected criteria
   const sortedInventory = processedInventory.sort((a, b) => {
@@ -634,57 +533,68 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
 
         {expandedCategories.has(category) && (
           <div className="border-t border-theme">
-            {items.map((item) => (
-              <div key={item.originalIndex} className={`flex items-center justify-between px-2 py-1 border-b border-theme last:border-b-0 transition-all cursor-pointer ${
-                bulkMode && selectedItems.has(item.originalIndex)
-                  ? 'bg-[var(--accent-color)]/10 border-[var(--accent-color)]/30'
-                  : 'hover:bg-theme-primary/50'
-              }`}
-              onClick={() => !bulkMode && setSelectedItemIndex(item.originalIndex)}
+            {items.length > CATEGORY_VIRTUALIZE_THRESHOLD ? (
+              <List
+                height={Math.min(400, items.length * 64)}
+                itemCount={items.length}
+                itemSize={64}
+                width={'100%'}
               >
-                {bulkMode && (
-                  <input
-                    type="checkbox"
-                    checked={selectedItems.has(item.originalIndex)}
-                    onChange={() => toggleItemSelection(item.originalIndex)}
-                    className="mr-3 w-4 h-4 text-[var(--accent-color)] bg-theme-primary border-theme rounded focus:ring-[var(--accent-color)]"
-                  />
-                )}
+                {({ index, style }) => renderCategoryItem({ index, style, category })}
+              </List>
+            ) : (
+              items.map((item) => (
+                <div key={item.originalIndex} className={`flex items-center justify-between px-2 py-1 border-b border-theme last:border-b-0 transition-all cursor-pointer ${
+                  bulkMode && selectedItems.has(item.originalIndex)
+                    ? 'bg-[var(--accent-color)]/10 border-[var(--accent-color)]/30'
+                    : 'hover:bg-theme-primary/50'
+                }`}
+                onClick={() => !bulkMode && setSelectedItemIndex(item.originalIndex)}
+                >
+                  {bulkMode && (
+                    <input
+                      type="checkbox"
+                      checked={selectedItems.has(item.originalIndex)}
+                      onChange={() => toggleItemSelection(item.originalIndex)}
+                      className="mr-3 w-4 h-4 text-[var(--accent-color)] bg-theme-primary border-theme rounded focus:ring-[var(--accent-color)]"
+                    />
+                  )}
 
-                <div className="flex items-center gap-1 flex-1">
-                  <img
-                    src={item.image}
-                    alt={item.item}
-                    className="w-10 h-10 rounded-lg object-cover bg-theme-primary border border-theme"
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement;
-                      target.src = '/images/placeholder.svg';
-                    }}
-                  />
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <div className="font-medium text-theme-primary">{item.item}</div>
-                      <div className="text-xs text-theme-secondary opacity-70 bg-theme-secondary px-1 py-0.5 rounded">Qty: {formatItemQuantity(item)}</div>
-                      {item.expirationDate && (
-                        <div className={`text-xs px-1 py-0.5 rounded font-medium ${
-                          getExpirationColor(item.expirationDate, item.expirationType) === 'red' ? 'bg-red-100 text-red-800' :
-                          getExpirationColor(item.expirationDate, item.expirationType) === 'yellow' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-green-100 text-green-800'
-                        }`}>
-                          {Math.ceil((new Date(item.expirationDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))}d
-                        </div>
-                      )}
+                  <div className="flex items-center gap-1 flex-1">
+                    <img
+                      src={item.image}
+                      alt={item.item}
+                      className="w-10 h-10 rounded-lg object-cover bg-theme-primary border border-theme"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.src = '/images/placeholder.svg';
+                      }}
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <div className="font-medium text-theme-primary">{item.item}</div>
+                        <div className="text-xs text-theme-secondary opacity-70 bg-theme-secondary px-1 py-0.5 rounded">Qty: {formatItemQuantity(item)}</div>
+                        {item.expirationDate && (
+                          <div className={`text-xs px-1 py-0.5 rounded font-medium ${
+                            getExpirationColor(item.expirationDate, item.expirationType) === 'red' ? 'bg-red-100 text-red-800' :
+                            getExpirationColor(item.expirationDate, item.expirationType) === 'yellow' ? 'bg-yellow-100 text-yellow-800' :
+                            'bg-green-100 text-green-800'
+                          }`}>
+                            {Math.ceil((new Date(item.expirationDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))}d
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                {!bulkMode && (
-                  <div className="text-theme-secondary opacity-50">
-                    <ChevronRight className="w-5 h-5" />
-                  </div>
-                )}
-              </div>
-            ))}
+                  {!bulkMode && (
+                    <div className="text-theme-secondary opacity-50">
+                      <ChevronRight className="w-5 h-5" />
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
           </div>
         )}
       </div>
@@ -711,6 +621,15 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
             <div className="p-4 text-center text-theme-secondary opacity-50 text-sm">
               No items in {locationLabel.toLowerCase()}
             </div>
+          ) : items.length > CATEGORY_VIRTUALIZE_THRESHOLD ? (
+            <List
+              height={Math.min(400, items.length * 64)}
+              itemCount={items.length}
+              itemSize={64}
+              width={'100%'}
+            >
+              {({ index, style }) => renderStorageItem({ index, style, location })}
+            </List>
           ) : (
             items.map((item) => (
               <div key={item.originalIndex} className={`flex items-center justify-between px-2 py-1 border-b border-theme last:border-b-0 transition-all cursor-pointer ${
@@ -770,7 +689,118 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   });
 
   // Virtualized flat list renderer for large inventories
-  const VIRTUALIZE_THRESHOLD = 80;
+  const VIRTUALIZE_THRESHOLD = 50;
+
+  // Virtualized category item renderer
+  const renderCategoryItem = ({ index, style, category }: { index: number; style: React.CSSProperties; category: string }) => {
+    const items = groupedItems[category];
+    const item = items[index];
+    if (!item) return null;
+    return (
+      <div style={style} key={item.originalIndex} className={`flex items-center justify-between px-2 py-1 border-b border-theme last:border-b-0 transition-all cursor-pointer ${
+        bulkMode && selectedItems.has(item.originalIndex)
+          ? 'bg-[var(--accent-color)]/10 border-[var(--accent-color)]/30'
+          : 'hover:bg-theme-primary/50'
+      }`}
+      onClick={() => !bulkMode && setSelectedItemIndex(item.originalIndex)}
+      >
+        {bulkMode && (
+          <input
+            type="checkbox"
+            checked={selectedItems.has(item.originalIndex)}
+            onChange={() => toggleItemSelection(item.originalIndex)}
+            className="mr-3 w-4 h-4 text-[var(--accent-color)] bg-theme-primary border-theme rounded focus:ring-[var(--accent-color)]"
+          />
+        )}
+
+        <div className="flex items-center gap-1 flex-1">
+          <ProgressiveImage
+            src={item.image}
+            alt={item.item}
+            className="w-10 h-10 rounded-lg object-cover bg-theme-primary border border-theme"
+            fallbackSrc="/images/placeholder.svg"
+          />
+          <div className="flex-1">
+            <div className="flex items-center gap-2">
+              <div className="font-medium text-theme-primary">{item.item}</div>
+              <div className="text-xs text-theme-secondary opacity-70 bg-theme-secondary px-1 py-0.5 rounded">Qty: {formatItemQuantity(item)}</div>
+              {item.expirationDate && (
+                <div className={`text-xs px-1 py-0.5 rounded font-medium ${
+                  getExpirationColor(item.expirationDate, item.expirationType) === 'red' ? 'bg-red-100 text-red-800' :
+                  getExpirationColor(item.expirationDate, item.expirationType) === 'yellow' ? 'bg-yellow-100 text-yellow-800' :
+                  'bg-green-100 text-green-800'
+                }`}>
+                  {Math.ceil((new Date(item.expirationDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))}d
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {!bulkMode && (
+          <div className="text-theme-secondary opacity-50">
+            <ChevronRight className="w-5 h-5" />
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Virtualized storage item renderer
+  const renderStorageItem = ({ index, style, location }: { index: number; style: React.CSSProperties; location: string }) => {
+    const items = groupedByStorage[location] || [];
+    const item = items[index];
+    if (!item) return null;
+    return (
+      <div style={style} key={item.originalIndex} className={`flex items-center justify-between px-2 py-1 border-b border-theme last:border-b-0 transition-all cursor-pointer ${
+        bulkMode && selectedItems.has(item.originalIndex)
+          ? 'bg-[var(--accent-color)]/10 border-[var(--accent-color)]/30'
+          : 'hover:bg-theme-primary/50'
+      }`}
+      onClick={() => !bulkMode && setSelectedItemIndex(item.originalIndex)}
+      >
+        {bulkMode && (
+          <input
+            type="checkbox"
+            checked={selectedItems.has(item.originalIndex)}
+            onChange={() => toggleItemSelection(item.originalIndex)}
+            className="mr-3 w-4 h-4 text-[var(--accent-color)] bg-theme-primary border-theme rounded focus:ring-[var(--accent-color)]"
+          />
+        )}
+
+        <div className="flex items-center gap-1 flex-1">
+          <ProgressiveImage
+            src={item.image}
+            alt={item.item}
+            className="w-10 h-10 rounded-lg object-cover bg-theme-primary border border-theme"
+            fallbackSrc="/images/placeholder.svg"
+          />
+          <div className="flex-1">
+            <div className="flex items-center gap-2">
+              <div className="font-medium text-theme-primary">{item.item}</div>
+              <div className="text-xs text-theme-secondary opacity-70 bg-theme-secondary px-1 py-0.5 rounded">Qty: {formatItemQuantity(item)}</div>
+              {item.expirationDate && (
+                <div className={`text-xs px-1 py-0.5 rounded font-medium ${
+                  getExpirationColor(item.expirationDate, item.expirationType) === 'red' ? 'bg-red-100 text-red-800' :
+                  getExpirationColor(item.expirationDate, item.expirationType) === 'yellow' ? 'bg-yellow-100 text-yellow-800' :
+                  'bg-green-100 text-green-800'
+                }`}>
+                  {Math.ceil((new Date(item.expirationDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))}d
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {!bulkMode && (
+          <div className="text-theme-secondary opacity-50">
+            <ChevronRight className="w-5 h-5" />
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const renderRow = ({ index, style }: { index: number; style: React.CSSProperties }) => {
     const item = sortedInventory[index];
     if (!item) return null;
@@ -1276,10 +1306,10 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
 
             {/* Scan Review Modal (appears after analyze) */}
             {showScanReviewModal && scanResults && (
-              <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-                <div className="bg-theme-primary rounded-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto border border-theme p-4">
+              <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center p-2 pt-24 pb-24">
+                <div className="bg-theme-primary rounded-lg max-w-sm sm:max-w-2xl w-full max-h-[calc(100vh-160px)] overflow-y-auto border border-theme p-3 sm:p-4 pb-24">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-bold text-theme-secondary">Review Scanned Items</h3>
+                    <h3 className="text-sm sm:text-lg font-bold text-theme-secondary">Review Scanned Items ({scanResults.length})</h3>
                     <button onClick={() => { setShowScanReviewModal(false); setScanResults(null); }} className="p-2 rounded hover:bg-theme-secondary">
                       <X className="w-5 h-5 text-theme-secondary" />
                     </button>
@@ -1287,46 +1317,50 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
 
                   <div className="space-y-3">
                     {scanResults.map((sItem, idx) => (
-                      <div key={sItem.id} className="bg-theme-secondary p-3 rounded-lg border border-theme flex items-center gap-3">
-                        <img src={sItem.image} alt={sItem.item} className="w-12 h-12 rounded object-cover" onError={(e) => { (e.target as HTMLImageElement).src = '/images/placeholder.svg'; }} />
-                        <div className="flex-1">
-                          <input value={sItem.item} onChange={(e) => {
-                            const updated = [...scanResults];
-                            updated[idx] = { ...updated[idx], item: e.target.value };
-                            setScanResults(updated);
-                          }} className="w-full px-2 py-1 rounded bg-theme-primary border border-theme text-theme-primary" />
-                          <div className="flex gap-2 mt-2">
-                            <input type="number" value={parseInt(sItem.quantity_estimate || '1')} onChange={(e) => {
+                      <div key={sItem.id} className="bg-theme-secondary p-3 rounded-lg border border-theme">
+                        <div className="flex items-start gap-3">
+                          <img src={sItem.image} alt={sItem.item} className="w-12 h-12 rounded object-cover flex-shrink-0" onError={(e) => { (e.target as HTMLImageElement).src = '/images/placeholder.svg'; }} />
+                          <div className="flex-1 min-w-0">
+                            <input value={sItem.item} onChange={(e) => {
                               const updated = [...scanResults];
-                              updated[idx] = { ...updated[idx], quantity_estimate: e.target.value };
+                              updated[idx] = { ...updated[idx], item: e.target.value };
                               setScanResults(updated);
-                            }} className="w-24 px-2 py-1 rounded bg-theme-primary border border-theme text-theme-primary" />
-                            <select value={sItem.category || 'Uncategorized'} onChange={(e) => {
-                              const updated = [...scanResults];
-                              updated[idx] = { ...updated[idx], category: e.target.value };
-                              setScanResults(updated);
-                            }} className="px-2 py-1 rounded bg-theme-primary border border-theme text-theme-primary">
-                              {getAllCategories(customCategories).map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                            </select>
-                            {('confidence' in sItem) && (
-                              <div className="text-sm text-theme-secondary opacity-80 ml-auto">Conf: {(sItem as any).confidence}</div>
-                            )}
+                            }} className="w-full px-2 py-1 rounded bg-theme-primary border border-theme text-theme-primary text-sm" />
+                            <div className="flex flex-wrap gap-2 mt-2">
+                              <input type="number" value={parseInt(sItem.quantity_estimate || '1')} onChange={(e) => {
+                                const updated = [...scanResults];
+                                updated[idx] = { ...updated[idx], quantity_estimate: e.target.value };
+                                setScanResults(updated);
+                              }} className="w-20 px-2 py-1 text-sm rounded bg-theme-primary border border-theme text-theme-primary" placeholder="Qty" />
+                              <select value={sItem.category || 'Uncategorized'} onChange={(e) => {
+                                const updated = [...scanResults];
+                                updated[idx] = { ...updated[idx], category: e.target.value };
+                                setScanResults(updated);
+                              }} className="px-2 py-1 text-sm rounded bg-theme-primary border border-theme text-theme-primary">
+                                {getAllCategories(customCategories).map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                              </select>
+                              {('confidence' in sItem) && (
+                                <div className="text-sm text-theme-secondary opacity-80">Conf: {(sItem as any).confidence}</div>
+                              )}
+                            </div>
                           </div>
                         </div>
-                        <button onClick={() => {
-                          const updated = scanResults.filter((_, i) => i !== idx);
-                          setScanResults(updated.length ? updated : null);
-                          if (updated.length === 0) setShowScanReviewModal(false);
-                        }} className="p-2 rounded bg-red-600 text-white">Remove</button>
+                        <div className="flex justify-end mt-2">
+                          <button onClick={() => {
+                            const updated = scanResults.filter((_, i) => i !== idx);
+                            setScanResults(updated.length ? updated : null);
+                            if (updated.length === 0) setShowScanReviewModal(false);
+                          }} className="px-3 py-1 text-sm rounded bg-red-600 text-white hover:bg-red-700">Remove</button>
+                        </div>
                       </div>
                     ))}
                   </div>
 
                   <div className="flex gap-2 mt-4">
-                    <button onClick={() => {
+                    <button onClick={async () => {
                       // Confirm: add scanResults to inventory
                       if (scanResults) {
-                        setInventory(prev => [...prev, ...scanResults]);
+                        await addItems(scanResults);
                       }
                       setShowScanReviewModal(false);
                       setScanResults(null);
@@ -1600,7 +1634,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
 
       {/* Bulk Quantity Edit Modal */}
       {showBulkQuantityEdit && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center p-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-60 p-4">
           <div className="bg-theme-primary rounded-t-3xl max-w-md w-full max-h-[80vh] overflow-y-auto shadow-xl animate-slide-up">
             <div className="p-6 pb-2.5">
               <div className="flex items-center justify-between mb-6">
@@ -1669,18 +1703,16 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                   Skip
                 </button>
                 <button
-                  onClick={() => {
+                  onClick={async () => {
                     // Update all items with their new quantities
-                    bulkQuantityEditItems.forEach(item => {
+                    const updatePromises = bulkQuantityEditItems.map(async (item) => {
                       const inventoryIndex = inventory.findIndex(i => i.id === item.id);
                       if (inventoryIndex !== -1) {
-                        setInventory(prev => {
-                          const updated = [...prev];
-                          updated[inventoryIndex] = { ...updated[inventoryIndex], quantity_estimate: item.quantity_estimate };
-                          return updated;
-                        });
+                        await updateItem(inventoryIndex, { quantity_estimate: item.quantity_estimate });
                       }
                     });
+                    
+                    await Promise.all(updatePromises);
                     setShowBulkQuantityEdit(false);
                     setBulkQuantityEditItems([]);
                   }}
