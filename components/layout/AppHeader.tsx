@@ -1,12 +1,13 @@
 import React from 'react';
 import { Sun, Moon, Undo2 } from 'lucide-react';
-import { User } from '../../types';
+import { User, Household } from '../../types';
 import { UsageIndicator } from '../UsageIndicator';
-import { SyncIndicator } from '../SyncIndicator';
+import { HouseholdStatusIndicator } from '../HouseholdStatusIndicator';
 import { SyncStatus } from '../../hooks/useOfflineStatus';
 
 interface AppHeaderProps {
   user: User;
+  household: Household | null;
   settings: any;
   setSettings: (settings: any) => void;
   onShowHousehold: () => void;
@@ -18,6 +19,7 @@ interface AppHeaderProps {
 
 export const AppHeader: React.FC<AppHeaderProps> = ({
   user,
+  household,
   settings,
   setSettings,
   onShowHousehold,
@@ -82,6 +84,14 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
               onSyncClick={onSyncClick}
             />
           </div>
+          {household && household.members.length > 1 && (
+            <div className="mt-1">
+              <HouseholdStatusIndicator
+                household={household}
+                currentUserId={user.id}
+              />
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {recentActions.length > 0 && onUndo && (

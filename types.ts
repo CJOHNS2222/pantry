@@ -217,4 +217,7 @@ export interface Member {
   role: 'admin' | 'member';
   status?: 'Active' | 'Invited' | 'Inactive';
   joinedAt: string;
+  lastSeen?: string; // ISO timestamp of last activity
+  currentActivity?: string; // Current tab/page they're viewing
+  isOnline?: boolean; // Real-time online status
 }

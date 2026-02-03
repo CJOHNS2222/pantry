@@ -14,7 +14,7 @@ import { createShoppingListListener, createSavedRecipesListener, createMealPlanL
 import { useScopedDataListener } from './useDataListener';
 import { firestoreCache } from '../services/cacheService';
 
-export function useDataManagement(user: User | null, addToast: (message: string, type?: 'error' | 'info', ttl?: number, actionLabel?: string, action?: () => void) => void, addToShoppingList?: (items: string[]) => void, updateSyncStatus?: (updates: any) => void) {
+export function useDataManagement(user: User | null, addToast: (message: string, type?: 'error' | 'info', ttl?: number, actionLabel?: string, action?: () => void) => void, addToShoppingList?: (items: string[]) => void, updateSyncStatus?: (updates: any) => void, activityLogger?: { logItemAdded?: (itemName: string, itemId?: string) => void; logItemRemoved?: (itemName: string, itemId?: string) => void; logShoppingAdded?: (itemName: string, itemId?: string) => void; logRecipeSaved?: (recipeName: string, recipeId?: string) => void; logMealCompleted?: (mealName: string) => void }) {
   // Data States
   const [mealPlanState, setMealPlanState] = useState<DayPlan[]>([]);
   const [household, setHousehold] = useState<Household | null>(null);
@@ -212,8 +212,24 @@ export function useDataManagement(user: User | null, addToast: (message: string,
 
     const unsubs: (()=>void)[] = [];
 
+    // Household document listener - always listen if user has a household
+    if (household?.id) {
+      unsubs.push(onSnapshot(doc(db, 'households', household.id), snap => {
+        if (snap.exists()) {
+          const householdData = { id: snap.id, ...snap.data() } as Household;
+          setHousehold(householdData);
+        }
+        setIsLoadingHousehold(false);
+      }, err => {
+        console.error("Household document listener failed:", err);
+        setIsLoadingHousehold(false);
+      }));
+    } else {
+      setIsLoadingHousehold(false);
+    }
+
     // Determine if we are in a valid household (multi-member household)
-    const inHousehold = isHouseholdMember(household, user) && household?.id && 
+    const inHousehold = isHouseholdMember(household, user) && household?.id &&
                        (Array.isArray(household.memberIds) ? household.memberIds.length > 1 : false);
 
     // Inventory listener - conditional based on household status
@@ -1229,6 +1245,12 @@ export function useDataManagement(user: User | null, addToast: (message: string,
     const itemToDelete = inventory[index];
     if (!itemToDelete) return;
 
+    // Log activity if in household
+    if (activityLogger?.logItemRemoved && household?.id && isHouseholdMember(household, user) &&
+        (Array.isArray(household.memberIds) ? household.memberIds.length > 1 : false)) {
+      activityLogger.logItemRemoved(itemToDelete.item, itemToDelete.id);
+    }
+
     // Record the undo action
     await recordUndo('delete_item', itemToDelete);
 
@@ -1252,6 +1274,12 @@ export function useDataManagement(user: User | null, addToast: (message: string,
   const addItem = async (item: PantryItem) => {
     // Add to local state
     setInventory(prev => [...prev, item]);
+
+    // Log activity if in household
+    if (activityLogger?.logItemAdded && household?.id && isHouseholdMember(household, user) &&
+        (Array.isArray(household.memberIds) ? household.memberIds.length > 1 : false)) {
+      activityLogger.logItemAdded(item.item, item.id);
+    }
 
     // Save to database
     const collectionPath = household?.id && isHouseholdMember(household, user) &&

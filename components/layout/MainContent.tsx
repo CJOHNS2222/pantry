@@ -13,7 +13,7 @@ const Settings = React.lazy(() => import('../Settings').then(module => ({ defaul
 // Keep Login and Tutorial as regular imports since they're shown immediately
 import { Login } from '../Login';
 import { Tutorial } from '../Tutorial';
-import { HouseholdManager } from '../Household';
+import { HouseholdActivityFeed } from '../HouseholdActivityFeed';
 import { UsageIndicator } from '../UsageIndicator';
 import ComponentErrorBoundary from '../ComponentErrorBoundary';
 import { useApp } from '../../contexts/AppContext';
@@ -56,7 +56,10 @@ export const MainContent: React.FC = () => {
     isLoadingHousehold,
     consumptionSuggestions,
     expirationAlerts,
-    recipeSuggestions
+    recipeSuggestions,
+    household,
+    recentActivities,
+    isLoadingActivities
   } = appState;
 
   const {
@@ -117,6 +120,17 @@ export const MainContent: React.FC = () => {
         showUpgradeCTA={true}
         onUpgrade={() => setActiveTab(Tab.SETTINGS)}
       />
+
+      {/* Household Activity Feed - Show for households with multiple members */}
+      {household && household.members.length > 1 && (
+        <div className="mb-4">
+          <HouseholdActivityFeed
+            activities={recentActivities}
+            isLoading={isLoadingActivities}
+            maxItems={3}
+          />
+        </div>
+      )}
 
       {activeTab === Tab.PANTRY && (
         <ComponentErrorBoundary componentName="PantryScanner">

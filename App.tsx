@@ -15,7 +15,7 @@ import { useTheme } from './hooks/useTheme';
 import { useSettings } from './hooks/useSettings';
 import { useToasts } from './hooks/useToasts';
 import { useDataManagement } from './hooks/useDataManagement';
-import { useOfflineStatus } from './hooks/useOfflineStatus';
+import { useHouseholdActivity } from './hooks/useHouseholdActivity';
 import AnalyticsService from './services/analyticsService';
 import { isHouseholdMember, inferCategoryFromItemName, inferStorageLocationFromItemName, parseIngredientForShoppingList, getItemImage, fetchExternalItemImage } from './utils/appUtils';
 import { getOrCreateHousehold } from './services/householdService';
@@ -121,7 +121,25 @@ const App: React.FC = () => {
     isLoadingSavedRecipes,
     isLoadingRatings,
     isLoadingHousehold,
-  } = useDataManagement(user, addToast, addToShoppingList, syncStatus.updateSyncStatus);
+  } = useDataManagement(user, addToast, addToShoppingList, syncStatus.updateSyncStatus, {
+    logItemAdded,
+    logItemRemoved,
+    logShoppingAdded,
+    logRecipeSaved,
+    logMealCompleted
+  });
+
+  // Household activity tracking
+  const {
+    recentActivities,
+    isLoadingActivities,
+    logActivity,
+    logItemAdded,
+    logItemRemoved,
+    logShoppingAdded,
+    logRecipeSaved,
+    logMealCompleted
+  } = useHouseholdActivity(user, household, activeTab);
 
   // Initialize safe area handling for mobile devices
   useEffect(() => {
@@ -423,6 +441,7 @@ const App: React.FC = () => {
 
         <AppHeader
           user={user}
+          household={household}
           settings={settings}
           setSettings={setSettings}
           onShowHousehold={() => setShowHousehold(true)}
@@ -437,6 +456,7 @@ const App: React.FC = () => {
             activeTab,
             setActiveTab,
             user,
+            household,
             inventory,
             setInventory,
             shoppingList,
@@ -462,7 +482,9 @@ const App: React.FC = () => {
             isLoadingHousehold,
             consumptionSuggestions,
             expirationAlerts,
-            recipeSuggestions
+            recipeSuggestions,
+            recentActivities,
+            isLoadingActivities
           }}
         >
           <AppActionsProvider

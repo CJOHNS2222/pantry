@@ -1,7 +1,7 @@
 // contexts/AppContext.tsx
 import React, { createContext, useContext, ReactNode } from 'react';
 import { Tab } from '../types/app';
-import { User, PantryItem, DayPlan, ShoppingItem, SavedRecipe, RecipeRating, RecipeSearchResult, CustomCategory, StructuredRecipe } from '../types';
+import { User, PantryItem, DayPlan, ShoppingItem, SavedRecipe, RecipeRating, RecipeSearchResult, CustomCategory, StructuredRecipe, Household } from '../types';
 
 // Core app state that should be available globally
 interface AppContextValue {
@@ -11,6 +11,7 @@ interface AppContextValue {
 
   // User
   user: User | null;
+  household: Household | null;
 
   // Core data
   inventory: PantryItem[];
@@ -49,6 +50,10 @@ interface AppContextValue {
   consumptionSuggestions: any[];
   expirationAlerts: any[];
   recipeSuggestions: any[];
+
+  // Household activity
+  recentActivities: any[];
+  isLoadingActivities: boolean;
 }
 
 const AppContext = createContext<AppContextValue | undefined>(undefined);
