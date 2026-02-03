@@ -6,6 +6,7 @@ import { Browser } from '@capacitor/browser';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, sendEmailVerification, sendPasswordResetEmail } from 'firebase/auth';
 import { logEvent } from 'firebase/analytics';
 import { analytics } from '../firebaseConfig';
+import { validateEmail, validatePassword, validateName } from '../src/utils/validation';
 
 
 
@@ -23,32 +24,33 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  const validateEmail = (email: string) => {
-    return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email);
-  };
-
-  const validatePassword = (password: string) => {
-    // At least 6 chars, one number, one letter
-    return /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{6,}$/.test(password);
-  };
-
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setSuccess(null);
-    if (!validateEmail(email)) {
+    
+    // Validate email
+    const emailValidation = validateEmail(email);
+    if (!emailValidation.isValid) {
       setError('Please enter a valid email address.');
       return;
     }
-    if (!validatePassword(password)) {
+    
+    // Validate password
+    const passwordValidation = validatePassword(password);
+    if (!passwordValidation.isValid) {
       setError('Password must be at least 6 characters and contain a number and a letter.');
       return;
     }
+    
     if (isSignup) {
-      if (!name.trim()) {
-        setError('Please enter your name.');
+      // Validate name
+      const nameValidation = validateName(name);
+      if (!nameValidation.isValid) {
+        setError('Please enter a valid name.');
         return;
       }
+      
       if (password !== confirmPassword) {
         setError('Passwords do not match.');
         return;
@@ -96,7 +98,8 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const handleForgotPassword = async () => {
     setError(null);
     setSuccess(null);
-    if (!validateEmail(email)) {
+    const emailValidation = validateEmail(email);
+    if (!emailValidation.isValid) {
       setError('Please enter your email address above to reset password.');
       return;
     }

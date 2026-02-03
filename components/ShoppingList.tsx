@@ -3,6 +3,7 @@ import { ShoppingBasket, Check, Trash2, Archive, Plus, X, Share2, Copy, Download
 import { ShoppingItem } from '../types';
 import { inferCategoryFromItemName, getItemImage } from '../utils/appUtils';
 import { log } from '../services/logService';
+import { validateItemName, validateQuantity } from '../src/utils/validation';
 
 interface ShoppingListProps {
   items: ShoppingItem[];
@@ -14,6 +15,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ items, setItems, onM
   const [newItem, setNewItem] = React.useState('');
   const [newQty, setNewQty] = React.useState<string>('1');
   const [isAddModalOpen, setIsAddModalOpen] = React.useState(false);
+  const [validationErrors, setValidationErrors] = React.useState<{item?: string, quantity?: string}>({});
 
   // Suggested items for quick adding
   const suggestedItems = [
@@ -104,7 +106,24 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ items, setItems, onM
 
   const addItem = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newItem.trim() || !newQty.trim()) return;
+
+    // Clear previous validation errors
+    setValidationErrors({});
+
+    // Validate item name
+    const itemValidation = validateItemName(newItem);
+    if (!itemValidation.isValid) {
+      setValidationErrors(prev => ({ ...prev, item: itemValidation.errors.join(', ') }));
+      return;
+    }
+
+    // Validate quantity
+    const quantityValidation = validateQuantity(newQty);
+    if (!quantityValidation.isValid) {
+      setValidationErrors(prev => ({ ...prev, quantity: quantityValidation.errors.join(', ') }));
+      return;
+    }
+
     setItems(prev => [...prev, {
         id: Math.random().toString(36).substr(2, 9),
         item: newItem,
@@ -122,6 +141,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ items, setItems, onM
     setIsAddModalOpen(false);
     setNewItem('');
     setNewQty('1');
+    setValidationErrors({});
   };
 
   const handleCheckout = () => {
@@ -300,16 +320,21 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ items, setItems, onM
 
               <form onSubmit={addItem} className="space-y-4">
                 <div className="space-y-4">
-                  <input 
-                    id="newItem"
-                    name="newItem"
-                    type="text"
-                    value={newItem}
-                    onChange={(e) => setNewItem(e.target.value)}
-                    placeholder="Enter item name..."
-                    className="w-full bg-theme-secondary border border-theme rounded-lg px-4 py-3 text-theme-primary shadow-sm outline-none focus:border-[var(--accent-color)]"
-                    autoFocus
-                  />
+                  <div>
+                    <input 
+                      id="newItem"
+                      name="newItem"
+                      type="text"
+                      value={newItem}
+                      onChange={(e) => setNewItem(e.target.value)}
+                      placeholder="Enter item name..."
+                      className={`w-full bg-theme-secondary border rounded-lg px-4 py-3 text-theme-primary shadow-sm outline-none focus:border-[var(--accent-color)] ${validationErrors.item ? 'border-red-500' : 'border-theme'}`}
+                      autoFocus
+                    />
+                    {validationErrors.item && (
+                      <p className="text-red-500 text-xs mt-1">{validationErrors.item}</p>
+                    )}
+                  </div>
                   <div className="flex gap-3">
                     <input
                       id="newQty"
@@ -317,9 +342,12 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ items, setItems, onM
                       type="text"
                       value={newQty}
                       onChange={e => setNewQty(e.target.value)}
-                      className="flex-1 bg-theme-secondary border border-theme rounded-lg px-3 py-3 text-theme-primary shadow-sm focus:border-[var(--accent-color)] outline-none"
+                      className={`flex-1 bg-theme-secondary border rounded-lg px-3 py-3 text-theme-primary shadow-sm focus:border-[var(--accent-color)] outline-none ${validationErrors.quantity ? 'border-red-500' : 'border-theme'}`}
                       placeholder="Quantity (e.g. 2, 1 cup, 2 tbsp)"
                     />
+                    {validationErrors.quantity && (
+                      <p className="text-red-500 text-xs mt-1">{validationErrors.quantity}</p>
+                    )}
                   </div>
                 </div>
                 <button 
