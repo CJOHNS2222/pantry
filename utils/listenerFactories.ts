@@ -17,7 +17,8 @@ export function createShoppingListListener(
   user: User,
   household: Household | null,
   inHousehold: boolean,
-  setShoppingList: (items: ShoppingItem[]) => void
+  setShoppingList: (items: ShoppingItem[]) => void,
+  setIsLoading?: (loading: boolean) => void
 ) {
   const collectionPath = inHousehold
     ? `households/${household!.id}/shoppingList`
@@ -40,8 +41,10 @@ export function createShoppingListListener(
       setRemoteShoppingListUpdate(true);
       setShoppingList(data);
     }
+    setIsLoading?.(false);
   }, err => {
     console.error(`${inHousehold ? 'Household' : 'User'} shoppingList listener failed:`, err);
+    setIsLoading?.(false);
   });
 }
 
@@ -52,7 +55,8 @@ export function createSavedRecipesListener(
   user: User,
   household: Household | null,
   inHousehold: boolean,
-  setSavedRecipes: (recipes: SavedRecipe[]) => void
+  setSavedRecipes: (recipes: SavedRecipe[]) => void,
+  setIsLoading?: (loading: boolean) => void
 ) {
   const collectionPath = inHousehold
     ? `households/${household!.id}/savedRecipes`
@@ -70,8 +74,10 @@ export function createSavedRecipesListener(
     if (hasSavedRecipesChanged(uniqueData, [])) { // We'll pass current state when calling
       setSavedRecipes(uniqueData);
     }
+    setIsLoading?.(false);
   }, err => {
     console.error(`${inHousehold ? 'Household' : 'User'} savedRecipes listener failed:`, err);
+    setIsLoading?.(false);
   });
 }
 
@@ -82,7 +88,8 @@ export function createMealPlanListener(
   user: User,
   household: Household | null,
   inHousehold: boolean,
-  setMealPlan: (plan: DayPlan[]) => void
+  setMealPlan: (plan: DayPlan[]) => void,
+  setIsLoading?: (loading: boolean) => void
 ) {
   const collectionPath = inHousehold
     ? `households/${household!.id}/mealPlan`
@@ -157,7 +164,9 @@ export function createMealPlanListener(
       setRemoteMealPlanUpdate(true);
       setMealPlan(fullWeekPlan);
     }
+    setIsLoading?.(false);
   }, err => {
     console.error(`${inHousehold ? 'Household' : 'User'} mealPlan listener failed:`, err);
+    setIsLoading?.(false);
   });
 }

@@ -28,8 +28,13 @@ export function useDataManagement(user: User | null, addToast: (message: string,
   const [recipeSaveLimitExceeded, setRecipeSaveLimitExceeded] = useState(false);
   const [mealPlanLimitExceeded, setMealPlanLimitExceeded] = useState(false);
 
-  // Online status
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  // Loading states
+  const [isLoadingInventory, setIsLoadingInventory] = useState(true);
+  const [isLoadingShoppingList, setIsLoadingShoppingList] = useState(true);
+  const [isLoadingMealPlan, setIsLoadingMealPlan] = useState(true);
+  const [isLoadingSavedRecipes, setIsLoadingSavedRecipes] = useState(true);
+  const [isLoadingRatings, setIsLoadingRatings] = useState(true);
+  const [isLoadingHousehold, setIsLoadingHousehold] = useState(true);
 
   // Undo actions
   const [recentActions, setRecentActions] = useState<any[]>([]);
@@ -221,9 +226,11 @@ export function useDataManagement(user: User | null, addToast: (message: string,
           setRemoteInventoryUpdate(true);
           setInventory(serverData);
         }
+        setIsLoadingInventory(false);
         initialDataLoadedRef.current = true;
       }, err => {
         console.error("Household inventory listener failed:", err);
+        setIsLoadingInventory(false);
       }));
     } else {
       // Listen to user inventory when not in household
@@ -234,17 +241,19 @@ export function useDataManagement(user: User | null, addToast: (message: string,
           setRemoteInventoryUpdate(true);
           setInventory(serverData);
         }
+        setIsLoadingInventory(false);
         initialDataLoadedRef.current = true;
       }, err => {
         console.error("User inventory listener failed:", err);
+        setIsLoadingInventory(false);
       }));
     }
 
     // Scoped listeners for shopping list, saved recipes, and meal plans
     // These automatically choose between user and household collections
-    unsubs.push(createShoppingListListener(user, household, inHousehold, setShoppingList));
-    unsubs.push(createSavedRecipesListener(user, household, inHousehold, setSavedRecipes));
-    unsubs.push(createMealPlanListener(user, household, inHousehold, setMealPlan));
+    unsubs.push(createShoppingListListener(user, household, inHousehold, setShoppingList, setIsLoadingShoppingList));
+    unsubs.push(createSavedRecipesListener(user, household, inHousehold, setSavedRecipes, setIsLoadingSavedRecipes));
+    unsubs.push(createMealPlanListener(user, household, inHousehold, setMealPlan, setIsLoadingMealPlan));
 
     return () => {
       unsubs.forEach(unsub => unsub());
@@ -693,6 +702,7 @@ export function useDataManagement(user: User | null, addToast: (message: string,
         } as RecipeRating);
       });
       setRatings(allRatings);
+      setIsLoadingRatings(false);
     }, (error) => {
       console.error('Error loading ratings from Firestore:', error);
       if ((error as any)?.code === 'permission-denied') {
@@ -700,6 +710,7 @@ export function useDataManagement(user: User | null, addToast: (message: string,
       }
       const saved = localStorage.getItem('ratings');
       if (saved) setRatings(JSON.parse(saved));
+      setIsLoadingRatings(false);
     });
     return () => unsubscribe();
   }, [user?.id]);
@@ -707,6 +718,13 @@ export function useDataManagement(user: User | null, addToast: (message: string,
   // Persistence
   useEffect(() => { localStorage.setItem('mealPlan', JSON.stringify(mealPlan)); }, [mealPlan]);
   useEffect(() => { localStorage.setItem('household', JSON.stringify(household)); }, [household]);
+
+  // Set household loading to false when household data is available
+  useEffect(() => {
+    if (household !== null) {
+      setIsLoadingHousehold(false);
+    }
+  }, [household]);
 
   // Online/offline handling
   useEffect(() => {
@@ -1349,5 +1367,12 @@ export function useDataManagement(user: User | null, addToast: (message: string,
     // Usage limit checking functions
     checkRecipeSaveLimit,
     checkMealPlanLimit,
+    // Loading states
+    isLoadingInventory,
+    isLoadingShoppingList,
+    isLoadingMealPlan,
+    isLoadingSavedRecipes,
+    isLoadingRatings,
+    isLoadingHousehold,
   };
 }

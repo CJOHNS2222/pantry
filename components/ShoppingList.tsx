@@ -4,14 +4,16 @@ import { ShoppingItem } from '../types';
 import { inferCategoryFromItemName, getItemImage } from '../utils/appUtils';
 import { log } from '../services/logService';
 import { validateItemName, validateQuantity } from '../src/utils/validation';
+import { ShoppingListItemSkeleton } from './SkeletonLoader';
 
 interface ShoppingListProps {
   items: ShoppingItem[];
   setItems: React.Dispatch<React.SetStateAction<ShoppingItem[]>>;
   onMoveToPantry: (items: ShoppingItem[]) => void;
+  isLoadingShoppingList?: boolean;
 }
 
-export const ShoppingList: React.FC<ShoppingListProps> = ({ items, setItems, onMoveToPantry }) => {
+export const ShoppingList: React.FC<ShoppingListProps> = ({ items, setItems, onMoveToPantry, isLoadingShoppingList = false }) => {
   const [newItem, setNewItem] = React.useState('');
   const [newQty, setNewQty] = React.useState<string>('1');
   const [isAddModalOpen, setIsAddModalOpen] = React.useState(false);
@@ -387,7 +389,14 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ items, setItems, onM
       )}
 
       <div className="space-y-2">
-        {items.map((item) => (
+        {isLoadingShoppingList ? (
+          // Show skeleton loading items
+          Array.from({ length: 5 }).map((_, index) => (
+            <ShoppingListItemSkeleton key={`loading-${index}`} />
+          ))
+        ) : (
+          // Show actual items
+          items.map((item) => (
           <div 
             key={item.id} 
             onClick={() => toggleCheck(item.id)}
@@ -492,8 +501,9 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ items, setItems, onM
               </button>
             </div>
           </div>
-        ))}
-        {items.length === 0 && (
+        ))
+        )}
+        {items.length === 0 && !isLoadingShoppingList && (
              <div className="text-center py-12 opacity-30 flex flex-col items-center">
                 <ShoppingBasket className="w-12 h-12 mb-2" />
                 <p>List is empty</p>

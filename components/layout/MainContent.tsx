@@ -48,6 +48,12 @@ export const MainContent: React.FC = () => {
     customCategories,
     recipeSaveLimitExceeded,
     mealPlanLimitExceeded,
+    isLoadingInventory,
+    isLoadingShoppingList,
+    isLoadingMealPlan,
+    isLoadingSavedRecipes,
+    isLoadingRatings,
+    isLoadingHousehold,
     consumptionSuggestions,
     expirationAlerts,
     recipeSuggestions
@@ -150,6 +156,8 @@ export const MainContent: React.FC = () => {
               setActiveTab={setActiveTab}
               recipeSaveLimitExceeded={recipeSaveLimitExceeded}
               mealPlanLimitExceeded={mealPlanLimitExceeded}
+              isLoadingMealPlan={isLoadingMealPlan}
+              isLoadingSavedRecipes={isLoadingSavedRecipes}
               settings={settings}
               onOpenRecipeSearch={() => {
                 // This will be called by the tutorial to open recipe search modal
@@ -166,6 +174,7 @@ export const MainContent: React.FC = () => {
               items={shoppingList}
               setItems={appState.setShoppingList}
               onMoveToPantry={onMoveToPantry}
+              isLoadingShoppingList={isLoadingShoppingList}
             />
           </Suspense>
         </ComponentErrorBoundary>

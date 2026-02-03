@@ -37,6 +37,14 @@ interface AppContextValue {
   recipeSaveLimitExceeded: boolean;
   mealPlanLimitExceeded: boolean;
 
+  // Loading states
+  isLoadingInventory: boolean;
+  isLoadingShoppingList: boolean;
+  isLoadingMealPlan: boolean;
+  isLoadingSavedRecipes: boolean;
+  isLoadingRatings: boolean;
+  isLoadingHousehold: boolean;
+
   // UI state
   consumptionSuggestions: any[];
   expirationAlerts: any[];

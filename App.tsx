@@ -114,6 +114,13 @@ const App: React.FC = () => {
     // Usage limit checking functions
     checkRecipeSaveLimit,
     checkMealPlanLimit,
+    // Loading states
+    isLoadingInventory,
+    isLoadingShoppingList,
+    isLoadingMealPlan,
+    isLoadingSavedRecipes,
+    isLoadingRatings,
+    isLoadingHousehold,
   } = useDataManagement(user, addToast, addToShoppingList, syncStatus.updateSyncStatus);
 
   // Initialize safe area handling for mobile devices
@@ -447,6 +454,12 @@ const App: React.FC = () => {
             customCategories,
             recipeSaveLimitExceeded,
             mealPlanLimitExceeded,
+            isLoadingInventory,
+            isLoadingShoppingList,
+            isLoadingMealPlan,
+            isLoadingSavedRecipes,
+            isLoadingRatings,
+            isLoadingHousehold,
             consumptionSuggestions,
             expirationAlerts,
             recipeSuggestions

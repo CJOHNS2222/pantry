@@ -14,7 +14,7 @@ import { parseIngredientForShoppingList } from '../utils/appUtils';
 import AnalyticsService from '../services/analyticsService';
 import { searchRecipes } from '../utils/searchUtils';
 import { debounce } from '../utils/debounceUtils';
-import { CompactRecipeCardSkeleton } from './SkeletonLoader';
+import { CompactRecipeCardSkeleton, MealPlanSkeleton } from './SkeletonLoader';
 // import CalendarService from '../services/calendarService'; // Temporarily disabled
 
 interface MealPlannerProps {
@@ -30,6 +30,8 @@ interface MealPlannerProps {
   setActiveTab: (tab: Tab) => void;
   recipeSaveLimitExceeded?: boolean;
   mealPlanLimitExceeded?: boolean;
+  isLoadingMealPlan?: boolean;
+  isLoadingSavedRecipes?: boolean;
   settings?: {
     notifications: {
       enabled: boolean;
@@ -355,7 +357,7 @@ const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
   );
 };
 
-export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan, inventory, addToShoppingList, onAddToPlan, onSaveRecipe, onMarkAsMade, onRate, user, setActiveTab, recipeSaveLimitExceeded = false, mealPlanLimitExceeded = false, settings, onOpenRecipeSearch }) => {
+export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan, inventory, addToShoppingList, onAddToPlan, onSaveRecipe, onMarkAsMade, onRate, user, setActiveTab, recipeSaveLimitExceeded = false, mealPlanLimitExceeded = false, isLoadingMealPlan = false, isLoadingSavedRecipes = false, settings, onOpenRecipeSearch }) => {
     // List of staple items to ignore (unless user wants them included)
     const STAPLES = ['salt', 'pepper', 'oil', 'water', 'flour', 'sugar', 'butter', 'vinegar', 'baking powder', 'baking soda', 'spices', 'seasoning', 'soy sauce', 'cornstarch', 'yeast'];
     const includeStaples = settings?.shopping?.includeStaples || false;
@@ -791,10 +793,20 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
 
         <GroceryCostEstimator mealPlan={mealPlan} inventory={inventory} />
 
-        {/* Calendar Grid */}
-        <div className="space-y-4">
-          <div className="grid grid-cols-3 gap-2">
-            {mealPlan.map((day, dayIndex) => (
+        {/* Loading state */}
+        {isLoadingMealPlan ? (
+          <div className="space-y-4">
+            <div className="grid grid-cols-3 gap-2">
+              {Array.from({ length: 7 }).map((_, index) => (
+                <MealPlanSkeleton key={`loading-${index}`} />
+              ))}
+            </div>
+          </div>
+        ) : (
+          /* Calendar Grid */
+          <div className="space-y-4">
+            <div className="grid grid-cols-3 gap-2">
+              {mealPlan.map((day, dayIndex) => (
               <div
                 key={dayIndex}
                 onClick={() => setSelectedDayIndex(dayIndex)}
@@ -867,6 +879,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
             ))}
           </div>
         </div>
+        )}
 
         {/* Trash can for removing meals */}
         {isDragging && (
