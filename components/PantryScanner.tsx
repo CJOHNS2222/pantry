@@ -16,7 +16,7 @@ import { PantryItemSkeleton } from './SkeletonLoader';
 import { searchPantryItems, getEnhancedAutocompleteSuggestions, filterPantryItems, savePantryFilter, loadPantryFilter, defaultPantryFilter, saveSearchToHistory, getRecentSearchSuggestions, AutocompleteSuggestion } from '../utils/searchUtils';
 import { getMealPrepSuggestions, RecipeIngredientMatch } from '../utils/searchUtils';
 import { debounce } from '../utils/debounceUtils';
-import { formatItemQuantity } from '../utils/appUtils';
+import { formatItemQuantity, getExpirationColor } from '../utils/appUtils';
 import { PantryService } from '../services/pantryService';
 import { useApp } from '../contexts/AppContext';
 import { useAppActions } from '../contexts/AppActionsContext';
