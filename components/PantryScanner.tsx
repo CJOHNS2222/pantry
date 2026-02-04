@@ -3,19 +3,25 @@ import { Camera as CapacitorCamera, CameraResultType, CameraSource } from '@capa
 import { Camera, Upload, Loader2, Plus, Trash2, CheckCircle2, ShoppingBasket, X, Barcode, ChevronDown, ChevronRight, ChevronUp, Image, ChefHat, TrendingUp, Search, Filter, Settings2, Clock, Tag } from 'lucide-react';
 import { FixedSizeList as List } from 'react-window';
 import { analyzePantryImage } from '../services/geminiService';
-import { getItemImage, inferCategoryFromItemName, inferStorageLocationFromItemName, getStorageLocationImage, getAutoExpirationDate, getExpirationColor, getAllCategories, getCategoryIcon, parseItemText, fetchExternalItemImage, combineQuantities, formatItemQuantity } from '../utils/appUtils';
+import StorageLocationIndicator from './StorageLocationIndicator';
 import { PantryItem, LoadingState, ConsumptionSuggestion, ExpirationAlert, CustomCategory, RecipeSuggestion, PantryFilter } from '../types';
 import { Tab } from '../types/app';
 import AnalyticsService from '../services/analyticsService';
 import { BrowserMultiFormatReader } from '@zxing/library';
+import VisualQuantitySelector from './VisualQuantitySelector';
 import PriceTrends from './PriceTrends';
 import ItemDetailModal from './ItemDetailModal';
 import { ProgressiveImage } from './ProgressiveImage';
-import { searchPantryItems, getEnhancedAutocompleteSuggestions, filterPantryItems, savePantryFilter, loadPantryFilter, defaultPantryFilter, saveSearchToHistory, getRecentSearchSuggestions, AutocompleteSuggestion } from '../utils/searchUtils';
-import { PantryService } from '../services/pantryService';
-import { useKeyboardNavigation } from '../hooks/useKeyboardNavigation';
 import { PantryItemSkeleton } from './SkeletonLoader';
+import { searchPantryItems, getEnhancedAutocompleteSuggestions, filterPantryItems, savePantryFilter, loadPantryFilter, defaultPantryFilter, saveSearchToHistory, getRecentSearchSuggestions, AutocompleteSuggestion } from '../utils/searchUtils';
+import { getMealPrepSuggestions, RecipeIngredientMatch } from '../utils/searchUtils';
 import { debounce } from '../utils/debounceUtils';
+import { formatItemQuantity } from '../utils/appUtils';
+import { PantryService } from '../services/pantryService';
+import { useApp } from '../contexts/AppContext';
+import { useAppActions } from '../contexts/AppActionsContext';
+import { useKeyboardNavigation } from '../hooks/useKeyboardNavigation';
+import RecipeModal from './RecipeModal';
 
 // Constants for virtualization threshold
 
@@ -59,6 +65,14 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   isLoadingInventory = false,
   user
 }) => {
+  // Use context hooks
+  const appState = useApp();
+  const appActions = useAppActions();
+
+  // Destructure needed values
+  const { household, savedRecipes } = appState;
+  const { onSaveRecipe, onRateRecipe, checkRecipeSaveLimit, checkMealPlanLimit } = appActions;
+
   // Constants for virtualization threshold
   const CATEGORY_VIRTUALIZE_THRESHOLD = 20;
 
@@ -93,7 +107,25 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   const [showAutocomplete, setShowAutocomplete] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
 
+  // Meal prep suggestions state
+  const [mealPrepSuggestions, setMealPrepSuggestions] = useState<RecipeIngredientMatch[]>([]);
+
+  // Recipe modal state
+  const [showRecipeModal, setShowRecipeModal] = useState(false);
+  const [modalRecipe, setModalRecipe] = useState<any>(null);
+  const [modalContext, setModalContext] = useState<'search' | 'scheduled'>('search');
+
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Calculate meal prep suggestions when recipes or inventory change
+  React.useEffect(() => {
+    if (savedRecipes.length > 0 && inventory.length > 0) {
+      const suggestions = getMealPrepSuggestions(savedRecipes, inventory, 60); // 60% match minimum
+      setMealPrepSuggestions(suggestions);
+    } else {
+      setMealPrepSuggestions([]);
+    }
+  }, [savedRecipes, inventory]); // Re-calculate when recipes or inventory change
 
   // Check for bulk quantity editing trigger
   React.useEffect(() => {
@@ -156,6 +188,22 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
       setDebouncedSearchQuery('');
     }
   }, [searchQuery, debouncedPantrySearch]);
+
+  // Handle recipe modal opening from meal prep suggestions
+  React.useEffect(() => {
+    const handleOpenRecipeModal = (event: CustomEvent) => {
+      const { recipe, isSavedView } = event.detail;
+      setModalRecipe(recipe);
+      setModalContext('search');
+      setShowRecipeModal(true);
+    };
+
+    window.addEventListener('openRecipeModal', handleOpenRecipeModal as EventListener);
+
+    return () => {
+      window.removeEventListener('openRecipeModal', handleOpenRecipeModal as EventListener);
+    };
+  }, []);
 
   // Keyboard navigation support for modals
   useKeyboardNavigation({
@@ -460,21 +508,24 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
     switch (sortBy) {
       case 'name':
         return a.item.localeCompare(b.item);
-      case 'lastAdded':
+      case 'lastAdded': {
         const aDate = a.lastRestocked || a.dateAdded || '';
         const bDate = b.lastRestocked || b.dateAdded || '';
         return new Date(bDate).getTime() - new Date(aDate).getTime(); // Most recent first
-      case 'expiration':
+      }
+      case 'expiration': {
         const aExp = a.expirationDate || '9999-12-31';
         const bExp = b.expirationDate || '9999-12-31';
         return new Date(aExp).getTime() - new Date(bExp).getTime(); // Soonest first
+      }
       case 'category':
         return (a.category || '').localeCompare(b.category || '');
-      case 'location':
+      case 'location': {
         const locationOrder = { pantry: 1, fridge: 2, freezer: 3, spices: 4, other: 5 };
         const aLoc = a.storageLocation || 'pantry';
         const bLoc = b.storageLocation || 'pantry';
         return locationOrder[aLoc] - locationOrder[bLoc];
+      }
       default:
         return 0;
     }
@@ -638,11 +689,15 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   const storageViewContent = storageSectionOrder.map(location => {
     const items = groupedByStorage[location] || [];
     const locationLabel = storageLabels[location];
-    
+
     return (
       <div key={location} className="bg-theme-secondary rounded-lg border border-theme overflow-hidden">
         <div className="w-full flex items-center justify-between p-4">
           <div className="flex items-center gap-3">
+            <StorageLocationIndicator
+              location={location as 'pantry' | 'freezer' | 'fridge' | 'spices' | 'other'}
+              size="md"
+            />
             <h4 className="font-semibold text-theme-primary">{locationLabel}</h4>
             <span className="text-sm text-theme-secondary opacity-70">
               ({items.length} item{items.length !== 1 ? 's' : ''})
@@ -812,6 +867,11 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
           <div className="flex-1">
             <div className="flex items-center gap-2">
               <div className="font-medium text-theme-primary">{item.item}</div>
+              <StorageLocationIndicator
+                location={location as 'pantry' | 'freezer' | 'fridge' | 'spices' | 'other'}
+                size="sm"
+                showLabel={false}
+              />
               <div className="text-xs text-theme-secondary opacity-70 bg-theme-secondary px-1 py-0.5 rounded">Qty: {formatItemQuantity(item)}</div>
               {item.expirationDate && (
                 <div className={`text-xs px-1 py-0.5 rounded font-medium ${
@@ -914,6 +974,101 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
         </div>
       </div>
 
+      {/* Meal Prep Suggestions - Recipes You Can Make Immediately */}
+      {mealPrepSuggestions.length > 0 && (
+        <div className="bg-gradient-to-r from-green-500/10 to-emerald-500/5 border border-green-500/20 rounded-xl p-4 mb-6">
+          <div className="flex items-center gap-2 mb-3">
+            <ChefHat className="w-5 h-5 text-green-600" />
+            <h3 className="font-semibold text-theme-primary">Recipes You Can Make Now</h3>
+            <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">
+              {mealPrepSuggestions.filter(s => s.canMake).length} ready
+            </span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {mealPrepSuggestions.slice(0, 4).map((suggestion, index) => (
+              <div
+                key={index}
+                className="bg-theme-secondary/80 backdrop-blur-sm border border-green-500/30 rounded-lg p-3 cursor-pointer hover:bg-theme-secondary transition-all hover:shadow-md"
+              >
+                <div className="flex items-start justify-between mb-2">
+                  <h4 className="text-sm font-semibold text-theme-primary truncate flex-1">
+                    {suggestion.recipe.title}
+                  </h4>
+                  {suggestion.canMake && (
+                    <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full ml-2 flex-shrink-0">
+                      Ready!
+                    </span>
+                  )}
+                </div>
+
+                <div className="text-xs text-theme-secondary mb-2">
+                  {suggestion.availableIngredients}/{suggestion.totalIngredients} ingredients available
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setModalRecipe(suggestion.recipe);
+                      setModalContext('search');
+                      setShowRecipeModal(true);
+                      AnalyticsService.trackEvent('meal_prep_view_recipe', {
+                        recipe_title: suggestion.recipe.title,
+                        match_percentage: suggestion.matchPercentage,
+                        available_ingredients: suggestion.availableIngredients,
+                        total_ingredients: suggestion.totalIngredients,
+                        can_make: suggestion.canMake
+                      });
+                    }}
+                    className="flex-1 text-xs bg-[var(--accent-color)] text-white px-2 py-1 rounded hover:bg-[var(--accent-color)]/90 transition-colors"
+                  >
+                    View Recipe
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (setActiveTab) setActiveTab(Tab.MEALS);
+                      // Could add logic to open the specific recipe in meal planner
+                    }}
+                    className="flex-1 text-xs bg-theme-secondary border border-theme px-2 py-1 rounded hover:bg-theme-primary transition-colors"
+                  >
+                    Plan Meal
+                  </button>
+                  {suggestion.missingIngredients.length > 0 && (
+                    <button
+                      onClick={(e) => {
+                        const missingItems = suggestion.missingIngredients
+                          .filter(match => !match.available)
+                          .map(match => match.ingredient);
+                        if (missingItems.length > 0) {
+                          addToShoppingList(missingItems);
+                        }
+                      }}
+                      className="text-xs bg-theme-secondary border border-theme px-2 py-1 rounded hover:bg-theme-primary transition-colors"
+                      title={`Add ${suggestion.missingIngredients.length} missing ingredients to shopping list`}
+                    >
+                      +{suggestion.missingIngredients.length}
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+          {mealPrepSuggestions.length > 4 && (
+            <div className="text-center mt-3">
+              <button
+                onClick={() => {
+                  if (setActiveTab) setActiveTab(Tab.MEALS);
+                }}
+                className="text-sm text-[var(--accent-color)] hover:underline"
+              >
+                View all {mealPrepSuggestions.length} suggestions →
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Search and Filter Bar */}
       <div className="bg-theme-secondary p-4 rounded-2xl border border-theme shadow-lg mb-6">
         <div className="flex gap-3 items-center">
@@ -925,7 +1080,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                onFocus={() => setShowAutocomplete((searchQuery.length >= 1 && autocompleteSuggestions.length > 0) || (searchQuery.length === 0 && recentSearches.length > 0))}
+                onFocus={() => setShowAutocomplete(searchQuery.length >= 1 && autocompleteSuggestions.length > 0)}
                 onBlur={() => setTimeout(() => setShowAutocomplete(false), 200)}
                 placeholder="Search pantry items..."
                 className="w-full pl-10 pr-4 py-2 bg-theme-primary border border-theme rounded-lg text-theme-primary placeholder-theme-primary/50 focus:border-[var(--accent-color)] focus:outline-none"
@@ -1606,7 +1761,6 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
             <div className="flex gap-3">
               {storageOrder.map(location => {
                 const items = groupedByStorage[location] || [];
-                const locationImage = getStorageLocationImage(location);
                 const locationLabel = storageLabels[location];
                 return (
                   <div
@@ -1615,14 +1769,9 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                     className="bg-theme-secondary rounded-lg shadow-md border-2 border-[var(--accent-color)] overflow-hidden group hover:shadow-lg transition-all cursor-pointer w-20 h-20"
                   >
                     <div className="h-10 relative bg-gradient-to-br from-[var(--accent-color)]/20 to-[var(--accent-color)]/5 overflow-hidden flex items-center justify-center">
-                      <img
-                        src={locationImage}
-                        alt={locationLabel}
-                        className="w-6 h-6 object-contain"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          target.src = '/images/placeholder.svg';
-                        }}
+                      <StorageLocationIndicator
+                        location={location as 'pantry' | 'freezer' | 'fridge' | 'spices' | 'other'}
+                        size="md"
                       />
                     </div>
                     <div className="px-1 py-0.5 text-center">
@@ -1797,14 +1946,10 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                     />
                     <div className="flex-1">
                       <span className="font-medium text-theme-primary">{item.item}</span>
-                      <div className="flex items-center gap-2 mt-1">
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.1"
+                      <div className="mt-2">
+                        <VisualQuantitySelector
                           value={parseInt(item.quantity_estimate) || 1}
-                          onChange={(e) => {
-                            const newQty = parseFloat(e.target.value) || 1;
+                          onChange={(newQty) => {
                             const updatedItems = [...bulkQuantityEditItems];
                             updatedItems[index] = {
                               ...updatedItems[index],
@@ -1812,9 +1957,12 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                             };
                             setBulkQuantityEditItems(updatedItems);
                           }}
-                          className="w-20 px-2 py-1 text-sm bg-theme-primary border border-theme rounded text-theme-primary"
+                          itemName={item.item}
+                          unit="items"
+                          maxValue={20}
+                          showTypicalAmounts={false}
+                          className="scale-90"
                         />
-                        <span className="text-xs text-theme-secondary">items</span>
                       </div>
                     </div>
                   </div>
@@ -1870,6 +2018,23 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
           onAddToShoppingList={addToShoppingList}
           customCategories={customCategories}
           originalIndex={selectedItemIndex}
+        />
+      )}
+
+      {/* Recipe Modal */}
+      {showRecipeModal && modalRecipe && (
+        <RecipeModal
+          recipe={modalRecipe}
+          isOpen={showRecipeModal}
+          onClose={() => setShowRecipeModal(false)}
+          onAddToPlan={appActions.onAddToPlan}
+          onSaveRecipe={onSaveRecipe}
+          onRate={onRateRecipe}
+          showSaveButton={true}
+          showAddToPlan={modalContext === 'search'}
+          inventory={inventory}
+          household={household}
+          user={user}
         />
       )}
     </div>
