@@ -4,19 +4,139 @@ import { db } from '../firebaseConfig';
 import DatabaseMonitoringService from '../services/databaseMonitoringService';
 import AnalyticsService from '../services/analyticsService';
 import { UsageService } from '../services/usageService';
-import { User, PantryItem, DayPlan, Household, ShoppingItem, SavedRecipe, RecipeRating, CustomCategory, MealPlanItem, StructuredRecipe, ConsumptionSuggestion, ExpirationAlert, RecipeSuggestion } from '../types';
+import { User, PantryItem, DayPlan, Household, ShoppingItem, SavedRecipe, RecipeRating, RecipeRatingInput, CustomCategory, MealPlanItem, StructuredRecipe, ConsumptionSuggestion, ExpirationAlert, RecipeSuggestion } from '../types';
+import { AppError } from '../utils/errorUtils';
 import { hasPantryItemsChanged, hasShoppingItemsChanged, hasSavedRecipesChanged, hasMealPlansChanged, hasArraysChanged } from '../utils/comparisonUtils';
 import { setRemoteInventoryUpdate, isRemoteInventoryUpdate, setRemoteShoppingListUpdate, isRemoteShoppingListUpdate, setRemoteMealPlanUpdate, isRemoteMealPlanUpdate } from '../services/syncStateService';
 import { generateConsumptionSuggestions, generateExpirationAlerts, generateRecipeSuggestions, isHouseholdMember } from '../utils/appUtils';
 import { offlineQueue } from '../services/offlineQueueService';
 import { undoService } from '../services/undoService';
-import { createShoppingListListener, createSavedRecipesListener, createMealPlanListener } from '../utils/listenerFactories';
+import { NotificationService } from '../services/notificationService';
 import { useScopedDataListener } from './useDataListener';
 import { firestoreCache } from '../services/cacheService';
+
+// Global flag to prevent multiple listener setups
+const globalListenersSetUp = { current: false };
+
+// Helper functions for creating scoped listeners
+function createShoppingListListener(
+  user: User,
+  household: Household | null,
+  inHousehold: boolean,
+  setShoppingList: (items: ShoppingItem[]) => void,
+  setIsLoadingShoppingList: (loading: boolean) => void
+) {
+  if (inHousehold && household?.id) {
+    return onSnapshot(collection(db, 'households', household.id, 'shoppingList'), snap => {
+      const serverData = snap.docs.map(d => ({ id: d.id, ...d.data() } as ShoppingItem));
+      if (hasShoppingItemsChanged(serverData, [])) { // Using empty array as placeholder for current state
+        setRemoteShoppingListUpdate(true);
+        setShoppingList(serverData);
+      }
+      setIsLoadingShoppingList(false);
+    }, err => {
+      console.error("Household shopping list listener failed:", err);
+      setIsLoadingShoppingList(false);
+    });
+  } else {
+    return onSnapshot(collection(db, 'users', user.id, 'shoppingList'), snap => {
+      const serverData = snap.docs.map(d => ({ id: d.id, ...d.data() } as ShoppingItem));
+      if (hasShoppingItemsChanged(serverData, [])) { // Using empty array as placeholder for current state
+        setRemoteShoppingListUpdate(true);
+        setShoppingList(serverData);
+      }
+      setIsLoadingShoppingList(false);
+    }, err => {
+      console.error("User shopping list listener failed:", err);
+      setIsLoadingShoppingList(false);
+    });
+  }
+}
+
+function createSavedRecipesListener(
+  user: User,
+  household: Household | null,
+  inHousehold: boolean,
+  setSavedRecipes: (recipes: SavedRecipe[]) => void,
+  setIsLoadingSavedRecipes: (loading: boolean) => void
+) {
+  if (inHousehold && household?.id) {
+    return onSnapshot(collection(db, 'households', household.id, 'savedRecipes'), snap => {
+      const serverData = snap.docs.map(d => ({ id: d.id, ...d.data() } as SavedRecipe));
+      if (hasSavedRecipesChanged(serverData, [])) { // Using empty array as placeholder for current state
+        setSavedRecipes(serverData);
+      }
+      setIsLoadingSavedRecipes(false);
+    }, err => {
+      console.error("Household saved recipes listener failed:", err);
+      setIsLoadingSavedRecipes(false);
+    });
+  } else {
+    return onSnapshot(collection(db, 'users', user.id, 'savedRecipes'), snap => {
+      const serverData = snap.docs.map(d => ({ id: d.id, ...d.data() } as SavedRecipe));
+      if (hasSavedRecipesChanged(serverData, [])) { // Using empty array as placeholder for current state
+        setSavedRecipes(serverData);
+      }
+      setIsLoadingSavedRecipes(false);
+    }, err => {
+      console.error("User saved recipes listener failed:", err);
+      setIsLoadingSavedRecipes(false);
+    });
+  }
+}
+
+function createMealPlanListener(
+  user: User,
+  household: Household | null,
+  inHousehold: boolean,
+  setMealPlan: (plans: DayPlan[]) => void,
+  setIsLoadingMealPlan: (loading: boolean) => void
+) {
+  if (inHousehold && household?.id) {
+    return onSnapshot(collection(db, 'households', household.id, 'mealPlan'), snap => {
+      const serverData = snap.docs.map(d => {
+        const data = d.data();
+        // Convert Timestamp objects to strings for date fields
+        if (data.date && typeof data.date.toDate === 'function') {
+          data.date = data.date.toDate().toISOString().split('T')[0]; // Convert to YYYY-MM-DD format
+        }
+        return { id: d.id, ...data } as DayPlan;
+      });
+      if (hasMealPlansChanged(serverData, [])) { // Using empty array as placeholder for current state
+        setRemoteMealPlanUpdate(true);
+        setMealPlan(serverData);
+      }
+      setIsLoadingMealPlan(false);
+    }, err => {
+      console.error("Household meal plan listener failed:", err);
+      setIsLoadingMealPlan(false);
+    });
+  } else {
+    return onSnapshot(collection(db, 'users', user.id, 'mealPlan'), snap => {
+      const serverData = snap.docs.map(d => {
+        const data = d.data();
+        // Convert Timestamp objects to strings for date fields
+        if (data.date && typeof data.date.toDate === 'function') {
+          data.date = data.date.toDate().toISOString().split('T')[0]; // Convert to YYYY-MM-DD format
+        }
+        return { id: d.id, ...data } as DayPlan;
+      });
+      if (hasMealPlansChanged(serverData, [])) { // Using empty array as placeholder for current state
+        setRemoteMealPlanUpdate(true);
+        setMealPlan(serverData);
+      }
+      setIsLoadingMealPlan(false);
+    }, err => {
+      console.error("User meal plan listener failed:", err);
+      setIsLoadingMealPlan(false);
+    });
+  }
+}
 
 export function useDataManagement(user: User | null, addToast: (message: string, type?: 'error' | 'info', ttl?: number, actionLabel?: string, action?: () => void) => void, addToShoppingList?: (items: string[]) => void, updateSyncStatus?: (updates: any) => void, activityLogger?: { logItemAdded?: (itemName: string, itemId?: string) => void; logItemRemoved?: (itemName: string, itemId?: string) => void; logShoppingAdded?: (itemName: string, itemId?: string) => void; logRecipeSaved?: (recipeName: string, recipeId?: string) => void; logMealCompleted?: (mealName: string) => void }) {
   // Data States
   const [mealPlanState, setMealPlanState] = useState<DayPlan[]>([]);
+
   const [household, setHousehold] = useState<Household | null>(null);
   const [inventory, setInventory] = useState<PantryItem[]>([]);
   const [shoppingList, setShoppingList] = useState<ShoppingItem[]>([]);
@@ -38,6 +158,9 @@ export function useDataManagement(user: User | null, addToast: (message: string,
 
   // Undo actions
   const [recentActions, setRecentActions] = useState<any[]>([]);
+
+  // Online status
+  const [isOnline, setIsOnline] = useState(true);
 
   // Writing state refs to prevent concurrent operations
   const writingMealPlanRef = useRef(false);
@@ -196,6 +319,12 @@ export function useDataManagement(user: User | null, addToast: (message: string,
   // Flag to track if initial data has been loaded
   const initialDataLoadedRef = useRef(false);
 
+  // Counter for total Firestore reads
+  const totalReadsRef = useRef(0);
+
+  // Previous household data for comparison
+  const prevHouseholdRef = useRef<Household | null>(null);
+
   // Per-session client id used to mark writes
   const clientId = useMemo(() => {
     let id = localStorage.getItem('clientId');
@@ -210,6 +339,9 @@ export function useDataManagement(user: User | null, addToast: (message: string,
   useEffect(() => {
     if (!user?.id) return;
 
+    // Prevent multiple listener setups
+    if (globalListenersSetUp.current) return;
+
     const unsubs: (()=>void)[] = [];
 
     // Household document listener - always listen if user has a household
@@ -217,7 +349,16 @@ export function useDataManagement(user: User | null, addToast: (message: string,
       unsubs.push(onSnapshot(doc(db, 'households', household.id), snap => {
         if (snap.exists()) {
           const householdData = { id: snap.id, ...snap.data() } as Household;
-          setHousehold(householdData);
+          // Only update if the household data has actually changed (excluding timestamps)
+          const hasChanged = !prevHouseholdRef.current ||
+            householdData.id !== prevHouseholdRef.current.id ||
+            householdData.name !== prevHouseholdRef.current.name ||
+            householdData.ownerId !== prevHouseholdRef.current.ownerId ||
+            JSON.stringify(householdData.memberIds || []) !== JSON.stringify(prevHouseholdRef.current.memberIds || []);
+          if (hasChanged) {
+            prevHouseholdRef.current = householdData;
+            setHousehold(householdData);
+          }
         }
         setIsLoadingHousehold(false);
       }, err => {
@@ -271,8 +412,11 @@ export function useDataManagement(user: User | null, addToast: (message: string,
     unsubs.push(createSavedRecipesListener(user, household, inHousehold, setSavedRecipes, setIsLoadingSavedRecipes));
     unsubs.push(createMealPlanListener(user, household, inHousehold, setMealPlan, setIsLoadingMealPlan));
 
+    globalListenersSetUp.current = true;
+
     return () => {
       unsubs.forEach(unsub => unsub());
+      globalListenersSetUp.current = false;
     };
   }, [user?.id, household?.id]);
 
@@ -296,6 +440,12 @@ export function useDataManagement(user: User | null, addToast: (message: string,
     );
 
     if (expiredItems.length > 0) {
+      // Create notifications for expired items
+      expiredItems.forEach(async (item) => {
+        const daysUntilExpiry = Math.ceil((new Date(item.expirationDate!).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+        await NotificationService.createExpirationAlert(user.id, item.item, daysUntilExpiry, item.id);
+      });
+
       // Add expired items to shopping list
       const itemNames = expiredItems.map(item => item.item);
 
@@ -314,7 +464,62 @@ export function useDataManagement(user: User | null, addToast: (message: string,
         !expiredItems.some(expired => expired.id === item.id)
       ));
     }
+
+    // Check for items expiring soon (but not expired)
+    const itemsExpiringSoon = inventory.filter(item => {
+      if (!item.expirationDate) return false;
+      const daysUntilExpiry = Math.ceil((new Date(item.expirationDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+      return daysUntilExpiry > 0 && daysUntilExpiry <= 7; // Expiring within 7 days
+    });
+
+    // Create notifications for items expiring soon (limit to avoid spam)
+    itemsExpiringSoon.slice(0, 3).forEach(async (item) => {
+      const daysUntilExpiry = Math.ceil((new Date(item.expirationDate!).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+      await NotificationService.createExpirationAlert(user.id, item.item, daysUntilExpiry, item.id);
+    });
+
   }, [inventory, user?.id, addToShoppingList, addToast]);
+
+  // Daily combined notification (meals + shopping)
+  useEffect(() => {
+    if (!user?.id || !mealPlan.length || !shoppingList.length) return;
+
+    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    const lastDailyNotification = localStorage.getItem('lastDailyNotification');
+
+    // Only send once per day
+    if (lastDailyNotification === today) return;
+
+    // Get today's meals
+    const todayPlan = mealPlan.find(day => day.date === today);
+    const todaysMeals = todayPlan ? [
+      ...(todayPlan.breakfast || []),
+      ...(todayPlan.lunch || []),
+      ...(todayPlan.dinner || [])
+    ] : [];
+
+    // Get shopping list info
+    const shoppingCount = shoppingList.length;
+    const urgentItems = shoppingList
+      .filter(item => item.priority === 'urgent' || item.priority === 'high')
+      .map(item => item.item)
+      .slice(0, 3);
+
+    // Only send if there's something to notify about
+    if (todaysMeals.length > 0 || shoppingCount > 0) {
+      NotificationService.createDailyCombinedNotification(
+        user.id,
+        todaysMeals,
+        shoppingCount,
+        urgentItems
+      ).catch(error => {
+        console.error('Failed to create daily combined notification:', error);
+      });
+
+      // Mark as sent for today
+      localStorage.setItem('lastDailyNotification', today);
+    }
+  }, [user?.id, mealPlan, shoppingList]);
 
   // Write changes to Firestore
   useEffect(() => {
@@ -890,7 +1095,7 @@ export function useDataManagement(user: User | null, addToast: (message: string,
     }
   };
 
-  const handleSaveRecipe = async (recipe: any) => {
+  const handleSaveRecipe = async (recipe: StructuredRecipe) => {
     if (!user?.id) return;
     
     // Check if we've already determined the limit is exceeded
@@ -939,7 +1144,22 @@ export function useDataManagement(user: User | null, addToast: (message: string,
       addToast(`Saved ${recipe.title} to your recipes!`);
     } catch (error) {
       console.error('Error saving recipe:', error);
-      addToast('Failed to save recipe. Please try again.', 'error');
+
+      // Provide user-friendly error messages based on error type
+      let errorMessage = 'Failed to save recipe. Please try again.';
+
+      if (error instanceof AppError) {
+        errorMessage = error.userMessage;
+      } else if (error instanceof Error) {
+        // Handle common Firebase errors
+        if (error.message.includes('permission-denied')) {
+          errorMessage = 'You don\'t have permission to save recipes. Please check your account.';
+        } else if (error.message.includes('quota-exceeded')) {
+          errorMessage = 'Storage quota exceeded. Please free up some space and try again.';
+        }
+      }
+
+      addToast(errorMessage, 'error');
     }
   };
 
@@ -959,7 +1179,7 @@ export function useDataManagement(user: User | null, addToast: (message: string,
     }
   };
 
-  const handleRateRecipe = async (ratingData: any) => {
+  const handleRateRecipe = async (ratingData: RecipeRatingInput) => {
     if (!user?.id) return;
     try {
       // Remove the client-generated date and let serverTimestamp handle it
