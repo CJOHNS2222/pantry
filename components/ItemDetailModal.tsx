@@ -5,6 +5,7 @@ import PriceTrends from './PriceTrends';
 import { getAllCategories, getExpirationColor, cleanItemNameForShopping, formatItemQuantity, parseQuantity } from '../utils/appUtils';
 import { getNutritionFactsWithFallback, NutritionFacts, formatNutrition } from '../services/nutritionService';
 import { useKeyboardNavigation } from '../hooks/useKeyboardNavigation';
+import VisualQuantitySelector from './VisualQuantitySelector';
 
 interface ItemDetailModalProps {
   item: PantryItem;
@@ -137,109 +138,6 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
     onUpdateItem(originalIndex, { category });
   };
 
-  // Visual quantity estimation
-  const handleVisualQuantitySelect = (fillLevel: 'empty' | 'quarter' | 'half' | 'threeQuarter' | 'full') => {
-    // Get original purchase quantity if available
-    const originalQuantity = item.quantity?.originalAmount || item.quantity?.amount || parseInt(item.quantity_estimate) || 1;
-    const unit = item.quantity?.originalUnit || item.quantity?.unit || 'count';
-
-    let estimatedAmount: number;
-    switch (fillLevel) {
-      case 'empty':
-        estimatedAmount = 0;
-        break;
-      case 'quarter':
-        estimatedAmount = originalQuantity * 0.25;
-        break;
-      case 'half':
-        estimatedAmount = originalQuantity * 0.5;
-        break;
-      case 'threeQuarter':
-        estimatedAmount = originalQuantity * 0.75;
-        break;
-      case 'full':
-        estimatedAmount = originalQuantity;
-        break;
-      default:
-        estimatedAmount = originalQuantity;
-    }
-
-    // Update quantity
-    const updates: Partial<PantryItem> = {
-      quantity_estimate: estimatedAmount.toString(),
-      visualLevel: fillLevel
-    };
-
-    if (item.quantity) {
-      updates.quantity = {
-        ...item.quantity,
-        amount: estimatedAmount
-      };
-    } else {
-      updates.quantity = {
-        amount: estimatedAmount,
-        unit: unit
-      };
-    }
-
-    onUpdateItem(originalIndex, updates);
-    setEditQuantity(estimatedAmount);
-  };
-
-  // Visual Quantity Selector Component
-  const VisualQuantitySelector: React.FC = () => {
-    const fillLevels = [
-      { key: 'empty' as const, label: 'Empty', color: 'bg-red-200' },
-      { key: 'quarter' as const, label: '¼ Full', color: 'bg-orange-200' },
-      { key: 'half' as const, label: '½ Full', color: 'bg-yellow-200' },
-      { key: 'threeQuarter' as const, label: '¾ Full', color: 'bg-green-300' },
-      { key: 'full' as const, label: 'Full', color: 'bg-green-400' }
-    ];
-
-    return (
-      <div className="bg-theme-secondary p-2 rounded-lg border border-theme">
-        <label className="block text-sm font-medium text-theme-primary mb-2">
-          Visual Quantity Estimate
-        </label>
-        <p className="text-xs text-theme-secondary opacity-70 mb-2">
-          Click the level that matches how full your container looks:
-        </p>
-        <div className="grid grid-cols-5 gap-2">
-          {fillLevels.map((level) => (
-            <button
-              key={level.key}
-              onClick={() => handleVisualQuantitySelect(level.key)}
-              className="flex flex-col items-center p-2 rounded-lg border-2 border-theme hover:border-[var(--accent-color)] transition-colors group"
-              title={`Set to ${level.label}`}
-            >
-              {/* Container visualization */}
-              <div className="w-8 h-12 bg-theme-primary border border-theme rounded-sm mb-1 relative overflow-hidden">
-                {/* Fill level visualization */}
-                <div
-                  className={`absolute bottom-0 left-0 right-0 ${level.color} transition-all duration-200 ${
-                    level.key === 'empty' ? 'h-0' :
-                    level.key === 'quarter' ? 'h-3' :
-                    level.key === 'half' ? 'h-6' :
-                    level.key === 'threeQuarter' ? 'h-9' :
-                    'h-12'
-                  }`}
-                />
-                {/* Container outline */}
-                <div className="absolute inset-0 border border-theme rounded-sm opacity-50" />
-              </div>
-              <span className="text-xs text-theme-primary font-medium group-hover:text-[var(--accent-color)]">
-                {level.label}
-              </span>
-            </button>
-          ))}
-        </div>
-        <p className="text-xs text-theme-secondary opacity-60 mt-2 text-center">
-          This will estimate quantity based on your original purchase amount
-        </p>
-      </div>
-    );
-  };
-
   return (
     <>
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-60 p-4">
@@ -277,24 +175,19 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                 Quantity
               </label>
               {isEditing ? (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-center gap-2">
-                    <button
-                      onClick={handleQuantityDecrement}
-                      className="w-8 h-8 rounded-full bg-theme-primary border border-theme flex items-center justify-center text-theme-primary hover:bg-theme-secondary transition-colors"
-                    >
-                      <Minus className="w-4 h-4" />
-                    </button>
-                    <span className="text-xl font-bold text-theme-primary min-w-[2rem] text-center">
-                      {editQuantity}
-                    </span>
-                    <button
-                      onClick={handleQuantityIncrement}
-                      className="w-8 h-8 rounded-full bg-theme-primary border border-theme flex items-center justify-center text-theme-primary hover:bg-theme-secondary transition-colors"
-                    >
-                      <Plus className="w-4 h-4" />
-                    </button>
-                  </div>
+                <div className="space-y-4">
+                  <VisualQuantitySelector
+                    value={editQuantity}
+                    onChange={(newQuantity) => {
+                      setEditQuantity(newQuantity);
+                      setHasQuantityChanged(true);
+                    }}
+                    itemName={item.item}
+                    unit="items"
+                    maxValue={50}
+                    showTypicalAmounts={true}
+                  />
+
                   {hasQuantityChanged && (
                     <div className="flex gap-2 justify-center">
                       <button
@@ -324,9 +217,6 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                 </div>
               )}
             </div>
-
-            {/* Visual Quantity Selector */}
-            <VisualQuantitySelector />
 
             {/* Original Quantity (from recipe/shopping list) */}
             {item.originalQuantity && (
