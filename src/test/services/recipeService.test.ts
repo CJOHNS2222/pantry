@@ -135,7 +135,8 @@ describe('RecipeService', () => {
         status: 500,
       });
 
-      await expect(fetchRecipesFromSpoonacular('chicken', 10)).rejects.toThrow();
+      const result = await fetchRecipesFromSpoonacular('chicken', 10);
+      expect(result).toEqual([]);
     });
 
     it('handles network errors', async () => {

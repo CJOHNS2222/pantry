@@ -45,8 +45,8 @@ describe('RecipeRatingUI', () => {
     render(<RecipeRatingUI {...defaultProps} />);
 
     expect(screen.getByText('Rate this recipe')).toBeInTheDocument();
-    expect(screen.getByPlaceholderText('Share your tips or modifications...')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /submit review/i })).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Share your thoughts or tips...')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /submit rating/i })).toBeInTheDocument();
   });
 
   it('allows selecting star rating', () => {
@@ -62,13 +62,13 @@ describe('RecipeRatingUI', () => {
     fireEvent.click(starButtons[3]);
 
     // The component should be in a state where rating is set
-    expect(screen.getByPlaceholderText('Share your tips or modifications...')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Share your thoughts or tips...')).toBeInTheDocument();
   });
 
   it('allows entering comment', () => {
     render(<RecipeRatingUI {...defaultProps} />);
 
-    const commentTextarea = screen.getByPlaceholderText('Share your tips or modifications...');
+    const commentTextarea = screen.getByPlaceholderText('Share your thoughts or tips...');
     fireEvent.change(commentTextarea, { target: { value: 'Great recipe!' } });
 
     expect(commentTextarea).toHaveValue('Great recipe!');
@@ -85,11 +85,11 @@ describe('RecipeRatingUI', () => {
     fireEvent.click(starButtons[4]);
 
     // Enter comment
-    const commentTextarea = screen.getByPlaceholderText('Share your tips or modifications...');
+    const commentTextarea = screen.getByPlaceholderText('Share your thoughts or tips...');
     fireEvent.change(commentTextarea, { target: { value: 'Amazing recipe!' } });
 
     // Submit
-    const submitButton = screen.getByRole('button', { name: /submit review/i });
+    const submitButton = screen.getByRole('button', { name: /submit rating/i });
     fireEvent.click(submitButton);
 
     expect(mockOnRate).toHaveBeenCalledWith({
@@ -112,7 +112,7 @@ describe('RecipeRatingUI', () => {
     );
     fireEvent.click(starButtons[2]); // 3 stars
 
-    const submitButton = screen.getByRole('button', { name: /submit review/i });
+    const submitButton = screen.getByRole('button', { name: /submit rating/i });
     fireEvent.click(submitButton);
 
     await waitFor(() => {
@@ -131,7 +131,7 @@ describe('RecipeRatingUI', () => {
     );
     fireEvent.click(starButtons[0]); // 1 star
 
-    const submitButton = screen.getByRole('button', { name: /submit review/i });
+    const submitButton = screen.getByRole('button', { name: /submit rating/i });
     fireEvent.click(submitButton);
 
     expect(mockOnRate).toHaveBeenCalledWith({
@@ -148,7 +148,7 @@ describe('RecipeRatingUI', () => {
     const mockOnRate = vi.fn();
     render(<RecipeRatingUI {...defaultProps} onRate={mockOnRate} />);
 
-    const submitButton = screen.getByRole('button', { name: /submit review/i });
+    const submitButton = screen.getByRole('button', { name: /submit rating/i });
     expect(submitButton).toBeDisabled();
 
     // Should not call onRate if no rating selected
