@@ -157,10 +157,10 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
       setAutocompleteSuggestions(suggestions);
       setShowAutocomplete(suggestions.length > 0);
     } else {
-      // Show recent searches when no query
+      // Load recent searches but don't show dropdown automatically
       const recent = getRecentSearchSuggestions('pantry', 5);
       setRecentSearches(recent);
-      setShowAutocomplete(recent.length > 0);
+      setShowAutocomplete(false); // Don't show dropdown on initial load
       setAutocompleteSuggestions([]);
     }
   }, [searchQuery, inventory]);
@@ -1080,7 +1080,14 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                onFocus={() => setShowAutocomplete(searchQuery.length >= 1 && autocompleteSuggestions.length > 0)}
+                onFocus={() => {
+                  // Show recent searches if available, or autocomplete suggestions if there's a query
+                  if (searchQuery.length >= 1 && autocompleteSuggestions.length > 0) {
+                    setShowAutocomplete(true);
+                  } else if (searchQuery.length === 0 && recentSearches.length > 0) {
+                    setShowAutocomplete(true);
+                  }
+                }}
                 onBlur={() => setTimeout(() => setShowAutocomplete(false), 200)}
                 placeholder="Search pantry items..."
                 className="w-full pl-10 pr-4 py-2 bg-theme-primary border border-theme rounded-lg text-theme-primary placeholder-theme-primary/50 focus:border-[var(--accent-color)] focus:outline-none"
