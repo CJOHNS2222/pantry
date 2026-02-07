@@ -93,7 +93,7 @@ export const createHousehold = async (
           name: user.name || user.email?.split('@')[0] || 'Unknown',
           email: user.email,
           role: 'admin',
-          status: 'Active',
+          status: 'active',
           joinedAt: new Date().toISOString(),
         },
       ],
@@ -146,7 +146,7 @@ export const addMemberToHousehold = async (
 export const updateMemberStatus = async (
   householdId: string,
   memberEmail: string,
-  newStatus: 'Active' | 'Invited'
+  newStatus: 'active' | 'pending' | 'inactive'
 ): Promise<void> => {
   try {
     const householdRef = doc(db, 'households', householdId);
@@ -291,8 +291,8 @@ export const joinHousehold = async (
 
     perfTrace.putAttribute('result', 'joining');
 
-    // Update status to Active
-    await updateMemberStatus(householdId, user.email, 'Active');
+    // Update status to active
+    await updateMemberStatus(householdId, user.email, 'active');
 
     // Update user's ID in household if different
     const householdRef = doc(db, 'households', householdId);
@@ -310,7 +310,7 @@ export const joinHousehold = async (
             ...m,
             id: user.id,
             name: user.name || user.email?.split('@')[0] || 'Unknown',
-            status: 'Active',
+            status: 'active',
           };
         }
         return m;
@@ -330,7 +330,7 @@ export const joinHousehold = async (
     return {
       ...household,
       members: household.members.map((m: Member) =>
-        m.email === user.email ? { ...m, status: 'Active', id: user.id } : m
+        m.email === user.email ? { ...m, status: 'active', id: user.id } : m
       ),
     };
   } catch (error) {

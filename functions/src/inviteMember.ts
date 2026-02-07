@@ -92,7 +92,7 @@ async function inviteMemberCore(inviterUid: string, email: string, householdId: 
     email: invitedUserEmail,
     avatar: invitedUserAvatar,
     role: 'member', 
-    status: 'Invited',
+    status: 'pending',
     joinedAt: new Date().toISOString()
   };
   

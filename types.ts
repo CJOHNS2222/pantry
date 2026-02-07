@@ -260,7 +260,7 @@ export interface Household {
   id: string;
   name: string;
   members: Member[];
-  memberIds?: string[]; // convenience array of member UIDs for fast rule checks
+  memberIds: string[]; // For querying households by user ID
 }
 
 export interface Member {
@@ -269,7 +269,7 @@ export interface Member {
   email: string;
   avatar?: string;
   role: 'admin' | 'member';
-  status?: 'Active' | 'Invited' | 'Inactive';
+  status: 'active' | 'pending' | 'inactive';
   joinedAt: string;
   lastSeen?: string; // ISO timestamp of last activity
   currentActivity?: string; // Current tab/page they're viewing

@@ -363,7 +363,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
           name: user.name,
           email: user.email,
           role: 'admin',
-          status: 'Active'
+          status: 'active'
         }]
       };
 
