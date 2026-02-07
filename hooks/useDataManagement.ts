@@ -284,6 +284,12 @@ export function useDataManagement(user: User | null, addToast: (message: string,
   const writingMealPlanRef = useRef(false);
   const mealPlanCleanupDoneRef = useRef(false);
 
+  // Ref to track last shopping list collection path for sync
+  const lastShoppingListCollectionPathRef = useRef<string>();
+
+  // Ref to prevent repeated household clearing on permission errors
+  const householdClearedDueToPermissionsRef = useRef(false);
+
   // Helper function to clean objects by removing undefined fields (Firestore requirement)
   const cleanObject = (obj: any): any => {
     if (obj === null || obj === undefined) {
@@ -597,6 +603,15 @@ export function useDataManagement(user: User | null, addToast: (message: string,
             JSON.stringify(householdData.memberIds || []) !== JSON.stringify(prevHouseholdRef.current.memberIds || []) ||
             JSON.stringify(householdData.members || []) !== JSON.stringify(prevHouseholdRef.current.members || []);
           if (hasChanged) {
+            // Clean up duplicate memberIds if any exist
+            if (householdData.memberIds && Array.isArray(householdData.memberIds)) {
+              const uniqueMemberIds = Array.from(new Set(householdData.memberIds));
+              if (uniqueMemberIds.length !== householdData.memberIds.length) {
+                console.warn('Found duplicate memberIds, cleaning up:', householdData.memberIds, '->', uniqueMemberIds);
+                householdData.memberIds = uniqueMemberIds;
+              }
+            }
+            
             prevHouseholdRef.current = householdData;
             console.log('Setting household state:', householdData);
             setHousehold(householdData);
@@ -610,9 +625,19 @@ export function useDataManagement(user: User | null, addToast: (message: string,
       }, err => {
         console.error("Household document listener failed:", err);
         
-        // If it's a permissions error during household creation/setup, retry after a delay
-        if (err.code === 'permission-denied' && user?.householdId && householdListenerRetry < 3) {
-          console.log(`Retrying household listener due to permissions error (attempt ${householdListenerRetry + 1}/3)`);
+        // If it's a permissions error, the user has likely been removed from the household
+        if (err.code === 'permission-denied' && !householdClearedDueToPermissionsRef.current) {
+          console.log('Permission denied on household listener - clearing household state');
+          householdClearedDueToPermissionsRef.current = true;
+          setHousehold(null);
+          setIsLoadingHousehold(false);
+          // Reset retry counter
+          if (householdListenerRetry > 0) {
+            setHouseholdListenerRetry(0);
+          }
+        } else if (user?.householdId && householdListenerRetry < 3) {
+          // Only retry for other errors if user still has householdId
+          console.log(`Retrying household listener due to error (attempt ${householdListenerRetry + 1}/3)`);
           setTimeout(() => {
             setHouseholdListenerRetry(prev => prev + 1);
           }, 1000);
@@ -926,7 +951,15 @@ export function useDataManagement(user: User | null, addToast: (message: string,
           householdResults.forEach((res, idx) => {
             if (res.status === 'rejected' || (res.status === 'fulfilled' && (res.value as any)?.err)) {
               console.error('Household write failed:', res);
-              addToast('Failed to save some household data', 'error');
+              
+              // If it's a permission denied error, the user has likely been removed from the household
+              const error = res.status === 'rejected' ? res.reason : (res.value as any)?.err;
+              if (error?.code === 'permission-denied') {
+                console.log('Permission denied on household write - clearing household state');
+                setHousehold(null);
+              } else {
+                addToast('Failed to save some household data', 'error');
+              }
             }
           });
         } else {
@@ -1042,17 +1075,22 @@ export function useDataManagement(user: User | null, addToast: (message: string,
 
   // Shopping list sync
   useEffect(() => {
-    if (!user?.id || !listenersReadyRef.current || !shoppingList || isRemoteShoppingListUpdate()) {
+    if (!user?.id) return;
+
+    const collectionPath = household?.id && isHouseholdMember(household, user)
+      ? `households/${household.id}/shoppingList`
+      : `users/${user.id}/shoppingList`;
+
+    const collectionPathChanged = lastShoppingListCollectionPathRef.current !== collectionPath;
+    lastShoppingListCollectionPathRef.current = collectionPath;
+
+    if (!listenersReadyRef.current || !shoppingList || (isRemoteShoppingListUpdate() && !collectionPathChanged)) {
       return;
     }
 
     // Debounce the sync to avoid running on every state change
     const timeoutId = setTimeout(async () => {
       try {
-        const collectionPath = household?.id && isHouseholdMember(household, user)
-          ? `households/${household.id}/shoppingList`
-          : `users/${user.id}/shoppingList`;
-
         // Calculate changes using batch operations to minimize Firestore reads/writes
         const calculateShoppingListChanges = async () => {
           // Get existing documents to determine what changed

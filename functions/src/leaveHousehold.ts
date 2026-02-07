@@ -30,37 +30,57 @@ export const leaveHousehold = onCall(async (request) => {
     }
 
     const householdData = householdDoc.data();
-    const members = householdData?.members || [];
+    const members = householdData && Array.isArray(householdData.members) ? householdData.members : [];
+    const memberIds = householdData && Array.isArray(householdData.memberIds) ? householdData.memberIds : [];
 
-    // Check if user is a member
+    // Check if user is a member (check both arrays for backward compatibility)
     const memberIndex = members.findIndex((member: { id: string; }) => member.id === userId);
-    if (memberIndex === -1) {
+    const isMemberByIds = memberIds.includes(userId);
+
+    if (memberIndex === -1 && !isMemberByIds) {
       throw new HttpsError("permission-denied", "You are not a member of this household.");
     }
 
-    const member = members[memberIndex];
+    // Get member data for removal
+    let memberToRemove = null;
+    if (memberIndex !== -1) {
+      memberToRemove = members[memberIndex];
+    } else {
+      // Create a basic member object for removal if only in memberIds
+      memberToRemove = { id: userId };
+    }
 
     // Don't allow admin/owner to leave if there are other members
-    if (member.role === 'Admin' && members.length > 1) {
+    if (memberToRemove.role === 'Admin' && (members.length > 1 || memberIds.length > 1)) {
       throw new HttpsError("permission-denied", "As the household admin, you cannot leave while there are other members. Transfer admin rights first or delete the household.");
     }
 
-    // Remove member from household
-    const updatePayload: any = {
-      members: FieldValue.arrayRemove(member)
-    };
+    // Prepare update payload
+    const updatePayload: any = {};
 
-    if (householdData?.memberIds?.includes(userId)) {
+    // Remove from members array if it exists and user is in it
+    if (memberIndex !== -1) {
+      updatePayload.members = FieldValue.arrayRemove(memberToRemove);
+    }
+
+    // Remove from memberIds array if it exists
+    if (isMemberByIds) {
       updatePayload.memberIds = FieldValue.arrayRemove(userId);
     }
 
-    await householdRef.update(updatePayload);
+    // Only update if we have something to update
+    if (Object.keys(updatePayload).length > 0) {
+      await householdRef.update(updatePayload);
+    }
 
-    // Update user's document to remove householdId
+    // Update user's document to remove householdId (only if it exists)
     const userRef = db.collection("users").doc(userId);
-    await userRef.update({
-      householdId: FieldValue.delete()
-    });
+    const userDoc = await userRef.get();
+    if (userDoc.exists && userDoc.data()?.householdId) {
+      await userRef.update({
+        householdId: FieldValue.delete()
+      });
+    }
 
     // Remove custom claim for the leaving user
     try {
@@ -72,7 +92,8 @@ export const leaveHousehold = onCall(async (request) => {
     }
 
     // If this was the last member, delete the household
-    if (members.length === 1) {
+    const totalMembers = Math.max(members.length, memberIds.length);
+    if (totalMembers === 1) {
       await householdRef.delete();
     }
 
@@ -118,39 +139,59 @@ export const leaveHouseholdHttp = onRequest(async (req, res) => {
     }
 
     const householdData = householdDoc.data();
-    const members = householdData?.members || [];
+    const members = householdData && Array.isArray(householdData.members) ? householdData.members : [];
+    const memberIds = householdData && Array.isArray(householdData.memberIds) ? householdData.memberIds : [];
 
-    // Check if user is a member
+    // Check if user is a member (check both arrays for backward compatibility)
     const memberIndex = members.findIndex((member: { id: string; }) => member.id === userId);
-    if (memberIndex === -1) {
+    const isMemberByIds = memberIds.includes(userId);
+
+    if (memberIndex === -1 && !isMemberByIds) {
       res.status(403).json({ error: 'Not a member of this household' });
       return;
     }
 
-    const member = members[memberIndex];
+    // Get member data for removal
+    let memberToRemove = null;
+    if (memberIndex !== -1) {
+      memberToRemove = members[memberIndex];
+    } else {
+      // Create a basic member object for removal if only in memberIds
+      memberToRemove = { id: userId };
+    }
 
     // Don't allow admin/owner to leave if there are other members
-    if (member.role === 'Admin' && members.length > 1) {
+    if (memberToRemove.role === 'Admin' && (members.length > 1 || memberIds.length > 1)) {
       res.status(403).json({ error: 'As the household admin, you cannot leave while there are other members' });
       return;
     }
 
-    // Remove member from household
-    const updatePayload: any = {
-      members: FieldValue.arrayRemove(member)
-    };
+    // Prepare update payload
+    const updatePayload: any = {};
 
-    if (householdData?.memberIds?.includes(userId)) {
+    // Remove from members array if it exists and user is in it
+    if (memberIndex !== -1) {
+      updatePayload.members = FieldValue.arrayRemove(memberToRemove);
+    }
+
+    // Remove from memberIds array if it exists
+    if (isMemberByIds) {
       updatePayload.memberIds = FieldValue.arrayRemove(userId);
     }
 
-    await householdRef.update(updatePayload);
+    // Only update if we have something to update
+    if (Object.keys(updatePayload).length > 0) {
+      await householdRef.update(updatePayload);
+    }
 
-    // Update user's document to remove householdId
+    // Update user's document to remove householdId (only if it exists)
     const userRef = db.collection("users").doc(userId);
-    await userRef.update({
-      householdId: FieldValue.delete()
-    });
+    const userDoc = await userRef.get();
+    if (userDoc.exists && userDoc.data()?.householdId) {
+      await userRef.update({
+        householdId: FieldValue.delete()
+      });
+    }
 
     // Remove custom claim for the leaving user
     try {
@@ -162,7 +203,8 @@ export const leaveHouseholdHttp = onRequest(async (req, res) => {
     }
 
     // If this was the last member, delete the household
-    if (members.length === 1) {
+    const totalMembers = Math.max(members.length, memberIds.length);
+    if (totalMembers === 1) {
       await householdRef.delete();
     }
 

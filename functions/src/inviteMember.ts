@@ -70,6 +70,8 @@ async function inviteMemberCore(inviterUid: string, email: string, householdId: 
 
   let memberIdToStore = email;
   let invitedUserName = email.split('@')[0]; // Default fallback
+  let invitedUserEmail = email;
+  const invitedUserAvatar = undefined;
   try {
     const auth = getAuth();
     const userRecord = await auth.getUserByEmail(email).catch(() => null);
@@ -77,12 +79,22 @@ async function inviteMemberCore(inviterUid: string, email: string, householdId: 
       memberIdToStore = userRecord.uid;
       // Use the user's display name if available, otherwise fallback to email prefix
       invitedUserName = userRecord.displayName || email.split('@')[0];
+      invitedUserEmail = userRecord.email || email;
+      // Note: photoURL is not available in Firebase Functions for security reasons
     }
   } catch (err) {
     console.warn('Unable to resolve invited email to UID:', err);
   }
 
-  const newMember = { id: memberIdToStore, name: invitedUserName, email, role: 'member', status: 'Invited' };
+  const newMember = { 
+    id: memberIdToStore, 
+    name: invitedUserName, 
+    email: invitedUserEmail,
+    avatar: invitedUserAvatar,
+    role: 'member', 
+    status: 'Invited',
+    joinedAt: new Date().toISOString()
+  };
   
   // Ensure members is an array and add the new member (only if not already present)
   const currentMembers = Array.isArray(householdData.members) ? householdData.members : [];

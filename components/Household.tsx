@@ -667,7 +667,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
                   </button>
                   <div className="flex-1">
                     <div className="text-sm font-medium text-white flex items-center gap-2">
-                      {member.name} 
+                      {member.name && member.name !== 'Unknown' ? member.name : (member.email ? member.email.split('@')[0] : 'Unknown Member')} 
                       {member.email === user.email && <span className="text-[10px] bg-amber-500/20 text-amber-500 px-1.5 rounded">YOU</span>}
                     </div>
                     <div className="text-xs text-red-200/50">{member.role} • {member.status}</div>

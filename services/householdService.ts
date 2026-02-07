@@ -302,6 +302,8 @@ export const joinHousehold = async (
 
     if (!householdSnap.empty) {
       const members = householdSnap.docs[0].data().members || [];
+      const currentMemberIds = householdSnap.docs[0].data().memberIds || [];
+      
       const updatedMembers = members.map((m: Member) => {
         if (m.email === user.email) {
           return {
@@ -314,9 +316,12 @@ export const joinHousehold = async (
         return m;
       });
 
+      // Ensure memberIds are unique
+      const updatedMemberIds = Array.from(new Set([...currentMemberIds, user.id]));
+
       await updateDoc(householdSnap.docs[0].ref, {
         members: updatedMembers,
-        memberIds: arrayUnion(user.id),
+        memberIds: updatedMemberIds,
         updatedAt: serverTimestamp(),
       });
     }

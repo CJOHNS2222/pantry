@@ -29,6 +29,7 @@ import { AppProvider, useApp } from './contexts/AppContext';
 import { AppActionsProvider, useAppActions } from './contexts/AppActionsContext';
 import SafeAreaService from './services/safeAreaService';
 import { GlobalUpdatePrompt } from './components/GlobalUpdatePrompt';
+import { joinHousehold } from './services/householdService';
 
 // Lazy load monitoring components
 const DatabaseAnalytics = React.lazy(() => import('./components/DatabaseAnalytics').then(module => ({ default: module.default })));
@@ -256,85 +257,63 @@ const App: React.FC = () => {
   };
 
   const handleNotificationAction = async (notification: NotificationItem) => {
-    // Mark as read
-    await NotificationService.markAsRead(notification.id);
+    // Mark as read immediately to prevent multiple clicks
     setNotifications([]);
+    
+    try {
+      // Mark as read in database
+      await NotificationService.markAsRead(notification.id);
 
-    // Handle the action
-    switch (notification.actionType) {
-      case 'add_to_shopping':
-        if (notification.actionData?.itemName) {
-          addToShoppingList([notification.actionData.itemName]);
-        }
-        break;
-      case 'view_recipe':
-        if (notification.actionData?.recipeId) {
-          setActiveTab(Tab.RECIPES);
-          // Could scroll to specific recipe or set search
-        }
-        break;
-      case 'view_item':
-        if (notification.actionData?.tab === 'shopping') {
-          setActiveTab(Tab.SHOPPING);
-        }
-        break;
-      case 'join_household':
-        // Join household invitation
-        if (notification.actionData?.householdId && user) {
-          try {
-            // Update user document with householdId
-            const userRef = doc(db, 'users', user.id);
-            await updateDoc(userRef, {
-              householdId: notification.actionData.householdId,
-              updatedAt: serverTimestamp()
-            });
-
-            // Update household document to add member
-            const householdRef = doc(db, 'households', notification.actionData.householdId);
-            const householdDoc = await getDoc(householdRef);
-            
-            if (householdDoc.exists()) {
-              const householdData = householdDoc.data();
-              const currentMemberIds = Array.isArray(householdData?.memberIds) ? householdData.memberIds : [];
-              const currentMembers = Array.isArray(householdData?.members) ? householdData.members : [];
-              
-              const updatedMemberIds = [...currentMemberIds, user.id];
-              const newMember = {
-                id: user.id,
-                name: user.name,
-                email: user.email,
-                role: 'member',
-                status: 'Active',
-                joinedAt: new Date().toISOString()
-              };
-              const updatedMembers = [...currentMembers, newMember];
-              
-              await updateDoc(householdRef, {
-                memberIds: updatedMemberIds,
-                members: updatedMembers,
-                updatedAt: serverTimestamp()
-              });
-
-              // Update local user state with householdId
-              setUser({ ...user, householdId: notification.actionData.householdId });
-
-              // Update local household state immediately
-              const updatedHousehold = {
-                id: householdDoc.id,
-                ...householdData,
-                memberIds: updatedMemberIds,
-                members: updatedMembers
-              } as Household;
-              setHousehold(updatedHousehold);
-            }
-            
-            addToast('Successfully joined household!', 'success');
-          } catch (error) {
-            console.error('Error joining household:', error);
-            addToast('Failed to join household', 'error');
+      // Handle the action
+      switch (notification.actionType) {
+        case 'add_to_shopping':
+          if (notification.actionData?.itemName) {
+            addToShoppingList([notification.actionData.itemName]);
           }
-        }
-        break;
+          break;
+        case 'view_recipe':
+          if (notification.actionData?.recipeId) {
+            setActiveTab(Tab.RECIPES);
+            // Could scroll to specific recipe or set search
+          }
+          break;
+        case 'view_item':
+          if (notification.actionData?.tab === 'shopping') {
+            setActiveTab(Tab.SHOPPING);
+          }
+          break;
+        case 'join_household':
+          // Join household invitation
+          if (notification.actionData?.householdId && user) {
+            try {
+              // Use the household service to join
+              const updatedHousehold = await joinHousehold(notification.actionData.householdId, user);
+              
+              if (updatedHousehold) {
+                // Update local user state with householdId
+                setUser({ ...user, householdId: notification.actionData.householdId });
+                
+                // Update local household state
+                setHousehold(updatedHousehold);
+                
+                addToast('Successfully joined household!', 'success');
+              } else {
+                addToast('Failed to join household - invitation not found', 'error');
+              }
+            } catch (error: any) {
+              console.error('Error joining household:', error);
+              let message = 'Failed to join household';
+              if (error.message?.includes('not invited')) {
+                message = 'You are not invited to this household or have already joined';
+              }
+              addToast(message, 'error');
+            }
+          }
+          break;
+      }
+    } catch (error) {
+      console.error('Error handling notification action:', error);
+      addToast('Failed to process notification', 'error');
     }
   };
 

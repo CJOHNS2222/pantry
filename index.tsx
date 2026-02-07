@@ -4,6 +4,8 @@ import App from './App';
 import './src/index.css';
 import { initSentry } from './services/sentryService';
 import { I18nProvider } from './src/components/I18nProvider';
+import { AppProvider } from './contexts/AppContext';
+import { AppActionsProvider } from './contexts/AppActionsContext';
 
 // Initialize Sentry for error reporting
 // initSentry(); // Disabled for testing
@@ -16,6 +18,10 @@ if (!rootElement) {
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <I18nProvider>
-    <App />
+    <AppProvider>
+      <AppActionsProvider>
+        <App />
+      </AppActionsProvider>
+    </AppProvider>
   </I18nProvider>
 );
