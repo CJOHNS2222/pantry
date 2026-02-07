@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { doc, onSnapshot, collection, addDoc, getDocs, setDoc, serverTimestamp, query, where, Timestamp, deleteDoc, writeBatch } from 'firebase/firestore';
+import { doc, onSnapshot, collection, addDoc, getDocs, setDoc, serverTimestamp, query, where, Timestamp, deleteDoc, writeBatch, getDoc } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 import DatabaseMonitoringService from '../services/databaseMonitoringService';
 import AnalyticsService from '../services/analyticsService';
@@ -14,6 +14,7 @@ import { undoService } from '../services/undoService';
 import { NotificationService } from '../services/notificationService';
 import { useScopedDataListener } from './useDataListener';
 import { firestoreCache } from '../services/cacheService';
+import { HouseholdPreferenceService } from '../services/householdPreferenceService';
 
 // Global flag to prevent multiple listener setups
 const globalListenersSetUp = { current: false };
@@ -94,17 +95,74 @@ function createMealPlanListener(
 ) {
   if (inHousehold && household?.id) {
     return onSnapshot(collection(db, 'households', household.id, 'mealPlan'), snap => {
-      const serverData = snap.docs.map(d => {
-        const data = d.data();
-        // Convert Timestamp objects to strings for date fields
-        if (data.date && typeof data.date.toDate === 'function') {
-          data.date = data.date.toDate().toISOString().split('T')[0]; // Convert to YYYY-MM-DD format
+      // Create a 7-day (free) or 14-day (premium) template starting from today
+      const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const today = new Date();
+
+      // Check usage limits to determine planning horizon
+      let daysToShow = 7; // Default to 7 days
+      if (user?.subscription?.tier === 'family') {
+        daysToShow = 14; // Family users always get 2 weeks
+      } else if (user?.subscription?.tier === 'premium') {
+        daysToShow = 14; // Premium users get 2 weeks
+      } else {
+        daysToShow = 7; // Free users get 1 week
+      }
+
+      const fullWeekPlan: DayPlan[] = [];
+
+      for (let i = 0; i < daysToShow; i++) {
+        const d = new Date(today);
+        d.setDate(today.getDate() + i);
+        const iso = d.toISOString().slice(0, 10);
+        fullWeekPlan.push({
+          date: iso,
+          dayName: days[d.getDay()],
+          breakfast: [],
+          lunch: [],
+          dinner: []
+        });
+      }
+
+      // Merge Firestore data into the template
+      snap.docs.forEach(doc => {
+        const data = doc.data();
+        const dateStr = data.date && typeof data.date.toDate === 'function'
+          ? data.date.toDate().toISOString().slice(0, 10)
+          : data.date;
+        const existingDay = fullWeekPlan.find(day => day.date === dateStr);
+        if (existingDay) {
+          // Handle migration from old meals array to new structure
+          if (data.meals && Array.isArray(data.meals)) {
+            // Migrate old meals array to new structure
+            const validMeals = data.meals.filter((meal: any) => meal && meal.id && meal.recipe);
+            validMeals.forEach((meal: any) => {
+              const mealType = meal.type || 'dinner'; // Default to dinner if no type specified
+              switch (mealType) {
+                case 'breakfast':
+                  existingDay.breakfast.push(meal);
+                  break;
+                case 'lunch':
+                  existingDay.lunch.push(meal);
+                  break;
+                case 'dinner':
+                default:
+                  existingDay.dinner.push(meal);
+                  break;
+              }
+            });
+          } else {
+            // Handle new structure directly
+            existingDay.breakfast = data.breakfast || [];
+            existingDay.lunch = data.lunch || [];
+            existingDay.dinner = data.dinner || [];
+          }
         }
-        return { id: d.id, ...data } as DayPlan;
       });
-      if (hasMealPlansChanged(serverData, [])) { // Using empty array as placeholder for current state
+
+      if (hasMealPlansChanged(fullWeekPlan, [])) { // Using empty array as placeholder for current state
         setRemoteMealPlanUpdate(true);
-        setMealPlan(serverData);
+        setMealPlan(fullWeekPlan);
       }
       setIsLoadingMealPlan(false);
     }, err => {
@@ -113,17 +171,74 @@ function createMealPlanListener(
     });
   } else {
     return onSnapshot(collection(db, 'users', user.id, 'mealPlan'), snap => {
-      const serverData = snap.docs.map(d => {
-        const data = d.data();
-        // Convert Timestamp objects to strings for date fields
-        if (data.date && typeof data.date.toDate === 'function') {
-          data.date = data.date.toDate().toISOString().split('T')[0]; // Convert to YYYY-MM-DD format
+      // Create a 7-day (free) or 14-day (premium) template starting from today
+      const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const today = new Date();
+
+      // Check usage limits to determine planning horizon
+      let daysToShow = 7; // Default to 7 days
+      if (user?.subscription?.tier === 'family') {
+        daysToShow = 14; // Family users always get 2 weeks
+      } else if (user?.subscription?.tier === 'premium') {
+        daysToShow = 14; // Premium users get 2 weeks
+      } else {
+        daysToShow = 7; // Free users get 1 week
+      }
+
+      const fullWeekPlan: DayPlan[] = [];
+
+      for (let i = 0; i < daysToShow; i++) {
+        const d = new Date(today);
+        d.setDate(today.getDate() + i);
+        const iso = d.toISOString().slice(0, 10);
+        fullWeekPlan.push({
+          date: iso,
+          dayName: days[d.getDay()],
+          breakfast: [],
+          lunch: [],
+          dinner: []
+        });
+      }
+
+      // Merge Firestore data into the template
+      snap.docs.forEach(doc => {
+        const data = doc.data();
+        const dateStr = data.date && typeof data.date.toDate === 'function'
+          ? data.date.toDate().toISOString().slice(0, 10)
+          : data.date;
+        const existingDay = fullWeekPlan.find(day => day.date === dateStr);
+        if (existingDay) {
+          // Handle migration from old meals array to new structure
+          if (data.meals && Array.isArray(data.meals)) {
+            // Migrate old meals array to new structure
+            const validMeals = data.meals.filter((meal: any) => meal && meal.id && meal.recipe);
+            validMeals.forEach((meal: any) => {
+              const mealType = meal.type || 'dinner'; // Default to dinner if no type specified
+              switch (mealType) {
+                case 'breakfast':
+                  existingDay.breakfast.push(meal);
+                  break;
+                case 'lunch':
+                  existingDay.lunch.push(meal);
+                  break;
+                case 'dinner':
+                default:
+                  existingDay.dinner.push(meal);
+                  break;
+              }
+            });
+          } else {
+            // Handle new structure directly
+            existingDay.breakfast = data.breakfast || [];
+            existingDay.lunch = data.lunch || [];
+            existingDay.dinner = data.dinner || [];
+          }
         }
-        return { id: d.id, ...data } as DayPlan;
       });
-      if (hasMealPlansChanged(serverData, [])) { // Using empty array as placeholder for current state
+
+      if (hasMealPlansChanged(fullWeekPlan, [])) { // Using empty array as placeholder for current state
         setRemoteMealPlanUpdate(true);
-        setMealPlan(serverData);
+        setMealPlan(fullWeekPlan);
       }
       setIsLoadingMealPlan(false);
     }, err => {
@@ -162,19 +277,43 @@ export function useDataManagement(user: User | null, addToast: (message: string,
   // Online status
   const [isOnline, setIsOnline] = useState(true);
 
+  // Retry counter for household listener permissions issues
+  const [householdListenerRetry, setHouseholdListenerRetry] = useState(0);
+
   // Writing state refs to prevent concurrent operations
   const writingMealPlanRef = useRef(false);
   const mealPlanCleanupDoneRef = useRef(false);
 
   // Helper function to clean objects by removing undefined fields (Firestore requirement)
   const cleanObject = (obj: any): any => {
-    const cleaned: any = {};
-    for (const key in obj) {
-      if (obj[key] !== undefined) {
-        cleaned[key] = obj[key];
+    if (obj === null || obj === undefined) {
+      return undefined;
+    }
+
+    if (typeof obj === 'object') {
+      if (Array.isArray(obj)) {
+        // Clean arrays by filtering out null/undefined and cleaning each item
+        return obj
+          .filter(item => item !== null && item !== undefined)
+          .map(item => cleanObject(item))
+          .filter(item => item !== undefined);
+      } else {
+        // Clean objects by removing undefined properties and cleaning nested objects
+        const cleaned: any = {};
+        for (const key in obj) {
+          if (obj.hasOwnProperty(key)) {
+            const cleanedValue = cleanObject(obj[key]);
+            if (cleanedValue !== undefined) {
+              cleaned[key] = cleanedValue;
+            }
+          }
+        }
+        return cleaned;
       }
     }
-    return cleaned;
+
+    // Return primitive values as-is
+    return obj;
   };
 
   // Helper function for offline-aware writes
@@ -339,49 +478,167 @@ export function useDataManagement(user: User | null, addToast: (message: string,
   useEffect(() => {
     if (!user?.id) return;
 
-    // Prevent multiple listener setups
-    if (globalListenersSetUp.current) return;
+    // Prevent multiple listener setups, but allow re-setup when householdId changes
+    if (globalListenersSetUp.current && !user?.householdId) return;
 
     const unsubs: (()=>void)[] = [];
 
     // Household document listener - always listen if user has a household
-    if (household?.id) {
-      unsubs.push(onSnapshot(doc(db, 'households', household.id), snap => {
+    if (user?.householdId) {
+      unsubs.push(onSnapshot(doc(db, 'households', user.householdId), snap => {
+        console.log('Household listener callback fired, snap.exists():', snap.exists());
         if (snap.exists()) {
-          const householdData = { id: snap.id, ...snap.data() } as Household;
+          console.log('Household document data:', snap.data());
+          let householdData = { id: snap.id, ...snap.data() } as Household;
+          
+          // If members array doesn't exist, is empty, or is in wrong format (map instead of array), populate members from user documents
+          const membersIsArray = Array.isArray(householdData.members);
+          const membersIsEmpty = membersIsArray && householdData.members.length === 0;
+          const membersIsMap = householdData.members && typeof householdData.members === 'object' && !membersIsArray;
+          const needsPopulation = !householdData.members || !membersIsArray || membersIsEmpty || membersIsMap;
+          
+          if (needsPopulation && householdData.memberIds && householdData.memberIds.length > 0) {
+            // Don't fetch user data from Firestore due to security rules
+            // Instead, rely on data already in household document or use current user data
+            const uniqueMemberIds = [...new Set(householdData.memberIds)];
+              console.log('Processing memberIds:', uniqueMemberIds);
+
+              // If members exists as a map/object, convert it to array format first
+              if (membersIsMap && householdData.members) {
+                const mapMembers = householdData.members as Record<string, any>;
+                const convertedMembers: Member[] = [];
+
+                for (const memberId of uniqueMemberIds) {
+                  if (mapMembers[memberId]) {
+                    let memberName = mapMembers[memberId].name || mapMembers[memberId].email || 'Unknown';
+
+                    // Fix corrupted names that are actually member IDs
+                    if (memberName === memberId || (memberName.length > 20 && memberName.match(/^[a-zA-Z0-9_-]+$/))) {
+                      memberName = mapMembers[memberId].email?.split('@')[0] || `Member ${memberId.slice(0, 8)}`;
+                    }
+
+                    convertedMembers.push(cleanObject({
+                      id: memberId,
+                      name: memberName,
+                      email: mapMembers[memberId].email || '',
+                      avatar: mapMembers[memberId].avatar,
+                      role: mapMembers[memberId].role || 'member', // Preserve existing role
+                      status: mapMembers[memberId].status || 'Active',
+                      joinedAt: mapMembers[memberId].joinedAt || new Date().toISOString(),
+                      lastSeen: mapMembers[memberId].lastSeen,
+                      currentActivity: mapMembers[memberId].currentActivity,
+                      isOnline: mapMembers[memberId].isOnline,
+                      dietaryRestrictions: mapMembers[memberId].dietaryRestrictions,
+                      allergies: mapMembers[memberId].allergies,
+                      specialNeeds: mapMembers[memberId].specialNeeds
+                    }));
+                  }
+                }
+
+                if (convertedMembers.length > 0) {
+                  householdData.members = convertedMembers;
+                  // Don't update the household document here - let the population logic handle it
+                  console.log('Converted household members from map to array format');
+                }
+              }
+
+              // Only create basic member entries if there are NO members at all
+              // Trust that the household document has correct member data from join operations
+              if (!Array.isArray(householdData.members) || householdData.members.length === 0) {
+                console.log('Creating basic member entries for household with no members array');
+
+                const basicMembers = uniqueMemberIds.map(memberId => {
+                  // For current user, use their actual data
+                  if (memberId === user?.id) {
+                    return {
+                      id: memberId,
+                      name: user?.name || user?.email?.split('@')[0] || 'You',
+                      email: user?.email || '',
+                      avatar: user?.avatar,
+                      role: 'admin', // Current user is typically admin
+                      status: 'Active',
+                      joinedAt: new Date().toISOString(),
+                      lastSeen: new Date().toISOString(),
+                      currentActivity: undefined,
+                      isOnline: true,
+                      dietaryRestrictions: user?.profile?.dietaryRestrictions || [],
+                      allergies: user?.profile?.allergies || [],
+                      specialNeeds: user?.profile?.specialNeeds
+                    } as Member;
+                  }
+
+                  // For other members, use minimal placeholder - they should have real data from join operations
+                  return {
+                    id: memberId,
+                    name: `Member ${memberId.slice(0, 8)}`, // Placeholder - should be replaced by real data
+                    email: '',
+                    avatar: undefined,
+                    role: 'member',
+                    status: 'Active',
+                    joinedAt: new Date().toISOString(),
+                    lastSeen: undefined,
+                    currentActivity: undefined,
+                    isOnline: false,
+                    dietaryRestrictions: [],
+                    allergies: [],
+                    specialNeeds: undefined
+                  } as Member;
+                });
+
+                householdData.members = basicMembers;
+              }
+            }
+          
           // Only update if the household data has actually changed (excluding timestamps)
           const hasChanged = !prevHouseholdRef.current ||
             householdData.id !== prevHouseholdRef.current.id ||
             householdData.name !== prevHouseholdRef.current.name ||
             householdData.ownerId !== prevHouseholdRef.current.ownerId ||
-            JSON.stringify(householdData.memberIds || []) !== JSON.stringify(prevHouseholdRef.current.memberIds || []);
+            JSON.stringify(householdData.memberIds || []) !== JSON.stringify(prevHouseholdRef.current.memberIds || []) ||
+            JSON.stringify(householdData.members || []) !== JSON.stringify(prevHouseholdRef.current.members || []);
           if (hasChanged) {
             prevHouseholdRef.current = householdData;
+            console.log('Setting household state:', householdData);
             setHousehold(householdData);
           }
         }
         setIsLoadingHousehold(false);
+        // Reset retry counter on successful load
+        if (householdListenerRetry > 0) {
+          setHouseholdListenerRetry(0);
+        }
       }, err => {
         console.error("Household document listener failed:", err);
-        setIsLoadingHousehold(false);
+        
+        // If it's a permissions error during household creation/setup, retry after a delay
+        if (err.code === 'permission-denied' && user?.householdId && householdListenerRetry < 3) {
+          console.log(`Retrying household listener due to permissions error (attempt ${householdListenerRetry + 1}/3)`);
+          setTimeout(() => {
+            setHouseholdListenerRetry(prev => prev + 1);
+          }, 1000);
+        } else {
+          setIsLoadingHousehold(false);
+        }
       }));
     } else {
+      setHousehold(null);
       setIsLoadingHousehold(false);
     }
 
-    // Determine if we are in a valid household (multi-member household)
-    const inHousehold = isHouseholdMember(household, user) && household?.id &&
-                       (Array.isArray(household.memberIds) ? household.memberIds.length > 1 : false);
+    // Determine if we are in a valid household (any household with membership)
+    const inHousehold = isHouseholdMember(household, user) && household?.id;
 
-    // Inventory listener - conditional based on household status
-    if (inHousehold) {
-      // Listen to household inventory when in household
+    // Inventory listener - use household inventory if user has householdId (migrated at creation)
+    if (household?.id && isHouseholdMember(household, user)) {
+      // Listen to household inventory when user has a household
       unsubs.push(onSnapshot(collection(db, 'households', household.id, 'inventory'), snap => {
         const serverData = snap.docs.map(d => ({ id: d.id, ...d.data() } as PantryItem));
+        // Filter out invalid items
+        const validServerData = serverData.filter(item => item && typeof item === 'object' && item.id);
         // Only update if different to prevent infinite loops
-        if (hasPantryItemsChanged(serverData, inventory)) {
+        if (hasPantryItemsChanged(validServerData, inventory)) {
           setRemoteInventoryUpdate(true);
-          setInventory(serverData);
+          setInventory(validServerData);
         }
         setIsLoadingInventory(false);
         initialDataLoadedRef.current = true;
@@ -393,10 +650,12 @@ export function useDataManagement(user: User | null, addToast: (message: string,
       // Listen to user inventory when not in household
       unsubs.push(onSnapshot(collection(db, 'users', user.id, 'inventory'), snap => {
         const serverData = snap.docs.map(d => ({ id: d.id, ...d.data() } as PantryItem));
+        // Filter out invalid items
+        const validServerData = serverData.filter(item => item && typeof item === 'object' && item.id);
         // Only update if different to prevent infinite loops
-        if (hasPantryItemsChanged(serverData, inventory)) {
+        if (hasPantryItemsChanged(validServerData, inventory)) {
           setRemoteInventoryUpdate(true);
-          setInventory(serverData);
+          setInventory(validServerData);
         }
         setIsLoadingInventory(false);
         initialDataLoadedRef.current = true;
@@ -418,7 +677,7 @@ export function useDataManagement(user: User | null, addToast: (message: string,
       unsubs.forEach(unsub => unsub());
       globalListenersSetUp.current = false;
     };
-  }, [user?.id, household?.id]);
+  }, [user?.id, user?.householdId, householdListenerRetry]);
 
   // Set flag when listeners are ready
   useEffect(() => {
@@ -428,7 +687,7 @@ export function useDataManagement(user: User | null, addToast: (message: string,
       listenersReadyRef.current = false;
       initialDataLoadedRef.current = false;
     };
-  }, [user?.id, household?.id]);
+  }, [user?.id, user?.householdId, householdListenerRetry]);
 
   // Check for expired items and handle them
   useEffect(() => {
@@ -480,6 +739,25 @@ export function useDataManagement(user: User | null, addToast: (message: string,
 
   }, [inventory, user?.id, addToShoppingList, addToast]);
 
+  // Check for allergy alerts when inventory changes
+  useEffect(() => {
+    if (!inventory.length || !user?.id || !household?.id) return;
+
+    const checkAllergies = async () => {
+      try {
+        await HouseholdPreferenceService.checkHouseholdInventoryForAllergies(
+          household.id,
+          inventory,
+          user.id
+        );
+      } catch (error) {
+        console.error('Failed to check household inventory for allergies:', error);
+      }
+    };
+
+    checkAllergies();
+  }, [inventory, user?.id, household?.id]);
+
   // Daily combined notification (meals + shopping)
   useEffect(() => {
     if (!user?.id || !mealPlan.length || !shoppingList.length) return;
@@ -530,9 +808,8 @@ export function useDataManagement(user: User | null, addToast: (message: string,
 
     // Debounce the sync to avoid running on every state change
     const timeoutId = setTimeout(async () => {
-      // Determine if we are in a valid household (multi-member household)
-      const inHousehold = household?.id && isHouseholdMember(household, user) && 
-                         (Array.isArray(household.memberIds) ? household.memberIds.length > 1 : false);
+      // Determine if we are in a valid household (any household with membership)
+      const inHousehold = household?.id && isHouseholdMember(household, user);
 
       console.log('Inventory sync triggered - user:', user?.id, 'household:', household?.id, 'inventory length:', inventory.length, 'inHousehold:', inHousehold);
 
@@ -772,8 +1049,7 @@ export function useDataManagement(user: User | null, addToast: (message: string,
     // Debounce the sync to avoid running on every state change
     const timeoutId = setTimeout(async () => {
       try {
-        const collectionPath = household?.id && isHouseholdMember(household, user) && 
-                           (Array.isArray(household.memberIds) ? household.memberIds.length > 1 : false)
+        const collectionPath = household?.id && isHouseholdMember(household, user)
           ? `households/${household.id}/shoppingList`
           : `users/${user.id}/shoppingList`;
 
@@ -872,8 +1148,7 @@ export function useDataManagement(user: User | null, addToast: (message: string,
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
         const cutoffDate = Timestamp.fromDate(sevenDaysAgo);
 
-        const collectionPath = household?.id && isHouseholdMember(household, user) && 
-                           (Array.isArray(household.memberIds) ? household.memberIds.length > 1 : false)
+        const collectionPath = household?.id && isHouseholdMember(household, user)
           ? `households/${household.id}/mealPlan`
           : `users/${user.id}/mealPlan`;
 
@@ -981,12 +1256,27 @@ export function useDataManagement(user: User | null, addToast: (message: string,
   }, []);
 
   // Load undo actions
+  const prevUserIdRef = useRef<string | null>(null);
   useEffect(() => {
-    undoService.getRecentActions().then(actions => setRecentActions(actions)).catch(console.error);
-  }, []);
+    const currentUserId = user?.id || null;
+    const prevUserId = prevUserIdRef.current;
+
+    // Clear actions from previous user if user changed
+    if (prevUserId && prevUserId !== currentUserId) {
+      undoService.clearUserActions(prevUserId).catch(console.error);
+    }
+
+    if (currentUserId) {
+      undoService.getRecentActions(currentUserId).then(actions => setRecentActions(actions)).catch(console.error);
+    } else {
+      setRecentActions([]);
+    }
+
+    prevUserIdRef.current = currentUserId;
+  }, [user?.id]);
 
   // Handlers
-  const handleAddToPlan = async (recipe: any) => {
+  const handleAddToPlan = async (recipe: any, targetDayIndex?: number, targetMealType?: 'breakfast' | 'lunch' | 'dinner') => {
     if (!mealPlan) return;
 
     // Check if we've already determined the limit is exceeded
@@ -1010,44 +1300,62 @@ export function useDataManagement(user: User | null, addToast: (message: string,
       }
     }
 
-    const today = new Date().toISOString().slice(0, 10);
     let updatedPlan = [...mealPlan];
+    let dayIndex = targetDayIndex;
+    let mealType = targetMealType || 'breakfast';
 
-    // Check if today exists in the plan
-    const todayIndex = updatedPlan.findIndex(day => day.date === today);
-    if (todayIndex === -1) {
-      // Add today to the plan
-      const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-      const todayDate = new Date();
-      updatedPlan.push({
-        date: today,
-        dayName: days[todayDate.getDay()],
-        breakfast: [],
-        lunch: [],
-        dinner: []
-      });
-      // Sort by date
-      updatedPlan.sort((a, b) => a.date.localeCompare(b.date));
+    // If no target specified, default to today
+    if (dayIndex === undefined) {
+      const today = new Date().toISOString().slice(0, 10);
+      dayIndex = updatedPlan.findIndex(day => day.date === today);
+      
+      if (dayIndex === -1) {
+        // Add today to the plan
+        const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const todayDate = new Date();
+        updatedPlan.push({
+          date: today,
+          dayName: days[todayDate.getDay()],
+          breakfast: [],
+          lunch: [],
+          dinner: []
+        });
+        // Sort by date
+        updatedPlan.sort((a, b) => a.date.localeCompare(b.date));
+        dayIndex = updatedPlan.findIndex(day => day.date === today);
+      }
     }
 
-    // Now add the recipe to today as a meal object
-    updatedPlan = updatedPlan.map(day => {
-      if (day.date === today) {
+    // Ensure the target day exists
+    if (dayIndex === undefined || dayIndex < 0 || dayIndex >= updatedPlan.length) {
+      addToast('Invalid day selected', 'error');
+      return;
+    }
+
+    // Add the recipe to the specified day and meal type
+    updatedPlan = updatedPlan.map((day, index) => {
+      if (index === dayIndex) {
         const newMeal = {
           id: `meal-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           recipe: recipe,
-          mealType: 'breakfast' as const
+          mealType: mealType
         };
-        return { ...day, breakfast: [...day.breakfast, newMeal] };
+        
+        const updatedDay = { ...day };
+        if (!updatedDay[mealType]) updatedDay[mealType] = [];
+        updatedDay[mealType] = [...updatedDay[mealType], newMeal];
+        
+        return updatedDay;
       }
       return day;
     });
 
     setMealPlan(updatedPlan);
-    addToast(`Added ${recipe.title} to today's meal plan!`);
+    const dayName = updatedPlan[dayIndex].dayName;
+    addToast(`Added ${recipe.title} to ${dayName}'s ${mealType}!`);
 
     // Track analytics
-    AnalyticsService.trackMealPlanAdd(recipe.id || recipe.title, recipe.title, 'breakfast', 0);
+    AnalyticsService.trackMealPlanAdd(recipe.id || recipe.title, recipe.title, mealType, dayIndex);
 
     // Record the meal planning usage
     if (user) {
@@ -1105,8 +1413,7 @@ export function useDataManagement(user: User | null, addToast: (message: string,
     }
     
     try {
-      const inHousehold = isHouseholdMember(household, user) && household?.id && 
-                         (Array.isArray(household.memberIds) ? household.memberIds.length > 1 : false);
+      const inHousehold = isHouseholdMember(household, user) && household?.id;
       const collectionPath = inHousehold ? `households/${household.id}/savedRecipes` : `users/${user.id}/savedRecipes`;
       
       // Check for duplicate recipes
@@ -1166,8 +1473,7 @@ export function useDataManagement(user: User | null, addToast: (message: string,
   const handleDeleteRecipe = async (recipe: SavedRecipe) => {
     if (!user?.id) return;
     try {
-      const inHousehold = isHouseholdMember(household, user) && household?.id && 
-                         (Array.isArray(household.memberIds) ? household.memberIds.length > 1 : false);
+      const inHousehold = isHouseholdMember(household, user) && household?.id;
       const collectionPath = inHousehold ? `households/${household.id}/savedRecipes` : `users/${user.id}/savedRecipes`;
       
       await deleteDoc(doc(db, collectionPath, recipe.id));
@@ -1392,9 +1698,10 @@ export function useDataManagement(user: User | null, addToast: (message: string,
 
   // Undo functions
   const recordUndo = async (type: string, data: any) => {
+    if (!user?.id) return;
     try {
-      await undoService.recordAction({ type, data });
-      const actions = await undoService.getRecentActions();
+      await undoService.recordAction({ type, data }, user.id);
+      const actions = await undoService.getRecentActions(user.id);
       setRecentActions(actions);
     } catch (error) {
       console.error('Failed to record undo action:', error);
@@ -1406,18 +1713,41 @@ export function useDataManagement(user: User | null, addToast: (message: string,
       const undoOp = await undoService.undoAction(action);
       if (undoOp) {
         if (undoOp.type === 'restore_item') {
-          setInventory(prev => [...prev, undoOp.data]);
+          // Ensure the restored item is valid
+          if (undoOp.data && typeof undoOp.data === 'object' && undoOp.data.id) {
+            // Ensure the item has required properties
+            const restoredItem = {
+              ...undoOp.data,
+              consumptionHistory: undoOp.data.consumptionHistory || []
+            };
+            setInventory(prev => [...prev, restoredItem]);
+          } else {
+            console.warn('Invalid item data in undo operation:', undoOp.data);
+            addToast('Unable to restore item - invalid data', 'error');
+            return;
+          }
         } else if (undoOp.type === 'revert_edit') {
           // Revert the item to its previous state
           const { index, previousState } = undoOp.data;
-          setInventory(prev => {
-            const updated = [...prev];
-            updated[index] = previousState;
-            return updated;
-          });
+          if (previousState && typeof previousState === 'object' && previousState.id) {
+            // Ensure the item has required properties
+            const revertedItem = {
+              ...previousState,
+              consumptionHistory: previousState.consumptionHistory || []
+            };
+            setInventory(prev => {
+              const updated = [...prev];
+              updated[index] = revertedItem;
+              return updated;
+            });
+          } else {
+            console.warn('Invalid previous state in undo operation:', undoOp.data);
+            addToast('Unable to revert edit - invalid data', 'error');
+            return;
+          }
         }
         await undoService.removeAction(action.id);
-        const actions = await undoService.getRecentActions();
+        const actions = await undoService.getRecentActions(user?.id || '');
         setRecentActions(actions);
         addToast('Action undone', 'info');
       }
@@ -1447,8 +1777,7 @@ export function useDataManagement(user: User | null, addToast: (message: string,
     });
 
     // Save to database
-    const collectionPath = household?.id && isHouseholdMember(household, user) &&
-                          (Array.isArray(household.memberIds) ? household.memberIds.length > 1 : false)
+    const collectionPath = household?.id && isHouseholdMember(household, user)
       ? `households/${household.id}/inventory`
       : `users/${user.id}/inventory`;
 
@@ -1478,8 +1807,7 @@ export function useDataManagement(user: User | null, addToast: (message: string,
     setInventory(prev => prev.filter((_, i) => i !== index));
 
     // Delete from database
-    const collectionPath = household?.id && isHouseholdMember(household, user) &&
-                          (Array.isArray(household.memberIds) ? household.memberIds.length > 1 : false)
+    const collectionPath = household?.id && isHouseholdMember(household, user)
       ? `households/${household.id}/inventory`
       : `users/${user.id}/inventory`;
 
@@ -1502,8 +1830,7 @@ export function useDataManagement(user: User | null, addToast: (message: string,
     }
 
     // Save to database
-    const collectionPath = household?.id && isHouseholdMember(household, user) &&
-                          (Array.isArray(household.memberIds) ? household.memberIds.length > 1 : false)
+    const collectionPath = household?.id && isHouseholdMember(household, user)
       ? `households/${household.id}/inventory`
       : `users/${user.id}/inventory`;
 
@@ -1550,8 +1877,7 @@ export function useDataManagement(user: User | null, addToast: (message: string,
     });
 
     // Update database
-    const collectionPath = household?.id && isHouseholdMember(household, user) &&
-                          (Array.isArray(household.memberIds) ? household.memberIds.length > 1 : false)
+    const collectionPath = household?.id && isHouseholdMember(household, user)
       ? `households/${household.id}/inventory`
       : `users/${user.id}/inventory`;
 

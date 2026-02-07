@@ -1,9 +1,13 @@
 
 import {onCall, onRequest, HttpsError} from "firebase-functions/v2/https";
+import { defineJsonSecret } from "firebase-functions/params";
 import admin from 'firebase-admin';
 import {getFirestore, FieldValue} from "firebase-admin/firestore";
 import { getAuth } from 'firebase-admin/auth';
 import { sendEmail } from './helpers/sendEmail.js';
+
+// Define the secret for Gmail configuration
+const gmailConfigSecret = defineJsonSecret("EMAILSECRET");
 
 // Ensure the Admin SDK is initialized
 if (!admin.apps?.length) {
@@ -16,33 +20,83 @@ async function inviteMemberCore(inviterUid: string, email: string, householdId: 
   const db = getFirestore();
 
   const householdRef = db.collection("households").doc(householdId);
+  console.log('Household ref path:', householdRef.path);
   const householdDoc = await householdRef.get();
+  console.log('Household doc exists:', householdDoc.exists);
   if (!householdDoc.exists) {
     throw new HttpsError("not-found", "The specified household does not exist.");
   }
   const householdData = householdDoc.data();
-  const members = householdData?.members || [];
-  if (!members.some((member: { id: string; }) => member.id === inviterUid)) {
+  if (!householdData) {
+    throw new HttpsError("not-found", "The household data is corrupted.");
+  }
+
+  // Add a small delay to see if it's a race condition
+  await new Promise(resolve => setTimeout(resolve, 1000));
+
+  console.log('Full household data:', JSON.stringify(householdData, null, 2));
+  console.log('Household data members type:', typeof householdData.members);
+  console.log('Household data members:', householdData.members);
+  console.log('Household data memberIds type:', typeof householdData.memberIds);
+  console.log('Household data memberIds:', householdData.memberIds);
+  console.log('Inviter UID:', inviterUid);
+
+  // Check both members array and memberIds array for backward compatibility
+  const members = Array.isArray(householdData.members) ? householdData.members : [];
+  const memberIds = Array.isArray(householdData.memberIds) ? householdData.memberIds : [];
+
+  console.log('Members array after check:', members);
+  console.log('Member IDs array:', memberIds);
+
+  // Check if inviter is in either members or memberIds
+  const isMemberByMembers = members.some((member: { id: string; }) => member.id === inviterUid);
+  const isMemberByIds = memberIds.includes(inviterUid);
+
+  console.log('Is member by members array:', isMemberByMembers);
+  console.log('Is member by memberIds array:', isMemberByIds);
+
+  if (!isMemberByMembers && !isMemberByIds) {
+    console.log('User not found in members or memberIds');
     throw new HttpsError("permission-denied", "You are not a member of this household.");
   }
 
-  // Get inviter info
-  const inviter = members.find((member: { id: string; }) => member.id === inviterUid);
-  const inviterName = inviter?.name || 'Someone';
-  const householdName = householdData?.name || 'a household';
+  // Get inviter info - try from members array first, then fallback to basic info
+  let inviterName = 'Someone';
+  if (members.length > 0) {
+    const inviter = members.find((member: { id: string; }) => member.id === inviterUid);
+    inviterName = inviter?.name || 'Someone';
+  }
+  const householdName = householdData.name || 'a household';
 
   let memberIdToStore = email;
+  let invitedUserName = email.split('@')[0]; // Default fallback
   try {
     const auth = getAuth();
     const userRecord = await auth.getUserByEmail(email).catch(() => null);
-    if (userRecord && userRecord.uid) memberIdToStore = userRecord.uid;
+    if (userRecord && userRecord.uid) {
+      memberIdToStore = userRecord.uid;
+      // Use the user's display name if available, otherwise fallback to email prefix
+      invitedUserName = userRecord.displayName || email.split('@')[0];
+    }
   } catch (err) {
     console.warn('Unable to resolve invited email to UID:', err);
   }
 
-  const newMember = { id: memberIdToStore, name: email.split('@')[0], email, role: 'member', status: 'Active' };
-  const updatePayload: any = { members: FieldValue.arrayUnion(newMember) };
-  if (memberIdToStore && memberIdToStore !== email) updatePayload.memberIds = FieldValue.arrayUnion(memberIdToStore);
+  const newMember = { id: memberIdToStore, name: invitedUserName, email, role: 'member', status: 'Invited' };
+  
+  // Ensure members is an array and add the new member (only if not already present)
+  const currentMembers = Array.isArray(householdData.members) ? householdData.members : [];
+  const memberExists = currentMembers.some((m: any) => m.id === memberIdToStore);
+  const updatedMembers = memberExists ? currentMembers : [...currentMembers, newMember];
+  
+  const updatePayload: any = { members: updatedMembers };
+  if (memberIdToStore && memberIdToStore !== email) {
+    const currentMemberIds = Array.isArray(householdData.memberIds) ? householdData.memberIds : [];
+    const memberIdExists = currentMemberIds.includes(memberIdToStore);
+    if (!memberIdExists) {
+      updatePayload.memberIds = [...currentMemberIds, memberIdToStore];
+    }
+  }
   await householdRef.update(updatePayload);
 
   // Set custom claim for the invited user if they have a UID
@@ -58,14 +112,16 @@ async function inviteMemberCore(inviterUid: string, email: string, householdId: 
 
   const notificationsRef = db.collection('notifications');
   await notificationsRef.add({ 
-    email, 
-    type: 'household_invite', 
-    householdId, 
-    householdName,
-    inviterName,
+    userId: memberIdToStore, 
+    type: 'household_invite',
+    title: 'Household Invitation',
     message: `${inviterName} has invited you to join the "${householdName}" household on Smart Pantry!`, 
-    timestamp: FieldValue.serverTimestamp(), 
-    read: false 
+    priority: 'medium',
+    actionType: 'join_household',
+    actionLabel: 'Accept',
+    actionData: { householdId },
+    read: false,
+    createdAt: FieldValue.serverTimestamp()
   });
 
   // Send email invitation
@@ -114,7 +170,9 @@ async function inviteMemberCore(inviterUid: string, email: string, householdId: 
   return { success: true, newMember };
 }
 
-export const inviteMember = onCall(async (request) => {
+export const inviteMember = onCall(
+  { secrets: [gmailConfigSecret] },
+  async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'You must be logged in to invite members.');
   const inviterUid = request.auth.uid;
   const { email, householdId } = request.data;
@@ -151,4 +209,274 @@ export const inviteMemberHttp = onRequest(async (req, res) => {
     return;
   }
 });
+
+// Leave household function (admin privileges to bypass security rules)
+export const leaveHousehold = onCall(
+  { secrets: [gmailConfigSecret] },
+  async (request) => {
+    const { householdId } = request.data;
+    const userId = request.auth?.uid;
+
+    if (!userId) {
+      throw new HttpsError("unauthenticated", "User must be authenticated");
+    }
+
+    if (!householdId) {
+      throw new HttpsError("invalid-argument", "householdId is required");
+    }
+
+    const db = getFirestore();
+    const householdRef = db.collection("households").doc(householdId);
+    const householdDoc = await householdRef.get();
+
+    if (!householdDoc.exists) {
+      throw new HttpsError("not-found", "Household not found");
+    }
+
+    const householdData = householdDoc.data();
+    if (!householdData) {
+      throw new HttpsError("not-found", "Household data is corrupted");
+    }
+
+    const members = Array.isArray(householdData.members) ? householdData.members : [];
+    const memberIds = Array.isArray(householdData.memberIds) ? householdData.memberIds : [];
+
+    // Check if user is a member
+    if (!memberIds.includes(userId)) {
+      throw new HttpsError("permission-denied", "You are not a member of this household");
+    }
+
+    // Remove user from members and memberIds
+    const updatedMembers = members.filter((m: any) => m.id !== userId);
+    const updatedMemberIds = memberIds.filter((id: string) => id !== userId);
+
+    const updatePayload: any = {
+      members: updatedMembers,
+      memberIds: updatedMemberIds,
+      updatedAt: FieldValue.serverTimestamp()
+    };
+
+    await householdRef.update(updatePayload);
+
+    // If there are fewer than 2 members remaining, copy all data and delete the household
+    if (updatedMembers.length < 2) {
+      try {
+        // Copy household inventory to user's personal collection
+        const householdInventoryRef = householdRef.collection('inventory');
+        const inventorySnapshot = await householdInventoryRef.get();
+        
+        if (!inventorySnapshot.empty) {
+          const batch = db.batch();
+          const userInventoryRef = db.collection('users').doc(userId).collection('inventory');
+          
+          inventorySnapshot.docs.forEach((docItem) => {
+            const itemData = docItem.data();
+            const newItemRef = userInventoryRef.doc(docItem.id);
+            batch.set(newItemRef, itemData);
+          });
+          
+          await batch.commit();
+          console.log(`Copied ${inventorySnapshot.size} inventory items to user ${userId}`);
+        }
+
+        // Copy household meal plan
+        const householdMealPlanRef = householdRef.collection('mealPlan');
+        const mealPlanSnapshot = await householdMealPlanRef.get();
+        
+        if (!mealPlanSnapshot.empty) {
+          const batch = db.batch();
+          const userMealPlanRef = db.collection('users').doc(userId).collection('mealPlan');
+          
+          mealPlanSnapshot.docs.forEach((docItem) => {
+            const planData = docItem.data();
+            const newPlanRef = userMealPlanRef.doc(docItem.id);
+            batch.set(newPlanRef, planData);
+          });
+          
+          await batch.commit();
+          console.log(`Copied ${mealPlanSnapshot.size} meal plan items to user ${userId}`);
+        }
+
+        // Copy household shopping list
+        const householdShoppingListRef = householdRef.collection('shoppingList');
+        const shoppingListSnapshot = await householdShoppingListRef.get();
+        
+        if (!shoppingListSnapshot.empty) {
+          const batch = db.batch();
+          const userShoppingListRef = db.collection('users').doc(userId).collection('shoppingList');
+          
+          shoppingListSnapshot.docs.forEach((docItem) => {
+            const listData = docItem.data();
+            const newListRef = userShoppingListRef.doc(docItem.id);
+            batch.set(newListRef, listData);
+          });
+          
+          await batch.commit();
+          console.log(`Copied ${shoppingListSnapshot.size} shopping list items to user ${userId}`);
+        }
+
+        // Copy household saved recipes
+        const householdSavedRecipesRef = householdRef.collection('savedRecipes');
+        const savedRecipesSnapshot = await householdSavedRecipesRef.get();
+        
+        if (!savedRecipesSnapshot.empty) {
+          const batch = db.batch();
+          const userSavedRecipesRef = db.collection('users').doc(userId).collection('savedRecipes');
+          
+          savedRecipesSnapshot.docs.forEach((docItem) => {
+            const recipeData = docItem.data();
+            const newRecipeRef = userSavedRecipesRef.doc(docItem.id);
+            batch.set(newRecipeRef, recipeData);
+          });
+          
+          await batch.commit();
+          console.log(`Copied ${savedRecipesSnapshot.size} saved recipes to user ${userId}`);
+        }
+
+      } catch (copyError) {
+        console.error('Error copying household data to user:', copyError);
+        // Continue with household deletion even if copying fails
+      }
+
+      // Delete the household
+      await householdRef.delete();
+      console.log(`Deleted household ${householdId} as it had fewer than 2 remaining members`);
+    }
+
+    return { success: true };
+  }
+);
+
+// HTTP handler for leaving household
+export const leaveHouseholdHttp = onRequest(
+  { secrets: [gmailConfigSecret] },
+  async (req, res) => {
+    try {
+      if (req.method !== 'POST') { res.status(405).json({ error: 'method not allowed' }); return; }
+
+      const authHeader = req.headers.authorization;
+      if (!authHeader?.startsWith('Bearer ')) { res.status(401).json({ error: 'auth required' }); return; }
+
+      const idToken = authHeader.split('Bearer ')[1];
+      const decoded = await admin.auth().verifyIdToken(idToken);
+      if (!decoded) { res.status(401).json({ error: 'Invalid auth token' }); return; }
+
+      const userId = decoded.uid;
+      const { householdId } = req.body;
+      if (!householdId) { res.status(400).json({ error: 'householdId required' }); return; }
+
+      const db = getFirestore();
+      const householdRef = db.collection("households").doc(householdId);
+      const householdDoc = await householdRef.get();
+
+      if (!householdDoc.exists) { res.status(404).json({ error: 'Household not found' }); return; }
+
+      const householdData = householdDoc.data()!;
+      const members = Array.isArray(householdData.members) ? householdData.members : [];
+      const memberIds = Array.isArray(householdData.memberIds) ? householdData.memberIds : [];
+
+      if (!memberIds.includes(userId)) { res.status(403).json({ error: 'not a member' }); return; }
+
+      const updatedMembers = members.filter((m: any) => m.id !== userId);
+      const updatedMemberIds = memberIds.filter((id: string) => id !== userId);
+
+      await householdRef.update({
+        members: updatedMembers,
+        memberIds: updatedMemberIds,
+        updatedAt: FieldValue.serverTimestamp()
+      });
+
+      if (updatedMembers.length < 2) {
+        try {
+          // Copy household inventory to user's personal collection
+          const householdInventoryRef = householdRef.collection('inventory');
+          const inventorySnapshot = await householdInventoryRef.get();
+          
+          if (!inventorySnapshot.empty) {
+            const batch = db.batch();
+            const userInventoryRef = db.collection('users').doc(userId).collection('inventory');
+            
+            inventorySnapshot.docs.forEach((docItem) => {
+              const itemData = docItem.data();
+              const newItemRef = userInventoryRef.doc(docItem.id);
+              batch.set(newItemRef, itemData);
+            });
+            
+            await batch.commit();
+            console.log(`Copied ${inventorySnapshot.size} inventory items to user ${userId}`);
+          }
+
+          // Copy household meal plan
+          const householdMealPlanRef = householdRef.collection('mealPlan');
+          const mealPlanSnapshot = await householdMealPlanRef.get();
+          
+          if (!mealPlanSnapshot.empty) {
+            const batch = db.batch();
+            const userMealPlanRef = db.collection('users').doc(userId).collection('mealPlan');
+            
+            mealPlanSnapshot.docs.forEach((docItem) => {
+              const planData = docItem.data();
+              const newPlanRef = userMealPlanRef.doc(docItem.id);
+              batch.set(newPlanRef, planData);
+            });
+            
+            await batch.commit();
+            console.log(`Copied ${mealPlanSnapshot.size} meal plan items to user ${userId}`);
+          }
+
+          // Copy household shopping list
+          const householdShoppingListRef = householdRef.collection('shoppingList');
+          const shoppingListSnapshot = await householdShoppingListRef.get();
+          
+          if (!shoppingListSnapshot.empty) {
+            const batch = db.batch();
+            const userShoppingListRef = db.collection('users').doc(userId).collection('shoppingList');
+            
+            shoppingListSnapshot.docs.forEach((docItem) => {
+              const listData = docItem.data();
+              const newListRef = userShoppingListRef.doc(docItem.id);
+              batch.set(newListRef, listData);
+            });
+            
+            await batch.commit();
+            console.log(`Copied ${shoppingListSnapshot.size} shopping list items to user ${userId}`);
+          }
+
+          // Copy household saved recipes
+          const householdSavedRecipesRef = householdRef.collection('savedRecipes');
+          const savedRecipesSnapshot = await householdSavedRecipesRef.get();
+          
+          if (!savedRecipesSnapshot.empty) {
+            const batch = db.batch();
+            const userSavedRecipesRef = db.collection('users').doc(userId).collection('savedRecipes');
+            
+            savedRecipesSnapshot.docs.forEach((docItem) => {
+              const recipeData = docItem.data();
+              const newRecipeRef = userSavedRecipesRef.doc(docItem.id);
+              batch.set(newRecipeRef, recipeData);
+            });
+            
+            await batch.commit();
+            console.log(`Copied ${savedRecipesSnapshot.size} saved recipes to user ${userId}`);
+          }
+
+        } catch (copyError) {
+          console.error('Error copying household data to user:', copyError);
+          // Continue with household deletion even if copying fails
+        }
+
+        // Delete the household
+        await householdRef.delete();
+        console.log(`Deleted household ${householdId} as it had fewer than 2 remaining members`);
+      }
+
+      res.json({ success: true });
+      return;
+    } catch (err: any) {
+      console.error('leaveHouseholdHttp error:', err);
+      res.status(500).json({ error: err?.message || 'internal' });
+      return;
+    }
+  }
+);
 

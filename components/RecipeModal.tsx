@@ -1,8 +1,9 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Plus, Heart, Trash2, Minus, Users, CheckCircle2, Play, Pause, RotateCcw, AlertCircle } from 'lucide-react';
-import { StructuredRecipe, RecipeRating, SavedRecipe, PantryItem } from '../types';
+import { StructuredRecipe, RecipeRating, SavedRecipe, PantryItem, Household } from '../types';
 import { RecipeRatingUI } from './RecipeRating';
 import { ProgressiveImage } from './ProgressiveImage';
+import { PortionSelector } from './PortionSelector';
 import { generateBlurDataURL } from '../utils/appUtils';
 import { useKeyboardNavigation } from '../hooks/useKeyboardNavigation';
 
@@ -24,6 +25,7 @@ interface RecipeModalProps {
   isFromMealPlan?: boolean;
   recipeSaveLimitExceeded?: boolean;
   mealPlanLimitExceeded?: boolean;
+  household?: Household | null;
   user?: {
     id: string;
     name: string;
@@ -50,6 +52,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
   isFromMealPlan = false,
   recipeSaveLimitExceeded = false,
   mealPlanLimitExceeded = false,
+  household = null,
   user
 }) => {
   const [servings, setServings] = useState(4); // Default to 4 servings
@@ -502,27 +505,23 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
           )}
 
           <div className="mb-4">
+            <PortionSelector
+              household={household}
+              currentServings={servings}
+              onPortionChange={(newServings, scaledIngredients) => {
+                setServings(newServings);
+                // Update the recipe with scaled ingredients for display
+                // Note: This is just for display - the original recipe remains unchanged
+              }}
+              originalIngredients={recipe.ingredients || []}
+              className="mb-4"
+            />
+
             <div className="flex items-center justify-between mb-2">
               <h4 className="text-xs font-bold text-[var(--accent-color)] uppercase">Ingredients</h4>
-              <div className="flex items-center gap-2">
-                <Users className="w-3 h-3 text-theme-secondary opacity-50" />
-                <button
-                  onClick={() => setServings(Math.max(1, servings - 1))}
-                  className="w-6 h-6 rounded-full bg-theme-secondary hover:bg-theme-primary flex items-center justify-center text-theme-primary text-sm"
-                >
-                  <Minus className="w-3 h-3" />
-                </button>
-                <span className="text-sm font-medium text-theme-primary min-w-[2rem] text-center">
-                  {servings}
-                </span>
-                <button
-                  onClick={() => setServings(servings + 1)}
-                  className="w-6 h-6 rounded-full bg-theme-secondary hover:bg-theme-primary flex items-center justify-center text-theme-primary text-sm"
-                >
-                  <Plus className="w-3 h-3" />
-                </button>
-                <span className="text-xs text-theme-secondary opacity-70 ml-1">servings</span>
-              </div>
+              <span className="text-xs text-theme-secondary opacity-70">
+                {servings} serving{servings !== 1 ? 's' : ''}
+              </span>
             </div>
             <ul className="list-disc list-inside text-theme-secondary opacity-80">
               {Array.isArray(scaledIngredients) && scaledIngredients.length > 0 ? (

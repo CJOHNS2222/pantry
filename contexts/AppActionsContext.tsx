@@ -1,7 +1,7 @@
 // contexts/AppActionsContext.tsx
 import React, { createContext, useContext, ReactNode } from 'react';
 import { Tab } from '../types/app';
-import { PantryItem, DayPlan, ShoppingItem, SavedRecipe, RecipeSearchResult, CustomCategory, StructuredRecipe } from '../types';
+import { PantryItem, DayPlan, ShoppingItem, SavedRecipe, RecipeSearchResult, CustomCategory, StructuredRecipe, Settings, RecipeRatingInput } from '../types';
 
 // Action handlers that are stable references (memoized in parent)
 interface AppActionsContextValue {
@@ -21,7 +21,7 @@ interface AppActionsContextValue {
   onAddToPlan: (recipe: StructuredRecipe) => void;
   onSaveRecipe: (recipe: StructuredRecipe) => void;
   onDeleteRecipe: (recipe: SavedRecipe) => void;
-  onRateRecipe: (rating: any) => void;
+  onRateRecipe: (rating: RecipeRatingInput) => void;
   handleMarkAsMade: (recipe: StructuredRecipe) => void;
 
   // Shopping list operations
@@ -29,7 +29,7 @@ interface AppActionsContextValue {
   onAddToShoppingList: (items: string[]) => void;
 
   // Settings operations
-  setSettings: (settings: any) => void;
+  setSettings: (settings: Settings) => void;
   onAddCustomCategory?: (name: string, icon: string, color?: string) => void;
   onUpdateCustomCategory?: (categoryId: string, updates: Partial<Pick<CustomCategory, 'name' | 'icon' | 'color'>>) => void;
   onDeleteCustomCategory?: (categoryId: string) => void;

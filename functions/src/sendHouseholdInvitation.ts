@@ -1,8 +1,14 @@
 import {onCall, onRequest, HttpsError} from "firebase-functions/v2/https";
+import { defineJsonSecret } from "firebase-functions/params";
 import { sendEmail } from "./helpers/sendEmail";
 
+// Define the secret for Gmail configuration
+const gmailConfigSecret = defineJsonSecret("EMAILSECRET");
+
 // Cloud Function to send household invitations
-export const sendHouseholdInvitation = onCall(async (request) => {
+export const sendHouseholdInvitation = onCall(
+  { secrets: [gmailConfigSecret] },
+  async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'You must be logged in to send invitations.');
   }

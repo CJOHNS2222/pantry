@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, Suspense } from 'react';
-import { doc, onSnapshot, collection, addDoc, serverTimestamp, query, where } from 'firebase/firestore';
+import { doc, onSnapshot, collection, addDoc, serverTimestamp, query, where, updateDoc, getDoc } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
 import { db } from './firebaseConfig';
 import { Login } from './components/Login';
 import { HouseholdManager } from './components/Household';
@@ -16,14 +17,18 @@ import { useSettings } from './hooks/useSettings';
 import { useToasts } from './hooks/useToasts';
 import { useDataManagement } from './hooks/useDataManagement';
 import { useHouseholdActivity } from './hooks/useHouseholdActivity';
+import { useOfflineStatus } from './hooks/useOfflineStatus';
 import AnalyticsService from './services/analyticsService';
 import { isHouseholdMember, inferCategoryFromItemName, inferStorageLocationFromItemName, parseIngredientForShoppingList, getItemImage, fetchExternalItemImage } from './utils/appUtils';
-import { getOrCreateHousehold } from './services/householdService';
-import { GlobalUpdatePrompt } from './components/GlobalUpdatePrompt';
+import { NotificationBanner } from './components/NotificationBanner';
+import { NotificationService, NotificationItem, NotificationSettings } from './services/notificationService';
+import { pushNotificationService } from './services/pushNotificationService';
+import { HouseholdActivityService } from './services/householdActivityService';
 import { App as CapacitorApp, BackButtonListenerEvent } from '@capacitor/app';
 import { AppProvider, useApp } from './contexts/AppContext';
 import { AppActionsProvider, useAppActions } from './contexts/AppActionsContext';
 import SafeAreaService from './services/safeAreaService';
+import { GlobalUpdatePrompt } from './components/GlobalUpdatePrompt';
 
 // Lazy load monitoring components
 const DatabaseAnalytics = React.lazy(() => import('./components/DatabaseAnalytics').then(module => ({ default: module.default })));
@@ -43,20 +48,41 @@ const App: React.FC = () => {
   const [initialSearchQuery, setInitialSearchQuery] = useState<string>('');
 
   // UI States
-  const [showTutorial, setShowTutorial] = useState(false);
   const [showHousehold, setShowHousehold] = useState(false);
-  const [notifications, setNotifications] = useState<any[]>([]);
+  const [showTutorial, setShowTutorial] = useState(false);
   const [showNotificationsModal, setShowNotificationsModal] = useState(false);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>({
+    enabled: true,
+    quietHours: {
+      enabled: false,
+      start: '22:00',
+      end: '08:00'
+    },
+    types: {
+      expiration: 'day_before',
+      recipe_suggestion: true,
+      household_activity: true,
+      shopping_reminder: true,
+      system: true,
+      allergy_alert: true,
+      household_invite: true
+    }
+  });
 
-  // Ref to store the back button listener
   const backButtonListenerRef = useRef<any>(null);
 
-  // Custom hooks
   const { user, setUser, handleLogout } = useAuth();
   const { settings, setSettings } = useSettings();
-  const { theme } = useTheme(settings.theme);
-  const { toasts, setToasts, addToast } = useToasts();
+  const { addToast, toasts, setToasts } = useToasts();
   const { syncStatus, syncNow } = useOfflineStatus();
+
+  // Load notification settings from user profile
+  useEffect(() => {
+    if (user?.profile?.notificationSettings) {
+      setNotificationSettings(user.profile.notificationSettings);
+    }
+  }, [user?.profile?.notificationSettings]);
 
   // Function to add items to shopping list
   const addToShoppingList = (items: string[], source: string = 'manual') => {
@@ -74,6 +100,18 @@ const App: React.FC = () => {
     setShoppingList(prev => [...prev, ...newItems]);
     setActiveTab(Tab.SHOPPING);
   };
+
+  // Household activity tracking
+  const {
+    recentActivities,
+    isLoadingActivities,
+    logActivity,
+    logItemAdded,
+    logItemRemoved,
+    logShoppingAdded,
+    logRecipeSaved,
+    logMealCompleted
+  } = useHouseholdActivity(user, null, activeTab); // Pass null for household initially
 
   const {
     inventory,
@@ -129,49 +167,215 @@ const App: React.FC = () => {
     logMealCompleted
   });
 
-  // Household activity tracking
-  const {
-    recentActivities,
-    isLoadingActivities,
-    logActivity,
-    logItemAdded,
-    logItemRemoved,
-    logShoppingAdded,
-    logRecipeSaved,
-    logMealCompleted
-  } = useHouseholdActivity(user, household, activeTab);
+  // Update household activity tracking when household data becomes available
+  useEffect(() => {
+    if (user?.id && household?.id) {
+      const activityMap = {
+        [Tab.PANTRY]: 'viewing pantry',
+        [Tab.SHOPPING]: 'viewing shopping list',
+        [Tab.MEALS]: 'viewing meal plan',
+        [Tab.RECIPES]: 'viewing recipes',
+        [Tab.SETTINGS]: 'viewing settings',
+        [Tab.COMMUNITY]: 'viewing community'
+      };
+
+      const currentActivity = activityMap[activeTab] || 'using app';
+      HouseholdActivityService.updateMemberActivity(user.id, household.id, currentActivity);
+    }
+  }, [user?.id, household?.id, activeTab]);
 
   // Initialize safe area handling for mobile devices
   useEffect(() => {
     SafeAreaService.initialize().catch(console.error);
   }, []);
 
+  // Initialize push notifications for mobile devices
+  useEffect(() => {
+    if (user?.id) {
+      pushNotificationService.initialize().catch(console.error);
+    }
+  }, [user?.id]);
+
   // Listen for notifications while user is logged in
   useEffect(() => {
-    if (!user?.email) return;
+    if (!user?.id) return;
 
-    const notificationsQuery = query(
-      collection(db, "notifications"),
-      where("email", "==", user.email),
-      where("read", "==", false)
-    );
+    // Additional check to ensure Firebase auth is ready
+    const auth = getAuth();
+    if (!auth.currentUser) return;
 
-    const unsubscribe = onSnapshot(notificationsQuery, (snapshot) => {
-      const unread: any[] = [];
-      snapshot.forEach(doc => unread.push({ id: doc.id, ...doc.data() }));
-      if (unread.length > 0 && !showNotificationsModal) {
-        setNotifications(unread);
-        setShowNotificationsModal(true);
+    const checkAndShowNotifications = async () => {
+      try {
+        const unreadNotifications = await NotificationService.getUnreadNotifications(user.id, user.email);
+        const filteredNotifications = unreadNotifications.filter(notification =>
+          NotificationService.shouldShowNotification(notification, notificationSettings)
+        );
+
+        // Show the highest priority notification that hasn't been shown recently
+        if (filteredNotifications.length > 0) {
+          const highestPriority = filteredNotifications.reduce((prev, current) =>
+            getPriorityWeight(current.priority) > getPriorityWeight(prev.priority) ? current : prev
+          );
+
+          // Only show if we haven't shown a notification in the last 5 minutes
+          const lastShown = localStorage.getItem('lastNotificationShown');
+          const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
+
+          if (!lastShown || parseInt(lastShown) < fiveMinutesAgo) {
+            setNotifications([highestPriority]);
+            localStorage.setItem('lastNotificationShown', Date.now().toString());
+          }
+        }
+      } catch (error) {
+        console.error('Error checking notifications:', error);
       }
-    });
+    };
 
-    return unsubscribe;
-  }, [user?.email]);
+    // Check immediately and then every 5 minutes
+    checkAndShowNotifications();
+    const interval = setInterval(checkAndShowNotifications, 5 * 60 * 1000);
+
+    return () => clearInterval(interval);
+  }, [user?.id, notificationSettings]);
+
+  // Helper function to get priority weight for sorting
+  const getPriorityWeight = (priority: string): number => {
+    switch (priority) {
+      case 'urgent': return 4;
+      case 'high': return 3;
+      case 'medium': return 2;
+      case 'low': return 1;
+      default: return 0;
+    }
+  };
+
+  // Notification handlers
+  const handleNotificationDismiss = async (notificationId: string) => {
+    await NotificationService.markAsRead(notificationId);
+    setNotifications([]);
+  };
+
+  const handleNotificationAction = async (notification: NotificationItem) => {
+    // Mark as read
+    await NotificationService.markAsRead(notification.id);
+    setNotifications([]);
+
+    // Handle the action
+    switch (notification.actionType) {
+      case 'add_to_shopping':
+        if (notification.actionData?.itemName) {
+          addToShoppingList([notification.actionData.itemName]);
+        }
+        break;
+      case 'view_recipe':
+        if (notification.actionData?.recipeId) {
+          setActiveTab(Tab.RECIPES);
+          // Could scroll to specific recipe or set search
+        }
+        break;
+      case 'view_item':
+        if (notification.actionData?.tab === 'shopping') {
+          setActiveTab(Tab.SHOPPING);
+        }
+        break;
+      case 'join_household':
+        // Join household invitation
+        if (notification.actionData?.householdId && user) {
+          try {
+            // Update user document with householdId
+            const userRef = doc(db, 'users', user.id);
+            await updateDoc(userRef, {
+              householdId: notification.actionData.householdId,
+              updatedAt: serverTimestamp()
+            });
+
+            // Update household document to add member
+            const householdRef = doc(db, 'households', notification.actionData.householdId);
+            const householdDoc = await getDoc(householdRef);
+            
+            if (householdDoc.exists()) {
+              const householdData = householdDoc.data();
+              const currentMemberIds = Array.isArray(householdData?.memberIds) ? householdData.memberIds : [];
+              const currentMembers = Array.isArray(householdData?.members) ? householdData.members : [];
+              
+              const updatedMemberIds = [...currentMemberIds, user.id];
+              const newMember = {
+                id: user.id,
+                name: user.name,
+                email: user.email,
+                role: 'member',
+                status: 'Active',
+                joinedAt: new Date().toISOString()
+              };
+              const updatedMembers = [...currentMembers, newMember];
+              
+              await updateDoc(householdRef, {
+                memberIds: updatedMemberIds,
+                members: updatedMembers,
+                updatedAt: serverTimestamp()
+              });
+
+              // Update local user state with householdId
+              setUser({ ...user, householdId: notification.actionData.householdId });
+
+              // Update local household state immediately
+              const updatedHousehold = {
+                id: householdDoc.id,
+                ...householdData,
+                memberIds: updatedMemberIds,
+                members: updatedMembers
+              } as Household;
+              setHousehold(updatedHousehold);
+            }
+            
+            addToast('Successfully joined household!', 'success');
+          } catch (error) {
+            console.error('Error joining household:', error);
+            addToast('Failed to join household', 'error');
+          }
+        }
+        break;
+    }
+  };
+
+  const handleNotificationSnooze = async (notificationId: string, minutes: number) => {
+    await NotificationService.snoozeNotification(notificationId, minutes);
+    setNotifications([]);
+  };
 
 
 
 
   const handleLogin = async (loggedInUser: User) => {
+    // Update user document with login data
+    const userRef = doc(db, 'users', loggedInUser.id);
+    const userDoc = await getDoc(userRef);
+
+    if (!userDoc.exists()) {
+      // Create user document if it doesn't exist
+      await setDoc(userRef, {
+        name: loggedInUser.name,
+        email: loggedInUser.email,
+        subscription: {
+          tier: 'premium',
+          status: 'active',
+          current_period_end: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year from now
+          cancel_at_period_end: false
+        },
+        createdAt: serverTimestamp(),
+        hasSeenTutorial: false
+      });
+    } else {
+      // Update existing user document with name if it's missing or different
+      const userData = userDoc.data();
+      if (!userData?.name || userData.name !== loggedInUser.name) {
+        await updateDoc(userRef, {
+          name: loggedInUser.name,
+          updatedAt: serverTimestamp()
+        });
+      }
+    }
+
     setUser(loggedInUser);
 
     // Track login event
@@ -184,37 +388,10 @@ const App: React.FC = () => {
       has_seen_tutorial: loggedInUser.hasSeenTutorial
     });
 
-    const userHousehold = await getOrCreateHousehold(loggedInUser);
-    if (userHousehold) {
-      setHousehold(userHousehold);
-      // Track household membership
-      AnalyticsService.trackHouseholdJoin(userHousehold.id, isHouseholdMember(userHousehold, loggedInUser.id) ? 'member' : 'owner');
-    }
-
     if (!loggedInUser.hasSeenTutorial) setShowTutorial(true);
   };
 
   // Notifications are now handled by the real-time listener above
-
-  // Load household when user is authenticated
-  useEffect(() => {
-    if (user?.id) {
-      const loadHousehold = async () => {
-        try {
-          const userHousehold = await getOrCreateHousehold(user);
-          if (userHousehold) {
-            setHousehold(userHousehold);
-          } else {
-            setHousehold(null); // Clear if no household found
-          }
-        } catch (error) {
-          console.error('Error loading household:', error);
-          setHousehold(null);
-        }
-      };
-      loadHousehold();
-    }
-  }, [user?.id]);
 
   // Track app lifecycle events
   useEffect(() => {
@@ -309,6 +486,18 @@ const App: React.FC = () => {
 
   if (!user) return <Login onLogin={handleLogin} />;
 
+  // Function to navigate to settings and scroll to notifications
+  const navigateToNotifications = () => {
+    setActiveTab(Tab.SETTINGS);
+    // Scroll to notifications section after a short delay to allow settings to render
+    setTimeout(() => {
+      const notificationsSection = document.querySelector('[data-section="notifications"]');
+      if (notificationsSection) {
+        notificationsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 100);
+  };
+
   return (
     <>
       <ErrorBoundary>
@@ -320,6 +509,7 @@ const App: React.FC = () => {
               setHousehold={setHousehold} 
               onClose={() => setShowHousehold(false)}
               setActiveTab={setActiveTab}
+              addToast={addToast}
           />
         )}
 
@@ -449,6 +639,7 @@ const App: React.FC = () => {
           onUndo={performUndo}
           syncStatus={syncStatus}
           onSyncClick={syncNow}
+          onNavigateToSettings={navigateToNotifications}
         />
         
         <AppProvider
@@ -614,6 +805,28 @@ const App: React.FC = () => {
         </AppProvider>
         <AppNavigation activeTab={activeTab} setActiveTab={setActiveTab} />
         
+        {/* Household Manager Modal */}
+        {showHousehold && (
+          <HouseholdManager
+            user={user}
+            household={household}
+            setHousehold={setHousehold}
+            onClose={() => setShowHousehold(false)}
+            setActiveTab={setActiveTab}
+            addToast={addToast}
+          />
+        )}
+
+        {/* Notification Banner */}
+        {notifications.length > 0 && (
+          <NotificationBanner
+            notification={notifications[0]}
+            onDismiss={handleNotificationDismiss}
+            onAction={handleNotificationAction}
+            onSnooze={handleNotificationSnooze}
+          />
+        )}
+
         {/* Toast Notifications */}
         <div className="fixed bottom-4 right-4 mb-safe z-50 space-y-2">
           {toasts.map((toast) => (
@@ -661,7 +874,7 @@ const App: React.FC = () => {
       </Suspense>
     </>
   );
-}
+};
 
 export default App;
 

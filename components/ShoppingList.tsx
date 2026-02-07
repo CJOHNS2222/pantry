@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { ShoppingBasket, Check, Trash2, Archive, Plus, X, Share2, Copy, Download, MessageSquare } from 'lucide-react';
 import { ShoppingItem } from '../types';
 import { inferCategoryFromItemName, getItemImage } from '../utils/appUtils';
@@ -6,18 +6,84 @@ import { log } from '../services/logService';
 import { validateItemName, validateQuantity } from '../src/utils/validation';
 import { ShoppingListItemSkeleton } from './SkeletonLoader';
 
+// Import new enhancement components
+import { EnhancedShoppingListItem } from './EnhancedShoppingListItem';
+import { SmartShoppingListOrganizer } from './SmartShoppingListOrganizer';
+import { BatchOperations } from './BatchOperations';
+import { OfflineShoppingIndicator } from './OfflineShoppingIndicator';
+import { HouseholdShoppingShare } from './HouseholdShoppingShare';
+import { SmartShoppingSuggestions } from './SmartShoppingSuggestions';
+import { QuickAdd } from './QuickAdd';
+import { ShoppingListAnalytics } from './ShoppingListAnalytics';
+
+// Import hooks and services
+import { useOfflineStatus } from '../hooks/useOfflineStatus';
+import { useDataManagement } from '../hooks/useDataManagement';
+import { offlineQueueService } from '../services/offlineQueueService';
+import { offlineDataCache } from '../services/offlineDataCache';
+
 interface ShoppingListProps {
   items: ShoppingItem[];
   setItems: React.Dispatch<React.SetStateAction<ShoppingItem[]>>;
   onMoveToPantry: (items: ShoppingItem[]) => void;
   isLoadingShoppingList?: boolean;
+  pantryItems?: Array<{
+    id: string;
+    name: string;
+    quantity: number;
+    unit: string;
+    category?: string;
+    lastUpdated: Date;
+    expirationDate?: Date;
+  }>;
+  recentPurchases?: Array<{
+    itemName: string;
+    quantity: number;
+    unit: string;
+    category?: string;
+    purchasedAt: Date;
+  }>;
+  householdMembers?: Array<{
+    id: string;
+    name: string;
+    avatar?: string;
+    lastActive: Date;
+    currentActivity?: string;
+  }>;
+  onHouseholdMessage?: (message: string) => void;
 }
 
-export const ShoppingList: React.FC<ShoppingListProps> = ({ items, setItems, onMoveToPantry, isLoadingShoppingList = false }) => {
+export const ShoppingList: React.FC<ShoppingListProps> = ({
+  items,
+  setItems,
+  onMoveToPantry,
+  isLoadingShoppingList = false,
+  pantryItems = [],
+  recentPurchases = [],
+  householdMembers = [],
+  onHouseholdMessage
+}) => {
   const [newItem, setNewItem] = React.useState('');
   const [newQty, setNewQty] = React.useState<string>('1');
   const [isAddModalOpen, setIsAddModalOpen] = React.useState(false);
   const [validationErrors, setValidationErrors] = React.useState<{item?: string, quantity?: string}>({});
+
+  // New state for enhanced features
+  const [viewMode, setViewMode] = useState<'list' | 'organized'>('list');
+  const [showAnalytics, setShowAnalytics] = useState(false);
+  const [undoHistory, setUndoHistory] = useState<Array<{item: ShoppingItem, timestamp: Date}>>([]);
+  const [householdActivity, setHouseholdActivity] = useState<Array<{
+    id: string;
+    memberId: string;
+    memberName: string;
+    action: string;
+    itemName?: string;
+    timestamp: Date;
+  }>>([]);
+
+  // Hooks for offline functionality
+  const isOnline = useOfflineStatus();
+  const { addToQueue, processQueue } = useDataManagement();
 
   // Suggested items for quick adding
   const suggestedItems = [
@@ -91,7 +157,36 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ items, setItems, onM
   };
 
   const toggleCheck = (id: string) => {
+    const item = items.find(i => i.id === id);
+    if (!item) return;
+
+    const wasChecked = item.checked;
     setItems(prev => prev.map(i => i.id === id ? { ...i, checked: !i.checked } : i));
+
+    // Add to undo history if checking off
+    if (!wasChecked) {
+      setUndoHistory(prev => [...prev.slice(-4), { item: { ...item, checked: true }, timestamp: new Date() }]);
+    }
+
+    // Offline queue for sync
+    if (!isOnline) {
+      addToQueue({
+        type: 'update',
+        collection: 'shoppingList',
+        id,
+        data: { checked: !wasChecked }
+      });
+    }
+  };
+
+  const undoLastCheck = () => {
+    if (undoHistory.length === 0) return;
+
+    const lastAction = undoHistory[undoHistory.length - 1];
+    setItems(prev => prev.map(i =>
+      i.id === lastAction.item.id ? { ...i, checked: false } : i
+    ));
+    setUndoHistory(prev => prev.slice(0, -1));
   };
 
   const selectAll = () => {
@@ -126,17 +221,85 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ items, setItems, onM
       return;
     }
 
-    setItems(prev => [...prev, {
-        id: Math.random().toString(36).substr(2, 9),
-        item: newItem,
-        category: inferCategoryFromItemName(newItem),
-        checked: false,
-        quantity: newQty,
-        source: 'manual'
-    }]);
+    const newShoppingItem: ShoppingItem = {
+      id: Math.random().toString(36).substr(2, 9),
+      item: newItem,
+      category: inferCategoryFromItemName(newItem),
+      checked: false,
+      quantity: newQty,
+      source: 'manual'
+    };
+
+    setItems(prev => [...prev, newShoppingItem]);
+
+    // Offline queue for sync
+    if (!isOnline) {
+      addToQueue({
+        type: 'add',
+        collection: 'shoppingList',
+        data: newShoppingItem
+      });
+    }
+
     setNewItem('');
     setNewQty('1');
     setIsAddModalOpen(false); // Close modal after adding
+  };
+
+  // Enhanced add item from QuickAdd component
+  const handleQuickAdd = (quickAddItem: { name: string; category?: string; quantity?: string; unit?: string }) => {
+    const exists = items.some(item => item.item.toLowerCase() === quickAddItem.name.toLowerCase());
+    if (exists) {
+      alert(`${quickAddItem.name} is already in your shopping list!`);
+      return;
+    }
+
+    const newShoppingItem: ShoppingItem = {
+      id: Math.random().toString(36).substr(2, 9),
+      item: quickAddItem.name,
+      category: quickAddItem.category || inferCategoryFromItemName(quickAddItem.name),
+      checked: false,
+      quantity: quickAddItem.quantity || '1',
+      source: 'quick-add'
+    };
+
+    setItems(prev => [...prev, newShoppingItem]);
+
+    // Offline queue for sync
+    if (!isOnline) {
+      addToQueue({
+        type: 'add',
+        collection: 'shoppingList',
+        data: newShoppingItem
+      });
+    }
+  };
+
+  // Handle smart suggestions
+  const handleAddSuggestion = (suggestion: any) => {
+    handleQuickAdd({
+      name: suggestion.itemName,
+      quantity: suggestion.estimatedQuantity,
+      category: suggestion.category
+    });
+  };
+
+  // Batch operations
+  const handleBatchOperation = (category: string, operation: 'check' | 'uncheck') => {
+    setItems(prev => prev.map(item =>
+      item.category === category
+        ? { ...item, checked: operation === 'check' }
+        : item
+    ));
+
+    // Add to undo history for batch operations
+    if (operation === 'check') {
+      const checkedItems = items.filter(item => item.category === category && !item.checked);
+      setUndoHistory(prev => [
+        ...prev,
+        ...checkedItems.map(item => ({ item: { ...item, checked: true }, timestamp: new Date() }))
+      ].slice(-5)); // Keep last 5
+    }
   };
 
   const closeModal = () => {
@@ -149,7 +312,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ items, setItems, onM
   const handleCheckout = () => {
     const purchased = items.filter(i => i.checked);
     if (purchased.length === 0) return;
-    
+
     // Set default purchased quantities for items that don't have them
     const updatedItems = purchased.map(item => {
       if (!item.purchasedQuantity) {
@@ -159,10 +322,25 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ items, setItems, onM
       }
       return item;
     });
-    
+
     if (confirm(`Move ${purchased.length} items to pantry?`)) {
         onMoveToPantry(updatedItems);
+
+        // Clear undo history for checked items
+        setUndoHistory(prev => prev.filter(action =>
+          !purchased.some(item => item.id === action.item.id)
+        ));
+
         setItems(prev => prev.filter(i => !i.checked));
+
+        // Offline queue for sync
+        if (!isOnline) {
+          addToQueue({
+            type: 'batch',
+            collection: 'shoppingList',
+            data: { action: 'checkout', items: updatedItems }
+          });
+        }
     }
   };
 
@@ -225,75 +403,73 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ items, setItems, onM
       <div className="text-center mb-6">
         <h2 className="text-3xl font-serif font-bold text-theme-secondary">Shopping List</h2>
         <p className="text-theme-secondary opacity-60 text-sm mt-1">Items to purchase</p>
-        
-        {/* Export/Share Buttons */}
-        {items.length > 0 && (
-          <div className="flex justify-center gap-2 mt-4 flex-wrap">
-            <button
-              onClick={handleCopyToClipboard}
-              className="flex items-center gap-2 px-3 py-2 bg-theme-secondary text-theme-primary rounded-lg border border-theme hover:bg-theme-primary transition-colors text-sm"
-              title="Copy to clipboard"
-            >
-              <Copy className="w-4 h-4" />
-              Copy
-            </button>
-            <button
-              onClick={handleShare}
-              className="flex items-center gap-2 px-3 py-2 bg-theme-secondary text-theme-primary rounded-lg border border-theme hover:bg-theme-primary transition-colors text-sm"
-              title="Share shopping list"
-            >
-              <Share2 className="w-4 h-4" />
-              Share
-            </button>
-            <button
-              onClick={handleShareViaSMS}
-              className="flex items-center gap-2 px-3 py-2 bg-theme-secondary text-theme-primary rounded-lg border border-theme hover:bg-theme-primary transition-colors text-sm"
-              title="Send via text message"
-            >
-              <MessageSquare className="w-4 h-4" />
-              SMS
-            </button>
-            <button
-              onClick={handleExport}
-              className="flex items-center gap-2 px-3 py-2 bg-theme-secondary text-theme-primary rounded-lg border border-theme hover:bg-theme-primary transition-colors text-sm"
-              title="Download as text file"
-            >
-              <Download className="w-4 h-4" />
-              Export
-            </button>
-          </div>
-        )}
       </div>
 
-      {/* Suggested Items */}
-      <div className="bg-theme-secondary rounded-xl p-4 border border-theme">
-        <h3 className="text-sm font-semibold text-theme-primary mb-3 flex items-center gap-2">
-          <Plus className="w-4 h-4" />
-          Quick Add Suggestions
-        </h3>
-        <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide flex-nowrap">
-          {suggestedItems.map((itemName) => (
-            <button
-              key={itemName}
-              onClick={() => addSuggestedItem(itemName)}
-              className="flex-shrink-0 flex flex-col items-center gap-2 p-3 bg-theme-primary rounded-lg border border-theme hover:border-[var(--accent-color)] hover:bg-[var(--accent-color)]/5 transition-all group min-w-[80px]"
-            >
-              <img
-                src={getItemImage(itemName, inferCategoryFromItemName(itemName))}
-                alt={itemName}
-                className="w-10 h-10 rounded-lg object-cover bg-theme-secondary border border-theme"
-                onError={(e) => {
-                  const target = e.target as HTMLImageElement;
-                  target.src = '/images/placeholder.svg';
-                }}
-              />
-              <span className="text-xs font-medium text-theme-primary text-center leading-tight group-hover:text-[var(--accent-color)] transition-colors">
-                {itemName}
-              </span>
-            </button>
-          ))}
+      {/* Household Sharing */}
+      {householdMembers.length > 0 && (
+        <HouseholdShoppingShare
+          householdMembers={householdMembers}
+          recentActivity={householdActivity}
+          currentUserId="current-user" // TODO: Get from auth
+          onSendMessage={onHouseholdMessage}
+        />
+      )}
+
+      {/* Quick Add Component */}
+      <QuickAdd
+        onAddItem={handleQuickAdd}
+        onScanBarcode={async () => null} // TODO: Implement barcode scanning
+        onVoiceInput={async () => null} // TODO: Implement voice input
+        isOnline={isOnline}
+        recentItems={items.map(i => i.item)}
+        suggestedItems={suggestedItems}
+        onAddSuggestedItem={addSuggestedItem}
+      />
+
+      {/* Smart Suggestions */}
+      <SmartShoppingSuggestions
+        pantryItems={pantryItems}
+        recentPurchases={recentPurchases}
+        onAddSuggestion={handleAddSuggestion}
+        onDismissSuggestion={(id) => {
+          // TODO: Implement suggestion dismissal persistence
+          console.log('Dismiss suggestion:', id);
+        }}
+      />
+
+      {/* View Mode Toggle */}
+      {items.length > 0 && (
+        <div className="flex items-center justify-center gap-2 mb-4">
+          <button
+            onClick={() => setViewMode('list')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              viewMode === 'list'
+                ? 'bg-[var(--accent-color)] text-white'
+                : 'bg-theme-secondary text-theme-primary hover:bg-theme-primary'
+            }`}
+          >
+            List View
+          </button>
+          <button
+            onClick={() => setViewMode('organized')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              viewMode === 'organized'
+                ? 'bg-[var(--accent-color)] text-white'
+                : 'bg-theme-secondary text-theme-primary hover:bg-theme-primary'
+            }`}
+          >
+            Store Order
+          </button>
         </div>
-      </div>
+      )}
+
+      {/* Batch Operations */}
+      {items.length > 0 && (
+        <BatchOperations
+          items={items}
+          onBatchOperation={handleBatchOperation}
+        />
+      )}
 
       {/* Floating Action Button */}
       <button
@@ -366,7 +542,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ items, setItems, onM
       )}
 
       {items.length > 0 && (
-          <div className="flex gap-2 justify-between">
+          <div className="flex gap-2 justify-between items-center">
               <button
                 onClick={items.every(i => i.checked) ? deselectAll : selectAll}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all bg-theme-secondary text-theme-secondary hover:bg-[var(--accent-color)] hover:text-white"
@@ -374,6 +550,18 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ items, setItems, onM
                   <Check className="w-4 h-4" /> 
                   {items.every(i => i.checked) ? 'Deselect All' : 'Select All'}
               </button>
+              
+              {undoHistory.length > 0 && (
+                <button
+                  onClick={undoLastCheck}
+                  className="flex items-center gap-1 px-2 py-1 bg-orange-500 text-white rounded text-xs hover:bg-orange-600 transition-colors"
+                  title={`Undo last check (${undoHistory.length} available)`}
+                >
+                  <X className="w-3 h-3" />
+                  Undo ({undoHistory.length})
+                </button>
+              )}
+              
               <button 
                 onClick={handleCheckout}
                 disabled={!items.some(i => i.checked)}
@@ -394,114 +582,24 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ items, setItems, onM
           Array.from({ length: 5 }).map((_, index) => (
             <ShoppingListItemSkeleton key={`loading-${index}`} />
           ))
+        ) : viewMode === 'organized' ? (
+          // Organized by store layout
+          <SmartShoppingListOrganizer
+            items={items}
+            onToggleCheck={toggleCheck}
+            onRemove={remove}
+          />
         ) : (
-          // Show actual items
+          // Regular list view with enhanced items
           items.map((item) => (
-          <div 
-            key={item.id} 
-            onClick={() => toggleCheck(item.id)}
-            className={`flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer group ${
-              item.checked 
-              ? 'bg-[var(--accent-color)]/10 border-[var(--accent-color)]/30' 
-              : 'bg-theme-secondary border-theme hover:border-[var(--accent-color)]/50'
-            }`}
-          >
-            <div className="flex items-center gap-3 flex-1">
-              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
-                item.checked ? 'bg-[var(--accent-color)] border-[var(--accent-color)]' : 'border-theme'
-              }`}>
-                {item.checked && <Check className="w-3 h-3 text-white" />}
-              </div>
-              <div className="flex-1">
-                <span className={`font-medium ${item.checked ? 'line-through opacity-50' : 'text-theme-primary'}`}>
-                  {item.item}
-                </span>
-                {item.source && (
-                  <div className="text-xs text-theme-secondary opacity-60 mt-1">
-                    {item.source === 'suggested' && '💡 Suggested item'}
-                    {item.source === 'manual' && '✏️ Manually added'}
-                    {item.source === 'meal planner' && '📅 From meal planner'}
-                    {item.source === 'pantry scanner' && '📷 From pantry scanner'}
-                    {item.source === 'scanner suggestion' && '🤖 Scanner suggestion'}
-                    {item.source?.startsWith('recipe:') && `🍳 ${item.source.substring(8)}`}
-                  </div>
-                )}
-                {item.quantity && item.quantity !== '1' && (
-                  <div className="text-xs text-theme-secondary opacity-70">Needed: {item.quantity}</div>
-                )}
-                {item.checked && (
-                  <div className="mt-2">
-                    <select
-                      value={item.purchasedQuantity ? `${item.purchasedQuantity.amount} ${item.purchasedQuantity.unit}` : ''}
-                      onChange={(e) => {
-                        e.stopPropagation();
-                        const [amount, unit] = e.target.value.split(' ');
-                        setItems(prev => prev.map(i => 
-                          i.id === item.id 
-                            ? { ...i, purchasedQuantity: { amount: parseFloat(amount), unit } }
-                            : i
-                        ));
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                      className="text-xs bg-theme-primary border border-theme rounded px-2 py-1 text-theme-primary"
-                    >
-                      <option value="">Select purchased quantity</option>
-                      {/* Common quantity options based on item type */}
-                      {item.item.toLowerCase().includes('milk') && (
-                        <>
-                          <option value="0.5 gal">½ gallon</option>
-                          <option value="1 gal">1 gallon</option>
-                          <option value="2 gal">2 gallons</option>
-                        </>
-                      )}
-                      {(item.item.toLowerCase().includes('meat') || item.item.toLowerCase().includes('chicken') || item.item.toLowerCase().includes('beef') || item.item.toLowerCase().includes('pork')) && (
-                        <>
-                          <option value="0.5 lb">½ lb</option>
-                          <option value="1 lb">1 lb</option>
-                          <option value="2 lb">2 lbs</option>
-                          <option value="3 lb">3 lbs</option>
-                        </>
-                      )}
-                      {(item.item.toLowerCase().includes('bread') || item.item.toLowerCase().includes('loaf')) && (
-                        <>
-                          <option value="1 loaf">1 loaf</option>
-                          <option value="2 loaf">2 loaves</option>
-                        </>
-                      )}
-                      {(item.item.toLowerCase().includes('egg') || item.item.toLowerCase().includes('eggs')) && (
-                        <>
-                          <option value="6 count">6 eggs</option>
-                          <option value="12 count">12 eggs</option>
-                          <option value="18 count">18 eggs</option>
-                          <option value="24 count">24 eggs</option>
-                        </>
-                      )}
-                      {/* Generic options */}
-                      <option value="1 count">1 item</option>
-                      <option value="2 count">2 items</option>
-                      <option value="3 count">3 items</option>
-                      <option value="6 count">6 items</option>
-                      <option value="12 count">12 items</option>
-                    </select>
-                  </div>
-                )}
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              {item.quantity && item.quantity !== '1' && (
-                <div className="text-xs font-medium text-theme-secondary opacity-70 bg-theme-primary px-2 py-1 rounded">
-                  {item.quantity}
-                </div>
-              )}
-              <button 
-                onClick={(e) => { e.stopPropagation(); remove(item.id); }}
-                className="p-2 text-theme-secondary opacity-30 hover:opacity-100 hover:text-red-500 transition-opacity"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        ))
+            <EnhancedShoppingListItem
+              key={item.id}
+              item={item}
+              onToggleCheck={toggleCheck}
+              onRemove={remove}
+              isOnline={isOnline}
+            />
+          ))
         )}
         {items.length === 0 && !isLoadingShoppingList && (
              <div className="text-center py-12 opacity-60 flex flex-col items-center">
@@ -526,6 +624,70 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ items, setItems, onM
              </div>
         )}
       </div>
+
+      {/* Analytics Section */}
+      {showAnalytics && items.length > 0 && (
+        <ShoppingListAnalytics
+          shoppingItems={items.map(item => ({
+            ...item,
+            addedAt: new Date(), // TODO: Add proper timestamp
+            completedAt: item.checked ? new Date() : undefined,
+            estimatedPrice: 0 // TODO: Add price estimation
+          }))}
+          previousSessions={[]} // TODO: Add previous session data
+        />
+      )}
+
+      {/* Toggle Analytics Button */}
+      {items.length > 0 && (
+        <div className="flex justify-center mt-4">
+          <button
+            onClick={() => setShowAnalytics(!showAnalytics)}
+            className="px-4 py-2 bg-theme-secondary text-theme-primary rounded-lg hover:bg-theme-primary transition-colors text-sm"
+          >
+            {showAnalytics ? 'Hide Analytics' : 'Show Analytics'}
+          </button>
+        </div>
+      )}
+
+      {/* Export/Share Buttons */}
+      {items.length > 0 && (
+        <div className="flex justify-center gap-2 mt-6 flex-wrap">
+          <button
+            onClick={handleCopyToClipboard}
+            className="flex items-center gap-2 px-3 py-2 bg-theme-secondary text-theme-primary rounded-lg border border-theme hover:bg-theme-primary transition-colors text-sm"
+            title="Copy to clipboard"
+          >
+            <Copy className="w-4 h-4" />
+            Copy
+          </button>
+          <button
+            onClick={handleShare}
+            className="flex items-center gap-2 px-3 py-2 bg-theme-secondary text-theme-primary rounded-lg border border-theme hover:bg-theme-primary transition-colors text-sm"
+            title="Share shopping list"
+          >
+            <Share2 className="w-4 h-4" />
+            Share
+          </button>
+          <button
+            onClick={handleShareViaSMS}
+            className="flex items-center gap-2 px-3 py-2 bg-theme-secondary text-theme-primary rounded-lg border border-theme hover:bg-theme-primary transition-colors text-sm"
+            title="Send via text message"
+          >
+            <MessageSquare className="w-4 h-4" />
+            SMS
+          </button>
+          <button
+            onClick={handleExport}
+            className="flex items-center gap-2 px-3 py-2 bg-theme-secondary text-theme-primary rounded-lg border border-theme hover:bg-theme-primary transition-colors text-sm"
+            title="Download as text file"
+          >
+            <Download className="w-4 h-4" />
+            Export
+          </button>
+        </div>
+      )}
+
     </div>
   );
 };

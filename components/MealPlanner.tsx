@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { CalendarClock, Plus, Move, AlertCircle, ShoppingBasket, Trash2, HelpCircle } from 'lucide-react';
-import { DayPlan, MealPlanItem, PantryItem, StructuredRecipe, User, SavedRecipe } from '../types';
+import { DayPlan, MealPlanItem, PantryItem, StructuredRecipe, User, SavedRecipe, ShoppingItem } from '../types';
 import RecipeModal from './RecipeModal';
 import { MealPrepPlanner } from './MealPrepPlanner';
 import { PremiumFeature } from './PremiumFeature';
@@ -15,12 +15,14 @@ import AnalyticsService from '../services/analyticsService';
 import { searchRecipes } from '../utils/searchUtils';
 import { debounce } from '../utils/debounceUtils';
 import { CompactRecipeCardSkeleton, MealPlanSkeleton } from './SkeletonLoader';
+import { getMealPrepSuggestions, RecipeIngredientMatch } from '../utils/searchUtils';
 // import CalendarService from '../services/calendarService'; // Temporarily disabled
 
 interface MealPlannerProps {
   mealPlan: DayPlan[];
   setMealPlan: React.Dispatch<React.SetStateAction<DayPlan[]>>;
   inventory: PantryItem[];
+  shoppingList: ShoppingItem[];
   addToShoppingList: (items: string[]) => void;
   onAddToPlan?: (recipe: StructuredRecipe) => void;
   onSaveRecipe?: (recipe: StructuredRecipe) => void;
@@ -32,6 +34,7 @@ interface MealPlannerProps {
   mealPlanLimitExceeded?: boolean;
   isLoadingMealPlan?: boolean;
   isLoadingSavedRecipes?: boolean;
+  savedRecipes?: SavedRecipe[];
   settings?: {
     notifications: {
       enabled: boolean;
@@ -54,6 +57,7 @@ interface RecipeSearchModalProps {
   onClose: () => void;
   inventory: PantryItem[];
   user: User;
+  savedRecipes: SavedRecipe[];
 }
 
 const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
@@ -62,50 +66,19 @@ const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
   onAddRecipe,
   onClose,
   inventory,
-  user
+  user,
+  savedRecipes: propSavedRecipes
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<StructuredRecipe[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const [savedRecipes, setSavedRecipes] = useState<SavedRecipe[]>([]);
-  const [recipesLoaded, setRecipesLoaded] = useState(false);
+  const [savedRecipes, setSavedRecipes] = useState<SavedRecipe[]>(propSavedRecipes);
+  const [recipesLoaded, setRecipesLoaded] = useState(true); // Already loaded from props
 
-  // Load saved recipes only when needed (lazy loading)
-  const loadSavedRecipes = async () => {
-    if (recipesLoaded) return; // Already loaded
-
-    try {
-      // Load user-specific saved recipes
-      const userSaved = await getDocs(collection(db, 'users', user.id, 'savedRecipes'));
-      const userRecipes = userSaved.docs.map(doc => ({ id: doc.id, ...doc.data() } as SavedRecipe));
-
-      // Load global recipe database (limited to prevent performance issues)
-      const globalRecipes = await getSavedRecipes(20); // Limit to 20 most recent
-
-      // Combine and deduplicate recipes (user recipes take precedence)
-      const allRecipes = [...globalRecipes];
-      userRecipes.forEach(userRecipe => {
-        const existingIndex = allRecipes.findIndex(r => r.title === userRecipe.title);
-        if (existingIndex >= 0) {
-          allRecipes[existingIndex] = userRecipe; // Replace with user version
-        } else {
-          allRecipes.push(userRecipe);
-        }
-      });
-
-      setSavedRecipes(allRecipes);
-      setRecipesLoaded(true);
-    } catch (error) {
-      console.error('Error loading saved recipes:', error);
-    }
-  };
-
-  // Load recipes when user starts typing or opens search
+  // Update saved recipes when prop changes
   useEffect(() => {
-    if (searchQuery.length > 0) {
-      loadSavedRecipes();
-    }
-  }, [searchQuery]);
+    setSavedRecipes(propSavedRecipes);
+  }, [propSavedRecipes]);
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
@@ -357,7 +330,7 @@ const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
   );
 };
 
-export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan, inventory, addToShoppingList, onAddToPlan, onSaveRecipe, onMarkAsMade, onRate, user, setActiveTab, recipeSaveLimitExceeded = false, mealPlanLimitExceeded = false, isLoadingMealPlan = false, isLoadingSavedRecipes = false, settings, onOpenRecipeSearch }) => {
+export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan, inventory, shoppingList, addToShoppingList, onAddToPlan, onSaveRecipe, onMarkAsMade, onRate, user, setActiveTab, recipeSaveLimitExceeded = false, mealPlanLimitExceeded = false, isLoadingMealPlan = false, isLoadingSavedRecipes = false, savedRecipes: propSavedRecipes = [], settings, onOpenRecipeSearch }) => {
     // List of staple items to ignore (unless user wants them included)
     const STAPLES = ['salt', 'pepper', 'oil', 'water', 'flour', 'sugar', 'butter', 'vinegar', 'baking powder', 'baking soda', 'spices', 'seasoning', 'soy sauce', 'cornstarch', 'yeast'];
     const includeStaples = settings?.shopping?.includeStaples || false;
@@ -371,31 +344,48 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
   const [showHelpTooltip, setShowHelpTooltip] = useState(false);
   const [selectedDayIndex, setSelectedDayIndex] = useState<number | null>(null);
 
-  // Load saved recipes only when meal prep planner is opened
-  const loadSavedRecipesForMealPrep = async () => {
-    if (savedRecipes.length > 0) return; // Already loaded
-
-    try {
-      const recipes = await getSavedRecipes();
-      setSavedRecipes(recipes);
-    } catch (error) {
-      console.error('Error loading saved recipes:', error);
-    }
-  };
+  // Use prop savedRecipes or local state as fallback
+  const [localSavedRecipes, setLocalSavedRecipes] = useState<SavedRecipe[]>([]);
+  const savedRecipes = propSavedRecipes.length > 0 ? propSavedRecipes : localSavedRecipes;
 
   const [isDragging, setIsDragging] = useState(false);
   const [dragOverTrash, setDragOverTrash] = useState(false);
   const [showRecipeSearch, setShowRecipeSearch] = useState(false);
   const [searchMealType, setSearchMealType] = useState<'breakfast' | 'lunch' | 'dinner' | null>(null);
   const [showMealPrepPlanner, setShowMealPrepPlanner] = useState(false);
-  const [savedRecipes, setSavedRecipes] = useState<SavedRecipe[]>([]);
+  const [showAddMealDialog, setShowAddMealDialog] = useState(false);
+  const [pendingRecipe, setPendingRecipe] = useState<StructuredRecipe | null>(null);
+
+  // Wrapper for onAddToPlan that shows day/meal selection dialog
+  const handleAddToPlan = (recipe: StructuredRecipe) => {
+    setPendingRecipe(recipe);
+    setShowAddMealDialog(true);
+  };
+
+  // Actually add the recipe to the plan
+  const confirmAddToPlan = (dayIndex: number, mealType: 'breakfast' | 'lunch' | 'dinner') => {
+    if (pendingRecipe && onAddToPlan) {
+      onAddToPlan(pendingRecipe, dayIndex, mealType);
+      setPendingRecipe(null);
+      setShowAddMealDialog(false);
+    }
+  };
 
   // Load saved recipes when meal prep planner opens
   useEffect(() => {
-    if (showMealPrepPlanner) {
-      loadSavedRecipesForMealPrep();
-    }
-  }, [showMealPrepPlanner]);
+    // No longer need to load recipes since we use prop savedRecipes
+  }, [showMealPrepPlanner, propSavedRecipes.length]);
+
+  // Calculate meal prep suggestions based on current pantry
+  const mealPrepSuggestions = useMemo(() => {
+    if (savedRecipes.length === 0 || inventory.length === 0) return [];
+    return getMealPrepSuggestions(savedRecipes, inventory, 60); // 60% match minimum
+  }, [savedRecipes, inventory]);
+
+  // Load saved recipes for meal prep suggestions on component mount (only if no prop recipes)
+  useEffect(() => {
+    // No longer need to load recipes since we use prop savedRecipes
+  }, [propSavedRecipes.length]);
 
   // Memoized missing ingredients computation
   const missingIngredients = useMemo(() => {
@@ -413,10 +403,20 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
     const missing = missingWithRecipes.filter(item => {
       const neededLower = item.ingredient.toLowerCase();
       if (!includeStaples && STAPLES.some(staple => neededLower.includes(staple))) return false;
-      return !inventory.some(pantryItem => 
+      
+      // Check if ingredient is already in inventory
+      const inInventory = inventory.some(pantryItem => 
         neededLower.includes(pantryItem.item.toLowerCase()) || 
         pantryItem.item.toLowerCase().includes(neededLower)
       );
+      
+      // Check if ingredient is already in shopping list
+      const inShoppingList = shoppingList.some(shoppingItem => 
+        neededLower.includes(shoppingItem.item.toLowerCase()) || 
+        shoppingItem.item.toLowerCase().includes(neededLower)
+      );
+      
+      return !inInventory && !inShoppingList;
     });
 
     // Group by ingredient and aggregate quantities
@@ -453,7 +453,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
     });
 
     return Object.values(grouped);
-  }, [mealPlan, inventory, includeStaples]);
+  }, [mealPlan, inventory, shoppingList, includeStaples]);
 
   // Legacy function for backward compatibility
   const getMissingIngredients = () => missingIngredients;
@@ -721,6 +721,25 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
       setMealPlan(newPlan);
   };
 
+  // Helper function to check if a day is today
+  const isToday = (dateString: string) => {
+    const today = new Date().toISOString().split('T')[0];
+    return dateString === today;
+  };
+
+  // Get today's meals for highlighting
+  const todaysMeals = useMemo(() => {
+    const today = new Date().toISOString().split('T')[0];
+    const todayPlan = mealPlan.find(day => day.date === today);
+    if (!todayPlan) return [];
+    
+    return [
+      ...(todayPlan.breakfast || []),
+      ...(todayPlan.lunch || []),
+      ...(todayPlan.dinner || [])
+    ];
+  }, [mealPlan]);
+
   return (
     <div className="space-y-6 pb-24 animate-fade-in">
       <div className="text-center mb-2 relative">
@@ -793,6 +812,129 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
 
         <GroceryCostEstimator mealPlan={mealPlan} inventory={inventory} />
 
+        {/* Today's Meals Highlight */}
+        {todaysMeals.length > 0 && (
+          <div className="bg-gradient-to-r from-[var(--accent-color)]/10 to-[var(--accent-color)]/5 border border-[var(--accent-color)]/20 rounded-xl p-4 mb-4">
+            <div className="flex items-center gap-2 mb-3">
+              <CalendarClock className="w-5 h-5 text-[var(--accent-color)]" />
+              <h3 className="font-semibold text-theme-primary">Today's Meals</h3>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              {todaysMeals.map((meal, index) => (
+                <div
+                  key={meal.id}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setModalRecipe(meal.recipe);
+                    setModalContext('scheduled');
+                    setShowRecipeModal(true);
+                  }}
+                  className="bg-theme-secondary/80 backdrop-blur-sm border border-[var(--accent-color)]/30 rounded-lg p-3 cursor-pointer hover:bg-theme-secondary transition-all hover:shadow-md"
+                >
+                  <div className="text-xs font-semibold text-[var(--accent-color)] mb-1 uppercase">
+                    {index < todaysMeals.length / 3 ? 'Breakfast' : index < (todaysMeals.length * 2) / 3 ? 'Lunch' : 'Dinner'}
+                  </div>
+                  <div className="text-sm font-medium text-theme-primary truncate">
+                    {meal.recipe.title}
+                  </div>
+                  <div className="text-xs text-theme-secondary opacity-60 mt-1">
+                    Click to view recipe
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Meal Prep Suggestions */}
+        {mealPrepSuggestions.length > 0 && (
+          <div className="bg-gradient-to-r from-green-500/10 to-emerald-500/5 border border-green-500/20 rounded-xl p-4 mb-4">
+            <div className="flex items-center gap-2 mb-3">
+              <ShoppingBasket className="w-5 h-5 text-green-600" />
+              <h3 className="font-semibold text-theme-primary">Meal Prep Suggestions</h3>
+              <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">
+                {mealPrepSuggestions.length} recipes
+              </span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {mealPrepSuggestions.slice(0, 6).map((suggestion, index) => (
+                <div
+                  key={index}
+                  className="bg-theme-secondary/80 backdrop-blur-sm border border-green-500/30 rounded-lg p-3 cursor-pointer hover:bg-theme-secondary transition-all hover:shadow-md"
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <h4 className="text-sm font-semibold text-theme-primary truncate flex-1">
+                      {suggestion.recipe.title}
+                    </h4>
+                    {suggestion.canMake && (
+                      <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full ml-2 flex-shrink-0">
+                        Ready!
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="text-xs text-theme-secondary mb-2">
+                    {suggestion.availableIngredients}/{suggestion.totalIngredients} ingredients available
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setModalRecipe(suggestion.recipe);
+                        setModalContext('search');
+                        setShowRecipeModal(true);
+                        AnalyticsService.trackEvent('meal_prep_view_recipe', {
+                          recipe_title: suggestion.recipe.title,
+                          match_percentage: suggestion.matchPercentage,
+                          available_ingredients: suggestion.availableIngredients,
+                          total_ingredients: suggestion.totalIngredients,
+                          can_make: suggestion.canMake
+                        });
+                      }}
+                      className="flex-1 text-xs bg-[var(--accent-color)] text-white px-2 py-1 rounded hover:bg-[var(--accent-color)]/90 transition-colors"
+                    >
+                      View Recipe
+                    </button>
+                    {suggestion.missingIngredients.length > 0 && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const missingItems = suggestion.missingIngredients
+                            .filter(match => !match.available)
+                            .map(match => match.ingredient);
+                          if (missingItems.length > 0) {
+                            addToShoppingList(missingItems);
+                            AnalyticsService.trackEvent('meal_prep_add_missing_ingredients', {
+                              recipe_title: suggestion.recipe.title,
+                              missing_count: missingItems.length,
+                              total_ingredients: suggestion.totalIngredients
+                            });
+                          }
+                        }}
+                        className="text-xs bg-theme-secondary border border-theme px-2 py-1 rounded hover:bg-theme-primary transition-colors"
+                        title={`Add ${suggestion.missingIngredients.length} missing ingredients to shopping list`}
+                      >
+                        +{suggestion.missingIngredients.length}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+            {mealPrepSuggestions.length > 6 && (
+              <div className="text-center mt-3">
+                <button
+                  onClick={() => setShowMealPrepPlanner(true)}
+                  className="text-sm text-[var(--accent-color)] hover:underline"
+                >
+                  View all {mealPrepSuggestions.length} suggestions →
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Loading state */}
         {isLoadingMealPlan ? (
           <div className="space-y-4">
@@ -810,18 +952,20 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
               <div
                 key={dayIndex}
                 onClick={() => setSelectedDayIndex(dayIndex)}
-                onDragOver={(e) => handleDragOver(e, dayIndex)}
-                onDragLeave={handleDragLeave}
-                onDrop={(e) => handleDrop(e, dayIndex)}
                 className={`bg-theme-secondary rounded-lg p-3 min-h-[250px] border-2 transition-all cursor-pointer flex flex-col hover:shadow-lg hover:scale-[1.02] ${
-                  dragOverDay === dayIndex
-                    ? 'border-[var(--accent-color)] shadow-lg'
+                  isToday(day.date)
+                    ? 'border-[var(--accent-color)] bg-gradient-to-br from-[var(--accent-color)]/5 to-transparent shadow-md ring-1 ring-[var(--accent-color)]/20'
                     : 'border-theme'
                 }`}
               >
                 <div className="mb-2">
-                  <h3 className="text-sm font-bold text-theme-primary">{day.dayName}</h3>
-                  <p className="text-xs opacity-50 font-mono">{day.date}</p>
+                  <h3 className={`text-sm font-bold ${isToday(day.date) ? 'text-[var(--accent-color)]' : 'text-theme-primary'}`}>
+                    {day.dayName}
+                    {isToday(day.date) && <span className="ml-1 text-xs">📅</span>}
+                  </h3>
+                  <p className={`text-xs font-mono ${isToday(day.date) ? 'text-[var(--accent-color)] font-semibold' : 'opacity-50'}`}>
+                    {day.date}
+                  </p>
                 </div>
 
                 <div className="space-y-1 flex-1 overflow-y-auto text-xs">
@@ -830,14 +974,24 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
                     const mealsForType = day[mealTypeKey] || [];
 
                     return (
-                      <div key={mealType} className="space-y-1">
+                      <div 
+                        key={mealType} 
+                        className={`space-y-1 p-1 rounded transition-colors ${
+                          dragOverMealType?.dayIndex === dayIndex && dragOverMealType?.mealType === mealTypeKey
+                            ? 'bg-[var(--accent-color)]/10 border border-[var(--accent-color)]/30'
+                            : 'hover:bg-theme-primary/20'
+                        }`}
+                        onDragOver={(e) => handleDragOver(e, dayIndex, mealTypeKey)}
+                        onDragLeave={handleDragLeave}
+                        onDrop={(e) => handleDrop(e, dayIndex, mealTypeKey)}
+                      >
                         <div className="text-[10px] font-semibold text-theme-primary opacity-60 uppercase">
                           {mealType.slice(0, 1)}
                         </div>
                         <div className="space-y-1">
                           {mealsForType.length === 0 ? (
                             <div className="h-6 flex items-center text-[9px] opacity-30">
-                              —
+                              Drop here
                             </div>
                           ) : (
                             mealsForType.map((meal, mealIndex) => {
@@ -850,7 +1004,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
                                     handleDragStart(e, dayIndex, mealTypeKey, mealIndex);
                                   }}
                                   onDragEnd={handleDragEnd}
-                                  className={`bg-theme-primary border rounded p-1 text-[9px] cursor-move group shadow-sm active:cursor-grabbing transition-all truncate hover:opacity-50 flex items-center justify-between gap-1 ${
+                                  className={`bg-theme-primary/60 border border-theme/30 rounded-md p-1.5 text-[9px] cursor-pointer group shadow-sm active:cursor-grabbing transition-all truncate hover:opacity-80 hover:bg-theme-primary/80 hover:border-[var(--accent-color)]/40 hover:shadow-md flex items-center justify-between gap-1 ${
                                     draggedMeal?.dayIndex === dayIndex && draggedMeal?.mealType === mealTypeKey && draggedMeal?.mealIndex === mealIndex
                                       ? 'opacity-50 scale-95'
                                       : ''
@@ -866,6 +1020,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
                                   <span className="text-[var(--accent-color)] font-semibold truncate flex-1">
                                     {meal.recipe.title}
                                   </span>
+                                  <span className="text-[8px] opacity-60 group-hover:opacity-80">👁️</span>
                                 </div>
                               );
                             })
@@ -1083,6 +1238,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
                 }}
                 inventory={inventory}
                 user={user}
+                savedRecipes={propSavedRecipes}
               />
             </div>
           </div>
@@ -1095,7 +1251,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
           recipe={modalRecipe}
           isOpen={showRecipeModal}
           onClose={() => setShowRecipeModal(false)}
-          onAddToPlan={modalContext === 'search' ? onAddToPlan : undefined}
+          onAddToPlan={modalContext === 'search' ? handleAddToPlan : undefined}
           onSaveRecipe={onSaveRecipe}
           onRate={onRate}
           onMarkAsMade={modalContext === 'scheduled' ? onMarkAsMade : undefined}
@@ -1116,6 +1272,63 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
           onAddToPlan={onAddToPlan!}
           onClose={() => setShowMealPrepPlanner(false)}
         />
+      )}
+
+      {/* Add Meal Dialog */}
+      {showAddMealDialog && pendingRecipe && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-theme-primary rounded-2xl p-6 max-w-md w-full mx-4">
+            <h3 className="text-xl font-bold text-theme-text mb-4 text-center">
+              Add "{pendingRecipe.title}" to Meal Plan
+            </h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-theme-text mb-2">Select Day:</label>
+                <select
+                  className="w-full p-3 bg-theme-secondary border border-theme rounded-lg text-theme-text"
+                  onChange={(e) => setSelectedDayIndex(parseInt(e.target.value))}
+                  defaultValue=""
+                >
+                  <option value="" disabled>Select a day...</option>
+                  {mealPlan.map((day, index) => (
+                    <option key={day.date} value={index}>
+                      {day.dayName} - {day.date}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-theme-text mb-2">Select Meal:</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['breakfast', 'lunch', 'dinner'] as const).map((mealType) => (
+                    <button
+                      key={mealType}
+                      onClick={() => selectedDayIndex !== null && confirmAddToPlan(selectedDayIndex, mealType)}
+                      className="p-3 bg-theme-secondary hover:bg-[var(--accent-color)] hover:text-white border border-theme rounded-lg text-theme-text capitalize transition-colors"
+                    >
+                      {mealType}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowAddMealDialog(false);
+                  setPendingRecipe(null);
+                  setSelectedDayIndex(null);
+                }}
+                className="flex-1 py-3 font-medium bg-theme-secondary text-theme-text rounded-lg hover:bg-theme-primary transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

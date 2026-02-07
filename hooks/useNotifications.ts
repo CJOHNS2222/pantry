@@ -80,59 +80,20 @@ export function useNotifications(settings: NotificationSettings, userEmail?: str
     if (Capacitor.isNativePlatform()) {
       const notifications = [];
 
-      if (settings.types.shoppingList) {
+      // Single daily combined notification (meals + shopping)
+      if (settings.types.shoppingList || settings.types.mealPlan) {
         notifications.push({
           id: 1,
-          title: 'Shopping List Reminder',
-          body: 'Don\'t forget to check your shopping list!',
+          title: 'Daily Pantry Check',
+          body: 'Check your meals to prepare and shopping list for today',
           schedule: {
             at: notificationTime,
             repeats: true,
             every: 'day'
           },
-          actionTypeId: 'shopping',
-          extra: { type: 'shoppingList' }
+          actionTypeId: 'daily_check',
+          extra: { type: 'dailyCombined' }
         });
-      }
-
-      if (settings.types.mealPlan) {
-        // Schedule meal preparation notifications for each planned meal
-        if (mealPlan) {
-          const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-          const todayPlan = mealPlan.find(day => day.date === today);
-          const todaysMeals = [
-            ...(todayPlan?.breakfast || []),
-            ...(todayPlan?.lunch || []),
-            ...(todayPlan?.dinner || [])
-          ];
-          
-          // Assume meal times: 0=breakfast(8am), 1=lunch(12pm), 2=dinner(6pm)
-          const mealTimes = [8, 12, 18]; // hours
-          
-          todaysMeals.forEach((meal, index) => {
-            if (index < mealTimes.length) {
-              const mealTime = new Date();
-              mealTime.setHours(mealTimes[index], 0, 0, 0);
-              const prepTime = new Date(mealTime);
-              prepTime.setHours(prepTime.getHours() - 2); // 2 hours before
-
-              if (prepTime > now) {
-                const mealNames = ['Breakfast', 'Lunch', 'Dinner'];
-                notifications.push({
-                  id: 3 + index, // 3, 4, 5
-                  title: `${mealNames[index]} Preparation Reminder`,
-                  body: `Time to prepare your ${mealNames[index].toLowerCase()}!`,
-                  schedule: {
-                    at: prepTime,
-                    repeats: false // Only for today
-                  },
-                  actionTypeId: 'mealprep',
-                  extra: { type: 'mealPrep', mealIndex: index }
-                });
-              }
-            }
-          });
-        }
       }
 
       if (notifications.length > 0) {

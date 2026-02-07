@@ -727,8 +727,6 @@ function withTimeout<T>(
 **Impact:** HIGH | Complex feature, needs UX polish
 
 1. **Better calendar interaction**
-   - Show recipe titles directly on calendar
-   - Drag to rearrange meals
    - Today's meals highlighted/sticky at top
    - Click to see full recipe without leaving calendar
 
@@ -753,15 +751,13 @@ function withTimeout<T>(
 **Impact:** HIGH | Core workflow
 
 1. **Better scanning experience**
-   - Show confidence: "Found 'Milk' - 95% confident" 
    - Allow quick quantity adjustment during scan (visual slider, not text input)
-   - Batch scan mode: "Scan 5 more items" vs manual one-by-one
    - Currently: Scan → Review → Adjust → Save (too many steps)
 
 2. **Visual quantity selector**
    - Slider with visual indicators: Empty 🥛 → Quarter → Half → Full
    - Show typical amounts: "Half gallon of milk"
-   - Number + unit picker side-by-side
+   - Number + unit picker side-by-side in pantry, itemModal, and shopping list
    - Currently: Text input confusing (2, 2 cups, 1 liter, etc.)
 
 3. **Smart item categorization**
@@ -771,7 +767,7 @@ function withTimeout<T>(
 
 4. **Expiration date UX**
    - Calendar picker showing "~1 month", "~2 weeks", "~3 days"
-   - "Best by" vs "Use by" explanation
+ *  - "Best by" vs "Use by" explanation
    - Badge color: Green (fresh) → Yellow (soon) → Red (urgent)
    - Currently: Text input, unclear semantics
 
@@ -796,10 +792,6 @@ function withTimeout<T>(
    - Batch check: "Mark all Dairy as done"
    - Currently: Checkbox is small target on mobile
 
-3. **Price tracking at store**
-   - "Milk: $3.50 today vs avg $3.20"
-   - Store location detection: "Found at aisle 5 (from our map)"
-   - Better price history visualization
 
 4. **Smart list organization at store**
    - Auto-group by store aisle/section (Produce, Dairy, Frozen, etc.)

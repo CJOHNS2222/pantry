@@ -6,6 +6,7 @@ interface Action {
   id: string;
   type: ActionType;
   timestamp: number;
+  userId: string; // Add user ID to scope actions per user
   data: any; // Previous state or details
 }
 
@@ -36,13 +37,14 @@ class UndoService {
     });
   }
 
-  async recordAction(action: Omit<Action, 'id' | 'timestamp'>): Promise<void> {
+  async recordAction(action: Omit<Action, 'id' | 'timestamp' | 'userId'>, userId: string): Promise<void> {
     if (!this.db) await this.init();
 
     const fullAction: Action = {
       ...action,
-      id: `${action.type}_${Date.now()}`,
-      timestamp: Date.now()
+      id: `${action.type}_${userId}_${Date.now()}`,
+      timestamp: Date.now(),
+      userId
     };
 
     return new Promise((resolve, reject) => {
@@ -52,14 +54,14 @@ class UndoService {
 
       request.onerror = () => reject(request.error);
       request.onsuccess = () => {
-        // Keep only last MAX_ACTIONS
-        this.pruneOldActions();
+        // Keep only last MAX_ACTIONS per user
+        this.pruneOldActions(userId);
         resolve();
       };
     });
   }
 
-  async getRecentActions(limit: number = MAX_ACTIONS): Promise<Action[]> {
+  async getRecentActions(userId: string, limit: number = MAX_ACTIONS): Promise<Action[]> {
     if (!this.db) await this.init();
 
     return new Promise((resolve, reject) => {
@@ -72,7 +74,10 @@ class UndoService {
       request.onsuccess = (event) => {
         const cursor = (event.target as IDBRequest).result;
         if (cursor && actions.length < limit) {
-          actions.push(cursor.value);
+          // Only include actions for the current user
+          if (cursor.value.userId === userId) {
+            actions.push(cursor.value);
+          }
           cursor.continue();
         } else {
           resolve(actions);
@@ -95,8 +100,31 @@ class UndoService {
     });
   }
 
-  private async pruneOldActions(): Promise<void> {
-    const actions = await this.getRecentActions(MAX_ACTIONS + 10);
+  async clearUserActions(userId: string): Promise<void> {
+    if (!this.db) await this.init();
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction([STORE_NAME], 'readwrite');
+      const store = transaction.objectStore(STORE_NAME);
+      const request = store.openCursor();
+
+      request.onsuccess = (event) => {
+        const cursor = (event.target as IDBRequest).result;
+        if (cursor) {
+          if (cursor.value.userId === userId) {
+            cursor.delete();
+          }
+          cursor.continue();
+        } else {
+          resolve();
+        }
+      };
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  private async pruneOldActions(userId: string): Promise<void> {
+    const actions = await this.getRecentActions(userId, MAX_ACTIONS + 10);
     if (actions.length > MAX_ACTIONS) {
       const toDelete = actions.slice(MAX_ACTIONS);
       for (const action of toDelete) {

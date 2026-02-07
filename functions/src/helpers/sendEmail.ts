@@ -1,22 +1,28 @@
-import * as functions from "firebase-functions";
+import { defineJsonSecret } from "firebase-functions/params";
 import * as nodemailer from "nodemailer";
+
+// Define the secret for Gmail configuration
+const gmailConfigSecret = defineJsonSecret("EMAILSECRET");
 
 let transporter: any;
 let cachedGmailEmail: string | null = null;
 
-const getTransporter = () => {
+const getTransporter = async () => {
   if (!transporter) {
-    // @ts-expect-error - functions.config() is available at runtime
-    const gmailConfig = functions.config().gmail;
-    if (!gmailConfig?.email || !gmailConfig?.password) {
-      throw new Error("Gmail credentials not configured. Please run: firebase functions:config:set gmail.email=YOUR_EMAIL gmail.password=YOUR_PASSWORD");
+    // Get the Gmail config from the secret
+    const gmailConfig = gmailConfigSecret.value();
+    if (!gmailConfig?.useremail || !gmailConfig?.clientid || !gmailConfig?.clientsecret || !gmailConfig?.refreshtoken) {
+      throw new Error("Gmail OAuth2 credentials not configured in EMAILSECRET");
     }
-    cachedGmailEmail = gmailConfig.email;
+    cachedGmailEmail = gmailConfig.useremail;
     transporter = nodemailer.createTransport({
       service: "gmail",
       auth: {
-        user: gmailConfig.email,
-        pass: gmailConfig.password,
+        type: "OAuth2",
+        user: gmailConfig.useremail,
+        clientId: gmailConfig.clientid,
+        clientSecret: gmailConfig.clientsecret,
+        refreshToken: gmailConfig.refreshtoken,
       },
     });
   }
@@ -28,11 +34,10 @@ export const sendEmail = async (
   subject: string,
   body: string
 ) => {
-  const transporter = getTransporter();
+  const transporter = await getTransporter();
   if (!cachedGmailEmail) {
-    // @ts-expect-error - functions.config() is available at runtime
-    const gmailConfig = functions.config().gmail;
-    cachedGmailEmail = gmailConfig?.email || "noreply@smartpantry.com";
+    const gmailConfig = gmailConfigSecret.value();
+    cachedGmailEmail = gmailConfig?.useremail || "noreply@smartpantry.com";
   }
   const mailOptions = {
     from: cachedGmailEmail,

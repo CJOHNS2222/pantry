@@ -90,7 +90,7 @@ export const createHousehold = async (
       members: [
         {
           id: user.id,
-          name: user.name,
+          name: user.name || user.email?.split('@')[0] || 'Unknown',
           email: user.email,
           role: 'admin',
           status: 'Active',
@@ -197,21 +197,22 @@ export const removeMemberFromHousehold = async (
     const householdData = household.data();
     const members = householdData.members || [];
 
-    // Check if current user is admin
+    // Check if current user is admin or is removing themselves
     const currentUserMember = members.find((m: Member) => m.id === currentUserId);
-    if (!currentUserMember || currentUserMember.role !== 'admin') {
-      throw new Error('Only admins can remove members');
+    const isSelfRemoval = memberId === currentUserId;
+    
+    if (!currentUserMember) {
+      throw new Error('User not found in household');
+    }
+    
+    if (!isSelfRemoval && currentUserMember.role !== 'admin') {
+      throw new Error('Only admins can remove other members');
     }
 
     // Find member to remove
     const memberToRemove = members.find((m: Member) => m.id === memberId);
     if (!memberToRemove) {
       throw new Error('Member not found');
-    }
-
-    // Cannot remove yourself this way - use leaveHousehold
-    if (memberId === currentUserId) {
-      throw new Error('Use leave household to remove yourself');
     }
 
     // Remove member from members and memberIds
@@ -306,7 +307,7 @@ export const joinHousehold = async (
           return {
             ...m,
             id: user.id,
-            name: user.name,
+            name: user.name || user.email?.split('@')[0] || 'Unknown',
             status: 'Active',
           };
         }

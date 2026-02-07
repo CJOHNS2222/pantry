@@ -162,6 +162,7 @@ export const MainContent: React.FC = () => {
               mealPlan={mealPlan}
               setMealPlan={appState.setMealPlan}
               inventory={inventory}
+              shoppingList={shoppingList}
               addToShoppingList={onAddToShoppingList}
               onAddToPlan={onAddToPlan}
               onSaveRecipe={onSaveRecipe}
@@ -173,6 +174,7 @@ export const MainContent: React.FC = () => {
               mealPlanLimitExceeded={mealPlanLimitExceeded}
               isLoadingMealPlan={isLoadingMealPlan}
               isLoadingSavedRecipes={isLoadingSavedRecipes}
+              savedRecipes={savedRecipes}
               settings={settings}
               onOpenRecipeSearch={() => {
                 // This will be called by the tutorial to open recipe search modal
@@ -218,6 +220,7 @@ export const MainContent: React.FC = () => {
               recipeSaveLimitExceeded={recipeSaveLimitExceeded}
               mealPlanLimitExceeded={mealPlanLimitExceeded}
               isLoadingSavedRecipes={isLoadingSavedRecipes}
+              household={household}
             />
           </Suspense>
         </ComponentErrorBoundary>
@@ -248,6 +251,7 @@ export const MainContent: React.FC = () => {
               mealPlan={mealPlan}
               inventory={inventory}
               onShowTutorial={onShowTutorial}
+              household={household}
             />
           </Suspense>
         </ComponentErrorBoundary>

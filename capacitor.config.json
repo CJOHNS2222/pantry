@@ -1,0 +1,19 @@
+{
+  "appId": "com.smart.pantry",
+  "appName": "Smart Pantry",
+  "webDir": "dist",
+  "plugins": {
+    "App": {},
+    "Device": {},
+    "PushNotifications": {
+      "presentationOptions": ["badge", "sound", "alert"]
+    },
+    "SafeArea": {}
+  },
+  "android": {
+    "icon": "public/icons/smartpantryicon.png"
+  },
+  "ios": {
+    "icon": "public/icons/smartpantryicon.png"
+  }
+}

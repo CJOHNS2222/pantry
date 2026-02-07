@@ -268,20 +268,36 @@ class UsageService {
     const userRef = doc(db, 'users', userId);
     const userDoc = await getDoc(userRef);
     if (!userDoc.exists()) return false;
-    
+
     const user = userDoc.data() as User;
-    
+    console.log('canAddHouseholdMember - User data:', { userId, householdId: user.householdId, subscription: user.subscription });
+
     // Get current household member count
-    const householdRef = doc(db, 'households', user.householdId || '');
+    if (!user.householdId) {
+      console.log('canAddHouseholdMember - No householdId, allowing creation');
+      // User doesn't have a household yet, so they can create one
+      return true;
+    }
+
+    const householdRef = doc(db, 'households', user.householdId);
     const householdDoc = await getDoc(householdRef);
     const currentMemberCount = householdDoc.exists() ? householdDoc.data().members?.length || 0 : 0;
-    
+
     // For free users: max 1 member (themselves)
     // For premium: max 3 members
     // For family: max 5 members (user + 4 family members)
-    const maxMembers = user.subscription?.tier === 'family' ? 5 : 
+    const maxMembers = user.subscription?.tier === 'family' ? 5 :
                       user.subscription?.tier === 'premium' ? 3 : 1;
-    return currentMemberCount < maxMembers;
+
+    const canAdd = currentMemberCount < maxMembers;
+    console.log('canAddHouseholdMember - Result:', {
+      currentMemberCount,
+      maxMembers,
+      subscriptionTier: user.subscription?.tier,
+      canAdd
+    });
+
+    return canAdd;
   }
 
   static async updatePlanLimits(user: User, plan: 'free' | 'premium' | 'family'): Promise<void> {

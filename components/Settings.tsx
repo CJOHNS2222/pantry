@@ -12,11 +12,15 @@ import { log } from '../services/logService';
 import { LanguageSelector } from '../src/components/LanguageSelector';
 import { useNotifications } from '../hooks/useNotifications';
 import { UserProfile, CustomCategory, PantryItem } from '../types';
-import { VersionUpdate } from './VersionUpdate';
+import { NotificationSettingsComponent } from './NotificationSettings';
+import { PendingNotifications } from './PendingNotifications';
+import { NotificationService, NotificationSettings } from '../services/notificationService';
 import { DayPlan } from '../types';
 import { BarChart3, Loader2 } from 'lucide-react';
 import AnalyticsService from '../services/analyticsService';
 import { userOptedInToGemini, setUserGeminiOptIn, getGeminiUsage } from '../services/featureFlags';
+import { VersionUpdate } from './VersionUpdate';
+import { Household } from '../types';
 
 const defaultSettings = {
   notifications: {
@@ -54,6 +58,7 @@ interface SettingsProps {
   mealPlan?: DayPlan[];
   inventory?: PantryItem[];
   onShowTutorial?: () => void;
+  household?: Household | null;
 }
 
 export const Settings: React.FC<SettingsProps> = ({ 
@@ -67,7 +72,8 @@ export const Settings: React.FC<SettingsProps> = ({
   onDeleteCustomCategory,
   mealPlan,
   inventory = [],
-  onShowTutorial
+  onShowTutorial,
+  household
 }) => {
   const [feedback, setFeedback] = useState('');
   const [sending, setSending] = useState(false);
@@ -87,6 +93,9 @@ export const Settings: React.FC<SettingsProps> = ({
   const [geminiOptedIn, setGeminiOptedIn] = useState(() => userOptedInToGemini(user?.id));
   const [geminiUsage, setGeminiUsage] = useState(() => getGeminiUsage(user?.id));
   const [updatingBulkImages, setUpdatingBulkImages] = useState(false);
+  const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>(
+    NotificationService.getDefaultSettings()
+  );
 
   // Update userProfile when user data loads
   useEffect(() => {
@@ -574,168 +583,35 @@ export const Settings: React.FC<SettingsProps> = ({
       {/* Household Members Section */}
       {user && (
         <div className="bg-theme-secondary rounded-xl border border-theme p-4">
-          <h3 className="font-semibold mb-3 text-theme-primary">Household Members</h3>
+          <h3 className="font-semibold mb-3 text-theme-primary">Household</h3>
           <div className="space-y-3">
-            <p className="text-sm text-theme-secondary">
-              Manage dietary preferences and restrictions for each household member to get personalized recipe suggestions.
-            </p>
-            <button
-              onClick={() => setShowHouseholdManager(true)}
-              className="bg-[var(--accent-color)] text-white px-4 py-2 rounded font-medium text-sm hover:bg-opacity-90 transition-colors"
-            >
-              Manage Household
-            </button>
-            <div className="text-xs text-theme-secondary">
-              {householdMembers.length} household member{householdMembers.length === 1 ? '' : 's'}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Household Members Modal */}
-      {showHouseholdManager && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-theme-primary rounded-xl border border-theme p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-theme-primary">Household Members</h3>
-              <button
-                onClick={() => setShowHouseholdManager(false)}
-                className="text-theme-secondary hover:text-theme-primary"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              {householdMembers.map((member, index) => (
-                <div key={index} className="border border-theme-secondary/20 rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-medium text-theme-primary">{member.name}</h4>
-                    <button
-                      onClick={() => {
-                        const updated = householdMembers.filter((_, i) => i !== index);
-                        setHouseholdMembers(updated);
-                      }}
-                      className="text-red-500 hover:text-red-700 text-sm"
-                    >
-                      Remove
-                    </button>
+            {household ? (
+              <>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-theme-primary">{household.name}</p>
+                    <p className="text-xs text-theme-secondary">
+                      {household.members && Array.isArray(household.members) ? household.members.length : 0} member{household.members && Array.isArray(household.members) && household.members.length === 1 ? '' : 's'}
+                    </p>
                   </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                    <div>
-                      <label className="block text-xs text-theme-secondary mb-1">Dietary Restrictions</label>
-                      <input
-                        type="text"
-                        value={member.dietaryRestrictions?.join(', ') || ''}
-                        onChange={(e) => {
-                          const updated = [...householdMembers];
-                          updated[index].dietaryRestrictions = e.target.value ? e.target.value.split(',').map(s => s.trim()) : [];
-                          setHouseholdMembers(updated);
-                        }}
-                        placeholder="vegetarian, gluten-free"
-                        className="w-full p-2 border rounded text-sm text-black bg-white"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs text-theme-secondary mb-1">Allergies</label>
-                      <input
-                        type="text"
-                        value={member.allergies?.join(', ') || ''}
-                        onChange={(e) => {
-                          const updated = [...householdMembers];
-                          updated[index].allergies = e.target.value ? e.target.value.split(',').map(s => s.trim()) : [];
-                          setHouseholdMembers(updated);
-                        }}
-                        placeholder="nuts, dairy"
-                        className="w-full p-2 border rounded text-sm text-black bg-white"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs text-theme-secondary mb-1">Diet Goal</label>
-                      <select
-                        value={member.dietGoal || ''}
-                        onChange={(e) => {
-                          const updated = [...householdMembers];
-                          updated[index].dietGoal = e.target.value as any;
-                          setHouseholdMembers(updated);
-                        }}
-                        className="w-full p-2 border rounded text-sm text-black bg-white"
-                      >
-                        <option value="">No specific goal</option>
-                        <option value="lose-weight">Lose Weight</option>
-                        <option value="maintain-weight">Maintain Weight</option>
-                        <option value="gain-weight">Gain Weight</option>
-                        <option value="build-muscle">Build Muscle</option>
-                        <option value="improve-health">Improve Health</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs text-theme-secondary mb-1">Favorite Cuisines</label>
-                      <input
-                        type="text"
-                        value={member.favoriteCuisines?.join(', ') || ''}
-                        onChange={(e) => {
-                          const updated = [...householdMembers];
-                          updated[index].favoriteCuisines = e.target.value ? e.target.value.split(',').map(s => s.trim()) : [];
-                          setHouseholdMembers(updated);
-                        }}
-                        placeholder="italian, mexican, thai"
-                        className="w-full p-2 border rounded text-sm text-black bg-white"
-                      />
-                    </div>
+                  <div className="text-right">
+                    <p className="text-xs text-theme-secondary">Click your avatar above to manage</p>
                   </div>
                 </div>
-              ))}
-
-              <button
-                onClick={() => {
-                  setHouseholdMembers([...householdMembers, {
-                    name: `Member ${householdMembers.length + 1}`,
-                    dietaryRestrictions: [],
-                    allergies: [],
-                    dietGoal: undefined,
-                    favoriteCuisines: []
-                  }]);
-                }}
-                className="w-full bg-theme-secondary/20 hover:bg-theme-secondary/30 border border-[var(--accent-color)]/20 rounded-lg py-2 text-sm font-medium text-theme-primary"
-              >
-                + Add Household Member
-              </button>
-
-              <div className="flex gap-2 pt-4">
-                <button
-                  onClick={async () => {
-                    if (!user) return;
-                    try {
-                      await updateDoc(doc(db, 'users', user.id), {
-                        householdMembers: householdMembers
-                      });
-                      setShowHouseholdManager(false);
-                      alert('Household members updated successfully!');
-                    } catch (error) {
-                      log.error('Error updating household', { error }, 'Settings');
-                      alert('Failed to update household members. Please try again.');
-                    }
-                  }}
-                  className="flex-1 bg-green-500 text-white px-4 py-2 rounded font-medium hover:bg-green-600"
-                >
-                  Save Changes
-                </button>
-                <button
-                  onClick={() => setShowHouseholdManager(false)}
-                  className="flex-1 bg-theme-secondary text-theme-primary px-4 py-2 rounded font-medium hover:bg-theme-secondary/80"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
+                <p className="text-sm text-theme-secondary">
+                  Invite family members, manage permissions, and customize preferences for personalized recipe recommendations.
+                </p>
+              </>
+            ) : (
+              <p className="text-sm text-theme-secondary">
+                Create a household to share your pantry with family members. Click your avatar above to get started.
+              </p>
+            )}
           </div>
         </div>
       )}
+
+
 
       {/* Categories Section */}
       {user && (
@@ -835,99 +711,19 @@ export const Settings: React.FC<SettingsProps> = ({
       </div>
 
       {/* Notifications Section */}
-      <div className="bg-theme-secondary rounded-xl border border-theme p-4">
-        <h3 className="font-semibold mb-3 text-theme-primary">Notifications</h3>
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <label htmlFor="enableNotifications" className="flex items-center gap-2">
-              <span className="text-sm text-theme-primary">Enable Notifications</span>
-              <input
-                id="enableNotifications"
-                name="enableNotifications"
-                type="checkbox"
-                checked={pendingNotifications.enabled}
-                onChange={e => handleNotifChange('enabled', e.target.checked)}
-                className="ml-2"
-              />
-            </label>
-            {pendingNotifications.enabled && (
-              <input
-                id="notificationTime"
-                name="notificationTime"
-                type="time"
-                value={pendingNotifications.time}
-                onChange={e => handleNotifChange('time', e.target.value)}
-                className="border rounded px-1 py-1 text-black bg-white text-xs w-20"
-              />
-            )}
-          </div>
+      <div data-section="notifications">
+        {user && (
+          <NotificationSettingsComponent
+            user={user}
+            currentSettings={notificationSettings}
+            onSettingsChange={setNotificationSettings}
+          />
+        )}
 
-          {pendingNotifications.enabled && (
-            <div className="flex items-center justify-between">
-              <label htmlFor="shoppingListNotif" className="flex items-center gap-2">
-                <span className="text-sm text-theme-primary">Shopping List</span>
-                <input
-                  id="shoppingListNotif"
-                  name="shoppingListNotif"
-                  type="checkbox"
-                  checked={pendingNotifications.types.shoppingList}
-                  onChange={e => handleNotifChange('types', { shoppingList: e.target.checked })}
-                />
-              </label>
-              <label htmlFor="mealPlanNotif" className="flex items-center gap-2">
-                <span className="text-sm text-theme-primary">Meal Reminders</span>
-                <input
-                  id="mealPlanNotif"
-                  name="mealPlanNotif"
-                  type="checkbox"
-                  checked={pendingNotifications.types.mealPlan}
-                  onChange={e => handleNotifChange('types', { mealPlan: e.target.checked })}
-                />
-              </label>
-            </div>
-          )}
-
-          {pendingNotifications.enabled && pendingNotifications.types.cookingReminders !== undefined && (
-            <div className="space-y-2 border-t border-theme pt-3 mt-3">
-              <div className="flex items-center justify-between">
-                <label className="flex items-center gap-2">
-                  <span className="text-sm text-theme-primary">Cooking Reminders</span>
-                  <input
-                    type="checkbox"
-                    checked={pendingNotifications.types.cookingReminders}
-                    onChange={e => handleNotifChange('types', { cookingReminders: e.target.checked })}
-                  />
-                </label>
-              </div>
-              {pendingNotifications.types.cookingReminders && (
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-theme-secondary">Remind me</span>
-                  <select
-                    value={pendingNotifications.cookingReminderTime || 30}
-                    onChange={e => handleNotifChange('cookingReminderTime', parseInt(e.target.value))}
-                    className="border rounded px-2 py-1 text-black bg-white text-xs"
-                  >
-                    <option value={15}>15 minutes</option>
-                    <option value={30}>30 minutes</option>
-                    <option value={45}>45 minutes</option>
-                    <option value={60}>1 hour</option>
-                    <option value={120}>2 hours</option>
-                  </select>
-                  <span className="text-xs text-theme-secondary">before cooking</span>
-                </div>
-              )}
-            </div>
-          )}
-
-          {notifChanged && (
-            <button
-              onClick={confirmNotifChanges}
-              className="w-full bg-blue-500 text-white px-4 py-2 rounded text-sm font-medium hover:bg-blue-600"
-            >
-              Save Notification Settings
-            </button>
-          )}
-        </div>
+        {/* Pending Notifications Section */}
+        {user && (
+          <PendingNotifications user={user} />
+        )}
       </div>
 
       {/* AI Features Section */}

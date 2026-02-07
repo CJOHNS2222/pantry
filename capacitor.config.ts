@@ -11,6 +11,9 @@ const config: CapacitorConfig = {
     Device: {
       // Device plugin configuration
     },
+    PushNotifications: {
+      presentationOptions: ["badge", "sound", "alert"],
+    },
     // Calendar: {
     //   // Calendar plugin configuration - temporarily disabled due to build compatibility
     // },
@@ -24,6 +27,13 @@ const config: CapacitorConfig = {
     // Browser: {
     //   toolbarColor: '#2A0A10'
     // }
+  },
+  // App icon configuration
+  android: {
+    icon: 'public/icons/smartpantryicon.png'
+  },
+  ios: {
+    icon: 'public/icons/smartpantryicon.png'
   }
 };
 

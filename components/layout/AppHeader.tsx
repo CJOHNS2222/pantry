@@ -1,9 +1,12 @@
-import React from 'react';
-import { Sun, Moon, Undo2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Sun, Moon, Undo2, Bell } from 'lucide-react';
 import { User, Household } from '../../types';
 import { UsageIndicator } from '../UsageIndicator';
 import { HouseholdStatusIndicator } from '../HouseholdStatusIndicator';
+import { SyncIndicator } from '../SyncIndicator';
+import { OnlineIndicator } from '../OnlineIndicator';
 import { SyncStatus } from '../../hooks/useOfflineStatus';
+import { NotificationService } from '../../services/notificationService';
 
 interface AppHeaderProps {
   user: User;
@@ -15,6 +18,7 @@ interface AppHeaderProps {
   onUndo?: (action: any) => void;
   syncStatus: SyncStatus;
   onSyncClick?: () => void;
+  onNavigateToSettings?: () => void;
 }
 
 export const AppHeader: React.FC<AppHeaderProps> = ({
@@ -26,8 +30,32 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   recentActions = [],
   onUndo,
   syncStatus,
-  onSyncClick
+  onSyncClick,
+  onNavigateToSettings
 }) => {
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
+
+  useEffect(() => {
+    const loadUnreadCount = async () => {
+      // Only load notifications if user is authenticated
+      if (!user?.id) return;
+      
+      try {
+        const unreadNotifications = await NotificationService.getUnreadNotifications(user.id, user.email);
+        setUnreadNotificationsCount(unreadNotifications.length);
+      } catch (error) {
+        console.error('Error loading unread notifications count:', error);
+        // Don't show error to user, just set count to 0
+        setUnreadNotificationsCount(0);
+      }
+    };
+
+    loadUnreadCount();
+
+    // Refresh count every 30 seconds
+    const interval = setInterval(loadUnreadCount, 30000);
+    return () => clearInterval(interval);
+  }, [user?.id, user?.email]);
   return (
     <header 
       className="bg-theme-secondary p-3 pt-5 pb-0 fixed top-0 left-0 right-0 max-w-md mx-auto z-20 shadow-md border-b border-theme transition-colors duration-300"
@@ -35,8 +63,23 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
     >
       <div className="flex justify-between items-center">
         <div className="flex flex-col items-start">
-          <div className="text-sm font-medium text-theme-primary opacity-80" id="user-email">
-            {user.email}
+          <div className="flex items-center gap-2">
+            <div className="text-sm font-medium text-theme-primary opacity-80" id="user-email">
+              {user.email}
+            </div>
+            {unreadNotificationsCount > 0 && user?.id && onNavigateToSettings && (
+              <button
+                onClick={onNavigateToSettings}
+                className="relative p-1 text-amber-500 hover:text-amber-400 transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 rounded"
+                aria-label={`${unreadNotificationsCount} unread notifications`}
+                title="View pending notifications"
+              >
+                <Bell className="w-4 h-4" />
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-medium">
+                  {unreadNotificationsCount > 99 ? '99+' : unreadNotificationsCount}
+                </span>
+              </button>
+            )}
           </div>
           <button
             data-tutorial="household-button"
@@ -77,12 +120,13 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             AI Kitchen Assistant
           </span>
           <UsageIndicator user={user} compact={true} onUpgrade={() => {}} />
-          <div className="mt-1">
+          <div className="mt-1 flex items-center gap-2">
             <SyncIndicator
               syncStatus={syncStatus}
               compact={true}
               onSyncClick={onSyncClick}
             />
+            <OnlineIndicator isOnline={syncStatus.isOnline} />
           </div>
           {household && household.members.length > 1 && (
             <div className="mt-1">

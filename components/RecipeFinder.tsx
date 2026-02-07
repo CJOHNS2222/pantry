@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Search, Loader2, Sparkles, ExternalLink, Globe, Plus, Clock, List, ChefHat, ToggleLeft, ToggleRight, Star, Heart, Bookmark, Zap, Mic } from 'lucide-react';
 import { searchRecipes } from '../services/geminiService';
 import { getSavedRecipes, getCachedPopularRecipes } from '../services/recipeService';
-import { RecipeSearchResult, LoadingState, RecipeRating, StructuredRecipe, PantryItem, SavedRecipe, User } from '../types';
+import { RecipeSearchResult, LoadingState, RecipeRating, StructuredRecipe, PantryItem, SavedRecipe, User, Household } from '../types';
 import { Tab } from '../types/app';
 import { RecipeCardSkeleton } from './SkeletonLoader';
 import { PremiumFeature } from './PremiumFeature';
@@ -15,6 +15,8 @@ import AnalyticsService from '../services/analyticsService';
 import { UsageService } from '../services/usageService';
 import { searchPantryItems, getEnhancedAutocompleteSuggestions, filterPantryItems, savePantryFilter, loadPantryFilter, defaultPantryFilter, saveSearchToHistory, getRecentSearchSuggestions, AutocompleteSuggestion } from '../utils/searchUtils';
 import { useKeyboardNavigation } from '../hooks/useKeyboardNavigation';
+import { debounce } from '../utils/debounceUtils';
+import { filterRecipesByHouseholdPreferences } from '../utils/preferenceUtils';
 
 interface RecipeFinderProps {
     onAddToPlan: (recipe: StructuredRecipe) => void;
@@ -36,9 +38,11 @@ interface RecipeFinderProps {
     mealPlanLimitExceeded?: boolean;
     // Loading states
     isLoadingSavedRecipes?: boolean;
+    // Household data for preference filtering
+    household?: Household | null;
 }
 
-export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveRecipe, onDeleteRecipe, onMarkAsMade, inventory, ratings, onRate, savedRecipes, user, setActiveTab, persistedResult, setPersistedResult, initialSearchQuery, addToast, recipeSaveLimitExceeded = false, mealPlanLimitExceeded = false, isLoadingSavedRecipes = false }) => {
+export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveRecipe, onDeleteRecipe, onMarkAsMade, inventory, ratings, onRate, savedRecipes, user, setActiveTab, persistedResult, setPersistedResult, initialSearchQuery, addToast, recipeSaveLimitExceeded = false, mealPlanLimitExceeded = false, isLoadingSavedRecipes = false, household }) => {
     // List of staple items to ignore
     const STAPLES = ['salt', 'pepper', 'oil', 'water', 'flour', 'sugar', 'butter', 'vinegar', 'baking powder', 'baking soda', 'spices', 'seasoning', 'soy sauce', 'cornstarch', 'yeast'];
     
@@ -1024,6 +1028,29 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                     return r.type.toLowerCase() === recipeType.toLowerCase();
                 });
             }
+
+            // Filter recipes based on household member preferences
+            if (household?.members && Array.isArray(household.members) && household.members.length > 0) {
+                const { safeRecipes, riskyRecipes } = filterRecipesByHouseholdPreferences(
+                    filteredRecipes,
+                    household.members,
+                    false // Allow recipes with restrictions/dislikes but no allergies
+                );
+
+                // Show warning for risky recipes if any exist
+                if (riskyRecipes.length > 0 && addToast) {
+                    const totalIssues = riskyRecipes.reduce((sum, r) => sum + r.violations.length, 0);
+                    addToast(
+                        `${riskyRecipes.length} recipes may not suit all household members (${totalIssues} issues found). Check recipe details for warnings.`,
+                        'info',
+                        5000
+                    );
+                }
+
+                // Use safe recipes, but include risky ones with warnings
+                filteredRecipes = [...safeRecipes, ...riskyRecipes.map(r => r.recipe)];
+            }
+
             setResult({ ...data, recipes: filteredRecipes });
             setIsResultFromCache(false);
             if (setPersistedResult) setPersistedResult({ ...data, recipes: filteredRecipes });

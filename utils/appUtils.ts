@@ -1,7 +1,7 @@
 import { doc, setDoc, Timestamp, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 import { DayPlan } from '../types';
-import { ConsumptionSuggestion, ExpirationAlert, RecipeSuggestion, PantryItem, CustomCategory } from '../types';
+import { ConsumptionSuggestion, ExpirationAlert, RecipeSuggestion, PantryItem, CustomCategory, Member } from '../types';
 import { getPerformance, trace } from "firebase/performance";
 
 const performance = getPerformance();
@@ -31,11 +31,11 @@ export function next7DateKeys(start = new Date()) {
   return keys;
 }
 
-export function isHouseholdMember(h: any, u: any) {
+export function isHouseholdMember(h: Household | null | undefined, u: User | null | undefined) {
   if (!h || !u) return false;
   if (Array.isArray(h.memberIds) && h.memberIds.includes(u.id)) return true;
   if (Array.isArray(h.members)) {
-    return h.members.some((m: any) => (m.id && m.id === u.id) || (m.email && m.email === u.email));
+    return h.members.some((m: Member) => (m.id && m.id === u.id) || (m.email && m.email === u.email));
   }
   return false;
 }
@@ -618,6 +618,114 @@ export function inferCategoryFromItemName(itemName: string): string {
   return 'Uncategorized'; // Default fallback
 }
 
+export interface CategorySuggestion {
+  category: string;
+  confidence: 'high' | 'medium' | 'low';
+  reasoning: string;
+}
+
+export function getCategorySuggestions(itemName: string): CategorySuggestion[] {
+  const item = itemName.toLowerCase();
+  const suggestions: CategorySuggestion[] = [];
+
+  // High confidence matches
+  if (item.includes('cheddar') || item.includes('mozzarella') || item.includes('parmesan') || item.includes('swiss')) {
+    suggestions.push({
+      category: 'Dairy & Eggs',
+      confidence: 'high',
+      reasoning: 'Cheese varieties typically belong to dairy'
+    });
+  }
+
+  if (item.includes('apple') || item.includes('banana') || item.includes('orange') || item.includes('grape')) {
+    suggestions.push({
+      category: 'Fruits & Vegetables',
+      confidence: 'high',
+      reasoning: 'Common fruits'
+    });
+  }
+
+  if (item.includes('milk') || item.includes('yogurt') || item.includes('butter')) {
+    suggestions.push({
+      category: 'Dairy & Eggs',
+      confidence: 'high',
+      reasoning: 'Dairy products'
+    });
+  }
+
+  if (item.includes('chicken') || item.includes('beef') || item.includes('pork') || item.includes('turkey')) {
+    suggestions.push({
+      category: 'Meat & Poultry',
+      confidence: 'high',
+      reasoning: 'Meat and poultry products'
+    });
+  }
+
+  if (item.includes('pasta') || item.includes('spaghetti') || item.includes('macaroni')) {
+    suggestions.push({
+      category: 'Pasta & Noodles',
+      confidence: 'high',
+      reasoning: 'Pasta varieties'
+    });
+  }
+
+  if (item.includes('bread') || item.includes('rice') || item.includes('cereal')) {
+    suggestions.push({
+      category: 'Grains & Bread',
+      confidence: 'high',
+      reasoning: 'Grain and bread products'
+    });
+  }
+
+  // Medium confidence matches
+  if (item.includes('chip') || item.includes('cookie') || item.includes('cracker')) {
+    suggestions.push({
+      category: 'Snacks',
+      confidence: 'medium',
+      reasoning: 'Snack foods'
+    });
+  }
+
+  if (item.includes('soda') || item.includes('juice') || item.includes('coffee')) {
+    suggestions.push({
+      category: 'Beverages',
+      confidence: 'medium',
+      reasoning: 'Beverages and drinks'
+    });
+  }
+
+  if (item.includes('frozen') || item.includes('ice cream')) {
+    suggestions.push({
+      category: 'Frozen Foods',
+      confidence: 'medium',
+      reasoning: 'Frozen items'
+    });
+  }
+
+  if (item.includes('soup') || item.includes('canned')) {
+    suggestions.push({
+      category: 'Canned Goods',
+      confidence: 'medium',
+      reasoning: 'Canned or packaged foods'
+    });
+  }
+
+  // Low confidence fallback
+  if (suggestions.length === 0) {
+    suggestions.push({
+      category: 'Uncategorized',
+      confidence: 'low',
+      reasoning: 'Unable to determine category from item name'
+    });
+  }
+
+  // Sort by confidence (high first)
+  return suggestions.sort((a, b) => {
+    const order = { high: 3, medium: 2, low: 1 };
+    return order[b.confidence] - order[a.confidence];
+  });
+}
+
 export function inferStorageLocationFromItemName(itemName: string): 'pantry' | 'freezer' | 'fridge' | 'spices' | 'other' {
   const item = itemName.toLowerCase();
   
@@ -857,7 +965,10 @@ export function generateConsumptionSuggestions(inventory: PantryItem[]): Consump
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  inventory.forEach(item => {
+  // Filter out undefined or invalid items
+  const validInventory = inventory.filter(item => item && typeof item === 'object' && item.id);
+
+  validInventory.forEach(item => {
     if (!item.consumptionHistory || item.consumptionHistory.length < 2) {
       return; // Need at least 2 data points for patterns
     }

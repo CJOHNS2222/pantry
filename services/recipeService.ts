@@ -4,6 +4,7 @@ import { db, storage } from "../firebaseConfig";
 import DatabaseMonitoringService from "./databaseMonitoringService";
 import { StructuredRecipe, SavedRecipe } from "../types";
 import { getPerformance, trace } from "firebase/performance";
+import { withErrorHandling, AppError, ErrorCode } from "../utils/errorUtils";
 
 const SPOONACULAR_API_KEY = import.meta.env.VITE_SPOONACULAR_API_KEY;
 const SPOONACULAR_BASE_URL = "https://api.spoonacular.com";
@@ -63,47 +64,54 @@ export const fetchRecipesFromSpoonacular = async (
   number: number = 10,
   offset: number = 0
 ): Promise<SpoonacularRecipe[]> => {
-  const perfTrace = trace(performance, 'fetch_spoonacular_recipes');
-  perfTrace.start();
+  return withErrorHandling(async () => {
+    const perfTrace = trace(performance, 'fetch_spoonacular_recipes');
+    perfTrace.start();
 
-  try {
-    if (!SPOONACULAR_API_KEY) {
-      throw new Error("Spoonacular API key not configured");
+    try {
+      if (!SPOONACULAR_API_KEY) {
+        throw new AppError(
+          ErrorCode.API_ERROR,
+          "Spoonacular API key not configured",
+          "Recipe search is currently unavailable. Please try again later.",
+          { retryable: false }
+        );
+      }
+
+      const params = new URLSearchParams({
+        apiKey: SPOONACULAR_API_KEY,
+        number: number.toString(),
+        offset: offset.toString(),
+        addRecipeInformation: "true",
+        fillIngredients: "true"
+      });
+
+      if (query) {
+        params.append("query", query);
+      }
+
+      // Add custom metrics
+      perfTrace.putMetric('query_length', query.length);
+      perfTrace.putMetric('requested_count', number);
+      perfTrace.putMetric('offset', offset);
+
+      const response = await fetch(`${SPOONACULAR_BASE_URL}/recipes/complexSearch?${params}`);
+
+      if (!response.ok) {
+        throw AppError.fromApiError(response, { query, number, offset });
+      }
+
+      const data = await response.json();
+      const results = data.results || [];
+
+      // Add more metrics
+      perfTrace.putMetric('results_returned', results.length);
+
+      return results;
+    } finally {
+      perfTrace.stop();
     }
-
-    const params = new URLSearchParams({
-      apiKey: SPOONACULAR_API_KEY,
-      number: number.toString(),
-      offset: offset.toString(),
-      addRecipeInformation: "true",
-      fillIngredients: "true"
-    });
-
-    if (query) {
-      params.append("query", query);
-    }
-
-    // Add custom metrics
-    perfTrace.putMetric('query_length', query.length);
-    perfTrace.putMetric('requested_count', number);
-    perfTrace.putMetric('offset', offset);
-
-    const response = await fetch(`${SPOONACULAR_BASE_URL}/recipes/complexSearch?${params}`);
-
-    if (!response.ok) {
-      throw new Error(`Spoonacular API error: ${response.status} ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    const results = data.results || [];
-
-    // Add more metrics
-    perfTrace.putMetric('results_returned', results.length);
-
-    return results;
-  } finally {
-    perfTrace.stop();
-  }
+  }, { operation: 'fetchRecipesFromSpoonacular', query, number, offset }, { retries: 2 });
 };
 
 /**
@@ -164,28 +172,27 @@ export const uploadRecipeImage = async (imageUrl: string, recipeId: string): Pro
  * Save recipe to Firestore
  */
 export const saveRecipeToFirestore = async (recipe: StructuredRecipe): Promise<string> => {
-  const perfTrace = trace(performance, 'save_recipe_firestore');
-  perfTrace.start();
+  return withErrorHandling(async () => {
+    const perfTrace = trace(performance, 'save_recipe_firestore');
+    perfTrace.start();
 
-  try {
-    const savedRecipe: Omit<SavedRecipe, 'id'> = {
-      ...recipe,
-      dateSaved: new Date().toISOString()
-    };
+    try {
+      const savedRecipe: Omit<SavedRecipe, 'id'> = {
+        ...recipe,
+        dateSaved: new Date().toISOString()
+      };
 
-    // Add custom metrics
-    perfTrace.putMetric('ingredients_count', recipe.ingredients.length);
-    perfTrace.putMetric('instructions_count', recipe.instructions.length);
-    perfTrace.putAttribute('has_image', recipe.image ? 'true' : 'false');
+      // Add custom metrics
+      perfTrace.putMetric('ingredients_count', recipe.ingredients.length);
+      perfTrace.putMetric('instructions_count', recipe.instructions.length);
+      perfTrace.putAttribute('has_image', recipe.image ? 'true' : 'false');
 
-    const docRef = await addDoc(collection(db, "recipes"), savedRecipe);
-    return docRef.id;
-  } catch (error) {
-    console.error("Error saving recipe to Firestore:", error);
-    throw error;
-  } finally {
-    perfTrace.stop();
-  }
+      const docRef = await addDoc(collection(db, "recipes"), savedRecipe);
+      return docRef.id;
+    } finally {
+      perfTrace.stop();
+    }
+  }, { operation: 'saveRecipeToFirestore', recipeTitle: recipe.title }, { retries: 1 });
 };
 
 /**

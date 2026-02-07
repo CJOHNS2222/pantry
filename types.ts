@@ -88,7 +88,18 @@ export interface DayPlan {
   meals?: MealPlanItem[]; // Legacy support for migration
 }
 
-export interface RecipeRating {
+export interface RecipeRatingInput {
+  id: string;
+  recipeTitle: string;
+  rating: number;
+  comment: string;
+  userName: string;
+  userAvatar?: string;
+  date?: string; // Optional, will be set server-side
+  recipe?: StructuredRecipe;
+}
+
+export interface RecipeRating extends RecipeRatingInput {
   id: string;
   recipeTitle: string;
   rating: number;
@@ -97,6 +108,49 @@ export interface RecipeRating {
   userAvatar?: string;
   date: string;
   recipe?: StructuredRecipe;
+  // Enhanced rating system
+  wouldMakeAgain?: boolean;
+  feedback?: RecipeFeedback[];
+  photos?: RecipePhoto[];
+  modifications?: RecipeModification[];
+}
+
+export interface RecipeFeedback {
+  type: 'too-spicy' | 'too-bland' | 'too-time-consuming' | 'too-complicated' | 'love-it' | 'family-favorite' | 'easy-weeknight' | 'impressive-guests';
+  comment?: string;
+}
+
+export interface RecipePhoto {
+  id: string;
+  url: string;
+  caption?: string;
+  uploadedBy: string;
+  uploadedAt: string;
+}
+
+export interface RecipeModification {
+  id: string;
+  type: 'added' | 'removed' | 'substituted' | 'changed-quantity' | 'changed-method';
+  originalIngredient?: string;
+  modifiedIngredient?: string;
+  description: string;
+  userName: string;
+  userAvatar?: string;
+  date: string;
+  helpful: number; // Number of people who found this helpful
+}
+
+export interface RecipeCommunityStats {
+  totalRatings: number;
+  averageRating: number;
+  wouldMakeAgainPercentage: number;
+  topFeedback: RecipeFeedback[];
+  topModifications: RecipeModification[];
+  householdStats?: {
+    householdRatings: number;
+    householdAverageRating: number;
+    householdWouldMakeAgain: number;
+  };
 }
 
 export enum LoadingState {
@@ -220,4 +274,47 @@ export interface Member {
   lastSeen?: string; // ISO timestamp of last activity
   currentActivity?: string; // Current tab/page they're viewing
   isOnline?: boolean; // Real-time online status
+  
+  // Dietary preferences and restrictions
+  dietaryRestrictions?: string[];
+  allergies?: string[];
+  dietGoal?: 'lose-weight' | 'maintain-weight' | 'gain-weight' | 'build-muscle' | 'improve-health';
+  favoriteCuisines?: string[];
+  specialNeeds?: string; // Any special dietary needs or medical conditions
+  preferredProteins?: string[]; // Favorite proteins (chicken, beef, tofu, etc.)
+  dislikedIngredients?: string[]; // Ingredients they don't like
+}
+
+export interface Settings {
+  notifications: {
+    enabled: boolean;
+    time: string;
+    types: {
+      shoppingList: boolean;
+      mealPlan: boolean;
+      cookingReminders?: boolean;
+    };
+    cookingReminderTime?: number;
+  };
+  theme: {
+    mode: 'light' | 'dark' | 'system';
+    accentColor: string;
+    backgroundColor?: string;
+    textColor?: string;
+  };
+  shopping?: {
+    includeStaples?: boolean;
+  };
+}
+
+export interface HouseholdActivity {
+  id: string;
+  userId: string;
+  userName: string;
+  action: string; // 'added_item', 'removed_item', 'completed_meal', 'created_meal_plan', etc.
+  details?: string;
+  itemId?: string;
+  itemName?: string;
+  timestamp: any; // Firebase Timestamp
+  householdId: string;
 }

@@ -1,11 +1,20 @@
 import { useState, useEffect, useCallback } from 'react';
-import { User, Household } from '../types';
+import { User, Household, HouseholdActivity } from '../types';
 import { Tab } from '../types/app';
 import { HouseholdActivityService } from '../services/householdActivityService';
+import { debounce } from '../utils/debounceUtils';
 
 export function useHouseholdActivity(user: User | null, household: Household | null, currentTab: Tab) {
-  const [recentActivities, setRecentActivities] = useState<any[]>([]);
+  const [recentActivities, setRecentActivities] = useState<HouseholdActivity[]>([]);
   const [isLoadingActivities, setIsLoadingActivities] = useState(false);
+
+  // Debounced activity update to prevent excessive Firestore writes
+  const debouncedUpdateActivity = useCallback(
+    debounce((userId: string, householdId: string, activity: string) => {
+      HouseholdActivityService.updateMemberActivity(userId, householdId, activity);
+    }, 1000), // 1 second debounce
+    []
+  );
 
   // Update member activity when tab changes
   useEffect(() => {
@@ -21,8 +30,9 @@ export function useHouseholdActivity(user: User | null, household: Household | n
     };
 
     const currentActivity = activityMap[currentTab] || 'using app';
-    HouseholdActivityService.updateMemberActivity(user.id, household.id, currentActivity);
-  }, [currentTab, user?.id, household?.id]);
+    // Temporarily disabled to test if this causes excessive reads
+    // debouncedUpdateActivity(user.id, household.id, currentActivity);
+  }, [currentTab, user?.id, household?.id, debouncedUpdateActivity]);
 
   // Mark user as offline when component unmounts or page visibility changes
   useEffect(() => {
@@ -41,7 +51,8 @@ export function useHouseholdActivity(user: User | null, household: Household | n
           [Tab.ANALYTICS]: 'viewing analytics'
         };
         const currentActivity = activityMap[currentTab] || 'using app';
-        HouseholdActivityService.updateMemberActivity(user.id, household.id, currentActivity);
+        // Temporarily disabled
+        // debouncedUpdateActivity(user.id, household.id, currentActivity);
       }
     };
 

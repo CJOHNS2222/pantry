@@ -16,8 +16,8 @@ export default defineConfig(({ mode }) => {
         VitePWA({
           registerType: 'autoUpdate',
           manifest: {
-            name: 'Smart Pantry',
-            short_name: 'Pantry',
+            name: 'Smart Pantry Chef',
+            short_name: 'SmartPantry',
             start_url: '/',
             display: 'standalone',
             background_color: '#570404ff',

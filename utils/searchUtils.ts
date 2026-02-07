@@ -1,6 +1,25 @@
 import Fuse from 'fuse.js';
 import { PantryItem, StructuredRecipe, SavedRecipe } from '../types';
 
+// Ingredient matching result interface
+export interface IngredientMatch {
+  ingredient: string;
+  available: boolean;
+  pantryItem?: PantryItem;
+  requiredQuantity?: number;
+  availableQuantity?: number;
+}
+
+export interface RecipeIngredientMatch {
+  recipe: StructuredRecipe | SavedRecipe;
+  matchedIngredients: IngredientMatch[];
+  totalIngredients: number;
+  availableIngredients: number;
+  missingIngredients: IngredientMatch[];
+  canMake: boolean;
+  matchPercentage: number;
+}
+
 // Fuzzy search configuration for pantry items
 const pantryItemSearchOptions: Fuse.IFuseOptions<PantryItem> = {
   keys: [
@@ -381,4 +400,123 @@ export const loadPantryFilter = (): PantryFilter => {
     console.error('Failed to load pantry filter:', error);
   }
   return defaultPantryFilter;
+};
+
+// Match recipe ingredients against pantry inventory
+export const matchRecipeIngredients = (
+  recipe: StructuredRecipe | SavedRecipe,
+  pantryItems: PantryItem[]
+): RecipeIngredientMatch => {
+  const ingredients = recipe.ingredients || [];
+  const matchedIngredients: IngredientMatch[] = [];
+  const missingIngredients: IngredientMatch[] = [];
+
+  // Create fuzzy search instance for pantry items
+  const pantrySearchOptions: Fuse.IFuseOptions<PantryItem> = {
+    keys: [
+      { name: 'item', weight: 0.8 },
+      { name: 'category', weight: 0.2 }
+    ],
+    threshold: 0.3, // More strict matching for ingredient matching
+    includeScore: true,
+    minMatchCharLength: 2
+  };
+
+  const fuse = new Fuse(pantryItems, pantrySearchOptions);
+
+  ingredients.forEach(ingredient => {
+    // Parse ingredient to get name and quantity
+    const parsed = parseIngredientString(ingredient);
+    const ingredientName = parsed.name.toLowerCase();
+
+    // Search for matching pantry items
+    const searchResults = fuse.search(ingredientName);
+    const bestMatch = searchResults.length > 0 ? searchResults[0] : null;
+
+    // Consider it a match if score is good enough and quantities match
+    const isAvailable = bestMatch &&
+                       bestMatch.score! < 0.4 && // Good match threshold
+                       (!parsed.quantity || bestMatch.item.quantity >= parsed.quantity);
+
+    if (isAvailable) {
+      matchedIngredients.push({
+        ingredient: parsed.original,
+        available: true,
+        pantryItem: bestMatch.item,
+        requiredQuantity: parsed.quantity,
+        availableQuantity: bestMatch.item.quantity
+      });
+    } else {
+      missingIngredients.push({
+        ingredient: parsed.original,
+        available: false,
+        requiredQuantity: parsed.quantity,
+        availableQuantity: bestMatch?.item.quantity
+      });
+    }
+  });
+
+  const totalIngredients = ingredients.length;
+  const availableIngredients = matchedIngredients.length;
+  const matchPercentage = totalIngredients > 0 ? (availableIngredients / totalIngredients) * 100 : 0;
+  const canMake = availableIngredients === totalIngredients;
+
+  return {
+    recipe,
+    matchedIngredients,
+    totalIngredients,
+    availableIngredients,
+    missingIngredients,
+    canMake,
+    matchPercentage
+  };
+};
+
+// Simple ingredient parser - extracts name and quantity
+const parseIngredientString = (ingredient: string): {
+  original: string;
+  name: string;
+  quantity?: number;
+  unit?: string;
+} => {
+  const original = ingredient.trim();
+
+  // Match patterns like "2 cups flour", "1/2 lb chicken", "3 eggs", etc.
+  const quantityMatch = ingredient.match(/^(\d+(?:\/\d+)?(?:\.\d+)?)\s*([a-zA-Z]*)\s*(.+)$/);
+
+  if (quantityMatch) {
+    const [, qtyStr, unit, name] = quantityMatch;
+    const quantity = parseFloat(qtyStr);
+
+    return {
+      original,
+      name: name.trim(),
+      quantity: isNaN(quantity) ? undefined : quantity,
+      unit: unit || undefined
+    };
+  }
+
+  // No quantity found, just return the name
+  return {
+    original,
+    name: ingredient.trim()
+  };
+};
+
+// Get meal prep suggestions - recipes user can mostly make
+export const getMealPrepSuggestions = (
+  recipes: (StructuredRecipe | SavedRecipe)[],
+  pantryItems: PantryItem[],
+  minMatchPercentage: number = 70
+): RecipeIngredientMatch[] => {
+  return recipes
+    .map(recipe => matchRecipeIngredients(recipe, pantryItems))
+    .filter(match => match.matchPercentage >= minMatchPercentage)
+    .sort((a, b) => {
+      // Sort by: can make first, then by match percentage descending
+      if (a.canMake && !b.canMake) return -1;
+      if (!a.canMake && b.canMake) return 1;
+      return b.matchPercentage - a.matchPercentage;
+    })
+    .slice(0, 10); // Limit to top 10 suggestions
 };

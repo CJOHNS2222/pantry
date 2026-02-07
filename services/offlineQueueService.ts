@@ -328,7 +328,13 @@ class OfflineQueueService {
 
   // Legacy method for backward compatibility
   async processQueue(): Promise<void> {
-    await this.processQueueWithSync();
+    if (this.isProcessing) {
+      console.log('🔥 [OfflineQueueService] Sync already in progress, skipping');
+      return;
+    }
+    console.log('🔥 [OfflineQueueService] Starting to process offline queue');
+    const result = await this.processQueueWithSync();
+    console.log(`🔥 [OfflineQueueService] Processed ${result.total} operations: ${result.completed} completed, ${result.failed} failed, ${result.conflicts} conflicts`);
   }
 }
 

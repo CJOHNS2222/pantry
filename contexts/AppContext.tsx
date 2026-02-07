@@ -1,7 +1,7 @@
 // contexts/AppContext.tsx
 import React, { createContext, useContext, ReactNode } from 'react';
 import { Tab } from '../types/app';
-import { User, PantryItem, DayPlan, ShoppingItem, SavedRecipe, RecipeRating, RecipeSearchResult, CustomCategory, StructuredRecipe, Household } from '../types';
+import { User, PantryItem, DayPlan, ShoppingItem, SavedRecipe, RecipeRating, RecipeSearchResult, CustomCategory, StructuredRecipe, Household, Settings, ConsumptionSuggestion, ExpirationAlert, RecipeSuggestion, HouseholdActivity } from '../types';
 
 // Core app state that should be available globally
 interface AppContextValue {
@@ -30,8 +30,8 @@ interface AppContextValue {
   setInitialSearchQuery: (query: string) => void;
 
   // Settings
-  settings: any;
-  setSettings: (settings: any) => void;
+  settings: Settings;
+  setSettings: (settings: Settings) => void;
   customCategories?: CustomCategory[];
 
   // Usage limits
@@ -47,12 +47,12 @@ interface AppContextValue {
   isLoadingHousehold: boolean;
 
   // UI state
-  consumptionSuggestions: any[];
-  expirationAlerts: any[];
-  recipeSuggestions: any[];
+  consumptionSuggestions: ConsumptionSuggestion[];
+  expirationAlerts: ExpirationAlert[];
+  recipeSuggestions: RecipeSuggestion[];
 
   // Household activity
-  recentActivities: any[];
+  recentActivities: HouseholdActivity[];
   isLoadingActivities: boolean;
 }
 

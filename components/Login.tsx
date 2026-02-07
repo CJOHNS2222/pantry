@@ -36,11 +36,13 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
       return;
     }
     
-    // Validate password
-    const passwordValidation = validatePassword(password);
-    if (!passwordValidation.isValid) {
-      setError('Password must be at least 6 characters and contain a number and a letter.');
-      return;
+    // Validate password (only for signup)
+    if (isSignup) {
+      const passwordValidation = validatePassword(password);
+      if (!passwordValidation.isValid) {
+        setError('Password must be at least 8 characters and contain uppercase, lowercase, number, and special character.');
+        return;
+      }
     }
     
     if (isSignup) {
@@ -281,6 +283,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
               onChange={(e) => setPassword(e.target.value)}
               className="w-full bg-[#2A0A10] border border-red-900/50 rounded-xl px-4 py-3 text-white placeholder-red-900/50 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none transition-all"
               placeholder={intl.formatMessage({ id: "auth.passwordPlaceholder" })}
+              autoComplete="current-password"
               required
             />
              {!isSignup && (
@@ -332,12 +335,11 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
           </span>
           <div className="h-px bg-red-900/30 flex-1"></div>
         </div>
-//
-//        <div className="grid grid-cols-1 gap-4">
-  //        <button
-  //          type="button"
- //           onClick={handleGoogleLogin}
-  //          className="flex items-center justify-center gap-2 bg-white text-gray-800 font-medium py-3 rounded-xl hover:bg-gray-50 transition-colors"
+        <div className="grid grid-cols-1 gap-4">
+          <button
+            type="button"
+            onClick={handleGoogleLogin}
+            className="flex items-center justify-center gap-2 bg-white text-gray-800 font-medium py-3 rounded-xl hover:bg-gray-50 transition-colors"
           >
             <Chrome className="w-5 h-5 text-red-500" />
             Google

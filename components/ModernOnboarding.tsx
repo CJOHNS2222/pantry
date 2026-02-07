@@ -22,8 +22,6 @@ interface ModernOnboardingProps {
   onComplete: (data: OnboardingData) => void;
   onSkip: () => void;
 }
-  userName?: string;
-}
 
 type OnboardingStep = 'welcome' | 'quick-setup' | 'permissions' | 'value-demo' | 'complete';
 

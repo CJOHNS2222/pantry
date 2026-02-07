@@ -1,0 +1,13 @@
+{
+  "name": "smartpantrychef-website",
+  "version": "1.0.0",
+  "description": "Landing page for Smart Pantry Chef - AI Kitchen Assistant",
+  "main": "index.html",
+  "scripts": {
+    "start": "npx serve . -p 3000",
+    "deploy": "echo 'Upload the contents of this folder to your web hosting service'"
+  },
+  "keywords": ["pantry", "kitchen", "AI", "meal-planning", "recipes"],
+  "author": "Smart Pantry Chef",
+  "license": "MIT"
+}

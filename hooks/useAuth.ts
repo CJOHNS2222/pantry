@@ -47,7 +47,8 @@ export function useAuth() {
             },
             createdAt: new Date(),
             email: fbUser.email,
-            name: fbUser.displayName
+            // Don't set name here - it will be set by handleLogin
+            name: null
           });
           console.log('User document created successfully');
         } catch (error) {
@@ -60,13 +61,14 @@ export function useAuth() {
         const userData = userDocSnap.data();
         setUser({
           id: fbUser.uid,
-          name: fbUser.displayName || (fbUser.email ? fbUser.email.split('@')[0] : 'User'),
+          name: userData?.name || fbUser.displayName || (fbUser.email ? fbUser.email.split('@')[0] : 'User'),
           email: fbUser.email || '',
           avatar: userData?.avatar || fbUser.photoURL || undefined,
           provider: fbUser.providerData?.[0]?.providerId?.includes('google') ? 'google' : 'email',
           hasSeenTutorial: user?.hasSeenTutorial ?? false,
           subscription: userData?.subscription,
-          profile: userData?.profile
+          profile: userData?.profile,
+          householdId: userData?.householdId
         });
       });
     });
