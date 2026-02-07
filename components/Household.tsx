@@ -649,12 +649,13 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
 
           <h3 className="text-sm font-bold text-amber-500 uppercase mb-3 px-1">Group Members</h3>
           <div className="space-y-2">
-            {household.members && Array.isArray(household.members) && household.members.map((member) => (
+            {household.members && Array.isArray(household.members) && household.members.map((member) => {
+              const currentUser = household.members && Array.isArray(household.members) ? household.members.find(m => m.email === user.email) : null;
+              return (
               <div key={member.id} className="flex items-center justify-between bg-[#2A0A10] p-3 rounded-lg border border-red-900/30">
                 <div className="flex items-center gap-3 flex-1">
                   <button 
                     onClick={() => {
-                      const currentUser = household.members && Array.isArray(household.members) ? household.members.find(m => m.email === user.email) : null;
                       if (currentUser?.role === 'admin' || member.email === user.email) {
                         openMemberPreferences(member);
                       }
@@ -706,7 +707,8 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
                   })()}
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
@@ -1067,12 +1069,13 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
 
           <h3 className="text-sm font-bold text-amber-500 uppercase mb-3 px-1">Group Members</h3>
           <div className="space-y-2">
-            {household.members && Array.isArray(household.members) && household.members.map((member) => (
+            {household.members && Array.isArray(household.members) && household.members.map((member) => {
+              const currentUser = household.members && Array.isArray(household.members) ? household.members.find(m => m.email === user.email) : null;
+              return (
               <div key={member.id} className="flex items-center justify-between bg-[#2A0A10] p-3 rounded-lg border border-red-900/30">
                 <div className="flex items-center gap-3 flex-1">
                   <button 
                     onClick={() => {
-                      const currentUser = household.members && Array.isArray(household.members) ? household.members.find(m => m.email === user.email) : null;
                       if (currentUser?.role === "admin" || member.email === user.email) {
                         openMemberPreferences(member);
                       }
@@ -1124,7 +1127,8 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
                   })()}
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
