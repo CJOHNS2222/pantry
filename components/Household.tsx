@@ -655,13 +655,13 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
                   <button 
                     onClick={() => {
                       const currentUser = household.members && Array.isArray(household.members) ? household.members.find(m => m.email === user.email) : null;
-                      if (currentUser?.role === 'admin') {
+                      if (currentUser?.role === 'admin' || member.email === user.email) {
                         openMemberPreferences(member);
                       }
                     }}
                     className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${
                       member.email === user.email ? 'bg-amber-500 text-[#2A0A10]' : 'bg-red-900/50 text-red-200 hover:bg-red-800/50'
-                    } transition-colors`}
+                    } transition-colors ${currentUser?.role === 'admin' || member.email === user.email ? 'cursor-pointer' : 'cursor-default'}`}
                   >
                     {member.name.charAt(0).toUpperCase()}
                   </button>
@@ -682,7 +682,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
                 <div className="flex items-center gap-2">
                   {(() => {
                     const currentUser = household.members && Array.isArray(household.members) ? household.members.find(m => m.email === user.email) : null;
-                    return currentUser?.role === 'admin' && (
+                    return (currentUser?.role === 'admin' || member.email === user.email) && (
                       <button 
                         onClick={() => openMemberPreferences(member)}
                         className="text-red-900/50 hover:text-amber-500 p-2 transition-colors"
@@ -1073,13 +1073,13 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
                   <button 
                     onClick={() => {
                       const currentUser = household.members && Array.isArray(household.members) ? household.members.find(m => m.email === user.email) : null;
-                      if (currentUser?.role === "admin") {
+                      if (currentUser?.role === "admin" || member.email === user.email) {
                         openMemberPreferences(member);
                       }
                     }}
                     className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${
                       member.email === user.email ? "bg-amber-500 text-[#2A0A10]" : "bg-red-900/50 text-red-200 hover:bg-red-800/50"
-                    } transition-colors`}
+                    } transition-colors ${currentUser?.role === "admin" || member.email === user.email ? "cursor-pointer" : "cursor-default"}`}
                   >
                     {member.name.charAt(0).toUpperCase()}
                   </button>
@@ -1100,7 +1100,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
                 <div className="flex items-center gap-2">
                   {(() => {
                     const currentUser = household.members && Array.isArray(household.members) ? household.members.find(m => m.email === user.email) : null;
-                    return currentUser?.role === "admin" && (
+                    return (currentUser?.role === "admin" || member.email === user.email) && (
                       <button 
                         onClick={() => openMemberPreferences(member)}
                         className="text-red-900/50 hover:text-amber-500 p-2 transition-colors"
