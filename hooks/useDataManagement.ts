@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { collection, doc, onSnapshot, getDocs, setDoc, serverTimestamp, query, where, Timestamp, deleteDoc, writeBatch, getDoc } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 import DatabaseMonitoringService from '../services/databaseMonitoringService';
@@ -1690,7 +1690,7 @@ export function useDataManagement(user: User | null, addToast: (message: string,
   );
 
   const recipeSuggestions = useMemo(() => 
-    generateRecipeSuggestions(inventory), [inventory]
+    [], [] // Disabled automatic recipe suggestions to reduce database queries
   );
 
   // Custom Category Management Functions
@@ -1791,6 +1791,11 @@ export function useDataManagement(user: User | null, addToast: (message: string,
       addToast('Failed to delete category. Please try again.', 'error');
     }
   };
+
+  // Manual recipe suggestions generation (disabled automatic to reduce queries)
+  const generateRecipeSuggestionsOnDemand = useCallback(() => {
+    return generateRecipeSuggestions(inventory);
+  }, [inventory]);
 
   const handleMarkAsMade = async (recipe: StructuredRecipe) => {
     try {
@@ -2110,6 +2115,7 @@ export function useDataManagement(user: User | null, addToast: (message: string,
     addCustomCategory,
     updateCustomCategory,
     deleteCustomCategory,
+    generateRecipeSuggestionsOnDemand,
     handleAddToPlan,
     handleSaveRecipe,
     handleDeleteRecipe,
