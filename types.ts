@@ -29,6 +29,9 @@ export interface PantryItem {
     quantity: number;
     unit: string;
   }[];
+
+  // Expiry alert tracking
+  expiryAlertShown?: boolean; // Whether expiry alert has been displayed to user
 }
 
 export interface ShoppingItem {
@@ -42,6 +45,9 @@ export interface ShoppingItem {
     amount: number;
     unit: string;
   }; // Quantity actually purchased
+  addedAt?: Date; // When the item was added to the shopping list
+  completedAt?: Date; // When the item was checked off
+  estimatedPrice?: number; // Estimated price for analytics
 }
 
 export interface GroundingChunk {
@@ -193,6 +199,7 @@ export interface UserProfile {
   activityLevel?: 'sedentary' | 'lightly-active' | 'moderately-active' | 'very-active' | 'extremely-active';
   dietaryRestrictions?: string[];
   allergies?: string[];
+  householdSize?: number; // number of people in household
 }
 
 export interface HouseholdMember {

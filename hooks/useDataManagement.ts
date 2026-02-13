@@ -6,7 +6,7 @@ import AnalyticsService from '../services/analyticsService';
 import { UsageService } from '../services/usageService';
 import { User, PantryItem, DayPlan, Household, ShoppingItem, SavedRecipe, RecipeRating, RecipeRatingInput, CustomCategory, MealPlanItem, StructuredRecipe, ConsumptionSuggestion, ExpirationAlert, RecipeSuggestion } from '../types';
 import { AppError } from '../utils/errorUtils';
-import { hasPantryItemsChanged, hasArraysChanged } from '../utils/comparisonUtils';
+import { hasPantryItemsChanged, hasArraysChanged, hasMealPlansChanged } from '../utils/comparisonUtils';
 import { setRemoteInventoryUpdate, isRemoteInventoryUpdate, setRemoteShoppingListUpdate, isRemoteShoppingListUpdate, setRemoteMealPlanUpdate, isRemoteMealPlanUpdate } from '../services/syncStateService';
 import { log } from '../services/logService';
 import { generateConsumptionSuggestions, generateExpirationAlerts, generateRecipeSuggestions, isHouseholdMember } from '../utils/appUtils';
@@ -169,7 +169,7 @@ function createMealPlanListener(
       });
 
       // Check if meal plan has actually changed to prevent infinite loops
-      if (!hasArraysChanged(fullWeekPlan, prevMealPlanRef.current)) {
+      if (!hasMealPlansChanged(fullWeekPlan, prevMealPlanRef.current)) {
         setIsLoadingMealPlan(false);
         return;
       }
@@ -258,7 +258,7 @@ function createMealPlanListener(
       });
 
       // Check if meal plan has actually changed to prevent infinite loops
-      if (!hasArraysChanged(fullWeekPlan, prevMealPlanRef.current)) {
+      if (!hasMealPlansChanged(fullWeekPlan, prevMealPlanRef.current)) {
         setIsLoadingMealPlan(false);
         return;
       }
@@ -1680,6 +1680,18 @@ export function useDataManagement(user: User | null, addToast: (message: string,
     }
   };
 
+  // Helper function to determine if an item should show expiry alert
+  const shouldShowExpiryAlert = (item: PantryItem): boolean => {
+    if (!item.expirationDate) return false;
+    
+    const expirationDate = new Date(item.expirationDate);
+    const today = new Date();
+    const daysRemaining = Math.ceil((expirationDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    
+    // Show alert for items expiring within 7 days (including already expired)
+    return daysRemaining <= 7;
+  };
+
   // Computed consumption suggestions and expiration alerts
   const consumptionSuggestions = useMemo(() => 
     generateConsumptionSuggestions(inventory), [inventory]
@@ -1934,9 +1946,16 @@ export function useDataManagement(user: User | null, addToast: (message: string,
     });
 
     // Update the item in local state
+    let updatedItemForDB: PantryItem;
     setInventory(prev => {
       const updated = [...prev];
-      updated[index] = { ...updated[index], ...updates };
+      const updatedItem = { ...updated[index], ...updates };
+      // Recalculate expiry alert flag if expiration date was updated
+      if (updates.expirationDate !== undefined || updates.expirationType !== undefined) {
+        updatedItem.expiryAlertShown = shouldShowExpiryAlert(updatedItem);
+      }
+      updated[index] = updatedItem;
+      updatedItemForDB = updatedItem;
       return updated;
     });
 
@@ -1949,7 +1968,7 @@ export function useDataManagement(user: User | null, addToast: (message: string,
       type: 'update',
       collection: collectionPath,
       docId: currentItem.id,
-      data: cleanObject({ ...currentItem, ...updates })
+      data: cleanObject(updatedItemForDB!)
     });
 
     // Update the cache
@@ -1990,8 +2009,14 @@ export function useDataManagement(user: User | null, addToast: (message: string,
 
   // Add item to inventory
   const addItem = async (item: PantryItem) => {
+    // Set expiry alert flag based on expiration date
+    const itemWithAlert = {
+      ...item,
+      expiryAlertShown: shouldShowExpiryAlert(item)
+    };
+
     // Add to local state
-    setInventory(prev => [...prev, item]);
+    setInventory(prev => [...prev, itemWithAlert]);
 
     // Log activity if in household
     if (activityLogger?.logItemAdded && household?.id && isHouseholdMember(household, user) &&
@@ -2007,11 +2032,11 @@ export function useDataManagement(user: User | null, addToast: (message: string,
     await performWrite({
       type: 'add',
       collection: collectionPath,
-      data: cleanObject(item)
+      data: cleanObject(itemWithAlert)
     });
 
     // Update the cache
-    await InventoryCacheService.addItemToCache(item, user?.householdId, user?.id);
+    await InventoryCacheService.addItemToCache(itemWithAlert, user?.householdId, user?.id);
 
     // Provide haptic feedback
     HapticService.itemAdded();

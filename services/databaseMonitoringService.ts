@@ -14,6 +14,7 @@ import {
   startAfter,
   writeBatch,
   onSnapshot,
+  deleteField,
   Query,
   DocumentData,
   QuerySnapshot,
@@ -26,7 +27,6 @@ import { reportDatabaseError, reportHeavyWritePattern, reportPerformanceIssue } 
 
 interface DatabaseMetrics {
   reads: number;
-  writes: number;
   deletes: number;
   queries: number;
   batchOperations: number;
@@ -55,6 +55,7 @@ class DatabaseMonitoringService {
   private static readonly HEAVY_WRITE_THRESHOLD = 50; // writes per minute
   private static readonly HEAVY_WRITE_WINDOW = 60000; // 1 minute in milliseconds
   private static readonly PERFORMANCE_THRESHOLD = 5000; // 5 seconds
+  private static isInitialized = false;
 
   // Track write patterns for heavy write detection
   private static trackWritePattern(collection: string): void {
@@ -138,6 +139,44 @@ class DatabaseMonitoringService {
     return firestoreCollection(db, path);
   }
 
+  // Document reference wrapper
+  static doc(path: string): any;
+  static doc(collectionPath: string, documentId: string): any;
+  static doc(pathOrCollection: string, documentId?: string) {
+    if (documentId !== undefined) {
+      // Two parameters: collection path + document ID
+      return doc(db, `${pathOrCollection}/${documentId}`);
+    } else {
+      // One parameter: full path
+      return doc(db, pathOrCollection);
+    }
+  }
+
+  // Query builders
+  static query(...args: any[]) {
+    return query(...args);
+  }
+
+  static where(field: string, opStr: string, value: any) {
+    return where(field, opStr, value);
+  }
+
+  static orderBy(field: string, direction?: 'asc' | 'desc') {
+    return orderBy(field, direction);
+  }
+
+  static limit(n: number) {
+    return limit(n);
+  }
+
+  static startAfter(...fieldValues: any[]) {
+    return startAfter(...fieldValues);
+  }
+
+  static deleteField() {
+    return deleteField();
+  }
+
   // Enhanced document operations with tracking
   static async getDoc(ref: any): Promise<DocumentSnapshot> {
     const startTime = Date.now();
@@ -173,7 +212,7 @@ class DatabaseMonitoringService {
       this.metrics.reads += result.size;
 
       AnalyticsService.trackQueryPerformance(
-        queryRef.type === 'query' ? 'unknown' : queryRef.parent.id,
+        queryRef.parent?.id || 'unknown',
         'getDocs',
         result.size,
         duration
@@ -442,6 +481,208 @@ class DatabaseMonitoringService {
       timestamp: Date.now(),
       sessionDuration: Date.now() - this.sessionStartTime
     };
+  }
+
+  // Initialize monitoring by monkey-patching Firestore functions
+  static initializeMonitoring() {
+    if (this.isInitialized) return;
+
+    try {
+      // Store original functions
+      const originalGetDoc = getDoc;
+      const originalGetDocs = getDocs;
+      const originalSetDoc = setDoc;
+      const originalUpdateDoc = updateDoc;
+      const originalAddDoc = addDoc;
+      const originalDeleteDoc = deleteDoc;
+      const originalOnSnapshot = onSnapshot;
+      const originalWriteBatch = writeBatch;
+
+      // Monkey-patch getDoc
+      (globalThis as any).getDoc = async (ref: any) => {
+        const startTime = Date.now();
+        try {
+          const result = await originalGetDoc(ref);
+          const duration = Date.now() - startTime;
+
+          this.metrics.reads++;
+          AnalyticsService.trackDatabaseOperation('read', ref.parent.id, 1, {
+            operation: 'getDoc',
+            success: true,
+            duration_ms: duration
+          });
+          return result;
+        } catch (error) {
+          const duration = Date.now() - startTime;
+          AnalyticsService.trackDatabaseOperation('read', ref.parent.id, 1, {
+            operation: 'getDoc',
+            success: false,
+            error: (error as Error).message,
+            duration_ms: duration
+          });
+          throw error;
+        }
+      };
+
+      // Monkey-patch getDocs
+      (globalThis as any).getDocs = async (query: any) => {
+        const startTime = Date.now();
+        try {
+          const result = await originalGetDocs(query);
+          const duration = Date.now() - startTime;
+
+          this.metrics.reads += result.size;
+          this.metrics.queries++;
+          AnalyticsService.trackDatabaseOperation('read', query._query?.path?.segments?.[0] || 'unknown', result.size, {
+            operation: 'getDocs',
+            success: true,
+            duration_ms: duration
+          });
+          return result;
+        } catch (error) {
+          const duration = Date.now() - startTime;
+          AnalyticsService.trackDatabaseOperation('read', query._query?.path?.segments?.[0] || 'unknown', 0, {
+            operation: 'getDocs',
+            success: false,
+            error: (error as Error).message,
+            duration_ms: duration
+          });
+          throw error;
+        }
+      };
+
+      // Monkey-patch setDoc
+      (globalThis as any).setDoc = async (ref: any, data: any) => {
+        const startTime = Date.now();
+        try {
+          const result = await originalSetDoc(ref, data);
+          const duration = Date.now() - startTime;
+
+          this.metrics.writes++;
+          this.trackWritePattern(ref.parent.id);
+          AnalyticsService.trackDatabaseOperation('write', ref.parent.id, 1, {
+            operation: 'setDoc',
+            success: true,
+            duration_ms: duration
+          });
+          return result;
+        } catch (error) {
+          const duration = Date.now() - startTime;
+          AnalyticsService.trackDatabaseOperation('write', ref.parent.id, 1, {
+            operation: 'setDoc',
+            success: false,
+            error: (error as Error).message,
+            duration_ms: duration
+          });
+          throw error;
+        }
+      };
+
+      // Monkey-patch updateDoc
+      (globalThis as any).updateDoc = async (ref: any, data: any) => {
+        const startTime = Date.now();
+        try {
+          const result = await originalUpdateDoc(ref, data);
+          const duration = Date.now() - startTime;
+
+          this.metrics.writes++;
+          this.trackWritePattern(ref.parent.id);
+          AnalyticsService.trackDatabaseOperation('write', ref.parent.id, 1, {
+            operation: 'updateDoc',
+            success: true,
+            duration_ms: duration
+          });
+          return result;
+        } catch (error) {
+          const duration = Date.now() - startTime;
+          AnalyticsService.trackDatabaseOperation('write', ref.parent.id, 1, {
+            operation: 'updateDoc',
+            success: false,
+            error: (error as Error).message,
+            duration_ms: duration
+          });
+          throw error;
+        }
+      };
+
+      // Monkey-patch addDoc
+      (globalThis as any).addDoc = async (ref: any, data: any) => {
+        const startTime = Date.now();
+        try {
+          const result = await originalAddDoc(ref, data);
+          const duration = Date.now() - startTime;
+
+          this.metrics.writes++;
+          this.trackWritePattern(ref.parent.id);
+          AnalyticsService.trackDatabaseOperation('write', ref.parent.id, 1, {
+            operation: 'addDoc',
+            success: true,
+            duration_ms: duration
+          });
+          return result;
+        } catch (error) {
+          const duration = Date.now() - startTime;
+          AnalyticsService.trackDatabaseOperation('write', ref.parent.id, 1, {
+            operation: 'addDoc',
+            success: false,
+            error: (error as Error).message,
+            duration_ms: duration
+          });
+          throw error;
+        }
+      };
+
+      // Monkey-patch deleteDoc
+      (globalThis as any).deleteDoc = async (ref: any) => {
+        const startTime = Date.now();
+        try {
+          const result = await originalDeleteDoc(ref);
+          const duration = Date.now() - startTime;
+
+          this.metrics.deletes++;
+          AnalyticsService.trackDatabaseOperation('write', ref.parent.id, 1, {
+            operation: 'deleteDoc',
+            success: true,
+            duration_ms: duration
+          });
+          return result;
+        } catch (error) {
+          const duration = Date.now() - startTime;
+          AnalyticsService.trackDatabaseOperation('write', ref.parent.id, 1, {
+            operation: 'deleteDoc',
+            success: false,
+            error: (error as Error).message,
+            duration_ms: duration
+          });
+          throw error;
+        }
+      };
+
+      // Monkey-patch onSnapshot
+      (globalThis as any).onSnapshot = (ref: any, callback: any, errorCallback?: any) => {
+        this.metrics.realtimeSubscriptions++;
+        AnalyticsService.trackDatabaseOperation('read', ref.parent?.id || 'unknown', 0, {
+          operation: 'onSnapshot',
+          type: 'subscription_start'
+        });
+
+        const unsubscribe = originalOnSnapshot(ref, callback, errorCallback);
+
+        return () => {
+          this.metrics.realtimeSubscriptions--;
+          AnalyticsService.trackDatabaseOperation('read', ref.parent?.id || 'unknown', 0, {
+            operation: 'onSnapshot',
+            type: 'subscription_end'
+          });
+          unsubscribe();
+        };
+      };
+
+      this.isInitialized = true;
+      console.log('🔥 Database monitoring initialized with function overrides');
+    } catch (error) {
+      console.error('Failed to initialize database monitoring:', error);
+    }
   }
 }
 
