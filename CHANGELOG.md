@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-02-13
 
+### Added
+- **Expiry Alerts**: Added persistent expiry alert system with visual indicators
+  - Items expiring within 7 days now show a clock icon in the pantry view
+  - Alert status is stored with each item to avoid constant database queries
+  - Automatic calculation when adding or updating items with expiration dates
+
+### Fixed
+- **Meal Plan Performance**: Fixed infinite loop in meal plan listener causing excessive database reads
+  - Replaced shallow array comparison with deep equality check using `hasMealPlansChanged`
+  - Prevents unnecessary state updates when meal plan data hasn't actually changed
+- **Database Monitoring**: Fixed TypeError in `DatabaseMonitoringService.getDocs` when queryRef.parent is null
+
 ### Changed
 - **Inventory Management**: Migrated PantryScanner to use InventoryCacheService for efficient bulk operations
 - **Database Monitoring**: Reduced update frequencies for PerformanceMonitoringDashboard (1s → 60s) and DatabaseAnalytics (5s → 60s)
