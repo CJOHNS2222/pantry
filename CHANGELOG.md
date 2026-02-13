@@ -5,6 +5,16 @@ All notable changes to Smart Pantry Chef will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] - 2026-02-13
+
+### Changed
+- **Inventory Management**: Migrated PantryScanner to use InventoryCacheService for efficient bulk operations
+- **Database Monitoring**: Reduced update frequencies for PerformanceMonitoringDashboard (1s → 60s) and DatabaseAnalytics (5s → 60s)
+- **Listener Optimization**: Added 6-second throttling to inventory listeners to prevent excessive reads
+
+### Investigation
+- **Database Read Issue**: Investigated excessive database reads occurring every 6 seconds; implemented throttling and monitoring adjustments (later reverted due to increased read volume)
+
 ## [1.3.1] - 2026-02-09
 
 ### Fixed

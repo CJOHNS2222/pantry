@@ -1,20 +1,24 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { doc, onSnapshot, collection, addDoc, getDocs, setDoc, serverTimestamp, query, where, Timestamp, deleteDoc, writeBatch, getDoc } from 'firebase/firestore';
+import { collection, doc, onSnapshot, getDocs, setDoc, serverTimestamp, query, where, Timestamp, deleteDoc, writeBatch, getDoc } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 import DatabaseMonitoringService from '../services/databaseMonitoringService';
 import AnalyticsService from '../services/analyticsService';
 import { UsageService } from '../services/usageService';
 import { User, PantryItem, DayPlan, Household, ShoppingItem, SavedRecipe, RecipeRating, RecipeRatingInput, CustomCategory, MealPlanItem, StructuredRecipe, ConsumptionSuggestion, ExpirationAlert, RecipeSuggestion } from '../types';
 import { AppError } from '../utils/errorUtils';
-import { hasPantryItemsChanged, hasShoppingItemsChanged, hasSavedRecipesChanged, hasMealPlansChanged, hasArraysChanged } from '../utils/comparisonUtils';
+import { hasPantryItemsChanged, hasArraysChanged } from '../utils/comparisonUtils';
 import { setRemoteInventoryUpdate, isRemoteInventoryUpdate, setRemoteShoppingListUpdate, isRemoteShoppingListUpdate, setRemoteMealPlanUpdate, isRemoteMealPlanUpdate } from '../services/syncStateService';
+import { log } from '../services/logService';
 import { generateConsumptionSuggestions, generateExpirationAlerts, generateRecipeSuggestions, isHouseholdMember } from '../utils/appUtils';
 import { offlineQueue } from '../services/offlineQueueService';
 import { undoService } from '../services/undoService';
 import { NotificationService } from '../services/notificationService';
+import { ERROR_MESSAGES } from '../constants/errorMessages';
 import { useScopedDataListener } from './useDataListener';
 import { firestoreCache } from '../services/cacheService';
 import { HouseholdPreferenceService } from '../services/householdPreferenceService';
+import { InventoryCacheService } from '../services/inventoryCacheService';
+import HapticService from '../services/hapticService';
 
 // Global flag to prevent multiple listener setups
 const globalListenersSetUp = { current: false };
@@ -27,28 +31,30 @@ function createShoppingListListener(
   setShoppingList: (items: ShoppingItem[]) => void,
   setIsLoadingShoppingList: (loading: boolean) => void
 ) {
-  if (inHousehold && household?.id) {
-    return onSnapshot(collection(db, 'households', household.id, 'shoppingList'), snap => {
+  if (inHousehold) {
+    return onSnapshot(collection(db, 'households', user.householdId, 'shoppingList'), snap => {
       const serverData = snap.docs.map(d => ({ id: d.id, ...d.data() } as ShoppingItem));
-      if (hasShoppingItemsChanged(serverData, [])) { // Using empty array as placeholder for current state
-        setRemoteShoppingListUpdate(true);
-        setShoppingList(serverData);
-      }
+      setRemoteShoppingListUpdate(true);
+      setShoppingList(serverData);
       setIsLoadingShoppingList(false);
     }, err => {
-      console.error("Household shopping list listener failed:", err);
+      // Don't log permission-denied errors as they are expected when user doesn't have access
+      if (err.code !== 'permission-denied') {
+        log.error('Household shopping list listener failed', err, 'DataManagement');
+      }
       setIsLoadingShoppingList(false);
     });
   } else {
     return onSnapshot(collection(db, 'users', user.id, 'shoppingList'), snap => {
       const serverData = snap.docs.map(d => ({ id: d.id, ...d.data() } as ShoppingItem));
-      if (hasShoppingItemsChanged(serverData, [])) { // Using empty array as placeholder for current state
-        setRemoteShoppingListUpdate(true);
-        setShoppingList(serverData);
-      }
+      setRemoteShoppingListUpdate(true);
+      setShoppingList(serverData);
       setIsLoadingShoppingList(false);
     }, err => {
-      console.error("User shopping list listener failed:", err);
+      // Don't log permission-denied errors as they are expected when user doesn't have access
+      if (err.code !== 'permission-denied') {
+        log.error('User shopping list listener failed', err, 'DataManagement');
+      }
       setIsLoadingShoppingList(false);
     });
   }
@@ -61,26 +67,28 @@ function createSavedRecipesListener(
   setSavedRecipes: (recipes: SavedRecipe[]) => void,
   setIsLoadingSavedRecipes: (loading: boolean) => void
 ) {
-  if (inHousehold && household?.id) {
-    return onSnapshot(collection(db, 'households', household.id, 'savedRecipes'), snap => {
+  if (inHousehold) {
+    return onSnapshot(collection(db, 'households', user.householdId, 'savedRecipes'), snap => {
       const serverData = snap.docs.map(d => ({ id: d.id, ...d.data() } as SavedRecipe));
-      if (hasSavedRecipesChanged(serverData, [])) { // Using empty array as placeholder for current state
-        setSavedRecipes(serverData);
-      }
+      setSavedRecipes(serverData);
       setIsLoadingSavedRecipes(false);
     }, err => {
-      console.error("Household saved recipes listener failed:", err);
+      // Don't log permission-denied errors as they are expected when user doesn't have access
+      if (err.code !== 'permission-denied') {
+        log.error('Household saved recipes listener failed', err, 'DataManagement');
+      }
       setIsLoadingSavedRecipes(false);
     });
   } else {
     return onSnapshot(collection(db, 'users', user.id, 'savedRecipes'), snap => {
       const serverData = snap.docs.map(d => ({ id: d.id, ...d.data() } as SavedRecipe));
-      if (hasSavedRecipesChanged(serverData, [])) { // Using empty array as placeholder for current state
-        setSavedRecipes(serverData);
-      }
+      setSavedRecipes(serverData);
       setIsLoadingSavedRecipes(false);
     }, err => {
-      console.error("User saved recipes listener failed:", err);
+      // Don't log permission-denied errors as they are expected when user doesn't have access
+      if (err.code !== 'permission-denied') {
+        log.error('User saved recipes listener failed', err, 'DataManagement');
+      }
       setIsLoadingSavedRecipes(false);
     });
   }
@@ -93,8 +101,8 @@ function createMealPlanListener(
   setMealPlan: (plans: DayPlan[]) => void,
   setIsLoadingMealPlan: (loading: boolean) => void
 ) {
-  if (inHousehold && household?.id) {
-    return onSnapshot(collection(db, 'households', household.id, 'mealPlan'), snap => {
+  if (inHousehold) {
+    return onSnapshot(collection(db, 'households', user.householdId, 'mealPlan'), snap => {
       // Create a 7-day (free) or 14-day (premium) template starting from today
       const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
       const today = new Date();
@@ -160,13 +168,14 @@ function createMealPlanListener(
         }
       });
 
-      if (hasMealPlansChanged(fullWeekPlan, [])) { // Using empty array as placeholder for current state
-        setRemoteMealPlanUpdate(true);
-        setMealPlan(fullWeekPlan);
-      }
+      setRemoteMealPlanUpdate(true);
+      setMealPlan(fullWeekPlan);
       setIsLoadingMealPlan(false);
     }, err => {
-      console.error("Household meal plan listener failed:", err);
+      // Don't log permission-denied errors as they are expected when user doesn't have access
+      if (err.code !== 'permission-denied') {
+        console.error("Household meal plan listener failed:", err);
+      }
       setIsLoadingMealPlan(false);
     });
   } else {
@@ -236,19 +245,20 @@ function createMealPlanListener(
         }
       });
 
-      if (hasMealPlansChanged(fullWeekPlan, [])) { // Using empty array as placeholder for current state
-        setRemoteMealPlanUpdate(true);
-        setMealPlan(fullWeekPlan);
-      }
+      setRemoteMealPlanUpdate(true);
+      setMealPlan(fullWeekPlan);
       setIsLoadingMealPlan(false);
     }, err => {
-      console.error("User meal plan listener failed:", err);
+      // Don't log permission-denied errors as they are expected when user doesn't have access
+      if (err.code !== 'permission-denied') {
+        console.error("User meal plan listener failed:", err);
+      }
       setIsLoadingMealPlan(false);
     });
   }
 }
 
-export function useDataManagement(user: User | null, addToast: (message: string, type?: 'error' | 'info', ttl?: number, actionLabel?: string, action?: () => void) => void, addToShoppingList?: (items: string[]) => void, updateSyncStatus?: (updates: any) => void, activityLogger?: { logItemAdded?: (itemName: string, itemId?: string) => void; logItemRemoved?: (itemName: string, itemId?: string) => void; logShoppingAdded?: (itemName: string, itemId?: string) => void; logRecipeSaved?: (recipeName: string, recipeId?: string) => void; logMealCompleted?: (mealName: string) => void }) {
+export function useDataManagement(user: User | null, addToast: (message: string, type?: 'error' | 'info', ttl?: number, actionLabel?: string, action?: () => void) => void, addToShoppingList?: (items: string[]) => void, updateSyncStatus?: (updates: any) => void, activityLogger?: { logItemAdded?: (itemName: string, itemId?: string) => void; logItemRemoved?: (itemName: string, itemId?: string) => void; logShoppingAdded?: (itemName: string, itemId?: string) => void; logRecipeSaved?: (recipeName: string, recipeId?: string) => void; logMealCompleted?: (mealName: string) => void }, options?: { disableInventoryListeners?: boolean }) {
   // Data States
   const [mealPlanState, setMealPlanState] = useState<DayPlan[]>([]);
 
@@ -307,7 +317,7 @@ export function useDataManagement(user: User | null, addToast: (message: string,
         // Clean objects by removing undefined properties and cleaning nested objects
         const cleaned: any = {};
         for (const key in obj) {
-          if (obj.hasOwnProperty(key)) {
+          if (Object.prototype.hasOwnProperty.call(obj, key)) {
             const cleanedValue = cleanObject(obj[key]);
             if (cleanedValue !== undefined) {
               cleaned[key] = cleanedValue;
@@ -470,6 +480,9 @@ export function useDataManagement(user: User | null, addToast: (message: string,
   // Previous household data for comparison
   const prevHouseholdRef = useRef<Household | null>(null);
 
+  // Last time we checked for expiration notifications (to avoid spam)
+  const lastExpirationCheckRef = useRef<number>(0);
+
   // Per-session client id used to mark writes
   const clientId = useMemo(() => {
     let id = localStorage.getItem('clientId');
@@ -482,19 +495,21 @@ export function useDataManagement(user: User | null, addToast: (message: string,
 
   // Firestore synchronization effects
   useEffect(() => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      return;
+    }
 
     // Prevent multiple listener setups, but allow re-setup when householdId changes
-    if (globalListenersSetUp.current && !user?.householdId) return;
+    if (globalListenersSetUp.current && !user?.householdId) {
+      return;
+    }
 
     const unsubs: (()=>void)[] = [];
 
     // Household document listener - always listen if user has a household
     if (user?.householdId) {
       unsubs.push(onSnapshot(doc(db, 'households', user.householdId), snap => {
-        console.log('Household listener callback fired, snap.exists():', snap.exists());
         if (snap.exists()) {
-          console.log('Household document data:', snap.data());
           let householdData = { id: snap.id, ...snap.data() } as Household;
           
           // If members array doesn't exist, is empty, or is in wrong format (map instead of array), populate members from user documents
@@ -528,7 +543,7 @@ export function useDataManagement(user: User | null, addToast: (message: string,
                       name: memberName,
                       email: mapMembers[memberId].email || '',
                       avatar: mapMembers[memberId].avatar,
-                      role: mapMembers[memberId].role || 'member', // Preserve existing role
+                      role: mapMembers[memberId].role || (memberId === user?.id ? 'admin' : 'member'), // Preserve existing role, default to admin for current user
                       status: mapMembers[memberId].status || 'active',
                       joinedAt: mapMembers[memberId].joinedAt || new Date().toISOString(),
                       lastSeen: mapMembers[memberId].lastSeen,
@@ -593,6 +608,15 @@ export function useDataManagement(user: User | null, addToast: (message: string,
 
                 householdData.members = basicMembers;
               }
+
+              // Ensure current user is always admin in their household
+              if (Array.isArray(householdData.members) && householdData.members.length > 0 && user?.id) {
+                const currentUserMember = householdData.members.find(m => m.id === user.id);
+                if (currentUserMember && currentUserMember.role !== 'admin') {
+                  console.log('Updating current user role to admin');
+                  currentUserMember.role = 'admin';
+                }
+              }
             }
           
           // Only update if the household data has actually changed (excluding timestamps)
@@ -623,7 +647,10 @@ export function useDataManagement(user: User | null, addToast: (message: string,
           setHouseholdListenerRetry(0);
         }
       }, err => {
-        console.error("Household document listener failed:", err);
+        // Don't log permission-denied errors as they are expected when user doesn't have access
+        if (err.code !== 'permission-denied') {
+          console.error("Household document listener failed:", err);
+        }
         
         // If it's a permissions error, the user has likely been removed from the household
         if (err.code === 'permission-denied' && !householdClearedDueToPermissionsRef.current) {
@@ -651,43 +678,56 @@ export function useDataManagement(user: User | null, addToast: (message: string,
     }
 
     // Determine if we are in a valid household (any household with membership)
-    const inHousehold = isHouseholdMember(household, user) && household?.id;
+    const inHousehold = !!user?.householdId;
 
     // Inventory listener - use household inventory if user has householdId (migrated at creation)
-    if (household?.id && isHouseholdMember(household, user)) {
-      // Listen to household inventory when user has a household
-      unsubs.push(onSnapshot(collection(db, 'households', household.id, 'inventory'), snap => {
-        const serverData = snap.docs.map(d => ({ id: d.id, ...d.data() } as PantryItem));
-        // Filter out invalid items
-        const validServerData = serverData.filter(item => item && typeof item === 'object' && item.id);
-        // Only update if different to prevent infinite loops
-        if (hasPantryItemsChanged(validServerData, inventory)) {
-          setRemoteInventoryUpdate(true);
-          setInventory(validServerData);
-        }
-        setIsLoadingInventory(false);
-        initialDataLoadedRef.current = true;
-      }, err => {
-        console.error("Household inventory listener failed:", err);
-        setIsLoadingInventory(false);
-      }));
+    // Skip inventory listeners when disabled (e.g., for cache testing)
+    if (!options?.disableInventoryListeners) {
+      if (user?.householdId) {
+        // Listen to household inventory when user has a household
+        unsubs.push(onSnapshot(collection(db, 'households', user.householdId, 'inventory'), snap => {
+          const serverData = snap.docs.map(d => ({ id: d.id, ...d.data() } as PantryItem));
+          // Filter out invalid items
+          const validServerData = serverData.filter(item => item && typeof item === 'object' && item.id);
+          // Only update if different to prevent infinite loops
+          if (hasPantryItemsChanged(validServerData, inventory)) {
+            setRemoteInventoryUpdate(true);
+            setInventory(validServerData);
+          }
+          setIsLoadingInventory(false);
+          initialDataLoadedRef.current = true;
+        }, err => {
+          // Don't log permission-denied errors as they are expected when user doesn't have access
+          if (err.code !== 'permission-denied') {
+            console.error("Household inventory listener failed:", err);
+          }
+          setIsLoadingInventory(false);
+        }));
+      } else {
+        // Listen to user inventory when not in household
+        unsubs.push(onSnapshot(collection(db, 'users', user.id, 'inventory'), snap => {
+          const serverData = snap.docs.map(d => ({ id: d.id, ...d.data() } as PantryItem));
+          // Filter out invalid items
+          const validServerData = serverData.filter(item => item && typeof item === 'object' && item.id);
+          // Only update if different to prevent infinite loops
+          if (hasPantryItemsChanged(validServerData, inventory)) {
+            setRemoteInventoryUpdate(true);
+            setInventory(validServerData);
+          }
+          setIsLoadingInventory(false);
+          initialDataLoadedRef.current = true;
+        }, err => {
+          // Don't log permission-denied errors as they are expected when user doesn't have access
+          if (err.code !== 'permission-denied') {
+            console.error("User inventory listener failed:", err);
+          }
+          setIsLoadingInventory(false);
+        }));
+      }
     } else {
-      // Listen to user inventory when not in household
-      unsubs.push(onSnapshot(collection(db, 'users', user.id, 'inventory'), snap => {
-        const serverData = snap.docs.map(d => ({ id: d.id, ...d.data() } as PantryItem));
-        // Filter out invalid items
-        const validServerData = serverData.filter(item => item && typeof item === 'object' && item.id);
-        // Only update if different to prevent infinite loops
-        if (hasPantryItemsChanged(validServerData, inventory)) {
-          setRemoteInventoryUpdate(true);
-          setInventory(validServerData);
-        }
-        setIsLoadingInventory(false);
-        initialDataLoadedRef.current = true;
-      }, err => {
-        console.error("User inventory listener failed:", err);
-        setIsLoadingInventory(false);
-      }));
+      // When inventory listeners are disabled, mark as loaded immediately
+      setIsLoadingInventory(false);
+      initialDataLoadedRef.current = true;
     }
 
     // Scoped listeners for shopping list, saved recipes, and meal plans
@@ -757,10 +797,15 @@ export function useDataManagement(user: User | null, addToast: (message: string,
     });
 
     // Create notifications for items expiring soon (limit to avoid spam)
-    itemsExpiringSoon.slice(0, 3).forEach(async (item) => {
-      const daysUntilExpiry = Math.ceil((new Date(item.expirationDate!).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
-      await NotificationService.createExpirationAlert(user.id, item.item, daysUntilExpiry, item.id);
-    });
+    // Only check every 5 minutes to avoid excessive notifications
+    const now = Date.now();
+    if (now - lastExpirationCheckRef.current > 5 * 60 * 1000) { // 5 minutes
+      itemsExpiringSoon.slice(0, 3).forEach(async (item) => {
+        const daysUntilExpiry = Math.ceil((new Date(item.expirationDate!).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+        await NotificationService.createExpirationAlert(user.id, item.item, daysUntilExpiry, item.id);
+      });
+      lastExpirationCheckRef.current = now;
+    }
 
   }, [inventory, user?.id, addToShoppingList, addToast]);
 
@@ -834,27 +879,25 @@ export function useDataManagement(user: User | null, addToast: (message: string,
     // Debounce the sync to avoid running on every state change
     const timeoutId = setTimeout(async () => {
       // Determine if we are in a valid household (any household with membership)
-      const inHousehold = household?.id && isHouseholdMember(household, user);
-
-      console.log('Inventory sync triggered - user:', user?.id, 'household:', household?.id, 'inventory length:', inventory.length, 'inHousehold:', inHousehold);
+      const inHousehold = user?.householdId && (!household?.id || isHouseholdMember(household, user));
 
       writingMealPlanRef.current = true;
       try {
-        // If offline, enqueue the inventory sync to IndexedDB for later processing
-        try {
-          if (typeof window !== 'undefined' && !navigator.onLine) {
-            const { enqueueInventorySync } = await import('../services/writeQueueService');
-            await enqueueInventorySync({ userId: user.id, householdId: household?.id || null, inHousehold, inventory });
-            addToast('Offline — changes queued and will sync when you are back online.', 'info');
-            return;
-          }
-        } catch (err) {
-          console.warn('Failed to enqueue offline sync, continuing without queue:', err);
-        }
+        // If offline, enqueue the inventory sync to IndexedDB for later processing - DISABLED
+        // try {
+        //   if (typeof window !== 'undefined' && !navigator.onLine) {
+        //     const { enqueueInventorySync } = await import('../services/writeQueueService');
+        //     await enqueueInventorySync({ userId: user.id, householdId: household?.id || null, inHousehold, inventory });
+        //     addToast('Offline — changes queued and will sync when you are back online.', 'info');
+        //     return;
+        //   }
+        // } catch (err) {
+        //   console.warn('Failed to enqueue offline sync, continuing without queue:', err);
+        // }
         
         if (inHousehold) {
           // When in household, sync inventory to household collection
-          const householdInventoryPath = `households/${household.id}/inventory`;
+          const householdInventoryPath = `households/${user.householdId}/inventory`;
 
           // Use batch operations to minimize round trips
           // Note: This approach writes all current items but doesn't delete removed items
@@ -888,11 +931,12 @@ export function useDataManagement(user: User | null, addToast: (message: string,
           
           // Sync other household data (saved recipes, meal plan)
           const householdWrites: Promise<any>[] = [];
-          savedRecipes.filter(item => item && item.id).forEach(item => {
-            householdWrites.push(
-              setDoc(doc(db, 'households', household.id, 'savedRecipes', item.id), cleanObject(item)).catch(err => ({ err, path: `households/${household.id}/savedRecipes/${item.id}` }))
-            );
-          });
+          // Skip writing savedRecipes in sync effect since they are already persisted when saved
+          // savedRecipes.filter(item => item && item.id).forEach(item => {
+          //   householdWrites.push(
+          //     setDoc(doc(db, 'households', household.id, 'savedRecipes', item.id), cleanObject(item)).catch(err => ({ err, path: `households/${household.id}/savedRecipes/${item.id}` }))
+          //   );
+          // });
           if (mealPlan) {
             // Clean up old meal plan entries (older than today)
             const today = new Date();
@@ -901,7 +945,7 @@ export function useDataManagement(user: User | null, addToast: (message: string,
             
             try {
               const oldMealPlanDocs = await getDocs(query(
-                collection(db, 'households', household.id, 'mealPlan'),
+                collection(db, 'households', user.householdId, 'mealPlan'),
                 where('date', '<', Timestamp.fromDate(today))
               ));
               
@@ -942,7 +986,7 @@ export function useDataManagement(user: User | null, addToast: (message: string,
                 lastModifiedAt: serverTimestamp()
               };
               householdWrites.push(
-                setDoc(doc(db, 'households', household.id, 'mealPlan', docId), payload).catch(err => ({ err, path: `households/${household.id}/mealPlan/${docId}` }))
+                setDoc(doc(db, 'households', user.householdId, 'mealPlan', docId), payload).catch(err => ({ err, path: `households/${user.householdId}/mealPlan/${docId}` }))
               );
             });
           }
@@ -955,10 +999,10 @@ export function useDataManagement(user: User | null, addToast: (message: string,
               // If it's a permission denied error, the user has likely been removed from the household
               const error = res.status === 'rejected' ? res.reason : (res.value as any)?.err;
               if (error?.code === 'permission-denied') {
-                console.log('Permission denied on household write - clearing household state');
+                log.warn('Permission denied on household write - clearing household state', { userId: user.id }, 'useDataManagement');
                 setHousehold(null);
               } else {
-                addToast('Failed to save some household data', 'error');
+                addToast(ERROR_MESSAGES.SAVE_FAILED, 'error');
               }
             }
           });
@@ -999,11 +1043,12 @@ export function useDataManagement(user: User | null, addToast: (message: string,
           // Individual user collections (when not in household)
           const userWrites: Promise<any>[] = [];
           
-          savedRecipes.filter(item => item && item.id).forEach(item => {
-            userWrites.push(
-              setDoc(doc(db, 'users', user.id, 'savedRecipes', item.id), cleanObject(item)).catch(err => ({ err, path: `users/${user.id}/savedRecipes/${item.id}` }))
-            );
-          });
+          // Skip writing savedRecipes in sync effect since they are already persisted when saved
+          // savedRecipes.filter(item => item && item.id).forEach(item => {
+          //   userWrites.push(
+          //     setDoc(doc(db, 'users', user.id, 'savedRecipes', item.id), cleanObject(item)).catch(err => ({ err, path: `users/${user.id}/savedRecipes/${item.id}` }))
+          //   );
+          // });
           if (mealPlan) {
             // Clean up old meal plan entries (older than today)
             const today = new Date();
@@ -1060,8 +1105,8 @@ export function useDataManagement(user: User | null, addToast: (message: string,
           const userResults = await Promise.allSettled(userWrites);
           userResults.forEach((res, idx) => {
             if (res.status === 'rejected' || (res.status === 'fulfilled' && (res.value as any)?.err)) {
-              console.error('User write failed:', res);
-              addToast('Failed to save some user data', 'error');
+              log.error('User write failed', { result: res, index: idx }, 'useDataManagement');
+              addToast(ERROR_MESSAGES.SAVE_FAILED, 'error');
             }
           });
         }
@@ -1071,31 +1116,32 @@ export function useDataManagement(user: User | null, addToast: (message: string,
     }, 1000); // 1 second debounce
 
     return () => clearTimeout(timeoutId);
-    }, [user?.id, household?.id, inventory, savedRecipes, mealPlan]);
+    }, [user?.id, user?.householdId, inventory, savedRecipes, mealPlan]);
 
   // Shopping list sync
   useEffect(() => {
     if (!user?.id) return;
 
-    const collectionPath = household?.id && isHouseholdMember(household, user)
-      ? `households/${household.id}/shoppingList`
+    const collectionPath = user?.householdId
+      ? `households/${user.householdId}/shoppingList`
       : `users/${user.id}/shoppingList`;
 
     const collectionPathChanged = lastShoppingListCollectionPathRef.current !== collectionPath;
     lastShoppingListCollectionPathRef.current = collectionPath;
 
-    if (!listenersReadyRef.current || !shoppingList || (isRemoteShoppingListUpdate() && !collectionPathChanged)) {
+    if (isLoadingShoppingList || !shoppingList || (isRemoteShoppingListUpdate() && !collectionPathChanged)) {
       return;
     }
 
     // Debounce the sync to avoid running on every state change
     const timeoutId = setTimeout(async () => {
+      setRemoteShoppingListUpdate(false); // Reset the flag so sync can run
       try {
         // Calculate changes using batch operations to minimize Firestore reads/writes
         const calculateShoppingListChanges = async () => {
           // Get existing documents to determine what changed
-          const shoppingListRef = DatabaseMonitoringService.collection(collectionPath);
-          const existingDocs = await DatabaseMonitoringService.getDocs(query(shoppingListRef));
+          const shoppingListRef = collection(db, collectionPath);
+          const existingDocs = await getDocs(query(shoppingListRef));
           const existingItems = existingDocs.docs.map(doc => ({ id: doc.id, ...doc.data() } as ShoppingItem));
 
           // Create change sets
@@ -1124,11 +1170,6 @@ export function useDataManagement(user: User | null, addToast: (message: string,
         };
 
         const changeSet = await calculateShoppingListChanges();
-
-        console.log('Shopping list sync - collection:', collectionPath,
-                   'toDelete:', changeSet.toDelete.length,
-                   'toAdd:', changeSet.toAdd.length,
-                   'toUpdate:', changeSet.toUpdate.length);
 
         // Use batch operations for all changes
         const batch = writeBatch(db);
@@ -1173,7 +1214,7 @@ export function useDataManagement(user: User | null, addToast: (message: string,
     }, 1000); // 1 second debounce
 
     return () => clearTimeout(timeoutId);
-  }, [user?.id, household?.id, shoppingList]);
+  }, [user?.id, user?.householdId, shoppingList]);
 
   // Meal plan sync
   useEffect(() => {
@@ -1186,8 +1227,8 @@ export function useDataManagement(user: User | null, addToast: (message: string,
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
         const cutoffDate = Timestamp.fromDate(sevenDaysAgo);
 
-        const collectionPath = household?.id && isHouseholdMember(household, user)
-          ? `households/${household.id}/mealPlan`
+        const collectionPath = user?.householdId
+          ? `households/${user.householdId}/mealPlan`
           : `users/${user.id}/mealPlan`;
 
         const oldDocsQuery = query(
@@ -1202,7 +1243,10 @@ export function useDataManagement(user: User | null, addToast: (message: string,
           await Promise.allSettled(deletePromises);
         }
       } catch (error) {
-        console.error('Error cleaning up old meal plans:', error);
+        // Don't log permission-denied errors as they are expected when user doesn't have access
+        if ((error as any)?.code !== 'permission-denied') {
+          console.error('Error cleaning up old meal plans:', error);
+        }
       }
     };
 
@@ -1211,7 +1255,7 @@ export function useDataManagement(user: User | null, addToast: (message: string,
       mealPlanCleanupDoneRef.current = true;
       cleanupOldMealPlans();
     }
-  }, [user?.id, household?.id]);
+  }, [user?.id, user?.householdId]);
 
   // Ratings listener
   useEffect(() => {
@@ -1260,38 +1304,38 @@ export function useDataManagement(user: User | null, addToast: (message: string,
     }
   }, [household]);
 
-  // Online/offline handling
-  useEffect(() => {
-    const handleOnline = async () => {
-      setIsOnline(true);
-      // Process queued operations when coming back online
-      try {
-        await offlineQueue.processQueue();
-        addToast('Changes synced successfully!', 'info');
-      } catch (error) {
-        console.error('Failed to process offline queue:', error);
-        addToast('Some changes failed to sync. Please check your connection.', 'error');
-      }
-    };
+  // Online/offline handling - DISABLED
+  // useEffect(() => {
+  //   const handleOnline = async () => {
+  //     setIsOnline(true);
+  //     // Process queued operations when coming back online
+  //     try {
+  //       await offlineQueue.processQueue();
+  //       addToast('Changes synced successfully!', 'info');
+  //     } catch (error) {
+  //       console.error('Failed to process offline queue:', error);
+  //       addToast('Some changes failed to sync. Please check your connection.', 'error');
+  //     }
+  //   };
 
-    const handleOffline = () => {
-      setIsOnline(false);
-      addToast('You are offline. Changes will be synced when connection is restored.', 'info');
-    };
+  //   const handleOffline = () => {
+  //     setIsOnline(false);
+  //     addToast('You are offline. Changes will be synced when connection is restored.', 'info');
+  //   };
 
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
+  //   window.addEventListener('online', handleOnline);
+  //   window.addEventListener('offline', handleOffline);
 
-    // Process queue on app start if online
-    if (navigator.onLine) {
-      offlineQueue.processQueue().catch(console.error);
-    }
+  //   // Process queue on app start if online
+  //   if (navigator.onLine) {
+  //     offlineQueue.processQueue().catch(console.error);
+  //   }
 
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
+  //   return () => {
+  //     window.removeEventListener('online', handleOnline);
+  //     window.removeEventListener('offline', handleOffline);
+  //   };
+  // }, []);
 
   // Load undo actions
   const prevUserIdRef = useRef<string | null>(null);
@@ -1319,7 +1363,7 @@ export function useDataManagement(user: User | null, addToast: (message: string,
 
     // Check if we've already determined the limit is exceeded
     if (mealPlanLimitExceeded) {
-      addToast('You\'ve reached your weekly meal planning limit. Upgrade to Premium for unlimited meal planning!', 'error');
+      addToast(ERROR_MESSAGES.PLANNING_LIMIT_REACHED, 'error');
       return;
     }
 
@@ -1329,7 +1373,7 @@ export function useDataManagement(user: User | null, addToast: (message: string,
         // Use the checkMealPlanLimit function to update state
         const canAdd = await checkMealPlanLimit();
         if (!canAdd) {
-          addToast('You\'ve reached your weekly meal planning limit. Upgrade to Premium for unlimited meal planning!', 'error');
+          addToast(ERROR_MESSAGES.PLANNING_LIMIT_REACHED, 'error');
           return;
         }
       } catch (error) {
@@ -1366,7 +1410,7 @@ export function useDataManagement(user: User | null, addToast: (message: string,
 
     // Ensure the target day exists
     if (dayIndex === undefined || dayIndex < 0 || dayIndex >= updatedPlan.length) {
-      addToast('Invalid day selected', 'error');
+      addToast(ERROR_MESSAGES.INVALID_DAY, 'error');
       return;
     }
 
@@ -1442,27 +1486,48 @@ export function useDataManagement(user: User | null, addToast: (message: string,
   };
 
   const handleSaveRecipe = async (recipe: StructuredRecipe) => {
-    if (!user?.id) return;
-    
+    if (!user?.id) {
+      return;
+    }
+
     // Check if we've already determined the limit is exceeded
     if (recipeSaveLimitExceeded) {
       addToast('You have reached the maximum number of saved recipes for your plan. Please upgrade to save more recipes.', 'error');
       return;
     }
-    
+
     try {
       const inHousehold = isHouseholdMember(household, user) && household?.id;
       const collectionPath = inHousehold ? `households/${household.id}/savedRecipes` : `users/${user.id}/savedRecipes`;
-      
-      // Check for duplicate recipes
-      const existingRecipe = savedRecipes.find(saved => 
-        saved.title?.toLowerCase() === recipe.title?.toLowerCase()
+
+      // Check for duplicate recipes by querying Firestore directly (more reliable than local state)
+      const existingRecipesQuery = query(
+        collection(db, collectionPath),
+        where('title', '==', recipe.title)
       );
-      
-      if (existingRecipe) {
+      const existingRecipesSnap = await getDocs(existingRecipesQuery);
+
+      // Also check for very similar recipes (same title and similar ingredients count)
+      let isDuplicate = false;
+      if (existingRecipesSnap.size > 0) {
+        for (const doc of existingRecipesSnap.docs) {
+          const existing = doc.data() as SavedRecipe;
+          const ingredientsMatch = existing.ingredients?.length === recipe.ingredients?.length;
+          const instructionsMatch = existing.instructions?.length === recipe.instructions?.length;
+          if (ingredientsMatch && instructionsMatch) {
+            console.log('⚠️ Found very similar recipe:', existing.title, 'with same structure');
+            isDuplicate = true;
+            break;
+          }
+        }
+      }
+
+      if (isDuplicate || existingRecipesSnap.size > 0) {
         addToast(`"${recipe.title}" is already saved in your recipes!`, 'info');
         return;
       }
+
+      console.log('✅ No duplicate found, proceeding with save...');
 
       // Check recipe save limit (and update state)
       const canSave = await checkRecipeSaveLimit();
@@ -1470,14 +1535,14 @@ export function useDataManagement(user: User | null, addToast: (message: string,
         addToast('You have reached the maximum number of saved recipes for your plan. Please upgrade to save more recipes.', 'error');
         return;
       }
-      
-      await addDoc(collection(db, collectionPath), {
+
+      const docRef = await addDoc(collection(db, collectionPath), {
         ...recipe,
         savedAt: serverTimestamp(),
         savedBy: user.name,
         userId: user.id
       });
-      
+
       // Record recipe save usage
       try {
         await UsageService.recordRecipeSave(user);
@@ -1485,7 +1550,7 @@ export function useDataManagement(user: User | null, addToast: (message: string,
         console.error('Error recording recipe save usage:', error);
         // Don't fail the operation if recording fails
       }
-      
+
       addToast(`Saved ${recipe.title} to your recipes!`);
     } catch (error) {
       console.error('Error saving recipe:', error);
@@ -1766,8 +1831,9 @@ export function useDataManagement(user: User | null, addToast: (message: string,
           }
         } else if (undoOp.type === 'revert_edit') {
           // Revert the item to its previous state
-          const { index, previousState } = undoOp.data;
-          if (previousState && typeof previousState === 'object' && previousState.id) {
+          const { itemId, previousState } = undoOp.data;
+          const currentIndex = inventory.findIndex(item => item.id === itemId);
+          if (currentIndex !== -1 && previousState && typeof previousState === 'object' && previousState.id) {
             // Ensure the item has required properties
             const revertedItem = {
               ...previousState,
@@ -1775,12 +1841,12 @@ export function useDataManagement(user: User | null, addToast: (message: string,
             };
             setInventory(prev => {
               const updated = [...prev];
-              updated[index] = revertedItem;
+              updated[currentIndex] = revertedItem;
               return updated;
             });
           } else {
-            console.warn('Invalid previous state in undo operation:', undoOp.data);
-            addToast('Unable to revert edit - invalid data', 'error');
+            console.warn('Invalid revert data or item not found:', undoOp.data);
+            addToast('Unable to revert edit - item not found or invalid data', 'error');
             return;
           }
         }
@@ -1788,6 +1854,8 @@ export function useDataManagement(user: User | null, addToast: (message: string,
         const actions = await undoService.getRecentActions(user?.id || '');
         setRecentActions(actions);
         addToast('Action undone', 'info');
+      } else {
+        console.warn('No undo operation returned for action:', action);
       }
     } catch (error) {
       console.error('Failed to undo action:', error);
@@ -1802,7 +1870,7 @@ export function useDataManagement(user: User | null, addToast: (message: string,
 
     // Record the undo action
     await recordUndo('update_item', {
-      index,
+      itemId: currentItem.id,
       previousState: currentItem,
       updates
     });
@@ -1815,8 +1883,8 @@ export function useDataManagement(user: User | null, addToast: (message: string,
     });
 
     // Save to database
-    const collectionPath = household?.id && isHouseholdMember(household, user)
-      ? `households/${household.id}/inventory`
+    const collectionPath = user?.householdId
+      ? `households/${user.householdId}/inventory`
       : `users/${user.id}/inventory`;
 
     await performWrite({
@@ -1825,6 +1893,9 @@ export function useDataManagement(user: User | null, addToast: (message: string,
       docId: currentItem.id,
       data: cleanObject({ ...currentItem, ...updates })
     });
+
+    // Update the cache
+    await InventoryCacheService.updateItemInCache(currentItem.id, updates, user?.householdId, user?.id);
   };
 
   // Delete item with undo recording
@@ -1845,8 +1916,8 @@ export function useDataManagement(user: User | null, addToast: (message: string,
     setInventory(prev => prev.filter((_, i) => i !== index));
 
     // Delete from database
-    const collectionPath = household?.id && isHouseholdMember(household, user)
-      ? `households/${household.id}/inventory`
+    const collectionPath = user?.householdId
+      ? `households/${user.householdId}/inventory`
       : `users/${user.id}/inventory`;
 
     await performWrite({
@@ -1854,6 +1925,9 @@ export function useDataManagement(user: User | null, addToast: (message: string,
       collection: collectionPath,
       docId: itemToDelete.id
     });
+
+    // Update the cache
+    await InventoryCacheService.removeItemFromCache(itemToDelete.id, user?.householdId, user?.id);
   };
 
   // Add item to inventory
@@ -1868,8 +1942,8 @@ export function useDataManagement(user: User | null, addToast: (message: string,
     }
 
     // Save to database
-    const collectionPath = household?.id && isHouseholdMember(household, user)
-      ? `households/${household.id}/inventory`
+    const collectionPath = user?.householdId
+      ? `households/${user.householdId}/inventory`
       : `users/${user.id}/inventory`;
 
     await performWrite({
@@ -1877,21 +1951,46 @@ export function useDataManagement(user: User | null, addToast: (message: string,
       collection: collectionPath,
       data: cleanObject(item)
     });
+
+    // Update the cache
+    await InventoryCacheService.addItemToCache(item, user?.householdId, user?.id);
+
+    // Provide haptic feedback
+    HapticService.itemAdded();
   };
 
   // Add multiple items to inventory
   const addItems = async (items: PantryItem[]) => {
+
     // Process items: merge with existing items by name
     const itemsToAdd: PantryItem[] = [];
     const itemsToUpdate: { index: number, updates: Partial<PantryItem> }[] = [];
 
     items.forEach(item => {
-      const existingIndex = inventory.findIndex(i => i.item.toLowerCase() === item.item.toLowerCase());
+      // More robust item matching - normalize item names
+      const normalizeItemName = (name: string) => {
+        return name.toLowerCase()
+          .trim()
+          .replace(/\s+/g, ' ') // normalize spaces
+          .replace(/[^\w\s]/g, '') // remove punctuation
+          .replace(/\b\d+\s*(?:%|percent|oz|lb|g|kg|ml|l|cup|cups|tbsp|tsp|qt|gal|pint|pints)\b/g, '') // remove common units
+          .trim();
+      };
+
+      const normalizedNewItem = normalizeItemName(item.item);
+      const existingIndex = inventory.findIndex(i => {
+        const normalizedExisting = normalizeItemName(i.item);
+        return normalizedExisting === normalizedNewItem ||
+               normalizedExisting.includes(normalizedNewItem) ||
+               normalizedNewItem.includes(normalizedExisting);
+      });
+
       if (existingIndex !== -1) {
         // Update existing item
         const existing = inventory[existingIndex];
         const newQty = (parseInt(existing.quantity_estimate) || 1) + (parseInt(item.quantity_estimate) || 1);
         const newReservations = [...(existing.reservations || []), ...(item.reservations || [])];
+
         itemsToUpdate.push({
           index: existingIndex,
           updates: {
@@ -1905,18 +2004,11 @@ export function useDataManagement(user: User | null, addToast: (message: string,
       }
     });
 
-    // Update local state
-    setInventory(prev => {
-      const updated = [...prev];
-      itemsToUpdate.forEach(({ index, updates }) => {
-        updated[index] = { ...updated[index], ...updates };
-      });
-      return [...updated, ...itemsToAdd];
-    });
+    console.log('Items to update:', itemsToUpdate.length, 'Items to add:', itemsToAdd.length);
 
-    // Update database
-    const collectionPath = household?.id && isHouseholdMember(household, user)
-      ? `households/${household.id}/inventory`
+    // Update database only - let Firestore listener handle local state updates
+    const collectionPath = user?.householdId
+      ? `households/${user.householdId}/inventory`
       : `users/${user.id}/inventory`;
 
     // Update existing items
@@ -1938,6 +2030,12 @@ export function useDataManagement(user: User | null, addToast: (message: string,
     }));
 
     await Promise.all([...updatePromises, ...addPromises]);
+
+    // Update the cache with the new inventory state
+    // Note: This will be updated again by the real-time listener, but we want to ensure cache consistency
+    setTimeout(async () => {
+      await InventoryCacheService.updateCache(inventory, user?.householdId, user?.id);
+    }, 100); // Small delay to let real-time updates settle
   };
 
   return {

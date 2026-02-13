@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import DatabaseMonitoringService from '../services/databaseMonitoringService';
 
 interface DatabaseMetrics {
@@ -14,16 +14,92 @@ interface DatabaseMetrics {
 const DatabaseAnalytics: React.FC = () => {
   const [metrics, setMetrics] = useState<DatabaseMetrics | null>(null);
   const [isVisible, setIsVisible] = useState(false);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const buttonRef = useRef<HTMLButtonElement>(null);
 
+  // Load saved position from localStorage
+  useEffect(() => {
+    const savedPosition = localStorage.getItem('dbAnalyticsButtonPosition');
+    if (savedPosition) {
+      try {
+        const parsed = JSON.parse(savedPosition);
+        setPosition(parsed);
+      } catch (error) {
+        console.error('Failed to parse saved position:', error);
+        // Reset to default if parsing fails
+        setPosition({ x: window.innerWidth - 120, y: window.innerHeight - 60 });
+      }
+    } else {
+      // Default position (top-left for testing) - use a safer calculation
+      setTimeout(() => {
+        setPosition({ x: 20, y: 20 });
+      }, 100);
+    }
+  }, []);
+
+  // Load metrics when component becomes visible
   useEffect(() => {
     if (isVisible) {
-      const interval = setInterval(() => {
-        setMetrics(DatabaseMonitoringService.getMetrics());
-      }, 1000);
-
-      return () => clearInterval(interval);
+      const currentMetrics = DatabaseMonitoringService.getMetrics();
+      setMetrics(currentMetrics);
     }
   }, [isVisible]);
+
+  // Update metrics every 5 seconds when visible
+  useEffect(() => {
+    if (!isVisible) return;
+
+    const interval = setInterval(() => {
+      const currentMetrics = DatabaseMonitoringService.getMetrics();
+      setMetrics(currentMetrics);
+    }, 5000); // Update every 5 seconds
+
+    return () => clearInterval(interval);
+  }, [isVisible]);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setDragOffset({
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top
+      });
+      setIsDragging(true);
+    }
+  };
+
+  const handleMouseMove = (e: MouseEvent) => {
+    if (isDragging) {
+      const newX = e.clientX - dragOffset.x;
+      const newY = e.clientY - dragOffset.y;
+
+      // Constrain to viewport bounds
+      const maxX = window.innerWidth - 120; // Button width + margin
+      const maxY = window.innerHeight - 40; // Button height + margin
+      const constrainedX = Math.max(0, Math.min(newX, maxX));
+      const constrainedY = Math.max(0, Math.min(newY, maxY));
+
+      setPosition({ x: constrainedX, y: constrainedY });
+    }
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  // Add global mouse event listeners when dragging
+  useEffect(() => {
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
+  }, [isDragging, dragOffset]);
 
   const formatDuration = (ms: number): string => {
     const seconds = Math.floor(ms / 1000);
@@ -47,16 +123,35 @@ const DatabaseAnalytics: React.FC = () => {
   if (!isVisible) {
     return (
       <button
+        ref={buttonRef}
         onClick={() => setIsVisible(true)}
-        className="fixed bottom-4 right-4 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg hover:bg-blue-700 transition-colors z-50"
+        onMouseDown={handleMouseDown}
+        style={{
+          position: 'fixed',
+          left: `${position.x}px`,
+          top: `${position.y}px`,
+          cursor: isDragging ? 'grabbing' : 'grab',
+          userSelect: 'none',
+          zIndex: 9999 // Make sure it's on top
+        }}
+        className="bg-red-600 text-white px-8 py-4 rounded-lg shadow-2xl hover:bg-red-700 transition-colors border-4 border-yellow-400 animate-pulse text-lg font-bold"
+        title="Click to open Database Analytics"
       >
-        📊 DB Analytics
+        📊 DB Analytics ({metrics ? `${DatabaseMonitoringService.getMetrics().reads} reads` : '...'})
+        {console.log('Button is rendering!')}
       </button>
     );
   }
 
   return (
-    <div className="fixed bottom-4 right-4 bg-white border border-gray-300 rounded-lg shadow-xl p-4 max-w-sm z-50">
+    <div 
+      className="bg-white border border-gray-300 rounded-lg shadow-xl p-4 max-w-sm z-50"
+      style={{
+        position: 'fixed',
+        left: `${Math.max(16, Math.min(position.x - 320, window.innerWidth - 336))}px`,
+        top: `${Math.max(16, Math.min(position.y - 400, window.innerHeight - 416))}px`
+      }}
+    >
       <div className="flex justify-between items-center mb-3">
         <h3 className="text-lg font-semibold text-gray-800">Database Analytics</h3>
         <button
