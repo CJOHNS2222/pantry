@@ -8,7 +8,7 @@ import { AppProvider } from './contexts/AppContext';
 import { AppActionsProvider } from './contexts/AppActionsContext';
 
 // Initialize Sentry for error reporting
-// initSentry(); // Disabled for testing
+// initSentry(); // DISABLED for testing
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {

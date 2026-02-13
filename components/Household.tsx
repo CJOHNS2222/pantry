@@ -25,9 +25,6 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
   const [isCreating, setIsCreating] = useState(false);
   const [householdName, setHouseholdName] = useState('');
   const [householdMemberLimitExceeded, setHouseholdMemberLimitExceeded] = useState(false);
-  const [showMemberPreferences, setShowMemberPreferences] = useState(false);
-  const [selectedMember, setSelectedMember] = useState<Member | null>(null);
-  const [memberPreferences, setMemberPreferences] = useState<Partial<Member>>({});
 
   const checkHouseholdMemberLimit = async () => {
     try {
@@ -310,45 +307,6 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
     }
   };
 
-  const openMemberPreferences = (member: Member) => {
-    setSelectedMember(member);
-    setMemberPreferences({
-      dietaryRestrictions: member.dietaryRestrictions || [],
-      allergies: member.allergies || [],
-      dietGoal: member.dietGoal,
-      favoriteCuisines: member.favoriteCuisines || [],
-      specialNeeds: member.specialNeeds || '',
-      preferredProteins: member.preferredProteins || [],
-      dislikedIngredients: member.dislikedIngredients || [],
-    });
-    setShowMemberPreferences(true);
-  };
-
-  const saveMemberPreferences = async () => {
-    if (!selectedMember || !household) return;
-
-    try {
-      const memberIndex = household.members.findIndex(m => m.id === selectedMember.id);
-      if (memberIndex === -1) return;
-
-      const updatedMember = { ...household.members[memberIndex], ...memberPreferences };
-      const updatedMembers = [...household.members];
-      updatedMembers[memberIndex] = updatedMember;
-
-      await updateDoc(doc(db, 'households', household.id), {
-        members: updatedMembers,
-        updatedAt: serverTimestamp()
-      });
-
-      setShowMemberPreferences(false);
-      setSelectedMember(null);
-      addToast('Member preferences updated successfully', 'info');
-    } catch (error) {
-      console.error('Error updating member preferences:', error);
-      addToast('Failed to update member preferences', 'error');
-    }
-  };
-
   const createHousehold = async () => {
     if (!householdName.trim() || isCreating) return;
 
@@ -576,7 +534,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
     );
   }
 
-  return (
+  const mainUI = (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
       <div className="bg-[#3F1016] border border-amber-500/30 w-full max-w-md rounded-2xl shadow-2xl relative overflow-hidden flex flex-col max-h-[85vh]">
         
@@ -585,40 +543,41 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
             <Users className="w-5 h-5 text-amber-500" />
             <h2 className="font-serif font-bold text-amber-50 text-lg">{household.name}</h2>
           </div>
-          <button onClick={onClose} className="text-red-200/50 hover:text-white">
-            <X className="w-6 h-6" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={() => {
+                setActiveTab(Tab.SETTINGS);
+                onClose();
+                // Scroll to household section after navigation
+                setTimeout(() => {
+                  const householdSection = document.querySelector('[data-section="household"]');
+                  if (householdSection) {
+                    householdSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }
+                }, 100);
+              }}
+              className="text-red-200/50 hover:text-amber-500 p-2 transition-colors"
+              title="Household Settings"
+            >
+              <Settings className="w-5 h-5" />
+            </button>
+            <button onClick={onClose} className="text-red-200/50 hover:text-white">
+              <X className="w-6 h-6" />
+            </button>
+          </div>
         </div>
 
         <div className="p-6 overflow-y-auto flex-1">
-          {/* Debug: Show user info */}
-          <div className="bg-red-900/20 p-2 mb-4 text-xs text-red-200">
-            User: {user.email} | Household: {household.name} | Members: {household.members?.length || 0}
-            {household.members && Array.isArray(household.members) && household.members.find(m => m.email === user.email) && (
-              <> | Role: {household.members.find(m => m.email === user.email)?.role}</>
-            )}
-            <br />
-            Member emails: {household.members && Array.isArray(household.members) ? household.members.map(m => m.email).join(', ') : 'none'}
-            <br />
-            User in members: {household.members && Array.isArray(household.members) ? (household.members.some(m => m.email === user.email) ? 'YES' : 'NO') : 'N/A'}
-            <br />
-            Invite button visible: {(() => {
-              const currentUser = household.members && Array.isArray(household.members) ? household.members.find(m => m.email === user.email) : null;
-              return currentUser?.role === 'admin' ? 'YES (user is admin)' : `NO (${currentUser ? `user role: ${currentUser.role}` : 'user not found in members'})`;
-            })()}
-          </div>
-
           {/* Temporarily force invite form to show for testing */}
-          {true && (
-            <PremiumFeature
-              feature="householdMembers"
-              user={user}
-              limit={3}
-              currentCount={household.members?.length || 0}
-              fallbackMessage="Upgrade to Family plan to add more than 3 household members"
-              onUpgrade={() => setActiveTab(Tab.SETTINGS)}
-              >
-                <div className="bg-[#2A0A10]/50 p-4 rounded-xl border border-red-900/30 mb-6">
+          <PremiumFeature
+            feature="householdMembers"
+            user={user}
+            limit={3}
+            currentCount={household.members?.length || 0}
+            fallbackMessage="Upgrade to Family plan to add more than 3 household members"
+            onUpgrade={() => setActiveTab(Tab.SETTINGS)}
+          >
+            <div className="bg-[#2A0A10]/50 p-4 rounded-xl border border-red-900/30 mb-6">
                   <h3 className="text-sm font-bold text-amber-500 uppercase mb-3">Invite Family Member</h3>
                   <form onSubmit={handleInvite} className="flex gap-2">
                     <div className="relative flex-1">
@@ -645,7 +604,6 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
                   </p>
                 </div>
               </PremiumFeature>
-          )}
 
           <h3 className="text-sm font-bold text-amber-500 uppercase mb-3 px-1">Group Members</h3>
           <div className="space-y-2">
@@ -655,14 +613,9 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
               <div key={member.id} className="flex items-center justify-between bg-[#2A0A10] p-3 rounded-lg border border-red-900/30">
                 <div className="flex items-center gap-3 flex-1">
                   <button 
-                    onClick={() => {
-                      if (currentUser?.role === 'admin' || member.email === user.email) {
-                        openMemberPreferences(member);
-                      }
-                    }}
                     className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${
                       member.email === user.email ? 'bg-amber-500 text-[#2A0A10]' : 'bg-red-900/50 text-red-200 hover:bg-red-800/50'
-                    } transition-colors ${currentUser?.role === 'admin' || member.email === user.email ? 'cursor-pointer' : 'cursor-default'}`}
+                    } transition-colors cursor-default`}
                   >
                     {member.name.charAt(0).toUpperCase()}
                   </button>
@@ -681,18 +634,6 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  {(() => {
-                    const currentUser = household.members && Array.isArray(household.members) ? household.members.find(m => m.email === user.email) : null;
-                    return (currentUser?.role === 'admin' || member.email === user.email) && (
-                      <button 
-                        onClick={() => openMemberPreferences(member)}
-                        className="text-red-900/50 hover:text-amber-500 p-2 transition-colors"
-                        title="Edit member preferences"
-                      >
-                        <Settings className="w-4 h-4" />
-                      </button>
-                    );
-                  })()}
                   {(() => {
                     const currentUser = household.members && Array.isArray(household.members) ? household.members.find(m => m.email === user.email) : null;
                     return member.email !== user.email && currentUser?.role === 'admin' && (
@@ -731,216 +672,6 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
       </div>
     </div>
   );
-
-  // Member Preferences Modal
-  if (showMemberPreferences && selectedMember) {
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
-        <div className="bg-[#3F1016] border border-amber-500/30 w-full max-w-lg rounded-2xl shadow-2xl relative overflow-hidden max-h-[90vh] overflow-y-auto">
-          <div className="p-4 border-b border-red-900/50 flex justify-between items-center bg-[#2A0A10] sticky top-0">
-            <div className="flex items-center gap-2">
-              <Settings className="w-5 h-5 text-amber-500" />
-              <h2 className="font-serif font-bold text-amber-50 text-lg">{selectedMember.name}'s Preferences</h2>
-            </div>
-            <button onClick={() => setShowMemberPreferences(false)} className="text-red-200/50 hover:text-white">
-              <X className="w-6 h-6" />
-            </button>
-          </div>
-
-          <div className="p-6 space-y-6">
-            {/* Dietary Restrictions */}
-            <div>
-              <label className="block text-sm font-medium text-amber-500 mb-2 flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4" />
-                Dietary Restrictions
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                {['Vegetarian', 'Vegan', 'Gluten-Free', 'Dairy-Free', 'Keto', 'Paleo', 'Low-Carb', 'Halal', 'Kosher'].map((restriction) => (
-                  <label key={restriction} className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={memberPreferences.dietaryRestrictions?.includes(restriction) || false}
-                      onChange={(e) => {
-                        const current = memberPreferences.dietaryRestrictions || [];
-                        if (e.target.checked) {
-                          setMemberPreferences(prev => ({
-                            ...prev,
-                            dietaryRestrictions: [...current, restriction]
-                          }));
-                        } else {
-                          setMemberPreferences(prev => ({
-                            ...prev,
-                            dietaryRestrictions: current.filter(r => r !== restriction)
-                          }));
-                        }
-                      }}
-                      className="rounded border-red-900/50 bg-[#2A0A10] text-amber-500 focus:border-amber-500"
-                    />
-                    {restriction}
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            {/* Allergies */}
-            <div>
-              <label className="block text-sm font-medium text-amber-500 mb-2">Allergies</label>
-              <div className="grid grid-cols-2 gap-2">
-                {['Peanuts', 'Tree Nuts', 'Dairy', 'Eggs', 'Soy', 'Wheat', 'Fish', 'Shellfish', 'Sesame', 'Mustard'].map((allergy) => (
-                  <label key={allergy} className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={memberPreferences.allergies?.includes(allergy) || false}
-                      onChange={(e) => {
-                        const current = memberPreferences.allergies || [];
-                        if (e.target.checked) {
-                          setMemberPreferences(prev => ({
-                            ...prev,
-                            allergies: [...current, allergy]
-                          }));
-                        } else {
-                          setMemberPreferences(prev => ({
-                            ...prev,
-                            allergies: current.filter(a => a !== allergy)
-                          }));
-                        }
-                      }}
-                      className="rounded border-red-900/50 bg-[#2A0A10] text-amber-500 focus:border-amber-500"
-                    />
-                    {allergy}
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            {/* Diet Goal */}
-            <div>
-              <label className="block text-sm font-medium text-amber-500 mb-2">Diet Goal</label>
-              <select
-                value={memberPreferences.dietGoal || ''}
-                onChange={(e) => setMemberPreferences(prev => ({ ...prev, dietGoal: e.target.value as any || undefined }))}
-                className="w-full bg-[#2A0A10] border border-red-900/50 rounded-lg px-3 py-2 text-sm text-white focus:border-amber-500 outline-none"
-              >
-                <option value="">No specific goal</option>
-                <option value="lose-weight">Lose Weight</option>
-                <option value="maintain-weight">Maintain Weight</option>
-                <option value="gain-weight">Gain Weight</option>
-                <option value="build-muscle">Build Muscle</option>
-                <option value="improve-health">Improve Health</option>
-              </select>
-            </div>
-
-            {/* Favorite Cuisines */}
-            <div>
-              <label className="block text-sm font-medium text-amber-500 mb-2 flex items-center gap-2">
-                <Heart className="w-4 h-4" />
-                Favorite Cuisines
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                {['Italian', 'Mexican', 'Chinese', 'Japanese', 'Indian', 'Thai', 'French', 'Mediterranean', 'American', 'Korean'].map((cuisine) => (
-                  <label key={cuisine} className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={memberPreferences.favoriteCuisines?.includes(cuisine) || false}
-                      onChange={(e) => {
-                        const current = memberPreferences.favoriteCuisines || [];
-                        if (e.target.checked) {
-                          setMemberPreferences(prev => ({
-                            ...prev,
-                            favoriteCuisines: [...current, cuisine]
-                          }));
-                        } else {
-                          setMemberPreferences(prev => ({
-                            ...prev,
-                            favoriteCuisines: current.filter(c => c !== cuisine)
-                          }));
-                        }
-                      }}
-                      className="rounded border-red-900/50 bg-[#2A0A10] text-amber-500 focus:border-amber-500"
-                    />
-                    {cuisine}
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            {/* Special Needs */}
-            <div>
-              <label className="block text-sm font-medium text-amber-500 mb-2">Special Dietary Needs</label>
-              <textarea
-                value={memberPreferences.specialNeeds || ''}
-                onChange={(e) => setMemberPreferences(prev => ({ ...prev, specialNeeds: e.target.value }))}
-                placeholder="Any special dietary needs, medical conditions, or preferences..."
-                className="w-full bg-[#2A0A10] border border-red-900/50 rounded-lg px-3 py-2 text-sm text-white placeholder-red-200/50 focus:border-amber-500 outline-none resize-none"
-                rows={3}
-              />
-            </div>
-
-            {/* Preferred Proteins */}
-            <div>
-              <label className="block text-sm font-medium text-amber-500 mb-2">Preferred Proteins</label>
-              <div className="grid grid-cols-2 gap-2">
-                {['Chicken', 'Beef', 'Pork', 'Fish', 'Tofu', 'Tempeh', 'Lentils', 'Beans', 'Turkey', 'Lamb'].map((protein) => (
-                  <label key={protein} className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={memberPreferences.preferredProteins?.includes(protein) || false}
-                      onChange={(e) => {
-                        const current = memberPreferences.preferredProteins || [];
-                        if (e.target.checked) {
-                          setMemberPreferences(prev => ({
-                            ...prev,
-                            preferredProteins: [...current, protein]
-                          }));
-                        } else {
-                          setMemberPreferences(prev => ({
-                            ...prev,
-                            preferredProteins: current.filter(p => p !== protein)
-                          }));
-                        }
-                      }}
-                      className="rounded border-red-900/50 bg-[#2A0A10] text-amber-500 focus:border-amber-500"
-                    />
-                    {protein}
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            {/* Disliked Ingredients */}
-            <div>
-              <label className="block text-sm font-medium text-amber-500 mb-2">Disliked Ingredients</label>
-              <input
-                type="text"
-                value={memberPreferences.dislikedIngredients?.join(', ') || ''}
-                onChange={(e) => setMemberPreferences(prev => ({ 
-                  ...prev, 
-                  dislikedIngredients: e.target.value ? e.target.value.split(',').map(s => s.trim()).filter(s => s) : []
-                }))}
-                placeholder="Separate with commas (e.g., mushrooms, olives, cilantro)"
-                className="w-full bg-[#2A0A10] border border-red-900/50 rounded-lg px-3 py-2 text-sm text-white placeholder-red-200/50 focus:border-amber-500 outline-none"
-              />
-            </div>
-          </div>
-
-          <div className="p-4 bg-[#2A0A10] border-t border-red-900/50 flex gap-3">
-            <button
-              onClick={() => setShowMemberPreferences(false)}
-              className="flex-1 bg-gray-600 hover:bg-gray-700 text-white py-2 px-4 rounded-lg font-medium transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={saveMemberPreferences}
-              className="flex-1 bg-amber-600 hover:bg-amber-500 text-white py-2 px-4 rounded-lg font-medium transition-colors"
-            >
-              Save Preferences
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   // Main Household Modal (when not showing member preferences)
   if (!household) {
@@ -1011,28 +742,10 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
         </div>
 
         <div className="p-6 overflow-y-auto flex-1">
-          {/* Debug: Show user info */}
-          <div className="bg-red-900/20 p-2 mb-4 text-xs text-red-200">
-            User: {user.email} | Household: {household.name} | Members: {household.members?.length || 0}
-            {household.members && Array.isArray(household.members) && household.members.find(m => m.email === user.email) && (
-              <> | Role: {household.members.find(m => m.email === user.email)?.role}</>
-            )}
-            <br />
-            Member emails: {household.members && Array.isArray(household.members) ? household.members.map(m => m.email).join(", ") : "none"}
-            <br />
-            User in members: {household.members && Array.isArray(household.members) ? (household.members.some(m => m.email === user.email) ? "YES" : "NO") : "N/A"}
-            <br />
-            Invite button visible: {(() => {
-              const currentUser = household.members && Array.isArray(household.members) ? household.members.find(m => m.email === user.email) : null;
-              return currentUser?.role === "admin" ? "YES (user is admin)" : `NO (${currentUser ? `user role: ${currentUser.role}` : "user not found in members"})`;
-            })()}
-          </div>
-
           {/* Temporarily force invite form to show for testing */}
-          {true && (
-            <PremiumFeature
-              feature="householdMembers"
-              user={user}
+          <PremiumFeature
+            feature="householdMembers"
+            user={user}
               limit={3}
               currentCount={household.members?.length || 0}
               fallbackMessage="Upgrade to Family plan to add more than 3 household members"
@@ -1065,7 +778,6 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
                   </p>
                 </div>
               </PremiumFeature>
-          )}
 
           <h3 className="text-sm font-bold text-amber-500 uppercase mb-3 px-1">Group Members</h3>
           <div className="space-y-2">
@@ -1075,14 +787,9 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
               <div key={member.id} className="flex items-center justify-between bg-[#2A0A10] p-3 rounded-lg border border-red-900/30">
                 <div className="flex items-center gap-3 flex-1">
                   <button 
-                    onClick={() => {
-                      if (currentUser?.role === "admin" || member.email === user.email) {
-                        openMemberPreferences(member);
-                      }
-                    }}
                     className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${
                       member.email === user.email ? "bg-amber-500 text-[#2A0A10]" : "bg-red-900/50 text-red-200 hover:bg-red-800/50"
-                    } transition-colors ${currentUser?.role === "admin" || member.email === user.email ? "cursor-pointer" : "cursor-default"}`}
+                    } transition-colors cursor-default`}
                   >
                     {member.name.charAt(0).toUpperCase()}
                   </button>
@@ -1101,18 +808,6 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  {(() => {
-                    const currentUser = household.members && Array.isArray(household.members) ? household.members.find(m => m.email === user.email) : null;
-                    return (currentUser?.role === "admin" || member.email === user.email) && (
-                      <button 
-                        onClick={() => openMemberPreferences(member)}
-                        className="text-red-900/50 hover:text-amber-500 p-2 transition-colors"
-                        title="Edit member preferences"
-                      >
-                        <Settings className="w-4 h-4" />
-                      </button>
-                    );
-                  })()}
                   {(() => {
                     const currentUser = household.members && Array.isArray(household.members) ? household.members.find(m => m.email === user.email) : null;
                     return member.email !== user.email && currentUser?.role === "admin" && (
@@ -1150,5 +845,11 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
         </div>
       </div>
     </div>
+  );
+
+  return (
+    <>
+      {mainUI}
+    </>
   );
 };

@@ -390,8 +390,8 @@ class GroceryPriceService {
   // Vote on price accuracy
   async voteOnPrice(priceId: string, userId: string, vote: 'up' | 'down'): Promise<void> {
     try {
-      const priceRef = doc(db, this.COLLECTION_NAME, priceId);
-      const priceDoc = await getDoc(priceRef);
+      const priceRef = DatabaseMonitoringService.doc(this.COLLECTION_NAME, priceId);
+      const priceDoc = await DatabaseMonitoringService.getDoc(priceRef);
 
       if (!priceDoc.exists()) {
         throw new Error('Price not found');
@@ -576,8 +576,8 @@ class GroceryPriceService {
   /**
    * Convert Open Prices data to our PriceData format
    */
-  private convertOpenPricesToPriceData(prices: OpenPricesPrice[]): PriceData | null {
-    if (prices.length === 0) return null;
+  private convertOpenPricesToPriceData(prices: OpenPricesPrice[] | null): PriceData | null {
+    if (!prices || prices.length === 0) return null;
 
     // Filter to USD prices only and convert to numbers
     const usdPrices = prices
@@ -661,11 +661,42 @@ class GroceryPriceService {
     }
   }
 
-  private async fetchOpenPrices(ingredient: string, location?: string): Promise<any> {
-    // TODO: Implement Open Prices API integration
-    // This is a placeholder for future Open Prices API implementation
-    console.log(`Open Prices API not implemented yet for ${ingredient}`);
-    return null;
+  private async fetchOpenPrices(ingredient: string, location?: string): Promise<OpenPricesPrice[]> {
+    try {
+      // Get recent prices (last 30 days) for current price estimation
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const startDateStr = thirtyDaysAgo.toISOString().split('T')[0]; // YYYY-MM-DD format
+
+      const params = new URLSearchParams({
+        product_name__like: ingredient,
+        date__gte: startDateStr,
+        currency: 'USD',
+        limit: '50', // Get recent prices for current estimate
+        order_by: '-date' // Most recent first
+      });
+
+      if (location) {
+        params.append('location__like', location);
+      }
+
+      const response = await fetch(`${this.OPEN_PRICES_BASE_URL}/prices?${params}`, {
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'SmartPantry/1.0'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Open Prices API error: ${response.status}`);
+      }
+
+      const data: OpenPricesResponse = await response.json();
+      return data.items || [];
+    } catch (error) {
+      console.warn(`Failed to fetch current prices from Open Prices API for ${ingredient}:`, error);
+      return [];
+    }
   }
 
   async saveGroceryPrice(priceData: GroceryPrice): Promise<void> {

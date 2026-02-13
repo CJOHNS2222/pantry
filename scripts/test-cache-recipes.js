@@ -5,7 +5,7 @@
  * Run with: node scripts/test-cache-recipes.js
  */
 
-import { getCachedPopularRecipes } from '../services/recipeService.js';
+import { getCachedPopularRecipes } from '../services/recipeService.ts';
 
 async function testCachedRecipes() {
   try {

@@ -17,6 +17,8 @@ interface SmartShoppingListOrganizerProps {
   onUndo: (id: string) => void;
   isOffline?: boolean;
   lastSynced?: Date;
+  isSelected?: (id: string) => boolean;
+  onLongPress?: () => void;
 }
 
 export const SmartShoppingListOrganizer: React.FC<SmartShoppingListOrganizerProps> = ({
@@ -25,7 +27,9 @@ export const SmartShoppingListOrganizer: React.FC<SmartShoppingListOrganizerProp
   onRemove,
   onUndo,
   isOffline = false,
-  lastSynced
+  lastSynced,
+  isSelected,
+  onLongPress
 }) => {
   const aisleGroups = useMemo(() => {
     const groups: StoreAisleGroup[] = [
@@ -146,6 +150,8 @@ export const SmartShoppingListOrganizer: React.FC<SmartShoppingListOrganizerProp
                 onUndo={onUndo}
                 isOffline={isOffline}
                 lastSynced={lastSynced}
+                isSelected={isSelected ? isSelected(item.id) : undefined}
+                onLongPress={onLongPress}
               />
             ))}
           </div>

@@ -163,7 +163,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
     if (e.key === 'Enter') {
       handleSubmit();
     } else if (e.key === 'Escape') {
-      setShowSuggestions(false);
+      onClose();
     }
   };
 
@@ -173,24 +173,31 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
     inputRef.current?.focus();
   };
 
+  const handleBackdropClick = (e: React.MouseEvent) => {
+    if (e.target === e.currentTarget) {
+      onClose();
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-60 p-4">
-      <div className="bg-theme-primary rounded-lg shadow-xl w-full max-w-md mx-auto max-h-[80vh] overflow-y-auto border border-theme pb-20 pt-20">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-60 p-4" onClick={handleBackdropClick}>
+      <div className="bg-theme-primary rounded-lg shadow-xl w-full max-w-md mx-auto max-h-[80vh] overflow-hidden border border-theme">
         {/* Header */}
-        <div className="flex items-center justify-between p-3 border-b border-theme fixed top-[100px] left-0 right-0 max-w-md mx-auto z-[100] bg-theme-primary">
+        <div className="flex items-center justify-between p-4 border-b border-theme">
           <h3 className="text-lg font-semibold text-theme-primary">Add Item</h3>
           <button
             onClick={onClose}
-            className="text-theme-secondary opacity-70 hover:opacity-100 hover:text-theme-primary"
+            className="text-theme-secondary opacity-70 hover:opacity-100 hover:text-theme-primary p-1"
+            aria-label="Close modal"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Content */}
-        <div className="p-4 pt-16">
+        <div className="p-4 max-h-[60vh] overflow-y-auto">
           <div className="relative mb-4">
           <div className="flex gap-2">
             <div className="flex-1 relative">
@@ -245,6 +252,13 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
 
         {/* Action Buttons */}
         <div className="flex gap-2 mb-4">
+          <button
+            onClick={onClose}
+            className="px-3 py-2 bg-theme-secondary text-theme-primary hover:bg-theme-primary border border-theme rounded-lg transition-colors"
+          >
+            Cancel
+          </button>
+
           <button
             onClick={handleVoiceInput}
             disabled={!isOnline || isScanning}

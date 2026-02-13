@@ -276,15 +276,41 @@ describe('RecipeService', () => {
         docs: mockRecipes.map(recipe => ({
           id: recipe.id,
           data: () => recipe,
+          exists: true,
+          metadata: {
+            fromCache: false,
+            hasPendingWrites: false,
+            isEqual: vi.fn(() => false)
+          },
+          get: vi.fn(),
+          toJSON: vi.fn(() => ({})),
+          ref: {} as any
         })),
         forEach: vi.fn((callback) => {
           mockRecipes.forEach(recipe => callback({
             id: recipe.id,
             data: () => recipe,
+            exists: true,
+            metadata: {
+              fromCache: false,
+              hasPendingWrites: false,
+              isEqual: vi.fn(() => false)
+            },
+            get: vi.fn(),
+            toJSON: vi.fn(() => ({})),
+            ref: {} as any
           }));
         }),
         size: mockRecipes.length,
-        empty: false
+        empty: false,
+        metadata: {
+          fromCache: false,
+          hasPendingWrites: false,
+          isEqual: vi.fn(() => false)
+        },
+        query: {} as any,
+        docChanges: vi.fn(() => []),
+        toJSON: vi.fn(() => ({}))
       };
 
       vi.mocked(DatabaseMonitoringService.getDocs).mockResolvedValueOnce(mockQuerySnapshot);
@@ -368,9 +394,17 @@ describe('RecipeService', () => {
       ];
 
       const mockDocumentSnapshot = {
-        exists: vi.fn(() => true),
+        exists: true,
         data: vi.fn(() => ({ recipes: mockRecipes })),
-        id: 'popular-recipes-cache'
+        id: 'popular-recipes-cache',
+        metadata: {
+          fromCache: false,
+          hasPendingWrites: false,
+          isEqual: vi.fn(() => false)
+        },
+        get: vi.fn(),
+        toJSON: vi.fn(() => ({})),
+        ref: {} as any
       };
 
       vi.mocked(DatabaseMonitoringService.getDoc).mockResolvedValueOnce(mockDocumentSnapshot);

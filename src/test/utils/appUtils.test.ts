@@ -14,9 +14,10 @@ describe('next7DateKeys', () => {
   it('should return consecutive dates', () => {
     const result = next7DateKeys();
 
+    expect(result).toHaveLength(7);
     for (let i = 1; i < result.length; i++) {
-      const prevDate = new Date(result[i - 1]);
-      const currentDate = new Date(result[i]);
+      const prevDate = new Date(result[i - 1]!);
+      const currentDate = new Date(result[i]!);
       const diffTime = currentDate.getTime() - prevDate.getTime();
       const diffDays = diffTime / (1000 * 60 * 60 * 24);
       expect(diffDays).toBe(1);

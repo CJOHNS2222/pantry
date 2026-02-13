@@ -31,8 +31,11 @@ import { doc, getDoc, setDoc, updateDoc, Timestamp } from 'firebase/firestore';
 describe('UsageService', () => {
   const mockUser: User = {
     id: 'user123',
+    name: 'Test User',
     email: 'test@example.com',
-    subscriptionPlan: 'free',
+    provider: 'email',
+    hasSeenTutorial: false,
+    subscription: { tier: 'free', status: 'active', current_period_end: new Date(), cancel_at_period_end: false },
     householdId: 'household123',
   };
 
@@ -48,9 +51,9 @@ describe('UsageService', () => {
     };
 
     // Mock doc function to return a mock reference
-    doc.mockReturnValue('mock-doc-ref');
+    vi.mocked(doc).mockReturnValue('mock-doc-ref' as any);
 
-    getDoc.mockResolvedValue({
+    vi.mocked(getDoc).mockResolvedValue({
       exists: vi.fn(() => true),
       data: vi.fn(() => ({
         searches: {
@@ -77,8 +80,8 @@ describe('UsageService', () => {
       id: 'test-doc-id'
     });
 
-    setDoc.mockResolvedValue(undefined);
-    updateDoc.mockResolvedValue(undefined);
+    vi.mocked(setDoc).mockResolvedValue(undefined);
+    vi.mocked(updateDoc).mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -195,6 +198,11 @@ describe('UsageService', () => {
           twoWeekPlanning: false,
           resetDate: new Date(),
         },
+        gemini: {
+          weekly: 10,
+          used: 0,
+          resetDate: new Date(),
+        },
       };
 
       const mockDocumentSnapshot = {
@@ -212,11 +220,16 @@ describe('UsageService', () => {
             twoWeekPlanning: false,
             resetDate: Timestamp.fromDate(new Date()),
           },
+          gemini: {
+            weekly: 10,
+            used: 0,
+            resetDate: Timestamp.fromDate(new Date()),
+          },
         })),
         id: 'usage-limits'
       };
 
-      getDoc.mockResolvedValueOnce(mockDocumentSnapshot);
+      vi.mocked(getDoc).mockResolvedValueOnce(mockDocumentSnapshot);
 
       const result = await UsageService.canPerformSearch(mockUser);
 
@@ -237,6 +250,11 @@ describe('UsageService', () => {
           twoWeekPlanning: false,
           resetDate: new Date(),
         },
+        gemini: {
+          weekly: 10,
+          used: 0,
+          resetDate: new Date(),
+        },
       };
 
       const mockDocumentSnapshot = {
@@ -254,6 +272,11 @@ describe('UsageService', () => {
             twoWeekPlanning: false,
             resetDate: Timestamp.fromDate(new Date()),
           },
+          gemini: {
+            weekly: 10,
+            used: 0,
+            resetDate: Timestamp.fromDate(new Date()),
+          },
         })),
         id: 'usage-limits'
       };
@@ -266,7 +289,7 @@ describe('UsageService', () => {
     });
 
     it('records search usage', async () => {
-      updateDoc.mockResolvedValueOnce();
+      vi.mocked(updateDoc).mockResolvedValueOnce();
 
       await expect(UsageService.recordSearch(mockUser)).resolves.toBeUndefined();
       expect(updateDoc).toHaveBeenCalled();
@@ -287,7 +310,7 @@ describe('UsageService', () => {
     });
 
     it('records recipe save', async () => {
-      updateDoc.mockResolvedValueOnce();
+      vi.mocked(updateDoc).mockResolvedValueOnce();
 
       await expect(UsageService.recordRecipeSave(mockUser)).resolves.toBeUndefined();
       expect(updateDoc).toHaveBeenCalled();
@@ -308,7 +331,7 @@ describe('UsageService', () => {
     });
 
     it('records meal plan addition', async () => {
-      updateDoc.mockResolvedValueOnce();
+      vi.mocked(updateDoc).mockResolvedValueOnce();
 
       await expect(UsageService.recordMealPlanAddition(mockUser)).resolves.toBeUndefined();
       expect(updateDoc).toHaveBeenCalled();
@@ -341,9 +364,9 @@ describe('UsageService', () => {
       };
 
       // Mock doc to return objects with path property
-      doc.mockImplementation((db, path) => ({ path }));
+      vi.mocked(doc).mockImplementation((db, path) => ({ path }));
 
-      getDoc.mockImplementation((ref) => {
+      vi.mocked(getDoc).mockImplementation((ref) => {
         if (ref.path.includes('users')) return Promise.resolve(userDoc);
         if (ref.path.includes('households')) return Promise.resolve(householdDoc);
         return Promise.resolve({ exists: vi.fn(() => false), data: vi.fn(() => ({})) });
@@ -363,14 +386,14 @@ describe('UsageService', () => {
 
   describe('Plan updates', () => {
     it('updates plan limits to premium', async () => {
-      updateDoc.mockResolvedValueOnce();
+      vi.mocked(updateDoc).mockResolvedValueOnce();
 
       await expect(UsageService.updatePlanLimits(mockUser, 'premium')).resolves.toBeUndefined();
       expect(updateDoc).toHaveBeenCalled();
     });
 
     it('handles plan update errors', async () => {
-      updateDoc.mockRejectedValueOnce(new Error('Update failed'));
+      vi.mocked(updateDoc).mockRejectedValueOnce(new Error('Update failed'));
 
       await expect(UsageService.updatePlanLimits(mockUser, 'premium')).rejects.toThrow('Update failed');
     });

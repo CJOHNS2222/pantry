@@ -1,6 +1,7 @@
 import { db } from '../firebaseConfig';
 import { setDoc, deleteDoc, doc } from 'firebase/firestore';
 import { reportSyncIssue } from './sentryService';
+import { log } from './logService';
 
 // Enhanced retry configuration
 const RETRY_CONFIG = {
@@ -73,7 +74,7 @@ export async function withRetry<T>(
       }
 
       const delay = calculateRetryDelay(attempt);
-      console.warn(`${operationName} failed (attempt ${attempt}/${maxAttempts}), retrying in ${delay}ms:`, error);
+      log.warn(`${operationName} failed (attempt ${attempt}/${maxAttempts}), retrying in ${delay}ms`, { error: lastError }, 'WriteQueueService');
 
       await new Promise(resolve => setTimeout(resolve, delay));
     }
@@ -177,7 +178,7 @@ export async function processQueue() {
   try {
     ops = await getAllOps();
   } catch (err) {
-    console.error('Failed to read write queue:', err);
+    log.error('Failed to read write queue', { error: err }, 'WriteQueue');
     return;
   }
 
@@ -194,13 +195,13 @@ export async function processQueue() {
           try {
             await setDoc(doc(db, pathBase, item.id), cleanObject(item));
           } catch (err) {
-            console.error('Failed to write queued inventory item:', err);
+            log.error('Failed to write queued inventory item', { error: err, itemId: item.id }, 'WriteQueue');
             throw err;
           }
         }
       } else {
         // Placeholder: handle other op types here (e.g., mealPlan, recipes)
-        console.debug('Processing generic op type:', op.type);
+        log.debug('Processing generic op type', { type: op.type }, 'WriteQueue');
       }
 
       if (op.id) await deleteOp(op.id);
@@ -209,7 +210,12 @@ export async function processQueue() {
       const attempts = (op.attempts || 0) + 1;
 
       if (attempts >= RETRY_CONFIG.maxAttempts || !isRetryableError(error)) {
-        console.error(`Operation ${op.type} failed permanently after ${attempts} attempts:`, error);
+        log.error(`Operation failed permanently after retries`, { 
+          type: op.type, 
+          attempts, 
+          maxAttempts: RETRY_CONFIG.maxAttempts, 
+          error 
+        }, 'WriteQueue');
         // Mark for permanent failure - could move to dead letter queue
         if (op.id) await deleteOp(op.id);
       } else {
@@ -217,7 +223,13 @@ export async function processQueue() {
         const delay = calculateRetryDelay(attempts);
         const nextAttempt = Date.now() + delay;
 
-        console.warn(`Operation ${op.type} failed, scheduling retry ${attempts}/${RETRY_CONFIG.maxAttempts} in ${delay}ms:`, error);
+        log.warn(`Operation failed, scheduling retry`, { 
+          type: op.type, 
+          attempts, 
+          maxAttempts: RETRY_CONFIG.maxAttempts, 
+          delay, 
+          error 
+        }, 'WriteQueue');
 
         // Update operation with retry info
         const dbInst = await open();
@@ -257,7 +269,7 @@ export async function processQueue() {
           }
         };
       } catch (e) {
-        console.error('Failed to schedule retry for op:', e);
+        log.error('Failed to schedule retry for operation', { error: e, operationType: op.type }, 'WriteQueue');
         // Report this secondary error as well
         reportSyncIssue('retry_scheduling', e as Error, attempts, {
           original_operation: op.type,
@@ -272,7 +284,7 @@ export async function processQueue() {
 // Auto-process when online
 if (typeof window !== 'undefined') {
   window.addEventListener('online', () => {
-    processQueue().catch(err => console.error('Error processing write queue on online:', err));
+    processQueue().catch(err => log.error('Error processing write queue on online', { error: err }, 'WriteQueue'));
   });
 }
 

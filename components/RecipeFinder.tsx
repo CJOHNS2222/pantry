@@ -115,7 +115,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
     // New smart filters
     const [dietaryRestrictions, setDietaryRestrictions] = useState<string[]>([]);
     const [maxPrepTime, setMaxPrepTime] = useState<string>('30');
-    const [servings, setServings] = useState<string>('4');
+    const [servings, setServings] = useState<string>(user?.profile?.householdSize?.toString() || '4');
     
     // Recent searches state
     const [recentRecipeSearches, setRecentRecipeSearches] = useState<string[]>([]);
@@ -1181,6 +1181,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                                     className="w-full h-full group-hover:scale-105 transition-transform duration-300"
                                     blurDataURL={generateBlurDataURL(300, 200)}
                                     placeholderSrc="/images/placeholder.svg"
+                                    lazy={true}
                                 />
                             ) : (
                                 <div className="w-full h-full bg-theme-primary/10 flex items-center justify-center">
@@ -1249,7 +1250,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                         </div>
 
                         <div className="mt-3 pt-3 border-t border-theme" onClick={(e) => e.stopPropagation()}>
-                             <RecipeRatingUI recipeTitle={recipe.title} recipe={recipe} onRate={onRate} user={user} />
+                             <RecipeRatingUI recipeTitle={recipe.title} recipe={recipe} onRatingSubmitted={onRate} householdId={user?.householdId} />
                         </div>
                     </div>
                 </div>
@@ -1284,6 +1285,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                                 className="w-full h-full group-hover:scale-110 transition-transform duration-500 filter group-hover:brightness-110"
                                 blurDataURL={generateBlurDataURL(300, 300)}
                                 placeholderSrc="/images/placeholder.svg"
+                                lazy={true}
                             />
                         ) : (
                             <div className="w-full h-full flex items-center justify-center bg-theme-primary/10">
@@ -1349,7 +1351,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
           >
             <div className="space-y-4">
                 {isLoadingSavedRecipes ? (
-                    <div className="grid grid-cols-4 gap-4">
+                    <div className="grid grid-cols-3 gap-4">
                         {Array.from({ length: 8 }).map((_, index) => (
                             <RecipeCardSkeleton key={index} />
                         ))}
@@ -1360,7 +1362,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                         <p>No saved recipes yet.</p>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-4 gap-4">
+                    <div className="grid grid-cols-3 gap-4">
                         {savedRecipes.map(r => renderRecipeCard(r, true, true))}
                     </div>
                 )}
@@ -1687,7 +1689,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
 
             {loadingState === LoadingState.LOADING && (
                 <div className="animate-fade-in-up mt-8">
-                    <div className="grid grid-cols-4 gap-4">
+                    <div className="grid grid-cols-3 gap-4">
                         {Array.from({ length: 8 }).map((_, idx) => (
                             <RecipeCardSkeleton key={`skeleton-${idx}`} />
                         ))}
@@ -1706,7 +1708,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                                 </div>
                             </div>
                         )}
-                        <div className="grid grid-cols-4 gap-4">
+                        <div className="grid grid-cols-3 gap-4">
                             {result.recipes.map((recipe, idx) => renderRecipeTile(recipe))}
                         </div>
                     </div>
@@ -1749,7 +1751,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                 {/* Category Filter and Surprise Me */}
                 <div className="flex items-center justify-between mb-6">
                     <div className="flex flex-wrap gap-2">
-                        {['All', 'Dinner', 'Lunch', 'Breakfast', 'Dessert', 'Appetizer', 'Salad', 'Soup', 'Drink'].map((category) => (
+                        {['All', 'Dinner', 'Lunch', 'Breakfast', 'Soup', 'Drink'].map((category) => (
                             <button
                                 key={category}
                                 onClick={() => setSelectedCategory(category)}
@@ -1801,7 +1803,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                         </div>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-4 gap-4">
+                    <div className="grid grid-cols-3 gap-4">
                         {firebaseRecipes
                             .filter(recipe => {
                                 if (selectedCategory === 'All') return true;
@@ -1858,6 +1860,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                                                 className="w-full h-full group-hover:scale-110 transition-transform duration-500 filter group-hover:brightness-110"
                                                 blurDataURL={generateBlurDataURL(200, 200)}
                                                 placeholderSrc="/images/placeholder.svg"
+                                                lazy={true}
                                             />
                                         ) : (
                                             <div className="w-full h-full flex items-center justify-center bg-theme-primary/10">

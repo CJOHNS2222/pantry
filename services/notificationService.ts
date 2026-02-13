@@ -3,8 +3,8 @@
  * Manages contextual notifications, timing, and user preferences
  */
 
-import { collection, addDoc, updateDoc, doc, query, where, orderBy, limit, getDocs, serverTimestamp, Timestamp } from 'firebase/firestore';
-import { db } from '../firebaseConfig';
+import DatabaseMonitoringService from './databaseMonitoringService';
+import { serverTimestamp, Timestamp } from 'firebase/firestore';
 import { User } from '../types';
 import { pushNotificationService } from './pushNotificationService';
 
@@ -52,7 +52,7 @@ export class NotificationService {
     userId: string,
     notification: Omit<NotificationItem, 'id' | 'userId' | 'read' | 'createdAt'>
   ): Promise<string> {
-    const docRef = await addDoc(collection(db, this.COLLECTION), {
+    const docRef = await DatabaseMonitoringService.addDoc(DatabaseMonitoringService.collection(this.COLLECTION), {
       userId,
       read: false,
       createdAt: serverTimestamp(),
@@ -81,6 +81,34 @@ export class NotificationService {
     daysUntilExpiry: number,
     itemId: string
   ): Promise<string> {
+    // Check if notification already exists for this item
+    const existingNotifications = await this.getUnreadNotifications(userId);
+    const existingNotification = existingNotifications.find(n =>
+      n.type === 'expiration' &&
+      n.actionData?.itemId === itemId &&
+      !n.read
+    );
+
+    if (existingNotification) {
+      // Update existing notification if priority changed or days changed
+      const currentPriority = existingNotification.priority;
+      const newPriority = daysUntilExpiry <= 0 ? 'urgent' :
+                         daysUntilExpiry === 1 ? 'high' :
+                         daysUntilExpiry <= 3 ? 'medium' : 'low';
+
+      if (currentPriority !== newPriority) {
+        await DatabaseMonitoringService.updateDoc(DatabaseMonitoringService.doc(this.COLLECTION + '/' + existingNotification.id), {
+          priority: newPriority,
+          title: daysUntilExpiry <= 0 ? 'Item Expired!' :
+                 daysUntilExpiry === 1 ? 'Expires Tomorrow!' :
+                 daysUntilExpiry <= 3 ? 'Expires Soon' : 'Expires This Week',
+          message: daysUntilExpiry <= 0 ? `${itemName} has expired and was moved to shopping list` :
+                  `${itemName} expires in ${daysUntilExpiry} days`
+        });
+      }
+      return existingNotification.id;
+    }
+
     let priority: 'low' | 'medium' | 'high' | 'urgent' = 'low';
     let title = '';
     let message = '';
@@ -217,6 +245,9 @@ export class NotificationService {
     shoppingListCount: number,
     urgentShoppingItems: string[]
   ): Promise<string> {
+    // Delete any existing daily pantry check notifications first
+    await this.deleteExistingDailyNotifications(userId);
+
     // Build message parts
     const messageParts: string[] = [];
 
@@ -270,36 +301,19 @@ export class NotificationService {
    */
   static async getUnreadNotifications(userId: string, userEmail?: string): Promise<NotificationItem[]> {
     try {
-      // Query for notifications where userId matches the user's ID or email
-      // Get all notifications for the user and filter read status in memory to avoid compound query issues
-      const queries = [
-        query(
-          collection(db, this.COLLECTION),
-          where('userId', '==', userId),
-          orderBy('createdAt', 'desc'),
-          limit(50) // Get more to filter in memory
-        )
-      ];
-
-      // Also check for notifications stored with email (for legacy/before signup invites)
-      if (userEmail) {
-        queries.push(
-          query(
-            collection(db, this.COLLECTION),
-            where('userId', '==', userEmail),
-            orderBy('createdAt', 'desc'),
-            limit(50)
-          )
-        );
-      }
-
-      const results = await Promise.all(queries.map(q => getDocs(q)));
-      const allNotifications = results.flatMap(snapshot => 
-        snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        } as NotificationItem))
+      // Query for notifications where userId matches the user's ID
+      const q = DatabaseMonitoringService.query(
+        DatabaseMonitoringService.collection(this.COLLECTION),
+        DatabaseMonitoringService.where('userId', '==', userId),
+        DatabaseMonitoringService.orderBy('createdAt', 'desc'),
+        DatabaseMonitoringService.limit(50)
       );
+
+      const querySnapshot = await DatabaseMonitoringService.getDocs(q);
+      const allNotifications = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as NotificationItem));
 
       // Filter for unread notifications in memory and check snooze status
       const unreadNotifications = allNotifications.filter(notification => {
@@ -313,7 +327,11 @@ export class NotificationService {
         .filter((notification, index, self) => 
           index === self.findIndex(n => n.id === notification.id)
         )
-        .sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis())
+        .sort((a, b) => {
+          const aTime = a.createdAt?.toMillis() || 0;
+          const bTime = b.createdAt?.toMillis() || 0;
+          return bTime - aTime;
+        })
         .slice(0, 20);
 
       return uniqueNotifications;
@@ -328,7 +346,7 @@ export class NotificationService {
    * Mark notification as read
    */
   static async markAsRead(notificationId: string): Promise<void> {
-    await updateDoc(doc(db, this.COLLECTION, notificationId), {
+    await DatabaseMonitoringService.updateDoc(DatabaseMonitoringService.doc(this.COLLECTION + '/' + notificationId), {
       read: true
     });
   }
@@ -338,7 +356,7 @@ export class NotificationService {
    */
   static async snoozeNotification(notificationId: string, minutes: number): Promise<void> {
     const snoozedUntil = new Date(Date.now() + minutes * 60 * 1000);
-    await updateDoc(doc(db, this.COLLECTION, notificationId), {
+    await DatabaseMonitoringService.updateDoc(DatabaseMonitoringService.doc(this.COLLECTION + '/' + notificationId), {
       snoozedUntil: Timestamp.fromDate(snoozedUntil)
     });
   }
@@ -422,16 +440,36 @@ export class NotificationService {
    */
   static async cleanupOldNotifications(userId: string): Promise<void> {
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const q = query(
-      collection(db, this.COLLECTION),
-      where('userId', '==', userId),
-      where('createdAt', '<', Timestamp.fromDate(thirtyDaysAgo))
+    const q = DatabaseMonitoringService.query(
+      DatabaseMonitoringService.collection(this.COLLECTION),
+      DatabaseMonitoringService.where('userId', '==', userId),
+      DatabaseMonitoringService.where('createdAt', '<', Timestamp.fromDate(thirtyDaysAgo))
     );
 
-    const snapshot = await getDocs(q);
+    const snapshot = await DatabaseMonitoringService.getDocs(q);
     const batch = [];
     for (const doc of snapshot.docs) {
-      batch.push(doc.ref.delete());
+      batch.push(DatabaseMonitoringService.deleteDoc(DatabaseMonitoringService.doc(this.COLLECTION + '/' + doc.id)));
+    }
+    await Promise.all(batch);
+  }
+
+  /**
+   * Delete existing daily pantry check notifications for a user
+   * This prevents duplicate notifications from accumulating
+   */
+  static async deleteExistingDailyNotifications(userId: string): Promise<void> {
+    const q = DatabaseMonitoringService.query(
+      DatabaseMonitoringService.collection(this.COLLECTION),
+      DatabaseMonitoringService.where('userId', '==', userId),
+      DatabaseMonitoringService.where('type', '==', 'system'),
+      DatabaseMonitoringService.where('title', '==', 'Daily Pantry Check')
+    );
+
+    const snapshot = await DatabaseMonitoringService.getDocs(q);
+    const batch = [];
+    for (const doc of snapshot.docs) {
+      batch.push(DatabaseMonitoringService.deleteDoc(DatabaseMonitoringService.doc(this.COLLECTION + '/' + doc.id)));
     }
     await Promise.all(batch);
   }

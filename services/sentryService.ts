@@ -22,9 +22,23 @@ export const initSentry = () => {
           /^https:\/\/.*\.web\.app/,
         ],
       }),
+      // Add replay integration for session recordings
+      Sentry.replayIntegration({
+        maskAllText: true,
+        blockAllMedia: true,
+      }),
+      // Add feedback integration for user feedback
+      Sentry.feedbackIntegration({
+        colorScheme: 'auto',
+        showBranding: false,
+      }),
     ],
     // Performance Monitoring
     tracesSampleRate: environment === 'production' ? 0.1 : 1.0,
+
+    // Session replay
+    replaysSessionSampleRate: environment === 'production' ? 0.1 : 1.0,
+    replaysOnErrorSampleRate: 1.0,
 
     // Error filtering
     beforeSend(event, hint) {
@@ -51,11 +65,23 @@ export const initSentry = () => {
       return event;
     },
 
-    // Capture console errors in production
-    beforeBreadcrumb(breadcrumb) {
+    // Enhanced breadcrumb capture
+    beforeBreadcrumb(breadcrumb, hint) {
+      // Capture console errors in production
       if (breadcrumb.category === 'console' && breadcrumb.level === 'error') {
         return breadcrumb;
       }
+
+      // Capture navigation breadcrumbs
+      if (breadcrumb.category === 'navigation') {
+        return breadcrumb;
+      }
+
+      // Capture user interaction breadcrumbs
+      if (breadcrumb.category === 'ui.click' || breadcrumb.category === 'ui.input') {
+        return breadcrumb;
+      }
+
       return breadcrumb;
     }
   });
@@ -130,6 +156,180 @@ export const reportHeavyWritePattern = (collection: string, writeCount: number, 
       `Heavy write pattern detected: ${writeCount} writes to ${collection} in ${timeWindow / 1000}s`,
       'warning'
     );
+  });
+};
+
+// User action tracking for breadcrumbs
+export const trackUserAction = (action: string, category: string, details?: any) => {
+  Sentry.addBreadcrumb({
+    category: 'user_action',
+    message: action,
+    level: 'info',
+    data: {
+      category,
+      ...details,
+      timestamp: new Date().toISOString(),
+    },
+  });
+};
+
+// Track navigation events
+export const trackNavigation = (from: string, to: string, context?: any) => {
+  Sentry.addBreadcrumb({
+    category: 'navigation',
+    message: `Navigation: ${from} → ${to}`,
+    level: 'info',
+    data: {
+      from,
+      to,
+      ...context,
+    },
+  });
+};
+
+// Track feature usage
+export const trackFeatureUsage = (feature: string, action: string, details?: any) => {
+  Sentry.addBreadcrumb({
+    category: 'feature_usage',
+    message: `Feature: ${feature} - ${action}`,
+    level: 'info',
+    data: {
+      feature,
+      action,
+      ...details,
+    },
+  });
+};
+
+// Track user authentication events
+export const trackAuthEvent = (event: 'login' | 'logout' | 'signup' | 'password_reset', details?: any) => {
+  Sentry.addBreadcrumb({
+    category: 'auth',
+    message: `Auth: ${event}`,
+    level: 'info',
+    data: {
+      event,
+      ...details,
+    },
+  });
+};
+
+// Track shopping list operations
+export const trackShoppingListAction = (action: 'add_item' | 'remove_item' | 'check_item' | 'uncheck_item' | 'clear_list', details?: any) => {
+  Sentry.addBreadcrumb({
+    category: 'shopping_list',
+    message: `Shopping: ${action}`,
+    level: 'info',
+    data: {
+      action,
+      ...details,
+    },
+  });
+};
+
+// Track recipe operations
+export const trackRecipeAction = (action: 'search' | 'save' | 'unsave' | 'rate' | 'generate_meal_plan', details?: any) => {
+  Sentry.addBreadcrumb({
+    category: 'recipe',
+    message: `Recipe: ${action}`,
+    level: 'info',
+    data: {
+      action,
+      ...details,
+    },
+  });
+};
+
+// Track pantry operations
+export const trackPantryAction = (action: 'add_item' | 'edit_item' | 'delete_item' | 'scan_item' | 'search_items', details?: any) => {
+  Sentry.addBreadcrumb({
+    category: 'pantry',
+    message: `Pantry: ${action}`,
+    level: 'info',
+    data: {
+      action,
+      ...details,
+    },
+  });
+};
+
+// Track household operations
+export const trackHouseholdAction = (action: 'create' | 'join' | 'leave' | 'invite_member' | 'remove_member', details?: any) => {
+  Sentry.addBreadcrumb({
+    category: 'household',
+    message: `Household: ${action}`,
+    level: 'info',
+    data: {
+      action,
+      ...details,
+    },
+  });
+};
+
+// Track performance metrics
+export const trackPerformanceMetric = (metric: string, value: number, unit: string, context?: any) => {
+  Sentry.addBreadcrumb({
+    category: 'performance',
+    message: `Performance: ${metric} = ${value}${unit}`,
+    level: 'info',
+    data: {
+      metric,
+      value,
+      unit,
+      ...context,
+    },
+  });
+};
+
+// Track error boundaries
+export const trackErrorBoundary = (component: string, error: Error, errorInfo?: any) => {
+  Sentry.addBreadcrumb({
+    category: 'error_boundary',
+    message: `Error boundary caught error in ${component}`,
+    level: 'error',
+    data: {
+      component,
+      error_message: error.message,
+      error_stack: error.stack,
+      ...errorInfo,
+    },
+  });
+};
+
+// Set user context for better error tracking
+export const setUserContext = (userId: string, email?: string, householdId?: string) => {
+  Sentry.setUser({
+    id: userId,
+    email: email,
+    household_id: householdId,
+  });
+
+  Sentry.setTag('user_id', userId);
+  if (householdId) {
+    Sentry.setTag('household_id', householdId);
+  }
+};
+
+// Clear user context on logout
+export const clearUserContext = () => {
+  Sentry.setUser(null);
+  Sentry.setTag('user_id', undefined);
+  Sentry.setTag('household_id', undefined);
+};
+
+// Set app context
+export const setAppContext = (version: string, platform: 'web' | 'android' | 'ios', theme: 'light' | 'dark') => {
+  Sentry.setTag('app_version', version);
+  Sentry.setTag('platform', platform);
+  Sentry.setTag('theme', theme);
+
+  Sentry.setContext('app_info', {
+    version,
+    platform,
+    theme,
+    user_agent: navigator.userAgent,
+    language: navigator.language,
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
   });
 };
 

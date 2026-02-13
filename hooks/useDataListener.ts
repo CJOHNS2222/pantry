@@ -1,7 +1,6 @@
 // hooks/useDataListener.ts
 import { useEffect } from 'react';
-import { onSnapshot, collection } from 'firebase/firestore';
-import { db } from '../firebaseConfig';
+import DatabaseMonitoringService from '../services/databaseMonitoringService';
 
 /**
  * Generic hook for creating Firestore collection listeners
@@ -16,8 +15,8 @@ export function useDataListener<T>(
   useEffect(() => {
     if (!collectionPath) return;
 
-    const unsubscribe = onSnapshot(
-      collection(db, collectionPath),
+    const unsubscribe = DatabaseMonitoringService.onSnapshot(
+      DatabaseMonitoringService.collection(collectionPath),
       (snapshot) => {
         const data = snapshot.docs.map(doc => {
           const docData = { id: doc.id, ...doc.data() };

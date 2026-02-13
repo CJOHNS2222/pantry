@@ -1,6 +1,7 @@
 import React from 'react';
 import AnalyticsService from '../services/analyticsService';
 import * as Sentry from '@sentry/react';
+import { trackErrorBoundary } from '../services/sentryService';
 
 interface ErrorBoundaryState {
   hasError: boolean;
@@ -24,6 +25,12 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error('Error caught by boundary:', error, errorInfo);
+
+    // Track error boundary event
+    trackErrorBoundary(this.constructor.name, error, {
+      componentStack: errorInfo.componentStack,
+      errorBoundary: this.constructor.name
+    });
 
     // Report to Sentry with React context
     Sentry.withScope((scope) => {

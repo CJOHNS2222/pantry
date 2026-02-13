@@ -144,6 +144,14 @@ export function validateQuantity(quantity: string): ValidationResult {
         if (value && !PATTERNS.quantity.test(value)) {
           return 'Quantity should be a number with optional unit (e.g., "2 cups", "1.5 lbs")';
         }
+        // Extract numeric part and check if it's at least 1
+        const numericMatch = value.match(/^(\d+(?:\.\d+)?)/);
+        if (numericMatch) {
+          const numericValue = parseFloat(numericMatch[1]);
+          if (numericValue < 1) {
+            return 'Quantity must be at least 1';
+          }
+        }
         return null;
       }
     ]

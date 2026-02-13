@@ -3,7 +3,8 @@
  * Tracks member activity and provides real-time collaboration features
  */
 
-import { doc, updateDoc, serverTimestamp, collection, addDoc, query, where, orderBy, limit, getDocs, onSnapshot } from 'firebase/firestore';
+import DatabaseMonitoringService from './databaseMonitoringService';
+import { serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 import { User, Household } from '../types';
 import { Tab } from '../types/app';
@@ -14,10 +15,10 @@ export class HouseholdActivityService {
    */
   static async updateMemberActivity(userId: string, householdId: string, activity: string) {
     try {
-      const householdRef = doc(db, 'households', householdId);
-      const memberPath = `members.${userId}`;
+      const householdRef = DatabaseMonitoringService.doc('households', householdId);
+      const memberPath = `memberActivity.${userId}`;
 
-      await updateDoc(householdRef, {
+      await DatabaseMonitoringService.updateDoc(householdRef, {
         [memberPath + '.lastSeen']: serverTimestamp(),
         [memberPath + '.currentActivity']: activity,
         [memberPath + '.isOnline']: true
@@ -32,10 +33,10 @@ export class HouseholdActivityService {
    */
   static async markMemberOffline(userId: string, householdId: string) {
     try {
-      const householdRef = doc(db, 'households', householdId);
-      const memberPath = `members.${userId}`;
+      const householdRef = DatabaseMonitoringService.doc('households', householdId);
+      const memberPath = `memberActivity.${userId}`;
 
-      await updateDoc(householdRef, {
+      await DatabaseMonitoringService.updateDoc(householdRef, {
         [memberPath + '.isOnline']: false
       });
     } catch (error) {
@@ -67,7 +68,8 @@ export class HouseholdActivityService {
         householdId
       };
 
-      await addDoc(collection(db, 'households', householdId, 'activity'), activityData);
+      const activityCollection = DatabaseMonitoringService.collection('households', householdId, 'activity');
+      await DatabaseMonitoringService.addDoc(activityCollection, activityData);
     } catch (error) {
       console.error('Error logging activity:', error);
     }
@@ -78,13 +80,14 @@ export class HouseholdActivityService {
    */
   static async getRecentActivities(householdId: string, limitCount: number = 10) {
     try {
-      const activitiesQuery = query(
-        collection(db, 'households', householdId, 'activity'),
-        orderBy('timestamp', 'desc'),
-        limit(limitCount)
+      const activityCollection = DatabaseMonitoringService.collection('households', householdId, 'activity');
+      const activitiesQuery = DatabaseMonitoringService.query(
+        activityCollection,
+        DatabaseMonitoringService.orderBy('timestamp', 'desc'),
+        DatabaseMonitoringService.limit(limitCount)
       );
 
-      const snapshot = await getDocs(activitiesQuery);
+      const snapshot = await DatabaseMonitoringService.getDocs(activitiesQuery);
       return snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
@@ -99,13 +102,14 @@ export class HouseholdActivityService {
    * Subscribe to household activities (real-time)
    */
   static subscribeToActivities(householdId: string, callback: (activities: any[]) => void) {
-    const activitiesQuery = query(
-      collection(db, 'households', householdId, 'activity'),
-      orderBy('timestamp', 'desc'),
-      limit(20)
+    const activityCollection = DatabaseMonitoringService.collection('households', householdId, 'activity');
+    const activitiesQuery = DatabaseMonitoringService.query(
+      activityCollection,
+      DatabaseMonitoringService.orderBy('timestamp', 'desc'),
+      DatabaseMonitoringService.limit(20)
     );
 
-    return onSnapshot(activitiesQuery, (snapshot) => {
+    return DatabaseMonitoringService.onSnapshot(activitiesQuery, (snapshot) => {
       const activities = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()

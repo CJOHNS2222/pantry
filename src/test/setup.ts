@@ -187,8 +187,20 @@ vi.mock('../firebaseConfig', () => ({
 global.fetch = vi.fn(() =>
   Promise.resolve({
     ok: true,
+    status: 200,
+    statusText: 'OK',
+    headers: new Headers(),
     json: () => Promise.resolve({}),
-    blob: () => Promise.resolve(new Blob())
+    blob: () => Promise.resolve(new Blob()),
+    text: () => Promise.resolve(''),
+    arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
+    formData: () => Promise.resolve(new FormData()),
+    clone: () => ({}) as Response,
+    body: null,
+    bodyUsed: false,
+    redirected: false,
+    type: 'basic' as ResponseType,
+    url: ''
   })
 );
 

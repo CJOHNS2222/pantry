@@ -42,6 +42,7 @@ interface AppActionsContextValue {
   // Auth operations
   onLogout: () => void;
   onShowTutorial: () => void;
+  onShowHousehold?: () => void;
 
   // Usage limit checking
   checkRecipeSaveLimit: () => Promise<boolean>;

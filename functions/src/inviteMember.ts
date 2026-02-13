@@ -86,18 +86,31 @@ async function inviteMemberCore(inviterUid: string, email: string, householdId: 
     console.warn('Unable to resolve invited email to UID:', err);
   }
 
-  const newMember = { 
+  const newMember: any = { 
     id: memberIdToStore, 
     name: invitedUserName, 
     email: invitedUserEmail,
-    avatar: invitedUserAvatar,
     role: 'member', 
     status: 'pending',
     joinedAt: new Date().toISOString()
   };
   
+  // Add avatar only if it exists
+  if (invitedUserAvatar) {
+    newMember.avatar = invitedUserAvatar;
+  }
+  
   // Ensure members is an array and add the new member (only if not already present)
-  const currentMembers = Array.isArray(householdData.members) ? householdData.members : [];
+  let currentMembers = [];
+  if (Array.isArray(householdData.members)) {
+    currentMembers = householdData.members;
+  } else if (householdData.members && typeof householdData.members === 'object') {
+    // Convert map to array (handle legacy data where members might be stored as a map)
+    const mapMembers = householdData.members as Record<string, any>;
+    currentMembers = Object.keys(mapMembers).map(id => ({ id, ...mapMembers[id] }));
+  } else {
+    currentMembers = [];
+  }
   const memberExists = currentMembers.some((m: any) => m.id === memberIdToStore);
   const updatedMembers = memberExists ? currentMembers : [...currentMembers, newMember];
   

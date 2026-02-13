@@ -7,6 +7,15 @@ interface CommunityProps {
   ratings: RecipeRating[];
   onAddToPlan: (recipe: StructuredRecipe) => void;
   onSaveRecipe?: (recipe: StructuredRecipe) => void;
+  user?: {
+    id: string;
+    name: string;
+    email: string;
+    avatar?: string;
+    profile?: {
+      householdSize?: number;
+    };
+  };
 }
 
 interface RecipeStats {
@@ -16,7 +25,7 @@ interface RecipeStats {
   comments: RecipeRating[];
 }
 
-export const Community: React.FC<CommunityProps> = ({ ratings, onAddToPlan, onSaveRecipe }) => {
+export const Community: React.FC<CommunityProps> = ({ ratings, onAddToPlan, onSaveRecipe, user }) => {
     // List of staple items to ignore in ingredient display
     const STAPLES = ['salt', 'pepper', 'oil', 'water', 'flour', 'sugar', 'butter', 'vinegar', 'baking powder', 'baking soda', 'spices', 'seasoning', 'soy sauce', 'cornstarch', 'yeast'];
   const [showModal, setShowModal] = useState(false);
@@ -173,6 +182,7 @@ export const Community: React.FC<CommunityProps> = ({ ratings, onAddToPlan, onSa
             showSaveButton={true}
             showMarkAsMade={false}
             showAddToPlan={true}
+            user={user}
           />
         );
       })()}

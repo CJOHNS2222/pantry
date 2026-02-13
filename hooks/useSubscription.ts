@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
-import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
-import { db } from '../firebaseConfig';
+import DatabaseMonitoringService from '../services/databaseMonitoringService';
 import { User, Subscription } from '../types';
 import { UsageService } from '../services/usageService';
 
@@ -14,7 +13,7 @@ export function useSubscription(user: User | null) {
       return;
     }
 
-    const unsubscribe = onSnapshot(doc(db, 'users', user.id), (doc) => {
+    const unsubscribe = DatabaseMonitoringService.onSnapshot(DatabaseMonitoringService.doc('users', user.id), (doc) => {
       const data = doc.data();
       if (data?.subscription) {
         setSubscription(data.subscription);
@@ -38,7 +37,7 @@ export function useSubscription(user: User | null) {
 
     try {
       const newSubscription = { ...subscription, ...updates };
-      await updateDoc(doc(db, 'users', user.id), {
+      await DatabaseMonitoringService.updateDoc(DatabaseMonitoringService.doc('users', user.id), {
         subscription: newSubscription
       });
 

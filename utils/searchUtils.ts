@@ -1,5 +1,6 @@
 import Fuse from 'fuse.js';
 import { PantryItem, StructuredRecipe, SavedRecipe } from '../types';
+import { log } from '../services/logService';
 
 // Ingredient matching result interface
 export interface IngredientMatch {
@@ -335,7 +336,7 @@ export const saveSearchToHistory = (query: string, type: 'pantry' | 'recipe', re
 
     localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(recentHistory));
   } catch (error) {
-    console.error('Failed to save search history:', error);
+    log.error('Failed to save search history', error, 'SearchUtils');
   }
 };
 
@@ -351,7 +352,7 @@ export const loadSearchHistory = (type?: 'pantry' | 'recipe'): SearchHistoryItem
       return history;
     }
   } catch (error) {
-    console.error('Failed to load search history:', error);
+    log.error('Failed to load search history', error, 'SearchUtils');
   }
   return [];
 };
@@ -373,7 +374,7 @@ export const clearSearchHistory = (type?: 'pantry' | 'recipe'): void => {
       localStorage.removeItem(SEARCH_HISTORY_KEY);
     }
   } catch (error) {
-    console.error('Failed to clear search history:', error);
+    log.error('Failed to clear search history', error, 'SearchUtils');
   }
 };
 
@@ -384,7 +385,7 @@ export const savePantryFilter = (filter: PantryFilter): void => {
   try {
     localStorage.setItem(PANTRY_FILTER_KEY, JSON.stringify(filter));
   } catch (error) {
-    console.error('Failed to save pantry filter:', error);
+    log.error('Failed to save pantry filter', error, 'SearchUtils');
   }
 };
 
@@ -397,7 +398,7 @@ export const loadPantryFilter = (): PantryFilter => {
       return { ...defaultPantryFilter, ...parsed };
     }
   } catch (error) {
-    console.error('Failed to load pantry filter:', error);
+    log.error('Failed to load pantry filter', error, 'SearchUtils');
   }
   return defaultPantryFilter;
 };

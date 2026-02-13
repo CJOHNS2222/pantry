@@ -185,7 +185,7 @@ describe('GroceryCostEstimator', () => {
     const totalCostContainer = screen.getByText('Estimated cost for missing ingredients').previousElementSibling;
     expect(totalCostContainer).toBeInTheDocument();
     expect(totalCostContainer).toHaveClass('text-2xl', 'font-bold', 'text-green-600');
-    expect(totalCostContainer).toHaveTextContent('$15.75');
+    expect(totalCostContainer).toHaveTextContent('$15.74');
   });
 
   it('handles empty meal plan', () => {

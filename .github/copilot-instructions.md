@@ -32,7 +32,7 @@
 
 ## Integration Points
 - **Firebase services**: Auth, Firestore, Analytics, Storage, Functions all initialized in `firebaseConfig.ts`
-- **Capacitor plugins**: Camera, LocalNotifications, PushNotifications, App configured in `capacitor.config.ts`
+- **Capacitor plugins**: Camera, LocalNotifications, PushNotifications, Haptics, App configured in `capacitor.config.ts`
 - **AI integration**: Google Gemini API for recipe generation, check `canUseGemini()` before calls
 - **Payment processing**: Stripe + PayPal integration for subscriptions
 - **External APIs**: Spoonacular for recipe data (test with `npm run test-spoonacular`)

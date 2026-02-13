@@ -51,7 +51,7 @@ export const leaveHousehold = onCall(async (request) => {
     }
 
     // Don't allow admin/owner to leave if there are other members
-    if (memberToRemove.role === 'Admin' && (members.length > 1 || memberIds.length > 1)) {
+    if (memberToRemove.role === 'admin' && (members.length > 1 || memberIds.length > 1)) {
       throw new HttpsError("permission-denied", "As the household admin, you cannot leave while there are other members. Transfer admin rights first or delete the household.");
     }
 

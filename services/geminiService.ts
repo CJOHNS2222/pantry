@@ -347,12 +347,12 @@ const performSearch = async (params: RecipeSearchParams, user: User | undefined,
 
   if (params.query) {
     // Mode 1: Specific Search - ultra-concise for cost efficiency
-    prompt = `2 recipes for "${params.query}"`;
+    prompt = `3 recipes for "${params.query}"`;
     if (params.restrictions) prompt += `. Restrictions: ${params.restrictions}`;
   } else {
     // Mode 2: Generate from Pantry - ultra-concise
     const limitedIngredients = params.ingredients.split(', ').slice(0, 25).join(', ');
-    prompt = `2 recipes using: ${limitedIngredients}`;
+    prompt = `3 recipes using: ${limitedIngredients}`;
     
     if (params.strictMode) {
       prompt += `. Only these + basics (oil, salt, pepper, water)`;

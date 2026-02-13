@@ -1,7 +1,7 @@
 import { App } from '@capacitor/app';
 import { Device } from '@capacitor/device';
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
-import { db } from '../firebaseConfig';
+import DatabaseMonitoringService from './databaseMonitoringService';
+import { log } from './logService';
 
 export interface AppVersion {
   version: string;
@@ -37,7 +37,7 @@ class VersionService {
       this.currentVersion = appInfo.version;
       this.platform = deviceInfo.platform;
     } catch (error) {
-      console.warn('Failed to get app info:', error);
+      log.warn('Failed to get app info', { error }, 'VersionService');
       // Fallback for web
       this.currentVersion = '1.0.0';
       this.platform = 'web';
@@ -71,8 +71,8 @@ class VersionService {
       const platform = await this.getPlatform();
 
       // Get latest version info from Firebase
-      const versionDocRef = doc(db, 'app_versions', platform);
-      const versionDoc = await getDoc(versionDocRef);
+      const versionDocRef = DatabaseMonitoringService.doc('app_versions/' + platform);
+      const versionDoc = await DatabaseMonitoringService.getDoc(versionDocRef);
 
       if (!versionDoc.exists()) {
         // No version info available, create initial data
@@ -113,7 +113,7 @@ class VersionService {
 
       return result;
     } catch (error) {
-      console.error('Failed to check for updates:', error);
+      log.error('Failed to check for updates', { error }, 'VersionService');
       // Return safe defaults
       const currentVersion = await this.getCurrentVersion();
       const result = {
@@ -154,7 +154,7 @@ class VersionService {
         updatedAt: new Date()
       });
     } catch (error) {
-      console.error('Failed to update version info:', error);
+      log.error('Failed to update version info', { error }, 'VersionService');
       throw error;
     }
   }
@@ -182,7 +182,7 @@ class VersionService {
 
       // console.log(`Initialized version data for ${platform}`);
     } catch (error) {
-      console.error('Failed to initialize version data:', error);
+      log.error('Failed to initialize version data', { error }, 'VersionService');
       // Don't throw - this is a non-critical operation
     }
   }

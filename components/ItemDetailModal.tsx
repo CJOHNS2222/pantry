@@ -6,6 +6,7 @@ import { getAllCategories, getExpirationColor, cleanItemNameForShopping, formatI
 import { getNutritionFactsWithFallback, NutritionFacts, formatNutrition } from '../services/nutritionService';
 import { useKeyboardNavigation } from '../hooks/useKeyboardNavigation';
 import VisualQuantitySelector from './VisualQuantitySelector';
+import QuantityUnitPicker from './QuantityUnitPicker';
 
 interface ItemDetailModalProps {
   item: PantryItem;
@@ -27,14 +28,18 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   originalIndex
 }) => {
   const [showPriceTrends, setShowPriceTrends] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
   const [editQuantity, setEditQuantity] = useState(() => {
     if (item.quantity) {
       return item.quantity.amount;
     }
     return parseInt(item.quantity_estimate) || 1;
   });
-  const [hasQuantityChanged, setHasQuantityChanged] = useState(false);
+  const [editUnit, setEditUnit] = useState(() => {
+    if (item.quantity) {
+      return item.quantity.unit;
+    }
+    return 'count';
+  });
   const [nutrition, setNutrition] = useState<NutritionFacts | null>(null);
   const [loadingNutrition, setLoadingNutrition] = useState(true);
   const [isEditingExpiration, setIsEditingExpiration] = useState(false);
@@ -70,49 +75,36 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
       const updates: Partial<PantryItem> = {
         quantity_estimate: newQuantity.toString()
       };
-      
+
       if (item.quantity) {
         updates.quantity = {
           ...item.quantity,
-          amount: newQuantity
+          amount: newQuantity,
+          unit: editUnit
         };
       } else {
         // Create new quantity object if it doesn't exist
         updates.quantity = {
           amount: newQuantity,
-          unit: 'count'
+          unit: editUnit
         };
       }
-      
+
       onUpdateItem(originalIndex, updates);
       setEditQuantity(newQuantity);
-      setHasQuantityChanged(false);
-      setIsEditing(false);
     }
   };
 
-  const handleQuantityIncrement = () => {
-    const newQuantity = editQuantity + 1;
-    setEditQuantity(newQuantity);
-    const originalQuantity = item.quantity ? item.quantity.amount : (parseInt(item.quantity_estimate) || 1);
-    setHasQuantityChanged(newQuantity !== originalQuantity);
-  };
+  const handleUnitChange = (newUnit: string) => {
+    const updates: Partial<PantryItem> = {
+      quantity: {
+        amount: editQuantity,
+        unit: newUnit
+      }
+    };
 
-  const handleQuantityDecrement = () => {
-    const newQuantity = Math.max(0, editQuantity - 1);
-    setEditQuantity(newQuantity);
-    const originalQuantity = item.quantity ? item.quantity.amount : (parseInt(item.quantity_estimate) || 1);
-    setHasQuantityChanged(newQuantity !== originalQuantity);
-  };
-
-  const handleSaveQuantity = () => {
-    handleQuantityChange(editQuantity);
-  };
-
-  const handleCancelEdit = () => {
-    setEditQuantity(item.quantity_estimate || 1);
-    setHasQuantityChanged(false);
-    setIsEditing(false);
+    onUpdateItem(originalIndex, updates);
+    setEditUnit(newUnit);
   };
 
   const handleSaveExpiration = () => {
@@ -141,9 +133,9 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   return (
     <>
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-60 p-4">
-        <div className="bg-theme-primary rounded-lg shadow-xl w-full max-w-md mx-auto max-h-[80vh] overflow-y-auto border border-theme pb-20 pt-20">
-          {/* Header */}
-          <div className="flex items-center justify-between p-3 border-b border-theme fixed top-[100px] left-0 right-0 max-w-md mx-auto z-[100] bg-theme-primary">
+        <div className="bg-theme-primary rounded-lg shadow-xl w-full max-w-md mx-auto max-h-[80vh] flex flex-col border border-theme">
+          {/* Header - Fixed */}
+          <div className="flex items-center justify-between pt-4 px-3 pb-3 border-b border-theme flex-shrink-0">
             <h3 className="text-lg font-semibold text-theme-primary">{item.item}</h3>
             <button
               onClick={onClose}
@@ -153,69 +145,37 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
             </button>
           </div>
 
-          {/* Item Image */}
-          <div className="p-2 flex justify-center">
-            <img
-              src={item.image}
-              alt={item.item}
-              className="w-24 h-24 rounded-lg object-cover border-2 border-theme"
-              onError={(e) => {
-                console.log('Image failed to load:', e.target.src);
-                const target = e.target as HTMLImageElement;
-                target.src = '/images/placeholder.svg';
-              }}
-            />
-          </div>
+          {/* Scrollable Content */}
+          <div className="flex-1 overflow-y-auto px-3 py-2">
+            {/* Item Image */}
+            <div className="pb-2 flex justify-center">
+              <img
+                src={item.image}
+                alt={item.item}
+                className="w-24 h-24 rounded-lg object-cover border-2 border-theme"
+                onError={(e) => {
+                  console.log('Image failed to load:', e.target.src);
+                  const target = e.target as HTMLImageElement;
+                  target.src = '/images/placeholder.svg';
+                }}
+              />
+            </div>
 
-          {/* Item Details */}
-          <div className="px-3 space-y-2">
+            {/* Item Details */}
+            <div className="px-3 space-y-2">
             {/* Quantity Section - Compact */}
-            <div className="bg-theme-secondary p-2 rounded-lg border border-theme">
-              <label className="block text-sm font-medium text-theme-primary mb-2">
+            <div className="bg-theme-secondary p-1.5 rounded-lg border border-theme">
+              <label className="block text-sm font-medium text-theme-primary mb-1.5">
                 Quantity
               </label>
-              {isEditing ? (
-                <div className="space-y-4">
-                  <VisualQuantitySelector
-                    value={editQuantity}
-                    onChange={(newQuantity) => {
-                      setEditQuantity(newQuantity);
-                      setHasQuantityChanged(true);
-                    }}
-                    itemName={item.item}
-                    unit="items"
-                    maxValue={50}
-                    showTypicalAmounts={true}
-                  />
-
-                  {hasQuantityChanged && (
-                    <div className="flex gap-2 justify-center">
-                      <button
-                        onClick={handleSaveQuantity}
-                        className="px-3 py-1 text-sm bg-[var(--accent-color)] text-white rounded-lg hover:bg-[var(--accent-color)]/80 transition-colors"
-                      >
-                        Save
-                      </button>
-                      <button
-                        onClick={handleCancelEdit}
-                        className="px-3 py-1 text-sm bg-theme-primary text-theme-primary border border-theme rounded-lg hover:bg-theme-secondary transition-colors"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="flex items-center justify-between">
-                  <span className="text-lg font-semibold text-theme-primary">{formatItemQuantity(item)}</span>
-                  <button
-                    onClick={() => setIsEditing(true)}
-                    className="text-[var(--accent-color)] hover:text-[var(--accent-color)]/80"
-                  >
-                    <Edit3 className="w-4 h-4" />
-                  </button>
-                </div>
-              )}
+              <QuantityUnitPicker
+                quantity={editQuantity}
+                unit={editUnit}
+                onQuantityChange={handleQuantityChange}
+                onUnitChange={handleUnitChange}
+                itemName={item.item}
+                showControls={true}
+              />
             </div>
 
             {/* Original Quantity (from recipe/shopping list) */}
@@ -350,39 +310,39 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                   <h4 className="font-semibold text-theme-primary text-sm">Nutrition Facts</h4>
                   <span className="text-xs text-theme-primary/70 ml-auto">{nutrition.servingSize}</span>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-2">
                   {nutrition.calories && (
-                    <div className="bg-theme-primary/30 p-2 rounded">
+                    <div className="bg-theme-primary/30 p-1.5 rounded">
                       <div className="text-xs text-theme-primary/70">Calories</div>
                       <div className="text-sm font-bold text-theme-primary">{Math.round(nutrition.calories)}</div>
                     </div>
                   )}
                   {nutrition.protein && (
-                    <div className="bg-theme-primary/30 p-2 rounded">
+                    <div className="bg-theme-primary/30 p-1.5 rounded">
                       <div className="text-xs text-theme-primary/70">Protein</div>
                       <div className="text-sm font-bold text-theme-primary">{nutrition.protein.toFixed(1)}g</div>
                     </div>
                   )}
                   {nutrition.carbs && (
-                    <div className="bg-theme-primary/30 p-2 rounded">
+                    <div className="bg-theme-primary/30 p-1.5 rounded">
                       <div className="text-xs text-theme-primary/70">Carbs</div>
                       <div className="text-sm font-bold text-theme-primary">{nutrition.carbs.toFixed(1)}g</div>
                     </div>
                   )}
                   {nutrition.fat && (
-                    <div className="bg-theme-primary/30 p-2 rounded">
+                    <div className="bg-theme-primary/30 p-1.5 rounded">
                       <div className="text-xs text-theme-primary/70">Fat</div>
                       <div className="text-sm font-bold text-theme-primary">{nutrition.fat.toFixed(1)}g</div>
                     </div>
                   )}
                   {nutrition.fiber && (
-                    <div className="bg-theme-primary/30 p-2 rounded">
+                    <div className="bg-theme-primary/30 p-1.5 rounded">
                       <div className="text-xs text-theme-primary/70">Fiber</div>
                       <div className="text-sm font-bold text-theme-primary">{nutrition.fiber.toFixed(1)}g</div>
                     </div>
                   )}
                   {nutrition.sugar && (
-                    <div className="bg-theme-primary/30 p-2 rounded">
+                    <div className="bg-theme-primary/30 p-1.5 rounded">
                       <div className="text-xs text-theme-primary/70">Sugar</div>
                       <div className="text-sm font-bold text-theme-primary">{nutrition.sugar.toFixed(1)}g</div>
                     </div>
@@ -419,37 +379,49 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
               </div>
             )}
           </div>
+          </div>
 
-          {/* Action Buttons */}
-          <div className="px-3 py-3 border-t border-theme space-y-2">
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={() => onAddToShoppingList([cleanItemNameForShopping(item.item)])}
-                className="flex items-center justify-center gap-2 px-4 py-2 bg-[var(--accent-color)] text-[var(--text-theme-primary)] rounded-lg hover:bg-[var(--accent-color)]/80 transition-colors"
-              >
-                <ShoppingBasket className="w-4 h-4" />
-                Buy More
-              </button>
-              <button
-                onClick={() => setShowPriceTrends(true)}
-                className="flex items-center justify-center gap-2 px-4 py-2 bg-[var(--bg-theme-secondary)] text-[var(--text-theme-primary)] border border-[var(--border-theme)] rounded-lg hover:bg-[var(--bg-theme-primary)] transition-colors"
-              >
-                <TrendingUp className="w-4 h-4" />
-                Price Trends
-              </button>
+          {/* Action Buttons - Fixed at bottom */}
+          <div className="flex-shrink-0 border-t border-theme bg-theme-primary">
+            <div className="p-3 space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => onAddToShoppingList([cleanItemNameForShopping(item.item)])}
+                  className="flex items-center justify-center gap-2 px-4 py-2 bg-[var(--accent-color)] text-[var(--text-theme-primary)] rounded-lg hover:bg-[var(--accent-color)]/80 transition-colors"
+                >
+                  <ShoppingBasket className="w-4 h-4" />
+                  Buy More
+                </button>
+                <button
+                  onClick={() => setShowPriceTrends(true)}
+                  className="flex items-center justify-center gap-2 px-4 py-2 bg-[var(--bg-theme-secondary)] text-[var(--text-theme-primary)] border border-[var(--border-theme)] rounded-lg hover:bg-[var(--bg-theme-primary)] transition-colors"
+                >
+                  <TrendingUp className="w-4 h-4" />
+                  Price Trends
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => {
+                    if (window.confirm(`Are you sure you want to delete ${item.item}?`)) {
+                      onDeleteItem(originalIndex);
+                      onClose();
+                    }
+                  }}
+                  className="flex items-center justify-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Delete Item
+                </button>
+                <button
+                  onClick={onClose}
+                  className="flex items-center justify-center gap-2 px-4 py-2 bg-[var(--bg-theme-secondary)] text-[var(--text-theme-primary)] border border-[var(--border-theme)] rounded-lg hover:bg-[var(--bg-theme-primary)] transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                  Close
+                </button>
+              </div>
             </div>
-            <button
-              onClick={() => {
-                if (window.confirm(`Are you sure you want to delete ${item.item}?`)) {
-                  onDeleteItem(originalIndex);
-                  onClose();
-                }
-              }}
-              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-            >
-              <Trash2 className="w-4 h-4" />
-              Delete Item
-            </button>
           </div>
         </div>
       </div>

@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { TrendingUp, ChefHat, Clock, Target, Lightbulb, Star } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { useDataManagement } from '../hooks/useDataManagement';
+import AnalyticsService from '../services/analyticsService';
 
 /**
  * Interface for smart recommendation data
@@ -190,11 +191,49 @@ const SmartRecommendations: React.FC = () => {
 
   const getImpactIcon = (impact: string) => {
     switch (impact) {
-      case 'high': return '🔥';
-      case 'medium': return '⚡';
-      case 'low': return '💡';
-      default: return '💡';
+      case 'high': return '🔴';
+      case 'medium': return '🟡';
+      case 'low': return '🟢';
+      default: return '⚪';
     }
+  };
+
+  const handleRecommendationAction = (rec: SmartRecommendation) => {
+    // Track the recommendation action
+    AnalyticsService.trackRecommendationAction(rec.id, rec.type);
+
+    switch (rec.type) {
+      case 'recipe':
+        // Navigate to recipes tab
+        if (rec.actionText.includes('View Recipe') || rec.actionText.includes('Browse Recipes')) {
+          // This would need to be passed as a prop or accessed via context
+          // For now, we'll just show a toast
+          console.log(`Navigate to recipes for: ${rec.title}`);
+        } else if (rec.actionText.includes('Find Recipes')) {
+          console.log(`Find recipes using expiring items for: ${rec.title}`);
+        }
+        break;
+      case 'feature':
+        if (rec.actionText.includes('Create Meal Plan')) {
+          console.log('Navigate to meal planning');
+        } else if (rec.actionText.includes('Upgrade Now')) {
+          console.log('Navigate to premium upgrade');
+        } else if (rec.actionText.includes('Add First Item')) {
+          console.log('Navigate to add inventory item');
+        }
+        break;
+      case 'shopping':
+        if (rec.actionText.includes('Create List')) {
+          console.log('Navigate to shopping list creation');
+        }
+        break;
+      default:
+        console.log(`Action for ${rec.type}: ${rec.actionText}`);
+    }
+
+    // For now, show a toast indicating the action
+    // In a real implementation, this would navigate or perform the action
+    console.log(`Recommendation action: ${rec.actionText} for ${rec.title}`);
   };
 
   if (recommendations.length === 0) {
@@ -245,7 +284,10 @@ const SmartRecommendations: React.FC = () => {
 
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-gray-500">{rec.category}</span>
-                  <button className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors">
+                  <button 
+                    onClick={() => handleRecommendationAction(rec)}
+                    className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                  >
                     {rec.actionText}
                   </button>
                 </div>

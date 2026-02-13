@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { CalendarClock, Plus, Move, AlertCircle, ShoppingBasket, Trash2, HelpCircle } from 'lucide-react';
+import { CalendarClock, Plus, Move, AlertCircle, ShoppingBasket, Trash2, HelpCircle, Search } from 'lucide-react';
 import { DayPlan, MealPlanItem, PantryItem, StructuredRecipe, User, SavedRecipe, ShoppingItem } from '../types';
 import RecipeModal from './RecipeModal';
 import { MealPrepPlanner } from './MealPrepPlanner';
@@ -7,7 +7,7 @@ import { PremiumFeature } from './PremiumFeature';
 import { GroceryCostEstimator } from './GroceryCostEstimator';
 import { Tab } from '../types/app';
 import { searchRecipes as searchRecipesGemini } from '../services/geminiService';
-import { getSavedRecipes } from '../services/recipeService';
+import { getSavedRecipes, getCachedPopularRecipes } from '../services/recipeService';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 import { parseIngredientForShoppingList } from '../utils/appUtils';
@@ -71,35 +71,101 @@ const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<StructuredRecipe[]>([]);
+  const [searchResultsSource, setSearchResultsSource] = useState<'saved' | 'gemini' | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [savedRecipes, setSavedRecipes] = useState<SavedRecipe[]>(propSavedRecipes);
   const [recipesLoaded, setRecipesLoaded] = useState(true); // Already loaded from props
+  const [cachedRecipes, setCachedRecipes] = useState<SavedRecipe[]>([]);
+  const [cachedRecipesLoaded, setCachedRecipesLoaded] = useState(false);
 
-  // Update saved recipes when prop changes
+  // Load cached recipes when component mounts
   useEffect(() => {
-    setSavedRecipes(propSavedRecipes);
-  }, [propSavedRecipes]);
+    const loadCachedRecipes = async () => {
+      try {
+        const recipes = await getCachedPopularRecipes();
+        setCachedRecipes(recipes);
+        setCachedRecipesLoaded(true);
+      } catch (error) {
+        console.error('Failed to load cached recipes:', error);
+        setCachedRecipesLoaded(true); // Still mark as loaded to avoid infinite loading
+      }
+    };
+
+    loadCachedRecipes();
+  }, []);
+
+  // Clear search results when query is empty
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setSearchResults([]);
+      setSearchResultsSource(null);
+    }
+  }, [searchQuery]);
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
 
     setIsSearching(true);
     try {
-      const pantryIngredients = inventory.map(item => item.item.toLowerCase()).join(', ');
-      const result = await searchRecipesGemini({
-        query: searchQuery,
-        ingredients: pantryIngredients,
-        restrictions: '',
-        maxCookTime: 60,
-        maxIngredients: 15,
-        measurementSystem: 'Standard',
-        strictMode: false,
-        userId: user?.id
-      }, user);
-      setSearchResults(result.recipes || []);
+      // First, search through saved recipes
+      const savedResults = searchRecipes(savedRecipes, searchQuery)
+        .filter((recipe, index, self) =>
+          index === self.findIndex(r => r.title === recipe.title)
+        );
+
+      // Also search through cached recipes
+      const cachedResults = searchRecipes(cachedRecipes, searchQuery)
+        .filter((recipe, index, self) =>
+          index === self.findIndex(r => r.title === recipe.title)
+        )
+        .filter(recipe => !savedResults.some(saved => saved.title === recipe.title)); // Avoid duplicates
+
+      // Combine saved and cached results
+      const allResults = [...savedResults, ...cachedResults];
+
+      // If we found recipes, show them
+      if (allResults.length > 0) {
+        setSearchResults(allResults.map(recipe => ({
+          title: recipe.title,
+          description: recipe.description || '',
+          cookTime: recipe.cookTime || '30 mins',
+          servings: recipe.servings || 4,
+          ingredients: recipe.ingredients || [],
+          instructions: recipe.instructions || [],
+          image: recipe.image,
+          nutrition: recipe.nutrition,
+          tags: recipe.tags || []
+        })));
+        setSearchResultsSource('saved');
+        setIsSearching(false);
+        return;
+      }
+
+      // If no saved/cached recipes found, try Gemini as fallback (only if user opted in)
+      const { userOptedInToGemini } = await import('../services/featureFlags');
+      if (userOptedInToGemini(user?.id)) {
+        const pantryIngredients = inventory.map(item => item.item.toLowerCase()).join(', ');
+        const result = await searchRecipesGemini({
+          query: searchQuery,
+          ingredients: pantryIngredients,
+          restrictions: '',
+          maxCookTime: 60,
+          maxIngredients: 15,
+          measurementSystem: 'Standard',
+          strictMode: false,
+          userId: user?.id
+        }, user);
+        setSearchResults(result.recipes || []);
+        setSearchResultsSource('gemini');
+      } else {
+        // No recipes found and user hasn't opted into Gemini
+        setSearchResults([]);
+        setSearchResultsSource(null);
+      }
     } catch (error) {
       console.error('Search error:', error);
       setSearchResults([]);
+      setSearchResultsSource(null);
     } finally {
       setIsSearching(false);
     }
@@ -126,8 +192,19 @@ const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
     searchRecipes(savedRecipes, searchQuery)
       .filter((recipe, index, self) =>
         index === self.findIndex(r => r.title === recipe.title)
-      ),
-    [savedRecipes, searchQuery]
+      )
+      .filter(recipe => !searchResults.some(searchResult => searchResult.title === recipe.title)),
+    [savedRecipes, searchQuery, searchResults]
+  );
+
+  const filteredCachedRecipes = useMemo(() => 
+    searchRecipes(cachedRecipes, searchQuery)
+      .filter((recipe, index, self) =>
+        index === self.findIndex(r => r.title === recipe.title)
+      )
+      .filter(recipe => !searchResults.some(searchResult => searchResult.title === recipe.title))
+      .filter(recipe => !filteredSavedRecipes.some(saved => saved.title === recipe.title)), // Avoid duplicates with saved recipes
+    [cachedRecipes, searchQuery, searchResults, filteredSavedRecipes]
   );
 
   return (
@@ -166,7 +243,9 @@ const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
         )}
         {searchResults.length > 0 && !isSearching && (
           <div>
-            <h4 className="text-sm font-semibold text-theme-secondary mb-2">Search Results</h4>
+            <h4 className="text-sm font-semibold text-theme-secondary mb-2">
+              {searchResultsSource === 'saved' ? 'Saved Recipes' : 'Recipe Suggestions'}
+            </h4>
             <div className="grid grid-cols-3 gap-2">
               {searchResults.map((recipe, index) => (
                 <div
@@ -314,9 +393,167 @@ const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
           </div>
         )}
 
-        {!isSearching && searchQuery && searchResults.length === 0 && filteredSavedRecipes.length === 0 && (
+        {filteredCachedRecipes.length > 0 && cachedRecipesLoaded && (
+          <div>
+            <h4 className="text-sm font-semibold text-theme-secondary mb-2">Popular Recipes</h4>
+            <div className="grid grid-cols-3 gap-2">
+              {filteredCachedRecipes.map((recipe) => (
+                <div
+                  key={recipe.id}
+                  className="bg-theme-secondary rounded-lg overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
+                  onClick={() => {
+                    // Open recipe modal for preview
+                    const event = new CustomEvent('openRecipeModal', {
+                      detail: { recipe, isSavedView: false }
+                    });
+                    window.dispatchEvent(event);
+                  }}
+                >
+                  {/* Recipe Image */}
+                  <div className="aspect-square bg-theme-primary/20 relative overflow-hidden">
+                    {recipe.image ? (
+                      <img
+                        src={recipe.image}
+                        alt={recipe.title}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.style.display = 'none';
+                          const parent = target.parentElement;
+                          if (parent) {
+                            parent.innerHTML = `
+                              <div class="w-full h-full flex items-center justify-center bg-theme-primary/10">
+                                <svg class="w-6 h-6 text-theme-secondary opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                                </svg>
+                              </div>
+                            `;
+                          }
+                        }}
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-theme-primary/10">
+                        <svg className="w-6 h-6 text-theme-secondary opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                        </svg>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Recipe Info */}
+                  <div className="p-2">
+                    <h5 className="font-semibold text-xs text-theme-primary line-clamp-2 leading-tight mb-1">{recipe.title}</h5>
+                    <div className="flex items-center justify-between text-xs text-theme-secondary opacity-70">
+                      <span>{recipe.cookTime}</span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onAddRecipe(recipe, dayIndex);
+                        }}
+                        className="px-2 py-1 bg-[var(--accent-color)] text-white rounded text-xs hover:bg-[var(--accent-color)]/90"
+                      >
+                        Add
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {!isSearching && searchQuery && searchResults.length === 0 && filteredSavedRecipes.length === 0 && filteredCachedRecipes.length === 0 && (
           <div className="text-center py-8 text-theme-primary opacity-50">
             No recipes found. Try a different search term.
+          </div>
+        )}
+
+        {/* Cached Recipes Section - Show when no search query */}
+        {!searchQuery && cachedRecipesLoaded && cachedRecipes.length > 0 && (
+          <div>
+            <h4 className="text-sm font-semibold text-theme-secondary mb-2">Popular Recipes</h4>
+            <div className="grid grid-cols-3 gap-2">
+              {cachedRecipes.slice(0, 12).map((recipe) => (
+                <div
+                  key={recipe.id}
+                  className="bg-theme-secondary rounded-lg overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
+                  onClick={() => {
+                    // Open recipe modal for preview
+                    const event = new CustomEvent('openRecipeModal', {
+                      detail: { recipe, isSavedView: false }
+                    });
+                    window.dispatchEvent(event);
+                  }}
+                >
+                  {/* Recipe Image */}
+                  <div className="aspect-square bg-theme-primary/20 relative overflow-hidden">
+                    {recipe.image ? (
+                      <img
+                        src={recipe.image}
+                        alt={recipe.title}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.style.display = 'none';
+                          const parent = target.parentElement;
+                          if (parent) {
+                            parent.innerHTML = `
+                              <div class="w-full h-full flex items-center justify-center bg-theme-primary/10">
+                                <svg class="w-6 h-6 text-theme-secondary opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                                </svg>
+                              </div>
+                            `;
+                          }
+                        }}
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-theme-primary/10">
+                        <svg className="w-6 h-6 text-theme-secondary opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                        </svg>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Recipe Info */}
+                  <div className="p-2">
+                    <h5 className="font-semibold text-xs text-theme-primary line-clamp-2 leading-tight mb-1">{recipe.title}</h5>
+                    <div className="flex items-center justify-between text-xs text-theme-secondary opacity-70">
+                      <span>{recipe.cookTime}</span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onAddRecipe(recipe, dayIndex);
+                        }}
+                        className="px-2 py-1 bg-[var(--accent-color)] text-white rounded text-xs hover:bg-[var(--accent-color)]/90"
+                      >
+                        Add
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {!searchQuery && !cachedRecipesLoaded && (
+          <div>
+            <h4 className="text-sm font-semibold text-theme-secondary mb-2">Popular Recipes</h4>
+            <div className="grid grid-cols-3 gap-2">
+              {Array.from({ length: 6 }).map((_, index) => (
+                <CompactRecipeCardSkeleton key={`cached-skeleton-${index}`} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {!searchQuery && cachedRecipesLoaded && cachedRecipes.length === 0 && (
+          <div className="text-center py-8 text-theme-primary opacity-50">
+            No popular recipes available
           </div>
         )}
 
@@ -343,6 +580,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
   const [modalContext, setModalContext] = useState<'search' | 'scheduled'>('search');
   const [showHelpTooltip, setShowHelpTooltip] = useState(false);
   const [selectedDayIndex, setSelectedDayIndex] = useState<number | null>(null);
+  const [isEstimatorOpen, setIsEstimatorOpen] = useState(false);
 
   // Use prop savedRecipes or local state as fallback
   const [localSavedRecipes, setLocalSavedRecipes] = useState<SavedRecipe[]>([]);
@@ -425,16 +663,52 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
       const key = parsed.itemName;
       
       if (!acc[key]) {
+        // Extract unit from quantity string more intelligently
+        let unit = 'count';
+        const qtyParts = parsed.quantity.split(' ');
+        
+        if (qtyParts.length > 1) {
+          // Check if the second part looks like a unit
+          const potentialUnit = qtyParts[1].toLowerCase();
+          const commonUnits = ['tbs', 'tbsp', 'tsp', 'cup', 'cups', 'oz', 'ounce', 'lb', 'pound', 'g', 'gram', 'kg', 'liter', 'l', 'ml', 'clove', 'cloves', 'bunch', 'bunches', 'sprig', 'sprigs', 'head', 'heads', 'stalk', 'stalks', 'slice', 'slices', 'piece', 'pieces'];
+          
+          if (commonUnits.includes(potentialUnit) || potentialUnit.endsWith('s')) {
+            unit = potentialUnit;
+          } else if (parsed.quantity.match(/\d+\s*(g|kg|ml|l|oz|lb)$/i)) {
+            // Handle cases like "200g" where unit is attached to number
+            const unitMatch = parsed.quantity.match(/\d+\s*(g|kg|ml|l|oz|lb)$/i);
+            if (unitMatch) {
+              unit = unitMatch[1].toLowerCase();
+            }
+          }
+        } else if (parsed.quantity.match(/\d+(g|kg|ml|l|oz|lb)$/i)) {
+          // Handle cases like "200g" without space
+          const unitMatch = parsed.quantity.match(/\d+(g|kg|ml|l|oz|lb)$/i);
+          if (unitMatch) {
+            unit = unitMatch[1].toLowerCase();
+          }
+        }
+        
         acc[key] = {
           ingredient: parsed.itemName,
           quantity: 0, // Will be calculated
-          unit: parsed.quantity.includes(' ') ? parsed.quantity.split(' ')[1] : 'count',
+          unit: unit,
           recipes: []
         };
       }
       
-      // Add quantity (parse numeric value)
-      const qtyValue = parseFloat(parsed.quantity.split(' ')[0]) || 1;
+      // Add quantity (parse numeric value, handling fractions)
+      let qtyValue = 1;
+      const qtyStr = parsed.quantity.split(' ')[0];
+      
+      if (qtyStr.includes('/')) {
+        // Handle fractions like "1/2"
+        const [numerator, denominator] = qtyStr.split('/').map(Number);
+        qtyValue = numerator / denominator;
+      } else {
+        qtyValue = parseFloat(qtyStr) || 1;
+      }
+      
       acc[key].quantity += qtyValue;
       
       // Track recipes
@@ -742,11 +1016,10 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
 
   return (
     <div className="space-y-6 pb-24 animate-fade-in">
-      <div className="text-center mb-2 relative">
-        <div className="flex items-center justify-center gap-2 mb-2">
+      <div className="text-center mb-1 relative">
+        <div className="flex items-center justify-center gap-2">
           <h2 className="text-3xl font-serif font-bold text-theme-secondary">Meal Schedule</h2>
         </div>
-        <p className="text-theme-secondary opacity-60 text-sm mt-1">Plan your week ahead</p>
         
         {/* Help Tooltip */}
         {showHelpTooltip && (
@@ -810,7 +1083,26 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
           {missingItemsCount > 0 ? `Add ${missingItemsCount} Missing Items to List` : "Pantry is Stocked"}
         </button>
 
-        <GroceryCostEstimator mealPlan={mealPlan} inventory={inventory} />
+        <div className={`flex gap-4 ${isEstimatorOpen ? 'flex-col' : ''}`}>
+          <div className={isEstimatorOpen ? 'w-full' : 'flex-1'}>
+            <GroceryCostEstimator 
+              mealPlan={mealPlan} 
+              inventory={inventory} 
+              onEstimatorToggle={setIsEstimatorOpen}
+            />
+          </div>
+          {!isEstimatorOpen && (
+            <div className="flex-1">
+              <button
+                onClick={() => setActiveTab(Tab.RECIPES)}
+                className="w-full flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+              >
+                <Search className="w-4 h-4" />
+                Search
+              </button>
+            </div>
+          )}
+        </div>
 
         {/* Today's Meals Highlight */}
         {todaysMeals.length > 0 && (
@@ -953,7 +1245,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
                 key={dayIndex}
                 onClick={() => setSelectedDayIndex(dayIndex)}
                 className={`bg-theme-secondary rounded-lg p-3 min-h-[250px] border-2 transition-all cursor-pointer flex flex-col hover:shadow-lg hover:scale-[1.02] ${
-                  isToday(day.date)
+                  isToday(day.date) && !showRecipeModal && !showRecipeSearch && !showAddMealDialog && !showMealPrepPlanner
                     ? 'border-[var(--accent-color)] bg-gradient-to-br from-[var(--accent-color)]/5 to-transparent shadow-md ring-1 ring-[var(--accent-color)]/20'
                     : 'border-theme'
                 }`}

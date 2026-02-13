@@ -37,7 +37,7 @@ describe('RecipeRatingUI', () => {
   const defaultProps = {
     recipeTitle: 'Test Recipe',
     recipe: mockRecipe,
-    onRate: vi.fn(),
+    onRatingSubmitted: vi.fn(),
     user: mockUser
   };
 
@@ -76,7 +76,7 @@ describe('RecipeRatingUI', () => {
 
   it('submits rating with comment', () => {
     const mockOnRate = vi.fn();
-    render(<RecipeRatingUI {...defaultProps} onRate={mockOnRate} />);
+    render(<RecipeRatingUI {...defaultProps} onRatingSubmitted={mockOnRate} />);
 
     // Select 5 stars
     const starButtons = screen.getAllByRole('button').filter(button =>
@@ -104,7 +104,7 @@ describe('RecipeRatingUI', () => {
 
   it('shows thank you message after submission', async () => {
     const mockOnRate = vi.fn();
-    render(<RecipeRatingUI {...defaultProps} onRate={mockOnRate} />);
+    render(<RecipeRatingUI {...defaultProps} onRatingSubmitted={mockOnRate} />);
 
     // Select rating and submit
     const starButtons = screen.getAllByRole('button').filter(button =>
@@ -116,14 +116,14 @@ describe('RecipeRatingUI', () => {
     fireEvent.click(submitButton);
 
     await waitFor(() => {
-      expect(screen.getByText('Thank you for your feedback!')).toBeInTheDocument();
-      expect(screen.getByText('Your review helps the community.')).toBeInTheDocument();
+      expect(screen.getByText('Rating submitted successfully!')).toBeInTheDocument();
+      expect(screen.getByText('Thanks for your feedback!')).toBeInTheDocument();
     });
   });
 
   it('handles anonymous user', () => {
     const mockOnRate = vi.fn();
-    render(<RecipeRatingUI {...defaultProps} onRate={mockOnRate} user={undefined} />);
+    render(<RecipeRatingUI {...defaultProps} onRatingSubmitted={mockOnRate} user={undefined} />);
 
     // Select rating and submit
     const starButtons = screen.getAllByRole('button').filter(button =>
@@ -146,7 +146,7 @@ describe('RecipeRatingUI', () => {
 
   it('prevents form submission without rating', () => {
     const mockOnRate = vi.fn();
-    render(<RecipeRatingUI {...defaultProps} onRate={mockOnRate} />);
+    render(<RecipeRatingUI {...defaultProps} onRatingSubmitted={mockOnRate} />);
 
     const submitButton = screen.getByRole('button', { name: /submit rating/i });
     expect(submitButton).toBeDisabled();

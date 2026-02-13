@@ -19,6 +19,11 @@ export async function saveDayPlan(householdId: string, day: DayPlan) {
   }, { merge: true });
 }
 
+/**
+ * Generates an array of the next 7 date keys in YYYY-MM-DD format
+ * @param start The starting date (defaults to today)
+ * @returns Array of 7 date strings
+ */
 export function next7DateKeys(start = new Date()) {
   const keys: string[] = [];
   const d = new Date(start);
@@ -31,6 +36,12 @@ export function next7DateKeys(start = new Date()) {
   return keys;
 }
 
+/**
+ * Checks if a user is a member of a household
+ * @param h The household object
+ * @param u The user object
+ * @returns True if the user is a member of the household
+ */
 export function isHouseholdMember(h: Household | null | undefined, u: User | null | undefined) {
   if (!h || !u) return false;
   if (Array.isArray(h.memberIds) && h.memberIds.includes(u.id)) return true;
@@ -50,7 +61,7 @@ export function parseItemText(itemText: string): { quantity: number; description
   
   // Extract quantity from the beginning (e.g., "1 ", "2 ", "3 ", etc.)
   const quantityMatch = text.match(/^(\d+)\s+/);
-  const quantity = quantityMatch ? parseInt(quantityMatch[1], 10) : 1;
+  const quantity = quantityMatch ? Math.max(1, parseInt(quantityMatch[1], 10)) : 1;
   
   // Clean the description by removing quantities and common descriptors
   let description = text

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CheckSquare, Package, Tag } from 'lucide-react';
+import { CheckSquare, Package, Tag, Archive, Undo2 } from 'lucide-react';
 import { ShoppingItem } from '../types';
 import { inferCategoryFromItemName } from '../utils/appUtils';
 
@@ -7,14 +7,17 @@ interface BatchOperationsProps {
   items: ShoppingItem[];
   onBatchCheck: (itemIds: string[]) => void;
   onBatchUncheck: (itemIds: string[]) => void;
+  onMoveToPantry?: (items: ShoppingItem[]) => void;
 }
 
 export const BatchOperations: React.FC<BatchOperationsProps> = ({
   items,
   onBatchCheck,
-  onBatchUncheck
+  onBatchUncheck,
+  onMoveToPantry
 }) => {
   const [showBatchMenu, setShowBatchMenu] = useState(false);
+  const [recentlyMovedCategories, setRecentlyMovedCategories] = useState<Set<string>>(new Set());
 
   const categories = React.useMemo(() => {
     const categoryMap = new Map<string, ShoppingItem[]>();
@@ -56,6 +59,27 @@ export const BatchOperations: React.FC<BatchOperationsProps> = ({
     setShowBatchMenu(false);
   };
 
+  const handleMoveCategoryToPantry = (categoryName: string) => {
+    if (!onMoveToPantry) return;
+    
+    const categoryItems = items.filter(item =>
+      inferCategoryFromItemName(item.item) === categoryName
+    );
+    
+    onMoveToPantry(categoryItems);
+    setRecentlyMovedCategories(prev => new Set([...prev, categoryName]));
+    setShowBatchMenu(false);
+  };
+
+  const handleUndoMoveCategory = (categoryName: string) => {
+    setRecentlyMovedCategories(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(categoryName);
+      return newSet;
+    });
+    // Note: The items remain in pantry - user would need to manually remove them if desired
+  };
+
   const handleSelectAll = () => {
     const uncheckedItems = items.filter(item => !item.checked);
     onBatchCheck(uncheckedItems.map(item => item.id));
@@ -76,85 +100,59 @@ export const BatchOperations: React.FC<BatchOperationsProps> = ({
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-semibold text-theme-primary flex items-center gap-2">
           <CheckSquare className="w-4 h-4" />
-          Quick Actions
+          Categories
         </h3>
         <button
           onClick={() => setShowBatchMenu(!showBatchMenu)}
           className="text-xs text-[var(--accent-color)] hover:underline"
         >
-          {showBatchMenu ? 'Hide' : 'Show'} options
+          {showBatchMenu ? 'Hide' : 'Show'} categories
         </button>
       </div>
 
-      {/* Basic Actions */}
-      <div className="flex gap-2 mb-3">
-        <button
-          onClick={handleSelectAll}
-          disabled={uncheckedCount === 0}
-          className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${
-            uncheckedCount > 0
-              ? 'bg-[var(--accent-color)] text-white shadow-lg'
-              : 'bg-theme-primary text-theme-secondary opacity-50 cursor-not-allowed'
-          }`}
-        >
-          <CheckSquare className="w-4 h-4" />
-          Check All ({uncheckedCount})
-        </button>
-
-        <button
-          onClick={handleDeselectAll}
-          disabled={checkedCount === 0}
-          className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${
-            checkedCount > 0
-              ? 'bg-theme-primary text-theme-secondary hover:bg-red-50 hover:text-red-600 border border-red-200'
-              : 'bg-theme-primary text-theme-secondary opacity-50 cursor-not-allowed'
-          }`}
-        >
-          <Package className="w-4 h-4" />
-          Uncheck All ({checkedCount})
-        </button>
-      </div>
-
-      {/* Advanced Batch Operations */}
+      {/* Category Operations */}
       {showBatchMenu && (
         <div className="space-y-2 animate-fade-in">
           <div className="text-xs text-theme-secondary opacity-70 mb-2">
-            Mark entire categories as done:
+            Move entire categories to pantry:
           </div>
 
-          {categories.map(category => (
-            <div key={category.name} className="flex items-center justify-between p-2 bg-theme-primary rounded-lg">
-              <div className="flex items-center gap-2">
-                <Tag className="w-4 h-4 text-theme-secondary" />
-                <span className="text-sm font-medium text-theme-primary">{category.name}</span>
-                <span className="text-xs text-theme-secondary opacity-70">
-                  ({category.uncheckedCount} left, {category.checkedCount} done)
-                </span>
-              </div>
+          {categories.map(category => {
+            const recentlyMoved = recentlyMovedCategories.has(category.name);
+            return (
+              <div key={category.name} className="flex items-center justify-between p-2 bg-theme-primary rounded-lg">
+                <div className="flex items-center gap-2">
+                  <Tag className="w-4 h-4 text-theme-secondary" />
+                  <span className="text-sm font-medium text-theme-primary">{category.name}</span>
+                  <span className="text-xs text-theme-secondary opacity-70">
+                    ({category.uncheckedCount + category.checkedCount} items)
+                  </span>
+                </div>
 
-              <div className="flex gap-1">
-                {category.uncheckedCount > 0 && (
-                  <button
-                    onClick={() => handleBatchCheckCategory(category.name)}
-                    className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded hover:bg-green-200 transition-colors"
-                    title={`Mark all ${category.name} items as done`}
-                  >
-                    ✓ All
-                  </button>
-                )}
-
-                {category.checkedCount > 0 && (
-                  <button
-                    onClick={() => handleBatchUncheckCategory(category.name)}
-                    className="px-2 py-1 text-xs bg-orange-100 text-orange-800 rounded hover:bg-orange-200 transition-colors"
-                    title={`Uncheck all ${category.name} items`}
-                  >
-                    ↺ Undo
-                  </button>
-                )}
+                <div className="flex gap-1">
+                  {recentlyMoved ? (
+                    <button
+                      onClick={() => handleUndoMoveCategory(category.name)}
+                      className="px-2 py-1 text-xs bg-orange-500 text-white rounded hover:bg-orange-600 transition-colors"
+                      title={`Undo move of ${category.name} to pantry`}
+                    >
+                      <Undo2 className="w-3 h-3 inline mr-1" />
+                      Undo
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => handleMoveCategoryToPantry(category.name)}
+                      className="px-2 py-1 text-xs bg-[var(--accent-color)] text-white rounded hover:bg-[var(--accent-color)]/90 transition-colors"
+                      title={`Move all ${category.name} items to pantry`}
+                    >
+                      <Archive className="w-3 h-3 inline mr-1" />
+                      Move to Pantry
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

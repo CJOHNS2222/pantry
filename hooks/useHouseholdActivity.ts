@@ -22,6 +22,7 @@ export function useHouseholdActivity(user: User | null, household: Household | n
 
     const activityMap = {
       [Tab.PANTRY]: 'viewing pantry',
+      [Tab.PANTRY_CACHE_TEST]: 'testing cached pantry',
       [Tab.SHOPPING]: 'viewing shopping list',
       [Tab.MEAL_PLAN]: 'viewing meal plan',
       [Tab.RECIPES]: 'viewing recipes',
@@ -44,6 +45,7 @@ export function useHouseholdActivity(user: User | null, household: Household | n
       } else {
         const activityMap = {
           [Tab.PANTRY]: 'viewing pantry',
+          [Tab.PANTRY_CACHE_TEST]: 'testing cached pantry',
           [Tab.SHOPPING]: 'viewing shopping list',
           [Tab.MEAL_PLAN]: 'viewing meal plan',
           [Tab.RECIPES]: 'viewing recipes',

@@ -1,4 +1,5 @@
 // utils/errorUtils.ts
+import { log } from '../services/logService';
 export enum ErrorCode {
   // Network errors
   NETWORK_ERROR = 'NETWORK_ERROR',
@@ -201,12 +202,12 @@ export async function withErrorHandling<T>(
       );
 
       // Log error for debugging
-      console.error(`Operation failed (attempt ${attempt + 1}/${retries + 1}):`, {
+      log.error(`Operation failed (attempt ${attempt + 1}/${retries + 1})`, {
         code: lastError.code,
         message: lastError.message,
         context,
         retryable: lastError.retryable
-      });
+      }, 'ErrorUtils');
 
       // If this is the last attempt or error is not retryable, throw
       if (attempt === retries || !lastError.retryable) {
@@ -244,5 +245,115 @@ export async function safeAsync<T>(
       { originalError: error instanceof Error ? error : undefined, context, retryable: false }
     );
     return { success: false, error: appError };
+  }
+}
+
+/**
+ * Firebase operation wrapper with retry logic and proper error handling
+ */
+export async function withFirebaseRetry<T>(
+  operation: () => Promise<T>,
+  context: string,
+  maxRetries: number = 3
+): Promise<T> {
+  let lastError: Error;
+
+  for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+
+      // Check if this is a retryable Firebase error
+      const isRetryable = isFirebaseRetryableError(lastError);
+
+      if (!isRetryable || attempt > maxRetries) {
+        // Convert to AppError for consistent handling
+        const appError = new AppError(
+          getFirebaseErrorCode(lastError),
+          lastError.message,
+          `Operation failed: ${context}`,
+          {
+            originalError: lastError,
+            context,
+            retryable: isRetryable,
+            attempts: attempt
+          }
+        );
+
+        log.error(`Firebase operation failed after ${attempt} attempts`, appError, 'FirebaseUtils');
+        throw appError;
+      }
+
+      // Exponential backoff: 1s, 2s, 4s
+      const delay = Math.min(1000 * Math.pow(2, attempt - 1), 10000);
+      log.warn(`Firebase operation failed, retrying in ${delay}ms (attempt ${attempt}/${maxRetries + 1})`, { error: lastError, context }, 'FirebaseUtils');
+
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+
+  throw lastError!;
+}
+
+/**
+ * Check if a Firebase error is retryable
+ */
+function isFirebaseRetryableError(error: Error): boolean {
+  const retryableCodes = [
+    'unavailable',
+    'deadline-exceeded',
+    'resource-exhausted',
+    'cancelled',
+    'internal',
+    'unknown'
+  ];
+
+  const retryableMessages = [
+    'network',
+    'timeout',
+    'temporarily unavailable',
+    'too many requests'
+  ];
+
+  // Check Firebase error code
+  if ((error as any).code) {
+    const code = (error as any).code.toLowerCase();
+    if (retryableCodes.some(rc => code.includes(rc))) {
+      return true;
+    }
+  }
+
+  // Check error message
+  const message = error.message.toLowerCase();
+  return retryableMessages.some(rm => message.includes(rm));
+}
+
+/**
+ * Convert Firebase error to AppError code
+ */
+function getFirebaseErrorCode(error: Error): ErrorCode {
+  const code = (error as any).code;
+  if (!code) return ErrorCode.UNKNOWN_ERROR;
+
+  switch (code) {
+    case 'permission-denied':
+      return ErrorCode.PERMISSION_DENIED;
+    case 'not-found':
+      return ErrorCode.NOT_FOUND;
+    case 'already-exists':
+      return ErrorCode.CONFLICT;
+    case 'resource-exhausted':
+      return ErrorCode.RATE_LIMITED;
+    case 'failed-precondition':
+      return ErrorCode.VALIDATION_ERROR;
+    case 'invalid-argument':
+      return ErrorCode.VALIDATION_ERROR;
+    case 'unavailable':
+      return ErrorCode.NETWORK_ERROR;
+    case 'deadline-exceeded':
+      return ErrorCode.TIMEOUT_ERROR;
+    default:
+      return ErrorCode.FIRESTORE_ERROR;
   }
 }

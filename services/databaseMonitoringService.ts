@@ -211,6 +211,10 @@ class DatabaseMonitoringService {
       this.metrics.queries++;
       this.metrics.reads += result.size;
 
+      // Detailed logging for query tracking
+      const queryPath = this.getQueryPath(queryRef);
+      console.log(`🔍 QUERY: ${queryPath} | Results: ${result.size} | Duration: ${duration}ms | Total Queries: ${this.metrics.queries}`);
+
       AnalyticsService.trackQueryPerformance(
         queryRef.parent?.id || 'unknown',
         'getDocs',
@@ -220,12 +224,45 @@ class DatabaseMonitoringService {
 
       return result;
     } catch (error) {
+      const queryPath = this.getQueryPath(queryRef);
+      console.error(`❌ QUERY FAILED: ${queryPath} | Error: ${error.message}`);
+
       AnalyticsService.trackDatabaseOperation('read', 'unknown', 0, {
         operation: 'getDocs',
         success: false,
         error: error.message
       });
       throw error;
+    }
+  }
+
+  // Helper method to extract query path for logging
+  private static getQueryPath(queryRef: Query): string {
+    try {
+      // Try multiple ways to get the path
+      if (queryRef.parent?.path) {
+        return queryRef.parent.path;
+      }
+
+      // Try to get path from the query itself
+      if ((queryRef as any)._path) {
+        return (queryRef as any)._path.segments?.join('/') || 'unknown';
+      }
+
+      // Try to get collection name from query
+      if ((queryRef as any)._collection) {
+        const collection = (queryRef as any)._collection;
+        if (collection.path) {
+          return collection.path;
+        }
+        if (collection._path) {
+          return collection._path.segments?.join('/') || 'unknown';
+        }
+      }
+
+      return 'unknown';
+    } catch (error) {
+      return 'unknown';
     }
   }
 
@@ -434,6 +471,9 @@ class DatabaseMonitoringService {
   static onSnapshot(ref: any, callback: (snapshot: any) => void): Unsubscribe {
     this.metrics.realtimeSubscriptions++;
 
+    const path = ref.parent?.path || ref.path || 'unknown';
+    console.log(`📡 SUBSCRIPTION: ${path} | Total Subscriptions: ${this.metrics.realtimeSubscriptions}`);
+
     AnalyticsService.trackDatabaseOperation('read', ref.parent?.id || 'unknown', 0, {
       operation: 'onSnapshot',
       type: 'subscription_start'
@@ -442,7 +482,11 @@ class DatabaseMonitoringService {
     const unsubscribe = onSnapshot(ref, (snapshot) => {
       // Track each snapshot received
       if (snapshot.docChanges) {
-        AnalyticsService.trackDatabaseOperation('read', ref.parent?.id || 'unknown', snapshot.docChanges().length, {
+        const changes = snapshot.docChanges().length;
+        if (changes > 0) {
+          console.log(`📡 SUBSCRIPTION UPDATE: ${path} | Changes: ${changes}`);
+        }
+        AnalyticsService.trackDatabaseOperation('read', ref.parent?.id || 'unknown', changes, {
           operation: 'onSnapshot_update'
         });
       }
@@ -466,7 +510,8 @@ class DatabaseMonitoringService {
     this.cleanupWritePatterns();
 
     const metrics = this.getMetrics();
-    console.log('🔥 Firestore Database Metrics:', {
+    const timestamp = new Date().toLocaleTimeString();
+    console.log(`🔥 [${timestamp}] Firestore Database Metrics:`, {
       ...metrics,
       readsPerMinute: Math.round((metrics.reads / metrics.sessionDuration) * 60000),
       writesPerMinute: Math.round((metrics.writes / metrics.sessionDuration) * 60000),
@@ -677,6 +722,11 @@ class DatabaseMonitoringService {
           unsubscribe();
         };
       };
+
+      // Set up periodic metrics logging every 30 seconds
+      setInterval(() => {
+        this.logCurrentMetrics();
+      }, 30000);
 
       this.isInitialized = true;
       console.log('🔥 Database monitoring initialized with function overrides');

@@ -8,6 +8,9 @@ import { getMessaging, onMessage, isSupported } from "firebase/messaging";
 import { Capacitor } from '@capacitor/core';
 import webFirebaseConfig from './VITE_firebaseConfig';
 
+// Initialize monitoring BEFORE any Firebase operations
+import DatabaseMonitoringService from './services/databaseMonitoringService';
+
 let config;
 // Use the web config for all platforms (including Capacitor)
 config = webFirebaseConfig;
@@ -17,6 +20,9 @@ export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const storage = getStorage(app);
 export const functions = getFunctions(app);
+
+// Initialize database monitoring immediately
+DatabaseMonitoringService.initializeMonitoring();
 
 // Initialize messaging (FCM) - only on supported platforms
 let messaging: any = null;

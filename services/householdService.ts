@@ -3,18 +3,11 @@
  * Manages household creation, member management, and household lookup
  */
 
+import DatabaseMonitoringService from './databaseMonitoringService';
 import {
-  doc,
-  collection,
-  query,
-  where,
-  getDocs,
-  setDoc,
-  updateDoc,
   arrayUnion,
   arrayRemove,
   serverTimestamp,
-  deleteDoc,
 } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 import DatabaseMonitoringService from './databaseMonitoringService';
@@ -34,9 +27,9 @@ export const getOrCreateHousehold = async (user: User): Promise<Household | null
 
   try {
     // First, check if user belongs to any existing household by memberIds
-    const householdQuery = query(
-      collection(db, 'households'),
-      where('memberIds', 'array-contains', user.id)
+    const householdQuery = DatabaseMonitoringService.query(
+      DatabaseMonitoringService.collection('households'),
+      DatabaseMonitoringService.where('memberIds', 'array-contains', user.id)
     );
 
     // Option 1: Use direct Firestore (current)
@@ -103,7 +96,7 @@ export const createHousehold = async (
     // Add custom metrics
     perfTrace.putMetric('household_name_length', householdName.length);
 
-    await setDoc(doc(db, 'households', householdId), {
+    await DatabaseMonitoringService.setDoc(DatabaseMonitoringService.doc('households/' + householdId), {
       ...newHousehold,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
@@ -130,7 +123,7 @@ export const addMemberToHousehold = async (
     perfTrace.putAttribute('member_role', member.role);
     perfTrace.putAttribute('member_status', member.status);
 
-    await updateDoc(doc(db, 'households', householdId), {
+    await DatabaseMonitoringService.updateDoc(DatabaseMonitoringService.doc('households/' + householdId), {
       members: arrayUnion(member),
       memberIds: arrayUnion(member.id),
       updatedAt: serverTimestamp(),
@@ -149,28 +142,42 @@ export const updateMemberStatus = async (
   newStatus: 'active' | 'pending' | 'inactive'
 ): Promise<void> => {
   try {
-    const householdRef = doc(db, 'households', householdId);
-    const householdSnap = await getDocs(
-      query(collection(db, 'households'), where('id', '==', householdId))
-    );
+    const householdRef = DatabaseMonitoringService.doc('households/' + householdId);
+    const householdSnap = await DatabaseMonitoringService.getDoc(householdRef);
 
-    if (householdSnap.empty) {
-      throw new Error('Household not found');
+    if (!householdSnap.exists()) {
+      throw new Error('Unable to join 10: Household not found');
     }
 
-    const household = householdSnap.docs[0];
-    const members = household.data().members || [];
+    const householdData = householdSnap.data();
+    const members = householdData.members || [];
+    const currentMemberIds = householdData.memberIds || [];
 
     const updatedMembers = members.map((m: Member) =>
-      m.email === memberEmail ? { ...m, status: newStatus } : m
+      m.email?.toLowerCase() === memberEmail?.toLowerCase() ? { ...m, status: newStatus } : m
     );
 
-    await updateDoc(household.ref, {
+    // Find the updated member to get their ID
+    const updatedMember = updatedMembers.find((m: Member) =>
+      m.email?.toLowerCase() === memberEmail?.toLowerCase()
+    );
+
+    const updatePayload: any = {
       members: updatedMembers,
       updatedAt: serverTimestamp(),
-    });
+    };
+
+    // If activating a member, ensure their ID is in memberIds
+    if (newStatus === 'active' && updatedMember && updatedMember.id) {
+      const updatedMemberIds = Array.from(new Set([...currentMemberIds, updatedMember.id]));
+      if (updatedMemberIds.length !== currentMemberIds.length) {
+        updatePayload.memberIds = updatedMemberIds;
+      }
+    }
+
+    await DatabaseMonitoringService.updateDoc(householdRef, updatePayload);
   } catch (error) {
-    console.error('Error updating member status:', error);
+    console.error('Unable to join 10: Error updating member status:', error);
     throw error;
   }
 };
@@ -184,17 +191,14 @@ export const removeMemberFromHousehold = async (
   currentUserId: string
 ): Promise<void> => {
   try {
-    const householdRef = doc(db, 'households', householdId);
-    const householdSnap = await getDocs(
-      query(collection(db, 'households'), where('id', '==', householdId))
-    );
+    const householdRef = DatabaseMonitoringService.doc('households/' + householdId);
+    const householdSnap = await DatabaseMonitoringService.getDoc(householdRef);
 
-    if (householdSnap.empty) {
+    if (!householdSnap.exists()) {
       throw new Error('Household not found');
     }
 
-    const household = householdSnap.docs[0];
-    const householdData = household.data();
+    const householdData = householdSnap.data();
     const members = householdData.members || [];
 
     // Check if current user is admin or is removing themselves
@@ -226,11 +230,11 @@ export const removeMemberFromHousehold = async (
       updatePayload.memberIds = arrayRemove(memberId);
     }
 
-    await updateDoc(household.ref, updatePayload);
+    await DatabaseMonitoringService.updateDoc(household.ref, updatePayload);
 
     // If this was the last member besides the admin, delete the household
     if (updatedMembers.length === 1) {
-      await deleteDoc(householdRef);
+      await DatabaseMonitoringService.deleteDoc(householdRef);
     }
   } catch (error) {
     console.error('Error removing member from household:', error);
@@ -243,29 +247,58 @@ export const removeMemberFromHousehold = async (
  */
 export const findHouseholdByInvite = async (
   householdId: string,
-  inviteeEmail: string
+  inviteeEmail: string,
+  inviteeUserId?: string
 ): Promise<Household | null> => {
   try {
-    const householdRef = doc(db, 'households', householdId);
-    const householdSnap = await getDocs(
-      query(collection(db, 'households'), where('id', '==', householdId))
-    );
+    // Direct Firestore lookup instead of Cloud Function
+    const householdRef = DatabaseMonitoringService.doc('households/' + householdId);
+    const householdSnap = await DatabaseMonitoringService.getDoc(householdRef);
 
-    if (householdSnap.empty) {
+    if (!householdSnap.exists()) {
       return null;
     }
 
-    const householdDoc = householdSnap.docs[0];
-    const household = householdDoc.data() as Household;
+    const householdData = householdSnap.data();
+
+    // Handle both array and map formats for members
+    let members = [];
+    if (Array.isArray(householdData.members)) {
+      members = householdData.members;
+    } else if (householdData.members && typeof householdData.members === 'object') {
+      // Convert map to array
+      const mapMembers = householdData.members as Record<string, any>;
+      members = Object.keys(mapMembers).map(id => ({ id, ...mapMembers[id] }));
+    }
 
     // Check if user is invited
-    const isInvited = household.members?.some(
-      (m: Member) => m.email === inviteeEmail && m.status === 'Invited'
+    const invitedMember = members.find((m: any) =>
+      m.email?.toLowerCase() === inviteeEmail?.toLowerCase() && m.status === 'pending'
     );
 
-    return isInvited ? household : null;
+    // If no pending member found, check if user is already in memberIds (they might have been invited but data got corrupted)
+    if (!invitedMember && inviteeUserId && householdData.memberIds?.includes(inviteeUserId)) {
+      // Create a mock member object for the return
+      return {
+        id: householdId,
+        name: householdData.name,
+        members: members,
+        memberIds: householdData.memberIds || []
+      } as Household;
+    }
+
+    if (!invitedMember) {
+      return null;
+    }
+
+    return {
+      id: householdId,
+      name: householdData.name,
+      members: members,
+      memberIds: householdData.memberIds || []
+    } as Household;
   } catch (error) {
-    console.error('Error finding household by invite:', error);
+    console.error('Unable to join 5: Error finding household by invite:', error);
     return null;
   }
 };
@@ -282,11 +315,11 @@ export const joinHousehold = async (
 
   try {
     // Check if user is invited
-    const household = await findHouseholdByInvite(householdId, user.email);
+    const household = await findHouseholdByInvite(householdId, user.email, user.id);
 
     if (!household) {
       perfTrace.putAttribute('result', 'not_invited');
-      throw new Error('You are not invited to this household');
+      throw new Error('Unable to join 6: You are not invited to this household');
     }
 
     perfTrace.putAttribute('result', 'joining');
@@ -295,17 +328,15 @@ export const joinHousehold = async (
     await updateMemberStatus(householdId, user.email, 'active');
 
     // Update user's ID in household if different
-    const householdRef = doc(db, 'households', householdId);
-    const householdSnap = await getDocs(
-      query(collection(db, 'households'), where('id', '==', householdId))
-    );
+    const householdRef = DatabaseMonitoringService.doc('households/' + householdId);
+    const householdSnap = await DatabaseMonitoringService.getDoc(householdRef);
 
-    if (!householdSnap.empty) {
-      const members = householdSnap.docs[0].data().members || [];
-      const currentMemberIds = householdSnap.docs[0].data().memberIds || [];
+    if (householdSnap.exists()) {
+      const members = householdSnap.data().members || [];
+      const currentMemberIds = householdSnap.data().memberIds || [];
       
       const updatedMembers = members.map((m: Member) => {
-        if (m.email === user.email) {
+        if (m.email?.toLowerCase() === user.email?.toLowerCase()) {
           return {
             ...m,
             id: user.id,
@@ -319,12 +350,18 @@ export const joinHousehold = async (
       // Ensure memberIds are unique
       const updatedMemberIds = Array.from(new Set([...currentMemberIds, user.id]));
 
-      await updateDoc(householdSnap.docs[0].ref, {
+      await DatabaseMonitoringService.updateDoc(householdRef, {
         members: updatedMembers,
         memberIds: updatedMemberIds,
         updatedAt: serverTimestamp(),
       });
     }
+
+    // Update the user document with householdId
+    await DatabaseMonitoringService.updateDoc(DatabaseMonitoringService.doc('users/' + user.id), {
+      householdId: householdId,
+      updatedAt: serverTimestamp(),
+    });
 
     // Return updated household
     return {
@@ -334,7 +371,7 @@ export const joinHousehold = async (
       ),
     };
   } catch (error) {
-    console.error('Error joining household:', error);
+    console.error('Unable to join 7: Error joining household:', error);
     throw error;
   } finally {
     perfTrace.stop();

@@ -6,6 +6,7 @@ import { StripeCheckout } from './StripeCheckout';
 import { PayPalCheckout } from './PayPalCheckout';
 import { UsageService, UsageLimits } from '../services/usageService';
 import { log } from '../services/logService';
+import AnalyticsService from '../services/analyticsService';
 
 interface SubscriptionManagerProps {
   user: User | null;
@@ -35,9 +36,22 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }
     };
 
     fetchUsageLimits();
-  }, [user]);
+    
+    // Track subscription funnel - viewing pricing
+    AnalyticsService.trackSubscriptionFunnel('view_pricing', {
+      current_tier: subscription?.tier || 'free',
+      is_active: isActive
+    });
+  }, [user, subscription?.tier, isActive]);
 
   const handleUpgrade = (plan: any) => {
+    // Track subscription funnel
+    AnalyticsService.trackSubscriptionFunnel('upgrade_intent', {
+      plan_name: plan.name,
+      plan_price: plan.price,
+      current_tier: subscription?.tier || 'free'
+    });
+    
     // Temporarily disabled until Stripe payments are fully functional
     alert('Premium subscriptions coming soon! We\'re working on implementing payment processing. Stay tuned for updates.');
     // setSelectedPlan(plan);

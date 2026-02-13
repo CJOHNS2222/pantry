@@ -43,6 +43,12 @@ export const calculatePortionScaling = (
 };
 
 // Scale recipe ingredients based on portion configuration
+/**
+ * Scales recipe ingredients based on household size and portion configuration
+ * @param recipe The recipe to scale
+ * @param portionConfig The portion configuration with scaling factor
+ * @returns Array of scaled ingredient strings
+ */
 export const scaleRecipeIngredients = (
   recipe: StructuredRecipe | SavedRecipe,
   portionConfig: PortionConfig
@@ -104,6 +110,11 @@ const formatScaledQuantity = (quantity: number): string => {
 };
 
 // Get recommended serving size based on household
+/**
+ * Calculates recommended serving size based on household member count
+ * @param household The household object with members array
+ * @returns Recommended number of servings for the household size
+ */
 export const getRecommendedServings = (household: Household | null): number => {
   const householdSize = household?.members?.length || 1;
 

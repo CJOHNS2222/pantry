@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { ShoppingBasket, Check, Trash2, Archive, Plus, X, Share2, Copy, Download, MessageSquare } from 'lucide-react';
 import { ShoppingItem } from '../types';
 import { inferCategoryFromItemName, getItemImage } from '../utils/appUtils';
@@ -12,15 +12,16 @@ import { SmartShoppingListOrganizer } from './SmartShoppingListOrganizer';
 import { BatchOperations } from './BatchOperations';
 import { OfflineShoppingIndicator } from './OfflineShoppingIndicator';
 import { HouseholdShoppingShare } from './HouseholdShoppingShare';
-import { SmartShoppingSuggestions } from './SmartShoppingSuggestions';
 import { QuickAdd } from './QuickAdd';
 import { ShoppingListAnalytics } from './ShoppingListAnalytics';
+import QuantityUnitPicker from './QuantityUnitPicker';
 
 // Import hooks and services
 import { useOfflineStatus } from '../hooks/useOfflineStatus';
 import { useDataManagement } from '../hooks/useDataManagement';
 import { offlineQueueService } from '../services/offlineQueueService';
 import { offlineDataCache } from '../services/offlineDataCache';
+import { groceryPriceService } from '../services/groceryPriceService';
 
 interface ShoppingListProps {
   items: ShoppingItem[];
@@ -65,6 +66,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
 }) => {
   const [newItem, setNewItem] = React.useState('');
   const [newQty, setNewQty] = React.useState<string>('1');
+  const [newUnit, setNewUnit] = React.useState<string>('count');
   const [isAddModalOpen, setIsAddModalOpen] = React.useState(false);
   const [validationErrors, setValidationErrors] = React.useState<{item?: string, quantity?: string}>({});
 
@@ -80,6 +82,106 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     itemName?: string;
     timestamp: Date;
   }>>([]);
+
+  // Multi-selection state
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+
+  // Session tracking for analytics
+  const [currentSessionId] = useState(() => `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
+  const [previousSessions, setPreviousSessions] = useState<Array<{
+    sessionId: string;
+    items: ShoppingItem[];
+    startTime: Date;
+    endTime?: Date;
+    totalSpent: number;
+  }>>([]);
+
+  // Load previous sessions from localStorage on mount
+  useEffect(() => {
+    const savedSessions = localStorage.getItem('shoppingListSessions');
+    if (savedSessions) {
+      try {
+        const parsed = JSON.parse(savedSessions);
+        setPreviousSessions(parsed.map((session: any) => ({
+          ...session,
+          startTime: new Date(session.startTime),
+          endTime: session.endTime ? new Date(session.endTime) : undefined,
+          items: session.items.map((item: any) => ({
+            ...item,
+            addedAt: item.addedAt ? new Date(item.addedAt) : undefined,
+            completedAt: item.completedAt ? new Date(item.completedAt) : undefined,
+          }))
+        })));
+      } catch (error) {
+        console.warn('Failed to load previous shopping sessions:', error);
+      }
+    }
+  }, []);
+
+  // Helper function to estimate price for an item
+  const estimateItemPrice = async (itemName: string, quantity?: number | string): Promise<number> => {
+    try {
+      const priceData = await groceryPriceService.getIngredientPrice(itemName);
+      if (!priceData) return 0;
+
+      // Parse quantity - handle both numbers and strings like "2 cups"
+      let qty = 1;
+      if (typeof quantity === 'number') {
+        qty = quantity;
+      } else if (typeof quantity === 'string') {
+        const parsed = parseFloat(quantity);
+        if (!isNaN(parsed)) {
+          qty = parsed;
+        }
+      }
+
+      return priceData.averagePrice * qty;
+    } catch (error) {
+      console.warn(`Failed to estimate price for ${itemName}:`, error);
+      return 0;
+    }
+  };
+
+  // Save current session to localStorage when all items are completed
+  const saveCurrentSession = useCallback(() => {
+    const completedItems = items.filter(item => item.checked && item.completedAt);
+    if (completedItems.length === 0) return;
+
+    const totalSpent = completedItems.reduce((sum, item) => sum + (item.estimatedPrice || 0), 0);
+    const sessionStartTime = items.reduce((earliest, item) =>
+      item.addedAt && (!earliest || item.addedAt < earliest) ? item.addedAt : earliest,
+      null as Date | null
+    );
+
+    if (!sessionStartTime) return;
+
+    const newSession = {
+      sessionId: currentSessionId,
+      items: [...completedItems],
+      startTime: sessionStartTime,
+      endTime: new Date(),
+      totalSpent
+    };
+
+    const updatedSessions = [...previousSessions, newSession];
+    setPreviousSessions(updatedSessions);
+
+    // Save to localStorage
+    try {
+      localStorage.setItem('shoppingListSessions', JSON.stringify(updatedSessions));
+    } catch (error) {
+      console.warn('Failed to save shopping sessions to localStorage:', error);
+    }
+  }, [items, currentSessionId, previousSessions]);
+
+  // Save session when all items become completed
+  useEffect(() => {
+    const allItemsCompleted = items.length > 0 && items.every(item => item.checked);
+    if (allItemsCompleted) {
+      saveCurrentSession();
+    }
+  }, [items, saveCurrentSession]);
 
   // Hooks for offline functionality
   const isOnline = useOfflineStatus();
@@ -113,7 +215,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     [uncheckedItemsText]
   );
 
-  const addSuggestedItem = (itemName: string) => {
+  const addSuggestedItem = async (itemName: string) => {
     // Check if item already exists
     const exists = items.some(item => item.item.toLowerCase() === itemName.toLowerCase());
     if (exists) {
@@ -121,17 +223,22 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
       return;
     }
 
+    // Estimate price for the item
+    const estimatedPrice = await estimateItemPrice(itemName, '1');
+
     setItems(prev => [...prev, {
       id: Math.random().toString(36).substr(2, 9),
       item: itemName,
       category: inferCategoryFromItemName(itemName),
       checked: false,
       quantity: '1',
-      source: 'suggested'
+      source: 'suggested',
+      addedAt: new Date(),
+      estimatedPrice
     }]);
   };
 
-  const addRecipeItem = (itemName: string, requiredQuantity: string, recipeName: string) => {
+  const addRecipeItem = async (itemName: string, requiredQuantity: string, recipeName: string) => {
     // Check if item already exists
     const existingItem = items.find(item => item.item.toLowerCase() === itemName.toLowerCase());
     if (existingItem) {
@@ -146,13 +253,18 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
       return;
     }
 
+    // Estimate price for the item
+    const estimatedPrice = await estimateItemPrice(itemName, requiredQuantity);
+
     setItems(prev => [...prev, {
       id: Math.random().toString(36).substr(2, 9),
       item: itemName,
       category: inferCategoryFromItemName(itemName),
       checked: false,
       quantity: requiredQuantity,
-      source: `recipe: ${recipeName}`
+      source: `recipe: ${recipeName}`,
+      addedAt: new Date(),
+      estimatedPrice
     }]);
   };
 
@@ -161,11 +273,17 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     if (!item) return;
 
     const wasChecked = item.checked;
-    setItems(prev => prev.map(i => i.id === id ? { ...i, checked: !i.checked } : i));
+    const now = new Date();
+
+    setItems(prev => prev.map(i => i.id === id ? {
+      ...i,
+      checked: !i.checked,
+      completedAt: !i.checked ? now : undefined // Set completedAt when checking, clear when unchecking
+    } : i));
 
     // Add to undo history if checking off
     if (!wasChecked) {
-      setUndoHistory(prev => [...prev.slice(-4), { item: { ...item, checked: true }, timestamp: new Date() }]);
+      setUndoHistory(prev => [...prev.slice(-4), { item: { ...item, checked: true }, timestamp: now }]);
     }
 
     // Offline queue for sync
@@ -174,7 +292,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
         type: 'update',
         collection: 'shoppingList',
         id,
-        data: { checked: !wasChecked }
+        data: { checked: !wasChecked, completedAt: !wasChecked ? now : null }
       });
     }
   };
@@ -201,7 +319,55 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     setItems(prev => prev.filter(i => i.id !== id));
   };
 
-  const addItem = (e: React.FormEvent) => {
+  // Multi-selection functions
+  const toggleSelectionMode = () => {
+    setSelectionMode(!selectionMode);
+    setSelectedItems(new Set());
+  };
+
+  const toggleItemSelection = (id: string) => {
+    if (!selectionMode) return;
+
+    setSelectedItems(prev => {
+      const newSelected = new Set(prev);
+      if (newSelected.has(id)) {
+        newSelected.delete(id);
+      } else {
+        newSelected.add(id);
+      }
+      return newSelected;
+    });
+  };
+
+  const selectAllItems = () => {
+    if (!selectionMode) return;
+    setSelectedItems(new Set(items.map(item => item.id)));
+  };
+
+  const deselectAllItems = () => {
+    setSelectedItems(new Set());
+  };
+
+  const deleteSelectedItems = () => {
+    if (selectedItems.size === 0) return;
+    setItems(prev => prev.filter(item => !selectedItems.has(item.id)));
+    setSelectedItems(new Set());
+    setSelectionMode(false);
+  };
+
+  const checkSelectedItems = () => {
+    if (selectedItems.size === 0) return;
+    const now = new Date();
+    setItems(prev => prev.map(item =>
+      selectedItems.has(item.id)
+        ? { ...item, checked: true, completedAt: now }
+        : item
+    ));
+    setSelectedItems(new Set());
+    setSelectionMode(false);
+  };
+
+  const addItem = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // Clear previous validation errors
@@ -221,13 +387,18 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
       return;
     }
 
+    // Estimate price for the item
+    const estimatedPrice = await estimateItemPrice(newItem, newQty);
+
     const newShoppingItem: ShoppingItem = {
       id: Math.random().toString(36).substr(2, 9),
       item: newItem,
       category: inferCategoryFromItemName(newItem),
       checked: false,
-      quantity: newQty,
-      source: 'manual'
+      quantity: newUnit === 'count' ? newQty : `${newQty} ${newUnit}`,
+      source: 'manual',
+      addedAt: new Date(),
+      estimatedPrice
     };
 
     setItems(prev => [...prev, newShoppingItem]);
@@ -243,16 +414,20 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
 
     setNewItem('');
     setNewQty('1');
+    setNewUnit('count');
     setIsAddModalOpen(false); // Close modal after adding
   };
 
   // Enhanced add item from QuickAdd component
-  const handleQuickAdd = (quickAddItem: { name: string; category?: string; quantity?: string; unit?: string }) => {
+  const handleQuickAdd = async (quickAddItem: { name: string; category?: string; quantity?: string; unit?: string }) => {
     const exists = items.some(item => item.item.toLowerCase() === quickAddItem.name.toLowerCase());
     if (exists) {
       alert(`${quickAddItem.name} is already in your shopping list!`);
       return;
     }
+
+    // Estimate price for the item
+    const estimatedPrice = await estimateItemPrice(quickAddItem.name, quickAddItem.quantity || '1');
 
     const newShoppingItem: ShoppingItem = {
       id: Math.random().toString(36).substr(2, 9),
@@ -260,7 +435,9 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
       category: quickAddItem.category || inferCategoryFromItemName(quickAddItem.name),
       checked: false,
       quantity: quickAddItem.quantity || '1',
-      source: 'quick-add'
+      source: 'quick-add',
+      addedAt: new Date(),
+      estimatedPrice
     };
 
     setItems(prev => [...prev, newShoppingItem]);
@@ -306,6 +483,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     setIsAddModalOpen(false);
     setNewItem('');
     setNewQty('1');
+    setNewUnit('count');
     setValidationErrors({});
   };
 
@@ -424,16 +602,12 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
         recentItems={items.map(i => i.item)}
         suggestedItems={suggestedItems}
         onAddSuggestedItem={addSuggestedItem}
-      />
-
-      {/* Smart Suggestions */}
-      <SmartShoppingSuggestions
         pantryItems={pantryItems}
         recentPurchases={recentPurchases}
         onAddSuggestion={handleAddSuggestion}
         onDismissSuggestion={(id) => {
           // TODO: Implement suggestion dismissal persistence
-          console.log('Dismiss suggestion:', id);
+          log.debug('Dismiss suggestion:', { id }, 'ShoppingList');
         }}
       />
 
@@ -461,14 +635,6 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
             Store Order
           </button>
         </div>
-      )}
-
-      {/* Batch Operations */}
-      {items.length > 0 && (
-        <BatchOperations
-          items={items}
-          onBatchOperation={handleBatchOperation}
-        />
       )}
 
       {/* Floating Action Button */}
@@ -513,20 +679,15 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                       <p className="text-red-500 text-xs mt-1">{validationErrors.item}</p>
                     )}
                   </div>
-                  <div className="flex gap-3">
-                    <input
-                      id="newQty"
-                      name="newQty"
-                      type="text"
-                      value={newQty}
-                      onChange={e => setNewQty(e.target.value)}
-                      className={`flex-1 bg-theme-secondary border rounded-lg px-3 py-3 text-theme-primary shadow-sm focus:border-[var(--accent-color)] outline-none ${validationErrors.quantity ? 'border-red-500' : 'border-theme'}`}
-                      placeholder="Quantity (e.g. 2, 1 cup, 2 tbsp)"
-                    />
-                    {validationErrors.quantity && (
-                      <p className="text-red-500 text-xs mt-1">{validationErrors.quantity}</p>
-                    )}
-                  </div>
+                  <QuantityUnitPicker
+                    quantity={parseFloat(newQty) || 1}
+                    unit={newUnit}
+                    onQuantityChange={(qty) => setNewQty(qty.toString())}
+                    onUnitChange={setNewUnit}
+                    itemName={newItem}
+                    showControls={true}
+                    maxQuantity={999}
+                  />
                 </div>
                 <button 
                   type="submit" 
@@ -549,6 +710,18 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
               >
                   <Check className="w-4 h-4" /> 
                   {items.every(i => i.checked) ? 'Deselect All' : 'Select All'}
+              </button>
+
+              <button
+                onClick={toggleSelectionMode}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${
+                  selectionMode
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-theme-secondary text-theme-secondary hover:bg-blue-500 hover:text-white'
+                }`}
+              >
+                  <Check className="w-4 h-4" />
+                  {selectionMode ? 'Exit Selection' : 'Multi-Select'}
               </button>
               
               {undoHistory.length > 0 && (
@@ -576,6 +749,53 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
           </div>
       )}
 
+      {/* Multi-selection controls */}
+      {selectionMode && (
+        <div className="flex gap-2 justify-between items-center bg-blue-50 border border-blue-200 rounded-lg p-3">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-blue-700">
+              {selectedItems.size} item{selectedItems.size !== 1 ? 's' : ''} selected
+            </span>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={selectedItems.size === items.length ? deselectAllItems : selectAllItems}
+              className="px-3 py-1 text-xs font-medium text-blue-600 hover:text-blue-800 hover:bg-blue-100 rounded transition-colors"
+            >
+              {selectedItems.size === items.length ? 'Deselect All' : 'Select All'}
+            </button>
+            <button
+              onClick={checkSelectedItems}
+              disabled={selectedItems.size === 0}
+              className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
+                selectedItems.size > 0
+                  ? 'text-green-600 hover:text-green-800 hover:bg-green-100'
+                  : 'text-gray-400 cursor-not-allowed'
+              }`}
+            >
+              Check Selected
+            </button>
+            <button
+              onClick={deleteSelectedItems}
+              disabled={selectedItems.size === 0}
+              className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
+                selectedItems.size > 0
+                  ? 'text-red-600 hover:text-red-800 hover:bg-red-100'
+                  : 'text-gray-400 cursor-not-allowed'
+              }`}
+            >
+              Delete Selected
+            </button>
+            <button
+              onClick={toggleSelectionMode}
+              className="px-3 py-1 text-xs font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="space-y-2">
         {isLoadingShoppingList ? (
           // Show skeleton loading items
@@ -586,8 +806,10 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
           // Organized by store layout
           <SmartShoppingListOrganizer
             items={items}
-            onToggleCheck={toggleCheck}
+            onToggleCheck={selectionMode ? toggleItemSelection : toggleCheck}
             onRemove={remove}
+            isSelected={selectionMode ? (id) => selectedItems.has(id) : undefined}
+            onLongPress={selectionMode ? undefined : () => setSelectionMode(true)}
           />
         ) : (
           // Regular list view with enhanced items
@@ -595,9 +817,11 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
             <EnhancedShoppingListItem
               key={item.id}
               item={item}
-              onToggleCheck={toggleCheck}
+              onToggleCheck={selectionMode ? toggleItemSelection : toggleCheck}
               onRemove={remove}
               isOnline={isOnline}
+              isSelected={selectionMode ? selectedItems.has(item.id) : undefined}
+              onLongPress={selectionMode ? undefined : () => setSelectionMode(true)}
             />
           ))
         )}
@@ -625,16 +849,47 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
         )}
       </div>
 
+      {/* Batch Operations - Moved below the list */}
+      {items.length > 0 && (
+        <BatchOperations
+          items={items}
+          onBatchCheck={(itemIds) => {
+            setItems(prev => prev.map(item =>
+              itemIds.includes(item.id) ? { ...item, checked: true } : item
+            ));
+          }}
+          onBatchUncheck={(itemIds) => {
+            setItems(prev => prev.map(item =>
+              itemIds.includes(item.id) ? { ...item, checked: false } : item
+            ));
+          }}
+          onMoveToPantry={onMoveToPantry}
+        />
+      )}
+
       {/* Analytics Section */}
       {showAnalytics && items.length > 0 && (
         <ShoppingListAnalytics
           shoppingItems={items.map(item => ({
-            ...item,
-            addedAt: new Date(), // TODO: Add proper timestamp
-            completedAt: item.checked ? new Date() : undefined,
-            estimatedPrice: 0 // TODO: Add price estimation
+            id: item.id,
+            name: item.item,
+            quantity: parseFloat(item.quantity?.toString() || '1') || 1,
+            unit: 'each', // Default unit, could be improved
+            category: item.category,
+            isCompleted: item.checked,
+            estimatedPrice: item.estimatedPrice,
+            addedAt: item.addedAt || new Date(),
+            completedAt: item.completedAt
           }))}
-          previousSessions={[]} // TODO: Add previous session data
+          previousSessions={previousSessions.map(session => ({
+            date: session.startTime,
+            totalItems: session.items.length,
+            completedItems: session.items.filter(item => item.checked).length,
+            totalSpent: session.totalSpent,
+            timeSpent: session.endTime
+              ? Math.round((session.endTime.getTime() - session.startTime.getTime()) / (1000 * 60))
+              : 0
+          }))}
         />
       )}
 

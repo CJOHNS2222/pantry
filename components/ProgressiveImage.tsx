@@ -8,6 +8,7 @@ interface ProgressiveImageProps {
   blurDataURL?: string;
   onLoad?: () => void;
   onError?: () => void;
+  lazy?: boolean;
 }
 
 export const ProgressiveImage: React.FC<ProgressiveImageProps> = ({
@@ -17,13 +18,52 @@ export const ProgressiveImage: React.FC<ProgressiveImageProps> = ({
   placeholderSrc,
   blurDataURL,
   onLoad,
-  onError
+  onError,
+  lazy = false
 }) => {
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [showPlaceholder, setShowPlaceholder] = useState(true);
+  const [shouldLoad, setShouldLoad] = useState(!lazy);
+  const imgRef = React.useRef<HTMLImageElement>(null);
 
   useEffect(() => {
+    if (!lazy) {
+      loadImage();
+      return;
+    }
+
+    // Set up intersection observer for lazy loading
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const [entry] = entries;
+        if (entry.isIntersecting) {
+          setShouldLoad(true);
+          observer.disconnect();
+        }
+      },
+      {
+        rootMargin: '50px', // Start loading 50px before the image comes into view
+        threshold: 0.1
+      }
+    );
+
+    if (imgRef.current) {
+      observer.observe(imgRef.current);
+    }
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [lazy]);
+
+  useEffect(() => {
+    if (shouldLoad) {
+      loadImage();
+    }
+  }, [shouldLoad, src]);
+
+  const loadImage = () => {
     const img = new Image();
     img.src = src;
 
@@ -43,7 +83,7 @@ export const ProgressiveImage: React.FC<ProgressiveImageProps> = ({
       img.onload = null;
       img.onerror = null;
     };
-  }, [src, onLoad, onError]);
+  };
 
   // If there's an error and no placeholder, show nothing
   if (imageError && !placeholderSrc) {
@@ -74,8 +114,10 @@ export const ProgressiveImage: React.FC<ProgressiveImageProps> = ({
 
       {/* Main image */}
       <img
-        src={src}
+        ref={imgRef}
+        src={shouldLoad ? src : undefined}
         alt={alt}
+        loading={lazy ? "lazy" : "eager"}
         className={`w-full h-full object-cover transition-opacity duration-300 ${
           imageLoaded ? 'opacity-100' : 'opacity-0'
         }`}

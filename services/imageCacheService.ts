@@ -1,6 +1,7 @@
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '../firebaseConfig';
-import { doc, getDoc, setDoc, collection, query, where, getDocs, writeBatch } from 'firebase/firestore';
+import DatabaseMonitoringService from './databaseMonitoringService';
+import { writeBatch } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 
 export interface CachedImage {
@@ -109,10 +110,23 @@ async function syncCacheWithFirestore(): Promise<void> {
     return;
   }
 
+  // Check if Firebase is initialized
+  try {
+    // Import db to check if it's available
+    const { db } = await import('../firebaseConfig');
+    if (!db) {
+      console.log('Firebase not initialized yet, skipping image cache sync');
+      return;
+    }
+  } catch (error) {
+    console.log('Firebase config not available, skipping image cache sync');
+    return;
+  }
+
   try {
     console.log('Syncing image cache with Firestore...');
-    const cacheRef = collection(db, 'image_cache');
-    const snapshot = await getDocs(cacheRef);
+    const cacheRef = DatabaseMonitoringService.collection('image_cache');
+    const snapshot = await DatabaseMonitoringService.getDocs(DatabaseMonitoringService.query(cacheRef));
 
     snapshot.forEach(doc => {
       const data = doc.data() as CachedImage;
@@ -172,8 +186,8 @@ export async function getCachedImageUrl(itemName: string): Promise<string | null
 
   // Only hit Firestore if not in any cache (expensive operation)
   try {
-    const cacheRef = doc(db, 'image_cache', cacheKey);
-    const cacheDoc = await getDoc(cacheRef);
+    const cacheRef = DatabaseMonitoringService.doc('image_cache', cacheKey);
+    const cacheDoc = await DatabaseMonitoringService.getDoc(cacheRef);
 
     if (cacheDoc.exists()) {
       const cachedImage = cacheDoc.data() as CachedImage;
@@ -238,8 +252,8 @@ export async function getCachedImageUrls(itemNames: string[]): Promise<Map<strin
   // Only hit Firestore for remaining items (batch operation)
   try {
     const batchPromises = uncachedKeys.map(async (cacheKey) => {
-      const cacheRef = doc(db, 'image_cache', cacheKey);
-      const cacheDoc = await getDoc(cacheRef);
+      const cacheRef = DatabaseMonitoringService.doc('image_cache', cacheKey);
+      const cacheDoc = await DatabaseMonitoringService.getDoc(cacheRef);
       return { cacheKey, doc: cacheDoc };
     });
 

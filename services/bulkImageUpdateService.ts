@@ -1,4 +1,5 @@
-import { collection, getDocs, doc, updateDoc, query, where } from 'firebase/firestore';
+import DatabaseMonitoringService from './databaseMonitoringService';
+import { InventoryCacheService } from './inventoryCacheService';
 import { db } from '../firebaseConfig';
 import { PantryItem, User } from '../types';
 import { fetchExternalItemImage } from '../utils/appUtils';
@@ -27,14 +28,8 @@ export class BulkImageUpdateService {
       // Initialize cache system
       await initializeImageCache();
 
-      // Get all pantry items for the user
-      const pantryRef = collection(db, 'users', user.id, 'inventory');
-      const pantrySnapshot = await getDocs(pantryRef);
-
-      const items = pantrySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as PantryItem));
+      // Get all pantry items for the user using cached data (1 read instead of N reads)
+      const items = await InventoryCacheService.getCachedInventory(undefined, user.id);
 
       result.totalItems = items.length;
 
@@ -157,14 +152,8 @@ export class BulkImageUpdateService {
       // Initialize cache system
       await initializeImageCache();
 
-      // Get all pantry items for the household
-      const pantryRef = collection(db, 'households', householdId, 'inventory');
-      const pantrySnapshot = await getDocs(pantryRef);
-
-      const items = pantrySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as PantryItem));
+      // Get all pantry items for the household using cached data (1 read instead of N reads)
+      const items = await InventoryCacheService.getCachedInventory(householdId);
 
       result.totalItems = items.length;
 

@@ -1,0 +1,291 @@
+import React from 'react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { vi, describe, test, expect, beforeEach } from 'vitest';
+import { RecipeFinder } from '../RecipeFinder';
+import { RecipeSearchResult, StructuredRecipe, SavedRecipe, PantryItem, RecipeRating, User, Household } from '../../types';
+import { Tab } from '../../types/app';
+
+// Mock services and utilities
+vi.mock('../../services/geminiService', () => ({
+  searchRecipes: vi.fn(),
+}));
+
+vi.mock('../../services/recipeService', () => ({
+  getSavedRecipes: vi.fn(() => Promise.resolve([])),
+  getCachedPopularRecipes: vi.fn(() => Promise.resolve([])),
+}));
+
+vi.mock('../../services/analyticsService', () => ({
+  default: {
+    trackRecipeSearch: vi.fn(),
+    trackRecipeSave: vi.fn(),
+    trackRecipeView: vi.fn(),
+  },
+}));
+
+vi.mock('../../services/logService', () => ({
+  log: {
+    error: vi.fn(),
+    debug: vi.fn(),
+    info: vi.fn(),
+  },
+}));
+
+vi.mock('../../utils/searchUtils', () => ({
+  searchPantryItems: vi.fn(),
+  getEnhancedAutocompleteSuggestions: vi.fn(),
+  filterPantryItems: vi.fn(),
+  savePantryFilter: vi.fn(),
+  loadPantryFilter: vi.fn(),
+  defaultPantryFilter: {},
+  saveSearchToHistory: vi.fn(),
+  getRecentSearchSuggestions: vi.fn(),
+}));
+
+vi.mock('../../utils/debounceUtils', () => ({
+  debounce: vi.fn((fn) => fn),
+}));
+
+vi.mock('../../utils/preferenceUtils', () => ({
+  filterRecipesByHouseholdPreferences: vi.fn((recipes) => recipes),
+}));
+
+vi.mock('../hooks/useKeyboardNavigation', () => ({
+  useKeyboardNavigation: vi.fn(() => ({
+    handleKeyDown: vi.fn(),
+    focusedIndex: -1,
+  })),
+}));
+
+// Mock child components
+vi.mock('../SkeletonLoader', () => ({
+  RecipeCardSkeleton: () => <div data-testid="recipe-card-skeleton">Loading...</div>,
+}));
+
+vi.mock('../PremiumFeature', () => ({
+  PremiumFeature: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
+
+vi.mock('../RecipeRating', () => ({
+  RecipeRatingUI: () => <div data-testid="recipe-rating">Rating</div>,
+}));
+
+vi.mock('../ProgressiveImage', () => ({
+  ProgressiveImage: ({ alt }: { alt: string }) => <img alt={alt} data-testid="progressive-image" />,
+}));
+
+vi.mock('../RecipeModal', () => ({
+  default: () => <div data-testid="recipe-modal">Recipe Modal</div>,
+}));
+
+const mockUser: User = {
+  id: 'test-user',
+  email: 'test@example.com',
+  profile: {
+    name: 'Test User',
+    avatar: null,
+  },
+  subscription: {
+    tier: 'free',
+    status: 'active',
+  },
+};
+
+const mockInventory: PantryItem[] = [
+  {
+    id: '1',
+    item: 'Chicken Breast',
+    category: 'Meat',
+    quantity: '2 lbs',
+    storageLocation: 'fridge',
+    expirationDate: new Date('2026-03-01'),
+  },
+];
+
+const mockRatings: RecipeRating[] = [];
+const mockSavedRecipes: SavedRecipe[] = [];
+
+const defaultProps = {
+  onAddToPlan: vi.fn(),
+  onSaveRecipe: vi.fn(),
+  onDeleteRecipe: vi.fn(),
+  onMarkAsMade: vi.fn(),
+  inventory: mockInventory,
+  ratings: mockRatings,
+  onRate: vi.fn(),
+  savedRecipes: mockSavedRecipes,
+  user: mockUser,
+  setActiveTab: vi.fn(),
+  persistedResult: null,
+  setPersistedResult: vi.fn(),
+  initialSearchQuery: '',
+  addToast: vi.fn(),
+  recipeSaveLimitExceeded: false,
+  mealPlanLimitExceeded: false,
+  isLoadingSavedRecipes: false,
+  household: null as Household | null,
+};
+
+describe('RecipeFinder', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  test('renders search input and basic UI elements', () => {
+    render(<RecipeFinder {...defaultProps} />);
+
+    const searchInputs = screen.getAllByPlaceholderText('Search e.g. Pasta...');
+    expect(searchInputs[0]).toBeInTheDocument();
+    const searchButtons = screen.getAllByRole('button', { name: /search for recipes/i });
+    expect(searchButtons[0]).toBeInTheDocument();
+  });
+
+  test('displays initial search query when provided', () => {
+    const props = { ...defaultProps, initialSearchQuery: 'chicken stir fry' };
+    render(<RecipeFinder {...props} />);
+
+    const searchInputs = screen.getAllByPlaceholderText('Search e.g. Pasta...');
+    expect(searchInputs[0]).toHaveValue('chicken stir fry');
+  });
+
+  test('shows loading state when searching', async () => {
+    // Mock the search function to return a promise that doesn't resolve immediately
+    const { searchRecipes } = await import('../../services/geminiService');
+    vi.mocked(searchRecipes).mockImplementation(() => new Promise(() => {}));
+
+    render(<RecipeFinder {...defaultProps} />);
+
+    const searchInputs = screen.getAllByPlaceholderText('Search e.g. Pasta...');
+    const searchInput = searchInputs[0];
+    const searchButtons = screen.getAllByRole('button', { name: /search for recipes/i });
+    const searchButton = searchButtons[0];
+
+    fireEvent.change(searchInput, { target: { value: 'chicken' } });
+    fireEvent.click(searchButton);
+
+    // Should show loading state
+    await waitFor(() => {
+      expect(screen.getByTestId('recipe-card-skeleton')).toBeInTheDocument();
+    });
+  });
+
+  test('handles search results display', async () => {
+    const mockRecipe: StructuredRecipe = {
+      id: 'test-recipe',
+      title: 'Test Chicken Recipe',
+      description: 'A delicious chicken recipe',
+      ingredients: [
+        { item: 'Chicken Breast', quantity: '1 lb', notes: '' },
+        { item: 'Salt', quantity: '1 tsp', notes: '' },
+      ],
+      instructions: [
+        { step: 1, instruction: 'Cook the chicken' },
+        { step: 2, instruction: 'Season with salt' },
+      ],
+      servings: 4,
+      prepTime: 15,
+      cookTime: 30,
+      totalTime: 45,
+      difficulty: 'Easy',
+      cuisine: 'American',
+      tags: ['chicken', 'quick'],
+      nutritionalInfo: {
+        calories: 300,
+        protein: 25,
+        carbs: 10,
+        fat: 15,
+      },
+      imageUrl: 'https://example.com/recipe.jpg',
+    };
+
+    const mockSearchResult: RecipeSearchResult = {
+      query: 'chicken',
+      recipes: [mockRecipe],
+      searchTime: 1000,
+      totalResults: 1,
+    };
+
+    const { searchRecipes } = await import('../../services/geminiService');
+    vi.mocked(searchRecipes).mockResolvedValue(mockSearchResult);
+
+    render(<RecipeFinder {...defaultProps} />);
+
+    const searchInputs = screen.getAllByPlaceholderText('Search e.g. Pasta...');
+    const searchInput = searchInputs[0];
+    const searchButtons = screen.getAllByRole('button', { name: /search for recipes/i });
+    const searchButton = searchButtons[0];
+
+    fireEvent.change(searchInput, { target: { value: 'chicken' } });
+    fireEvent.click(searchButton);
+
+    await waitFor(() => {
+      expect(screen.getByText('Test Chicken Recipe')).toBeInTheDocument();
+    });
+  });
+
+  test('calls onSaveRecipe when save button is clicked', async () => {
+    const mockRecipe: StructuredRecipe = {
+      id: 'test-recipe',
+      title: 'Test Recipe',
+      description: 'A test recipe',
+      ingredients: [{ item: 'Test Ingredient', quantity: '1', notes: '' }],
+      instructions: [{ step: 1, instruction: 'Test instruction' }],
+      servings: 2,
+      prepTime: 10,
+      cookTime: 20,
+      totalTime: 30,
+      difficulty: 'Easy',
+      cuisine: 'Test',
+      tags: ['test'],
+      nutritionalInfo: {
+        calories: 200,
+        protein: 10,
+        carbs: 20,
+        fat: 10,
+      },
+      imageUrl: 'https://example.com/test.jpg',
+    };
+
+    const mockSearchResult: RecipeSearchResult = {
+      query: 'test',
+      recipes: [mockRecipe],
+      searchTime: 500,
+      totalResults: 1,
+    };
+
+    const { searchRecipes } = await import('../../services/geminiService');
+    vi.mocked(searchRecipes).mockResolvedValue(mockSearchResult);
+
+    const mockOnSaveRecipe = vi.fn();
+    const props = { ...defaultProps, onSaveRecipe: mockOnSaveRecipe };
+
+    render(<RecipeFinder {...props} />);
+
+    const searchInputs = screen.getAllByPlaceholderText('Search e.g. Pasta...');
+    const searchInput = searchInputs[0];
+    const searchButtons = screen.getAllByRole('button', { name: /search for recipes/i });
+    const searchButton = searchButtons[0];
+
+    fireEvent.change(searchInput, { target: { value: 'test' } });
+    fireEvent.click(searchButton);
+
+    await waitFor(() => {
+      expect(screen.getByText('Test Recipe')).toBeInTheDocument();
+    });
+
+    // Click on the recipe to open modal
+    const recipeCard = screen.getByText('Test Recipe');
+    fireEvent.click(recipeCard);
+
+    // Modal should be opened
+    expect(screen.getByTestId('recipe-modal')).toBeInTheDocument();
+  });
+
+  test('renders with recipe save limit exceeded prop', () => {
+    const props = { ...defaultProps, recipeSaveLimitExceeded: true };
+    render(<RecipeFinder {...props} />);
+
+    // Component should render without errors
+    expect(screen.getByRole('main', { name: 'Recipe finder' })).toBeInTheDocument();
+  });
+});

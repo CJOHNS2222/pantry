@@ -33,8 +33,7 @@ try {
 import { initializeApp } from "firebase/app";
 import { getFirestore, collection, addDoc, getDocs, query, where } from "firebase/firestore";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { initializeApp as initializeAdminApp, cert } from "firebase-admin/app";
-import { getStorage as getAdminStorage } from "firebase-admin/storage";
+import { getAuth, signInAnonymously } from "firebase/auth";
 
 // Firebase config (same as in your app)
 const firebaseConfig = {
@@ -51,15 +50,9 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// Initialize Firebase Admin app for server-side operations
-const serviceAccount = JSON.parse(readFileSync(join(__dirname, '..', 'new-service-account.json'), 'utf8'));
-const adminApp = initializeAdminApp({
-  credential: cert(serviceAccount),
-  storageBucket: process.env.VITE_STORAGE_BUCKET
-});
-
-// Use admin storage for uploads (authenticated)
-const storage = getAdminStorage(adminApp);
+// Use client storage for uploads (requires authentication)
+const storage = getStorage(app);
+const auth = getAuth(app);
 
 const SPOONACULAR_API_KEY = process.env.VITE_SPOONACULAR_API_KEY;
 const SPOONACULAR_BASE_URL = "https://api.spoonacular.com";
@@ -218,20 +211,13 @@ async function uploadRecipeImage(imageUrl, recipeId) {
     const arrayBuffer = await response.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // Upload to Firebase Storage using admin SDK
-    const bucket = storage.bucket();
-    const file = bucket.file(`recipes/${recipeId}.jpg`);
-    await file.save(buffer, {
-      metadata: {
-        contentType: 'image/jpeg',
-      },
-    });
+    // Upload to Firebase Storage using client SDK
+    const storageRef = ref(storage, `recipes/${recipeId}.jpg`);
+    const blob = new Blob([buffer], { type: 'image/jpeg' });
+    await uploadBytes(storageRef, blob);
 
     // Get download URL
-    const [downloadURL] = await file.getSignedUrl({
-      action: 'read',
-      expires: '03-09-2491', // Far future date for permanent access
-    });
+    const downloadURL = await getDownloadURL(storageRef);
 
     return downloadURL;
   } catch (error) {
@@ -446,6 +432,16 @@ async function main() {
   console.log(`⏱️  Rate limit: None for MealDB, 1 request/second for Spoonacular`);
 
   const startTime = Date.now();
+
+  // Authenticate before uploading
+  console.log('🔐 Authenticating with Firebase...');
+  try {
+    await signInAnonymously(auth);
+    console.log('✅ Authentication successful');
+  } catch (error) {
+    console.error('❌ Authentication failed:', error);
+    process.exit(1);
+  }
 
   try {
     const result = await bulkUploadRecipes(

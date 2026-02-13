@@ -18,14 +18,16 @@ class AnalyticsService {
 
   // Track user identification
   static setUser(userId: string, properties?: Record<string, any>) {
-    setUserId(analytics, userId);
-    if (properties) {
-      setUserProperties(analytics, properties);
+    if (analytics) {
+      setUserId(analytics, userId);
+      if (properties) {
+        setUserProperties(analytics, properties);
+      }
     }
   }
 
   static setUserProperties(properties: Record<string, any> | null) {
-    if (properties) {
+    if (analytics && properties) {
       setUserProperties(analytics, properties);
     }
   }
@@ -428,6 +430,101 @@ class AnalyticsService {
 
   static trackAppForeground() {
     this.logEvent('app_foreground');
+  }
+
+  // Funnel tracking for subscription conversion
+  static trackSubscriptionFunnel(step: 'view_pricing' | 'start_trial' | 'upgrade_intent' | 'payment_attempt' | 'payment_success' | 'payment_failed', details?: Record<string, any>) {
+    this.logEvent('subscription_funnel', {
+      funnel_step: step,
+      ...details
+    });
+  }
+
+  static trackSubscriptionFunnelConversion(fromStep: string, toStep: string, timeSpent?: number) {
+    this.logEvent('subscription_funnel_conversion', {
+      from_step: fromStep,
+      to_step: toStep,
+      time_spent_seconds: timeSpent
+    });
+  }
+
+  // Feature adoption metrics
+  static trackFeatureDiscovery(featureName: string, discoveryMethod: 'tutorial' | 'tooltip' | 'organic' | 'notification') {
+    this.logEvent('feature_discovery', {
+      feature_name: featureName,
+      discovery_method: discoveryMethod
+    });
+  }
+
+  static trackFeatureFirstUse(featureName: string, context?: Record<string, any>) {
+    this.logEvent('feature_first_use', {
+      feature_name: featureName,
+      ...context
+    });
+  }
+
+  static trackFeatureEngagement(featureName: string, engagementType: 'click' | 'view' | 'complete' | 'share', value?: number) {
+    this.logEvent('feature_engagement', {
+      feature_name: featureName,
+      engagement_type: engagementType,
+      value: value
+    });
+  }
+
+  static trackFeatureRetention(featureName: string, daysSinceFirstUse: number, usageCount: number) {
+    this.logEvent('feature_retention', {
+      feature_name: featureName,
+      days_since_first_use: daysSinceFirstUse,
+      usage_count: usageCount
+    });
+  }
+
+  // User journey tracking
+  static trackUserJourney(milestone: string, details?: Record<string, any>) {
+    this.logEvent('user_journey_milestone', {
+      milestone,
+      ...details
+    });
+  }
+
+  // A/B testing and experimentation
+  static trackExperimentView(experimentName: string, variant: string) {
+    this.logEvent('experiment_view', {
+      experiment_name: experimentName,
+      variant
+    });
+  }
+
+  static trackExperimentConversion(experimentName: string, variant: string, conversionType: string) {
+    this.logEvent('experiment_conversion', {
+      experiment_name: experimentName,
+      variant,
+      conversion_type: conversionType
+    });
+  }
+
+  // User segmentation
+  static trackUserSegment(segment: 'new_user' | 'casual_user' | 'power_user' | 'premium_user', previousSegment?: string) {
+    this.logEvent('user_segment_change', {
+      new_segment: segment,
+      previous_segment: previousSegment
+    });
+  }
+
+  // Onboarding funnel
+  static trackOnboardingStep(step: string, completed: boolean, timeSpent?: number) {
+    this.logEvent('onboarding_step', {
+      step_name: step,
+      completed,
+      time_spent_seconds: timeSpent
+    });
+  }
+
+  static trackOnboardingComplete(totalTime: number, stepsCompleted: number) {
+    this.logEvent('onboarding_complete', {
+      total_time_seconds: totalTime,
+      steps_completed: stepsCompleted
+    });
   }
 }
 

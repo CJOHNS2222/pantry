@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { collection, doc, onSnapshot, getDocs, setDoc, serverTimestamp, query, where, Timestamp, deleteDoc, writeBatch, getDoc } from 'firebase/firestore';
+import { collection, doc, serverTimestamp, query, where, Timestamp, deleteDoc, writeBatch } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 import DatabaseMonitoringService from '../services/databaseMonitoringService';
 import AnalyticsService from '../services/analyticsService';
@@ -32,7 +32,7 @@ function createShoppingListListener(
   setIsLoadingShoppingList: (loading: boolean) => void
 ) {
   if (inHousehold) {
-    return onSnapshot(collection(db, 'households', user.householdId, 'shoppingList'), snap => {
+    return DatabaseMonitoringService.onSnapshot(collection(db, 'households', user.householdId, 'shoppingList'), snap => {
       const serverData = snap.docs.map(d => ({ id: d.id, ...d.data() } as ShoppingItem));
       setRemoteShoppingListUpdate(true);
       setShoppingList(serverData);
@@ -45,7 +45,7 @@ function createShoppingListListener(
       setIsLoadingShoppingList(false);
     });
   } else {
-    return onSnapshot(collection(db, 'users', user.id, 'shoppingList'), snap => {
+    return DatabaseMonitoringService.onSnapshot(collection(db, 'users', user.id, 'shoppingList'), snap => {
       const serverData = snap.docs.map(d => ({ id: d.id, ...d.data() } as ShoppingItem));
       setRemoteShoppingListUpdate(true);
       setShoppingList(serverData);
@@ -68,7 +68,7 @@ function createSavedRecipesListener(
   setIsLoadingSavedRecipes: (loading: boolean) => void
 ) {
   if (inHousehold) {
-    return onSnapshot(collection(db, 'households', user.householdId, 'savedRecipes'), snap => {
+    return DatabaseMonitoringService.onSnapshot(collection(db, 'households', user.householdId, 'savedRecipes'), snap => {
       const serverData = snap.docs.map(d => ({ id: d.id, ...d.data() } as SavedRecipe));
       setSavedRecipes(serverData);
       setIsLoadingSavedRecipes(false);
@@ -80,7 +80,7 @@ function createSavedRecipesListener(
       setIsLoadingSavedRecipes(false);
     });
   } else {
-    return onSnapshot(collection(db, 'users', user.id, 'savedRecipes'), snap => {
+    return DatabaseMonitoringService.onSnapshot(collection(db, 'users', user.id, 'savedRecipes'), snap => {
       const serverData = snap.docs.map(d => ({ id: d.id, ...d.data() } as SavedRecipe));
       setSavedRecipes(serverData);
       setIsLoadingSavedRecipes(false);
@@ -99,10 +99,11 @@ function createMealPlanListener(
   household: Household | null,
   inHousehold: boolean,
   setMealPlan: (plans: DayPlan[]) => void,
-  setIsLoadingMealPlan: (loading: boolean) => void
+  setIsLoadingMealPlan: (loading: boolean) => void,
+  prevMealPlanRef: React.MutableRefObject<DayPlan[]>
 ) {
   if (inHousehold) {
-    return onSnapshot(collection(db, 'households', user.householdId, 'mealPlan'), snap => {
+    return DatabaseMonitoringService.onSnapshot(collection(db, 'households', user.householdId, 'mealPlan'), snap => {
       // Create a 7-day (free) or 14-day (premium) template starting from today
       const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
       const today = new Date();
@@ -191,7 +192,7 @@ function createMealPlanListener(
       setIsLoadingMealPlan(false);
     });
   } else {
-    return onSnapshot(collection(db, 'users', user.id, 'mealPlan'), snap => {
+    return DatabaseMonitoringService.onSnapshot(collection(db, 'users', user.id, 'mealPlan'), snap => {
       // Create a 7-day (free) or 14-day (premium) template starting from today
       const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
       const today = new Date();
@@ -373,11 +374,11 @@ export function useDataManagement(user: User | null, addToast: (message: string,
       addToast('Change queued for when you\'re back online.', 'info');
     } else {
       if (operation.type === 'add') {
-        await addDoc(collection(db, operation.collection), operation.data);
+        await DatabaseMonitoringService.addDoc(DatabaseMonitoringService.collection(operation.collection), operation.data);
       } else if (operation.type === 'update' && operation.docId) {
-        await setDoc(doc(db, operation.collection, operation.docId), operation.data);
+        await DatabaseMonitoringService.setDoc(DatabaseMonitoringService.doc(operation.collection, operation.docId), operation.data);
       } else if (operation.type === 'delete' && operation.docId) {
-        await deleteDoc(doc(db, operation.collection, operation.docId));
+        await DatabaseMonitoringService.deleteDoc(DatabaseMonitoringService.doc(operation.collection, operation.docId));
       }
       
       // Invalidate cache for the affected collection
@@ -539,7 +540,7 @@ export function useDataManagement(user: User | null, addToast: (message: string,
 
     // Household document listener - always listen if user has a household
     if (user?.householdId) {
-      unsubs.push(onSnapshot(doc(db, 'households', user.householdId), snap => {
+      unsubs.push(DatabaseMonitoringService.onSnapshot(doc(db, 'households', user.householdId), snap => {
         if (snap.exists()) {
           let householdData = { id: snap.id, ...snap.data() } as Household;
           
@@ -716,7 +717,7 @@ export function useDataManagement(user: User | null, addToast: (message: string,
     if (!options?.disableInventoryListeners) {
       if (user?.householdId) {
         // Listen to household inventory when user has a household
-        unsubs.push(onSnapshot(collection(db, 'households', user.householdId, 'inventory'), snap => {
+        unsubs.push(DatabaseMonitoringService.onSnapshot(collection(db, 'households', user.householdId, 'inventory'), snap => {
           const serverData = snap.docs.map(d => ({ id: d.id, ...d.data() } as PantryItem));
           // Filter out invalid items
           const validServerData = serverData.filter(item => item && typeof item === 'object' && item.id);
@@ -736,7 +737,7 @@ export function useDataManagement(user: User | null, addToast: (message: string,
         }));
       } else {
         // Listen to user inventory when not in household
-        unsubs.push(onSnapshot(collection(db, 'users', user.id, 'inventory'), snap => {
+        unsubs.push(DatabaseMonitoringService.onSnapshot(collection(db, 'users', user.id, 'inventory'), snap => {
           const serverData = snap.docs.map(d => ({ id: d.id, ...d.data() } as PantryItem));
           // Filter out invalid items
           const validServerData = serverData.filter(item => item && typeof item === 'object' && item.id);
@@ -765,7 +766,7 @@ export function useDataManagement(user: User | null, addToast: (message: string,
     // These automatically choose between user and household collections
     unsubs.push(createShoppingListListener(user, household, inHousehold, setShoppingList, setIsLoadingShoppingList));
     unsubs.push(createSavedRecipesListener(user, household, inHousehold, setSavedRecipes, setIsLoadingSavedRecipes));
-    unsubs.push(createMealPlanListener(user, household, inHousehold, setMealPlan, setIsLoadingMealPlan));
+    unsubs.push(createMealPlanListener(user, household, inHousehold, setMealPlan, setIsLoadingMealPlan, prevMealPlanRef));
 
     globalListenersSetUp.current = true;
 
@@ -947,25 +948,25 @@ export function useDataManagement(user: User | null, addToast: (message: string,
             batch.set(doc(db, householdInventoryPath, item.id), cleanObject(item));
           });
 
-          // Periodic cleanup of orphaned items (run occasionally)
-          if (Math.random() < 0.1) { // 10% chance to run cleanup
-            try {
-              const allDocs = await getDocs(collection(db, householdInventoryPath));
-              const currentIds = new Set(inventory.map(item => item.id));
-              const orphanedDocs = allDocs.docs.filter(doc => !currentIds.has(doc.id));
-
-              if (orphanedDocs.length > 0) {
-                console.log(`Cleaning up ${orphanedDocs.length} orphaned household inventory items`);
-                const cleanupBatch = writeBatch(db);
-                orphanedDocs.forEach(doc => {
-                  cleanupBatch.delete(doc.ref);
-                });
-                await cleanupBatch.commit();
-              }
-            } catch (err) {
-              console.warn('Failed to cleanup orphaned household inventory items:', err);
-            }
-          }
+          // Periodic cleanup of orphaned items (disabled - was causing unnecessary queries)
+          // if (Math.random() < 0.1) { // 10% chance to run cleanup
+          //   try {
+          //     const allDocs = await DatabaseMonitoringService.getDocs(DatabaseMonitoringService.collection(householdInventoryPath));
+          //     const currentIds = new Set(inventory.map(item => item.id));
+          //     const orphanedDocs = allDocs.docs.filter(doc => !currentIds.has(doc.id));
+          //
+          //     if (orphanedDocs.length > 0) {
+          //       console.log(`Cleaning up ${orphanedDocs.length} orphaned household inventory items`);
+          //       const cleanupBatch = writeBatch(db);
+          //       orphanedDocs.forEach(doc => {
+          //         cleanupBatch.delete(doc.ref);
+          //       });
+          //       await cleanupBatch.commit();
+          //     }
+          //   } catch (err) {
+          //     console.warn('Failed to cleanup orphaned household inventory items:', err);
+          //   }
+          // }
           
           // Sync other household data (saved recipes, meal plan)
           const householdWrites: Promise<any>[] = [];
@@ -982,14 +983,14 @@ export function useDataManagement(user: User | null, addToast: (message: string,
             const todayStr = today.toISOString().slice(0, 10);
             
             try {
-              const oldMealPlanDocs = await getDocs(query(
-                collection(db, 'households', user.householdId, 'mealPlan'),
-                where('date', '<', Timestamp.fromDate(today))
+              const oldMealPlanDocs = await DatabaseMonitoringService.getDocs(DatabaseMonitoringService.query(
+                DatabaseMonitoringService.collection('households', user.householdId, 'mealPlan'),
+                DatabaseMonitoringService.where('date', '<', Timestamp.fromDate(today))
               ));
               
               oldMealPlanDocs.docs.forEach(doc => {
                 householdWrites.push(
-                  deleteDoc(doc.ref).catch(err => ({ err, path: doc.ref.path }))
+                  DatabaseMonitoringService.deleteDoc(doc.ref).catch(err => ({ err, path: doc.ref.path }))
                 );
               });
               
@@ -1061,7 +1062,7 @@ export function useDataManagement(user: User | null, addToast: (message: string,
           // Periodic cleanup of orphaned items (run occasionally)
           if (Math.random() < 0.1) { // 10% chance to run cleanup
             try {
-              const allDocs = await getDocs(collection(db, userInventoryPath));
+              const allDocs = await DatabaseMonitoringService.getDocs(DatabaseMonitoringService.collection(userInventoryPath));
               const currentIds = new Set(inventory.map(item => item.id));
               const orphanedDocs = allDocs.docs.filter(doc => !currentIds.has(doc.id));
 
@@ -1093,14 +1094,14 @@ export function useDataManagement(user: User | null, addToast: (message: string,
             today.setHours(0, 0, 0, 0);
             
             try {
-              const oldMealPlanDocs = await getDocs(query(
-                collection(db, 'users', user.id, 'mealPlan'),
-                where('date', '<', Timestamp.fromDate(today))
+              const oldMealPlanDocs = await DatabaseMonitoringService.getDocs(DatabaseMonitoringService.query(
+                DatabaseMonitoringService.collection('users', user.id, 'mealPlan'),
+                DatabaseMonitoringService.where('date', '<', Timestamp.fromDate(today))
               ));
               
               oldMealPlanDocs.docs.forEach(doc => {
                 userWrites.push(
-                  deleteDoc(doc.ref).catch(err => ({ err, path: doc.ref.path }))
+                  DatabaseMonitoringService.deleteDoc(doc.ref).catch(err => ({ err, path: doc.ref.path }))
                 );
               });
               
@@ -1183,8 +1184,8 @@ export function useDataManagement(user: User | null, addToast: (message: string,
         // Calculate changes using batch operations to minimize Firestore reads/writes
         const calculateShoppingListChanges = async () => {
           // Get existing documents to determine what changed
-          const shoppingListRef = collection(db, collectionPath);
-          const existingDocs = await getDocs(query(shoppingListRef));
+          const shoppingListRef = DatabaseMonitoringService.collection(collectionPath);
+          const existingDocs = await DatabaseMonitoringService.getDocs(DatabaseMonitoringService.query(shoppingListRef));
           const existingItems = existingDocs.docs.map(doc => ({ id: doc.id, ...doc.data() } as ShoppingItem));
 
           // Create change sets
@@ -1284,13 +1285,13 @@ export function useDataManagement(user: User | null, addToast: (message: string,
           ? `households/${user.householdId}/mealPlan`
           : `users/${user.id}/mealPlan`;
 
-        const oldDocsQuery = query(
-          collection(db, collectionPath),
-          where('date', '<', cutoffDate)
+        const oldDocsQuery = DatabaseMonitoringService.query(
+          DatabaseMonitoringService.collection(collectionPath),
+          DatabaseMonitoringService.where('date', '<', cutoffDate)
         );
 
-        const oldDocs = await getDocs(oldDocsQuery);
-        const deletePromises = oldDocs.docs.map(doc => deleteDoc(doc.ref));
+        const oldDocs = await DatabaseMonitoringService.getDocs(oldDocsQuery);
+        const deletePromises = oldDocs.docs.map(doc => DatabaseMonitoringService.deleteDoc(doc.ref));
 
         if (deletePromises.length > 0) {
           await Promise.allSettled(deletePromises);
@@ -1313,7 +1314,7 @@ export function useDataManagement(user: User | null, addToast: (message: string,
   // Ratings listener
   useEffect(() => {
     if (!user?.id) return;
-    const unsubscribe = onSnapshot(collection(db, 'ratings'), (snapshot) => {
+    const unsubscribe = DatabaseMonitoringService.onSnapshot(DatabaseMonitoringService.collection('ratings'), (snapshot) => {
       const allRatings: RecipeRating[] = [];
       snapshot.forEach((doc) => {
         const data = doc.data();
@@ -1554,11 +1555,11 @@ export function useDataManagement(user: User | null, addToast: (message: string,
       const collectionPath = inHousehold ? `households/${household.id}/savedRecipes` : `users/${user.id}/savedRecipes`;
 
       // Check for duplicate recipes by querying Firestore directly (more reliable than local state)
-      const existingRecipesQuery = query(
-        collection(db, collectionPath),
-        where('title', '==', recipe.title)
+      const existingRecipesQuery = DatabaseMonitoringService.query(
+        DatabaseMonitoringService.collection(collectionPath),
+        DatabaseMonitoringService.where('title', '==', recipe.title)
       );
-      const existingRecipesSnap = await getDocs(existingRecipesQuery);
+      const existingRecipesSnap = await DatabaseMonitoringService.getDocs(existingRecipesQuery);
 
       // Also check for very similar recipes (same title and similar ingredients count)
       let isDuplicate = false;
@@ -1589,7 +1590,7 @@ export function useDataManagement(user: User | null, addToast: (message: string,
         return;
       }
 
-      const docRef = await addDoc(collection(db, collectionPath), {
+      const docRef = await DatabaseMonitoringService.addDoc(DatabaseMonitoringService.collection(collectionPath), {
         ...recipe,
         savedAt: serverTimestamp(),
         savedBy: user.name,
@@ -1632,7 +1633,7 @@ export function useDataManagement(user: User | null, addToast: (message: string,
       const inHousehold = isHouseholdMember(household, user) && household?.id;
       const collectionPath = inHousehold ? `households/${household.id}/savedRecipes` : `users/${user.id}/savedRecipes`;
       
-      await deleteDoc(doc(db, collectionPath, recipe.id));
+      await DatabaseMonitoringService.deleteDoc(DatabaseMonitoringService.doc(collectionPath, recipe.id));
       
       addToast(`Removed ${recipe.title} from your saved recipes.`);
     } catch (error) {
@@ -1658,7 +1659,7 @@ export function useDataManagement(user: User | null, addToast: (message: string,
         ratingDoc.userAvatar = user.avatar;
       }
       
-      const docRef = await addDoc(collection(db, 'ratings'), ratingDoc);
+      const docRef = await DatabaseMonitoringService.addDoc(DatabaseMonitoringService.collection('ratings'), ratingDoc);
 
       // Immediately update local state with the new rating
       const newRating: RecipeRating = {
@@ -1720,7 +1721,7 @@ export function useDataManagement(user: User | null, addToast: (message: string,
       const newCategory = createCustomCategory(name, icon, color, user.id);
       
       // Save to Firestore
-      const docRef = await addDoc(collection(db, 'users', user.id, 'customCategories'), {
+      const docRef = await DatabaseMonitoringService.addDoc(DatabaseMonitoringService.collection('users', user.id, 'customCategories'), {
         name: newCategory.name,
         icon: newCategory.icon,
         color: newCategory.color,
@@ -1761,7 +1762,7 @@ export function useDataManagement(user: User | null, addToast: (message: string,
       }
 
       // Update in Firestore
-      await setDoc(doc(db, 'users', user.id, 'customCategories', categoryId), {
+      await DatabaseMonitoringService.setDoc(DatabaseMonitoringService.doc('users', user.id, 'customCategories', categoryId), {
         ...updatedCategory,
         updatedAt: serverTimestamp()
       }, { merge: true });
@@ -1792,7 +1793,7 @@ export function useDataManagement(user: User | null, addToast: (message: string,
       }
 
       // Delete from Firestore
-      await deleteDoc(doc(db, 'users', user.id, 'customCategories', categoryId));
+      await DatabaseMonitoringService.deleteDoc(DatabaseMonitoringService.doc('users', user.id, 'customCategories', categoryId));
 
       // Update local state
       setCustomCategories(prev => prev.filter(cat => cat.id !== categoryId));

@@ -43,13 +43,11 @@ export const PendingNotifications: React.FC<PendingNotificationsProps> = ({
           // Add item to shopping list
           if (notification.actionData?.item) {
             // This would need to be implemented based on your shopping list service
-            console.log('Adding to shopping list:', notification.actionData.item);
           }
           break;
         case 'view_recipe':
           // Navigate to recipe
           if (notification.actionData?.recipeId) {
-            console.log('Viewing recipe:', notification.actionData.recipeId);
           }
           break;
         case 'join_household':
@@ -69,16 +67,27 @@ export const PendingNotifications: React.FC<PendingNotificationsProps> = ({
               
               if (householdDoc.exists()) {
                 const householdData = householdDoc.data();
+                
+                // Handle both array and map formats for members (same as checkInvitation function)
+                let existingMembers = [];
+                if (householdData && Array.isArray(householdData.members)) {
+                  existingMembers = householdData.members;
+                } else if (householdData?.members && typeof householdData.members === 'object') {
+                  // Convert map to array (handle legacy data where members might be stored as a map)
+                  const mapMembers = householdData.members as Record<string, any>;
+                  existingMembers = Object.keys(mapMembers).map(id => ({ id, ...mapMembers[id] }));
+                }
+                
                 const updatedMemberIds = [...(householdData.memberIds || []), user.id];
                 const newMember = {
                   id: user.id,
                   name: user.name,
                   email: user.email,
                   role: 'member',
-                  status: 'Active',
+                  status: 'active',
                   joinedAt: new Date().toISOString()
                 };
-                const updatedMembers = [...(householdData.members || []), newMember];
+                const updatedMembers = [...existingMembers, newMember];
                 
                 await updateDoc(householdRef, {
                   memberIds: updatedMemberIds,
@@ -87,7 +96,6 @@ export const PendingNotifications: React.FC<PendingNotificationsProps> = ({
                 });
               }
               
-              console.log('Joined household:', notification.actionData.householdId);
             } catch (error) {
               console.error('Error joining household:', error);
               throw error;

@@ -79,7 +79,8 @@ export class PantryService {
   static createManualItem(
     itemName: string,
     quantity: number,
-    existingInventory: PantryItem[]
+    existingInventory: PantryItem[],
+    unit: string = 'count'
   ): PantryItem {
     // Validate input using centralized validation
     const validation = validatePantryItem(itemName, quantity);
@@ -123,7 +124,7 @@ export class PantryService {
       item: itemName.trim(),
       category: category,
       quantity_estimate: quantity.toString(), // Keep for backward compatibility
-      quantity: { amount: quantity, unit: 'count' }, // New quantity system
+      quantity: { amount: quantity, unit: unit }, // New quantity system
       image,
       storageLocation: inferStorageLocationFromItemName(itemName),
       expirationDate: getAutoExpirationDate(itemName, category),

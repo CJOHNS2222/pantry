@@ -80,7 +80,8 @@ export const MainContent: React.FC = () => {
     onUpdateCustomCategory,
     onDeleteCustomCategory,
     onLogout,
-    onShowTutorial
+    onShowTutorial,
+    onShowHousehold
   } = appActions;
   // Helper function to match ingredients to inventory
   const inventoryNeeded = (ingredients: string[], pantryInventory: PantryItem[]): PantryItem[] => {
@@ -121,27 +122,12 @@ export const MainContent: React.FC = () => {
         onUpgrade={() => setActiveTab(Tab.SETTINGS)}
       />
 
-      {/* Household Activity Feed - Show for households with multiple members */}
-      {household && household.members.length > 1 && (
-        <div className="mb-4">
-          <HouseholdActivityFeed
-            activities={recentActivities}
-            isLoading={isLoadingActivities}
-            maxItems={3}
-          />
-        </div>
-      )}
 
+      {/* Main pantry tab */}
       {activeTab === Tab.PANTRY && (
         <ComponentErrorBoundary componentName="PantryScanner">
           <Suspense fallback={<LoadingSpinner />}>
             <PantryScanner
-              inventory={inventory}
-              setInventory={appState.setInventory}
-              updateItem={updateItem}
-              deleteItem={deleteItem}
-              addItem={addItem}
-              addItems={addItems}
               addToShoppingList={onAddToShoppingList}
               consumptionSuggestions={consumptionSuggestions}
               expirationAlerts={expirationAlerts}
@@ -149,12 +135,12 @@ export const MainContent: React.FC = () => {
               customCategories={customCategories}
               setActiveTab={setActiveTab}
               setInitialSearchQuery={appActions.setInitialSearchQuery}
-              isLoadingInventory={isLoadingInventory}
               user={user}
             />
           </Suspense>
         </ComponentErrorBoundary>
       )}
+
       {activeTab === Tab.MEALS && (
         <ComponentErrorBoundary componentName="MealPlanner">
           <Suspense fallback={<LoadingSpinner />}>
@@ -232,6 +218,7 @@ export const MainContent: React.FC = () => {
               ratings={ratings}
               onAddToPlan={onAddToPlan}
               onSaveRecipe={onSaveRecipe}
+              user={user}
             />
           </Suspense>
         </ComponentErrorBoundary>
@@ -252,6 +239,7 @@ export const MainContent: React.FC = () => {
               inventory={inventory}
               onShowTutorial={onShowTutorial}
               household={household}
+              onShowHousehold={onShowHousehold}
             />
           </Suspense>
         </ComponentErrorBoundary>

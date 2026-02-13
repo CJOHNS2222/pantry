@@ -1,0 +1,48 @@
+📡 SUBSCRIPTION: users/2h2KSLQhI8aGROiYCwikLxiRj4w1 | Total Subscriptions: 5
+databaseMonitoringService.ts:475 📡 SUBSCRIPTION: users/2h2KSLQhI8aGROiYCwikLxiRj4w1 | Total Subscriptions: 6
+databaseMonitoringService.ts:475 📡 SUBSCRIPTION: ratings | Total Subscriptions: 7
+installHook.js:1 [WARN] [VersionService] Failed to get app info Object
+overrideMethod @ installHook.js:1Understand this warning
+2DatabaseAnalytics.tsx:141 Button is rendering!
+databaseMonitoringService.ts:216 🔍 QUERY: unknown | Results: 0 | Duration: 403ms | Total Queries: 1
+databaseMonitoringService.ts:216 🔍 QUERY: unknown | Results: 0 | Duration: 402ms | Total Queries: 2
+DatabaseAnalytics.tsx:141 Button is rendering!
+inventoryCacheService.ts:112 ✅ Loaded 9 cached inventory items (1 database read)
+9installHook.js:1 An empty string ("") was passed to the src attribute. This may cause the browser to download the whole page again over the network. To fix this, either do not render the element at all or pass null to src instead of an empty string.
+overrideMethod @ installHook.js:1Understand this error
+DatabaseAnalytics.tsx:141 Button is rendering!
+installHook.js:1 🚨 Heavy write pattern detected: 2 writes to usage in 39ms
+overrideMethod @ installHook.js:1Understand this warning
+installHook.js:1 🚨 Heavy write pattern detected: 2 writes to usage in 62ms
+overrideMethod @ installHook.js:1Understand this warning
+3DatabaseAnalytics.tsx:141 Button is rendering!
+databaseMonitoringService.ts:514 🔥 [2:31:32 AM] Firestore Database Metrics: {reads: 5, writes: 4, deletes: 0, queries: 2, batchOperations: 0, …}activeWritePatterns: 0batchOperations: 0deletes: 0queries: 2reads: 5readsPerMinute: 10realtimeSubscriptions: 7sessionDuration: 30009writes: 4writesPerMinute: 8[[Prototype]]: Object
+databaseMonitoringService.ts:216 🔍 QUERY: unknown | Results: 0 | Duration: 115ms | Total Queries: 3
+databaseMonitoringService.ts:514 🔥 [2:32:02 AM] Firestore Database Metrics: {reads: 5, writes: 4, deletes: 0, queries: 3, batchOperations: 0, …}activeWritePatterns: 0batchOperations: 0deletes: 0queries: 3reads: 5readsPerMinute: 5realtimeSubscriptions: 7sessionDuration: 60005writes: 4writesPerMinute: 4[[Prototype]]: Object
+databaseMonitoringService.ts:216 🔍 QUERY: unknown | Results: 0 | Duration: 206ms | Total Queries: 4
+databaseMonitoringService.ts:514 🔥 [2:32:32 AM] Firestore Database Metrics: {reads: 5, writes: 4, deletes: 0, queries: 4, batchOperations: 0, …}activeWritePatterns: 0batchOperations: 0deletes: 0queries: 4reads: 5readsPerMinute: 3realtimeSubscriptions: 7sessionDuration: 90006writes: 4writesPerMinute: 3[[Prototype]]: Object
+databaseMonitoringService.ts:216 🔍 QUERY: unknown | Results: 0 | Duration: 110ms | Total Queries: 5
+databaseMonitoringService.ts:514 🔥 [2:33:02 AM] Firestore Database Metrics: {reads: 5, writes: 4, deletes: 0, queries: 5, batchOperations: 0, …}
+databaseMonitoringService.ts:216 🔍 QUERY: unknown | Results: 0 | Duration: 136ms | Total Queries: 6
+databaseMonitoringService.ts:475 📡 SUBSCRIPTION: users | Total Subscriptions: 8
+recipeService.ts:328 ✅ Loaded 50 cached recipes (1 database read)
+stripeService.ts:4 Loading the script 'https://js.stripe.com/clover/stripe.js' violates the following Content Security Policy directive: "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://aistudiocdn.com https://fonts.googleapis.com https://apis.google.com https://www.googleapis.com https://www.google.com https://accounts.google.com https://oauth.googleusercontent.com https://www.googletagmanager.com". Note that 'script-src-elem' was not explicitly set, so 'script-src' is used as a fallback. The action has been blocked.
+injectScript2 @ @stripe_stripe-js.js?v=28a1c102:48
+(anonymous) @ @stripe_stripe-js.js?v=28a1c102:101
+loadScript2 @ @stripe_stripe-js.js?v=28a1c102:84
+getStripePromise2 @ @stripe_stripe-js.js?v=28a1c102:147
+loadStripe2 @ @stripe_stripe-js.js?v=28a1c102:166
+(anonymous) @ stripeService.ts:4Understand this error
+@stripe_stripe-js.js?v=28a1c102:66 Uncaught (in promise) Error: Failed to load Stripe.js
+    at HTMLScriptElement.<anonymous> (@stripe_stripe-js.js?v=28a1c102:66:12)
+(anonymous) @ @stripe_stripe-js.js?v=28a1c102:66
+script
+injectScript2 @ @stripe_stripe-js.js?v=28a1c102:42
+(anonymous) @ @stripe_stripe-js.js?v=28a1c102:101
+loadScript2 @ @stripe_stripe-js.js?v=28a1c102:84
+getStripePromise2 @ @stripe_stripe-js.js?v=28a1c102:147
+loadStripe2 @ @stripe_stripe-js.js?v=28a1c102:166
+(anonymous) @ stripeService.ts:4Understand this error
+databaseMonitoringService.ts:216 🔍 QUERY: unknown | Results: 0 | Duration: 93ms | Total Queries: 7
+databaseMonitoringService.ts:514 🔥 [2:33:32 AM] Firestore Database Metrics: {reads: 6, writes: 4, deletes: 0, queries: 7, batchOperations: 0, …}
+databaseMonitoringService.ts:216 🔍 QUERY: unknown | Results: 0 | Duration: 115ms | Total Queries: 8

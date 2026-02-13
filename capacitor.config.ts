@@ -20,6 +20,9 @@ const config: CapacitorConfig = {
     SafeArea: {
       // Safe area plugin configuration
     },
+    Haptics: {
+      // Haptics plugin configuration
+    },
     // CapacitorHttp: {
     //   enabled: true,
     //   excludePatterns: ["*firestore.googleapis.com*"]

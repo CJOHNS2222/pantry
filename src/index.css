@@ -66,7 +66,7 @@ html, body {
   scrollbar-width: none;  /* Firefox */
   -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
   scroll-behavior: smooth; /* Smooth scrolling */
-  touch-action: pan-y; /* Only allow vertical touch scrolling */
+  touch-action: pan-x; /* Allow horizontal touch scrolling */
   overscroll-behavior-x: contain; /* Prevent overscroll on sides */
   flex-wrap: nowrap; /* Prevent wrapping */
 }

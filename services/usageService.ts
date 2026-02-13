@@ -1,6 +1,8 @@
-import { doc, getDoc, setDoc, updateDoc, increment, Timestamp } from 'firebase/firestore';
+import DatabaseMonitoringService from './databaseMonitoringService';
+import { increment, Timestamp } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 import { User } from '../types';
+import { log } from './logService';
 
 export interface UsageLimits {
   searches: {
@@ -93,8 +95,8 @@ class UsageService {
     const planTier = user.subscription?.tier || 'free';
     const planLimits = this.PLAN_LIMITS[planTier];
 
-    const usageRef = doc(db, 'users', user.id, 'usage', 'limits');
-    const usageDoc = await getDoc(usageRef);
+    const usageRef = DatabaseMonitoringService.doc('users/' + user.id + '/usage/limits');
+    const usageDoc = await DatabaseMonitoringService.getDoc(usageRef);
 
     const now = new Date();
     const weekStart = this.getWeekStart(now);
@@ -124,7 +126,7 @@ class UsageService {
         }
       };
 
-      await setDoc(usageRef, {
+      await DatabaseMonitoringService.setDoc(usageRef, {
         ...initialUsage,
         searches: { ...initialUsage.searches, resetDate: weekStart },
         mealPlanning: { ...initialUsage.mealPlanning, resetDate: weekStart },
@@ -147,7 +149,7 @@ class UsageService {
 
     // Reset weekly counters if the earliest reset date is in the past
     if (now > earliestResetDate) {
-      await updateDoc(usageRef, {
+      await DatabaseMonitoringService.updateDoc(usageRef, {
         'searches.used': 0,
         'searches.resetDate': weekStart,
         'mealPlanning.weeklyUsed': 0,
@@ -201,8 +203,8 @@ class UsageService {
   static async recordSearch(user: User): Promise<void> {
     if (!user?.id) return;
 
-    const usageRef = doc(db, 'users', user.id, 'usage', 'limits');
-    await updateDoc(usageRef, {
+    const usageRef = DatabaseMonitoringService.doc('users/' + user.id + '/usage/limits');
+    await DatabaseMonitoringService.updateDoc(usageRef, {
       'searches.used': increment(1),
       lastUpdated: new Date()
     });
@@ -221,8 +223,8 @@ class UsageService {
   static async recordRecipeSave(user: User): Promise<void> {
     if (!user?.id) return;
 
-    const usageRef = doc(db, 'users', user.id, 'usage', 'limits');
-    await updateDoc(usageRef, {
+    const usageRef = DatabaseMonitoringService.doc('users/' + user.id + '/usage/limits');
+    await DatabaseMonitoringService.updateDoc(usageRef, {
       'recipes.used': increment(1),
       lastUpdated: new Date()
     });
@@ -231,8 +233,8 @@ class UsageService {
   static async recordMealPlanAddition(user: User): Promise<void> {
     if (!user?.id) return;
 
-    const usageRef = doc(db, 'users', user.id, 'usage', 'limits');
-    await updateDoc(usageRef, {
+    const usageRef = DatabaseMonitoringService.doc('users/' + user.id + '/usage/limits');
+    await DatabaseMonitoringService.updateDoc(usageRef, {
       'mealPlanning.weeklyUsed': increment(1),
       lastUpdated: new Date()
     });
@@ -246,8 +248,8 @@ class UsageService {
   static async recordGeminiUsage(user: User): Promise<void> {
     if (!user?.id) return;
 
-    const usageRef = doc(db, 'users', user.id, 'usage', 'limits');
-    await updateDoc(usageRef, {
+    const usageRef = DatabaseMonitoringService.doc('users/' + user.id + '/usage/limits');
+    await DatabaseMonitoringService.updateDoc(usageRef, {
       'gemini.used': increment(1),
       lastUpdated: new Date()
     });
@@ -265,22 +267,22 @@ class UsageService {
     if (!userId) return false;
 
     // Get user data to check subscription tier
-    const userRef = doc(db, 'users', userId);
-    const userDoc = await getDoc(userRef);
+    const userRef = DatabaseMonitoringService.doc('users/' + userId);
+    const userDoc = await DatabaseMonitoringService.getDoc(userRef);
     if (!userDoc.exists()) return false;
 
     const user = userDoc.data() as User;
-    console.log('canAddHouseholdMember - User data:', { userId, householdId: user.householdId, subscription: user.subscription });
+    log.debug('canAddHouseholdMember - User data', { userId, householdId: user.householdId, subscription: user.subscription }, 'UsageService');
 
     // Get current household member count
     if (!user.householdId) {
-      console.log('canAddHouseholdMember - No householdId, allowing creation');
+      log.debug('canAddHouseholdMember - No householdId, allowing creation', { userId }, 'UsageService');
       // User doesn't have a household yet, so they can create one
       return true;
     }
 
-    const householdRef = doc(db, 'households', user.householdId);
-    const householdDoc = await getDoc(householdRef);
+    const householdRef = DatabaseMonitoringService.doc('households/' + user.householdId);
+    const householdDoc = await DatabaseMonitoringService.getDoc(householdRef);
     const currentMemberCount = householdDoc.exists() ? householdDoc.data().members?.length || 0 : 0;
 
     // For free users: max 1 member (themselves)
@@ -290,12 +292,12 @@ class UsageService {
                       user.subscription?.tier === 'premium' ? 3 : 1;
 
     const canAdd = currentMemberCount < maxMembers;
-    console.log('canAddHouseholdMember - Result:', {
+    log.debug('canAddHouseholdMember - Result', {
       currentMemberCount,
       maxMembers,
       subscriptionTier: user.subscription?.tier,
       canAdd
-    });
+    }, 'UsageService');
 
     return canAdd;
   }
@@ -304,9 +306,9 @@ class UsageService {
     if (!user?.id) return;
 
     const limits = this.PLAN_LIMITS[plan];
-    const usageRef = doc(db, 'users', user.id, 'usage', 'limits');
+    const usageRef = DatabaseMonitoringService.doc('users/' + user.id + '/usage/limits');
 
-    await updateDoc(usageRef, {
+    await DatabaseMonitoringService.updateDoc(usageRef, {
       'searches.weekly': limits.searches.weekly,
       'recipes.max': limits.recipes.max,
       'mealPlanning.weeklyRecipes': limits.mealPlanning.weeklyRecipes,

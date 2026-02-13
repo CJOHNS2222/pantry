@@ -6,9 +6,18 @@ import { calculatePortionScaling, PORTION_PRESETS, getRecommendedServings, Porti
 interface PortionSelectorProps {
   household: Household | null;
   currentServings: number;
-  onPortionChange: (newServings: number, scaledIngredients: string[]) => void;
+  onPortionChange: (newServings: number) => void;
   originalIngredients: string[];
   className?: string;
+  user?: {
+    id: string;
+    name: string;
+    email: string;
+    avatar?: string;
+    profile?: {
+      householdSize?: number;
+    };
+  };
 }
 
 export const PortionSelector: React.FC<PortionSelectorProps> = ({
@@ -16,7 +25,8 @@ export const PortionSelector: React.FC<PortionSelectorProps> = ({
   currentServings,
   onPortionChange,
   originalIngredients,
-  className = ''
+  className = '',
+  user
 }) => {
   const [selectedPreset, setSelectedPreset] = useState<string>('smallFamily');
   const [customServings, setCustomServings] = useState<number>(currentServings);
@@ -49,50 +59,17 @@ export const PortionSelector: React.FC<PortionSelectorProps> = ({
     const preset = PORTION_PRESETS[presetKey as keyof typeof PORTION_PRESETS];
     const newServings = Math.round(currentServings * preset.scalingFactor);
 
-    // Scale ingredients based on the preset
-    const scalingFactor = preset.scalingFactor;
-    const scaledIngredients = originalIngredients.map(ingredient => {
-      // Simple scaling logic - could be enhanced
-      const quantityMatch = ingredient.match(/^(\d+(?:\/\d+)?(?:\.\d+)?)\s*(.+)$/);
-      if (quantityMatch) {
-        const [, qtyStr, rest] = quantityMatch;
-        const quantity = parseFloat(qtyStr);
-        if (!isNaN(quantity)) {
-          const scaledQuantity = quantity * scalingFactor;
-          return `${scaledQuantity} ${rest}`;
-        }
-      }
-      return ingredient;
-    });
-
-    onPortionChange(newServings, scaledIngredients);
+    onPortionChange(newServings, []);
   };
 
   const handleCustomServingsChange = (newServings: number) => {
     if (newServings < 1) return;
     setCustomServings(newServings);
 
-    // Calculate scaling factor relative to original servings
-    const scalingFactor = newServings / currentServings;
-
-    // Scale ingredients
-    const scaledIngredients = originalIngredients.map(ingredient => {
-      const quantityMatch = ingredient.match(/^(\d+(?:\/\d+)?(?:\.\d+)?)\s*(.+)$/);
-      if (quantityMatch) {
-        const [, qtyStr, rest] = quantityMatch;
-        const quantity = parseFloat(qtyStr);
-        if (!isNaN(quantity)) {
-          const scaledQuantity = quantity * scalingFactor;
-          return `${scaledQuantity} ${rest}`;
-        }
-      }
-      return ingredient;
-    });
-
-    onPortionChange(newServings, scaledIngredients);
+    onPortionChange(newServings, []);
   };
 
-  const householdSize = household?.members?.length || 1;
+  const householdSize = household?.members?.length || user?.profile?.householdSize || 1;
 
   return (
     <div className={`bg-theme-secondary/50 rounded-lg p-4 border border-theme ${className}`}>

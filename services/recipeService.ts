@@ -1,10 +1,11 @@
-import { collection, addDoc, getDocs, query, where, orderBy, limit, doc, getDoc, setDoc } from "firebase/firestore";
+import DatabaseMonitoringService from "./databaseMonitoringService";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db, storage } from "../firebaseConfig";
 import DatabaseMonitoringService from "./databaseMonitoringService";
 import { StructuredRecipe, SavedRecipe } from "../types";
 import { getPerformance, trace } from "firebase/performance";
 import { withErrorHandling, AppError, ErrorCode } from "../utils/errorUtils";
+import { log } from "./logService";
 
 const SPOONACULAR_API_KEY = import.meta.env.VITE_SPOONACULAR_API_KEY;
 const SPOONACULAR_BASE_URL = "https://api.spoonacular.com";
@@ -160,7 +161,7 @@ export const uploadRecipeImage = async (imageUrl: string, recipeId: string): Pro
     const downloadURL = await getDownloadURL(storageRef);
     return downloadURL;
   } catch (error) {
-    console.error("Error uploading recipe image:", error);
+    log.error("Error uploading recipe image", { error, recipeId }, "RecipeService");
     perfTrace.putAttribute('result', 'fallback_to_original');
     return imageUrl; // Return original URL if upload fails
   } finally {
@@ -187,7 +188,7 @@ export const saveRecipeToFirestore = async (recipe: StructuredRecipe): Promise<s
       perfTrace.putMetric('instructions_count', recipe.instructions.length);
       perfTrace.putAttribute('has_image', recipe.image ? 'true' : 'false');
 
-      const docRef = await addDoc(collection(db, "recipes"), savedRecipe);
+      const docRef = await DatabaseMonitoringService.addDoc(DatabaseMonitoringService.collection("recipes"), savedRecipe);
       return docRef.id;
     } finally {
       perfTrace.stop();
@@ -240,12 +241,12 @@ export const bulkUploadRecipes = async (
               const uploadedImageUrl = await uploadRecipeImage(structuredRecipe.image, recipeId);
 
               // Update recipe with uploaded image URL
-              await setDoc(doc(db, "recipes", recipeId), {
+              await DatabaseMonitoringService.setDoc(DatabaseMonitoringService.doc("recipes/" + recipeId), {
                 ...structuredRecipe,
                 id: recipeId,
                 dateSaved: new Date().toISOString(),
                 image: uploadedImageUrl
-              }, { merge: true });
+              });
             }
 
             result.success++;
@@ -293,7 +294,7 @@ export const getSavedRecipes = async (limitCount: number = 50): Promise<SavedRec
 
     // Option 2: Use DatabaseMonitoringService for tracking (recommended for analytics)
     const recipesRef = DatabaseMonitoringService.collection("recipes");
-    const q = query(recipesRef, orderBy("dateSaved", "desc"), limit(limitCount));
+    const q = DatabaseMonitoringService.query(recipesRef, DatabaseMonitoringService.orderBy("dateSaved", "desc"), DatabaseMonitoringService.limit(limitCount));
     const querySnapshot = await DatabaseMonitoringService.getDocs(q);
 
     return querySnapshot.docs.map(doc => ({
@@ -314,7 +315,7 @@ export const getSavedRecipes = async (limitCount: number = 50): Promise<SavedRec
  */
 export const getCachedPopularRecipes = async (): Promise<SavedRecipe[]> => {
   try {
-    const popularRecipesRef = doc(db, "system", "popular_recipes");
+    const popularRecipesRef = DatabaseMonitoringService.doc("system/popular_recipes");
     const docSnap = await DatabaseMonitoringService.getDoc(popularRecipesRef);
 
     if (docSnap.exists()) {
@@ -328,23 +329,13 @@ export const getCachedPopularRecipes = async (): Promise<SavedRecipe[]> => {
       return uniqueRecipes;
     }
 
-    // If no cached recipes exist, fall back to the old method but cache the result
-    console.log("📥 No cached popular recipes found, loading and caching 50 recipes...");
+    // If no cached recipes exist, fall back to loading individual recipes
+    console.log("📥 No cached popular recipes found, falling back to individual recipe loading...");
     const recipes = await getSavedRecipes(50);
-    // Remove duplicates before caching
-    const uniqueRecipes = recipes.filter((recipe, index, self) =>
+    // Remove duplicates even in fallback
+    return recipes.filter((recipe, index, self) =>
       index === self.findIndex(r => r.title === recipe.title)
     );
-
-    // Try to cache for future use (don't fail if caching fails)
-    try {
-      await cachePopularRecipes(uniqueRecipes);
-      console.log(`💾 Cached ${uniqueRecipes.length} recipes for future fast loading`);
-    } catch (cacheError) {
-      console.warn("⚠️ Failed to cache recipes, but continuing with loaded recipes:", cacheError);
-    }
-
-    return uniqueRecipes;
   } catch (error) {
     console.error("❌ Error fetching cached popular recipes:", error);
     // Fall back to direct loading if caching fails
@@ -370,7 +361,7 @@ export const cachePopularRecipes = async (recipes: SavedRecipe[]): Promise<void>
       return;
     }
 
-    const popularRecipesRef = doc(db, "system", "popular_recipes");
+    const popularRecipesRef = DatabaseMonitoringService.doc("system/popular_recipes");
     await DatabaseMonitoringService.setDoc(popularRecipesRef, {
       recipes,
       lastUpdated: new Date(),
@@ -391,15 +382,81 @@ export const searchRecipesInFirestore = async (searchTerm: string): Promise<Save
   perfTrace.start();
 
   try {
-    // Note: Firestore doesn't support full-text search natively
-    // This is a simple implementation - you might want to use Algolia or Elastic Search for better search
-    // Option 1: Use direct Firestore (current)
-    // const q = query(collection(db, "recipes"));
-    // const querySnapshot = await getDocs(q);
+    if (!searchTerm.trim()) {
+      return [];
+    }
 
-    // Option 2: Use DatabaseMonitoringService for tracking (recommended for analytics)
+    const searchTermLower = searchTerm.toLowerCase();
+
+    // Use the search index for efficient querying
+    const searchIndexRef = DatabaseMonitoringService.collection("recipe_search_index");
+
+    // Query for recipes where searchText contains the search term
+    // Note: Firestore doesn't support full text search, so we use array-contains for keywords
+    // and prefix matching for searchText
+    const q = DatabaseMonitoringService.query(searchIndexRef);
+    const querySnapshot = await DatabaseMonitoringService.getDocs(q);
+
+    // Filter in memory for more flexible search (could be optimized further with Algolia)
+    const searchResults = [];
+    for (const doc of querySnapshot.docs) {
+      const searchEntry = doc.data();
+
+      // Check if search term matches title, description, ingredients, or keywords
+      const matches =
+        searchEntry.title?.toLowerCase().includes(searchTermLower) ||
+        searchEntry.description?.toLowerCase().includes(searchTermLower) ||
+        searchEntry.ingredients?.some((ing: string) => ing.toLowerCase().includes(searchTermLower)) ||
+        searchEntry.keywords?.some((kw: string) => kw.includes(searchTermLower)) ||
+        searchEntry.searchText?.includes(searchTermLower);
+
+      if (matches) {
+        searchResults.push(searchEntry);
+      }
+    }
+
+    // Get full recipe details for matches (only fetch the recipes we need)
+    const fullRecipes: SavedRecipe[] = [];
+    if (searchResults.length > 0) {
+      // Batch get the full recipes
+      const recipeIds = searchResults.map(result => result.id);
+      const recipePromises = recipeIds.map(id =>
+        DatabaseMonitoringService.getDoc(DatabaseMonitoringService.doc("recipes/" + id))
+      );
+
+      const recipeDocs = await Promise.all(recipePromises);
+
+      for (const doc of recipeDocs) {
+        if (doc.exists) {
+          fullRecipes.push({
+            id: doc.id,
+            ...doc.data()
+          } as SavedRecipe);
+        }
+      }
+    }
+
+    // Add custom metrics
+    perfTrace.putMetric('search_term_length', searchTerm.length);
+    perfTrace.putMetric('search_index_size', querySnapshot.docs.length);
+    perfTrace.putMetric('results_found', fullRecipes.length);
+
+    return fullRecipes;
+  } catch (error) {
+    console.error("Error searching recipes:", error);
+    // Fallback to old method if search index fails
+    console.log("🔄 Falling back to full collection search...");
+    return await searchRecipesInFirestoreFallback(searchTerm);
+  } finally {
+    perfTrace.stop();
+  }
+};
+
+// Fallback search method (original implementation)
+const searchRecipesInFirestoreFallback = async (searchTerm: string): Promise<SavedRecipe[]> => {
+  try {
     const recipesRef = DatabaseMonitoringService.collection("recipes");
-    const q = query(recipesRef);
+    const q = DatabaseMonitoringService.query(recipesRef);
     const querySnapshot = await DatabaseMonitoringService.getDocs(q);
 
     const allRecipes = querySnapshot.docs.map(doc => ({
@@ -414,16 +471,9 @@ export const searchRecipesInFirestore = async (searchTerm: string): Promise<Save
       recipe.ingredients.some(ing => ing.toLowerCase().includes(searchTerm.toLowerCase()))
     );
 
-    // Add custom metrics
-    perfTrace.putMetric('search_term_length', searchTerm.length);
-    perfTrace.putMetric('total_recipes_searched', allRecipes.length);
-    perfTrace.putMetric('results_found', filteredRecipes.length);
-
     return filteredRecipes;
   } catch (error) {
-    console.error("Error searching recipes:", error);
+    console.error("Error in fallback search:", error);
     return [];
-  } finally {
-    perfTrace.stop();
   }
-}
+};

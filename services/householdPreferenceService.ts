@@ -1,4 +1,5 @@
-import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
+import DatabaseMonitoringService from './databaseMonitoringService';
+import { InventoryCacheService } from './inventoryCacheService';
 import { db } from '../firebaseConfig';
 import { Member, PantryItem, Household } from '../types';
 import { checkInventoryAgainstHouseholdAllergies } from '../utils/preferenceUtils';
@@ -14,8 +15,8 @@ export class HouseholdPreferenceService {
   static async checkHouseholdInventoryForAllergies(householdId: string): Promise<void> {
     try {
       // Get household data
-      const householdRef = doc(db, 'households', householdId);
-      const householdSnap = await getDoc(householdRef);
+      const householdRef = DatabaseMonitoringService.doc('households', householdId);
+      const householdSnap = await DatabaseMonitoringService.getDoc(householdRef);
 
       if (!householdSnap.exists()) {
         console.warn(`Household ${householdId} not found`);
@@ -28,9 +29,16 @@ export class HouseholdPreferenceService {
         return; // No members to check
       }
 
+      // Check if any household member has allergies - if not, skip expensive inventory read
+      const hasAnyAllergies = household.members.some(member => member.allergies?.length > 0);
+      if (!hasAnyAllergies) {
+        console.log('No household members have allergies set, skipping inventory allergy check');
+        return;
+      }
+
       // Get household inventory
-      const inventoryRef = collection(db, 'households', householdId, 'inventory');
-      const inventorySnap = await getDocs(inventoryRef);
+      const inventoryRef = DatabaseMonitoringService.collection('households', householdId, 'inventory');
+      const inventorySnap = await DatabaseMonitoringService.getDocs(DatabaseMonitoringService.query(inventoryRef));
 
       if (inventorySnap.empty) {
         return; // No inventory to check
@@ -71,8 +79,8 @@ export class HouseholdPreferenceService {
    */
   static async getHouseholdMembers(householdId: string): Promise<Member[]> {
     try {
-      const householdRef = doc(db, 'households', householdId);
-      const householdSnap = await getDoc(householdRef);
+      const householdRef = DatabaseMonitoringService.doc('households', householdId);
+      const householdSnap = await DatabaseMonitoringService.getDoc(householdRef);
 
       if (!householdSnap.exists()) {
         return [];

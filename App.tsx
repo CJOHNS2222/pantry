@@ -23,6 +23,7 @@ import { isHouseholdMember, inferCategoryFromItemName, inferStorageLocationFromI
 import { NotificationBanner } from './components/NotificationBanner';
 import { NotificationService, NotificationItem, NotificationSettings } from './services/notificationService';
 import { pushNotificationService } from './services/pushNotificationService';
+import { log } from './services/logService';
 import { HouseholdActivityService } from './services/householdActivityService';
 import { App as CapacitorApp, BackButtonListenerEvent } from '@capacitor/app';
 import { AppProvider, useApp } from './contexts/AppContext';
@@ -30,6 +31,9 @@ import { AppActionsProvider, useAppActions } from './contexts/AppActionsContext'
 import SafeAreaService from './services/safeAreaService';
 import { GlobalUpdatePrompt } from './components/GlobalUpdatePrompt';
 import { joinHousehold } from './services/householdService';
+import { setAppContext, trackNavigation, trackShoppingListAction } from './services/sentryService';
+import PerformanceMonitoringService from './services/performanceMonitoringService';
+import HapticService from './services/hapticService';
 
 // Lazy load monitoring components
 const DatabaseAnalytics = React.lazy(() => import('./components/DatabaseAnalytics').then(module => ({ default: module.default })));
@@ -44,9 +48,32 @@ const LoadingSpinner: React.FC = () => (
 type Theme = 'dark' | 'light';
 
 const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<Tab>(Tab.PANTRY);
+  const [activeTab, setActiveTab] = useState<Tab>(Tab.PANTRY); // Default to pantry
   const [persistedRecipeResult, setPersistedRecipeResult] = useState<RecipeSearchResult | null>(null);
   const [initialSearchQuery, setInitialSearchQuery] = useState<string>('');
+
+  // Custom tab switching function that resets scroll position
+  const switchTab = (tab: Tab) => {
+    PerformanceMonitoringService.mark(`tab_switch_start_${tab}`);
+    
+    const tabNames = {
+      [Tab.PANTRY]: 'pantry',
+      [Tab.PANTRY_CACHE_TEST]: 'pantry_cache_test',
+      [Tab.SHOPPING]: 'shopping',
+      [Tab.MEALS]: 'meals',
+      [Tab.RECIPES]: 'recipes',
+      [Tab.SETTINGS]: 'settings',
+      [Tab.COMMUNITY]: 'community'
+    };
+    
+    trackNavigation(tabNames[activeTab] || 'unknown', tabNames[tab] || 'unknown');
+    HapticService.tabSwitch();
+    setActiveTab(tab);
+    window.scrollTo(0, 0);
+    
+    PerformanceMonitoringService.mark(`tab_switch_end_${tab}`);
+    PerformanceMonitoringService.measure(`tab_switch_${tab}`, `tab_switch_start_${tab}`, `tab_switch_end_${tab}`);
+  };
 
   // UI States
   const [showHousehold, setShowHousehold] = useState(false);
@@ -76,7 +103,11 @@ const App: React.FC = () => {
   const { user, setUser, handleLogout } = useAuth();
   const { settings, setSettings } = useSettings();
   const { addToast, toasts, setToasts } = useToasts();
+  // const { syncStatus, syncNow } = useOfflineStatus(); // DISABLED
   const { syncStatus, syncNow } = useOfflineStatus();
+
+  // Apply theme to document
+  useTheme(settings.theme);
 
   // Load notification settings from user profile
   useEffect(() => {
@@ -87,6 +118,10 @@ const App: React.FC = () => {
 
   // Function to add items to shopping list
   const addToShoppingList = (items: string[], source: string = 'manual') => {
+    PerformanceMonitoringService.mark('shopping_list_add_start');
+    
+    trackShoppingListAction('add_item', { count: items.length, source });
+    HapticService.itemAdded();
     const newItems = items.map(i => {
       const parsed = parseIngredientForShoppingList(i);
       return { 
@@ -100,6 +135,9 @@ const App: React.FC = () => {
     });
     setShoppingList(prev => [...prev, ...newItems]);
     setActiveTab(Tab.SHOPPING);
+    
+    PerformanceMonitoringService.mark('shopping_list_add_end');
+    PerformanceMonitoringService.measure('shopping_list_add', 'shopping_list_add_start', 'shopping_list_add_end');
   };
 
   // Household activity tracking
@@ -166,6 +204,8 @@ const App: React.FC = () => {
     logShoppingAdded,
     logRecipeSaved,
     logMealCompleted
+  }, {
+    disableInventoryListeners: activeTab === Tab.PANTRY_CACHE_TEST
   });
 
   // Update household activity tracking when household data becomes available
@@ -173,6 +213,7 @@ const App: React.FC = () => {
     if (user?.id && household?.id) {
       const activityMap = {
         [Tab.PANTRY]: 'viewing pantry',
+        [Tab.PANTRY_CACHE_TEST]: 'testing cached pantry',
         [Tab.SHOPPING]: 'viewing shopping list',
         [Tab.MEALS]: 'viewing meal plan',
         [Tab.RECIPES]: 'viewing recipes',
@@ -187,13 +228,32 @@ const App: React.FC = () => {
 
   // Initialize safe area handling for mobile devices
   useEffect(() => {
-    SafeAreaService.initialize().catch(console.error);
+    SafeAreaService.initialize().catch(error => log.error('Failed to initialize safe area service', { error }, 'App'));
+  }, []);
+
+  // Initialize performance monitoring
+  useEffect(() => {
+    PerformanceMonitoringService.init();
+    
+    // Track app open
+    PerformanceMonitoringService.mark('app_open');
+    
+    return () => {
+      PerformanceMonitoringService.cleanup();
+    };
   }, []);
 
   // Initialize push notifications for mobile devices
   useEffect(() => {
     if (user?.id) {
-      pushNotificationService.initialize().catch(console.error);
+      pushNotificationService.initialize().catch(error => log.error('Failed to initialize push notifications', { error }, 'App'));
+    }
+  }, [user?.id]);
+
+  // Initialize database monitoring
+  useEffect(() => {
+    if (user?.id) {
+      // Database monitoring is now initialized in firebaseConfig.ts
     }
   }, [user?.id]);
 
@@ -228,7 +288,7 @@ const App: React.FC = () => {
           }
         }
       } catch (error) {
-        console.error('Error checking notifications:', error);
+        log.error('Error checking notifications', { error }, 'App');
       }
     };
 
@@ -301,10 +361,10 @@ const App: React.FC = () => {
                 addToast('Failed to join household - invitation not found', 'error');
               }
             } catch (error: any) {
-              console.error('Error joining household:', error);
+              log.error('Error joining household', { error }, 'App');
               let message = 'Failed to join household';
               if (error.message?.includes('not invited')) {
-                message = 'You are not invited to this household or have already joined';
+                message = 'Unable to join 9: You are not invited to this household or have already joined';
               }
               addToast(message, 'error');
             }
@@ -312,7 +372,7 @@ const App: React.FC = () => {
           break;
       }
     } catch (error) {
-      console.error('Error handling notification action:', error);
+      log.error('Error handling notification action', { error }, 'App');
       addToast('Failed to process notification', 'error');
     }
   };
@@ -377,7 +437,7 @@ const App: React.FC = () => {
     // Initialize image cache system
     import('./services/imageCacheService').then(({ initializeImageCache }) => {
       initializeImageCache().catch(error => {
-        console.error('Failed to initialize image cache:', error);
+        log.error('Failed to initialize image cache', { error }, 'App');
       });
     });
 
@@ -443,7 +503,7 @@ const App: React.FC = () => {
     CapacitorApp.addListener('backButton', handleBackButton).then((listener) => {
       backButtonListenerRef.current = listener;
     }).catch((error) => {
-      console.error('Failed to add back button listener:', error);
+      log.error('Failed to add back button listener', { error }, 'App');
     });
 
     return () => {
@@ -479,6 +539,18 @@ const App: React.FC = () => {
 
   return (
     <>
+      {(() => {
+        // Set app context for Sentry
+        if (settings?.theme) {
+          setAppContext(
+            process.env.npm_package_version || '1.0.0',
+            'web', // Default to web, Capacitor will override if needed
+            settings.theme.mode
+          );
+        }
+        return null;
+      })()}
+
       <ErrorBoundary>
         <div className="h-screen flex flex-col max-w-md mx-auto shadow-2xl relative border-x border-theme transition-colors duration-300 overflow-x-hidden">
         {showHousehold && (
@@ -624,7 +696,7 @@ const App: React.FC = () => {
         <AppProvider
           value={{
             activeTab,
-            setActiveTab,
+            setActiveTab: switchTab,
             user,
             household,
             inventory,
@@ -686,7 +758,7 @@ const App: React.FC = () => {
                         image = externalImage;
                       }
                     } catch (error) {
-                      console.log('Failed to fetch external image for', i.item, error);
+                      log.debug('Failed to fetch external image', { item: i.item, error }, 'App');
                     }
                   }
                   
@@ -727,43 +799,22 @@ const App: React.FC = () => {
                   };
                 }));
                 
-                // Group processed items by name for merging (in case shopping list has duplicates)
-                const mergedItems: { [key: string]: PantryItem } = {};
-                processedItems.forEach(i => {
-                  const key = i.item.toLowerCase();
-                  if (mergedItems[key]) {
-                    mergedItems[key].quantity_estimate = (parseInt(mergedItems[key].quantity_estimate) + parseInt(i.quantity_estimate)).toString();
-                    // Merge reservations
-                    if (i.reservations) {
-                      mergedItems[key].reservations = [...(mergedItems[key].reservations || []), ...i.reservations];
-                    }
-                  } else {
-                    mergedItems[key] = { ...i };
-                  }
-                });
-                
-                // Add all merged items (addItems will handle merging with existing inventory)
-                await addItems(Object.values(mergedItems));
+                // Add all merged items immediately (addItems will handle merging with existing inventory)
+                const addedItems = await addItems(Object.values(mergedItems));
 
-                // Show toast for bulk quantity editing if multiple items were added
-                if (items.length > 1) {
-                  // Set a flag to indicate bulk quantity editing should be triggered
-                  localStorage.setItem('bulkQuantityEditPending', 'true');
-                  // Store the actual processed items for the modal to edit
-                  localStorage.setItem('bulkQuantityEditItems', JSON.stringify(Object.values(mergedItems)));
-                  
-                  addToast(
-                    `Added ${items.length} items to pantry. Edit quantities?`,
-                    'info',
-                    8000,
-                    'Edit Quantities',
-                    () => {
-                      // Switch to pantry tab and trigger bulk editing workflow
-                      setActiveTab(Tab.PANTRY);
-                      // The PantryScanner component will handle the bulk editing
-                    }
-                  );
-                }
+                // Show toast asking to edit quantities
+                addToast(
+                  `Added ${items.length} item${items.length > 1 ? 's' : ''} to pantry. Edit quantities?`,
+                  'info',
+                  8000,
+                  'Edit Quantities',
+                  () => {
+                    // Store the added items for quantity editing
+                    localStorage.setItem('pendingQuantityEdits', JSON.stringify(addedItems));
+                    // Switch to pantry tab and trigger quantity editing workflow
+                    setActiveTab(Tab.PANTRY);
+                  }
+                );
               },
               onAddToShoppingList: addToShoppingList,
               setSettings,
@@ -775,6 +826,7 @@ const App: React.FC = () => {
               setPersistedRecipeResult,
               onLogout: handleLogout,
               onShowTutorial: () => setShowTutorial(true),
+              onShowHousehold: () => setShowHousehold(true),
               checkRecipeSaveLimit,
               checkMealPlanLimit
             }}
@@ -782,7 +834,7 @@ const App: React.FC = () => {
             <MainContent />
           </AppActionsProvider>
         </AppProvider>
-        <AppNavigation activeTab={activeTab} setActiveTab={setActiveTab} />
+        <AppNavigation activeTab={activeTab} setActiveTab={switchTab} />
         
         {/* Household Manager Modal */}
         {showHousehold && (
@@ -791,7 +843,7 @@ const App: React.FC = () => {
             household={household}
             setHousehold={setHousehold}
             onClose={() => setShowHousehold(false)}
-            setActiveTab={setActiveTab}
+            setActiveTab={switchTab}
             addToast={addToast}
           />
         )}

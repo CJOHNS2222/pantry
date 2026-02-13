@@ -1,5 +1,6 @@
 import { db } from '../firebaseConfig';
-import { doc, setDoc, updateDoc, deleteDoc, collection, addDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import DatabaseMonitoringService from './databaseMonitoringService';
+import { serverTimestamp } from 'firebase/firestore';
 
 // IndexedDB setup
 const DB_NAME = 'SmartPantryQueue';
@@ -187,8 +188,8 @@ class OfflineQueueService {
       await addDoc(collection(db, coll), data);
     } else if (type === 'update' && docId) {
       // Check for conflicts before updating
-      const docRef = doc(db, coll, docId);
-      const docSnap = await getDoc(docRef);
+      const docRef = DatabaseMonitoringService.doc(coll, docId);
+      const docSnap = await DatabaseMonitoringService.getDoc(docRef);
 
       if (docSnap.exists()) {
         const serverData = docSnap.data();

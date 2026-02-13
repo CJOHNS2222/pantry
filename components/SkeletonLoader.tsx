@@ -1,4 +1,5 @@
 import React from 'react';
+import PropTypes from 'prop-types';
 
 interface SkeletonProps {
   className?: string;
@@ -7,6 +8,10 @@ interface SkeletonProps {
 export const Skeleton: React.FC<SkeletonProps> = React.memo(({ className = '' }) => (
   <div className={`animate-pulse bg-theme-secondary rounded ${className}`} />
 ));
+Skeleton.displayName = 'Skeleton';
+Skeleton.propTypes = {
+  className: PropTypes.string,
+};
 
 export const RecipeCardSkeleton: React.FC = React.memo(() => (
   <div className="bg-theme-secondary rounded-2xl shadow-xl border border-theme overflow-hidden mb-6">
@@ -34,6 +39,7 @@ export const RecipeCardSkeleton: React.FC = React.memo(() => (
     </div>
   </div>
 ));
+RecipeCardSkeleton.displayName = 'RecipeCardSkeleton';
 
 export const CompactRecipeCardSkeleton: React.FC = React.memo(() => (
   <div className="bg-theme-secondary rounded-lg shadow-md border border-theme overflow-hidden group">
@@ -43,6 +49,7 @@ export const CompactRecipeCardSkeleton: React.FC = React.memo(() => (
     </div>
   </div>
 ));
+CompactRecipeCardSkeleton.displayName = 'CompactRecipeCardSkeleton';
 
 export const PantryItemSkeleton: React.FC = React.memo(() => (
   <div className="bg-theme-secondary rounded-lg p-3 border border-theme">
@@ -56,6 +63,7 @@ export const PantryItemSkeleton: React.FC = React.memo(() => (
     </div>
   </div>
 ));
+PantryItemSkeleton.displayName = 'PantryItemSkeleton';
 
 export const ShoppingListItemSkeleton: React.FC = React.memo(() => (
   <div className="bg-theme-secondary rounded-lg p-3 border border-theme">
@@ -73,6 +81,7 @@ export const ShoppingListItemSkeleton: React.FC = React.memo(() => (
     </div>
   </div>
 ));
+ShoppingListItemSkeleton.displayName = 'ShoppingListItemSkeleton';
 
 export const MealPlanSkeleton: React.FC = React.memo(() => (
   <div className="bg-theme-secondary rounded-lg p-4 border border-theme">
@@ -93,3 +102,4 @@ export const MealPlanSkeleton: React.FC = React.memo(() => (
     </div>
   </div>
 ));
+MealPlanSkeleton.displayName = 'MealPlanSkeleton';

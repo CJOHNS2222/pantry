@@ -6,6 +6,7 @@ import { ProgressiveImage } from './ProgressiveImage';
 import { PortionSelector } from './PortionSelector';
 import { generateBlurDataURL } from '../utils/appUtils';
 import { useKeyboardNavigation } from '../hooks/useKeyboardNavigation';
+import { scaleRecipeIngredients, calculatePortionScaling } from '../utils/portionUtils';
 
 interface RecipeModalProps {
   recipe: StructuredRecipe | SavedRecipe;
@@ -56,6 +57,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
   user
 }) => {
   const [servings, setServings] = useState(4); // Default to 4 servings
+  const [isSaving, setIsSaving] = useState(false); // Prevent double-clicks
   const originalServings = 4; // Assume recipes are for 4 servings
   const ratingRef = useRef<HTMLDivElement>(null);
   const [showReviewPrompt, setShowReviewPrompt] = useState(false);
@@ -67,6 +69,13 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
   const [totalTime, setTotalTime] = useState(0);
   const [customTime, setCustomTime] = useState(0); // User-set custom time in minutes
   const [showCustomTimer, setShowCustomTimer] = useState(false);
+
+  // Reset saving state when modal opens/closes
+  useEffect(() => {
+    if (isOpen) {
+      setIsSaving(false);
+    }
+  }, [isOpen]);
   const [timerLabel, setTimerLabel] = useState('Cooking Timer');
   
   // Smart Substitutions State
@@ -284,20 +293,32 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
       estimates.fiber += 2;
     }
 
+    // Scale nutritional values based on servings
+    const scaleFactor = servings / originalServings;
+    const scaledEstimates = {
+      calories: estimates.calories * scaleFactor,
+      protein: estimates.protein * scaleFactor,
+      carbs: estimates.carbs * scaleFactor,
+      fat: estimates.fat * scaleFactor,
+      fiber: estimates.fiber * scaleFactor,
+      sodium: estimates.sodium * scaleFactor,
+      sugar: estimates.sugar * scaleFactor
+    };
+
     // Determine dietary compatibility
-    const isKeto = estimates.carbs < 20;
-    const isLowCarb = estimates.carbs < 50;
-    const isHighProtein = estimates.protein > 20;
-    const isLowFat = estimates.fat < 10;
+    const isKeto = scaledEstimates.carbs < 20;
+    const isLowCarb = scaledEstimates.carbs < 50;
+    const isHighProtein = scaledEstimates.protein > 20;
+    const isLowFat = scaledEstimates.fat < 10;
 
     return {
-      calories: Math.round(estimates.calories),
-      protein: Math.round(estimates.protein * 10) / 10,
-      carbs: Math.round(estimates.carbs * 10) / 10,
-      fat: Math.round(estimates.fat * 10) / 10,
-      fiber: Math.round(estimates.fiber * 10) / 10,
-      sodium: Math.round(estimates.sodium),
-      sugar: Math.round(estimates.sugar),
+      calories: Math.round(scaledEstimates.calories),
+      protein: Math.round(scaledEstimates.protein * 10) / 10,
+      carbs: Math.round(scaledEstimates.carbs * 10) / 10,
+      fat: Math.round(scaledEstimates.fat * 10) / 10,
+      fiber: Math.round(scaledEstimates.fiber * 10) / 10,
+      sodium: Math.round(scaledEstimates.sodium),
+      sugar: Math.round(scaledEstimates.sugar),
       dietaryGoals: {
         keto: isKeto,
         lowCarb: isLowCarb,
@@ -305,31 +326,16 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
         lowFat: isLowFat
       }
     };
-  }, [recipe.ingredients]);
+  }, [recipe.ingredients, servings]);
 
   // Scale ingredients based on servings
   const scaledIngredients = useMemo(() => {
     if (!recipe.ingredients || !Array.isArray(recipe.ingredients)) return [];
-    
-    const scaleFactor = servings / originalServings;
-    
-    return recipe.ingredients.map(ingredient => {
-      // Simple regex to find numbers at the beginning of ingredient strings
-      const numberMatch = ingredient.match(/^(\d+(?:\.\d+)?)/);
-      
-      if (numberMatch && scaleFactor !== 1) {
-        const originalNumber = parseFloat(numberMatch[1]);
-        const scaledNumber = originalNumber * scaleFactor;
-        
-        // Format the scaled number nicely (avoid decimals for whole numbers, round to 2 decimals for fractions)
-        const formattedNumber = scaledNumber % 1 === 0 ? scaledNumber.toString() : scaledNumber.toFixed(2).replace(/\.?0+$/, '');
-        
-        return ingredient.replace(/^(\d+(?:\.\d+)?)/, formattedNumber);
-      }
-      
-      return ingredient;
-    });
-  }, [recipe.ingredients, servings]);
+
+    // Use the proper portion scaling utility
+    const portionConfig = calculatePortionScaling(household, servings);
+    return scaleRecipeIngredients(recipe, portionConfig);
+  }, [recipe.ingredients, servings, household]);
 
   if (!isOpen || !recipe) return null;
 
@@ -339,10 +345,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
         <button className="absolute top-3 right-3 text-theme-secondary opacity-50 hover:opacity-100 z-20" onClick={onClose} aria-label="Close recipe details">
           &times;
         </button>
-        <div className="fixed top-[100px] left-0 right-0 max-w-lg mx-auto z-[100] py-4 text-3xl font-bold text-white bg-[var(--accent-color)] rounded-t-2xl flex items-center justify-center">
-          <span className="sr-only">Recipe Details</span>
-        </div>
-        <div className="overflow-y-auto p-6 pt-20 flex-1">
+        <div className="overflow-y-auto p-6 flex-1">
           <h2 className="text-2xl font-serif font-bold mb-2 text-[var(--accent-color)]">{recipe.title || 'Untitled'}</h2>
           {recipe.description && <p className="mb-4 text-theme-secondary opacity-70">{recipe.description}</p>}
 
@@ -508,13 +511,12 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
             <PortionSelector
               household={household}
               currentServings={servings}
-              onPortionChange={(newServings, scaledIngredients) => {
+              onPortionChange={(newServings) => {
                 setServings(newServings);
-                // Update the recipe with scaled ingredients for display
-                // Note: This is just for display - the original recipe remains unchanged
               }}
               originalIngredients={recipe.ingredients || []}
               className="mb-4"
+              user={user}
             />
 
             <div className="flex items-center justify-between mb-2">
@@ -625,52 +627,71 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
              <RecipeRatingUI
              recipeTitle={recipe.title}
              recipe={recipe}
-             onRate={(rating) => {
+             onRatingSubmitted={(rating) => {
               if (onRate) onRate(rating);
               setShowReviewPrompt(false);
               setTimeout(() => onClose(), 300); // Close modal after submitting a rating
             }}
-            user={user}
+            householdId={user?.householdId}
           />
         </div>
       )}
         </div>
-        <div className="sticky bottom-0 z-20 w-full py-4 bg-theme-primary rounded-b-2xl flex items-center gap-2 p-4 pb-12">
-          <button className="flex-1 py-3 font-bold border border-[var(--accent-color)] rounded-lg flex items-center justify-center gap-2" onClick={onClose}>CLOSE</button>
-          {showDeleteButton && onDeleteRecipe && (
-            <button onClick={() => { onDeleteRecipe(recipe as SavedRecipe); onClose(); }} className="flex-1 py-3 font-bold bg-red-500 text-white rounded-lg flex items-center justify-center gap-2">
-              <Trash2 className="w-4 h-4" /> Delete
-            </button>
-          )}
-          {showAddToPlan && onAddToPlan && (
-            <button 
-              onClick={() => { onAddToPlan(recipe as StructuredRecipe); onClose(); }} 
-              disabled={mealPlanLimitExceeded}
-              className={`flex-1 py-3 font-bold rounded-lg flex items-center justify-center gap-2 ${
-                mealPlanLimitExceeded 
-                  ? 'bg-gray-400 text-gray-600 cursor-not-allowed opacity-50' 
-                  : 'bg-[var(--accent-color)] text-white'
-              }`}
-            >
-              <Plus className="w-4 h-4" /> {mealPlanLimitExceeded ? 'Limit Reached' : 'Add to Schedule'}
-            </button>
-          )}
-          {showSaveButton && onSaveRecipe && (
-            <button 
-              onClick={() => { onSaveRecipe(recipe as StructuredRecipe); onClose(); }} 
-              disabled={recipeSaveLimitExceeded}
-              className={`flex-1 py-3 font-bold border rounded-lg flex items-center justify-center gap-2 ${
-                recipeSaveLimitExceeded 
-                  ? 'border-gray-400 text-gray-400 cursor-not-allowed opacity-50' 
-                  : 'border-[var(--accent-color)] hover:bg-[var(--accent-color)] hover:text-white'
-              }`}
-            >
-              <Heart className="w-4 h-4" /> {recipeSaveLimitExceeded ? 'Limit Reached' : 'Save'}
-            </button>
-          )}
-          {showMarkAsMade && onMarkAsMade && (
-            <button onClick={handleMarkAsMadeClick} className="flex-1 py-3 font-bold bg-[var(--accent-color)] text-white rounded-lg flex items-center justify-center gap-2"><CheckCircle2 className="w-4 h-4" /> Mark as Made</button>
-          )}
+        <div className="sticky bottom-0 z-20 w-full py-4 bg-theme-primary rounded-b-2xl p-4 pb-12">
+          {/* Primary action buttons - Mark as Made and Add to Schedule */}
+          <div className="flex items-center gap-2 mb-2">
+            {showMarkAsMade && onMarkAsMade && (
+              <button onClick={handleMarkAsMadeClick} className="flex-1 py-3 font-bold bg-[var(--accent-color)] text-white rounded-lg flex items-center justify-center gap-2">
+                <CheckCircle2 className="w-4 h-4" /> Mark as Made
+              </button>
+            )}
+            {showAddToPlan && onAddToPlan && (
+              <button
+                onClick={() => { onAddToPlan(recipe as StructuredRecipe); onClose(); }}
+                disabled={mealPlanLimitExceeded}
+                className={`flex-1 py-3 font-bold rounded-lg flex items-center justify-center gap-2 ${
+                  mealPlanLimitExceeded
+                    ? 'bg-gray-400 text-gray-600 cursor-not-allowed opacity-50'
+                    : 'bg-[var(--accent-color)] text-white'
+                }`}
+              >
+                <Plus className="w-4 h-4" /> {mealPlanLimitExceeded ? 'Limit Reached' : 'Add to Schedule'}
+              </button>
+            )}
+          </div>
+
+          {/* Secondary action buttons - Save, Delete, Close */}
+          <div className="flex items-center gap-2">
+            <button className="flex-1 py-3 font-bold border border-[var(--accent-color)] rounded-lg flex items-center justify-center gap-2" onClick={onClose}>CLOSE</button>
+            {showDeleteButton && onDeleteRecipe && (
+              <button onClick={() => { onDeleteRecipe(recipe as SavedRecipe); onClose(); }} className="flex-1 py-3 font-bold bg-red-500 text-white rounded-lg flex items-center justify-center gap-2">
+                <Trash2 className="w-4 h-4" /> Delete
+              </button>
+            )}
+            {showSaveButton && onSaveRecipe && (
+              <button
+                onClick={async () => { 
+                  if (isSaving) return; // Prevent double-clicks
+                  setIsSaving(true);
+                  console.log('🖱️ Save button clicked for recipe:', recipe.title);
+                  try {
+                    await onSaveRecipe(recipe as StructuredRecipe); 
+                    onClose(); 
+                  } finally {
+                    setIsSaving(false);
+                  }
+                }}
+                disabled={recipeSaveLimitExceeded || isSaving}
+                className={`flex-1 py-3 font-bold border rounded-lg flex items-center justify-center gap-2 ${
+                  recipeSaveLimitExceeded || isSaving
+                    ? 'border-gray-400 text-gray-400 cursor-not-allowed opacity-50'
+                    : 'border-[var(--accent-color)] hover:bg-[var(--accent-color)] hover:text-white'
+                }`}
+              >
+                <Heart className="w-4 h-4" /> {isSaving ? 'Saving...' : recipeSaveLimitExceeded ? 'Limit Reached' : 'Save'}
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -691,12 +712,12 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
               <RecipeRatingUI
                 recipeTitle={recipe.title}
                 recipe={recipe}
-                onRate={(rating) => {
+                onRatingSubmitted={(rating) => {
                   if (onRate) onRate(rating);
                   setShowRatingModal(false);
                   setTimeout(() => onClose(), 300); // Close main modal after submitting a rating
                 }}
-                user={user}
+                householdId={user?.householdId}
               />
             </div>
             <div className="flex justify-center">

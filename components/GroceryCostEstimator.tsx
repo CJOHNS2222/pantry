@@ -2,10 +2,12 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { DollarSign, Calculator, ShoppingCart, TrendingUp, Users, RefreshCw } from 'lucide-react';
 import { DayPlan, PantryItem } from '../types';
 import { groceryPriceService, PriceData } from '../services/groceryPriceService';
+import { parseIngredientForShoppingList } from '../utils/appUtils';
 
 interface GroceryCostEstimatorProps {
   mealPlan: DayPlan[];
   inventory: PantryItem[];
+  onEstimatorToggle?: (isOpen: boolean) => void;
 }
 
 interface IngredientCost {
@@ -16,13 +18,19 @@ interface IngredientCost {
   source: 'estimated' | 'known';
 }
 
-export const GroceryCostEstimator: React.FC<GroceryCostEstimatorProps> = ({ mealPlan, inventory }) => {
+export const GroceryCostEstimator: React.FC<GroceryCostEstimatorProps> = ({ mealPlan, inventory, onEstimatorToggle }) => {
   const [showEstimator, setShowEstimator] = useState(false);
   const [customPrices, setCustomPrices] = useState<Record<string, number>>({});
   const [priceData, setPriceData] = useState<Record<string, PriceData>>({});
   const [loadingPrices, setLoadingPrices] = useState(false);
   const [showPriceInput, setShowPriceInput] = useState<string | null>(null);
   const [userPriceInputs, setUserPriceInputs] = useState<Record<string, { price: string; unit: string; store: string }>>({});
+  const [includeAllIngredients, setIncludeAllIngredients] = useState(false);
+
+  const toggleEstimator = (isOpen: boolean) => {
+    setShowEstimator(isOpen);
+    onEstimatorToggle?.(isOpen);
+  };
 
   // Fetch current prices when component mounts or meal plan changes
   useEffect(() => {
@@ -156,31 +164,63 @@ export const GroceryCostEstimator: React.FC<GroceryCostEstimatorProps> = ({ meal
   };
 
   const parseIngredient = (ingredient: string): { name: string; quantity: number; unit: string } => {
-    // Simple parsing - could be enhanced with better NLP
-    const parts = ingredient.toLowerCase().split(' ');
+    // Use the same parsing logic as parseIngredientForShoppingList but return structured data
+    const parsed = parseIngredientForShoppingList(ingredient);
+    
+    // Extract quantity and unit from the parsed quantity string
+    const quantityParts = parsed.quantity.split(' ');
     let quantity = 1;
     let unit = 'each';
-    let name = ingredient;
-
-    // Try to extract quantity and unit
-    if (parts.length >= 2) {
-      const firstPart = parts[0];
-      const secondPart = parts[1];
+    
+    if (quantityParts.length >= 1) {
+      // Handle fractions and decimals
+      const qtyStr = quantityParts[0];
+      if (qtyStr.includes('/')) {
+        // Handle fractions like "1/2"
+        const [numerator, denominator] = qtyStr.split('/').map(Number);
+        quantity = numerator / denominator;
+      } else {
+        quantity = parseFloat(qtyStr) || 1;
+      }
       
-      // Check if first part is a number
-      const qty = parseFloat(firstPart);
-      if (!isNaN(qty)) {
-        quantity = qty;
-        // Check if second part is a unit
-        if (['cup', 'cups', 'tbsp', 'tsp', 'oz', 'lb', 'lbs', 'g', 'kg', 'ml', 'l', 'pound', 'pounds'].includes(secondPart)) {
-          unit = secondPart;
-          name = parts.slice(2).join(' ');
-        } else {
-          name = parts.slice(1).join(' ');
+      // Check for unit in remaining parts
+      if (quantityParts.length > 1) {
+        unit = quantityParts.slice(1).join(' ').toLowerCase();
+      } else {
+        // Try to infer unit from the quantity string
+        const qtyMatch = parsed.quantity.match(/^(\d+(?:\/\d+)?(?:\.\d+)?)\s*(.+)$/);
+        if (qtyMatch) {
+          const qtyStr = qtyMatch[1];
+          if (qtyStr.includes('/')) {
+            // Handle fractions like "1/2" or "1 1/2"
+            const parts = qtyStr.split(' ');
+            let total = 0;
+            for (const part of parts) {
+              if (part.includes('/')) {
+                const [num, den] = part.split('/').map(Number);
+                total += num / den;
+              } else {
+                total += parseFloat(part) || 0;
+              }
+            }
+            quantity = total;
+          } else {
+            quantity = parseFloat(qtyStr) || 1;
+          }
+          unit = qtyMatch[2] || 'each';
         }
       }
     }
-
+    
+    // Clean up the item name
+    let name = parsed.itemName.toLowerCase()
+      .replace(/\b(large|medium|small|big|tiny|huge|giant)\s+/gi, '')
+      .replace(/\b(ripe|raw|cooked|baked|fried|organic|chopped|minced|diced|sliced|grated)\s+/gi, '')
+      .trim();
+    
+    // Capitalize first letter
+    name = name.replace(/\b\w/g, l => l.toUpperCase());
+    
     return { name, quantity, unit };
   };
 
@@ -274,7 +314,7 @@ export const GroceryCostEstimator: React.FC<GroceryCostEstimatorProps> = ({ meal
       groupedIngredients[key] = (groupedIngredients[key] || 0) + parsed.quantity;
     });
     
-    // Check inventory and calculate costs for missing items
+    // Check inventory and calculate costs for missing items (or all items if includeAllIngredients is true)
     const costItems: IngredientCost[] = [];
     
     Object.entries(groupedIngredients).forEach(([name, totalQty]) => {
@@ -284,7 +324,7 @@ export const GroceryCostEstimator: React.FC<GroceryCostEstimatorProps> = ({ meal
         item.item.toLowerCase().includes(name)
       );
       
-      if (!inInventory) {
+      if (includeAllIngredients || !inInventory) {
         const costItem = estimateCost(`${totalQty} ${name}`);
         costItem.quantity = totalQty;
         costItems.push(costItem);
@@ -292,18 +332,18 @@ export const GroceryCostEstimator: React.FC<GroceryCostEstimatorProps> = ({ meal
     });
     
     return costItems;
-  }, [mealPlan, inventory, customPrices]);
+  }, [mealPlan, inventory, customPrices, includeAllIngredients]);
 
   const totalCost = costBreakdown.reduce((sum, item) => sum + item.estimatedCost, 0);
 
   if (!showEstimator) {
     return (
       <button
-        onClick={() => setShowEstimator(true)}
-        className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+        onClick={() => toggleEstimator(true)}
+        className="flex items-center justify-center gap-2 px-4 py-2 w-full bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors whitespace-nowrap"
       >
-        <Calculator className="w-4 h-4" />
-        Estimate Grocery Costs
+        <Calculator className="w-4 h-4 flex-shrink-0" />
+        <span className="truncate">Estimate Grocery Costs</span>
       </button>
     );
   }
@@ -315,12 +355,23 @@ export const GroceryCostEstimator: React.FC<GroceryCostEstimatorProps> = ({ meal
           <DollarSign className="w-5 h-5" />
           Grocery Cost Estimator
         </h3>
-        <button
-          onClick={() => setShowEstimator(false)}
-          className="text-theme-secondary hover:text-theme-primary"
-        >
-          ✕
-        </button>
+        <div className="flex items-center gap-4">
+          <label className="flex items-center gap-2 text-sm text-theme-secondary">
+            <input
+              type="checkbox"
+              checked={includeAllIngredients}
+              onChange={(e) => setIncludeAllIngredients(e.target.checked)}
+              className="rounded"
+            />
+            Include all ingredients
+          </label>
+          <button
+            onClick={() => toggleEstimator(false)}
+            className="text-theme-secondary hover:text-theme-primary"
+          >
+            ✕
+          </button>
+        </div>
       </div>
 
       <div className="space-y-4">
@@ -329,13 +380,13 @@ export const GroceryCostEstimator: React.FC<GroceryCostEstimatorProps> = ({ meal
             ${totalCost.toFixed(2)}
           </div>
           <div className="text-sm text-theme-secondary">
-            Estimated cost for missing ingredients
+            Estimated cost for {includeAllIngredients ? 'all' : 'missing'} ingredients
           </div>
         </div>
 
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <h4 className="font-medium text-theme-secondary">Missing Ingredients:</h4>
+            <h4 className="font-medium text-theme-secondary">{includeAllIngredients ? 'All' : 'Missing'} Ingredients:</h4>
             <button
               onClick={fetchCurrentPrices}
               disabled={loadingPrices}
@@ -384,7 +435,7 @@ export const GroceryCostEstimator: React.FC<GroceryCostEstimatorProps> = ({ meal
                         type="number"
                         step="0.01"
                         placeholder="Custom price"
-                        className="flex-1 px-2 py-1 text-sm border border-theme rounded"
+                        className="flex-1 px-2 py-1 text-sm border border-theme rounded text-black"
                         onChange={(e) => {
                           const price = parseFloat(e.target.value);
                           if (!isNaN(price)) {
@@ -411,7 +462,7 @@ export const GroceryCostEstimator: React.FC<GroceryCostEstimatorProps> = ({ meal
                             type="number"
                             step="0.01"
                             placeholder="Price"
-                            className="px-2 py-1 text-sm border rounded"
+                            className="px-2 py-1 text-sm border rounded text-black"
                             value={userPriceInputs[item.ingredient]?.price || ''}
                             onChange={(e) => setUserPriceInputs(prev => ({
                               ...prev,
@@ -421,7 +472,7 @@ export const GroceryCostEstimator: React.FC<GroceryCostEstimatorProps> = ({ meal
                           <input
                             type="text"
                             placeholder="Unit (lb, each, etc.)"
-                            className="px-2 py-1 text-sm border rounded"
+                            className="px-2 py-1 text-sm border rounded text-black"
                             value={userPriceInputs[item.ingredient]?.unit || ''}
                             onChange={(e) => setUserPriceInputs(prev => ({
                               ...prev,
@@ -431,7 +482,7 @@ export const GroceryCostEstimator: React.FC<GroceryCostEstimatorProps> = ({ meal
                           <input
                             type="text"
                             placeholder="Store (optional)"
-                            className="px-2 py-1 text-sm border rounded"
+                            className="px-2 py-1 text-sm border rounded text-black"
                             value={userPriceInputs[item.ingredient]?.store || ''}
                             onChange={(e) => setUserPriceInputs(prev => ({
                               ...prev,

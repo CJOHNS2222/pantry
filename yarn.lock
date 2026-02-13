@@ -904,6 +904,11 @@
   resolved "https://registry.npmjs.org/@capacitor/device/-/device-7.0.3.tgz"
   integrity sha512-lZs2qkv54fOAsZ/i+hJ0RGNch06vfmkQ5qsAt2QjBtNRKwOkZv9B5QjDcl+M6Jydwf3+qkG4Ow3H/pk8hgiaTg==
 
+"@capacitor/haptics@^7.0.0":
+  version "7.0.3"
+  resolved "https://registry.npmjs.org/@capacitor/haptics/-/haptics-7.0.3.tgz"
+  integrity sha512-6O5W4jtYKPGrulqt3pEeXKH1vWT5deSUoiiN2sVj7F6UgrEOxCmm06XS07Eeum0lDXEmksKARwtA+iQwHPswtA==
+
 "@capacitor/local-notifications@^7.0.0":
   version "7.0.4"
   resolved "https://registry.npmjs.org/@capacitor/local-notifications/-/local-notifications-7.0.4.tgz"
@@ -5434,6 +5439,11 @@ react-router@7.13.0:
     cookie "^1.0.1"
     set-cookie-parser "^2.6.0"
 
+react-swipeable@^7.0.2:
+  version "7.0.2"
+  resolved "https://registry.npmjs.org/react-swipeable/-/react-swipeable-7.0.2.tgz"
+  integrity sha512-v1Qx1l+aC2fdxKa9aKJiaU/ZxmJ5o98RMoFwUqAAzVWUcxgfHFXDDruCKXhw6zIYXm6V64JiHgP9f6mlME5l8w==
+
 react-window@^1.8.8:
   version "1.8.11"
   resolved "https://registry.npmjs.org/react-window/-/react-window-1.8.11.tgz"
@@ -5442,7 +5452,7 @@ react-window@^1.8.8:
     "@babel/runtime" "^7.0.0"
     memoize-one ">=3.1.1 <6"
 
-"react@^15.0.0 || ^16.0.0 || ^17.0.0 || ^18.0.0 || ^19.0.0", "react@^16.14.0 || 17.x || 18.x || 19.x", "react@^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0", "react@^16.8.0 || ^17 || ^18 || ^19", "react@^18.0.0 || ^19.0.0", react@^19.2.1, react@^19.2.3, "react@>=16.8.0 <20.0.0", react@>=18, "react@16 || 17 || 18 || 19":
+"react@^15.0.0 || ^16.0.0 || ^17.0.0 || ^18.0.0 || ^19.0.0", "react@^16.14.0 || 17.x || 18.x || 19.x", "react@^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0", "react@^16.8.0 || ^17 || ^18 || ^19", "react@^16.8.3 || ^17 || ^18 || ^19.0.0 || ^19.0.0-rc", "react@^18.0.0 || ^19.0.0", react@^19.2.1, react@^19.2.3, "react@>=16.8.0 <20.0.0", react@>=18, "react@16 || 17 || 18 || 19":
   version "19.2.3"
   resolved "https://registry.npmjs.org/react/-/react-19.2.3.tgz"
   integrity sha512-Ku/hhYbVjOQnXDZFv2+RibmLFGwFdeeKHFcOTlrt7xplBnya5OGn/hIRDsqDiSUcfORsDC7MPxwork8jBwsIWA==
