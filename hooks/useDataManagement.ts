@@ -168,8 +168,20 @@ function createMealPlanListener(
         }
       });
 
+      // Check if meal plan has actually changed to prevent infinite loops
+      if (!hasArraysChanged(fullWeekPlan, prevMealPlanRef.current)) {
+        setIsLoadingMealPlan(false);
+        return;
+      }
+
       setRemoteMealPlanUpdate(true);
       setMealPlan(fullWeekPlan);
+      prevMealPlanRef.current = fullWeekPlan.map(day => ({
+        ...day,
+        breakfast: [...day.breakfast],
+        lunch: [...day.lunch],
+        dinner: [...day.dinner]
+      }));
       setIsLoadingMealPlan(false);
     }, err => {
       // Don't log permission-denied errors as they are expected when user doesn't have access
@@ -245,8 +257,20 @@ function createMealPlanListener(
         }
       });
 
+      // Check if meal plan has actually changed to prevent infinite loops
+      if (!hasArraysChanged(fullWeekPlan, prevMealPlanRef.current)) {
+        setIsLoadingMealPlan(false);
+        return;
+      }
+
       setRemoteMealPlanUpdate(true);
       setMealPlan(fullWeekPlan);
+      prevMealPlanRef.current = fullWeekPlan.map(day => ({
+        ...day,
+        breakfast: [...day.breakfast],
+        lunch: [...day.lunch],
+        dinner: [...day.dinner]
+      }));
       setIsLoadingMealPlan(false);
     }, err => {
       // Don't log permission-denied errors as they are expected when user doesn't have access
@@ -299,6 +323,10 @@ export function useDataManagement(user: User | null, addToast: (message: string,
 
   // Ref to prevent repeated household clearing on permission errors
   const householdClearedDueToPermissionsRef = useRef(false);
+
+  // Refs to track previous states to prevent unnecessary updates
+  const prevMealPlanRef = useRef<DayPlan[]>([]);
+  const prevShoppingListRef = useRef<ShoppingItem[]>([]);
 
   // Helper function to clean objects by removing undefined fields (Firestore requirement)
   const cleanObject = (obj: any): any => {
@@ -482,6 +510,9 @@ export function useDataManagement(user: User | null, addToast: (message: string,
 
   // Last time we checked for expiration notifications (to avoid spam)
   const lastExpirationCheckRef = useRef<number>(0);
+
+  // Last time we checked for allergy alerts (to avoid excessive reads)
+  const lastAllergyCheckRef = useRef<number>(0);
 
   // Per-session client id used to mark writes
   const clientId = useMemo(() => {
@@ -813,6 +844,12 @@ export function useDataManagement(user: User | null, addToast: (message: string,
   useEffect(() => {
     if (!inventory.length || !user?.id || !household?.id) return;
 
+    // Only check for allergies every 5 minutes to avoid excessive reads
+    const now = Date.now();
+    if (now - lastAllergyCheckRef.current < 5 * 60 * 1000) { // 5 minutes
+      return;
+    }
+
     const checkAllergies = async () => {
       try {
         await HouseholdPreferenceService.checkHouseholdInventoryForAllergies(
@@ -820,6 +857,7 @@ export function useDataManagement(user: User | null, addToast: (message: string,
           inventory,
           user.id
         );
+        lastAllergyCheckRef.current = now;
       } catch (error) {
         console.error('Failed to check household inventory for allergies:', error);
       }
@@ -1133,6 +1171,11 @@ export function useDataManagement(user: User | null, addToast: (message: string,
       return;
     }
 
+    // Check if shopping list has actually changed to avoid unnecessary reads
+    if (!hasArraysChanged(shoppingList, prevShoppingListRef.current)) {
+      return;
+    }
+
     // Debounce the sync to avoid running on every state change
     const timeoutId = setTimeout(async () => {
       setRemoteShoppingListUpdate(false); // Reset the flag so sync can run
@@ -1171,6 +1214,13 @@ export function useDataManagement(user: User | null, addToast: (message: string,
 
         const changeSet = await calculateShoppingListChanges();
 
+        // If no changes, skip the batch operation
+        if (changeSet.toDelete.length === 0 && changeSet.toAdd.length === 0 && changeSet.toUpdate.length === 0) {
+          // Update the prev ref to prevent future unnecessary syncs
+          prevShoppingListRef.current = shoppingList.map(item => ({ ...item }));
+          return;
+        }
+
         // Use batch operations for all changes
         const batch = writeBatch(db);
 
@@ -1207,6 +1257,9 @@ export function useDataManagement(user: User | null, addToast: (message: string,
 
         // Commit all changes in one batch
         await batch.commit();
+
+        // Update the previous shopping list ref
+        prevShoppingListRef.current = shoppingList.map(item => ({ ...item }));
 
       } catch (error) {
         console.error('Error syncing shopping list:', error);
