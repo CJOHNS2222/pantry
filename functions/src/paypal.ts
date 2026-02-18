@@ -108,7 +108,7 @@ export const createPayPalSubscription = onRequest(async (req, res) => {
       approvalUrl: approvalUrl
     });
 
-  } catch (error) {
+  } catch (err: any) {
     console.error('PayPal subscription creation error:', error);
     res.status(500).json({ error: (error as Error).message });
   }
@@ -179,7 +179,7 @@ export const approvePayPalSubscription = onRequest(async (req, res) => {
       res.status(400).json({ error: 'Subscription not active' });
     }
 
-  } catch (error) {
+  } catch (err: any) {
     console.error('PayPal subscription approval error:', error);
     res.status(500).json({ error: (error as Error).message });
   }

@@ -50,7 +50,7 @@ class CalendarService {
       // This plugin doesn't seem to have explicit permission methods
       // Permissions are handled automatically by the native platforms
       return true;
-    } catch (error) {
+    } catch (err: any) {
       console.error('Error requesting calendar permissions:', error);
       return false;
     }
@@ -70,7 +70,7 @@ class CalendarService {
       // This plugin doesn't seem to have explicit permission checking
       // We'll assume permissions are granted if the plugin is available
       return true;
-    } catch (error) {
+    } catch (err: any) {
       console.error('Error checking calendar permissions:', error);
       return false;
     }
@@ -117,7 +117,7 @@ class CalendarService {
 
       await CapacitorCalendar.createEvent(event);
       return true;
-    } catch (error) {
+    } catch (err: any) {
       console.error('Error creating calendar event:', error);
       return false;
     }
@@ -154,7 +154,7 @@ class CalendarService {
 
       await CapacitorCalendar.createEvent(event);
       return true;
-    } catch (error) {
+    } catch (err: any) {
       console.error('Error creating cooking reminder:', error);
       return false;
     }
@@ -175,7 +175,7 @@ class CalendarService {
       await CapacitorCalendar.openCalendar({
         date: date.getTime()
       });
-    } catch (error) {
+    } catch (err: any) {
       console.error('Error opening calendar:', error);
     }
   }

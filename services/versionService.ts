@@ -36,7 +36,7 @@ class VersionService {
 
       this.currentVersion = appInfo.version;
       this.platform = deviceInfo.platform;
-    } catch (error) {
+    } catch (err: any) {
       log.warn('Failed to get app info', { error }, 'VersionService');
       // Fallback for web
       this.currentVersion = '1.0.0';
@@ -112,7 +112,7 @@ class VersionService {
       this.lastCheckTime = now;
 
       return result;
-    } catch (error) {
+    } catch (err: any) {
       log.error('Failed to check for updates', { error }, 'VersionService');
       // Return safe defaults
       const currentVersion = await this.getCurrentVersion();
@@ -153,7 +153,7 @@ class VersionService {
         ...versionData,
         updatedAt: new Date()
       });
-    } catch (error) {
+    } catch (err: any) {
       log.error('Failed to update version info', { error }, 'VersionService');
       throw error;
     }
@@ -181,7 +181,7 @@ class VersionService {
       });
 
       // console.log(`Initialized version data for ${platform}`);
-    } catch (error) {
+    } catch (err: any) {
       log.error('Failed to initialize version data', { error }, 'VersionService');
       // Don't throw - this is a non-critical operation
     }

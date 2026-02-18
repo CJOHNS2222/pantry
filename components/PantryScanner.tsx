@@ -29,7 +29,13 @@ import { InventoryCacheService } from '../services/inventoryCacheService';
 // Constants for virtualization threshold
 
 interface PantryScannerProps {
+  inventory: PantryItem[];
+  isLoadingInventory?: boolean;
   addToShoppingList: (items: string[]) => void;
+  onDeleteItem: (index: number) => Promise<void>;
+  onAddItem: (item: PantryItem) => Promise<void>;
+  onAddItems: (items: PantryItem[]) => Promise<void>;
+  onUpdateItem: (index: number, updates: Partial<PantryItem>) => Promise<void>;
   consumptionSuggestions?: ConsumptionSuggestion[];
   expirationAlerts?: ExpirationAlert[];
   recipeSuggestions?: RecipeSuggestion[];
@@ -45,7 +51,13 @@ interface PantryScannerProps {
 }
 
 export const PantryScanner: React.FC<PantryScannerProps> = ({ 
+  inventory,
+  isLoadingInventory = false,
   addToShoppingList,
+  onDeleteItem,
+  onAddItem,
+  onAddItems,
+  onUpdateItem,
   consumptionSuggestions = [],
   expirationAlerts = [],
   recipeSuggestions = [],
@@ -65,67 +77,15 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   // Constants for virtualization threshold
   const CATEGORY_VIRTUALIZE_THRESHOLD = 20;
 
-  // Inventory state using cache service
-  const [inventory, setInventory] = useState<PantryItem[]>([]);
-  const [isLoadingInventory, setIsLoadingInventory] = useState(true);
-
-  // Load inventory on mount
-  React.useEffect(() => {
-    loadInventory();
-  }, [user?.id]);
-
-  const loadInventory = async () => {
-    try {
-      setIsLoadingInventory(true);
-      const items = await InventoryCacheService.getCachedInventory(undefined, user?.id);
-      setInventory(items);
-    } catch (error) {
-      console.error('Failed to load inventory:', error);
-    } finally {
-      setIsLoadingInventory(false);
-    }
-  };
-
   // Inventory management functions using cache service
   const updateItem = async (index: number, updates: Partial<PantryItem>) => {
     const item = inventory[index];
     if (!item) return;
     
     try {
-      await InventoryCacheService.updateItemInCache(item.id, updates, undefined, user?.id);
-      setInventory(prev => prev.map((i, idx) => idx === index ? { ...i, ...updates } : i));
+      await onUpdateItem(index, updates);
     } catch (error) {
       console.error('Failed to update item:', error);
-    }
-  };
-
-  const deleteItem = async (index: number) => {
-    const item = inventory[index];
-    if (!item) return;
-    
-    try {
-      await InventoryCacheService.removeItemFromCache(item.id, undefined, user?.id);
-      setInventory(prev => prev.filter((_, idx) => idx !== index));
-    } catch (error) {
-      console.error('Failed to delete item:', error);
-    }
-  };
-
-  const addItem = async (item: PantryItem) => {
-    try {
-      await InventoryCacheService.addItemToCache(item, undefined, user?.id);
-      setInventory(prev => [...prev, item]);
-    } catch (error) {
-      console.error('Failed to add item:', error);
-    }
-  };
-
-  const addItems = async (items: PantryItem[]) => {
-    try {
-      await InventoryCacheService.addItemsToCache(items, undefined, user?.id);
-      setInventory(prev => [...prev, ...items]);
-    } catch (error) {
-      console.error('Failed to add items:', error);
     }
   };
 
@@ -420,16 +380,16 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
     }
   }, [rawBase64, mimeType, user]);
 
-  const removeItem = useCallback((index: number) => {
-    setInventory(prev => prev.filter((_, i) => i !== index));
-  }, [setInventory]);
+  const removeItem = useCallback(async (index: number) => {
+    await onDeleteItem(index);
+  }, [onDeleteItem]);
 
   const handleManualAdd = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
 
     try {
       const newItem = PantryService.createManualItem(newItemText, newQty, inventory, newUnit);
-      await addItem(newItem);
+      await onAddItem(newItem);
       setNewItemText('');
       setNewQty(1);
       setNewUnit('count');
@@ -437,7 +397,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Failed to add item. Please try again.');
     }
-  }, [newItemText, newQty, newUnit, inventory, addItem, setIsAddModalOpen]);
+  }, [newItemText, newQty, newUnit, inventory, onAddItem, setIsAddModalOpen]);
 
   const closeModal = useCallback(() => {
     setIsAddModalOpen(false);
@@ -482,28 +442,32 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
     }
   }, [selectedItems.size, inventory.length, setSelectedItems]);
 
-  const bulkDelete = useCallback(() => {
+  const bulkDelete = useCallback(async () => {
     if (selectedItems.size === 0) return;
 
     if (confirm(`Delete ${selectedItems.size} selected item(s)?`)) {
-      const indicesToDelete = Array.from(selectedItems);
-      setInventory(prev => PantryService.bulkDeleteItems(prev, indicesToDelete));
+      const indicesToDelete = Array.from(selectedItems).sort((a, b) => b - a); // Delete from highest index first
+      for (const index of indicesToDelete) {
+        await onDeleteItem(index);
+      }
       setSelectedItems(new Set());
       setBulkMode(false);
     }
-  }, [selectedItems, setInventory, setSelectedItems, setBulkMode]);
+  }, [selectedItems, onDeleteItem, setSelectedItems, setBulkMode]);
 
-  const bulkMoveToShoppingList = useCallback(() => {
+  const bulkMoveToShoppingList = useCallback(async () => {
     if (selectedItems.size === 0) return;
 
-    const indicesToMove = Array.from(selectedItems);
+    const indicesToMove = Array.from(selectedItems).sort((a, b) => b - a); // Delete from highest index first
     const itemsToMove = PantryService.bulkMoveToShoppingList(inventory, indicesToMove);
     addToShoppingList(itemsToMove, 'pantry scanner');
-    setInventory(prev => PantryService.bulkDeleteItems(prev, indicesToMove));
+    for (const index of indicesToMove) {
+      await onDeleteItem(index);
+    }
     setSelectedItems(new Set());
     setBulkMode(false);
     alert(`Moved ${selectedItems.size} items to shopping list.`);
-  }, [selectedItems, inventory, addToShoppingList, setInventory, setSelectedItems, setBulkMode]);
+  }, [selectedItems, inventory, addToShoppingList, onDeleteItem, setSelectedItems, setBulkMode]);
 
   const toggleCategory = useCallback((category: string) => {
     const newExpanded = new Set(expandedCategories);
@@ -522,32 +486,38 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   }, [expandedCategories, setExpandedCategories, setCategoryOrder]);
 
   // Bulk actions
-  const bulkChangeLocation = useCallback((newLocation: 'pantry' | 'fridge' | 'freezer' | 'spices' | 'other') => {
+  const bulkChangeLocation = useCallback(async (newLocation: 'pantry' | 'fridge' | 'freezer' | 'spices' | 'other') => {
     if (selectedItems.size === 0) return;
     const indicesToUpdate = Array.from(selectedItems);
-    setInventory(prev => PantryService.bulkChangeLocation(prev, indicesToUpdate, newLocation));
+    for (const index of indicesToUpdate) {
+      await onUpdateItem(index, { location: newLocation });
+    }
     setSelectedItems(new Set());
     setBulkMode(false);
-  }, [selectedItems, setInventory, setSelectedItems, setBulkMode]);
+  }, [selectedItems, onUpdateItem, setSelectedItems, setBulkMode]);
 
-  const bulkSetExpiration = useCallback((isoDate: string) => {
+  const bulkSetExpiration = useCallback(async (isoDate: string) => {
     if (selectedItems.size === 0) return;
     const indicesToUpdate = Array.from(selectedItems);
-    setInventory(prev => PantryService.bulkSetExpiration(prev, indicesToUpdate, isoDate, 'best-by'));
+    for (const index of indicesToUpdate) {
+      await onUpdateItem(index, { expiration_date: isoDate, expiration_type: 'best-by' });
+    }
     setSelectedItems(new Set());
     setBulkMode(false);
-  }, [selectedItems, setInventory, setSelectedItems, setBulkMode]);
+  }, [selectedItems, onUpdateItem, setSelectedItems, setBulkMode]);
 
-  const bulkAddToShoppingListWithRemove = useCallback(() => {
+  const bulkAddToShoppingListWithRemove = useCallback(async () => {
     if (selectedItems.size === 0) return;
-    const indicesToMove = Array.from(selectedItems);
+    const indicesToMove = Array.from(selectedItems).sort((a, b) => b - a); // Delete from highest index first
     const itemsToMove = PantryService.bulkMoveToShoppingList(inventory, indicesToMove);
     addToShoppingList(itemsToMove);
-    setInventory(prev => PantryService.bulkDeleteItems(prev, indicesToMove));
+    for (const index of indicesToMove) {
+      await onDeleteItem(index);
+    }
     setSelectedItems(new Set());
     setBulkMode(false);
     alert(`Moved ${itemsToMove.length} items to shopping list.`);
-  }, [selectedItems, inventory, addToShoppingList, setInventory, setSelectedItems, setBulkMode]);
+  }, [selectedItems, inventory, addToShoppingList, onDeleteItem, setSelectedItems, setBulkMode]);
 
   const toggleStorageLocation = useCallback((location: string) => {
     // Bring clicked storage location section to the top
@@ -618,20 +588,12 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
     other: 'Other'
   };
 
-  const updateStorageLocation = (itemIndex: number, newLocation: 'pantry' | 'freezer' | 'fridge' | 'spices' | 'other') => {
-    setInventory(prev => {
-      const updated = [...prev];
-      updated[itemIndex] = { ...updated[itemIndex], storageLocation: newLocation };
-      return updated;
-    });
+  const updateStorageLocation = async (itemIndex: number, newLocation: 'pantry' | 'freezer' | 'fridge' | 'spices' | 'other') => {
+    await onUpdateItem(itemIndex, { storageLocation: newLocation });
   };
 
-  const updateCategory = (itemIndex: number, newCategory: string) => {
-    setInventory(prev => {
-      const updated = [...prev];
-      updated[itemIndex] = { ...updated[itemIndex], category: newCategory };
-      return updated;
-    });
+  const updateCategory = async (itemIndex: number, newCategory: string) => {
+    await onUpdateItem(itemIndex, { category: newCategory });
   };
 
   // Sort categories by categoryOrder, then alphabetically
@@ -1660,7 +1622,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                     <button onClick={async () => {
                       // Confirm: add scanResults to inventory
                       if (scanResults) {
-                        await addItems(scanResults);
+                        await onAddItems(scanResults);
                       }
                       setShowScanReviewModal(false);
                       setScanResults(null);
@@ -2075,7 +2037,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
             await updateItem(index, updates);
           }}
           onDeleteItem={async (index) => {
-            await deleteItem(index);
+            await onDeleteItem(index);
             setSelectedItemIndex(null);
           }}
           onAddToShoppingList={addToShoppingList}

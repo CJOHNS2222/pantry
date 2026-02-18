@@ -247,7 +247,7 @@ export const GroceryCostEstimator: React.FC<GroceryCostEstimatorProps> = ({ meal
         ingredient: parsed.name,
         quantity: parsed.quantity,
         unit: realTimeData.unit,
-        estimatedCost: realTimeData.averagePrice * parsed.quantity,
+        estimatedCost: realTimeData.minPrice * parsed.quantity,
         source: 'known'
       };
     }

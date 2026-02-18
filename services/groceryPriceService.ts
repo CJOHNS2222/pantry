@@ -2,6 +2,7 @@ import { collection, doc, getDoc, setDoc, updateDoc, query, where, getDocs, orde
 import { db } from '../firebaseConfig';
 import DatabaseMonitoringService from './databaseMonitoringService';
 import { PriceTrend } from '../types/app';
+import { priceCacheService } from './priceCacheService';
 
 export interface GroceryPrice {
   id: string;
@@ -113,6 +114,12 @@ class GroceryPriceService {
     try {
       const ingredientKey = this.normalizeIngredientName(ingredient);
 
+      // Check cache first
+      const cachedData = priceCacheService.getPriceData(ingredientKey);
+      if (cachedData) {
+        return cachedData;
+      }
+
       // Source 1: Query for recent user-submitted prices (last 30 days)
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -142,8 +149,7 @@ class GroceryPriceService {
         const averagePrice = prices.reduce((sum, price) => sum + price, 0) / prices.length;
         const minPrice = Math.min(...prices);
         const maxPrice = Math.max(...prices);
-        console.log(`Using user-submitted price data for ${ingredient}: $${averagePrice.toFixed(2)}`);
-        return {
+        const priceData = {
           averagePrice,
           minPrice,
           maxPrice,
@@ -151,6 +157,9 @@ class GroceryPriceService {
           lastUpdated: new Date(),
           unit: 'lb' // Default unit, could be improved
         };
+        console.log(`Using user-submitted price data for ${ingredient}: $${averagePrice.toFixed(2)}`);
+        priceCacheService.setPriceData(ingredientKey, priceData);
+        return priceData;
       }
 
       // Source 2: Try Open Prices API
@@ -159,17 +168,17 @@ class GroceryPriceService {
         const openPriceData = this.convertOpenPricesToPriceData(openPrices);
         if (openPriceData) {
           console.log(`Using Open Prices API data for ${ingredient}:`, openPriceData);
+          priceCacheService.setPriceData(ingredientKey, openPriceData);
           return openPriceData;
         }
-      } catch (error) {
+      } catch (err: any) {
         console.warn('Open Prices API fallback failed:', error);
       }
 
       // Source 3: Use curated default prices as final fallback
       const defaultPrice = this.defaultPrices[ingredientKey];
       if (defaultPrice) {
-        console.log(`Using default price for ${ingredient}: $${defaultPrice.price.toFixed(2)}`);
-        return {
+        const priceData = {
           averagePrice: defaultPrice.price,
           minPrice: defaultPrice.price,
           maxPrice: defaultPrice.price,
@@ -177,19 +186,21 @@ class GroceryPriceService {
           lastUpdated: new Date(),
           unit: defaultPrice.unit
         };
+        console.log(`Using default price for ${ingredient}: $${defaultPrice.price.toFixed(2)}`);
+        priceCacheService.setPriceData(ingredientKey, priceData);
+        return priceData;
       }
 
       // If nothing found, return null and let component handle it
       console.warn(`No price data found for ${ingredient} from any source`);
       return null;
-    } catch (error) {
+    } catch (err: any) {
       console.error('Error fetching ingredient price:', error);
       // Try to at least return default price on error
       const ingredientKey = this.normalizeIngredientName(ingredient);
       const defaultPrice = this.defaultPrices[ingredientKey];
       if (defaultPrice) {
-        console.log(`Using default price (error fallback) for ${ingredient}: $${defaultPrice.price.toFixed(2)}`);
-        return {
+        const priceData = {
           averagePrice: defaultPrice.price,
           minPrice: defaultPrice.price,
           maxPrice: defaultPrice.price,
@@ -197,6 +208,9 @@ class GroceryPriceService {
           lastUpdated: new Date(),
           unit: defaultPrice.unit
         };
+        console.log(`Using default price (error fallback) for ${ingredient}: $${defaultPrice.price.toFixed(2)}`);
+        priceCacheService.setPriceData(ingredientKey, priceData);
+        return priceData;
       }
       return null;
     }
@@ -220,8 +234,6 @@ class GroceryPriceService {
         ingredient: ingredientKey,
         price,
         unit,
-        store,
-        location,
         currency: 'USD',
         lastUpdated: new Date(),
         source: 'user',
@@ -229,13 +241,20 @@ class GroceryPriceService {
         votes: 1
       };
 
+      if (store) {
+        priceData.store = store;
+      }
+      if (location) {
+        priceData.location = location;
+      }
+
       await setDoc(doc(db, this.COLLECTION_NAME, priceId), priceData);
 
       // Also store in price history
       await this.storePriceHistory(priceData);
-    } catch (error) {
-      console.error('Error submitting price update:', error);
-      throw error;
+    } catch (err: any) {
+      console.error('Error submitting price update:', err);
+      throw err;
     }
   }
 
@@ -294,7 +313,7 @@ class GroceryPriceService {
       });
 
       return combinedTrends.sort((a, b) => b.lastUpdated.getTime() - a.lastUpdated.getTime());
-    } catch (error) {
+    } catch (err: any) {
       console.error('Error fetching price trends:', error);
 
       // Fallback to Open Prices API only
@@ -355,7 +374,7 @@ class GroceryPriceService {
         priceChangePercent,
         priceHistory
       };
-    } catch (error) {
+    } catch (err: any) {
       console.error('Error analyzing price trends:', error);
 
       // Return default price on error
@@ -401,7 +420,7 @@ class GroceryPriceService {
       const newVotes = vote === 'up' ? currentVotes + 1 : Math.max(0, currentVotes - 1);
 
       await updateDoc(priceRef, { votes: newVotes });
-    } catch (error) {
+    } catch (err: any) {
       console.error('Error voting on price:', error);
       throw error;
     }
@@ -415,7 +434,7 @@ class GroceryPriceService {
         ...priceData,
         recordedAt: new Date()
       });
-    } catch (error) {
+    } catch (err: any) {
       console.error('Error storing price history:', error);
     }
   }
@@ -443,7 +462,7 @@ class GroceryPriceService {
       });
 
       return Array.from(ingredients).sort();
-    } catch (error) {
+    } catch (err: any) {
       console.error('Error fetching available ingredients:', error);
       return Object.keys(this.defaultPrices);
     }
@@ -483,7 +502,7 @@ class GroceryPriceService {
 
       const data: OpenPricesResponse = await response.json();
       return data.items || [];
-    } catch (error) {
+    } catch (err: any) {
       console.warn('Failed to fetch historical prices from Open Prices API:', error);
       return [];
     }
@@ -520,7 +539,7 @@ class GroceryPriceService {
         .sort((a, b) => b.lastUpdated.getTime() - a.lastUpdated.getTime()); // Most recent first
 
       return trends;
-    } catch (error) {
+    } catch (err: any) {
       console.error('Error fetching price trends from Open Prices API:', error);
       return [];
     }
@@ -568,7 +587,7 @@ class GroceryPriceService {
       });
 
       console.log(`Stored Open Prices snapshot for ${ingredient}: $${averagePrice.toFixed(2)}`);
-    } catch (error) {
+    } catch (err: any) {
       console.warn('Failed to store Open Prices snapshot:', error);
     }
   }
@@ -625,7 +644,7 @@ class GroceryPriceService {
       }
 
       console.log('Price trend update completed');
-    } catch (error) {
+    } catch (err: any) {
       console.error('Error updating price trends from API:', error);
     }
   }
@@ -655,7 +674,7 @@ class GroceryPriceService {
       });
 
       return response.ok;
-    } catch (error) {
+    } catch (err: any) {
       console.warn('Failed to submit price to Open Prices:', error);
       return false;
     }
@@ -693,7 +712,7 @@ class GroceryPriceService {
 
       const data: OpenPricesResponse = await response.json();
       return data.items || [];
-    } catch (error) {
+    } catch (err: any) {
       console.warn(`Failed to fetch current prices from Open Prices API for ${ingredient}:`, error);
       return [];
     }
@@ -706,7 +725,7 @@ class GroceryPriceService {
         ...priceData,
         lastUpdated: new Date()
       });
-    } catch (error) {
+    } catch (err: any) {
       console.error('Error saving grocery price:', error);
       throw error;
     }

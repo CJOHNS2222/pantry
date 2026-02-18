@@ -34,6 +34,8 @@ import { joinHousehold } from './services/householdService';
 import { setAppContext, trackNavigation, trackShoppingListAction } from './services/sentryService';
 import PerformanceMonitoringService from './services/performanceMonitoringService';
 import HapticService from './services/hapticService';
+import { ShoppingListCacheService } from './services/shoppingListCacheService';
+import { groceryPriceService } from './services/groceryPriceService';
 
 // Lazy load monitoring components
 const DatabaseAnalytics = React.lazy(() => import('./components/DatabaseAnalytics').then(module => ({ default: module.default })));
@@ -117,23 +119,44 @@ const App: React.FC = () => {
   }, [user?.profile?.notificationSettings]);
 
   // Function to add items to shopping list
-  const addToShoppingList = (items: string[], source: string = 'manual') => {
+  const addToShoppingList = async (items: string[], source: string = 'manual') => {
     PerformanceMonitoringService.mark('shopping_list_add_start');
     
     trackShoppingListAction('add_item', { count: items.length, source });
     HapticService.itemAdded();
-    const newItems = items.map(i => {
-      const parsed = parseIngredientForShoppingList(i);
-      return { 
-        id: Math.random().toString(36).substr(2,9), 
-        item: parsed.itemName, 
+    
+    const inHousehold = household?.id && isHouseholdMember(household, user);
+    const householdId = inHousehold ? household.id : undefined;
+    const userId = inHousehold ? undefined : user.id;
+    
+    // Create items with IDs and estimated prices
+    const newItems: ShoppingItem[] = [];
+    for (const item of items) {
+      const parsed = parseIngredientForShoppingList(item);
+      const estimatedPrice = await groceryPriceService.getIngredientPrice(parsed.itemName).then(priceData => priceData?.averagePrice || 0).catch(() => 0);
+      
+      newItems.push({
+        id: Math.random().toString(36).substr(2, 9),
+        item: parsed.itemName,
         quantity: parsed.quantity,
-        category: inferCategoryFromItemName(parsed.itemName), 
+        category: inferCategoryFromItemName(parsed.itemName),
         checked: false,
-        source: source
-      };
-    });
+        source: source,
+        addedAt: new Date(),
+        estimatedPrice
+      });
+    }
+    
+    // Update local state immediately for instant UI feedback
     setShoppingList(prev => [...prev, ...newItems]);
+    
+    // Batch write to cache
+    const batch = [];
+    for (const item of newItems) {
+      batch.push(ShoppingListCacheService.addItemToCache(item, householdId, userId));
+    }
+    await Promise.all(batch);
+    
     setActiveTab(Tab.SHOPPING);
     
     PerformanceMonitoringService.mark('shopping_list_add_end');
@@ -188,9 +211,14 @@ const App: React.FC = () => {
     // Usage limit states
     recipeSaveLimitExceeded,
     mealPlanLimitExceeded,
-    // Usage limit checking functions
+    // Limit checking functions
     checkRecipeSaveLimit,
     checkMealPlanLimit,
+    // Manual sync functions
+    syncShoppingListToDatabase,
+    syncMealPlanToDatabase,
+    syncSavedRecipesToDatabase,
+    addShoppingListItem,
     // Loading states
     isLoadingInventory,
     isLoadingShoppingList,
@@ -800,7 +828,15 @@ const App: React.FC = () => {
                 }));
                 
                 // Add all merged items immediately (addItems will handle merging with existing inventory)
-                const addedItems = await addItems(Object.values(mergedItems));
+                const addedItems = await addItems(Object.values(processedItems));
+
+                // Remove items from shopping list
+                setShoppingList(prev => prev.filter(item => !items.find(moved => moved.id === item.id)));
+                
+                // Sync shopping list to database after removing items
+                setTimeout(() => {
+                  syncShoppingListToDatabase();
+                }, 100);
 
                 // Show toast asking to edit quantities
                 addToast(
@@ -828,7 +864,8 @@ const App: React.FC = () => {
               onShowTutorial: () => setShowTutorial(true),
               onShowHousehold: () => setShowHousehold(true),
               checkRecipeSaveLimit,
-              checkMealPlanLimit
+              checkMealPlanLimit,
+              addShoppingListItem
             }}
           >
             <MainContent />

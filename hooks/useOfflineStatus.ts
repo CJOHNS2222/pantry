@@ -40,7 +40,7 @@ export const useOfflineStatus = () => {
           pendingOperations: pendingCount,
           hasConflicts: conflicts.length > 0
         }));
-      } catch (error) {
+      } catch (err: any) {
         console.error('Failed to initialize offline queue:', error);
       }
     };
@@ -141,7 +141,7 @@ export const useOfflineStatus = () => {
       }));
 
       endSync(true);
-    } catch (error) {
+    } catch (err: any) {
       const errorMessage = error instanceof Error ? error.message : 'Sync failed';
       endSync(false, errorMessage);
     }

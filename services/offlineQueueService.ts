@@ -155,7 +155,7 @@ class OfflineQueueService {
           await this.executeOperationWithConflictResolution(op);
           await this.remove(op.id);
           progress.completed++;
-        } catch (error) {
+        } catch (err: any) {
           const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
           if (this.isConflictError(error)) {

@@ -385,7 +385,7 @@ class AnalyticsService {
       if (analytics) {
         logEvent(analytics, eventName, parameters);
       }
-    } catch (error) {
+    } catch (err: any) {
       console.warn('Analytics event failed:', error);
     }
   }

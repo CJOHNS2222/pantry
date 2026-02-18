@@ -43,7 +43,7 @@ class SafeAreaService {
 
       // Apply safe area styles to the document
       this.applySafeAreaStyles();
-    } catch (error) {
+    } catch (err: any) {
       console.warn('Safe area detection failed:', error);
       // Fallback to basic viewport handling
       this.applyFallbackSafeArea();

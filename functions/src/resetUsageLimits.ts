@@ -42,7 +42,7 @@ export const resetWeeklyUsageLimits = onSchedule(
 
             resetCount++;
           }
-        } catch (error) {
+        } catch (err: any) {
           const errorMsg = `Failed to reset usage for user ${userDoc.id}: ${error}`;
           logger.error(errorMsg);
           errors.push(errorMsg);
@@ -55,7 +55,7 @@ export const resetWeeklyUsageLimits = onSchedule(
         logger.warn('Errors during reset:', errors);
       }
 
-    } catch (error) {
+    } catch (err: any) {
       logger.error('Critical error during weekly usage reset:', error);
       throw error;
     }

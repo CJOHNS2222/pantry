@@ -61,7 +61,7 @@ export const sendHouseholdInvitation = onCall(
       message: `Invitation sent to ${inviteeEmail}`
     };
 
-  } catch (error) {
+  } catch (err: any) {
     console.error('Error sending household invitation:', error);
     throw new HttpsError('internal', 'Failed to send invitation email. Please try again.');
   }

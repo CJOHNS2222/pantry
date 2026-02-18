@@ -1,15 +1,11 @@
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '../firebaseConfig';
 import DatabaseMonitoringService from './databaseMonitoringService';
-import { writeBatch } from 'firebase/firestore';
+import { writeBatch, doc, setDoc } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 
-export interface CachedImage {
-  originalUrl: string;
-  cachedUrl: string;
-  itemName: string;
-  createdAt: Date;
-  lastUsed: Date;
+export interface CachedImageData {
+  [cacheKey: string]: CachedImage;
 }
 
 // In-memory cache for this session
@@ -27,7 +23,7 @@ async function downloadImageAsBlob(url: string): Promise<Blob | null> {
       throw new Error(`Failed to fetch image: ${response.status}`);
     }
     return await response.blob();
-  } catch (error) {
+  } catch (err: any) {
     console.error('Error downloading image:', error);
     return null;
   }
@@ -52,7 +48,7 @@ async function uploadImageToStorage(blob: Blob, itemName: string): Promise<strin
     const downloadUrl = await getDownloadURL(storageRef);
 
     return downloadUrl;
-  } catch (error) {
+  } catch (err: any) {
     console.error('Error uploading image to storage:', error);
     return null;
   }
@@ -77,7 +73,7 @@ function loadLocalCache(): void {
         localStorage.removeItem('imageCache');
       }
     }
-  } catch (error) {
+  } catch (err: any) {
     console.error('Error loading local cache:', error);
   }
 }
@@ -92,7 +88,7 @@ function saveLocalCache(): void {
       cache: Object.fromEntries(memoryCache)
     };
     localStorage.setItem('imageCache', JSON.stringify(cacheData));
-  } catch (error) {
+  } catch (err: any) {
     console.error('Error saving local cache:', error);
   }
 }
@@ -118,24 +114,28 @@ async function syncCacheWithFirestore(): Promise<void> {
       console.log('Firebase not initialized yet, skipping image cache sync');
       return;
     }
-  } catch (error) {
+  } catch (err: any) {
     console.log('Firebase config not available, skipping image cache sync');
     return;
   }
 
   try {
     console.log('Syncing image cache with Firestore...');
-    const cacheRef = DatabaseMonitoringService.collection('image_cache');
-    const snapshot = await DatabaseMonitoringService.getDocs(DatabaseMonitoringService.query(cacheRef));
+    const cacheRef = DatabaseMonitoringService.doc('image_cache/global');
+    const snapshot = await DatabaseMonitoringService.getDoc(cacheRef);
 
-    snapshot.forEach(doc => {
-      const data = doc.data() as CachedImage;
-      memoryCache.set(data.itemName.toLowerCase().trim(), data);
-    });
+    if (snapshot.exists()) {
+      const data = snapshot.data() as CachedImageData;
+      for (const [cacheKey, cachedImage] of Object.entries(data)) {
+        if (cacheKey !== 'lastUpdated' && cacheKey !== 'version') {
+          memoryCache.set(cacheKey, cachedImage);
+        }
+      }
+    }
 
     saveLocalCache();
     localStorage.setItem(LAST_SYNC_KEY, now.toString());
-    console.log(`Synced ${snapshot.size} cached images`);
+    console.log(`Synced ${memoryCache.size} cached images`);
   } catch (error: any) {
     // Handle permission errors gracefully - Firestore sync is optional
     if (error?.code === 'permission-denied' || error?.message?.includes('insufficient permissions')) {
@@ -180,23 +180,26 @@ export async function getCachedImageUrl(itemName: string): Promise<string | null
         return cached.cachedUrl;
       }
     }
-  } catch (error) {
+  } catch (err: any) {
     console.error('Error reading local cache:', error);
   }
 
   // Only hit Firestore if not in any cache (expensive operation)
   try {
-    const cacheRef = DatabaseMonitoringService.doc('image_cache', cacheKey);
+    const cacheRef = DatabaseMonitoringService.doc('image_cache/global');
     const cacheDoc = await DatabaseMonitoringService.getDoc(cacheRef);
 
     if (cacheDoc.exists()) {
-      const cachedImage = cacheDoc.data() as CachedImage;
-      // Store in memory and local cache
-      memoryCache.set(cacheKey, cachedImage);
-      saveLocalCache();
-      return cachedImage.cachedUrl;
+      const data = cacheDoc.data() as CachedImageData;
+      const cachedImage = data[cacheKey];
+      if (cachedImage) {
+        // Store in memory and local cache
+        memoryCache.set(cacheKey, cachedImage);
+        saveLocalCache();
+        return cachedImage.cachedUrl;
+      }
     }
-  } catch (error) {
+  } catch (err: any) {
     console.error('Error getting cached image from Firestore:', error);
   }
 
@@ -240,7 +243,7 @@ export async function getCachedImageUrls(itemNames: string[]): Promise<Map<strin
       // Remove found items from uncached list
       uncachedKeys.splice(0, uncachedKeys.length, ...uncachedKeys.filter(key => !results.has(key)));
     }
-  } catch (error) {
+  } catch (err: any) {
     console.error('Error reading local cache:', error);
   }
 
@@ -251,24 +254,22 @@ export async function getCachedImageUrls(itemNames: string[]): Promise<Map<strin
 
   // Only hit Firestore for remaining items (batch operation)
   try {
-    const batchPromises = uncachedKeys.map(async (cacheKey) => {
-      const cacheRef = DatabaseMonitoringService.doc('image_cache', cacheKey);
-      const cacheDoc = await DatabaseMonitoringService.getDoc(cacheRef);
-      return { cacheKey, doc: cacheDoc };
-    });
+    const cacheRef = DatabaseMonitoringService.doc('image_cache/global');
+    const cacheDoc = await DatabaseMonitoringService.getDoc(cacheRef);
 
-    const batchResults = await Promise.all(batchPromises);
-
-    batchResults.forEach(({ cacheKey, doc }) => {
-      if (doc.exists()) {
-        const cachedImage = doc.data() as CachedImage;
-        memoryCache.set(cacheKey, cachedImage);
-        results.set(cacheKey, cachedImage.cachedUrl);
-      }
-    });
+    if (cacheDoc.exists()) {
+      const data = cacheDoc.data() as CachedImageData;
+      uncachedKeys.forEach(cacheKey => {
+        const cachedImage = data[cacheKey];
+        if (cachedImage) {
+          memoryCache.set(cacheKey, cachedImage);
+          results.set(cacheKey, cachedImage.cachedUrl);
+        }
+      });
+    }
 
     saveLocalCache();
-  } catch (error) {
+  } catch (err: any) {
     console.error('Error batch getting cached images from Firestore:', error);
   }
 
@@ -309,15 +310,18 @@ export async function cacheImageFromUrl(originalUrl: string, itemName: string): 
   };
 
   try {
-    const cacheRef = doc(db, 'image_cache', cacheKey);
-    await setDoc(cacheRef, cachedImage);
+    const cacheRef = doc(db, 'image_cache/global');
+    const cacheDoc = await DatabaseMonitoringService.getDoc(cacheRef);
+    const data = cacheDoc.exists() ? cacheDoc.data() as CachedImageData : {};
+    data[cacheKey] = cachedImage;
+    await setDoc(cacheRef, data);
 
     // Update local caches
     memoryCache.set(cacheKey, cachedImage);
     saveLocalCache();
 
     return cachedUrl;
-  } catch (error) {
+  } catch (err: any) {
     console.error('Error saving to Firestore cache:', error);
     // Still return the cached URL even if Firestore save failed
     // (image is uploaded to Storage, just not cached in DB)
@@ -367,7 +371,7 @@ export async function cacheImagesFromUrls(imageMap: Map<string, string>): Promis
         if (!cachedUrl) return null;
 
         return { itemName, cachedUrl, cacheKey };
-      } catch (error) {
+      } catch (err: any) {
         console.error(`Error caching image for ${itemName}:`, error);
         return null;
       }
@@ -380,11 +384,12 @@ export async function cacheImagesFromUrls(imageMap: Map<string, string>): Promis
 
     if (validResults.length > 0) {
       try {
-        const batch = writeBatch(db);
+        const cacheRef = doc(db, 'image_cache/global');
+        const cacheDoc = await DatabaseMonitoringService.getDoc(cacheRef);
+        const data = cacheDoc.exists() ? cacheDoc.data() as CachedImageData : {};
         const now = new Date();
 
         validResults.forEach(({ itemName, cachedUrl, cacheKey }) => {
-          const cacheRef = doc(db, 'image_cache', cacheKey);
           const cachedImage: CachedImage = {
             originalUrl: imageMap.get(itemName)!,
             cachedUrl,
@@ -393,16 +398,16 @@ export async function cacheImagesFromUrls(imageMap: Map<string, string>): Promis
             lastUsed: now
           };
 
-          batch.set(cacheRef, cachedImage);
+          data[cacheKey] = cachedImage;
 
           // Update local caches
           memoryCache.set(cacheKey, cachedImage);
           results.set(itemName, cachedUrl);
         });
 
-        await batch.commit();
+        await setDoc(cacheRef, data);
         console.log(`Successfully cached ${validResults.length} images in this batch`);
-      } catch (error) {
+      } catch (err: any) {
         console.error('Error batch saving to Firestore:', error);
         // Still add to results even if Firestore save failed
         validResults.forEach(({ itemName, cachedUrl }) => {

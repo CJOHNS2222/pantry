@@ -76,9 +76,9 @@ class GeminiRequestBatcher {
           const result = await request.operation();
           request.resolve(result);
           log.debug(`Completed Gemini request: ${request.id}`, {}, 'GeminiBatcher');
-        } catch (error) {
-          request.reject(error);
-          log.error(`Failed Gemini request: ${request.id}`, error, 'GeminiBatcher');
+        } catch (err: any) {
+          request.reject(err);
+          log.error(`Failed Gemini request: ${request.id}`, err, 'GeminiBatcher');
         }
       });
 
@@ -268,9 +268,9 @@ If an item doesn't fit these categories, use "Uncategorized".`,
       }
 
       return items;
-    } catch (error) {
-      console.error("Error analyzing pantry image:", error);
-      throw error;
+    } catch (err: any) {
+      console.error("Error analyzing pantry image:", err);
+      throw err;
     } finally {
       perfTrace?.stop();
     }
@@ -298,17 +298,17 @@ export const searchRecipes = async (params: RecipeSearchParams, user?: User): Pr
       }
 
       return await performSearch(params, user, perfTrace);
-    } catch (error) {
-      lastError = error as Error;
-      
+    } catch (err: any) {
+      lastError = err as Error;
+
       // Only retry on 429/rate limit errors
-      if (attempt < maxRetries && (error.message?.includes('429') || error.message?.includes('Too Many Requests') || error.message?.includes('Resource exhausted'))) {
-        console.warn(`Gemini rate limit hit, retrying (attempt ${attempt + 1}/${maxRetries}):`, error.message);
+      if (attempt < maxRetries && (err.message?.includes('429') || err.message?.includes('Too Many Requests') || err.message?.includes('Resource exhausted'))) {
+        console.warn(`Gemini rate limit hit, retrying (attempt ${attempt + 1}/${maxRetries}):`, err.message);
         continue;
       }
-      
+
       // For other errors or max retries reached, throw the error
-      throw error;
+      throw err;
     }
   }
 
@@ -454,20 +454,20 @@ const performSearch = async (params: RecipeSearchParams, user: User | undefined,
     throw timeoutError;
   }
 
-  } catch (error) {
-    console.error("Error searching recipes:", error);
-    
+  } catch (err: any) {
+    console.error("Error searching recipes:", err);
+
     // Provide more specific error messages
-    if (error.message?.includes('API_KEY')) {
+    if (err.message?.includes('API_KEY')) {
       throw new Error('API configuration error. Please check your Gemini API key.');
-    } else if (error.message?.includes('429') || error.message?.includes('Too Many Requests') || error.message?.includes('Resource exhausted')) {
+    } else if (err.message?.includes('429') || err.message?.includes('Too Many Requests') || err.message?.includes('Resource exhausted')) {
       throw new Error('API rate limit exceeded. Please wait a moment and try again.');
-    } else if (error.message?.includes('quota') || error.message?.includes('limit')) {
+    } else if (err.message?.includes('quota') || err.message?.includes('limit')) {
       throw new Error('API quota exceeded. Please try again later.');
-    } else if (error.message?.includes('network') || error.message?.includes('fetch')) {
+    } else if (err.message?.includes('network') || err.message?.includes('fetch')) {
       throw new Error('Network error. Please check your internet connection.');
     } else {
-      throw new Error(`Recipe search failed: ${error.message || 'Unknown error'}`);
+      throw new Error(`Recipe search failed: ${err.message || 'Unknown error'}`);
     }
   } finally {
     perfTrace?.stop();
@@ -545,7 +545,7 @@ function parseNaturalLanguageRecipes(text: string): StructuredRecipe[] {
       });
     }
     
-  } catch (error) {
+  } catch (err: any) {
     console.error("Error parsing natural language recipes:", error);
     // Return a basic fallback recipe
     recipes.push({

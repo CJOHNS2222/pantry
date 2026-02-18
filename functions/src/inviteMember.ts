@@ -129,7 +129,7 @@ async function inviteMemberCore(inviterUid: string, email: string, householdId: 
     try {
       await admin.auth().setCustomUserClaims(memberIdToStore, { householdId });
       console.log(`Custom claim 'householdId' set for user ${memberIdToStore} to ${householdId}`);
-    } catch (error) {
+    } catch (err: any) {
       console.error('Error setting custom claims:', error);
       // Don't fail the invite if claim setting fails
     }

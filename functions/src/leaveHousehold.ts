@@ -86,7 +86,7 @@ export const leaveHousehold = onCall(async (request) => {
     try {
       await admin.auth().setCustomUserClaims(userId, { householdId: null });
       console.log(`Custom claim 'householdId' removed for user ${userId}`);
-    } catch (error) {
+    } catch (err: any) {
       console.error('Error removing custom claims:', error);
       // Don't fail the leave process if claim removal fails
     }
@@ -99,7 +99,7 @@ export const leaveHousehold = onCall(async (request) => {
 
     return { success: true, message: 'Successfully left household' };
 
-  } catch (error) {
+  } catch (err: any) {
     console.error('Error leaving household:', error);
     throw error;
   }
@@ -197,7 +197,7 @@ export const leaveHouseholdHttp = onRequest(async (req, res) => {
     try {
       await admin.auth().setCustomUserClaims(userId, { householdId: null });
       console.log(`Custom claim 'householdId' removed for user ${userId}`);
-    } catch (error) {
+    } catch (err: any) {
       console.error('Error removing custom claims:', error);
       // Don't fail the leave process if claim removal fails
     }

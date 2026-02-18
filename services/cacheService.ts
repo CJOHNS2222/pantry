@@ -57,7 +57,7 @@ class ReadThroughCache<T> {
       const data = await fetcher();
       this.set(key, data, ttl);
       return data;
-    } catch (error) {
+    } catch (err: any) {
       log.error(`Failed to fetch data for key: ${key}`, error, 'Cache');
       throw error;
     }

@@ -49,7 +49,7 @@ export function useAuth() {
             // Don't set name here - it will be set by handleLogin
             name: null
           });
-        } catch (error) {
+        } catch (err: any) {
           console.error('Failed to create user document:', error);
         }
       }
@@ -76,7 +76,7 @@ export function useAuth() {
               // The onSnapshot will fire again with the updated data
               return;
             }
-          } catch (error) {
+          } catch (err: any) {
             console.error('Failed to check for existing household:', error);
           }
         }

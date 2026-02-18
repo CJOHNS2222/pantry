@@ -16,7 +16,7 @@ class HapticService {
   static async light() {
     try {
       await Haptics.impact({ style: ImpactStyle.Light });
-    } catch (error) {
+    } catch (err: any) {
       // Silently fail if haptics not available
     }
   }
@@ -25,7 +25,7 @@ class HapticService {
   static async medium() {
     try {
       await Haptics.impact({ style: ImpactStyle.Medium });
-    } catch (error) {
+    } catch (err: any) {
       // Silently fail if haptics not available
     }
   }
@@ -34,7 +34,7 @@ class HapticService {
   static async heavy() {
     try {
       await Haptics.impact({ style: ImpactStyle.Heavy });
-    } catch (error) {
+    } catch (err: any) {
       // Silently fail if haptics not available
     }
   }
@@ -43,7 +43,7 @@ class HapticService {
   static async success() {
     try {
       await Haptics.notification({ type: NotificationType.Success });
-    } catch (error) {
+    } catch (err: any) {
       // Silently fail if haptics not available
     }
   }
@@ -52,7 +52,7 @@ class HapticService {
   static async warning() {
     try {
       await Haptics.notification({ type: NotificationType.Warning });
-    } catch (error) {
+    } catch (err: any) {
       // Silently fail if haptics not available
     }
   }
@@ -61,7 +61,7 @@ class HapticService {
   static async error() {
     try {
       await Haptics.notification({ type: NotificationType.Error });
-    } catch (error) {
+    } catch (err: any) {
       // Silently fail if haptics not available
     }
   }
@@ -70,7 +70,7 @@ class HapticService {
   static async vibrate(duration: number = 100) {
     try {
       await Haptics.vibrate({ duration });
-    } catch (error) {
+    } catch (err: any) {
       // Silently fail if haptics not available
     }
   }
@@ -79,7 +79,7 @@ class HapticService {
   static async selection() {
     try {
       await Haptics.impact({ style: ImpactStyle.Light });
-    } catch (error) {
+    } catch (err: any) {
       // Silently fail if haptics not available
     }
   }
@@ -88,7 +88,7 @@ class HapticService {
   static async buttonPress() {
     try {
       await Haptics.impact({ style: ImpactStyle.Light });
-    } catch (error) {
+    } catch (err: any) {
       // Silently fail if haptics not available
     }
   }
@@ -97,7 +97,7 @@ class HapticService {
   static async itemAdded() {
     try {
       await Haptics.impact({ style: ImpactStyle.Medium });
-    } catch (error) {
+    } catch (err: any) {
       // Silently fail if haptics not available
     }
   }
@@ -106,7 +106,7 @@ class HapticService {
   static async itemRemoved() {
     try {
       await Haptics.impact({ style: ImpactStyle.Medium });
-    } catch (error) {
+    } catch (err: any) {
       // Silently fail if haptics not available
     }
   }
@@ -115,7 +115,7 @@ class HapticService {
   static async tabSwitch() {
     try {
       await Haptics.impact({ style: ImpactStyle.Light });
-    } catch (error) {
+    } catch (err: any) {
       // Silently fail if haptics not available
     }
   }
@@ -124,7 +124,7 @@ class HapticService {
   static async actionSuccess() {
     try {
       await Haptics.notification({ type: NotificationType.Success });
-    } catch (error) {
+    } catch (err: any) {
       // Silently fail if haptics not available
     }
   }
@@ -133,7 +133,7 @@ class HapticService {
   static async actionError() {
     try {
       await Haptics.notification({ type: NotificationType.Error });
-    } catch (error) {
+    } catch (err: any) {
       // Silently fail if haptics not available
     }
   }

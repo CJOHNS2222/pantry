@@ -52,8 +52,8 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 
     loadUnreadCount();
 
-    // Refresh count every 30 seconds
-    const interval = setInterval(loadUnreadCount, 30000);
+    // Refresh count every 5 minutes (reduced from 30 seconds to minimize queries)
+    const interval = setInterval(loadUnreadCount, 300000);
     return () => clearInterval(interval);
   }, [user?.id, user?.email]);
   return (

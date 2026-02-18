@@ -152,7 +152,7 @@ class Logger {
       const result = await operation();
       endTimer();
       return result;
-    } catch (error) {
+    } catch (err: any) {
       endTimer();
       this.error(`Async operation failed: ${label}`, error, context);
       throw error;
@@ -168,7 +168,7 @@ export const log = {
   debug: (message: string, data?: any, context?: string) => logger.debug(message, data, context),
   info: (message: string, data?: any, context?: string) => logger.info(message, data, context),
   warn: (message: string, data?: any, context?: string) => logger.warn(message, data, context),
-  error: (error?: Error | string, context?: string) => logger.error(error, context),
+  error: (message: string, error?: Error | string, context?: string) => logger.error(message, error, context),
 
   // Performance helpers
   startTimer: (label: string, context?: string) => logger.startTimer(label, context),

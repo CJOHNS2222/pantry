@@ -24,6 +24,10 @@ vi.mock('../../../services/geminiService', () => ({
 describe('PantryScanner Component', () => {
   const mockSetInventory = vi.fn();
   const mockAddToShoppingList = vi.fn();
+  const mockOnDeleteItem = vi.fn();
+  const mockOnAddItem = vi.fn();
+  const mockOnAddItems = vi.fn();
+  const mockOnUpdateItem = vi.fn();
 
   const initialInventory: PantryItem[] = [
     { id: '1', item: 'Milk', category: '', quantity_estimate: '2' },
@@ -38,8 +42,11 @@ describe('PantryScanner Component', () => {
     render(
       <PantryScanner
         inventory={initialInventory}
-        setInventory={mockSetInventory}
         addToShoppingList={mockAddToShoppingList}
+        onDeleteItem={mockOnDeleteItem}
+        onAddItem={mockOnAddItem}
+        onAddItems={mockOnAddItems}
+        onUpdateItem={mockOnUpdateItem}
       />
     );
 
@@ -51,8 +58,11 @@ describe('PantryScanner Component', () => {
     render(
       <PantryScanner
         inventory={initialInventory}
-        setInventory={mockSetInventory}
         addToShoppingList={mockAddToShoppingList}
+        onDeleteItem={mockOnDeleteItem}
+        onAddItem={mockOnAddItem}
+        onAddItems={mockOnAddItems}
+        onUpdateItem={mockOnUpdateItem}
       />
     );
 
@@ -63,8 +73,11 @@ describe('PantryScanner Component', () => {
     render(
       <PantryScanner
         inventory={[]} // Empty inventory to show scan prompt
-        setInventory={mockSetInventory}
         addToShoppingList={mockAddToShoppingList}
+        onDeleteItem={mockOnDeleteItem}
+        onAddItem={mockOnAddItem}
+        onAddItems={mockOnAddItems}
+        onUpdateItem={mockOnUpdateItem}
       />
     );
 

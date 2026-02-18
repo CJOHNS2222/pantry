@@ -35,9 +35,9 @@ export enum ErrorCode {
 
 export class AppError extends Error {
   public readonly code: ErrorCode;
-  public readonly statusCode?: number;
-  public readonly originalError?: Error;
-  public readonly context?: Record<string, any>;
+  public readonly statusCode: number | undefined;
+  public readonly originalError: Error | undefined;
+  public readonly context: Record<string, any> | undefined;
   public readonly retryable: boolean;
   public readonly userMessage: string;
 
@@ -193,12 +193,12 @@ export async function withErrorHandling<T>(
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
       return await operation();
-    } catch (error) {
-      lastError = error instanceof AppError ? error : new AppError(
+    } catch (err: any) {
+      lastError = err instanceof AppError ? err : new AppError(
         ErrorCode.UNKNOWN_ERROR,
-        error instanceof Error ? error.message : 'Unknown error occurred',
+        err instanceof Error ? err.message : 'Unknown error occurred',
         'An unexpected error occurred. Please try again.',
-        { originalError: error instanceof Error ? error : undefined, context, retryable: false }
+        { originalError: err instanceof Error ? err : undefined, context, retryable: false }
       );
 
       // Log error for debugging
@@ -237,12 +237,12 @@ export async function safeAsync<T>(
   try {
     const data = await operation();
     return { success: true, data };
-  } catch (error) {
-    const appError = error instanceof AppError ? error : new AppError(
+  } catch (err: any) {
+    const appError = err instanceof AppError ? err : new AppError(
       ErrorCode.UNKNOWN_ERROR,
-      error instanceof Error ? error.message : 'Unknown error occurred',
+      err instanceof Error ? err.message : 'Unknown error occurred',
       'An unexpected error occurred.',
-      { originalError: error instanceof Error ? error : undefined, context, retryable: false }
+      { originalError: err instanceof Error ? err : undefined, context, retryable: false }
     );
     return { success: false, error: appError };
   }
@@ -261,7 +261,7 @@ export async function withFirebaseRetry<T>(
   for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
     try {
       return await operation();
-    } catch (error) {
+    } catch (err: any) {
       lastError = error instanceof Error ? error : new Error(String(error));
 
       // Check if this is a retryable Firebase error

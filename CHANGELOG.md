@@ -32,6 +32,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Investigation
 - **Database Read Issue**: Investigated excessive database reads occurring every 6 seconds; implemented throttling and monitoring adjustments (later reverted due to increased read volume)
 
+### Fixed (2026-02-18)
+- **Shopping List**: Fixed a dynamic-import runtime error by correcting a syntax issue in `components/ShoppingList.tsx`. Normalized selection behavior to use only the `checked` flag and removed top-level Select All / Delete Checked controls.
+- **Price Cache Auth**: Made price-cache Firestore access auth-aware to prevent permission errors when the app initializes before authentication.
+- **TypeScript Hygiene**: Applied targeted type fixes to reduce compiler noise: narrowed unknown `catch` types, adjusted optional properties in `groceryPriceService`, and fixed several utility typings (`utils/appUtils.ts`, `utils/errorUtils.ts`).
+
+### Changed (developer)
+- Continued incremental TypeScript remediation across the repository (focused, low-risk patches). Next focus: add typed Firestore test mock factories to resolve many test mock typing errors.
+
 ## [1.3.1] - 2026-02-09
 
 ### Fixed

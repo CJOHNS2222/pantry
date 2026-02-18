@@ -63,7 +63,7 @@ export class RecipeRecommendationService {
         .sort((a, b) => b.confidence - a.confidence)
         .slice(0, limitCount);
 
-    } catch (error) {
+    } catch (err: any) {
       log.error('Failed to get personalized recommendations', { error, userId });
       return [];
     }
@@ -244,7 +244,7 @@ export class RecipeRecommendationService {
       }
 
       return recommendations;
-    } catch (error) {
+    } catch (err: any) {
       log.error('Failed to get trending recommendations', { error });
       return [];
     }
@@ -315,7 +315,7 @@ export class RecipeRecommendationService {
           date: data.date.toDate().toISOString()
         } as RecipeRating;
       });
-    } catch (error) {
+    } catch (err: any) {
       log.error('Failed to get user ratings', { error, userId });
       return [];
     }
@@ -341,7 +341,7 @@ export class RecipeRecommendationService {
           date: data.date.toDate().toISOString()
         } as RecipeRating;
       });
-    } catch (error) {
+    } catch (err: any) {
       log.error('Failed to get household ratings', { error, householdId });
       return [];
     }
@@ -375,7 +375,7 @@ export class RecipeRecommendationService {
       ];
 
       return similarRecipes.slice(0, limitCount);
-    } catch (error) {
+    } catch (err: any) {
       log.error('Failed to get similar recipes', { error, userId, baseRecipeId: baseRecipe.id });
       return [];
     }

@@ -335,7 +335,7 @@ export const saveSearchToHistory = (query: string, type: 'pantry' | 'recipe', re
     const recentHistory = filtered.slice(0, MAX_HISTORY_ITEMS);
 
     localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(recentHistory));
-  } catch (error) {
+  } catch (err: any) {
     log.error('Failed to save search history', error, 'SearchUtils');
   }
 };
@@ -351,7 +351,7 @@ export const loadSearchHistory = (type?: 'pantry' | 'recipe'): SearchHistoryItem
       }
       return history;
     }
-  } catch (error) {
+  } catch (err: any) {
     log.error('Failed to load search history', error, 'SearchUtils');
   }
   return [];
@@ -373,7 +373,7 @@ export const clearSearchHistory = (type?: 'pantry' | 'recipe'): void => {
     } else {
       localStorage.removeItem(SEARCH_HISTORY_KEY);
     }
-  } catch (error) {
+  } catch (err: any) {
     log.error('Failed to clear search history', error, 'SearchUtils');
   }
 };
@@ -384,7 +384,7 @@ const PANTRY_FILTER_KEY = 'smartpantry_pantry_filter';
 export const savePantryFilter = (filter: PantryFilter): void => {
   try {
     localStorage.setItem(PANTRY_FILTER_KEY, JSON.stringify(filter));
-  } catch (error) {
+  } catch (err: any) {
     log.error('Failed to save pantry filter', error, 'SearchUtils');
   }
 };
@@ -397,7 +397,7 @@ export const loadPantryFilter = (): PantryFilter => {
       // Merge with defaults to ensure all properties exist
       return { ...defaultPantryFilter, ...parsed };
     }
-  } catch (error) {
+  } catch (err: any) {
     log.error('Failed to load pantry filter', error, 'SearchUtils');
   }
   return defaultPantryFilter;

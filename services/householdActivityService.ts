@@ -23,7 +23,7 @@ export class HouseholdActivityService {
         [memberPath + '.currentActivity']: activity,
         [memberPath + '.isOnline']: true
       });
-    } catch (error) {
+    } catch (err: any) {
       console.error('Error updating member activity:', error);
     }
   }
@@ -39,7 +39,7 @@ export class HouseholdActivityService {
       await DatabaseMonitoringService.updateDoc(householdRef, {
         [memberPath + '.isOnline']: false
       });
-    } catch (error) {
+    } catch (err: any) {
       console.error('Error marking member offline:', error);
     }
   }
@@ -68,9 +68,9 @@ export class HouseholdActivityService {
         householdId
       };
 
-      const activityCollection = DatabaseMonitoringService.collection('households', householdId, 'activity');
+      const activityCollection = DatabaseMonitoringService.collection(`households/${householdId}/activity`);
       await DatabaseMonitoringService.addDoc(activityCollection, activityData);
-    } catch (error) {
+    } catch (err: any) {
       console.error('Error logging activity:', error);
     }
   }
@@ -80,7 +80,7 @@ export class HouseholdActivityService {
    */
   static async getRecentActivities(householdId: string, limitCount: number = 10) {
     try {
-      const activityCollection = DatabaseMonitoringService.collection('households', householdId, 'activity');
+      const activityCollection = DatabaseMonitoringService.collection(`households/${householdId}/activity`);
       const activitiesQuery = DatabaseMonitoringService.query(
         activityCollection,
         DatabaseMonitoringService.orderBy('timestamp', 'desc'),
@@ -92,7 +92,7 @@ export class HouseholdActivityService {
         id: doc.id,
         ...doc.data()
       }));
-    } catch (error) {
+    } catch (err: any) {
       console.error('Error getting recent activities:', error);
       return [];
     }
@@ -102,7 +102,7 @@ export class HouseholdActivityService {
    * Subscribe to household activities (real-time)
    */
   static subscribeToActivities(householdId: string, callback: (activities: any[]) => void) {
-    const activityCollection = DatabaseMonitoringService.collection('households', householdId, 'activity');
+    const activityCollection = DatabaseMonitoringService.collection(`households/${householdId}/activity`);
     const activitiesQuery = DatabaseMonitoringService.query(
       activityCollection,
       DatabaseMonitoringService.orderBy('timestamp', 'desc'),

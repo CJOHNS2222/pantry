@@ -43,7 +43,7 @@ export class RecipePhotoService {
 
       log.info('Recipe photo uploaded', { recipeTitle, userId, fileName });
       return photo;
-    } catch (error) {
+    } catch (err: any) {
       log.error('Failed to upload recipe photo', { error, recipeTitle, userId });
       throw error;
     }
@@ -58,7 +58,7 @@ export class RecipePhotoService {
       await deleteObject(storageRef);
 
       log.info('Recipe photo deleted', { photoId: photo.id });
-    } catch (error) {
+    } catch (err: any) {
       log.error('Failed to delete recipe photo', { error, photoId: photo.id });
       throw error;
     }
@@ -94,13 +94,13 @@ export class RecipePhotoService {
             ratingId: '', // Would come from Firestore
             recipeTitle
           });
-        } catch (error) {
+        } catch (err: any) {
           log.warn('Failed to get download URL for photo', { fileName: item.name });
         }
       }
 
       return photos;
-    } catch (error) {
+    } catch (err: any) {
       log.error('Failed to get recipe photos', { error, recipeTitle });
       return [];
     }

@@ -69,7 +69,7 @@ export class BulkImageUpdateService {
             if (newImage) {
               fetchedImages.set(item.item, newImage);
             }
-          } catch (error) {
+          } catch (err: any) {
             console.error(`Failed to fetch image for ${item.item}:`, error);
           }
         });
@@ -110,7 +110,7 @@ export class BulkImageUpdateService {
             result.updatedItems++;
             console.log(`✅ Updated image for: ${item.item}`);
           }
-        } catch (error) {
+        } catch (err: any) {
           result.failedItems++;
           result.errors.push(`Failed to update item ${item.item}: ${error}`);
           console.error(`Failed to update ${item.item}:`, error);
@@ -129,7 +129,7 @@ export class BulkImageUpdateService {
 
       console.log(`Bulk image update complete: ${result.updatedItems} updated, ${result.failedItems} failed`);
 
-    } catch (error) {
+    } catch (err: any) {
       result.errors.push(`Bulk update failed: ${error}`);
       console.error('Bulk image update failed:', error);
     }
@@ -192,7 +192,7 @@ export class BulkImageUpdateService {
             if (newImage) {
               fetchedImages.set(item.item, newImage);
             }
-          } catch (error) {
+          } catch (err: any) {
             console.error(`Failed to fetch image for household item ${item.item}:`, error);
           }
         });
@@ -232,7 +232,7 @@ export class BulkImageUpdateService {
             result.updatedItems++;
             console.log(`✅ Updated household image for: ${item.item}`);
           }
-        } catch (error) {
+        } catch (err: any) {
           result.failedItems++;
           result.errors.push(`Failed to update household item ${item.item}: ${error}`);
           console.error(`Failed to update household item ${item.item}:`, error);
@@ -251,7 +251,7 @@ export class BulkImageUpdateService {
 
       console.log(`Household bulk image update complete: ${result.updatedItems} updated, ${result.failedItems} failed`);
 
-    } catch (error) {
+    } catch (err: any) {
       result.errors.push(`Household bulk update failed: ${error}`);
       console.error('Household bulk image update failed:', error);
     }

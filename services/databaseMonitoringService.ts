@@ -27,6 +27,7 @@ import { reportDatabaseError, reportHeavyWritePattern, reportPerformanceIssue } 
 
 interface DatabaseMetrics {
   reads: number;
+  writes: number;
   deletes: number;
   queries: number;
   batchOperations: number;
@@ -192,7 +193,7 @@ class DatabaseMonitoringService {
       });
 
       return result;
-    } catch (error) {
+    } catch (err: any) {
       AnalyticsService.trackDatabaseOperation('read', ref.parent.id, 1, {
         operation: 'getDoc',
         success: false,
@@ -214,6 +215,7 @@ class DatabaseMonitoringService {
       // Detailed logging for query tracking
       const queryPath = this.getQueryPath(queryRef);
       console.log(`🔍 QUERY: ${queryPath} | Results: ${result.size} | Duration: ${duration}ms | Total Queries: ${this.metrics.queries}`);
+      console.trace('Query call stack:');
 
       AnalyticsService.trackQueryPerformance(
         queryRef.parent?.id || 'unknown',
@@ -223,7 +225,7 @@ class DatabaseMonitoringService {
       );
 
       return result;
-    } catch (error) {
+    } catch (err: any) {
       const queryPath = this.getQueryPath(queryRef);
       console.error(`❌ QUERY FAILED: ${queryPath} | Error: ${error.message}`);
 
@@ -261,7 +263,7 @@ class DatabaseMonitoringService {
       }
 
       return 'unknown';
-    } catch (error) {
+    } catch (err: any) {
       return 'unknown';
     }
   }
@@ -288,7 +290,7 @@ class DatabaseMonitoringService {
         success: true,
         duration_ms: duration
       });
-    } catch (error) {
+    } catch (err: any) {
       const duration = Date.now() - startTime;
       AnalyticsService.trackDatabaseOperation('write', ref.parent.id, 1, {
         operation: 'setDoc',
@@ -328,7 +330,7 @@ class DatabaseMonitoringService {
         success: true,
         duration_ms: duration
       });
-    } catch (error) {
+    } catch (err: any) {
       const duration = Date.now() - startTime;
       AnalyticsService.trackDatabaseOperation('write', ref.parent.id, 1, {
         operation: 'updateDoc',
@@ -369,7 +371,7 @@ class DatabaseMonitoringService {
       });
 
       return result;
-    } catch (error) {
+    } catch (err: any) {
       const duration = Date.now() - startTime;
       AnalyticsService.trackDatabaseOperation('write', ref.id, 1, {
         operation: 'addDoc',
@@ -395,7 +397,7 @@ class DatabaseMonitoringService {
         operation: 'deleteDoc',
         success: true
       });
-    } catch (error) {
+    } catch (err: any) {
       AnalyticsService.trackDatabaseOperation('delete', ref.parent.id, 1, {
         operation: 'deleteDoc',
         success: false,
@@ -431,7 +433,7 @@ class DatabaseMonitoringService {
         AnalyticsService.trackBatchOperation('batch_write', 'multiple_collections', operationCount);
 
         return result;
-      } catch (error) {
+      } catch (err: any) {
         const duration = Date.now() - startTime;
         AnalyticsService.trackBatchOperation('batch_write', 'multiple_collections', 0);
 
@@ -449,19 +451,20 @@ class DatabaseMonitoringService {
     const originalUpdate = batch.update.bind(batch);
     const originalDelete = batch.delete.bind(batch);
 
-    batch.set = (...args) => {
+    // Override batch operations to count them (use `any` to satisfy overloads)
+    (batch as any).set = (...args: any[]) => {
       operationCount++;
-      return originalSet(...args);
+      return originalSet(...args as any);
     };
 
-    batch.update = (...args) => {
+    (batch as any).update = (...args: any[]) => {
       operationCount++;
-      return originalUpdate(...args);
+      return originalUpdate(...args as any);
     };
 
-    batch.delete = (...args) => {
+    (batch as any).delete = (...args: any[]) => {
       operationCount++;
-      return originalDelete(...args);
+      return originalDelete(...args as any);
     };
 
     return batch;
@@ -479,7 +482,7 @@ class DatabaseMonitoringService {
       type: 'subscription_start'
     });
 
-    const unsubscribe = onSnapshot(ref, (snapshot) => {
+    const unsubscribe = onSnapshot(ref, (snapshot: any) => {
       // Track each snapshot received
       if (snapshot.docChanges) {
         const changes = snapshot.docChanges().length;
@@ -557,7 +560,7 @@ class DatabaseMonitoringService {
             duration_ms: duration
           });
           return result;
-        } catch (error) {
+        } catch (err: any) {
           const duration = Date.now() - startTime;
           AnalyticsService.trackDatabaseOperation('read', ref.parent.id, 1, {
             operation: 'getDoc',
@@ -584,7 +587,7 @@ class DatabaseMonitoringService {
             duration_ms: duration
           });
           return result;
-        } catch (error) {
+        } catch (err: any) {
           const duration = Date.now() - startTime;
           AnalyticsService.trackDatabaseOperation('read', query._query?.path?.segments?.[0] || 'unknown', 0, {
             operation: 'getDocs',
@@ -611,7 +614,7 @@ class DatabaseMonitoringService {
             duration_ms: duration
           });
           return result;
-        } catch (error) {
+        } catch (err: any) {
           const duration = Date.now() - startTime;
           AnalyticsService.trackDatabaseOperation('write', ref.parent.id, 1, {
             operation: 'setDoc',
@@ -638,7 +641,7 @@ class DatabaseMonitoringService {
             duration_ms: duration
           });
           return result;
-        } catch (error) {
+        } catch (err: any) {
           const duration = Date.now() - startTime;
           AnalyticsService.trackDatabaseOperation('write', ref.parent.id, 1, {
             operation: 'updateDoc',
@@ -665,7 +668,7 @@ class DatabaseMonitoringService {
             duration_ms: duration
           });
           return result;
-        } catch (error) {
+        } catch (err: any) {
           const duration = Date.now() - startTime;
           AnalyticsService.trackDatabaseOperation('write', ref.parent.id, 1, {
             operation: 'addDoc',
@@ -691,7 +694,7 @@ class DatabaseMonitoringService {
             duration_ms: duration
           });
           return result;
-        } catch (error) {
+        } catch (err: any) {
           const duration = Date.now() - startTime;
           AnalyticsService.trackDatabaseOperation('write', ref.parent.id, 1, {
             operation: 'deleteDoc',
@@ -730,7 +733,7 @@ class DatabaseMonitoringService {
 
       this.isInitialized = true;
       console.log('🔥 Database monitoring initialized with function overrides');
-    } catch (error) {
+    } catch (err: any) {
       console.error('Failed to initialize database monitoring:', error);
     }
   }

@@ -36,21 +36,15 @@ export class HouseholdPreferenceService {
         return;
       }
 
-      // Get household inventory
-      const inventoryRef = DatabaseMonitoringService.collection('households', householdId, 'inventory');
-      const inventorySnap = await DatabaseMonitoringService.getDocs(DatabaseMonitoringService.query(inventoryRef));
+      // Get household inventory from cache
+      const inventory = await InventoryCacheService.getCachedInventory(householdId);
 
-      if (inventorySnap.empty) {
+      if (inventory.length === 0) {
         return; // No inventory to check
       }
 
-      const inventoryItems = inventorySnap.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as PantryItem[];
-
       // Check each inventory item against all household members
-      for (const item of inventoryItems) {
+      for (const item of inventory) {
         const { memberViolations } = checkInventoryAgainstHouseholdAllergies(item, household.members);
 
         // Create notifications for each member with violations
@@ -69,7 +63,7 @@ export class HouseholdPreferenceService {
           console.log(`Created allergy alert for ${member.name} regarding ${item.item}`);
         }
       }
-    } catch (error) {
+    } catch (err: any) {
       console.error('Error checking household inventory for allergies:', error);
     }
   }
@@ -88,7 +82,7 @@ export class HouseholdPreferenceService {
 
       const household = householdSnap.data() as Household;
       return household.members || [];
-    } catch (error) {
+    } catch (err: any) {
       console.error('Error getting household members:', error);
       return [];
     }

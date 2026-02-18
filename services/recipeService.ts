@@ -160,7 +160,7 @@ export const uploadRecipeImage = async (imageUrl: string, recipeId: string): Pro
     // Get download URL
     const downloadURL = await getDownloadURL(storageRef);
     return downloadURL;
-  } catch (error) {
+  } catch (err: any) {
     log.error("Error uploading recipe image", { error, recipeId }, "RecipeService");
     perfTrace.putAttribute('result', 'fallback_to_original');
     return imageUrl; // Return original URL if upload fails
@@ -301,7 +301,7 @@ export const getSavedRecipes = async (limitCount: number = 50): Promise<SavedRec
       id: doc.id,
       ...doc.data()
     } as SavedRecipe));
-  } catch (error) {
+  } catch (err: any) {
     console.error("Error fetching saved recipes:", error);
     return [];
   }
@@ -336,7 +336,7 @@ export const getCachedPopularRecipes = async (): Promise<SavedRecipe[]> => {
     return recipes.filter((recipe, index, self) =>
       index === self.findIndex(r => r.title === recipe.title)
     );
-  } catch (error) {
+  } catch (err: any) {
     console.error("❌ Error fetching cached popular recipes:", error);
     // Fall back to direct loading if caching fails
     console.log("🔄 Falling back to direct recipe loading...");
@@ -368,7 +368,7 @@ export const cachePopularRecipes = async (recipes: SavedRecipe[]): Promise<void>
       version: 1
     });
     console.log(`💾 Cached ${recipes.length} popular recipes for efficient loading`);
-  } catch (error) {
+  } catch (err: any) {
     console.error("❌ Error caching popular recipes:", error);
     // Don't throw - caching failure shouldn't break the app
   }
@@ -442,7 +442,7 @@ export const searchRecipesInFirestore = async (searchTerm: string): Promise<Save
     perfTrace.putMetric('results_found', fullRecipes.length);
 
     return fullRecipes;
-  } catch (error) {
+  } catch (err: any) {
     console.error("Error searching recipes:", error);
     // Fallback to old method if search index fails
     console.log("🔄 Falling back to full collection search...");
@@ -472,7 +472,7 @@ const searchRecipesInFirestoreFallback = async (searchTerm: string): Promise<Sav
     );
 
     return filteredRecipes;
-  } catch (error) {
+  } catch (err: any) {
     console.error("Error in fallback search:", error);
     return [];
   }

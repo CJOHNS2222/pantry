@@ -25,7 +25,7 @@ export function useNotifications(settings: NotificationSettings, userEmail?: str
       try {
         const permission = await LocalNotifications.checkPermissions();
         setNotificationPermission(permission.display);
-      } catch (error) {
+      } catch (err: any) {
         console.error('Error checking notification permissions:', error);
       }
     };
@@ -47,7 +47,7 @@ export function useNotifications(settings: NotificationSettings, userEmail?: str
         if (settings.enabled && userEmail) {
           await scheduleNotifications(settings, mealPlan);
         }
-      } catch (error) {
+      } catch (err: any) {
         console.error('Error setting up notifications:', error);
       }
     };
@@ -60,7 +60,7 @@ export function useNotifications(settings: NotificationSettings, userEmail?: str
       const permission = await LocalNotifications.requestPermissions();
       setNotificationPermission(permission.display);
       return permission.display;
-    } catch (error) {
+    } catch (err: any) {
       console.error('Error requesting notification permissions:', error);
       return 'denied';
     }

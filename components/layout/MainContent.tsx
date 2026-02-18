@@ -74,6 +74,7 @@ export const MainContent: React.FC = () => {
     onRateRecipe,
     onMoveToPantry,
     onAddToShoppingList,
+    addShoppingListItem,
     handleMarkAsMade,
     addToast,
     onAddCustomCategory,
@@ -128,7 +129,13 @@ export const MainContent: React.FC = () => {
         <ComponentErrorBoundary componentName="PantryScanner">
           <Suspense fallback={<LoadingSpinner />}>
             <PantryScanner
+              inventory={inventory}
+              isLoadingInventory={isLoadingInventory}
               addToShoppingList={onAddToShoppingList}
+              onDeleteItem={deleteItem}
+              onAddItem={addItem}
+              onAddItems={addItems}
+              onUpdateItem={updateItem}
               consumptionSuggestions={consumptionSuggestions}
               expirationAlerts={expirationAlerts}
               recipeSuggestions={recipeSuggestions}
@@ -177,6 +184,9 @@ export const MainContent: React.FC = () => {
               items={shoppingList}
               setItems={appState.setShoppingList}
               onMoveToPantry={onMoveToPantry}
+              addShoppingListItem={addShoppingListItem}
+              user={user}
+              household={appState.household}
               isLoadingShoppingList={isLoadingShoppingList}
             />
           </Suspense>

@@ -211,7 +211,7 @@ class IndexedDBCache {
         // Rough estimate of storage used (very approximate)
         this.stats.storageUsed = this.stats.size * 1024; // Assume ~1KB per entry
       };
-    } catch (error) {
+    } catch (err: any) {
       log.warn('Failed to update cache stats', error, 'IndexedDBCache');
     }
   }
@@ -249,7 +249,7 @@ class IndexedDBCache {
       request.onerror = () => {
         log.error('Failed to cleanup cache', request.error, 'IndexedDBCache');
       };
-    } catch (error) {
+    } catch (err: any) {
       log.error('Cache cleanup failed', error, 'IndexedDBCache');
     }
   }

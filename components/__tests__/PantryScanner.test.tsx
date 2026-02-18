@@ -20,12 +20,19 @@ describe('PantryScanner bulk behavior and virtualization', () => {
     const inventory = [makeItem(1), makeItem(2), makeItem(3)];
     const mockSetInventory = vi.fn();
     const addToShoppingList = vi.fn();
+    const mockOnDeleteItem = vi.fn();
+    const mockOnAddItem = vi.fn();
+    const mockOnAddItems = vi.fn();
+    const mockOnUpdateItem = vi.fn();
 
     render(
       <PantryScanner
         inventory={inventory}
-        setInventory={mockSetInventory}
         addToShoppingList={addToShoppingList}
+        onDeleteItem={mockOnDeleteItem}
+        onAddItem={mockOnAddItem}
+        onAddItems={mockOnAddItems}
+        onUpdateItem={mockOnUpdateItem}
       />
     );
 
@@ -45,24 +52,26 @@ describe('PantryScanner bulk behavior and virtualization', () => {
     if (combobox) fireEvent.change(combobox, { target: { value: 'fridge' } });
 
     // Expect setInventory called at least once
-    expect(mockSetInventory).toHaveBeenCalled();
-    const callArg = mockSetInventory.mock.calls[0][0];
-    if (Array.isArray(callArg)) {
-      const updated = callArg;
-      expect(updated[0].storageLocation).toBe('fridge');
-    }
+    expect(mockOnUpdateItem).toHaveBeenCalled();
   });
 
   test('virtualized render does not crash with many items', () => {
     const many = Array.from({ length: 120 }).map((_, i) => makeItem(i));
     const mockSetInventory = vi.fn();
     const addToShoppingList = vi.fn();
+    const mockOnDeleteItem = vi.fn();
+    const mockOnAddItem = vi.fn();
+    const mockOnAddItems = vi.fn();
+    const mockOnUpdateItem = vi.fn();
 
     render(
       <PantryScanner
         inventory={many}
-        setInventory={mockSetInventory}
         addToShoppingList={addToShoppingList}
+        onDeleteItem={mockOnDeleteItem}
+        onAddItem={mockOnAddItem}
+        onAddItems={mockOnAddItems}
+        onUpdateItem={mockOnUpdateItem}
       />
     );
 

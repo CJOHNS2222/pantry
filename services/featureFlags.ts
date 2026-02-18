@@ -118,7 +118,7 @@ class FeatureFlagService {
         });
         log.info('Loaded feature flags from storage', { flags: parsed }, 'FeatureFlags');
       }
-    } catch (error) {
+    } catch (err: any) {
       log.error('Failed to load feature flags from storage', error, 'FeatureFlags');
     }
   }
@@ -127,7 +127,7 @@ class FeatureFlagService {
   private saveFlagsToStorage(): void {
     try {
       localStorage.setItem('featureFlags', JSON.stringify(this.flags));
-    } catch (error) {
+    } catch (err: any) {
       log.error('Failed to save feature flags to storage', error, 'FeatureFlags');
     }
   }

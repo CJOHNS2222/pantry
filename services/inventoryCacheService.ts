@@ -113,14 +113,15 @@ export class InventoryCacheService {
         return items;
       }
 
-      // Cache doesn't exist or is invalid, fall back to loading individual items
-      console.log("📥 No cached inventory found, falling back to individual item loading...");
-      return await this.loadAndCacheInventory(householdId, userId);
-    } catch (error) {
-      console.error("❌ Error fetching cached inventory:", error);
-      // Fall back to individual loading if caching fails
-      console.log("🔄 Falling back to direct inventory loading...");
-      return await this.loadAndCacheInventory(householdId, userId);
+      // Cache doesn't exist or is invalid
+      console.log("📥 No cached inventory found");
+      return [];
+    } catch (err: any) {
+      // Don't log permission errors as they may be expected
+      if (!error.message.includes('Missing or insufficient permissions')) {
+        console.error("❌ Error fetching cached inventory:", error);
+      }
+      return [];
     }
   }
 
@@ -128,30 +129,8 @@ export class InventoryCacheService {
    * Load inventory from individual documents and cache it
    */
   private static async loadAndCacheInventory(householdId?: string, userId?: string): Promise<PantryItem[]> {
-    let items: PantryItem[] = [];
-
-    try {
-      if (householdId) {
-        // Load household inventory
-        const inventoryRef = DatabaseMonitoringService.collection('households', householdId, 'inventory');
-        const snapshot = await DatabaseMonitoringService.getDocs(DatabaseMonitoringService.query(inventoryRef));
-        items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PantryItem));
-      } else if (userId) {
-        // Load user inventory
-        const inventoryRef = DatabaseMonitoringService.collection('users', userId, 'inventory');
-        const snapshot = await DatabaseMonitoringService.getDocs(DatabaseMonitoringService.query(inventoryRef));
-        items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PantryItem));
-      }
-
-      // Cache the loaded items
-      await this.updateCache(items, householdId, userId);
-
-      console.log(`📦 Cached ${items.length} inventory items for future reads`);
-      return items;
-    } catch (error) {
-      console.error("❌ Error loading inventory for caching:", error);
-      return items; // Return empty array or partial results
-    }
+    // No longer loading from collections
+    return [];
   }
 
   /**
@@ -175,7 +154,7 @@ export class InventoryCacheService {
       });
 
       await DatabaseMonitoringService.setDoc(cacheRef, cachedData);
-    } catch (error) {
+    } catch (err: any) {
       console.error("❌ Error updating inventory cache:", error);
       // Don't throw - caching failures shouldn't break the app
     }
@@ -207,7 +186,7 @@ export class InventoryCacheService {
         updateData.version = this.CACHE_VERSION;
         await DatabaseMonitoringService.setDoc(cacheRef, updateData);
       }
-    } catch (error) {
+    } catch (err: any) {
       console.error("❌ Error adding item to cache:", error);
     }
   }
@@ -241,7 +220,7 @@ export class InventoryCacheService {
       // Update cache with all items at once (1 write operation)
       await this.updateCache(allItems, householdId, userId);
       console.log(`📦 Added ${items.length} items to cache in 1 batch operation`);
-    } catch (error) {
+    } catch (err: any) {
       console.error("❌ Error adding items to cache:", error);
     }
   }
@@ -274,7 +253,7 @@ export class InventoryCacheService {
       };
 
       await DatabaseMonitoringService.updateDoc(cacheRef, updateData);
-    } catch (error) {
+    } catch (err: any) {
       console.error("❌ Error updating item in cache:", error);
     }
   }
@@ -301,7 +280,7 @@ export class InventoryCacheService {
       }
 
       await DatabaseMonitoringService.updateDoc(cacheRef, updateData);
-    } catch (error) {
+    } catch (err: any) {
       console.error("❌ Error removing item from cache:", error);
     }
   }
@@ -316,7 +295,7 @@ export class InventoryCacheService {
       // It replaces the entire cached inventory with the new state
       await this.updateCache(newItems, householdId, userId);
       console.log(`🔄 Bulk updated inventory cache with ${newItems.length} items (1 write operation)`);
-    } catch (error) {
+    } catch (err: any) {
       console.error("❌ Error bulk updating inventory cache:", error);
     }
   }
@@ -342,7 +321,7 @@ export class InventoryCacheService {
         itemCount: 0
       });
       console.log("🗑️ Cleared inventory cache");
-    } catch (error) {
+    } catch (err: any) {
       console.error("❌ Error clearing inventory cache:", error);
     }
   }

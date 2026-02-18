@@ -48,6 +48,14 @@ export interface ShoppingItem {
   addedAt?: Date; // When the item was added to the shopping list
   completedAt?: Date; // When the item was checked off
   estimatedPrice?: number; // Estimated price for analytics
+  priceData?: {
+    averagePrice: number;
+    minPrice: number;
+    maxPrice: number;
+    sampleSize: number;
+    lastUpdated: Date;
+    unit: string;
+  }; // Full price data for reference
 }
 
 export interface GroundingChunk {

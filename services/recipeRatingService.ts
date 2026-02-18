@@ -48,7 +48,7 @@ export class RecipeRatingService {
       await this.updateCommunityStats(rating.recipeTitle, householdId);
 
       log.info('Recipe rating submitted', { recipeTitle: rating.recipeTitle, userId });
-    } catch (error) {
+    } catch (err: any) {
       log.error('Failed to submit recipe rating', { error, recipeTitle: rating.recipeTitle });
       throw error;
     }
@@ -106,7 +106,7 @@ export class RecipeRatingService {
           householdWouldMakeAgain: 0
         } : undefined
       };
-    } catch (error) {
+    } catch (err: any) {
       log.error('Failed to get community stats', { error, recipeTitle });
       throw error;
     }
@@ -157,7 +157,7 @@ export class RecipeRatingService {
         lastUpdated: Timestamp.now()
       }, { merge: true });
 
-    } catch (error) {
+    } catch (err: any) {
       log.error('Failed to update community stats', { error, recipeTitle });
     }
   }
@@ -184,7 +184,7 @@ export class RecipeRatingService {
       });
 
       log.info('Recipe modification added', { recipeTitle, userId });
-    } catch (error) {
+    } catch (err: any) {
       log.error('Failed to add recipe modification', { error, recipeTitle });
       throw error;
     }
@@ -202,7 +202,7 @@ export class RecipeRatingService {
       });
 
       log.info('Modification marked as helpful', { modificationId, userId });
-    } catch (error) {
+    } catch (err: any) {
       log.error('Failed to mark modification as helpful', { error, modificationId });
       throw error;
     }
@@ -226,7 +226,7 @@ export class RecipeRatingService {
         ...doc.data(),
         date: doc.data().date.toDate().toISOString()
       })) as RecipeModification[];
-    } catch (error) {
+    } catch (err: any) {
       log.error('Failed to get top modifications', { error, recipeTitle });
       return [];
     }
@@ -253,7 +253,7 @@ export class RecipeRatingService {
         } as RecipeRating;
       }
       return null;
-    } catch (error) {
+    } catch (err: any) {
       log.error('Failed to get user rating', { error, recipeTitle, userId });
       return null;
     }
@@ -280,7 +280,7 @@ export class RecipeRatingService {
           date: data.date.toDate().toISOString()
         } as RecipeRating;
       });
-    } catch (error) {
+    } catch (err: any) {
       log.error('Failed to get household ratings', { error, recipeTitle, householdId });
       return [];
     }
@@ -349,7 +349,7 @@ export class RecipeRatingService {
       // TODO: Implement ingredient matching logic
 
       return recommendations.slice(0, limitCount);
-    } catch (error) {
+    } catch (err: any) {
       log.error('Failed to get personalized recommendations', { error, userId });
       return [];
     }

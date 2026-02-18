@@ -63,7 +63,7 @@ export class NotificationService {
     if (notification.priority === 'urgent') {
       try {
         await this.sendPushNotification(userId, notification);
-      } catch (error) {
+      } catch (err: any) {
         console.error('Failed to send push notification:', error);
         // Don't fail the whole operation if push notification fails
       }
@@ -289,7 +289,7 @@ export class NotificationService {
         actionData: { tab: mealPlan.length > 0 ? 'meals' : 'shopping' },
         priority: 'medium'
       });
-    } catch (error) {
+    } catch (err: any) {
       console.error('Failed to send daily push notification:', error);
     }
 
@@ -335,7 +335,7 @@ export class NotificationService {
         .slice(0, 20);
 
       return uniqueNotifications;
-    } catch (error) {
+    } catch (err: any) {
       console.error('Error getting unread notifications:', error);
       // Return empty array instead of throwing to prevent UI crashes
       return [];
@@ -527,7 +527,7 @@ export class NotificationService {
       await admin.messaging().send(fcmPayload);
       */
 
-    } catch (error) {
+    } catch (err: any) {
       console.error('Failed to prepare push notification:', error);
     }
   }

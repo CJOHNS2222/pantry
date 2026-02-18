@@ -14,18 +14,16 @@ interface SmartShoppingListOrganizerProps {
   items: ShoppingItem[];
   onToggleCheck: (id: string) => void;
   onRemove: (id: string) => void;
-  onUndo: (id: string) => void;
   isOffline?: boolean;
   lastSynced?: Date;
   isSelected?: (id: string) => boolean;
-  onLongPress?: () => void;
+  onLongPress?: (id: string) => void;
 }
 
 export const SmartShoppingListOrganizer: React.FC<SmartShoppingListOrganizerProps> = ({
   items,
   onToggleCheck,
   onRemove,
-  onUndo,
   isOffline = false,
   lastSynced,
   isSelected,
@@ -80,7 +78,7 @@ export const SmartShoppingListOrganizer: React.FC<SmartShoppingListOrganizerProp
         if (a.checked !== b.checked) {
           return a.checked ? 1 : -1; // Unchecked items first
         }
-        return a.item.localeCompare(b.item);
+        return (a.item || '').localeCompare(b.item || '');
       });
     });
 
@@ -147,10 +145,9 @@ export const SmartShoppingListOrganizer: React.FC<SmartShoppingListOrganizerProp
                 item={item}
                 onToggleCheck={onToggleCheck}
                 onRemove={onRemove}
-                onUndo={onUndo}
                 isOffline={isOffline}
                 lastSynced={lastSynced}
-                isSelected={isSelected ? isSelected(item.id) : undefined}
+                isSelected={isSelected ? isSelected(item.id) : false}
                 onLongPress={onLongPress}
               />
             ))}

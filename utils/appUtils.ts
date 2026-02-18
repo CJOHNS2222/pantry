@@ -1,6 +1,6 @@
 import { doc, setDoc, Timestamp, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
-import { DayPlan } from '../types';
+import { DayPlan, User, Household } from '../types';
 import { ConsumptionSuggestion, ExpirationAlert, RecipeSuggestion, PantryItem, CustomCategory, Member } from '../types';
 import { getPerformance, trace } from "firebase/performance";
 
@@ -61,7 +61,7 @@ export function parseItemText(itemText: string): { quantity: number; description
   
   // Extract quantity from the beginning (e.g., "1 ", "2 ", "3 ", etc.)
   const quantityMatch = text.match(/^(\d+)\s+/);
-  const quantity = quantityMatch ? Math.max(1, parseInt(quantityMatch[1], 10)) : 1;
+  const quantity = quantityMatch ? Math.max(1, parseInt(quantityMatch[1]!, 10)) : 1;
   
   // Clean the description by removing quantities and common descriptors
   let description = text
@@ -106,13 +106,13 @@ export function parseIngredientForShoppingList(ingredientText: string): { quanti
 
     // Check if first word/part is a quantity (number/fraction with optional unit)
     if (words.length > 0) {
-      const firstPart = words[0];
+      const firstPart = words[0]!;
       // Check if it's a number/fraction with optional unit attached (like "200g", "1.5kg", "1/2")
       if (/^\d+(\/\d+)?(\.\d+)?[a-zA-Z]*$/.test(firstPart)) {
         quantity = firstPart;
         // Check if next word is a unit
         if (words.length > 1) {
-          const potentialUnit = words[1].toLowerCase();
+          const potentialUnit = (words[1] || '').toLowerCase();
           // Common units that should be included in quantity
           const units = ['tbs', 'tbsp', 'tsp', 'cup', 'cups', 'oz', 'ounce', 'ounces', 'lb', 'pound', 'pounds', 
                         'g', 'gram', 'grams', 'kg', 'liter', 'l', 'ml', 'clove', 'cloves', 'bunch', 'bunches', 
@@ -609,7 +609,8 @@ export function getStorageLocationImage(location: string): string {
   return locationMappings[location] || '/images/placeholder.svg';
 }
 
-export function inferCategoryFromItemName(itemName: string): string {
+export function inferCategoryFromItemName(itemName: string | undefined): string {
+  if (!itemName || typeof itemName !== 'string') return 'Other';
   const item = itemName.toLowerCase();
   if (item.includes('apple') || item.includes('banana') || item.includes('orange') || item.includes('grape') || item.includes('strawberry') || item.includes('berry')) return 'Fruits & Vegetables';
   if (item.includes('carrot') || item.includes('potato') || item.includes('onion') || item.includes('broccoli') || item.includes('spinach') || item.includes('lettuce') || item.includes('tomato')) return 'Fruits & Vegetables';

@@ -78,7 +78,7 @@ export const getNutritionData = onCall(async (request) => {
 
     return data;
 
-  } catch (error) {
+  } catch (err: any) {
     console.error('Error in getNutritionData function:', error);
 
     if (error instanceof HttpsError) {

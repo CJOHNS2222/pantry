@@ -38,7 +38,7 @@ class PushNotificationService {
 
       this.isInitialized = true;
       console.log('Push notifications initialized successfully');
-    } catch (error) {
+    } catch (err: any) {
       console.error('Failed to initialize push notifications:', error);
     }
   }
@@ -76,7 +76,7 @@ class PushNotificationService {
       // Store token in localStorage for now (in production, send to your server)
       localStorage.setItem('fcmToken', token);
       console.log('FCM token stored:', token);
-    } catch (error) {
+    } catch (err: any) {
       console.error('Failed to store FCM token:', error);
     }
   }
@@ -192,7 +192,7 @@ class PushNotificationService {
       this.fcmToken = null;
       this.isInitialized = false;
       console.log('Push notifications unregistered');
-    } catch (error) {
+    } catch (err: any) {
       console.error('Failed to unregister push notifications:', error);
     }
   }

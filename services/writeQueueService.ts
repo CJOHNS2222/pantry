@@ -66,7 +66,7 @@ export async function withRetry<T>(
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       return await operation();
-    } catch (error) {
+    } catch (err: any) {
       lastError = error as Error;
 
       if (attempt === maxAttempts || !isRetryableError(error)) {
@@ -189,16 +189,8 @@ export async function processQueue() {
 
     try {
       if (op.type === 'inventorySync') {
-        const invOp = op as InventorySyncOp;
-        const pathBase = invOp.inHousehold && invOp.householdId ? `households/${invOp.householdId}/inventory` : `users/${invOp.userId}/inventory`;
-        for (const item of invOp.inventory) {
-          try {
-            await setDoc(doc(db, pathBase, item.id), cleanObject(item));
-          } catch (err) {
-            log.error('Failed to write queued inventory item', { error: err, itemId: item.id }, 'WriteQueue');
-            throw err;
-          }
-        }
+        // No longer writing to collections
+        log.debug('Skipping inventory sync - no collections', {}, 'WriteQueue');
       } else {
         // Placeholder: handle other op types here (e.g., mealPlan, recipes)
         log.debug('Processing generic op type', { type: op.type }, 'WriteQueue');

@@ -1,10 +1,11 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { ShoppingBasket, Check, Trash2, Archive, Plus, X, Share2, Copy, Download, MessageSquare } from 'lucide-react';
-import { ShoppingItem } from '../types';
-import { inferCategoryFromItemName, getItemImage } from '../utils/appUtils';
+import { ShoppingItem, User, Household } from '../types';
+import { inferCategoryFromItemName, getItemImage, isHouseholdMember } from '../utils/appUtils';
 import { log } from '../services/logService';
-import { validateItemName, validateQuantity } from '../src/utils/validation';
+import { validateItemName, validateQuantity } from '@/src/utils/validation';
 import { ShoppingListItemSkeleton } from './SkeletonLoader';
+import { ShoppingListCacheService } from '../services/shoppingListCacheService';
 
 // Import new enhancement components
 import { EnhancedShoppingListItem } from './EnhancedShoppingListItem';
@@ -19,14 +20,22 @@ import QuantityUnitPicker from './QuantityUnitPicker';
 // Import hooks and services
 import { useOfflineStatus } from '../hooks/useOfflineStatus';
 import { useDataManagement } from '../hooks/useDataManagement';
+import { useAuth } from '../hooks/useAuth';
 import { offlineQueueService } from '../services/offlineQueueService';
 import { offlineDataCache } from '../services/offlineDataCache';
 import { groceryPriceService } from '../services/groceryPriceService';
+
+// Firestore imports
+import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '../firebaseConfig';
 
 interface ShoppingListProps {
   items: ShoppingItem[];
   setItems: React.Dispatch<React.SetStateAction<ShoppingItem[]>>;
   onMoveToPantry: (items: ShoppingItem[]) => void;
+  addShoppingListItem: (item: Omit<ShoppingItem, 'id'>) => void;
+  user?: User;
+  household?: Household;
   isLoadingShoppingList?: boolean;
   pantryItems?: Array<{
     id: string;
@@ -58,6 +67,9 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   items,
   setItems,
   onMoveToPantry,
+  addShoppingListItem,
+  user,
+  household,
   isLoadingShoppingList = false,
   pantryItems = [],
   recentPurchases = [],
@@ -83,9 +95,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     timestamp: Date;
   }>>([]);
 
-  // Multi-selection state
-  const [selectionMode, setSelectionMode] = useState(false);
-  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+  // (selection model simplified) — rely on `checked` on items instead of separate selected state
 
   // Session tracking for analytics
   const [currentSessionId] = useState(() => `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
@@ -120,10 +130,20 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   }, []);
 
   // Helper function to estimate price for an item
-  const estimateItemPrice = async (itemName: string, quantity?: number | string): Promise<number> => {
+  const estimateItemPrice = async (itemName: string, quantity?: number | string): Promise<{
+    price: number;
+    priceData?: {
+      averagePrice: number;
+      minPrice: number;
+      maxPrice: number;
+      sampleSize: number;
+      lastUpdated: Date;
+      unit: string;
+    }
+  }> => {
     try {
       const priceData = await groceryPriceService.getIngredientPrice(itemName);
-      if (!priceData) return 0;
+      if (!priceData) return { price: 0 };
 
       // Parse quantity - handle both numbers and strings like "2 cups"
       let qty = 1;
@@ -136,10 +156,13 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
         }
       }
 
-      return priceData.averagePrice * qty;
+      return {
+        price: priceData.averagePrice * qty,
+        priceData
+      };
     } catch (error) {
       console.warn(`Failed to estimate price for ${itemName}:`, error);
-      return 0;
+      return { price: 0 };
     }
   };
 
@@ -184,8 +207,8 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   }, [items, saveCurrentSession]);
 
   // Hooks for offline functionality
-  const isOnline = useOfflineStatus();
   const { addToQueue, processQueue } = useDataManagement();
+  const { isOnline } = useOfflineStatus();
 
   // Suggested items for quick adding
   const suggestedItems = [
@@ -224,18 +247,19 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     }
 
     // Estimate price for the item
-    const estimatedPrice = await estimateItemPrice(itemName, '1');
+    const { price: estimatedPrice, priceData } = await estimateItemPrice(itemName, '1');
 
-    setItems(prev => [...prev, {
-      id: Math.random().toString(36).substr(2, 9),
+    // Add directly to database to avoid sync read
+    await addShoppingListItem({
       item: itemName,
       category: inferCategoryFromItemName(itemName),
       checked: false,
       quantity: '1',
       source: 'suggested',
       addedAt: new Date(),
-      estimatedPrice
-    }]);
+      estimatedPrice,
+      priceData
+    });
   };
 
   const addRecipeItem = async (itemName: string, requiredQuantity: string, recipeName: string) => {
@@ -254,7 +278,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     }
 
     // Estimate price for the item
-    const estimatedPrice = await estimateItemPrice(itemName, requiredQuantity);
+    const { price: estimatedPrice, priceData } = await estimateItemPrice(itemName, requiredQuantity);
 
     setItems(prev => [...prev, {
       id: Math.random().toString(36).substr(2, 9),
@@ -264,7 +288,8 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
       quantity: requiredQuantity,
       source: `recipe: ${recipeName}`,
       addedAt: new Date(),
-      estimatedPrice
+      estimatedPrice,
+      priceData
     }]);
   };
 
@@ -286,15 +311,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
       setUndoHistory(prev => [...prev.slice(-4), { item: { ...item, checked: true }, timestamp: now }]);
     }
 
-    // Offline queue for sync
-    if (!isOnline) {
-      addToQueue({
-        type: 'update',
-        collection: 'shoppingList',
-        id,
-        data: { checked: !wasChecked, completedAt: !wasChecked ? now : null }
-      });
-    }
+    // Note: checked state is not persisted to database/cache
   };
 
   const undoLastCheck = () => {
@@ -315,58 +332,50 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     setItems(prev => prev.map(i => ({ ...i, checked: false })));
   };
 
-  const remove = (id: string) => {
+  const remove = async (id: string) => {
     setItems(prev => prev.filter(i => i.id !== id));
+    
+    // Update cache
+    const inHousehold = household?.id && user ? isHouseholdMember(household, user) : false;
+    const householdId = inHousehold ? household.id : undefined;
+    const userId = inHousehold ? undefined : user?.id;
+    
+    try {
+      await ShoppingListCacheService.removeItemFromCache(id, householdId, userId);
+    } catch (error) {
+      console.error('Failed to remove item from cache:', error);
+    }
   };
 
   // Multi-selection functions
-  const toggleSelectionMode = () => {
-    setSelectionMode(!selectionMode);
-    setSelectedItems(new Set());
+
+  // Toggle an item's checked state (uses existing helper to keep undo history)
+  const handleItemToggle = (id: string) => {
+    toggleCheck(id);
   };
 
-  const toggleItemSelection = (id: string) => {
-    if (!selectionMode) return;
+  const deleteCheckedItems = async () => {
+    const checkedItems = items.filter(i => i.checked);
+    if (checkedItems.length === 0) return;
 
-    setSelectedItems(prev => {
-      const newSelected = new Set(prev);
-      if (newSelected.has(id)) {
-        newSelected.delete(id);
-      } else {
-        newSelected.add(id);
-      }
-      return newSelected;
-    });
+    const inHousehold = household?.id && user ? isHouseholdMember(household, user) : false;
+    const householdId = inHousehold ? household.id : undefined;
+    const userId = inHousehold ? undefined : user?.id;
+
+    // Remove from cache
+    const deletePromises = checkedItems.map(item =>
+      ShoppingListCacheService.removeItemFromCache(item.id, householdId, userId)
+    );
+
+    try {
+      await Promise.all(deletePromises);
+      // Remove checked items from local state
+      const checkedIds = new Set(checkedItems.map(i => i.id));
+      setItems(prev => prev.filter(i => !checkedIds.has(i.id)));
+    } catch (error) {
+      console.error('Failed to delete checked items from cache:', error);
+    }
   };
-
-  const selectAllItems = () => {
-    if (!selectionMode) return;
-    setSelectedItems(new Set(items.map(item => item.id)));
-  };
-
-  const deselectAllItems = () => {
-    setSelectedItems(new Set());
-  };
-
-  const deleteSelectedItems = () => {
-    if (selectedItems.size === 0) return;
-    setItems(prev => prev.filter(item => !selectedItems.has(item.id)));
-    setSelectedItems(new Set());
-    setSelectionMode(false);
-  };
-
-  const checkSelectedItems = () => {
-    if (selectedItems.size === 0) return;
-    const now = new Date();
-    setItems(prev => prev.map(item =>
-      selectedItems.has(item.id)
-        ? { ...item, checked: true, completedAt: now }
-        : item
-    ));
-    setSelectedItems(new Set());
-    setSelectionMode(false);
-  };
-
   const addItem = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -388,7 +397,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     }
 
     // Estimate price for the item
-    const estimatedPrice = await estimateItemPrice(newItem, newQty);
+    const { price: estimatedPrice, priceData } = await estimateItemPrice(newItem, newQty);
 
     const newShoppingItem: ShoppingItem = {
       id: Math.random().toString(36).substr(2, 9),
@@ -398,7 +407,8 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
       quantity: newUnit === 'count' ? newQty : `${newQty} ${newUnit}`,
       source: 'manual',
       addedAt: new Date(),
-      estimatedPrice
+      estimatedPrice,
+      priceData
     };
 
     setItems(prev => [...prev, newShoppingItem]);
@@ -427,7 +437,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     }
 
     // Estimate price for the item
-    const estimatedPrice = await estimateItemPrice(quickAddItem.name, quickAddItem.quantity || '1');
+    const { price: estimatedPrice, priceData } = await estimateItemPrice(quickAddItem.name, quickAddItem.quantity || '1');
 
     const newShoppingItem: ShoppingItem = {
       id: Math.random().toString(36).substr(2, 9),
@@ -437,7 +447,8 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
       quantity: quickAddItem.quantity || '1',
       source: 'quick-add',
       addedAt: new Date(),
-      estimatedPrice
+      estimatedPrice,
+      priceData
     };
 
     setItems(prev => [...prev, newShoppingItem]);
@@ -488,37 +499,41 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   };
 
   const handleCheckout = () => {
-    const purchased = items.filter(i => i.checked);
-    if (purchased.length === 0) return;
+    const itemsToMove = items.filter(i => i.checked);
+
+    if (itemsToMove.length === 0) return;
 
     // Set default purchased quantities for items that don't have them
-    const updatedItems = purchased.map(item => {
+    const updatedItems = itemsToMove.map(item => {
       if (!item.purchasedQuantity) {
-        // Try to parse the needed quantity, default to 1 count
         const neededQty = item.quantity ? parseFloat(item.quantity) : 1;
         return { ...item, purchasedQuantity: { amount: neededQty, unit: 'count' } };
       }
       return item;
     });
 
-    if (confirm(`Move ${purchased.length} items to pantry?`)) {
-        onMoveToPantry(updatedItems);
+    if (confirm(`Move ${itemsToMove.length} items to pantry?`)) {
+      onMoveToPantry(updatedItems);
 
-        // Clear undo history for checked items
-        setUndoHistory(prev => prev.filter(action =>
-          !purchased.some(item => item.id === action.item.id)
-        ));
+      // Clear undo history for the moved items
+      setUndoHistory(prev => prev.filter(action =>
+        !itemsToMove.some(item => item.id === action.item.id)
+      ));
 
-        setItems(prev => prev.filter(i => !i.checked));
+      // Remove moved items from list
+      const movedIds = new Set(itemsToMove.map(i => i.id));
+      setItems(prev => prev.filter(i => !movedIds.has(i.id)));
 
-        // Offline queue for sync
-        if (!isOnline) {
-          addToQueue({
-            type: 'batch',
-            collection: 'shoppingList',
-            data: { action: 'checkout', items: updatedItems }
-          });
-        }
+      // nothing else to clear; we operate on checked items only
+
+      // Offline queue for sync
+      if (!isOnline) {
+        addToQueue({
+          type: 'batch',
+          collection: 'shoppingList',
+          data: { action: 'checkout', items: updatedItems }
+        });
+      }
     }
   };
 
@@ -704,26 +719,6 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
 
       {items.length > 0 && (
           <div className="flex gap-2 justify-between items-center">
-              <button
-                onClick={items.every(i => i.checked) ? deselectAll : selectAll}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all bg-theme-secondary text-theme-secondary hover:bg-[var(--accent-color)] hover:text-white"
-              >
-                  <Check className="w-4 h-4" /> 
-                  {items.every(i => i.checked) ? 'Deselect All' : 'Select All'}
-              </button>
-
-              <button
-                onClick={toggleSelectionMode}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${
-                  selectionMode
-                    ? 'bg-blue-500 text-white'
-                    : 'bg-theme-secondary text-theme-secondary hover:bg-blue-500 hover:text-white'
-                }`}
-              >
-                  <Check className="w-4 h-4" />
-                  {selectionMode ? 'Exit Selection' : 'Multi-Select'}
-              </button>
-              
               {undoHistory.length > 0 && (
                 <button
                   onClick={undoLastCheck}
@@ -734,67 +729,24 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                   Undo ({undoHistory.length})
                 </button>
               )}
-              
-              <button 
-                onClick={handleCheckout}
-                disabled={!items.some(i => i.checked)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${
-                    items.some(i => i.checked) 
-                    ? 'bg-[var(--accent-color)] text-white shadow-lg' 
-                    : 'bg-theme-secondary text-theme-secondary opacity-50 cursor-not-allowed'
-                }`}
-              >
-                  <Archive className="w-4 h-4" /> Move Checked to Pantry
-              </button>
+
+              <div className="flex gap-2">
+                <button 
+                  onClick={handleCheckout}
+                  disabled={!items.some(i => i.checked)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${
+                      items.some(i => i.checked)
+                      ? 'bg-[var(--accent-color)] text-white shadow-lg' 
+                      : 'bg-theme-secondary text-theme-secondary opacity-50 cursor-not-allowed'
+                  }`}
+                >
+                    <Archive className="w-4 h-4" /> Move Checked to Pantry
+                </button>
+              </div>
           </div>
       )}
 
-      {/* Multi-selection controls */}
-      {selectionMode && (
-        <div className="flex gap-2 justify-between items-center bg-blue-50 border border-blue-200 rounded-lg p-3">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-blue-700">
-              {selectedItems.size} item{selectedItems.size !== 1 ? 's' : ''} selected
-            </span>
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={selectedItems.size === items.length ? deselectAllItems : selectAllItems}
-              className="px-3 py-1 text-xs font-medium text-blue-600 hover:text-blue-800 hover:bg-blue-100 rounded transition-colors"
-            >
-              {selectedItems.size === items.length ? 'Deselect All' : 'Select All'}
-            </button>
-            <button
-              onClick={checkSelectedItems}
-              disabled={selectedItems.size === 0}
-              className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
-                selectedItems.size > 0
-                  ? 'text-green-600 hover:text-green-800 hover:bg-green-100'
-                  : 'text-gray-400 cursor-not-allowed'
-              }`}
-            >
-              Check Selected
-            </button>
-            <button
-              onClick={deleteSelectedItems}
-              disabled={selectedItems.size === 0}
-              className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
-                selectedItems.size > 0
-                  ? 'text-red-600 hover:text-red-800 hover:bg-red-100'
-                  : 'text-gray-400 cursor-not-allowed'
-              }`}
-            >
-              Delete Selected
-            </button>
-            <button
-              onClick={toggleSelectionMode}
-              className="px-3 py-1 text-xs font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Multi-selection controls removed — using checked state only */}
 
       <div className="space-y-2">
         {isLoadingShoppingList ? (
@@ -806,10 +758,10 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
           // Organized by store layout
           <SmartShoppingListOrganizer
             items={items}
-            onToggleCheck={selectionMode ? toggleItemSelection : toggleCheck}
+            onToggleCheck={handleItemToggle}
             onRemove={remove}
-            isSelected={selectionMode ? (id) => selectedItems.has(id) : undefined}
-            onLongPress={selectionMode ? undefined : () => setSelectionMode(true)}
+            isSelected={(id) => items.some(it => it.id === id && it.checked)}
+            onLongPress={undefined}
           />
         ) : (
           // Regular list view with enhanced items
@@ -817,11 +769,11 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
             <EnhancedShoppingListItem
               key={item.id}
               item={item}
-              onToggleCheck={selectionMode ? toggleItemSelection : toggleCheck}
+              onToggleCheck={handleItemToggle}
               onRemove={remove}
               isOnline={isOnline}
-              isSelected={selectionMode ? selectedItems.has(item.id) : undefined}
-              onLongPress={selectionMode ? undefined : () => setSelectionMode(true)}
+              isSelected={item.checked}
+              onLongPress={undefined}
             />
           ))
         )}
