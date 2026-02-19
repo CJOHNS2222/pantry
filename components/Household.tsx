@@ -4,10 +4,15 @@ import { Users, Mail, Plus, X, Settings, ChefHat, Heart, AlertTriangle } from 'l
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { PremiumFeature } from './PremiumFeature';
 import { Tab } from '../types/app';
-import { addDoc, collection, doc, setDoc, updateDoc, serverTimestamp, getDoc, getDocs, writeBatch } from 'firebase/firestore';
+import { serverTimestamp } from 'firebase/firestore';
 import { db, auth } from '../firebaseConfig';
+import DatabaseMonitoringService from '../services/databaseMonitoringService';
 import { removeMemberFromHousehold } from '../services/householdService';
 import { UsageService } from '../services/usageService';
+import { InventoryCacheService } from '../services/inventoryCacheService';
+import { MealPlanCacheService } from '../services/mealPlanCacheService';
+import { RecipesCacheService } from '../services/recipesCacheService';
+import { ShoppingListCacheService } from '../services/shoppingListCacheService';
 
 interface HouseholdManagerProps {
   user: User;
@@ -43,7 +48,6 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
     e.preventDefault();
     if (!inviteEmail || isInviting) return;
 
-    // Check if we've already determined the limit is exceeded
     if (householdMemberLimitExceeded) {
       alert('You have reached the maximum number of household members for your plan. Please upgrade to add more members.');
       return;
@@ -51,32 +55,19 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
 
     setIsInviting(true);
     try {
-      // Check household member limit (and update state)
       const canAdd = await checkHouseholdMemberLimit();
       if (!canAdd) {
         alert('You have reached the maximum number of household members for your plan. Please upgrade to add more members.');
         return;
       }
-      console.log('Inviting to household:', household);
-      console.log('Household members:', household.members);
-      console.log('User ID:', user.id);
       const functions = getFunctions();
       const inviteMember = httpsCallable(functions, 'inviteMember');
       
-      // The cloud function returns the new member data upon success
       const result = await inviteMember({ email: inviteEmail, householdId: household.id });
       const { newMember } = result.data as { newMember: Member };
 
-      // Don't update local state here - the Firestore listener will handle it when the document updates
-      // setHousehold(prev => ({
-      //   ...prev,
-      //   members: [...prev.members, newMember]
-      // }));
-
-      // Record the household member addition for usage tracking
       await UsageService.recordHouseholdMemberAdd(user.id);
 
-      // Refresh the ID token to get updated custom claims
       await auth.currentUser?.getIdToken(true);
 
       setInviteEmail('');
@@ -85,7 +76,6 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
     } catch (error: any) {
       console.error("Error sending invitation:", error);
       
-      // Show user-friendly error message
       let message = 'Failed to send invitation';
       if (error.code === 'functions/permission-denied') {
         message = 'You are not a member of this household';
@@ -99,40 +89,6 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
       
       addToast(message, 'error');
       
-      // Fallback: try HTTP endpoint with ID token (handles CORS/dev calls)
-      try {
-        const { auth } = await import('../firebaseConfig');
-        const token = await auth.currentUser?.getIdToken();
-        if (!token) throw new Error('No auth token available');
-
-        const resp = await fetch(`https://us-central1-ornate-compass-478504-e1.cloudfunctions.net/inviteMemberHttp`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({ email: inviteEmail, householdId: household.id })
-        });
-
-        if (!resp.ok) throw new Error(`HTTP invite failed: ${resp.status}`);
-        const json = await resp.json();
-        if (json?.newMember) {
-          // Don't update local state here - the Firestore listener will handle it
-          // setHousehold(prev => ({ ...prev, members: [...prev.members, json.newMember] }));
-          
-          // Record the household member addition for usage tracking
-          await UsageService.recordHouseholdMemberAdd(user.id);
-          
-          // Refresh the ID token to get updated custom claims
-          await auth.currentUser?.getIdToken(true);
-          
-          setInviteEmail('');
-          console.log('Invitation sent via HTTP fallback');
-        }
-      } catch (err) {
-        console.error('Fallback HTTP invite error:', err);
-        addToast('Failed to send invitation. Please try again.', 'error');
-      }
     } finally {
       setIsInviting(false);
     }
@@ -145,28 +101,9 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
 
     try {
       await removeMemberFromHousehold(household.id, id, user.id);
-      
-      // Don't update local state here - the Firestore listener will handle it when the document updates
-      // setHousehold(prev => ({
-      //   ...prev,
-      //   members: prev.members.filter(m => m.id !== id),
-      //   memberIds: prev.memberIds?.filter(mid => mid !== id)
-      // }));
-
-      // If this was the last member, household will be deleted by the backend
-      // Check if household still exists
-      // const updatedHousehold = { ...household };
-      // updatedHousehold.members = updatedHousehold.members.filter(m => m.id !== id);
-      // if (updatedHousehold.members.length === 1) {
-      //   // Household was deleted
-      //   setHousehold(null);
-      //   onClose();
-      // }
-
     } catch (error: any) {
       console.error('Error removing member:', error);
       
-      // Show user-friendly error message
       let message = 'Failed to remove member';
       if (error.code === 'functions/permission-denied') {
         message = 'You do not have permission to remove this member';
@@ -184,110 +121,31 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
     }
 
     try {
-      // Copy household inventory back to user's personal collection
-      try {
-        const householdInventoryRef = collection(db, 'households', household.id, 'inventory');
-        const householdInventorySnapshot = await getDocs(householdInventoryRef);
-        
-        if (!householdInventorySnapshot.empty) {
-          const batch = writeBatch(db);
-          const userInventoryRef = collection(db, 'users', user.id, 'inventory');
-          
-          householdInventorySnapshot.docs.forEach((docItem) => {
-            const itemData = docItem.data();
-            const newItemRef = doc(userInventoryRef, docItem.id);
-            batch.set(newItemRef, itemData);
-          });
-          
-          await batch.commit();
-          console.log(`Copied ${householdInventorySnapshot.size} inventory items to user collection`);
-        }
-      } catch (inventoryError) {
-        console.error('Error copying inventory:', inventoryError);
-        // Continue with leaving household even if inventory copy fails
-      }
+      // Copy household data to user's personal collection using cache services
+      const householdId = household.id;
+      const userId = user.id;
 
-      // Copy household meal plans back to user's personal collection
-      try {
-        const householdMealPlanRef = collection(db, 'households', household.id, 'mealPlan');
-        const householdMealPlanSnapshot = await getDocs(householdMealPlanRef);
-        
-        if (!householdMealPlanSnapshot.empty) {
-          const batch = writeBatch(db);
-          const userMealPlanRef = collection(db, 'users', user.id, 'mealPlan');
-          
-          householdMealPlanSnapshot.docs.forEach((docItem) => {
-            const planData = docItem.data();
-            const newPlanRef = doc(userMealPlanRef, docItem.id);
-            batch.set(newPlanRef, planData);
-          });
-          
-          await batch.commit();
-          console.log(`Copied ${householdMealPlanSnapshot.size} meal plans to user collection`);
-        }
-      } catch (mealPlanError) {
-        console.error('Error copying meal plans:', mealPlanError);
-        // Continue with leaving household even if meal plan copy fails
-      }
+      const inventory = await InventoryCacheService.getCachedInventory(householdId);
+      await InventoryCacheService.setCache(inventory, undefined, userId);
 
-      // Copy household shopping lists back to user's personal collection
-      try {
-        const householdShoppingListRef = collection(db, 'households', household.id, 'shoppingList');
-        const householdShoppingListSnapshot = await getDocs(householdShoppingListRef);
-        
-        if (!householdShoppingListSnapshot.empty) {
-          const batch = writeBatch(db);
-          const userShoppingListRef = collection(db, 'users', user.id, 'shoppingList');
-          
-          householdShoppingListSnapshot.docs.forEach((docItem) => {
-            const listData = docItem.data();
-            const newListRef = doc(userShoppingListRef, docItem.id);
-            batch.set(newListRef, listData);
-          });
-          
-          await batch.commit();
-          console.log(`Copied ${householdShoppingListSnapshot.size} shopping list items to user collection`);
-        }
-      } catch (shoppingListError) {
-        console.error('Error copying shopping list:', shoppingListError);
-        // Continue with leaving household even if shopping list copy fails
-      }
+      const mealPlan = await MealPlanCacheService.getCachedMealPlan(householdId);
+      await MealPlanCacheService.updateCache(mealPlan, undefined, userId);
 
-      // Copy household saved recipes back to user's personal collection
-      try {
-        const householdSavedRecipesRef = collection(db, 'households', household.id, 'savedRecipes');
-        const householdSavedRecipesSnapshot = await getDocs(householdSavedRecipesRef);
-        
-        if (!householdSavedRecipesSnapshot.empty) {
-          const batch = writeBatch(db);
-          const userSavedRecipesRef = collection(db, 'users', user.id, 'savedRecipes');
-          
-          householdSavedRecipesSnapshot.docs.forEach((docItem) => {
-            const recipeData = docItem.data();
-            const newRecipeRef = doc(userSavedRecipesRef, docItem.id);
-            batch.set(newRecipeRef, recipeData);
-          });
-          
-          await batch.commit();
-          console.log(`Copied ${householdSavedRecipesSnapshot.size} saved recipes to user collection`);
-        }
-      } catch (savedRecipesError) {
-        console.error('Error copying saved recipes:', savedRecipesError);
-        // Continue with leaving household even if saved recipes copy fails
-      }
+      const shoppingList = await ShoppingListCacheService.getCachedShoppingList(householdId);
+      await ShoppingListCacheService.setCache(shoppingList, undefined, userId);
 
-      // Remove user from household using Cloud Function (admin privileges)
+      const savedRecipes = await RecipesCacheService.getCachedRecipes(householdId);
+      await RecipesCacheService.setCache(savedRecipes, undefined, userId);
+
       const leaveHouseholdFunction = httpsCallable(getFunctions(), 'leaveHousehold');
-      await leaveHouseholdFunction({ householdId: household.id });
+      await leaveHouseholdFunction({ householdId });
       
-      // Update user's householdId to null
-      const userRef = doc(db, 'users', user.id);
-      await updateDoc(userRef, {
+      const userRef = DatabaseMonitoringService.doc(db, 'users', userId);
+      await DatabaseMonitoringService.updateDoc(userRef, {
         householdId: null,
         updatedAt: serverTimestamp()
       });
 
-      // Close the household modal and clear household state
       setHousehold(null);
       onClose();
       
@@ -295,7 +153,6 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
     } catch (error: any) {
       console.error('Error leaving household:', error);
       
-      // Show user-friendly error message
       let message = 'Failed to leave household';
       if (error.code === 'functions/permission-denied') {
         message = 'You do not have permission to leave this household';
@@ -312,7 +169,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
 
     setIsCreating(true);
     try {
-      const householdRef = doc(collection(db, 'households'));
+      const householdRef = DatabaseMonitoringService.doc(DatabaseMonitoringService.collection(db, 'households'));
       const newHousehold = {
         name: householdName.trim(),
         memberIds: [user.id],
@@ -325,124 +182,35 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
         }]
       };
 
-      console.log('Creating household with data:', newHousehold);
-      await setDoc(householdRef, newHousehold);
+      await DatabaseMonitoringService.setDoc(householdRef, newHousehold);
 
-      // Verify the document was created correctly
-      const createdDoc = await getDoc(householdRef);
-      const createdData = createdDoc.data();
-      console.log('Created household document data:', createdData);
-      
-      // Update the user's document with the householdId
-      const userRef = doc(db, 'users', user.id);
-      await updateDoc(userRef, {
+      const userRef = DatabaseMonitoringService.doc(db, 'users', user.id);
+      await DatabaseMonitoringService.updateDoc(userRef, {
         householdId: householdRef.id,
         updatedAt: serverTimestamp()
       });
 
-      // Migrate existing user inventory to household inventory
-      try {
-        const userInventoryRef = collection(db, 'users', user.id, 'inventory');
-        const userInventorySnapshot = await getDocs(userInventoryRef);
-        
-        if (!userInventorySnapshot.empty) {
-          const batch = writeBatch(db);
-          const householdInventoryRef = collection(db, 'households', householdRef.id, 'inventory');
-          
-          userInventorySnapshot.docs.forEach((docItem) => {
-            const itemData = docItem.data();
-            const newItemRef = doc(householdInventoryRef, docItem.id);
-            batch.set(newItemRef, itemData);
-            batch.delete(docItem.ref);
-          });
-          
-          await batch.commit();
-          console.log(`Migrated ${userInventorySnapshot.size} inventory items to household`);
-        }
-      } catch (migrationError) {
-        console.error('Error migrating inventory:', migrationError);
-        // Don't fail the household creation if inventory migration fails
-      }
+      // Migrate user data to household using cache services
+      const userId = user.id;
+      const householdId = householdRef.id;
 
-      // Migrate existing user meal plans to household meal plans
-      try {
-        const userMealPlanRef = collection(db, 'users', user.id, 'mealPlan');
-        const userMealPlanSnapshot = await getDocs(userMealPlanRef);
-        
-        if (!userMealPlanSnapshot.empty) {
-          const batch = writeBatch(db);
-          const householdMealPlanRef = collection(db, 'households', householdRef.id, 'mealPlan');
-          
-          userMealPlanSnapshot.docs.forEach((docItem) => {
-            const planData = docItem.data();
-            const newPlanRef = doc(householdMealPlanRef, docItem.id);
-            batch.set(newPlanRef, planData);
-            batch.delete(docItem.ref);
-          });
-          
-          await batch.commit();
-          console.log(`Migrated ${userMealPlanSnapshot.size} meal plans to household`);
-        }
-      } catch (migrationError) {
-        console.error('Error migrating meal plans:', migrationError);
-        // Don't fail the household creation if meal plan migration fails
-      }
+      const inventory = await InventoryCacheService.getCachedInventory(undefined, userId);
+      await InventoryCacheService.setCache(inventory, householdId, undefined);
+      await InventoryCacheService.setCache([], undefined, userId); // Clear user's cache
 
-      // Migrate existing user shopping lists to household shopping lists
-      try {
-        const userShoppingListRef = collection(db, 'users', user.id, 'shoppingList');
-        const userShoppingListSnapshot = await getDocs(userShoppingListRef);
-        
-        if (!userShoppingListSnapshot.empty) {
-          const batch = writeBatch(db);
-          const householdShoppingListRef = collection(db, 'households', householdRef.id, 'shoppingList');
-          
-          userShoppingListSnapshot.docs.forEach((docItem) => {
-            const listData = docItem.data();
-            const newListRef = doc(householdShoppingListRef, docItem.id);
-            batch.set(newListRef, listData);
-            batch.delete(docItem.ref);
-          });
-          
-          await batch.commit();
-          console.log(`Migrated ${userShoppingListSnapshot.size} shopping list items to household`);
-        }
-      } catch (migrationError) {
-        console.error('Error migrating shopping list:', migrationError);
-        // Don't fail the household creation if shopping list migration fails
-      }
+      const mealPlan = await MealPlanCacheService.getCachedMealPlan(undefined, userId);
+      await MealPlanCacheService.updateCache(mealPlan, householdId, undefined);
+      await MealPlanCacheService.updateCache([], undefined, userId); // Clear user's cache
 
-      // Migrate existing user saved recipes to household saved recipes
-      try {
-        const userSavedRecipesRef = collection(db, 'users', user.id, 'savedRecipes');
-        const userSavedRecipesSnapshot = await getDocs(userSavedRecipesRef);
-        
-        if (!userSavedRecipesSnapshot.empty) {
-          const batch = writeBatch(db);
-          const householdSavedRecipesRef = collection(db, 'households', householdRef.id, 'savedRecipes');
-          
-          userSavedRecipesSnapshot.docs.forEach((docItem) => {
-            const recipeData = docItem.data();
-            const newRecipeRef = doc(householdSavedRecipesRef, docItem.id);
-            batch.set(newRecipeRef, recipeData);
-            batch.delete(docItem.ref);
-          });
-          
-          await batch.commit();
-          console.log(`Migrated ${userSavedRecipesSnapshot.size} saved recipes to household`);
-        }
-      } catch (migrationError) {
-        console.error('Error migrating saved recipes:', migrationError);
-        // Don't fail the household creation if saved recipes migration fails
-      }
+      const shoppingList = await ShoppingListCacheService.getCachedShoppingList(undefined, userId);
+      await ShoppingListCacheService.setCache(shoppingList, householdId, undefined);
+      await ShoppingListCacheService.setCache([], undefined, userId); // Clear user's cache
+
+      const savedRecipes = await RecipesCacheService.getCachedRecipes(undefined, userId);
+      await RecipesCacheService.setCache(savedRecipes, householdId, undefined);
+      await RecipesCacheService.setCache([], undefined, userId); // Clear user's cache
       
-      // Don't set household locally - the Firestore listener will handle it when user.householdId is updated
-      // const householdWithId = { ...newHousehold, id: householdRef.id };
-      // console.log('Setting household locally:', householdWithId);
-      // setHousehold(householdWithId);
-      // localStorage.setItem('household', JSON.stringify(householdWithId));
-      
-      console.log('Household created successfully');
+      console.log('Household created and data migrated successfully');
     } catch (error) {
       console.error('Error creating household:', error);
       alert('Failed to create household. Please try again.');
@@ -451,8 +219,6 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
     }
   };
 
-  // Render create form if no household exists and user doesn't have householdId
-  // If user has householdId but household is null, show loading state
   if (!household && !user?.householdId) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
@@ -505,7 +271,6 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
     );
   }
 
-  // Show loading state if user has householdId but household data hasn't loaded yet
   if (!household && user?.householdId) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
@@ -548,7 +313,6 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
               onClick={() => {
                 setActiveTab(Tab.SETTINGS);
                 onClose();
-                // Scroll to household section after navigation
                 setTimeout(() => {
                   const householdSection = document.querySelector('[data-section="household"]');
                   if (householdSection) {
@@ -568,7 +332,6 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
         </div>
 
         <div className="p-6 overflow-y-auto flex-1">
-          {/* Temporarily force invite form to show for testing */}
           <PremiumFeature
             feature="householdMembers"
             user={user}
@@ -742,7 +505,6 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
         </div>
 
         <div className="p-6 overflow-y-auto flex-1">
-          {/* Temporarily force invite form to show for testing */}
           <PremiumFeature
             feature="householdMembers"
             user={user}

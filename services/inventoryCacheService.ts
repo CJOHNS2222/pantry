@@ -118,8 +118,8 @@ export class InventoryCacheService {
       return [];
     } catch (err: any) {
       // Don't log permission errors as they may be expected
-      if (!error.message.includes('Missing or insufficient permissions')) {
-        console.error("❌ Error fetching cached inventory:", error);
+      if (!err.message.includes('Missing or insufficient permissions')) {
+        console.error("❌ Error fetching cached inventory:", err);
       }
       return [];
     }
@@ -155,7 +155,7 @@ export class InventoryCacheService {
 
       await DatabaseMonitoringService.setDoc(cacheRef, cachedData);
     } catch (err: any) {
-      console.error("❌ Error updating inventory cache:", error);
+      console.error("❌ Error updating inventory cache:", err);
       // Don't throw - caching failures shouldn't break the app
     }
   }
@@ -187,7 +187,7 @@ export class InventoryCacheService {
         await DatabaseMonitoringService.setDoc(cacheRef, updateData);
       }
     } catch (err: any) {
-      console.error("❌ Error adding item to cache:", error);
+      console.error("❌ Error adding item to cache:", err);
     }
   }
 
@@ -221,7 +221,7 @@ export class InventoryCacheService {
       await this.updateCache(allItems, householdId, userId);
       console.log(`📦 Added ${items.length} items to cache in 1 batch operation`);
     } catch (err: any) {
-      console.error("❌ Error adding items to cache:", error);
+      console.error("❌ Error adding items to cache:", err);
     }
   }
 
@@ -254,7 +254,7 @@ export class InventoryCacheService {
 
       await DatabaseMonitoringService.updateDoc(cacheRef, updateData);
     } catch (err: any) {
-      console.error("❌ Error updating item in cache:", error);
+      console.error("❌ Error updating item in cache:", err);
     }
   }
 
@@ -281,7 +281,7 @@ export class InventoryCacheService {
 
       await DatabaseMonitoringService.updateDoc(cacheRef, updateData);
     } catch (err: any) {
-      console.error("❌ Error removing item from cache:", error);
+      console.error("❌ Error removing item from cache:", err);
     }
   }
 
@@ -296,7 +296,7 @@ export class InventoryCacheService {
       await this.updateCache(newItems, householdId, userId);
       console.log(`🔄 Bulk updated inventory cache with ${newItems.length} items (1 write operation)`);
     } catch (err: any) {
-      console.error("❌ Error bulk updating inventory cache:", error);
+      console.error("❌ Error bulk updating inventory cache:", err);
     }
   }
 
@@ -322,7 +322,7 @@ export class InventoryCacheService {
       });
       console.log("🗑️ Cleared inventory cache");
     } catch (err: any) {
-      console.error("❌ Error clearing inventory cache:", error);
+      console.error("❌ Error clearing inventory cache:", err);
     }
   }
 }

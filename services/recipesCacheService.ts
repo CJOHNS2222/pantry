@@ -96,8 +96,8 @@ export class RecipesCacheService {
       return [];
     } catch (err: any) {
       // Don't log permission errors as they may be expected
-      if (!error.message.includes('Missing or insufficient permissions')) {
-        console.warn('Failed to load recipes cache:', error);
+      if (!err.message.includes('Missing or insufficient permissions')) {
+        console.warn('Failed to load recipes cache:', err);
       }
       return [];
     }
@@ -125,7 +125,7 @@ export class RecipesCacheService {
       await DatabaseMonitoringService.setDoc(cacheRef, cachedData);
       console.log(`💾 Updated saved recipes cache with ${recipes.length} recipes`);
     } catch (err: any) {
-      console.error('Failed to update saved recipes cache:', error);
+      console.error('Failed to update saved recipes cache:', err);
     }
   }
 
@@ -158,7 +158,7 @@ export class RecipesCacheService {
 
       console.log(`➕ Added recipe to cache: ${recipe.title}`);
     } catch (err: any) {
-      console.error('Failed to add recipe to cache:', error);
+      console.error('Failed to add recipe to cache:', err);
     }
   }
 
@@ -177,7 +177,7 @@ export class RecipesCacheService {
         console.log(`🔄 Updated recipe in cache: ${updatedRecipe.title}`);
       }
     } catch (err: any) {
-      console.error('Failed to update recipe in cache:', error);
+      console.error('Failed to update recipe in cache:', err);
     }
   }
 
@@ -197,7 +197,7 @@ export class RecipesCacheService {
       await DatabaseMonitoringService.updateDoc(cacheRef, updateData);
       console.log(`🗑️ Removed recipe from cache: ${recipeId}`);
     } catch (err: any) {
-      console.error('Failed to remove recipe from cache:', error);
+      console.error('Failed to remove recipe from cache:', err);
     }
   }
 
@@ -211,7 +211,7 @@ export class RecipesCacheService {
       await DatabaseMonitoringService.deleteDoc(cacheRef);
       console.log('🧹 Cleared saved recipes cache');
     } catch (err: any) {
-      console.error('Failed to clear saved recipes cache:', error);
+      console.error('Failed to clear saved recipes cache:', err);
     }
   }
 }
