@@ -21,7 +21,7 @@ import { InventoryCacheService } from '../services/inventoryCacheService';
 import { MealPlanCacheService } from '../services/mealPlanCacheService';
 import { RecipesCacheService, CachedRecipesData, RecipesCacheMetadata } from '../services/recipesCacheService';
 import { ShoppingListCacheService, CachedShoppingListData, ShoppingListCacheMetadata } from '../services/shoppingListCacheService';
-import HapticService from '../services/hapticService';
+// import HapticService from '../services/hapticService';
 
 // Global flag to prevent multiple meal plan syncs
 let mealPlanSyncInProgress = false;
@@ -1414,7 +1414,7 @@ const deleteCustomCategory = async (categoryId: string) => {
 
     await InventoryCacheService.addItemToCache(itemWithAlert, user?.householdId, user?.id);
 
-    HapticService.itemAdded();
+    // HapticService.itemAdded();
   };
 
   const addItems = async (items: PantryItem[]) => {
