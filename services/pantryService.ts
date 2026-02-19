@@ -54,7 +54,7 @@ export class PantryService {
           image = externalImage;
         }
       } catch (err: any) {
-        console.log('Failed to fetch external image for', description, error);
+        console.log('Failed to fetch external image for', description, err);
       }
     }
 
@@ -112,7 +112,7 @@ export class PantryService {
           image = externalImage;
         }
       } catch (err: any) {
-        console.log('Failed to fetch external image for', itemName, error);
+        console.log('Failed to fetch external image for', itemName, err);
       }
     }
 

@@ -130,9 +130,9 @@ const getCachedShoppingList = async (householdId?: string, userId?: string): Pro
 
     console.log('📭 No valid shopping list cache found.');
     return [];
-  } catch (error: any) {
-    if (!error.message.includes('Missing or insufficient permissions')) {
-      console.warn('Failed to load shopping list cache:', error);
+  } catch (err: any) {
+    if (!err.message.includes('Missing or insufficient permissions')) {
+      console.warn('Failed to load shopping list cache:', err);
     }
     return [];
   }

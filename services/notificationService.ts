@@ -64,7 +64,7 @@ export class NotificationService {
       try {
         await this.sendPushNotification(userId, notification);
       } catch (err: any) {
-        console.error('Failed to send push notification:', error);
+        console.error('Failed to send push notification:', err);
         // Don't fail the whole operation if push notification fails
       }
     }
@@ -290,7 +290,7 @@ export class NotificationService {
         priority: 'medium'
       });
     } catch (err: any) {
-      console.error('Failed to send daily push notification:', error);
+      console.error('Failed to send daily push notification:', err);
     }
 
     return notificationId;
@@ -336,7 +336,7 @@ export class NotificationService {
 
       return uniqueNotifications;
     } catch (err: any) {
-      console.error('Error getting unread notifications:', error);
+      console.error('Error getting unread notifications:', err);
       // Return empty array instead of throwing to prevent UI crashes
       return [];
     }

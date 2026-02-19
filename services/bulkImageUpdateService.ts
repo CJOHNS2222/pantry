@@ -1,6 +1,7 @@
 import DatabaseMonitoringService from './databaseMonitoringService';
 import { InventoryCacheService } from './inventoryCacheService';
 import { db } from '../firebaseConfig';
+import { doc, updateDoc } from 'firebase/firestore';
 import { PantryItem, User } from '../types';
 import { fetchExternalItemImage } from '../utils/appUtils';
 import { getCachedImageUrls, cacheImagesFromUrls, initializeImageCache } from './imageCacheService';
@@ -70,7 +71,7 @@ export class BulkImageUpdateService {
               fetchedImages.set(item.item, newImage);
             }
           } catch (err: any) {
-            console.error(`Failed to fetch image for ${item.item}:`, error);
+            console.error(`Failed to fetch image for ${item.item}:`, err);
           }
         });
 
@@ -112,8 +113,8 @@ export class BulkImageUpdateService {
           }
         } catch (err: any) {
           result.failedItems++;
-          result.errors.push(`Failed to update item ${item.item}: ${error}`);
-          console.error(`Failed to update ${item.item}:`, error);
+          result.errors.push(`Failed to update item ${item.item}: ${err}`);
+          console.error(`Failed to update ${item.item}:`, err);
         }
       });
 
@@ -130,8 +131,8 @@ export class BulkImageUpdateService {
       console.log(`Bulk image update complete: ${result.updatedItems} updated, ${result.failedItems} failed`);
 
     } catch (err: any) {
-      result.errors.push(`Bulk update failed: ${error}`);
-      console.error('Bulk image update failed:', error);
+      result.errors.push(`Bulk update failed: ${err}`);
+      console.error('Bulk image update failed:', err);
     }
 
     return result;
@@ -193,7 +194,7 @@ export class BulkImageUpdateService {
               fetchedImages.set(item.item, newImage);
             }
           } catch (err: any) {
-            console.error(`Failed to fetch image for household item ${item.item}:`, error);
+            console.error(`Failed to fetch image for household item ${item.item}:`, err);
           }
         });
 
@@ -234,8 +235,8 @@ export class BulkImageUpdateService {
           }
         } catch (err: any) {
           result.failedItems++;
-          result.errors.push(`Failed to update household item ${item.item}: ${error}`);
-          console.error(`Failed to update household item ${item.item}:`, error);
+          result.errors.push(`Failed to update household item ${item.item}: ${err}`);
+          console.error(`Failed to update household item ${item.item}:`, err);
         }
       });
 
@@ -252,8 +253,8 @@ export class BulkImageUpdateService {
       console.log(`Household bulk image update complete: ${result.updatedItems} updated, ${result.failedItems} failed`);
 
     } catch (err: any) {
-      result.errors.push(`Household bulk update failed: ${error}`);
-      console.error('Household bulk image update failed:', error);
+      result.errors.push(`Household bulk update failed: ${err}`);
+      console.error('Household bulk image update failed:', err);
     }
 
     return result;

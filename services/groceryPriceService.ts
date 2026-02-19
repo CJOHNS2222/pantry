@@ -172,7 +172,7 @@ class GroceryPriceService {
           return openPriceData;
         }
       } catch (err: any) {
-        console.warn('Open Prices API fallback failed:', error);
+        console.warn('Open Prices API fallback failed:', err);
       }
 
       // Source 3: Use curated default prices as final fallback
@@ -195,7 +195,7 @@ class GroceryPriceService {
       console.warn(`No price data found for ${ingredient} from any source`);
       return null;
     } catch (err: any) {
-      console.error('Error fetching ingredient price:', error);
+      console.error('Error fetching ingredient price:', err);
       // Try to at least return default price on error
       const ingredientKey = this.normalizeIngredientName(ingredient);
       const defaultPrice = this.defaultPrices[ingredientKey];
@@ -503,7 +503,7 @@ class GroceryPriceService {
       const data: OpenPricesResponse = await response.json();
       return data.items || [];
     } catch (err: any) {
-      console.warn('Failed to fetch historical prices from Open Prices API:', error);
+      console.warn('Failed to fetch historical prices from Open Prices API:', err);
       return [];
     }
   }
@@ -540,7 +540,7 @@ class GroceryPriceService {
 
       return trends;
     } catch (err: any) {
-      console.error('Error fetching price trends from Open Prices API:', error);
+      console.error('Error fetching price trends from Open Prices API:', err);
       return [];
     }
   }
@@ -588,7 +588,7 @@ class GroceryPriceService {
 
       console.log(`Stored Open Prices snapshot for ${ingredient}: $${averagePrice.toFixed(2)}`);
     } catch (err: any) {
-      console.warn('Failed to store Open Prices snapshot:', error);
+      console.warn('Failed to store Open Prices snapshot:', err);
     }
   }
 
@@ -645,7 +645,7 @@ class GroceryPriceService {
 
       console.log('Price trend update completed');
     } catch (err: any) {
-      console.error('Error updating price trends from API:', error);
+      console.error('Error updating price trends from API:', err);
     }
   }
 
@@ -675,7 +675,7 @@ class GroceryPriceService {
 
       return response.ok;
     } catch (err: any) {
-      console.warn('Failed to submit price to Open Prices:', error);
+      console.warn('Failed to submit price to Open Prices:', err);
       return false;
     }
   }
@@ -713,7 +713,7 @@ class GroceryPriceService {
       const data: OpenPricesResponse = await response.json();
       return data.items || [];
     } catch (err: any) {
-      console.warn(`Failed to fetch current prices from Open Prices API for ${ingredient}:`, error);
+      console.warn(`Failed to fetch current prices from Open Prices API for ${ingredient}:`, err);
       return [];
     }
   }
@@ -726,8 +726,8 @@ class GroceryPriceService {
         lastUpdated: new Date()
       });
     } catch (err: any) {
-      console.error('Error saving grocery price:', error);
-      throw error;
+      console.error('Error saving grocery price:', err);
+      throw err;
     }
   }
 

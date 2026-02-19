@@ -71,7 +71,7 @@ export class PriceDataCacheService {
 
       return result;
     } catch (err: any) {
-      console.warn('Failed to load price data cache:', error);
+      console.warn('Failed to load price data cache:', err);
       return new Map();
     }
   }
@@ -114,8 +114,8 @@ export class PriceDataCacheService {
       }, { merge: true });
 
     } catch (err: any) {
-      console.error('Failed to save price data cache:', error);
-      throw error;
+      console.error('Failed to save price data cache:', err);
+      throw err;
     }
   }
 
@@ -145,8 +145,8 @@ export class PriceDataCacheService {
 
       await DatabaseMonitoringService.updateDoc(cacheRef, updateData);
     } catch (err: any) {
-      console.error('Failed to update price data cache:', error);
-      throw error;
+      console.error('Failed to update price data cache:', err);
+      throw err;
     }
   }
 
@@ -174,8 +174,8 @@ export class PriceDataCacheService {
         }
       });
     } catch (err: any) {
-      console.error('Failed to clear price data cache:', error);
-      throw error;
+      console.error('Failed to clear price data cache:', err);
+      throw err;
     }
   }
 
@@ -207,7 +207,7 @@ export class PriceDataCacheService {
         lastUpdated: metadata?.lastUpdated
       };
     } catch (err: any) {
-      console.warn('Failed to get cache stats:', error);
+      console.warn('Failed to get cache stats:', err);
       return { size: 0 };
     }
   }

@@ -24,7 +24,7 @@ async function downloadImageAsBlob(url: string): Promise<Blob | null> {
     }
     return await response.blob();
   } catch (err: any) {
-    console.error('Error downloading image:', error);
+    console.error('Error downloading image:', err);
     return null;
   }
 }
@@ -49,7 +49,7 @@ async function uploadImageToStorage(blob: Blob, itemName: string): Promise<strin
 
     return downloadUrl;
   } catch (err: any) {
-    console.error('Error uploading image to storage:', error);
+    console.error('Error uploading image to storage:', err);
     return null;
   }
 }
@@ -74,7 +74,7 @@ function loadLocalCache(): void {
       }
     }
   } catch (err: any) {
-    console.error('Error loading local cache:', error);
+    console.error('Error loading local cache:', err);
   }
 }
 
@@ -89,7 +89,7 @@ function saveLocalCache(): void {
     };
     localStorage.setItem('imageCache', JSON.stringify(cacheData));
   } catch (err: any) {
-    console.error('Error saving local cache:', error);
+    console.error('Error saving local cache:', err);
   }
 }
 
@@ -136,12 +136,12 @@ async function syncCacheWithFirestore(): Promise<void> {
     saveLocalCache();
     localStorage.setItem(LAST_SYNC_KEY, now.toString());
     console.log(`Synced ${memoryCache.size} cached images`);
-  } catch (error: any) {
+  } catch (err: any) {
     // Handle permission errors gracefully - Firestore sync is optional
-    if (error?.code === 'permission-denied' || error?.message?.includes('insufficient permissions')) {
+    if (err?.code === 'permission-denied' || err?.message?.includes('insufficient permissions')) {
       console.log('Image cache Firestore sync skipped due to permissions (this is normal)');
     } else {
-      console.error('Error syncing cache with Firestore:', error);
+      console.error('Error syncing cache with Firestore:', err);
     }
   }
 }
@@ -181,7 +181,7 @@ export async function getCachedImageUrl(itemName: string): Promise<string | null
       }
     }
   } catch (err: any) {
-    console.error('Error reading local cache:', error);
+    console.error('Error reading local cache:', err);
   }
 
   // Only hit Firestore if not in any cache (expensive operation)
@@ -200,7 +200,7 @@ export async function getCachedImageUrl(itemName: string): Promise<string | null
       }
     }
   } catch (err: any) {
-    console.error('Error getting cached image from Firestore:', error);
+    console.error('Error getting cached image from Firestore:', err);
   }
 
   return null;
@@ -244,7 +244,7 @@ export async function getCachedImageUrls(itemNames: string[]): Promise<Map<strin
       uncachedKeys.splice(0, uncachedKeys.length, ...uncachedKeys.filter(key => !results.has(key)));
     }
   } catch (err: any) {
-    console.error('Error reading local cache:', error);
+    console.error('Error reading local cache:', err);
   }
 
   if (uncachedKeys.length === 0) {
@@ -270,7 +270,7 @@ export async function getCachedImageUrls(itemNames: string[]): Promise<Map<strin
 
     saveLocalCache();
   } catch (err: any) {
-    console.error('Error batch getting cached images from Firestore:', error);
+    console.error('Error batch getting cached images from Firestore:', err);
   }
 
   return results;
@@ -322,7 +322,7 @@ export async function cacheImageFromUrl(originalUrl: string, itemName: string): 
 
     return cachedUrl;
   } catch (err: any) {
-    console.error('Error saving to Firestore cache:', error);
+    console.error('Error saving to Firestore cache:', err);
     // Still return the cached URL even if Firestore save failed
     // (image is uploaded to Storage, just not cached in DB)
     return cachedUrl;
@@ -372,7 +372,7 @@ export async function cacheImagesFromUrls(imageMap: Map<string, string>): Promis
 
         return { itemName, cachedUrl, cacheKey };
       } catch (err: any) {
-        console.error(`Error caching image for ${itemName}:`, error);
+        console.error(`Error caching image for ${itemName}:`, err);
         return null;
       }
     });
@@ -408,7 +408,7 @@ export async function cacheImagesFromUrls(imageMap: Map<string, string>): Promis
         await setDoc(cacheRef, data);
         console.log(`Successfully cached ${validResults.length} images in this batch`);
       } catch (err: any) {
-        console.error('Error batch saving to Firestore:', error);
+        console.error('Error batch saving to Firestore:', err);
         // Still add to results even if Firestore save failed
         validResults.forEach(({ itemName, cachedUrl }) => {
           results.set(itemName, cachedUrl);

@@ -734,7 +734,7 @@ class DatabaseMonitoringService {
       this.isInitialized = true;
       console.log('🔥 Database monitoring initialized with function overrides');
     } catch (err: any) {
-      console.error('Failed to initialize database monitoring:', error);
+      console.error('Failed to initialize database monitoring:', err);
     }
   }
 }

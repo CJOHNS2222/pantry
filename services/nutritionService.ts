@@ -34,7 +34,7 @@ const getCache = (): Map<string, CachedNutrition> => {
     const obj = JSON.parse(cached);
     return new Map(Object.entries(obj) as [string, CachedNutrition][]);
   } catch (err: any) {
-    console.warn('Failed to load nutrition cache from localStorage:', error);
+    console.warn('Failed to load nutrition cache from localStorage:', err);
     return new Map();
   }
 };
@@ -47,7 +47,7 @@ const saveCache = (cache: Map<string, CachedNutrition>) => {
     const obj = Object.fromEntries(cache);
     localStorage.setItem(NUTRITION_CACHE_KEY, JSON.stringify(obj));
   } catch (err: any) {
-    console.warn('Failed to save nutrition cache to localStorage:', error);
+    console.warn('Failed to save nutrition cache to localStorage:', err);
   }
 };
 
@@ -144,7 +144,7 @@ const searchWithFallbacks = async (itemName: string): Promise<any[] | null> => {
         return data.foods;
       }
     } catch (err: any) {
-      console.warn('Error fetching nutrition data from USDA API:', error);
+      console.warn('Error fetching nutrition data from USDA API:', err);
       continue; // Try next term
     }
   }
@@ -214,7 +214,7 @@ export const getNutritionFacts = async (itemName: string): Promise<NutritionFact
 
       foodDetail = await response.json();
     } catch (err: any) {
-      console.warn('Error fetching nutrition details from USDA API:', error);
+      console.warn('Error fetching nutrition details from USDA API:', err);
       return null;
     }
     const nutrients = foodDetail.foodNutrients || [];
@@ -243,7 +243,7 @@ export const getNutritionFacts = async (itemName: string): Promise<NutritionFact
     saveCache(cache);
     return nutritionData;
   } catch (err: any) {
-    console.warn(`Error fetching nutrition for ${itemName}:`, error);
+    console.warn(`Error fetching nutrition for ${itemName}:`, err);
     return null;
   }
 };
@@ -263,7 +263,7 @@ export const getNutritionFactsWithFallback = async (itemName: string, category: 
     console.log(`Nutrition not found for ${itemName}, trying category: ${category}`);
     return await getNutritionFacts(category);
   } catch (err: any) {
-    console.warn('Error in nutrition fallback:', error);
+    console.warn('Error in nutrition fallback:', err);
     return null;
   }
 };
@@ -296,6 +296,6 @@ export const clearNutritionCache = () => {
   try {
     localStorage.removeItem(NUTRITION_CACHE_KEY);
   } catch (err: any) {
-    console.warn('Failed to clear nutrition cache:', error);
+    console.warn('Failed to clear nutrition cache:', err);
   }
 };

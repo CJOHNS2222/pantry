@@ -57,7 +57,7 @@ export const getOrCreateHousehold = async (user: User): Promise<Household | null
 
     return newHousehold;
   } catch (err: any) {
-    console.error('Error getting/creating household:', error);
+    console.error('Error getting/creating household:', err);
     return null;
   } finally {
     perfTrace.stop();
@@ -177,8 +177,8 @@ export const updateMemberStatus = async (
 
     await DatabaseMonitoringService.updateDoc(householdRef, updatePayload);
   } catch (err: any) {
-    console.error('Unable to join 10: Error updating member status:', error);
-    throw error;
+    console.error('Unable to join 10: Error updating member status:', err);
+    throw err;
   }
 };
 
@@ -237,8 +237,8 @@ export const removeMemberFromHousehold = async (
       await DatabaseMonitoringService.deleteDoc(householdRef);
     }
   } catch (err: any) {
-    console.error('Error removing member from household:', error);
-    throw error;
+    console.error('Error removing member from household:', err);
+    throw err;
   }
 };
 
@@ -298,7 +298,7 @@ export const findHouseholdByInvite = async (
       memberIds: householdData.memberIds || []
     } as Household;
   } catch (err: any) {
-    console.error('Unable to join 5: Error finding household by invite:', error);
+    console.error('Unable to join 5: Error finding household by invite:', err);
     return null;
   }
 };
@@ -371,8 +371,8 @@ export const joinHousehold = async (
       ),
     };
   } catch (err: any) {
-    console.error('Unable to join 7: Error joining household:', error);
-    throw error;
+    console.error('Unable to join 7: Error joining household:', err);
+    throw err;
   } finally {
     perfTrace.stop();
   }
@@ -399,7 +399,7 @@ export const getUserHouseholds = async (userEmail: string): Promise<Household[]>
       ...doc.data(),
     })) as Household[];
   } catch (err: any) {
-    console.error('Error getting user households:', error);
+    console.error('Error getting user households:', err);
     return [];
   }
 };

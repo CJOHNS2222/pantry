@@ -66,7 +66,7 @@ export async function fetchGroceryItemImage(itemName: string): Promise<string | 
 
     return null;
   } catch (err: any) {
-    console.error('Error fetching grocery item image:', error);
+    console.error('Error fetching grocery item image:', err);
     return null;
   }
 }
@@ -95,7 +95,7 @@ async function fetchUnsplashImage(query: string): Promise<string | null> {
       return cachedUrl || imageUrl;
     }
   } catch (err: any) {
-    console.error('Error fetching from Unsplash:', error);
+    console.error('Error fetching from Unsplash:', err);
   }
 
   return null;

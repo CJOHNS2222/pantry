@@ -32,17 +32,17 @@ export const sendHouseholdInvitation = async (
       success: true,
       message: data?.message || `Invitation sent to ${inviteeEmail}`,
     };
-  } catch (error: any) {
-    console.error('Failed to send invitation:', error);
+  } catch (err: any) {
+    console.error('Failed to send invitation:', err);
 
     // Provide user-friendly error messages
     let message = 'Failed to send invitation email';
 
-    if (error.code === 'functions/unauthenticated') {
+    if (err.code === 'functions/unauthenticated') {
       message = 'Please log in to send invitations';
-    } else if (error.code === 'functions/invalid-argument') {
-      message = error.message || 'Invalid invitation data';
-    } else if (error.code === 'functions/internal') {
+    } else if (err.code === 'functions/invalid-argument') {
+      message = err.message || 'Invalid invitation data';
+    } else if (err.code === 'functions/internal') {
       message = 'Email service temporarily unavailable. Please try again later.';
     }
 
