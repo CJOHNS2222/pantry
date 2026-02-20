@@ -7,9 +7,9 @@ const CACHE_VERSION = '1.0';
 
 const getCacheRef = (householdId?: string, userId?: string) => {
   if (householdId) {
-    return DatabaseMonitoringService.doc(`households/${householdId}/cache/mealPlan`);
+    return DatabaseMonitoringService.doc(db, `households/${householdId}/cache/mealPlan`);
   } else if (userId) {
-    return DatabaseMonitoringService.doc(`users/${userId}/cache/mealPlan`);
+    return DatabaseMonitoringService.doc(db, `users/${userId}/cache/mealPlan`);
   } else {
     throw new Error('A householdId or userId must be provided');
   }
@@ -40,37 +40,11 @@ const updateCache = async (mealPlan: DayPlan[], householdId?: string, userId?: s
 const addMeal = async (date: string, mealType: 'breakfast' | 'lunch' | 'dinner', meal: MealPlanItem, householdId?: string, userId?: string) => {
   try {
     const cacheRef = getCacheRef(householdId, userId);
-    const docSnap = await DatabaseMonitoringService.getDoc(cacheRef);
-    let updateData: any = {};
-    // If the document or days/date/mealType path doesn't exist, initialize it
-    if (!docSnap.exists() || !docSnap.data().days || !docSnap.data().days[date]) {
-      // Use setDoc with merge: true to create the structure if missing
-      updateData = {
-        version: CACHE_VERSION,
-        lastUpdated: new Date(),
-        days: {
-          [date]: {
-            dayName: new Date(date).toLocaleDateString(undefined, { weekday: 'long' }),
-            breakfast: mealType === 'breakfast' ? [meal] : [],
-            lunch: mealType === 'lunch' ? [meal] : [],
-            dinner: mealType === 'dinner' ? [meal] : []
-          }
-        }
-      };
-      await DatabaseMonitoringService.setDoc(cacheRef, updateData, { merge: true });
-    } else if (!Array.isArray(docSnap.data().days[date][mealType])) {
-      // If the mealType array is missing, initialize it
-      updateData = {
-        [`days.${date}.${mealType}`]: [meal]
-      };
-      await DatabaseMonitoringService.updateDoc(cacheRef, updateData);
-    } else {
-      // Safe to arrayUnion
-      const fieldPath = `days.${date}.${mealType}`;
-      await DatabaseMonitoringService.updateDoc(cacheRef, {
+    const fieldPath = `days.${date}.${mealType}`;
+
+    await DatabaseMonitoringService.updateDoc(cacheRef, {
         [fieldPath]: arrayUnion(meal)
-      });
-    }
+    });
   } catch (err: any) {
     console.error(`Failed to add meal for ${date}:`, err);
   }
