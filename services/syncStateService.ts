@@ -76,3 +76,9 @@ export const setRemoteMealPlanUpdate = (value: boolean) =>
 
 export const isRemoteMealPlanUpdate = () =>
   syncState.isFlagSet('remoteMealPlanUpdate');
+
+export const setRemoteSavedRecipesUpdate = (value: boolean) =>
+  syncState.setFlagTemporarily('remoteSavedRecipesUpdate', value);
+
+export const isRemoteSavedRecipesUpdate = () =>
+  syncState.isFlagSet('remoteSavedRecipesUpdate');

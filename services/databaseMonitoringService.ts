@@ -327,7 +327,15 @@ class DatabaseMonitoringService {
 
       AnalyticsService.trackDatabaseOperation('write', ref.parent.id, 1, {
         operation: 'updateDoc',
-        success:.message,
+        success: true,
+        duration_ms: duration
+      });
+    } catch (err: any) {
+      const duration = Date.now() - startTime;
+      AnalyticsService.trackDatabaseOperation('write', ref.parent.id, 1, {
+        operation: 'updateDoc',
+        success: false,
+        error: err.message,
         duration_ms: duration
       });
 
