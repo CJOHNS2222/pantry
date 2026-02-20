@@ -227,14 +227,14 @@ class DatabaseMonitoringService {
       return result;
     } catch (err: any) {
       const queryPath = this.getQueryPath(queryRef);
-      console.error(`❌ QUERY FAILED: ${queryPath} | Error: ${err.message}`);
+      console.error(`❌ QUERY FAILED: ${queryPath} | Error: ${error.message}`);
 
       AnalyticsService.trackDatabaseOperation('read', 'unknown', 0, {
         operation: 'getDocs',
         success: false,
-        error: err.message
+        error: error.message
       });
-      throw err;
+      throw error;
     }
   }
 
@@ -295,16 +295,16 @@ class DatabaseMonitoringService {
       AnalyticsService.trackDatabaseOperation('write', ref.parent.id, 1, {
         operation: 'setDoc',
         success: false,
-        error: err.message,
+        error: error.message,
         duration_ms: duration
       });
 
-      reportDatabaseError('setDoc', ref.parent.id, err as Error, {
+      reportDatabaseError('setDoc', ref.parent.id, error as Error, {
         document_id: ref.id,
         duration_ms: duration
       });
 
-      throw err;
+      throw error;
     }
   }
 
@@ -335,16 +335,16 @@ class DatabaseMonitoringService {
       AnalyticsService.trackDatabaseOperation('write', ref.parent.id, 1, {
         operation: 'updateDoc',
         success: false,
-        error: err.message,
+        error: error.message,
         duration_ms: duration
       });
 
-      reportDatabaseError('updateDoc', ref.parent.id, err as Error, {
+      reportDatabaseError('updateDoc', ref.parent.id, error as Error, {
         document_id: ref.id,
         duration_ms: duration
       });
 
-      throw err;
+      throw error;
     }
   }
 
@@ -376,15 +376,15 @@ class DatabaseMonitoringService {
       AnalyticsService.trackDatabaseOperation('write', ref.id, 1, {
         operation: 'addDoc',
         success: false,
-        error: err.message,
+        error: error.message,
         duration_ms: duration
       });
 
-      reportDatabaseError('addDoc', ref.id, err as Error, {
+      reportDatabaseError('addDoc', ref.id, error as Error, {
         duration_ms: duration
       });
 
-      throw err;
+      throw error;
     }
   }
 
@@ -401,9 +401,9 @@ class DatabaseMonitoringService {
       AnalyticsService.trackDatabaseOperation('delete', ref.parent.id, 1, {
         operation: 'deleteDoc',
         success: false,
-        error: err.message
+        error: error.message
       });
-      throw err;
+      throw error;
     }
   }
 
@@ -437,12 +437,12 @@ class DatabaseMonitoringService {
         const duration = Date.now() - startTime;
         AnalyticsService.trackBatchOperation('batch_write', 'multiple_collections', 0);
 
-        reportDatabaseError('batch_commit', 'multiple_collections', err as Error, {
+        reportDatabaseError('batch_commit', 'multiple_collections', error as Error, {
           operation_count: operationCount,
           duration_ms: duration
         });
 
-        throw err;
+        throw error;
       }
     };
 
@@ -565,10 +565,10 @@ class DatabaseMonitoringService {
           AnalyticsService.trackDatabaseOperation('read', ref.parent.id, 1, {
             operation: 'getDoc',
             success: false,
-            error: (err as Error).message,
+            error: (error as Error).message,
             duration_ms: duration
           });
-          throw err;
+          throw error;
         }
       };
 
@@ -592,10 +592,10 @@ class DatabaseMonitoringService {
           AnalyticsService.trackDatabaseOperation('read', query._query?.path?.segments?.[0] || 'unknown', 0, {
             operation: 'getDocs',
             success: false,
-            error: (err as Error).message,
+            error: (error as Error).message,
             duration_ms: duration
           });
-          throw err;
+          throw error;
         }
       };
 
@@ -619,10 +619,10 @@ class DatabaseMonitoringService {
           AnalyticsService.trackDatabaseOperation('write', ref.parent.id, 1, {
             operation: 'setDoc',
             success: false,
-            error: (err as Error).message,
+            error: (error as Error).message,
             duration_ms: duration
           });
-          throw err;
+          throw error;
         }
       };
 
@@ -646,10 +646,10 @@ class DatabaseMonitoringService {
           AnalyticsService.trackDatabaseOperation('write', ref.parent.id, 1, {
             operation: 'updateDoc',
             success: false,
-            error: (err as Error).message,
+            error: (error as Error).message,
             duration_ms: duration
           });
-          throw err;
+          throw error;
         }
       };
 
@@ -673,10 +673,10 @@ class DatabaseMonitoringService {
           AnalyticsService.trackDatabaseOperation('write', ref.parent.id, 1, {
             operation: 'addDoc',
             success: false,
-            error: (err as Error).message,
+            error: (error as Error).message,
             duration_ms: duration
           });
-          throw err;
+          throw error;
         }
       };
 
@@ -699,10 +699,10 @@ class DatabaseMonitoringService {
           AnalyticsService.trackDatabaseOperation('write', ref.parent.id, 1, {
             operation: 'deleteDoc',
             success: false,
-            error: (err as Error).message,
+            error: (error as Error).message,
             duration_ms: duration
           });
-          throw err;
+          throw error;
         }
       };
 
