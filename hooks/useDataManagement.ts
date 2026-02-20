@@ -999,11 +999,37 @@ export function useDataManagement(
     if (dayIndex === undefined) {
       const today = new Date().toISOString().slice(0, 10);
       dayIndex = mealPlan.findIndex(day => day.date === today);
+      // If today is not found, default to the first available day
+      if (dayIndex === -1 && mealPlan.length > 0) {
+        dayIndex = 0;
+      }
     }
     
     if (dayIndex === undefined || dayIndex < 0 || dayIndex >= mealPlan.length) {
-      addToast(ERROR_MESSAGES.INVALID_DAY, 'error');
-      return;
+      // If mealPlan is empty, create a new day for tomorrow and add the meal there
+      if (!mealPlan.length) {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const dateStr = tomorrow.toISOString().slice(0, 10);
+        const newDay = {
+          date: dateStr,
+          dayName: tomorrow.toLocaleDateString(undefined, { weekday: 'long' }),
+          breakfast: [],
+          lunch: [],
+          dinner: []
+        };
+        const mealTypeToUse = targetMealType || 'breakfast';
+        const newMeal = {
+          id: `meal-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          recipe: recipe,
+          mealType: mealTypeToUse
+        };
+        newDay[mealTypeToUse] = [newMeal];
+        await addMealToPlan(dateStr, mealTypeToUse, newMeal);
+        AnalyticsService.trackMealPlanAdd(recipe.id || recipe.title, recipe.title, mealTypeToUse, 0);
+        if (user) await UsageService.recordMealPlanAddition(user);
+        return;
+      }
     }
 
     const targetDate = mealPlan[dayIndex].date;
@@ -1690,6 +1716,11 @@ const deleteCustomCategory = async (categoryId: string) => {
       addToast('Failed to remove meal from plan.', 'error');
     }
   };
+
+  // Memoized suggestions and alerts
+  const consumptionSuggestions = useMemo(() => generateConsumptionSuggestions(inventory), [inventory]);
+  const expirationAlerts = useMemo(() => generateExpirationAlerts(inventory), [inventory]);
+  const recipeSuggestions = useMemo(() => generateRecipeSuggestions(inventory), [inventory]);
 
   return {
     inventory,

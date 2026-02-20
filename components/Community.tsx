@@ -25,7 +25,7 @@ interface RecipeStats {
   comments: RecipeRating[];
 }
 
-export const Community: React.FC<CommunityProps> = ({ ratings, onAddToPlan, onSaveRecipe, user }) => {
+export const Community: React.FC<CommunityProps> = ({ ratings = [], onAddToPlan, onSaveRecipe, user }) => {
     // List of staple items to ignore in ingredient display
     const STAPLES = ['salt', 'pepper', 'oil', 'water', 'flour', 'sugar', 'butter', 'vinegar', 'baking powder', 'baking soda', 'spices', 'seasoning', 'soy sauce', 'cornstarch', 'yeast'];
   const [showModal, setShowModal] = useState(false);

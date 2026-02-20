@@ -69,7 +69,7 @@ const App: React.FC = () => {
     };
     
     trackNavigation(tabNames[activeTab] || 'unknown', tabNames[tab] || 'unknown');
-    HapticService.tabSwitch();
+    HapticService.light();
     setActiveTab(tab);
     window.scrollTo(0, 0);
     

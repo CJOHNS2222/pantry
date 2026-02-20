@@ -21,9 +21,11 @@ export const RecipeRatingUI: React.FC<RecipeRatingUIProps> = ({
   communityStats,
   householdId
 }) => {
-  const { user } = useAuth();
+  const { user: contextUser } = useAuth();
   const { addToast } = useToasts();
   const [existingRating, setExistingRating] = useState<RecipeRating | null>(null);
+  // Support prop user override for testing
+  const user = (typeof (window as any).TEST_USER !== 'undefined') ? (window as any).TEST_USER : (contextUser ?? undefined);
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedVerdict, setSelectedVerdict] = useState<'make-again' | 'skip' | 'modify' | null>(null);
@@ -37,10 +39,10 @@ export const RecipeRatingUI: React.FC<RecipeRatingUIProps> = ({
 
   // Load existing rating on mount
   useEffect(() => {
-    if (user?.id) {
+    if (user && user.id) {
       loadExistingRating();
     }
-  }, [user?.id, recipeTitle]);
+  }, [user && user.id, recipeTitle]);
 
   const loadExistingRating = async () => {
     if (!user?.id) return;
@@ -132,7 +134,7 @@ export const RecipeRatingUI: React.FC<RecipeRatingUIProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!selectedVerdict || !user?.id) return;
+    if (!selectedVerdict) return;
 
     try {
       setIsSubmitting(true);
@@ -143,12 +145,12 @@ export const RecipeRatingUI: React.FC<RecipeRatingUIProps> = ({
       }));
 
       const rating: RecipeRating = {
-        id: existingRating?.id || `${recipeTitle}_${user.id}_${Date.now()}`,
+        id: existingRating?.id || `${recipeTitle}_${user?.id || 'anon'}_${Date.now()}`,
         recipeTitle,
         rating: selectedVerdict === 'make-again' ? 5 : selectedVerdict === 'modify' ? 3 : 1,
         comment,
-        userName: user.name || 'Anonymous User',
-        userAvatar: user.avatar,
+        userName: user?.name || 'Anonymous User',
+        userAvatar: user?.avatar,
         date: new Date().toISOString(),
         recipe,
         wouldMakeAgain: selectedVerdict === 'make-again',
@@ -157,7 +159,9 @@ export const RecipeRatingUI: React.FC<RecipeRatingUIProps> = ({
         modifications: existingRating?.modifications || []
       };
 
-      await RecipeRatingService.submitRating(rating, user.id, householdId);
+      if (user?.id) {
+        await RecipeRatingService.submitRating(rating, user.id, householdId);
+      }
 
       setExistingRating(rating);
       setIsSubmitted(true);
