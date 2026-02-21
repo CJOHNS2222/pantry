@@ -19,7 +19,7 @@ export interface CacheMetadata {
  * Similar to how popular_recipes are cached, but for inventory items
  */
 export class InventoryCacheService {
-  private static readonly CACHE_VERSION = 1;
+  public static readonly CACHE_VERSION = 1;
 
   // Define the order of fields in the item array - MATCHING actual PantryItem fields
   private static readonly ITEM_FIELD_ORDER = [
@@ -58,7 +58,7 @@ export class InventoryCacheService {
   /**
    * Convert an array back to a PantryItem
    */
-  private static arrayToPantryItem(itemId: string, itemArray: string[]): PantryItem {
+  public static arrayToPantryItem(itemId: string, itemArray: string[]): PantryItem {
     return {
       id: itemId,
       category: itemArray[0] || '',
@@ -145,12 +145,12 @@ export class InventoryCacheService {
       const cachedData: CachedInventoryData & CacheMetadata = {
         lastUpdated: new Date(),
         version: this.CACHE_VERSION,
-        itemCount: items.length
-      };
+        itemCount: items.length,
+      } as any;
 
       // Add each item as itemId -> itemArray
       items.forEach(item => {
-        cachedData[item.id] = this.pantryItemToArray(item);
+        (cachedData as any)[item.id] = this.pantryItemToArray(item);
       });
 
       await DatabaseMonitoringService.setDoc(cacheRef, cachedData);
@@ -170,20 +170,21 @@ export class InventoryCacheService {
 
       // Add the item to the cache document
       const updateData: Partial<CachedInventoryData & CacheMetadata> = {
-        [item.id]: this.pantryItemToArray(item),
         lastUpdated: new Date()
       };
+
+      (updateData as any)[item.id] = this.pantryItemToArray(item);
 
       // Increment item count (we need to read current count first)
       const docSnap = await DatabaseMonitoringService.getDoc(cacheRef);
       if (docSnap.exists()) {
         const data = docSnap.data() as CachedInventoryData & CacheMetadata;
-        updateData.itemCount = (data.itemCount || 0) + 1;
+        (updateData as any).itemCount = (data.itemCount || 0) + 1;
         await DatabaseMonitoringService.updateDoc(cacheRef, updateData);
       } else {
         // Document doesn't exist, create it with setDoc
-        updateData.itemCount = 1;
-        updateData.version = this.CACHE_VERSION;
+        (updateData as any).itemCount = 1;
+        (updateData as any).version = this.CACHE_VERSION;
         await DatabaseMonitoringService.setDoc(cacheRef, updateData);
       }
     } catch (err: any) {
@@ -248,9 +249,9 @@ export class InventoryCacheService {
 
       // Update the cache document
       const updateData: Partial<CachedInventoryData & CacheMetadata> = {
-        [itemId]: updatedItemArray,
         lastUpdated: new Date()
       };
+      (updateData as any)[itemId] = updatedItemArray;
 
       await DatabaseMonitoringService.updateDoc(cacheRef, updateData);
     } catch (err: any) {
@@ -268,15 +269,15 @@ export class InventoryCacheService {
 
       // Remove the item from the cache document
       const updateData: Partial<CachedInventoryData & CacheMetadata> = {
-        [itemId]: DatabaseMonitoringService.deleteField(), // Use Firestore delete field
         lastUpdated: new Date()
       };
+      (updateData as any)[itemId] = DatabaseMonitoringService.deleteField();
 
       // Decrement item count
       const docSnap = await DatabaseMonitoringService.getDoc(cacheRef);
       if (docSnap.exists()) {
         const data = docSnap.data() as CachedInventoryData & CacheMetadata;
-        updateData.itemCount = Math.max(0, (data.itemCount || 0) - 1);
+        (updateData as any).itemCount = Math.max(0, (data.itemCount || 0) - 1);
       }
 
       await DatabaseMonitoringService.updateDoc(cacheRef, updateData);

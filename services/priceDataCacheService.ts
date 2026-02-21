@@ -1,214 +1,111 @@
+import { auth } from '../firebaseConfig';
 import DatabaseMonitoringService from './databaseMonitoringService';
-import { PriceData } from './groceryPriceService';
-import { getAuth } from 'firebase/auth';
 
-export interface CachedPriceData {
-  // Ingredient key -> PriceData
-  [ingredientKey: string]: {
-    averagePrice: number;
-    minPrice: number;
-    maxPrice: number;
-    sampleSize: number;
-    lastUpdated: string; // ISO string
-    unit: string;
-  };
-}
-
-// Metadata stored separately in the cache document
-export interface PriceDataCacheMetadata {
+// Represents the structure of price data for a single grocery item
+export interface PriceData {
+  averagePrice: number;
+  minPrice: number;
+  maxPrice: number;
+  sampleSize: number;
   lastUpdated: Date;
-  version: number;
-  totalItems: number;
+  unit: string;
 }
 
-/**
- * Service for caching price data in Firestore for efficient bulk reads
- * Stores all price data in a single root-level document for global access
- */
+// Structure of the cache document stored in Firestore
+export interface PriceDataCache {
+  [itemName: string]: PriceData;
+}
+
+// Service for managing the cache of grocery item price data
 export class PriceDataCacheService {
-  private static readonly CACHE_DOC_ID = 'price_cache/global';
-  private static readonly CACHE_VERSION = 1;
+  private static readonly CACHE_COLLECTION = 'price_cache';
+  private static readonly CACHE_DOC_ID = 'priceData';
 
-  /**
-   * Get the cache document reference
-   */
+  // Debounce saving to Firestore to avoid rapid writes
+  private static saveTimeout: NodeJS.Timeout | null = null;
+
+  // In-memory cache to reduce Firestore reads
+  private static priceData: PriceDataCache = {};
+  private static hasLoaded = false;
+
+  // Get a reference to the global cache document
   private static getCacheRef() {
-    return doc(db, this.CACHE_DOC_ID);
+    return DatabaseMonitoringService.doc(`${this.CACHE_COLLECTION}/${this.CACHE_DOC_ID}`);
   }
 
-  /**
-   * Load all cached price data
-   */
-  static async loadPriceData(): Promise<Map<string, PriceData>> {
-    try {
-      // Check if user is authenticated before accessing Firestore
-      const auth = getAuth();
-      const user = auth.currentUser;
-      if (!user) {
-        console.warn('Cannot load price data cache: user not authenticated');
-        return new Map();
-      }
-
-      const cacheRef = this.getCacheRef();
-
-      const cacheDoc = await DatabaseMonitoringService.getDoc(cacheRef);
-      if (!cacheDoc.exists()) {
-        return new Map();
-      }
-
-      const data = cacheDoc.data();
-      const priceData = data?.priceData as CachedPriceData | undefined;
-
-      if (!priceData) return new Map();
-
-      const result = new Map<string, PriceData>();
-      for (const [key, cached] of Object.entries(priceData)) {
-        result.set(key, {
-          ...cached,
-          lastUpdated: new Date(cached.lastUpdated)
-        });
-      }
-
-      return result;
-    } catch (err: any) {
-      console.warn('Failed to load price data cache:', err);
-      return new Map();
+  // Load all price data from the cache
+  static async loadPriceData(): Promise<PriceDataCache> {
+    // Ensure we only try to load if a user is logged in
+    if (!auth.currentUser) {
+      console.log('User not authenticated, skipping price data load.');
+      return {};
     }
-  }
-
-  /**
-   * Save price data cache (batch write)
-   */
-  static async savePriceData(priceData: Map<string, PriceData>): Promise<void> {
-    if (priceData.size === 0) return;
-
-    try {
-      // Check if user is authenticated before accessing Firestore
-      const auth = getAuth();
-      const user = auth.currentUser;
-      if (!user) {
-        console.warn('Cannot save price data cache: user not authenticated');
-        return;
-      }
-
-      const cacheRef = this.getCacheRef();
-
-      // Convert Map to object for Firestore
-      const cachedData: CachedPriceData = {};
-      for (const [key, data] of priceData.entries()) {
-        cachedData[key] = {
-          ...data,
-          lastUpdated: data.lastUpdated.toISOString()
-        };
-      }
-
-      const metadata: PriceDataCacheMetadata = {
-        lastUpdated: new Date(),
-        version: this.CACHE_VERSION,
-        totalItems: priceData.size
-      };
-
-      await DatabaseMonitoringService.setDoc(cacheRef, {
-        priceData: cachedData,
-        metadata
-      }, { merge: true });
-
-    } catch (err: any) {
-      console.error('Failed to save price data cache:', err);
-      throw err;
+    // Avoid re-loading if we already have the data
+    if (this.hasLoaded) {
+        return this.priceData;
     }
-  }
 
-  /**
-   * Update specific price data in the cache
-   */
-  static async updatePriceData(ingredientKey: string, priceData: PriceData): Promise<void> {
     try {
-      // Check if user is authenticated before accessing Firestore
-      const auth = getAuth();
-      const user = auth.currentUser;
-      if (!user) {
-        console.warn('Cannot update price data cache: user not authenticated');
-        return;
-      }
-
       const cacheRef = this.getCacheRef();
-
-      const updateData = {
-        [`priceData.${ingredientKey}`]: {
-          ...priceData,
-          lastUpdated: priceData.lastUpdated.toISOString()
-        },
-        'metadata.lastUpdated': new Date(),
-        'metadata.version': this.CACHE_VERSION
-      };
-
-      await DatabaseMonitoringService.updateDoc(cacheRef, updateData);
-    } catch (err: any) {
-      console.error('Failed to update price data cache:', err);
-      throw err;
-    }
-  }
-
-  /**
-   * Clear the price data cache
-   */
-  static async clearCache(): Promise<void> {
-    try {
-      // Check if user is authenticated before accessing Firestore
-      const auth = getAuth();
-      const user = auth.currentUser;
-      if (!user) {
-        console.warn('Cannot clear price data cache: user not authenticated');
-        return;
-      }
-
-      const cacheRef = this.getCacheRef();
-
-      await DatabaseMonitoringService.updateDoc(cacheRef, {
-        priceData: {},
-        metadata: {
-          lastUpdated: new Date(),
-          version: this.CACHE_VERSION,
-          totalItems: 0
+      const docSnap = await DatabaseMonitoringService.getDoc(cacheRef);
+      if (docSnap.exists()) {
+        const data = docSnap.data() as PriceDataCache;
+        // Convert Firestore Timestamps to JS Date objects
+        for (const key in data) {
+          if (data[key].lastUpdated && (data[key].lastUpdated as any).toDate) {
+            data[key].lastUpdated = (data[key].lastUpdated as any).toDate();
+          }
         }
-      });
+        this.priceData = data;
+        this.hasLoaded = true;
+        return data;
+      }
     } catch (err: any) {
-      console.error('Failed to clear price data cache:', err);
-      throw err;
+      console.error("Failed to load price data cache:", err);
+    }
+    return {};
+  }
+
+  // Get price data for a single item from the in-memory cache
+  static getPriceData(itemName: string): PriceData | undefined {
+    return this.priceData[itemName.toLowerCase()];
+  }
+
+  // Set price data for a single item in the in-memory cache and schedule a save
+  static setPriceData(itemName: string, data: PriceData) {
+    this.priceData[itemName.toLowerCase()] = data;
+    this.scheduleSave();
+  }
+
+  // Debounce the save operation to avoid too many writes
+  private static scheduleSave() {
+    if (this.saveTimeout) {
+      clearTimeout(this.saveTimeout);
+    }
+    this.saveTimeout = setTimeout(() => {
+      this.savePriceData();
+    }, 2000); // Wait 2 seconds before saving
+  }
+
+  // Save the entire in-memory cache to Firestore
+  static async savePriceData() {
+    // Ensure we only try to save if a user is logged in
+    if (!auth.currentUser) {
+      console.log('User not authenticated, skipping price data save.');
+      return;
+    }
+
+    try {
+      const cacheRef = this.getCacheRef();
+      await DatabaseMonitoringService.setDoc(cacheRef, this.priceData, { merge: true });
+    } catch (err: any) {
+      console.error("Failed to save price data cache:", err);
     }
   }
 
-  /**
-   * Get cache statistics
-   */
-  static async getCacheStats(): Promise<{ size: number; lastUpdated?: Date }> {
-    try {
-      // Check if user is authenticated before accessing Firestore
-      const auth = getAuth();
-      const user = auth.currentUser;
-      if (!user) {
-        console.warn('Cannot get cache stats: user not authenticated');
-        return { size: 0 };
-      }
-
-      const cacheRef = this.getCacheRef();
-
-      const cacheDoc = await DatabaseMonitoringService.getDoc(cacheRef);
-      if (!cacheDoc.exists()) {
-        return { size: 0 };
-      }
-
-      const data = cacheDoc.data();
-      const metadata = data?.metadata as PriceDataCacheMetadata | undefined;
-
-      return {
-        size: metadata?.totalItems || 0,
-        lastUpdated: metadata?.lastUpdated
-      };
-    } catch (err: any) {
-      console.warn('Failed to get cache stats:', err);
-      return { size: 0 };
-    }
+  // Call this on user logout
+  static clearCache() {
+    this.priceData = {};
+    this.hasLoaded = false;
   }
 }

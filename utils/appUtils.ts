@@ -957,14 +957,28 @@ export function getAutoExpirationDate(itemName: string, category: string): strin
     return expirationDate.toISOString().slice(0, 10);
   }
 
-  // Could add more auto-expiration rules here for other items
-  // if (name.includes('leftovers') || cat === 'prepared') {
-  //   const expirationDate = new Date();
-  //   expirationDate.setDate(expirationDate.getDate() + 3);
-  //   return expirationDate.toISOString().slice(0, 10);
-  // }
-
   return undefined;
+}
+
+/**
+ * Determines whether an expiry alert should be shown for an item
+ * @param item The pantry item
+ * @returns True if an alert should be shown
+ */
+export function shouldShowExpiryAlert(item: PantryItem): boolean {
+  if (!item.expirationDate || item.expiryAlertShown) {
+    return false;
+  }
+  const expirationDate = new Date(item.expirationDate);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const daysRemaining = Math.ceil((expirationDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+  const isMilk = item.item.toLowerCase().includes('milk') || item.category.toLowerCase() === 'dairy';
+  const warningThreshold = isMilk ? 3 : 7;
+
+  return daysRemaining <= warningThreshold;
 }
 
 /**

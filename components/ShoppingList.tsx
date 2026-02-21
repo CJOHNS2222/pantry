@@ -24,6 +24,7 @@ import { useAuth } from '../hooks/useAuth';
 import { offlineQueueService } from '../services/offlineQueueService';
 import { offlineDataCache } from '../services/offlineDataCache';
 import { groceryPriceService } from '../services/groceryPriceService';
+import { priceCacheService } from '../services/priceCacheService';
 
 // Firestore imports
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';

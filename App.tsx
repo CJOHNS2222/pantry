@@ -36,6 +36,7 @@ import PerformanceMonitoringService from './services/performanceMonitoringServic
 import HapticService from './services/hapticService';
 import { ShoppingListCacheService } from './services/shoppingListCacheService';
 import { groceryPriceService } from './services/groceryPriceService';
+import { PriceDataCacheService } from './services/priceDataCacheService'; // Import the service
 
 // Lazy load monitoring components
 const DatabaseAnalytics = React.lazy(() => import('./components/DatabaseAnalytics').then(module => ({ default: module.default })));
@@ -102,14 +103,21 @@ const App: React.FC = () => {
 
   const backButtonListenerRef = useRef<any>(null);
 
-  const { user, setUser, handleLogout } = useAuth();
+  const { user, setUser, handleLogout, isAuthReady } = useAuth(); // Use isAuthReady
   const { settings, setSettings } = useSettings();
   const { addToast, toasts, setToasts } = useToasts();
-  // const { syncStatus, syncNow } = useOfflineStatus(); // DISABLED
   const { syncStatus, syncNow } = useOfflineStatus();
 
   // Apply theme to document
   useTheme(settings.theme);
+
+  // Load price data once auth is ready and we have a user
+  useEffect(() => {
+    if (isAuthReady && user) {
+      console.log("Auth is ready and user is logged in, loading price data...");
+      PriceDataCacheService.loadPriceData();
+    }
+  }, [isAuthReady, user]);
 
   // Load notification settings from user profile
   useEffect(() => {
@@ -129,7 +137,6 @@ const App: React.FC = () => {
     const householdId = inHousehold ? household.id : undefined;
     const userId = inHousehold ? undefined : user.id;
     
-    // Create items with IDs and estimated prices
     const newItems: ShoppingItem[] = [];
     for (const item of items) {
       const parsed = parseIngredientForShoppingList(item);
@@ -147,10 +154,8 @@ const App: React.FC = () => {
       });
     }
     
-    // Update local state immediately for instant UI feedback
     setShoppingList(prev => [...prev, ...newItems]);
     
-    // Batch write to cache
     const batch = [];
     for (const item of newItems) {
       batch.push(ShoppingListCacheService.addItemToCache(item, householdId, userId));
@@ -185,6 +190,7 @@ const App: React.FC = () => {
     ratings,
     mealPlan,
     setMealPlan,
+    updateMealPlan,
     household,
     setHousehold,
     consumptionSuggestions,
@@ -199,27 +205,21 @@ const App: React.FC = () => {
     handleDeleteRecipe,
     handleRateRecipe,
     handleMarkAsMade,
-    // Item management with undo
     updateItem,
     deleteItem,
     addItem,
     addItems,
-    // Undo
     recentActions,
     recordUndo,
     performUndo,
-    // Usage limit states
     recipeSaveLimitExceeded,
     mealPlanLimitExceeded,
-    // Limit checking functions
     checkRecipeSaveLimit,
     checkMealPlanLimit,
-    // Manual sync functions
     syncShoppingListToDatabase,
     syncMealPlanToDatabase,
     syncSavedRecipesToDatabase,
     addShoppingListItem,
-    // Loading states
     isLoadingInventory,
     isLoadingShoppingList,
     isLoadingMealPlan,
@@ -236,7 +236,6 @@ const App: React.FC = () => {
     disableInventoryListeners: activeTab === Tab.PANTRY_CACHE_TEST
   });
 
-  // Update household activity tracking when household data becomes available
   useEffect(() => {
     if (user?.id && household?.id) {
       const activityMap = {
@@ -254,42 +253,33 @@ const App: React.FC = () => {
     }
   }, [user?.id, household?.id, activeTab]);
 
-  // Initialize safe area handling for mobile devices
   useEffect(() => {
     SafeAreaService.initialize().catch(error => log.error('Failed to initialize safe area service', { error }, 'App'));
   }, []);
 
-  // Initialize performance monitoring
   useEffect(() => {
     PerformanceMonitoringService.init();
-    
-    // Track app open
     PerformanceMonitoringService.mark('app_open');
-    
     return () => {
       PerformanceMonitoringService.cleanup();
     };
   }, []);
 
-  // Initialize push notifications for mobile devices
   useEffect(() => {
     if (user?.id) {
       pushNotificationService.initialize().catch(error => log.error('Failed to initialize push notifications', { error }, 'App'));
     }
   }, [user?.id]);
 
-  // Initialize database monitoring
   useEffect(() => {
     if (user?.id) {
       // Database monitoring is now initialized in firebaseConfig.ts
     }
   }, [user?.id]);
 
-  // Listen for notifications while user is logged in
   useEffect(() => {
     if (!user?.id) return;
 
-    // Additional check to ensure Firebase auth is ready
     const auth = getAuth();
     if (!auth.currentUser) return;
 
@@ -300,13 +290,11 @@ const App: React.FC = () => {
           NotificationService.shouldShowNotification(notification, notificationSettings)
         );
 
-        // Show the highest priority notification that hasn't been shown recently
         if (filteredNotifications.length > 0) {
           const highestPriority = filteredNotifications.reduce((prev, current) =>
             getPriorityWeight(current.priority) > getPriorityWeight(prev.priority) ? current : prev
           );
 
-          // Only show if we haven't shown a notification in the last 5 minutes
           const lastShown = localStorage.getItem('lastNotificationShown');
           const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
 
@@ -320,14 +308,12 @@ const App: React.FC = () => {
       }
     };
 
-    // Check immediately and then every 5 minutes
     checkAndShowNotifications();
     const interval = setInterval(checkAndShowNotifications, 5 * 60 * 1000);
 
     return () => clearInterval(interval);
   }, [user?.id, notificationSettings]);
 
-  // Helper function to get priority weight for sorting
   const getPriorityWeight = (priority: string): number => {
     switch (priority) {
       case 'urgent': return 4;
@@ -338,21 +324,17 @@ const App: React.FC = () => {
     }
   };
 
-  // Notification handlers
   const handleNotificationDismiss = async (notificationId: string) => {
     await NotificationService.markAsRead(notificationId);
     setNotifications([]);
   };
 
   const handleNotificationAction = async (notification: NotificationItem) => {
-    // Mark as read immediately to prevent multiple clicks
     setNotifications([]);
     
     try {
-      // Mark as read in database
       await NotificationService.markAsRead(notification.id);
 
-      // Handle the action
       switch (notification.actionType) {
         case 'add_to_shopping':
           if (notification.actionData?.itemName) {
@@ -362,7 +344,6 @@ const App: React.FC = () => {
         case 'view_recipe':
           if (notification.actionData?.recipeId) {
             setActiveTab(Tab.RECIPES);
-            // Could scroll to specific recipe or set search
           }
           break;
         case 'view_item':
@@ -371,19 +352,13 @@ const App: React.FC = () => {
           }
           break;
         case 'join_household':
-          // Join household invitation
           if (notification.actionData?.householdId && user) {
             try {
-              // Use the household service to join
               const updatedHousehold = await joinHousehold(notification.actionData.householdId, user);
               
               if (updatedHousehold) {
-                // Update local user state with householdId
                 setUser({ ...user, householdId: notification.actionData.householdId });
-                
-                // Update local household state
                 setHousehold(updatedHousehold);
-                
                 addToast('Successfully joined household!', 'success');
               } else {
                 addToast('Failed to join household - invitation not found', 'error');
@@ -410,30 +385,24 @@ const App: React.FC = () => {
     setNotifications([]);
   };
 
-
-
-
   const handleLogin = async (loggedInUser: User) => {
-    // Update user document with login data
     const userRef = doc(db, 'users', loggedInUser.id);
     const userDoc = await getDoc(userRef);
 
     if (!userDoc.exists()) {
-      // Create user document if it doesn't exist
       await setDoc(userRef, {
         name: loggedInUser.name,
         email: loggedInUser.email,
         subscription: {
           tier: 'premium',
           status: 'active',
-          current_period_end: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year from now
+          current_period_end: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
           cancel_at_period_end: false
         },
         createdAt: serverTimestamp(),
         hasSeenTutorial: false
       });
     } else {
-      // Update existing user document with name if it's missing or different
       const userData = userDoc.data();
       if (!userData?.name || userData.name !== loggedInUser.name) {
         await updateDoc(userRef, {
@@ -444,11 +413,7 @@ const App: React.FC = () => {
     }
 
     setUser(loggedInUser);
-
-    // Track login event
     AnalyticsService.trackLogin(loggedInUser.provider || 'email');
-
-    // Set user properties for analytics
     AnalyticsService.setUser(loggedInUser.id, {
       email: loggedInUser.email,
       provider: loggedInUser.provider,
@@ -458,11 +423,7 @@ const App: React.FC = () => {
     if (!loggedInUser.hasSeenTutorial) setShowTutorial(true);
   };
 
-  // Notifications are now handled by the real-time listener above
-
-  // Track app lifecycle events
   useEffect(() => {
-    // Initialize image cache system
     import('./services/imageCacheService').then(({ initializeImageCache }) => {
       initializeImageCache().catch(error => {
         log.error('Failed to initialize image cache', { error }, 'App');
@@ -486,11 +447,9 @@ const App: React.FC = () => {
     };
   }, []);
 
-  // Handle back button for mobile navigation
   const [lastBackPress, setLastBackPress] = useState<number>(0);
   useEffect(() => {
     const handleBackButton = (event: BackButtonListenerEvent) => {
-      // Close modals in priority order
       if (showNotificationsModal) {
         setShowNotificationsModal(false);
         return;
@@ -506,28 +465,22 @@ const App: React.FC = () => {
         return;
       }
 
-      // Navigate back to default tab if not already there
       if (activeTab !== Tab.PANTRY) {
         setActiveTab(Tab.PANTRY);
         return;
       }
 
-      // Handle double-tap to exit on pantry tab
       const currentTime = Date.now();
       const timeDiff = currentTime - lastBackPress;
 
-      if (timeDiff < 2000) { // 2 seconds window for double tap
-        // Double tap detected - exit app
+      if (timeDiff < 2000) {
         CapacitorApp.exitApp();
       } else {
-        // Single tap - show message and auto-dismiss after 2 seconds
-        const toastId = 'exit-app';
         addToast('Press back again to exit', 'info', 2000);
         setLastBackPress(currentTime);
       }
     };
 
-    // Add back button listener
     CapacitorApp.addListener('backButton', handleBackButton).then((listener) => {
       backButtonListenerRef.current = listener;
     }).catch((error) => {
@@ -542,7 +495,6 @@ const App: React.FC = () => {
     };
   }, [showNotificationsModal, showTutorial, showHousehold, activeTab, lastBackPress, addToast]);
 
-  // Track tab switches
   const [previousTab, setPreviousTab] = useState<Tab>(Tab.PANTRY);
   useEffect(() => {
     if (activeTab !== previousTab) {
@@ -551,12 +503,19 @@ const App: React.FC = () => {
     }
   }, [activeTab, previousTab]);
 
+  // Show a loading spinner while waiting for auth to be ready
+  if (!isAuthReady) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-theme-primary">
+        <LoadingSpinner />
+      </div>
+    );
+  }
+
   if (!user) return <Login onLogin={handleLogin} />;
 
-  // Function to navigate to settings and scroll to notifications
   const navigateToNotifications = () => {
     setActiveTab(Tab.SETTINGS);
-    // Scroll to notifications section after a short delay to allow settings to render
     setTimeout(() => {
       const notificationsSection = document.querySelector('[data-section="notifications"]');
       if (notificationsSection) {
@@ -568,11 +527,10 @@ const App: React.FC = () => {
   return (
     <>
       {(() => {
-        // Set app context for Sentry
         if (settings?.theme) {
           setAppContext(
             process.env.npm_package_version || '1.0.0',
-            'web', // Default to web, Capacitor will override if needed
+            'web',
             settings.theme.mode
           );
         }
@@ -596,7 +554,6 @@ const App: React.FC = () => {
           <Tutorial
             onClose={async () => {
               setShowTutorial(false);
-              // Mark tutorial as seen
               if (user) {
                 const { doc, updateDoc } = await import('firebase/firestore');
                 await updateDoc(doc(db, 'users', user.id), { hasSeenTutorial: true });
@@ -614,16 +571,13 @@ const App: React.FC = () => {
               }
             }))}
             onOpenRecipeSearch={() => {
-              // Switch to meals tab and trigger recipe search modal
               setActiveTab(Tab.MEALS);
-              // The tutorial will handle opening the modal after a delay
             }}
             onOpenAnalytics={() => setActiveTab(Tab.SETTINGS)}
             currentTab={activeTab}
           />
         )}
 
-        {/* Notifications Modal */}
         {showNotificationsModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-lg max-w-md w-full max-h-[80vh] overflow-y-auto">
@@ -640,7 +594,6 @@ const App: React.FC = () => {
                           </p>
                           <button
                             onClick={async () => {
-                              // Load the household data
                               const { doc, getDoc, writeBatch } = await import('firebase/firestore');
                               const householdDoc = await getDoc(doc(db, 'households', notification.householdId));
                               if (householdDoc.exists()) {
@@ -653,15 +606,13 @@ const App: React.FC = () => {
                                 });
                               }
                               
-                              // Mark this notification as read
                               const batch = writeBatch(db);
                               batch.update(doc(db, 'notifications', notification.id), { read: true });
                               await batch.commit();
                               
-                              setActiveTab(Tab.PANTRY); // Go to pantry tab instead of household
+                              setActiveTab(Tab.PANTRY);
                               setShowNotificationsModal(false);
                               
-                              // Remove this notification from the local state
                               setNotifications(prev => prev.filter(n => n.id !== notification.id));
                             }}
                             className="mt-3 bg-amber-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-amber-700 transition-colors"
@@ -681,7 +632,6 @@ const App: React.FC = () => {
                 <div className="flex gap-3 mt-6">
                   <button
                     onClick={() => {
-                      // Mark notifications as read
                       import('firebase/firestore').then(async ({ writeBatch, doc }) => {
                         const batch = writeBatch(db);
                         notifications.forEach(notification => {
@@ -733,6 +683,7 @@ const App: React.FC = () => {
             setShoppingList,
             mealPlan,
             setMealPlan,
+            updateMealPlan,
             savedRecipes,
             ratings,
             persistedRecipeResult,
@@ -767,18 +718,17 @@ const App: React.FC = () => {
               setInventory,
               setShoppingList,
               setMealPlan,
+              updateMealPlan,
               onAddToPlan: handleAddToPlan,
               onSaveRecipe: handleSaveRecipe,
               onDeleteRecipe: handleDeleteRecipe,
               onRateRecipe: handleRateRecipe,
               handleMarkAsMade,
               onMoveToPantry: async (items) => {
-                // Process items and fetch external images for new items that don't have local images
                 const processedItems = await Promise.all(items.map(async (i) => {
                   const category = inferCategoryFromItemName(i.item);
                   let image = getItemImage(i.item, category);
                   
-                  // If it's a placeholder, try to fetch an external image
                   if (image === '/images/placeholder.svg') {
                     try {
                       const externalImage = await fetchExternalItemImage(i.item);
@@ -793,10 +743,8 @@ const App: React.FC = () => {
                   let addQty = i.purchasedQuantity ? i.purchasedQuantity.amount : (i.quantity ? parseFloat(i.quantity.toString()) || 1 : 1);
                   if (addQty < 1) addQty = 1;
                   
-                  // Parse recipe reservations from source
                   const reservations: { recipeId: string; recipeName: string; quantity: number; unit: string }[] = [];
                   if (i.source?.startsWith('recipe: need ')) {
-                    // Format: "recipe: need 1.5 oz for "Recipe Name""
                     const match = i.source.match(/recipe: need (.+?) for "(.+?)"/);
                     if (match) {
                       const qtyStr = match[1];
@@ -827,27 +775,21 @@ const App: React.FC = () => {
                   };
                 }));
                 
-                // Add all merged items immediately (addItems will handle merging with existing inventory)
                 const addedItems = await addItems(Object.values(processedItems));
 
-                // Remove items from shopping list
                 setShoppingList(prev => prev.filter(item => !items.find(moved => moved.id === item.id)));
                 
-                // Sync shopping list to database after removing items
                 setTimeout(() => {
                   syncShoppingListToDatabase();
                 }, 100);
 
-                // Show toast asking to edit quantities
                 addToast(
                   `Added ${items.length} item${items.length > 1 ? 's' : ''} to pantry. Edit quantities?`,
                   'info',
                   8000,
                   'Edit Quantities',
                   () => {
-                    // Store the added items for quantity editing
                     localStorage.setItem('pendingQuantityEdits', JSON.stringify(addedItems));
-                    // Switch to pantry tab and trigger quantity editing workflow
                     setActiveTab(Tab.PANTRY);
                   }
                 );
@@ -873,7 +815,6 @@ const App: React.FC = () => {
         </AppProvider>
         <AppNavigation activeTab={activeTab} setActiveTab={switchTab} />
         
-        {/* Household Manager Modal */}
         {showHousehold && (
           <HouseholdManager
             user={user}
@@ -885,7 +826,6 @@ const App: React.FC = () => {
           />
         )}
 
-        {/* Notification Banner */}
         {notifications.length > 0 && (
           <NotificationBanner
             notification={notifications[0]}
@@ -895,7 +835,6 @@ const App: React.FC = () => {
           />
         )}
 
-        {/* Toast Notifications */}
         <div className="fixed bottom-4 right-4 mb-safe z-50 space-y-2">
           {toasts.map((toast) => (
             <div
@@ -933,10 +872,8 @@ const App: React.FC = () => {
       </div>
       </ErrorBoundary>
 
-      {/* Global Update Prompt */}
       <GlobalUpdatePrompt />
 
-      {/* Database Analytics Dashboard - Lazy loaded */}
       <Suspense fallback={<LoadingSpinner />}>
         <DatabaseAnalytics />
       </Suspense>
@@ -945,6 +882,3 @@ const App: React.FC = () => {
 };
 
 export default App;
-
-
-

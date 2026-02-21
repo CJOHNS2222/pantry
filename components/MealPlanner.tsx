@@ -20,11 +20,11 @@ import { getMealPrepSuggestions, RecipeIngredientMatch } from '../utils/searchUt
 
 interface MealPlannerProps {
   mealPlan: DayPlan[];
-  setMealPlan: React.Dispatch<React.SetStateAction<DayPlan[]>>;
+  updateMealPlan: (newPlan: DayPlan[]) => void;
   inventory: PantryItem[];
   shoppingList: ShoppingItem[];
-  addToShoppingList: (items: string[]) => void;
-  onAddToPlan?: (recipe: StructuredRecipe) => void;
+  addToShoppingList: (items: string[], source?: string) => void;
+  onAddToPlan?: (recipe: StructuredRecipe, dayIndex?: number, mealType?: 'breakfast' | 'lunch' | 'dinner') => void;
   onSaveRecipe?: (recipe: StructuredRecipe) => void;
   onMarkAsMade?: (recipe: StructuredRecipe) => void;
   onRate?: (rating: any) => void;
@@ -35,18 +35,7 @@ interface MealPlannerProps {
   isLoadingMealPlan?: boolean;
   isLoadingSavedRecipes?: boolean;
   savedRecipes?: SavedRecipe[];
-  settings?: {
-    notifications: {
-      enabled: boolean;
-      time: string;
-      types: {
-        shoppingList: boolean;
-        mealPlan: boolean;
-        cookingReminders?: boolean;
-      };
-      cookingReminderTime?: number;
-    };
-  };
+  settings?: any;
   onOpenRecipeSearch?: () => void;
 }
 
@@ -567,7 +556,7 @@ const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
   );
 };
 
-export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan, inventory, shoppingList, addToShoppingList, onAddToPlan, onSaveRecipe, onMarkAsMade, onRate, user, setActiveTab, recipeSaveLimitExceeded = false, mealPlanLimitExceeded = false, isLoadingMealPlan = false, isLoadingSavedRecipes = false, savedRecipes: propSavedRecipes = [], settings, onOpenRecipeSearch }) => {
+export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPlan, inventory, shoppingList, addToShoppingList, onAddToPlan, onSaveRecipe, onMarkAsMade, onRate, user, setActiveTab, recipeSaveLimitExceeded = false, mealPlanLimitExceeded = false, isLoadingMealPlan = false, isLoadingSavedRecipes = false, savedRecipes: propSavedRecipes = [], settings, onOpenRecipeSearch }) => {
     // List of staple items to ignore (unless user wants them included)
     const STAPLES = ['salt', 'pepper', 'oil', 'water', 'flour', 'sugar', 'butter', 'vinegar', 'baking powder', 'baking soda', 'spices', 'seasoning', 'soy sauce', 'cornstarch', 'yeast'];
     const includeStaples = settings?.shopping?.includeStaples || false;
@@ -883,7 +872,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
       if (!newPlan[draggedMeal.dayIndex][sourceMealType]) newPlan[draggedMeal.dayIndex][sourceMealType] = [];
       newPlan[draggedMeal.dayIndex][sourceMealType] = newPlan[draggedMeal.dayIndex][sourceMealType].filter((_, i) => i !== draggedMeal.mealIndex);
       
-      setMealPlan(newPlan);
+      updateMealPlan(newPlan);
       setDraggedMeal(null);
       return;
     }
@@ -917,7 +906,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
       newPlan[targetDayIndex].breakfast.push(mealToMove);
     }
 
-    setMealPlan(newPlan);
+    updateMealPlan(newPlan);
     setDraggedMeal(null);
     setDragOverDay(null);
     setDragOverMealType(null);
@@ -992,7 +981,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
       }
       
       newPlan[dayIndex][mealTypeKey] = newPlan[dayIndex][mealTypeKey].filter((_, i) => i !== mealIndex);
-      setMealPlan(newPlan);
+      updateMealPlan(newPlan);
   };
 
   // Helper function to check if a day is today
@@ -1520,7 +1509,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
                     recipe,
                     mealType: searchMealType
                   });
-                  setMealPlan(newPlan);
+                  updateMealPlan(newPlan);
                   setShowRecipeSearch(false);
                   setSearchMealType(null);
                 }}

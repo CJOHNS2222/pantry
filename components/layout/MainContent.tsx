@@ -82,7 +82,8 @@ export const MainContent: React.FC = () => {
     onDeleteCustomCategory,
     onLogout,
     onShowTutorial,
-    onShowHousehold
+    onShowHousehold,
+    updateMealPlan
   } = appActions;
   // Helper function to match ingredients to inventory
   const inventoryNeeded = (ingredients: string[], pantryInventory: PantryItem[]): PantryItem[] => {
@@ -112,7 +113,7 @@ export const MainContent: React.FC = () => {
       dinner: day.dinner?.filter(meal => meal.recipe.title !== recipeTitle),
     }));
     
-    setMealPlan(newMealPlan);
+    updateMealPlan(newMealPlan);
   };
   return (
     <main className="overflow-y-auto overflow-x-hidden pb-safe px-4 scrollbar-hide bg-theme-primary" style={{ paddingTop: '120px', height: 'calc(100vh - 5rem - max(0.5rem, var(--safe-area-inset-bottom, 0px)))', WebkitOverflowScrolling: 'touch', touchAction: 'auto' }}>
@@ -153,7 +154,7 @@ export const MainContent: React.FC = () => {
           <Suspense fallback={<LoadingSpinner />}>
             <MealPlanner
               mealPlan={mealPlan}
-              setMealPlan={appState.setMealPlan}
+              updateMealPlan={updateMealPlan}
               inventory={inventory}
               shoppingList={shoppingList}
               addToShoppingList={onAddToShoppingList}

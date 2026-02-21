@@ -16,6 +16,7 @@ interface AppActionsContextValue {
   setInventory: (inventory: PantryItem[]) => void;
   setShoppingList: (shoppingList: ShoppingItem[]) => void;
   setMealPlan: (mealPlan: DayPlan[]) => void;
+  updateMealPlan: (mealPlan: DayPlan[]) => void;
 
   // Recipe operations
   onAddToPlan: (recipe: StructuredRecipe) => void;

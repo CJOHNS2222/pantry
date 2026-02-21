@@ -6,12 +6,11 @@ import { User } from '../types';
 import { analytics, db } from '../firebaseConfig';
 import AnalyticsService from '../services/analyticsService';
 import { setUserContext, clearUserContext, trackAuthEvent } from '../services/sentryService';
+import { PriceDataCacheService } from '../services/priceDataCacheService';
 
 export function useAuth() {
-  const [user, setUser] = useState<User | null>(() => {
-    const saved = localStorage.getItem('user');
-    return saved ? JSON.parse(saved) : null;
-  });
+  const [user, setUser] = useState<User | null>(null);
+  const [isAuthReady, setIsAuthReady] = useState(false); // New state
 
   useEffect(() => {
     const auth = getAuth();
@@ -27,6 +26,8 @@ export function useAuth() {
       if (!fbUser) {
         setUser(null);
         clearUserContext();
+        PriceDataCacheService.clearCache(); // Clear cache on logout
+        setIsAuthReady(true); // Auth is ready, even with no user
         return;
       }
 
@@ -36,21 +37,19 @@ export function useAuth() {
 
       if (!userDocSnap.exists()) {
         try {
-          // Create user document with default subscription
           await setDoc(userDocRef, {
             subscription: {
               tier: 'premium',
               status: 'active',
-              current_period_end: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year from now
+              current_period_end: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
               cancel_at_period_end: false
             },
             createdAt: new Date(),
             email: fbUser.email,
-            // Don't set name here - it will be set by handleLogin
-            name: null
+            name: fbUser.displayName || (fbUser.email ? fbUser.email.split('@')[0] : 'User'),
           });
         } catch (err: any) {
-          console.error('Failed to create user document:', error);
+          console.error('Failed to create user document:', err);
         }
       }
 
@@ -59,7 +58,6 @@ export function useAuth() {
         const userData = userDocSnap.data();
         const householdId = userData?.householdId;
 
-        // If householdId is not set, check if user is in any household
         if (!householdId) {
           try {
             const householdQuery = query(
@@ -73,11 +71,10 @@ export function useAuth() {
                 householdId: foundHouseholdId,
                 updatedAt: new Date()
               });
-              // The onSnapshot will fire again with the updated data
-              return;
+              return; // Listener will refire
             }
           } catch (err: any) {
-            console.error('Failed to check for existing household:', error);
+            console.error('Failed to check for existing household:', err);
           }
         }
 
@@ -87,14 +84,14 @@ export function useAuth() {
           email: fbUser.email || '',
           avatar: userData?.avatar || fbUser.photoURL || undefined,
           provider: fbUser.providerData?.[0]?.providerId?.includes('google') ? 'google' : 'email',
-          hasSeenTutorial: user?.hasSeenTutorial ?? false,
+          hasSeenTutorial: userData?.hasSeenTutorial ?? false,
           subscription: userData?.subscription,
           profile: userData?.profile,
           householdId: householdId
         });
 
-        // Set Sentry user context
         setUserContext(fbUser.uid, fbUser.email || undefined, householdId);
+        setIsAuthReady(true); // Auth is ready
       });
     });
 
@@ -106,29 +103,25 @@ export function useAuth() {
     };
   }, []);
 
-  // Persist user to localStorage
-  useEffect(() => {
-    localStorage.setItem('user', JSON.stringify(user));
-  }, [user]);
+  // No longer need to persist user to localStorage, auth state is the source of truth
 
   const handleLogin = (loggedInUser: User) => {
-    setUser(loggedInUser);
+    setUser(loggedInUser); // This might be redundant if onAuthStateChanged works as expected
     trackAuthEvent('login', { method: loggedInUser.provider });
     if (analytics) {
       logEvent(analytics, 'login', { method: loggedInUser.provider });
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     if (confirm("Are you sure you want to log out?")) {
       trackAuthEvent('logout');
       AnalyticsService.trackLogout();
-      signOut(getAuth());
-      setUser(null);
-      localStorage.clear();
-      window.location.reload();
+      await signOut(getAuth());
+      // No need to call setUser(null), onAuthStateChanged will handle it.
+      // No need for localStorage.clear() or window.location.reload()
     }
   };
 
-  return { user, setUser, handleLogin, handleLogout };
+  return { user, setUser, handleLogin, handleLogout, isAuthReady }; // Return new state
 }

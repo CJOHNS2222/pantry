@@ -18,7 +18,7 @@ export interface RecipesCacheMetadata {
  * Each recipe is stored as: recipeId -> [title, description, ingredients[], instructions[], cookTime, type, image, dateSaved, imagePlaceholder]
  */
 export class RecipesCacheService {
-  private static readonly CACHE_VERSION = 2;
+  public static readonly CACHE_VERSION = 2;
 
   /**
    * Convert a SavedRecipe to a cached array format
@@ -114,12 +114,12 @@ export class RecipesCacheService {
       const cachedData: CachedRecipesData & RecipesCacheMetadata = {
         lastUpdated: new Date(),
         version: this.CACHE_VERSION,
-        totalRecipes: recipes.length
-      };
+        totalRecipes: recipes.length,
+      } as any;
 
       // Convert each recipe to cached format
       recipes.forEach(recipe => {
-        cachedData[recipe.id] = this.savedRecipeToArray(recipe);
+        (cachedData as any)[recipe.id] = this.savedRecipeToArray(recipe);
       });
 
       await DatabaseMonitoringService.setDoc(cacheRef, cachedData);
@@ -139,8 +139,8 @@ export class RecipesCacheService {
 
       const updateData: Partial<CachedRecipesData & RecipesCacheMetadata> = {
         lastUpdated: new Date(),
-        [recipe.id]: this.savedRecipeToArray(recipe)
       };
+      (updateData as any)[recipe.id] = this.savedRecipeToArray(recipe);
 
       // First try to update existing cache
       try {
@@ -151,8 +151,8 @@ export class RecipesCacheService {
           lastUpdated: new Date(),
           version: this.CACHE_VERSION,
           totalRecipes: 1,
-          [recipe.id]: this.savedRecipeToArray(recipe)
-        };
+        } as any;
+        (cachedData as any)[recipe.id] = this.savedRecipeToArray(recipe);
         await DatabaseMonitoringService.setDoc(cacheRef, cachedData);
       }
 
@@ -168,7 +168,7 @@ export class RecipesCacheService {
   static async updateRecipeInCache(recipeId: string, updates: Partial<SavedRecipe>, householdId?: string, userId?: string): Promise<void> {
     try {
       // For updates, we need to get the current recipe first, then update it
-      const currentRecipes = await this.getCachedRecipes(householdId, userId);
+      const currentRecipes = await this.getCachedRecipes( householdId, userId);
       const currentRecipe = currentRecipes.find(r => r.id === recipeId);
 
       if (currentRecipe) {
@@ -191,8 +191,8 @@ export class RecipesCacheService {
 
       const updateData = {
         lastUpdated: new Date(),
-        [recipeId]: DatabaseMonitoringService.deleteField()
       };
+      (updateData as any)[recipeId] = DatabaseMonitoringService.deleteField();
 
       await DatabaseMonitoringService.updateDoc(cacheRef, updateData);
       console.log(`🗑️ Removed recipe from cache: ${recipeId}`);

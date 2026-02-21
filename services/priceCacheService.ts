@@ -1,154 +1,87 @@
-import { PriceData } from './groceryPriceService';
-import { PriceDataCacheService } from './priceDataCacheService';
-import { log } from './logService';
-import { getAuth } from 'firebase/auth';
+import { PriceData, PriceDataCacheService } from './priceDataCacheService';
 
-interface CachedPriceData {
-  data: PriceData;
-  timestamp: number;
-  ttl: number; // 24 hours
+// This is the shape of the data that the Open Prices API returns.
+interface OpenPricesAPIResponse {
+  "product_name": string;
+  "barcode": string;
+  "store_name": string;
+  "price": number;
+  "currency": string;
+  "date": string;
 }
 
-/**
- * Service for caching price data globally across the app
- * Uses Firestore for persistence and in-memory cache for performance
- */
+// This is the shape of the data that we store in our cache.
+export interface PriceCache {
+  [itemName: string]: PriceData;
+}
+
+// This class is responsible for fetching price data from the Open Prices API and caching it.
 class PriceCacheService {
-  private cache = new Map<string, CachedPriceData>();
-  private loaded = false;
+  private static readonly API_URL = 'https://www.openprices.org/api/v0/prices';
 
-  constructor() {
-    // Don't load from Firestore immediately - wait for authentication
-    // Loading will happen lazily when data is first requested
+  // This is the in-memory cache that we use to store price data.
+  private cache: PriceCache = {};
+
+  // This function loads the price data from the cache.
+  async loadPriceData() {
+    const cachedData = await PriceDataCacheService.loadPriceData();
+    this.cache = cachedData;
   }
 
-  /**
-   * Load cached price data from Firestore
-   */
-  private async loadFromFirestore() {
-    if (this.loaded) return;
+  // This function gets the price data for a single item from the cache.
+  getPriceData(itemName: string): PriceData | undefined {
+    return this.cache[itemName.toLowerCase()];
+  }
 
-    // Check if user is authenticated
-    const auth = getAuth();
-    if (!auth.currentUser) {
-      log.debug('User not authenticated, skipping Firestore load', {}, 'PriceCache');
-      return;
-    }
+  // This function sets the price data for a single item in the cache.
+  setPriceData(itemName: string, data: PriceData) {
+    this.cache[itemName.toLowerCase()] = data;
+    this.persistToFirestore();
+  }
 
+  // This function fetches the price data for a single item from the Open Prices API.
+  async fetchPriceData(itemName: string): Promise<PriceData | null> {
     try {
-      const firestoreData = await PriceDataCacheService.loadPriceData();
-      const now = Date.now();
+      const response = await fetch(`${PriceCacheService.API_URL}?product_name=${encodeURIComponent(itemName)}`);
+      const data: OpenPricesAPIResponse[] = await response.json();
 
-      // Load data into memory cache
-      for (const [key, data] of firestoreData.entries()) {
-        this.cache.set(key, {
-          data,
-          timestamp: now, // Use current time since we don't store TTL in Firestore
-          ttl: 24 * 60 * 60 * 1000 // 24 hours
-        });
+      if (data && data.length > 0) {
+        // Calculate the average, min, and max price from the API response.
+        const prices = data.map(item => item.price);
+        const averagePrice = prices.reduce((a, b) => a + b, 0) / prices.length;
+        const minPrice = Math.min(...prices);
+        const maxPrice = Math.max(...prices);
+
+        // Create a new PriceData object and store it in the cache.
+        const priceData: PriceData = {
+          averagePrice: parseFloat(averagePrice.toFixed(2)),
+          minPrice: minPrice,
+          maxPrice: maxPrice,
+          sampleSize: data.length,
+          lastUpdated: new Date(),
+          unit: 'each', // You may want to update this based on your product data
+        };
+        this.setPriceData(itemName, priceData);
+        return priceData;
       }
-
-      this.loaded = true;
-      log.debug(`Loaded ${firestoreData.size} price entries from Firestore`, {}, 'PriceCache');
-    } catch (err: any) {
-      log.warn('Failed to load price cache from Firestore', { error }, 'PriceCache');
-    }
-  }
-
-  /**
-   * Get cached price data for an ingredient
-   */
-  getPriceData(ingredient: string): PriceData | null {
-    const key = ingredient.toLowerCase();
-    const cached = this.cache.get(key);
-
-    if (cached && Date.now() - cached.timestamp < cached.ttl) {
-      log.debug(`Price cache hit for: ${ingredient}`, {}, 'PriceCache');
-      return cached.data;
-    }
-
-    // Remove expired entry
-    if (cached) {
-      this.cache.delete(key);
-    }
-
-    // Try to load from Firestore if not loaded yet
-    if (!this.loaded) {
-      this.loadFromFirestore().catch(error => {
-        log.warn('Failed to load price cache on demand', { error }, 'PriceCache');
-      });
+    } catch (error: any) {
+      console.error(`Failed to fetch price data for ${itemName}:`, error);
     }
 
     return null;
   }
 
-  /**
-   * Store price data in cache
-   */
-  setPriceData(ingredient: string, data: PriceData): void {
-    const key = ingredient.toLowerCase();
-    this.cache.set(key, {
-      data,
-      timestamp: Date.now(),
-      ttl: 24 * 60 * 60 * 1000 // 24 hours
-    });
-
-    // Persist to Firestore
-    this.persistToFirestore();
-
-    log.debug(`Price cached for: ${ingredient}`, {}, 'PriceCache');
-  }
-
-  /**
-   * Persist current cache to Firestore (debounced batch write)
-   */
-  private persistTimeout?: NodeJS.Timeout;
-  private async persistToFirestore() {
-    // Debounce saves to avoid too many writes
-    if (this.persistTimeout) {
-      clearTimeout(this.persistTimeout);
-    }
-
-    this.persistTimeout = setTimeout(async () => {
+  // This function persists the in-memory cache to Firestore.
+  private persistToFirestore() {
+    // We use a timeout to debounce the writes to Firestore.
+    setTimeout(() => {
       try {
-        const priceData = new Map<string, PriceData>();
-        for (const [key, cached] of this.cache.entries()) {
-          priceData.set(key, cached.data);
-        }
-
-        await PriceDataCacheService.savePriceData(priceData);
-        log.debug('Price cache persisted to Firestore', {}, 'PriceCache');
-      } catch (err: any) {
-        log.warn('Failed to persist price cache to Firestore', { error }, 'PriceCache');
+        PriceDataCacheService.savePriceData();
+      } catch (error: any) {
+        console.error('Failed to persist price data to Firestore:', error);
       }
-    }, 2000); // 2 second debounce
-  }
-
-  /**
-   * Clear all cached price data
-   */
-  clearCache(): void {
-    this.cache.clear();
-    this.loaded = false;
-
-    // Clear from Firestore
-    PriceDataCacheService.clearCache().catch(error => {
-      log.warn('Failed to clear price cache from Firestore', { error }, 'PriceCache');
-    });
-
-    log.debug('Price cache cleared', {}, 'PriceCache');
-  }
-
-  /**
-   * Get cache statistics
-   */
-  getCacheStats(): { size: number; entries: string[] } {
-    return {
-      size: this.cache.size,
-      entries: Array.from(this.cache.keys())
-    };
+    }, 1000);
   }
 }
 
-// Export singleton instance
 export const priceCacheService = new PriceCacheService();
