@@ -18,6 +18,7 @@ import { QuickAdd } from './QuickAdd';
 import { ShoppingListAnalytics } from './ShoppingListAnalytics';
 import QuantityUnitPicker from './QuantityUnitPicker';
 import { AdMobBanner } from './AdMobBanner';
+import { canShowAds } from '../utils/appUtils';
 
 // Import hooks and services
 import { useOfflineStatus } from '../hooks/useOfflineStatus';
@@ -80,7 +81,21 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   onHouseholdMessage
 }) => {
   const [newItem, setNewItem] = React.useState('');
-  const canShowAdBanner = user?.subscription?.tier === 'free' && Capacitor.getPlatform() !== 'web';
+  const [canShowAdBanner, setCanShowAdBanner] = React.useState<boolean>(false);
+
+  useEffect(() => {
+    let mounted = true;
+    if (!user) {
+      setCanShowAdBanner(false);
+      return;
+    }
+    canShowAds(user).then(result => {
+      if (mounted) setCanShowAdBanner(result);
+    }).catch(() => {
+      if (mounted) setCanShowAdBanner(false);
+    });
+    return () => { mounted = false; };
+  }, [user]);
   const [newQty, setNewQty] = React.useState<string>('1');
   const [newUnit, setNewUnit] = React.useState<string>('count');
   const [isAddModalOpen, setIsAddModalOpen] = React.useState(false);

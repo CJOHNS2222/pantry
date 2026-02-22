@@ -16,8 +16,8 @@ android {
         applicationId "com.smart.pantry"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 3
-        versionName "1.2.0"
+        versionCode 4
+        versionName "2026.02.22"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -36,10 +36,18 @@ android {
     }
     signingConfigs {
         release {
-            storeFile file('pantry-release.keystore')
-            storePassword '63789632aA!'
-            keyAlias 'pantry-key'
-            keyPassword '63789632aA!'
+            // Read signing configuration from project properties or fall back to local defaults.
+            // For local builds, copy `android/gradle.properties.example` to `android/gradle.properties`
+            // and set RELEASE_STORE_FILE, RELEASE_STORE_PASSWORD, RELEASE_KEY_ALIAS, RELEASE_KEY_PASSWORD.
+            def keystoreFile = project.hasProperty('RELEASE_STORE_FILE') ? file(RELEASE_STORE_FILE) : file('pantry-release.keystore')
+            def storePasswordVal = project.hasProperty('RELEASE_STORE_PASSWORD') ? RELEASE_STORE_PASSWORD : ''
+            def keyAliasVal = project.hasProperty('RELEASE_KEY_ALIAS') ? RELEASE_KEY_ALIAS : 'pantry-key'
+            def keyPasswordVal = project.hasProperty('RELEASE_KEY_PASSWORD') ? RELEASE_KEY_PASSWORD : ''
+
+            storeFile keystoreFile
+            storePassword storePasswordVal
+            keyAlias keyAliasVal
+            keyPassword keyPasswordVal
         }
     }
     buildTypes {

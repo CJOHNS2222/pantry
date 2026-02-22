@@ -25,6 +25,7 @@ import { useAppActions } from '../contexts/AppActionsContext';
 import { useKeyboardNavigation } from '../hooks/useKeyboardNavigation';
 import RecipeModal from './RecipeModal';
 import { AdMobBanner } from './AdMobBanner';
+import { canShowAds } from '../utils/appUtils';
 
 import { InventoryCacheService } from '../services/inventoryCacheService';
 
@@ -76,7 +77,21 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   const { household, savedRecipes } = appState;
   const { onSaveRecipe, onRateRecipe, checkRecipeSaveLimit, checkMealPlanLimit } = appActions;
 
-  const canShowAdBanner = user?.subscription?.tier === 'free' && Capacitor.getPlatform() !== 'web';
+  const [canShowAdBanner, setCanShowAdBanner] = React.useState<boolean>(false);
+
+  useEffect(() => {
+    let mounted = true;
+    if (!user) {
+      setCanShowAdBanner(false);
+      return;
+    }
+    canShowAds(user).then(result => {
+      if (mounted) setCanShowAdBanner(result);
+    }).catch(() => {
+      if (mounted) setCanShowAdBanner(false);
+    });
+    return () => { mounted = false; };
+  }, [user]);
 
   // Constants for virtualization threshold
   const CATEGORY_VIRTUALIZE_THRESHOLD = 20;

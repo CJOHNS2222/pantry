@@ -1,6 +1,8 @@
 import { doc, setDoc, Timestamp, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 import { DayPlan, User, Household } from '../types';
+import { Capacitor } from '@capacitor/core';
+import { UsageService } from '../services/usageService';
 import { ConsumptionSuggestion, ExpirationAlert, RecipeSuggestion, PantryItem, CustomCategory, Member } from '../types';
 import { getPerformance, trace } from "firebase/performance";
 
@@ -194,6 +196,40 @@ export function cleanItemNameForShopping(itemName: string): string {
   cleaned = cleaned.replace(/\b\w/g, l => l.toUpperCase());
 
   return cleaned;
+}
+
+/**
+ * Decide whether ads should be shown to a given user.
+ * Current policy: only show ads on native platforms for users on the `free` tier
+ * and only while they remain under at least one of their free-tier usage limits
+ * (saved recipes, weekly meal-plan recipe additions, or weekly recipe searches).
+ * Returns a Promise<boolean>.
+ */
+export async function canShowAds(user?: User | null): Promise<boolean> {
+  try {
+    if (!user) return false;
+    // Don't show ads on web
+    if (Capacitor.getPlatform() === 'web') return false;
+    // Only consider free tier for ad display
+    if (user.subscription?.tier !== 'free') return false;
+
+    const limits = await UsageService.getUsageLimits(user);
+
+    const underRecipeLimit = limits.recipes.max === -1 || (limits.recipes.used < limits.recipes.max);
+    const underMealPlanLimit = limits.mealPlanning.weeklyRecipes === -1 || (limits.mealPlanning.weeklyUsed < limits.mealPlanning.weeklyRecipes);
+    const underSearchLimit = limits.searches.weekly === -1 || (limits.searches.used < limits.searches.weekly);
+
+    // Show ads when user is within at least one of the usage limits
+    return underRecipeLimit || underMealPlanLimit || underSearchLimit;
+  } catch (err) {
+    // Conservative fallback: show ads for free users if limit check fails
+    try {
+      if (!user) return false;
+      return user.subscription?.tier === 'free';
+    } catch {
+      return false;
+    }
+  }
 }
 
 export function getItemImage(itemName: string, category: string): string {

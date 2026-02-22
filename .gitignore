@@ -28,6 +28,9 @@ yarn-error.log*
 new-service-account.json
 old-service-account.json
 
+# Android release keystore
+pantry-release.keystore
+
 # Sentry Config File
 sentry.properties
 sentry-wizard.exe
