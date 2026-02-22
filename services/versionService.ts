@@ -37,7 +37,7 @@ class VersionService {
       this.currentVersion = appInfo.version;
       this.platform = deviceInfo.platform;
     } catch (err: any) {
-      log.warn('Failed to get app info', { error }, 'VersionService');
+      log.warn('Failed to get app info', { error: err }, 'VersionService');
       // Fallback for web
       this.currentVersion = '1.0.0';
       this.platform = 'web';
@@ -113,7 +113,7 @@ class VersionService {
 
       return result;
     } catch (err: any) {
-      log.error('Failed to check for updates', { error }, 'VersionService');
+      log.error('Failed to check for updates', { error: err }, 'VersionService');
       // Return safe defaults
       const currentVersion = await this.getCurrentVersion();
       const result = {
@@ -147,21 +147,21 @@ class VersionService {
   async updateVersionInfo(versionData: Partial<AppVersion>): Promise<void> {
     try {
       const platform = await this.getPlatform();
-      const versionDocRef = doc(db, 'app_versions', platform);
+      const versionDocRef = DatabaseMonitoringService.doc('app_versions/' + platform);
 
-      await updateDoc(versionDocRef, {
+      await DatabaseMonitoringService.updateDoc(versionDocRef, {
         ...versionData,
         updatedAt: new Date()
       });
     } catch (err: any) {
-      log.error('Failed to update version info', { error }, 'VersionService');
-      throw error;
+      log.error('Failed to update version info', { error: err }, 'VersionService');
+      throw err;
     }
   }
 
   private async initializeVersionData(platform: string): Promise<void> {
     try {
-      const versionDocRef = doc(db, 'app_versions', platform);
+      const versionDocRef = DatabaseMonitoringService.doc('app_versions/' + platform);
       const initialVersionData: AppVersion = {
         version: '1.0.0',
         buildNumber: '1',
@@ -175,14 +175,14 @@ class VersionService {
           : null,
       };
 
-      await setDoc(versionDocRef, {
+      await DatabaseMonitoringService.setDoc(versionDocRef, {
         ...initialVersionData,
         updatedAt: new Date()
       });
 
       // console.log(`Initialized version data for ${platform}`);
     } catch (err: any) {
-      log.error('Failed to initialize version data', { error }, 'VersionService');
+      log.error('Failed to initialize version data', { error: err }, 'VersionService');
       // Don't throw - this is a non-critical operation
     }
   }
