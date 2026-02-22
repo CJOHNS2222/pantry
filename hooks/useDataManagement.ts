@@ -4,6 +4,7 @@ import { db } from '../firebaseConfig';
 import DatabaseMonitoringService from '../services/databaseMonitoringService';
 import AnalyticsService from '../services/analyticsService';
 import { UsageService } from '../services/usageService';
+import { RecipeRatingService } from '../services/recipeRatingService';
 import { User, PantryItem, DayPlan, Household, ShoppingItem, SavedRecipe, RecipeRating, RecipeRatingInput, CustomCategory, MealPlanItem, StructuredRecipe, ConsumptionSuggestion, ExpirationAlert, RecipeSuggestion, Member } from '../types';
 import { AppError } from '../utils/errorUtils';
 import { hasPantryItemsChanged, hasArraysChanged, hasMealPlansChanged } from '../utils/comparisonUtils';
@@ -288,6 +289,10 @@ export function useDataManagement(
   const [isLoadingMealPlan, setIsLoadingMealPlan] = useState(true);
   const [isLoadingSavedRecipes, setIsLoadingSavedRecipes] = useState(true);
   const [isLoadingHousehold, setIsLoadingHousehold] = useState(true);
+  const [isLoadingRatings, setIsLoadingRatings] = useState(true);
+
+  // Community ratings (global) - keep a lightweight realtime listener to populate Community tab
+  const [ratings, setRatings] = useState<RecipeRating[]>([]);
 
   // Undo actions
   const [recentActions, setRecentActions] = useState<any[]>([]);
@@ -520,6 +525,7 @@ export function useDataManagement(
     unsubs.push(createShoppingListListener(user, household, inHousehold, setShoppingList, setIsLoadingShoppingList, prevShoppingListRef));
     unsubs.push(createSavedRecipesListener(user, household, inHousehold, setSavedRecipes, setIsLoadingSavedRecipes, prevSavedRecipesRef));
     unsubs.push(createMealPlanListener(user, household, inHousehold, setMealPlan, setIsLoadingMealPlan, prevMealPlanRef));
+    // Do not attach continuous community ratings listener here; refresh on demand when tab is activated
     
     unsubs.push(DatabaseMonitoringService.onSnapshot(DatabaseMonitoringService.doc(`users/${user.id}/cache/customCategories`), snap => {
       setCustomCategories(snap.exists() ? (snap.data()?.categories || []) : []);
@@ -709,6 +715,8 @@ export function useDataManagement(
       };
 
       await RecipesCacheService.addRecipeToCache(savedRecipe, householdId, userId);
+      // Persist structured recipe into any existing rating documents for this recipe title
+      // No-op: rating docs include recipe data at submit time, no client-side attachment needed.
       await UsageService.recordRecipeSave(user);
 
       addToast(`Saved ${recipe.title} to your recipes!`);
@@ -870,14 +878,88 @@ export function useDataManagement(
   };
   
   const getRatingsForRecipe = async (recipeTitle: string): Promise<RecipeRating[]> => {
-    // Omitted for brevity
-    return [];
+    try {
+      const q = DatabaseMonitoringService.query(
+        DatabaseMonitoringService.collection('recipeRatings'),
+        DatabaseMonitoringService.where('recipeTitle', '==', recipeTitle),
+        DatabaseMonitoringService.orderBy('date', 'desc'),
+        DatabaseMonitoringService.limit(50)
+      );
+      const snap = await DatabaseMonitoringService.getDocs(q);
+      if (snap.empty) return [];
+      return snap.docs.map(d => {
+        const data = d.data() as any;
+        const dateField = data.date;
+        let dateStr: string | null = null;
+        if (dateField) {
+          if (typeof dateField.toDate === 'function') {
+            try { dateStr = dateField.toDate().toISOString(); } catch { dateStr = null; }
+          } else if (typeof dateField.seconds === 'number') {
+            dateStr = new Date(dateField.seconds * 1000).toISOString();
+          } else if (typeof dateField._seconds === 'number') {
+            dateStr = new Date(dateField._seconds * 1000).toISOString();
+          } else if (typeof dateField === 'string') {
+            dateStr = dateField;
+          }
+        }
+        return { ...data, id: d.id, date: dateStr } as RecipeRating;
+      });
+    } catch (err) {
+      log.error('Failed to get ratings for recipe', { err, recipeTitle }, 'DataManagement');
+      return [];
+    }
   };
 
   const getCommunityRatings = async (): Promise<RecipeRating[]> => {
-    // Omitted for brevity
-    return [];
+    try {
+      // Return currently cached ratings (listener keeps this fresh)
+      return ratings;
+    } catch (err) {
+      log.error('Failed to get community ratings', { err }, 'DataManagement');
+      return [];
+    }
   };
+
+  const refreshCommunityRatings = useCallback(async (): Promise<void> => {
+    if (!user?.id) return;
+    setIsLoadingRatings(true);
+    try {
+      const q = DatabaseMonitoringService.query(
+        DatabaseMonitoringService.collection('recipeRatings'),
+        DatabaseMonitoringService.orderBy('date', 'desc'),
+        DatabaseMonitoringService.limit(50)
+      );
+      const snap = await DatabaseMonitoringService.getDocs(q);
+      if (snap.empty) {
+        setRatings([]);
+        setIsLoadingRatings(false);
+        return;
+      }
+
+      const mapped: RecipeRating[] = snap.docs.map(d => {
+        const data = d.data() as any;
+        const dateField = data.date;
+        let dateStr: string | null = null;
+        if (dateField) {
+          if (typeof dateField.toDate === 'function') {
+            try { dateStr = dateField.toDate().toISOString(); } catch { dateStr = null; }
+          } else if (typeof dateField.seconds === 'number') {
+            dateStr = new Date(dateField.seconds * 1000).toISOString();
+          } else if (typeof dateField._seconds === 'number') {
+            dateStr = new Date(dateField._seconds * 1000).toISOString();
+          } else if (typeof dateField === 'string') {
+            dateStr = dateField;
+          }
+        }
+        return { ...data, id: d.id, date: dateStr } as RecipeRating;
+      });
+
+      setRatings(mapped);
+    } catch (err) {
+      log.error('Failed to refresh community ratings', { err }, 'DataManagement');
+    }
+    setIsLoadingRatings(false);
+  }, [user?.id]);
 
   const submitRating = async (ratingData: RecipeRatingInput) => {
     if (!user?.id) return;
@@ -943,6 +1025,7 @@ export function useDataManagement(
     setShoppingList,
     savedRecipes,
     setSavedRecipes,
+    ratings,
     mealPlan,
     setMealPlan,
     updateMealPlan,
@@ -965,6 +1048,7 @@ export function useDataManagement(
     submitRating,
     getRatingsForRecipe,
     getCommunityRatings,
+    refreshCommunityRatings,
     handleMarkAsMade,
     updateItem,
     deleteItem,

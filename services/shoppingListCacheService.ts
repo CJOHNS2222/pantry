@@ -67,7 +67,9 @@ const objectToShoppingItem = (itemId: string, itemObject: CachedShoppingListData
   } : undefined;
 
   if (priceData) {
-    priceCacheService.setPriceData(itemObject.item, priceData, householdId, userId);
+    // Do not persist price data back to the global price cache when merely loading
+    // cached shopping list items. Writing here causes a write storm on app load.
+    // If callers need to persist updates, call `priceCacheService.setPriceData` explicitly.
   }
 
   return {

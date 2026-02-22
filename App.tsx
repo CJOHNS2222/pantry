@@ -52,6 +52,7 @@ type Theme = 'dark' | 'light';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>(Tab.PANTRY); // Default to pantry
+  const prevActiveTabRef = useRef<Tab>(activeTab);
   const [persistedRecipeResult, setPersistedRecipeResult] = useState<RecipeSearchResult | null>(null);
   const [initialSearchQuery, setInitialSearchQuery] = useState<string>('');
 
@@ -226,6 +227,7 @@ const App: React.FC = () => {
     isLoadingSavedRecipes,
     isLoadingRatings,
     isLoadingHousehold,
+    refreshCommunityRatings,
   } = useDataManagement(user, addToast, addToShoppingList, syncStatus.updateSyncStatus, {
     logItemAdded,
     logItemRemoved,
@@ -235,6 +237,14 @@ const App: React.FC = () => {
   }, {
     disableInventoryListeners: activeTab === Tab.PANTRY_CACHE_TEST
   });
+
+  useEffect(() => {
+    // Refresh community ratings only when the tab transitions to COMMUNITY
+    if (activeTab === Tab.COMMUNITY && prevActiveTabRef.current !== Tab.COMMUNITY && typeof refreshCommunityRatings === 'function') {
+      refreshCommunityRatings().catch(error => log.error('Failed to refresh community ratings on tab activate', { error }, 'App'));
+    }
+    prevActiveTabRef.current = activeTab;
+  }, [activeTab, refreshCommunityRatings]);
 
   useEffect(() => {
     if (user?.id && household?.id) {

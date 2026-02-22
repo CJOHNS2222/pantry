@@ -139,6 +139,9 @@ export const RecipeRatingUI: React.FC<RecipeRatingUIProps> = ({
     try {
       setIsSubmitting(true);
 
+      // Use the provided `recipe` object directly — it should include recipe info at submit time.
+      const enrichedRecipe: StructuredRecipe = recipe;
+
       const feedback: RecipeFeedback[] = Array.from(selectedFeedback).map(type => ({
         type: type as RecipeFeedback['type'],
         comment: type === 'love-it' ? comment : undefined
@@ -152,7 +155,7 @@ export const RecipeRatingUI: React.FC<RecipeRatingUIProps> = ({
         userName: user?.name || 'Anonymous User',
         userAvatar: user?.avatar,
         date: new Date().toISOString(),
-        recipe,
+        recipe: enrichedRecipe,
         wouldMakeAgain: selectedVerdict === 'make-again',
         feedback,
         photos,

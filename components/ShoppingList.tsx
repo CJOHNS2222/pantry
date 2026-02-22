@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { ShoppingBasket, Check, Trash2, Archive, Plus, X, Share2, Copy, Download, MessageSquare } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
 import { ShoppingItem, User, Household } from '../types';
 import { inferCategoryFromItemName, getItemImage, isHouseholdMember } from '../utils/appUtils';
 import { log } from '../services/logService';
@@ -16,6 +17,7 @@ import { HouseholdShoppingShare } from './HouseholdShoppingShare';
 import { QuickAdd } from './QuickAdd';
 import { ShoppingListAnalytics } from './ShoppingListAnalytics';
 import QuantityUnitPicker from './QuantityUnitPicker';
+import { AdMobBanner } from './AdMobBanner';
 
 // Import hooks and services
 import { useOfflineStatus } from '../hooks/useOfflineStatus';
@@ -78,6 +80,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   onHouseholdMessage
 }) => {
   const [newItem, setNewItem] = React.useState('');
+  const canShowAdBanner = user?.subscription?.tier === 'free' && Capacitor.getPlatform() !== 'web';
   const [newQty, setNewQty] = React.useState<string>('1');
   const [newUnit, setNewUnit] = React.useState<string>('count');
   const [isAddModalOpen, setIsAddModalOpen] = React.useState(false);
@@ -895,6 +898,8 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
           </button>
         </div>
       )}
+
+      {canShowAdBanner && <AdMobBanner />}
 
     </div>
   );

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { Camera as CapacitorCamera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { Camera, Upload, Loader2, Plus, Trash2, CheckCircle2, ShoppingBasket, X, Barcode, ChevronDown, ChevronRight, ChevronUp, Image, ChefHat, TrendingUp, Search, Filter, Settings2, Clock, Tag } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
 import { FixedSizeList as List } from 'react-window';
 import { analyzePantryImage } from '../services/geminiService';
 import StorageLocationIndicator from './StorageLocationIndicator';
@@ -23,6 +24,7 @@ import { useApp } from '../contexts/AppContext';
 import { useAppActions } from '../contexts/AppActionsContext';
 import { useKeyboardNavigation } from '../hooks/useKeyboardNavigation';
 import RecipeModal from './RecipeModal';
+import { AdMobBanner } from './AdMobBanner';
 
 import { InventoryCacheService } from '../services/inventoryCacheService';
 
@@ -73,6 +75,8 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   // Destructure needed values
   const { household, savedRecipes } = appState;
   const { onSaveRecipe, onRateRecipe, checkRecipeSaveLimit, checkMealPlanLimit } = appActions;
+
+  const canShowAdBanner = user?.subscription?.tier === 'free' && Capacitor.getPlatform() !== 'web';
 
   // Constants for virtualization threshold
   const CATEGORY_VIRTUALIZE_THRESHOLD = 20;
@@ -2063,6 +2067,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
           user={user}
         />
       )}
+      {canShowAdBanner && <AdMobBanner />}
     </div>
   );
 };

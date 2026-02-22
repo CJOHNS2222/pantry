@@ -675,7 +675,26 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
                   setIsSaving(true);
                   console.log('🖱️ Save button clicked for recipe:', recipe.title);
                   try {
-                    await onSaveRecipe(recipe as StructuredRecipe); 
+                    // Sanitize placeholder recipe text so we don't persist UI-only messages
+                    const sanitized: StructuredRecipe = {
+                      title: (recipe as any).title || '',
+                      description: (recipe as any).description || '',
+                      ingredients: Array.isArray((recipe as any).ingredients) ? [...(recipe as any).ingredients] : [],
+                      instructions: Array.isArray((recipe as any).instructions) ? [...(recipe as any).instructions] : [],
+                      cookTime: (recipe as any).cookTime || '' ,
+                      image: (recipe as any).image
+                    };
+
+                    const placeholderPattern = /Full recipe not available in this rating/i;
+                    // Remove placeholder entries if present
+                    if (sanitized.ingredients.length === 1 && placeholderPattern.test(String(sanitized.ingredients[0]))) {
+                      sanitized.ingredients = [];
+                    }
+                    if (sanitized.instructions.length === 1 && placeholderPattern.test(String(sanitized.instructions[0]))) {
+                      sanitized.instructions = [];
+                    }
+
+                    await onSaveRecipe(sanitized as StructuredRecipe); 
                     onClose(); 
                   } finally {
                     setIsSaving(false);

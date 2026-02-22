@@ -24,6 +24,7 @@
     "test-firebase": "node test-firebase.js"
   },
   "dependencies": {
+    "@capacitor-community/admob": "^8.0.0",
     "@capacitor/android": "^7.0.0",
     "@capacitor/app": "^7.0.0",
     "@capacitor/browser": "^7.0.0",
@@ -35,7 +36,6 @@
     "@capacitor/local-notifications": "^7.0.0",
     "@capacitor/push-notifications": "^7.0.4",
     "@google/genai": "^1.31.0",
-    "@paypal/react-paypal-js": "^8.9.2",
     "@sentry/react": "^10.36.0",
     "@sentry/tracing": "^7.120.4",
     "@stripe/react-stripe-js": "^5.4.1",

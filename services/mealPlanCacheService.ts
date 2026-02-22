@@ -148,6 +148,8 @@ const removeMeal = async (date: string, mealType: 'breakfast' | 'lunch' | 'dinne
 export const MealPlanCacheService = {
   CACHE_VERSION,
   updateCache,
+  // Backwards-compatible alias: some callers expect `setCache`
+  setCache: updateCache,
   addMeal,
   updateMeal,
   removeMeal,

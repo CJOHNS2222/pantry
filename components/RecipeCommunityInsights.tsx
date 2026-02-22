@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Users, TrendingUp, ChefHat, ThumbsUp, MessageSquare, Star, Loader2 } from 'lucide-react';
 import { RecipeCommunityStats, RecipeModification, RecipeRating } from '../types';
 import { RecipeRatingService } from '../services/recipeRatingService';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { db } from '../firebaseConfig';
 import { useAuth } from '../hooks/useAuth';
 import { useToasts } from '../hooks/useToasts';
 
@@ -24,6 +26,25 @@ export const RecipeCommunityInsights: React.FC<RecipeCommunityInsightsProps> = (
 
   useEffect(() => {
     loadCommunityData();
+
+    // Subscribe to realtime updates for the community stats doc so UI updates when stats are created/updated
+    let unsubscribeStats: (() => void) | null = null;
+    try {
+      const statsRef = doc(db, 'recipeCommunityStats', recipeTitle);
+      unsubscribeStats = onSnapshot(statsRef, (snap) => {
+        console.debug('RecipeCommunityInsights: realtime stats snapshot', recipeTitle, snap.exists());
+        if (snap.exists()) {
+          const data = snap.data();
+          setStats({ ...data } as RecipeCommunityStats);
+        }
+      });
+    } catch (e) {
+      console.debug('RecipeCommunityInsights: realtime subscribe failed', e);
+    }
+
+    return () => {
+      if (unsubscribeStats) unsubscribeStats();
+    };
   }, [recipeTitle, householdId]);
 
   const loadCommunityData = async () => {
@@ -33,15 +54,18 @@ export const RecipeCommunityInsights: React.FC<RecipeCommunityInsightsProps> = (
 
       // Load community stats
       const communityStats = await RecipeRatingService.getCommunityStats(recipeTitle, householdId);
+      console.debug('RecipeCommunityInsights: fetched communityStats', recipeTitle, communityStats);
       setStats(communityStats);
 
       // Load top modifications
       const modifications = await RecipeRatingService.getTopModifications(recipeTitle, 5);
+      console.debug('RecipeCommunityInsights: fetched modifications', modifications);
       setTopModifications(modifications);
 
       // Load household ratings
       if (householdId) {
         const householdRatingsData = await RecipeRatingService.getHouseholdRatings(recipeTitle, householdId);
+        console.debug('RecipeCommunityInsights: fetched householdRatings', householdRatingsData);
         setHouseholdRatings(householdRatingsData);
       }
     } catch (err) {

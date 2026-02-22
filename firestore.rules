@@ -148,6 +148,17 @@ service cloud.firestore {
       allow delete: if request.auth != null && request.auth.uid == resource.data.userId;
     }
 
+    // Recipe community stats: allow authenticated users to read and allow updates from authenticated users
+    // Writes originate from the client in this app; ensure basic validation for stat fields
+    match /recipeCommunityStats/{docId} {
+      allow read: if request.auth != null;
+      allow create, update: if request.auth != null
+        && request.resource.data.keys().hasAny(['totalRatings', 'averageRating', 'wouldMakeAgainPercentage', 'topFeedback'])
+        && (request.resource.data.totalRatings is number || request.resource.data.totalRatings == null)
+        && (request.resource.data.averageRating is number || request.resource.data.averageRating == null)
+        && (request.resource.data.wouldMakeAgainPercentage is number || request.resource.data.wouldMakeAgainPercentage == null);
+    }
+
     // Image cache collection: allow authenticated users to cache pantry item images
     match /image_cache/{docId} {
       allow read, write: if request.auth != null; // Authenticated users can cache images

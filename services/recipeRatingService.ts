@@ -23,6 +23,21 @@ import {
 } from '../types';
 import { log } from './logService';
 
+// Recursively remove undefined properties (preserve Timestamp and other non-plain values)
+const sanitizeForFirestore = (obj: any): any => {
+  if (obj === null || typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) return obj.map(item => sanitizeForFirestore(item)).filter(i => i !== undefined);
+  // Keep Firebase Timestamps and special types as-is (they usually have toDate or _seconds/_nanoseconds)
+  if (obj.constructor && obj.constructor.name && ['Timestamp'].includes(obj.constructor.name)) return obj;
+
+  const out: any = {};
+  for (const key of Object.keys(obj)) {
+    const v = sanitizeForFirestore(obj[key]);
+    if (v !== undefined) out[key] = v;
+  }
+  return out;
+};
+
 export class RecipeRatingService {
   private static readonly RATINGS_COLLECTION = 'recipeRatings';
   private static readonly COMMUNITY_STATS_COLLECTION = 'recipeCommunityStats';
@@ -42,15 +57,17 @@ export class RecipeRatingService {
         updatedAt: Timestamp.now()
       };
 
-      await setDoc(ratingRef, ratingData, { merge: true });
+      // Remove any undefined fields (Firestore rejects undefined)
+      const cleanRatingData = sanitizeForFirestore(ratingData);
+      await setDoc(ratingRef, cleanRatingData, { merge: true });
 
       // Update community stats
       await this.updateCommunityStats(rating.recipeTitle, householdId);
 
       log.info('Recipe rating submitted', { recipeTitle: rating.recipeTitle, userId });
     } catch (err: any) {
-      log.error('Failed to submit recipe rating', { error, recipeTitle: rating.recipeTitle });
-      throw error;
+      log.error('Failed to submit recipe rating', { err, recipeTitle: rating.recipeTitle });
+      throw err;
     }
   }
 
@@ -107,8 +124,8 @@ export class RecipeRatingService {
         } : undefined
       };
     } catch (err: any) {
-      log.error('Failed to get community stats', { error, recipeTitle });
-      throw error;
+      log.error('Failed to get community stats', { err, recipeTitle });
+      throw err;
     }
   }
 
@@ -158,7 +175,7 @@ export class RecipeRatingService {
       }, { merge: true });
 
     } catch (err: any) {
-      log.error('Failed to update community stats', { error, recipeTitle });
+      log.error('Failed to update community stats', { err, recipeTitle });
     }
   }
 
@@ -185,8 +202,8 @@ export class RecipeRatingService {
 
       log.info('Recipe modification added', { recipeTitle, userId });
     } catch (err: any) {
-      log.error('Failed to add recipe modification', { error, recipeTitle });
-      throw error;
+      log.error('Failed to add recipe modification', { err, recipeTitle });
+      throw err;
     }
   }
 
@@ -203,8 +220,8 @@ export class RecipeRatingService {
 
       log.info('Modification marked as helpful', { modificationId, userId });
     } catch (err: any) {
-      log.error('Failed to mark modification as helpful', { error, modificationId });
-      throw error;
+      log.error('Failed to mark modification as helpful', { err, modificationId });
+      throw err;
     }
   }
 
@@ -224,10 +241,10 @@ export class RecipeRatingService {
       const modsSnapshot = await getDocs(modsQuery);
       return modsSnapshot.docs.map(doc => ({
         ...doc.data(),
-        date: doc.data().date.toDate().toISOString()
+        date: normalizeDate(doc.data().date)
       })) as RecipeModification[];
     } catch (err: any) {
-      log.error('Failed to get top modifications', { error, recipeTitle });
+      log.error('Failed to get top modifications', { err, recipeTitle });
       return [];
     }
   }
@@ -249,12 +266,12 @@ export class RecipeRatingService {
         const data = ratingSnapshot.docs[0].data();
         return {
           ...data,
-          date: data.date.toDate().toISOString()
+          date: normalizeDate(data.date)
         } as RecipeRating;
       }
       return null;
     } catch (err: any) {
-      log.error('Failed to get user rating', { error, recipeTitle, userId });
+      log.error('Failed to get user rating', { err, recipeTitle, userId });
       return null;
     }
   }
@@ -277,11 +294,11 @@ export class RecipeRatingService {
         const data = doc.data();
         return {
           ...data,
-          date: data.date.toDate().toISOString()
+          date: normalizeDate(data.date)
         } as RecipeRating;
       });
     } catch (err: any) {
-      log.error('Failed to get household ratings', { error, recipeTitle, householdId });
+      log.error('Failed to get household ratings', { err, recipeTitle, householdId });
       return [];
     }
   }
@@ -350,8 +367,27 @@ export class RecipeRatingService {
 
       return recommendations.slice(0, limitCount);
     } catch (err: any) {
-      log.error('Failed to get personalized recommendations', { error, userId });
+      log.error('Failed to get personalized recommendations', { err, userId });
       return [];
     }
   }
 }
+
+// Helper to normalize Firestore date fields that may be Timestamp, string, or plain object
+const normalizeDate = (dateField: any): string | null => {
+  if (!dateField) return null;
+  // Firestore Timestamp
+  if (typeof dateField.toDate === 'function') {
+    try { return dateField.toDate().toISOString(); } catch { /* fallthrough */ }
+  }
+  // Legacy proto-like object with seconds
+  if (typeof dateField.seconds === 'number') {
+    return new Date(dateField.seconds * 1000).toISOString();
+  }
+  if (typeof dateField._seconds === 'number') {
+    return new Date(dateField._seconds * 1000).toISOString();
+  }
+  // Already a string
+  if (typeof dateField === 'string') return dateField;
+  return null;
+};

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useApp } from '../contexts/AppContext';
 import { Star, Clock, ChefHat, Plus, X } from 'lucide-react';
 import { RecipeRating, StructuredRecipe } from '../types';
 import RecipeModal from './RecipeModal';
@@ -26,6 +27,8 @@ interface RecipeStats {
 }
 
 export const Community: React.FC<CommunityProps> = ({ ratings = [], onAddToPlan, onSaveRecipe, user }) => {
+  const app = useApp();
+  const { isLoadingRatings } = app;
     // List of staple items to ignore in ingredient display
     const STAPLES = ['salt', 'pepper', 'oil', 'water', 'flour', 'sugar', 'butter', 'vinegar', 'baking powder', 'baking soda', 'spices', 'seasoning', 'soy sauce', 'cornstarch', 'yeast'];
   const [showModal, setShowModal] = useState(false);
@@ -48,7 +51,9 @@ export const Community: React.FC<CommunityProps> = ({ ratings = [], onAddToPlan,
     }
     acc[key].totalRating += (typeof curr.rating === 'number' ? curr.rating : 0);
     acc[key].count += 1;
-    if (curr.comment) acc[key].comments.push(curr);
+    // Keep the full rating objects (comments array holds ratings) so embedded recipe data
+    // is preserved even when the rating has no textual comment.
+    acc[key].comments.push(curr);
     return acc;
   }, {} as Record<string, RecipeStats>);
 
@@ -61,12 +66,40 @@ export const Community: React.FC<CommunityProps> = ({ ratings = [], onAddToPlan,
     .sort((a, b) => (b.totalRating / Math.max(1, b.count)) - (a.totalRating / Math.max(1, a.count)));
   const [showAll, setShowAll] = useState(false);
   const findRecipeForStat = (stat: { comments: RecipeRating[] }) => {
-    const ratingWithRecipe = stat.comments.find(c => c.recipe && c.recipe.ingredients && c.recipe.instructions);
+    // Return the first available embedded recipe from comments, even if partial.
+    const ratingWithRecipe = stat.comments.find(c => c.recipe);
     return ratingWithRecipe ? ratingWithRecipe.recipe : null;
+  };
+
+  const sanitizeRecipeForSave = (r: StructuredRecipe): StructuredRecipe => {
+    const placeholderPattern = /Full recipe not available in this rating/i;
+    const sanitized: StructuredRecipe = {
+      title: r.title || '',
+      description: r.description || '',
+      ingredients: Array.isArray(r.ingredients) ? [...r.ingredients] : [],
+      instructions: Array.isArray(r.instructions) ? [...r.instructions] : [],
+      cookTime: r.cookTime || '',
+      image: (r as any).image
+    };
+
+    if (sanitized.ingredients.length === 1 && placeholderPattern.test(String(sanitized.ingredients[0]))) {
+      sanitized.ingredients = [];
+    }
+    if (sanitized.instructions.length === 1 && placeholderPattern.test(String(sanitized.instructions[0]))) {
+      sanitized.instructions = [];
+    }
+
+    return sanitized;
   };
 
   return (
     <div className="space-y-6 pb-24 animate-fade-in">
+      {isLoadingRatings && (
+        <div className="text-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--accent-color)] mx-auto mb-4"></div>
+          <p className="text-theme-secondary opacity-70">Loading community ratings…</p>
+        </div>
+      )}
       <div className="text-center mb-6">
         <h2 className="text-3xl font-serif font-bold text-theme-secondary">Community Favorites</h2>
         <p className="text-theme-secondary opacity-60 text-sm mt-1">Top rated recipes by our users</p>
@@ -125,27 +158,51 @@ export const Community: React.FC<CommunityProps> = ({ ratings = [], onAddToPlan,
                         </div>
                     )}
                     
-                    <button 
+                    <div className="flex gap-2">
+                      <button
                         onClick={(e) => {
+                          e.stopPropagation();
+                          if (fullRecipe) {
+                            onAddToPlan(fullRecipe);
+                          } else {
+                            const mockRecipe: StructuredRecipe = {
+                              title: stat.title,
+                              description: 'Community favorite',
+                              ingredients: ['Full recipe not available in this rating. Please save it first.'],
+                              instructions: ['Full recipe not available in this rating. Please save it first.'],
+                              cookTime: 'N/A'
+                            };
+                            onAddToPlan(mockRecipe);
+                          }
+                        }}
+                        className="flex-1 py-2 bg-[var(--accent-color)]/10 text-[var(--accent-color)] font-bold text-xs uppercase tracking-wider rounded-lg hover:bg-[var(--accent-color)] hover:text-white transition-all flex items-center justify-center gap-2"
+                      >
+                        <Plus className="w-4 h-4" /> Add to Schedule
+                      </button>
+
+                      {onSaveRecipe && (
+                        <button
+                          onClick={(e) => {
                             e.stopPropagation();
                             if (fullRecipe) {
-                                onAddToPlan(fullRecipe);
+                              onSaveRecipe(sanitizeRecipeForSave(fullRecipe));
                             } else {
-                                // Fallback for older data that might not have the full recipe
-                                const mockRecipe: StructuredRecipe = {
-                                    title: stat.title,
-                                    description: "Community favorite",
-                                    ingredients: ["Full recipe not available in this rating. Please save it first."],
-                                    instructions: ["Full recipe not available in this rating. Please save it first."],
-                                    cookTime: "N/A"
-                                };
-                                onAddToPlan(mockRecipe);
+                              const mockRecipe: StructuredRecipe = {
+                                title: stat.title,
+                                description: 'Community favorite',
+                                ingredients: ['Full recipe not available in this rating. Please save it first.'],
+                                instructions: ['Full recipe not available in this rating. Please save it first.'],
+                                cookTime: 'N/A'
+                              };
+                              onSaveRecipe(sanitizeRecipeForSave(mockRecipe));
                             }
-                        }}
-                        className="w-full py-2 bg-[var(--accent-color)]/10 text-[var(--accent-color)] font-bold text-xs uppercase tracking-wider rounded-lg hover:bg-[var(--accent-color)] hover:text-white transition-all flex items-center justify-center gap-2"
-                    >
-                        <Plus className="w-4 h-4" /> Add to Schedule
-                    </button>
+                          }}
+                          className="py-2 px-3 bg-theme-primary border border-theme rounded-lg text-sm font-semibold hover:bg-theme-secondary transition-colors"
+                        >
+                          Save Recipe
+                        </button>
+                      )}
+                    </div>
                 </div>
              </div>
            );

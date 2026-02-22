@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Crown, Check, X, CreditCard, Users, ChefHat, Heart } from 'lucide-react';
+import { Crown, Check, X } from 'lucide-react';
 import { useSubscription } from '../hooks/useSubscription';
 import { User } from '../types';
-import { StripeCheckout } from './StripeCheckout';
-import { PayPalCheckout } from './PayPalCheckout';
 import { UsageService, UsageLimits } from '../services/usageService';
 import { log } from '../services/logService';
 import AnalyticsService from '../services/analyticsService';
@@ -19,8 +17,6 @@ interface SubscriptionManagerProps {
 export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }) => {
   const { subscription, isPremium, isFamily, isActive } = useSubscription(user);
   const [showPlans, setShowPlans] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState<any>(null);
-  const [paymentMethod, setPaymentMethod] = useState<'stripe' | 'paypal'>('stripe');
   const [usageLimits, setUsageLimits] = useState<UsageLimits | null>(null);
 
   useEffect(() => {
@@ -52,20 +48,7 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }
       current_tier: subscription?.tier || 'free'
     });
     
-    // Temporarily disabled until Stripe payments are fully functional
-    alert('Premium subscriptions coming soon! We\'re working on implementing payment processing. Stay tuned for updates.');
-    // setSelectedPlan(plan);
-  };
-
-  const handleCheckoutSuccess = (subscriptionId: string) => {
-    alert(`Subscription created successfully! ID: ${subscriptionId}`);
-    setSelectedPlan(null);
-    setShowPlans(false);
-    // In a real app, you'd refresh the subscription data here
-  };
-
-  const handleCheckoutCancel = () => {
-    setSelectedPlan(null);
+    alert(`Premium subscriptions are handled through Google Play Billing. Upgrade on Android devices via the Play Store for ${plan.name}.`);
   };
 
   const plans = [
@@ -321,69 +304,15 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }
         </div>
       )}
 
-      {selectedPlan && (
-        <div className="mt-6">
-          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 mb-4">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              Choose Payment Method
-            </h3>
-
-            <div className="grid grid-cols-2 gap-4">
-              <button
-                onClick={() => setPaymentMethod('stripe')}
-                className={`p-4 border-2 rounded-lg transition-all ${
-                  paymentMethod === 'stripe'
-                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                    : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <CreditCard className="w-6 h-6 text-blue-500" />
-                  <div className="text-left">
-                    <div className="font-medium text-gray-900 dark:text-white">Credit Card</div>
-                    <div className="text-sm text-gray-600 dark:text-gray-400">Powered by Stripe</div>
-                  </div>
-                </div>
-              </button>
-
-              <button
-                onClick={() => setPaymentMethod('paypal')}
-                className={`p-4 border-2 rounded-lg transition-all ${
-                  paymentMethod === 'paypal'
-                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                    : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-6 h-6 bg-blue-600 rounded text-white flex items-center justify-center font-bold text-sm">P</div>
-                  <div className="text-left">
-                    <div className="font-medium text-gray-900 dark:text-white">PayPal</div>
-                    <div className="text-sm text-gray-600 dark:text-gray-400">PayPal Account</div>
-                  </div>
-                </div>
-              </button>
-            </div>
-          </div>
-
-          {paymentMethod === 'stripe' ? (
-            <StripeCheckout
-              planId={selectedPlan.id}
-              planName={selectedPlan.name}
-              planPrice={selectedPlan.price}
-              onSuccess={handleCheckoutSuccess}
-              onCancel={handleCheckoutCancel}
-            />
-          ) : (
-            <PayPalCheckout
-              planId={selectedPlan.id}
-              planName={selectedPlan.name}
-              planPrice={selectedPlan.price}
-              onSuccess={handleCheckoutSuccess}
-              onCancel={handleCheckoutCancel}
-            />
-          )}
-        </div>
-      )}
+      <div className="mt-6 bg-yellow-50 dark:bg-yellow-900/20 rounded-xl border border-yellow-200 dark:border-yellow-800 p-6 space-y-2">
+        <h3 className="text-lg font-semibold text-yellow-700 dark:text-yellow-200">Upgrade via Google Play Billing</h3>
+        <p className="text-sm text-yellow-800 dark:text-yellow-100">
+          Premium tiers are unlocked through the Google Play Store billing flow. Please upgrade inside the app on an Android device or visit the Play Store listing to activate your plan. Once Play completes the purchase, the subscription status syncs automatically.
+        </p>
+        <p className="text-xs text-yellow-600 dark:text-yellow-200">
+          On iOS or web the upgrade prompt is currently unavailable; use an Android device with Play Store access.
+        </p>
+      </div>
     </div>
   );
 };
