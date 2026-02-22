@@ -3,7 +3,7 @@
 ## Project Overview
 **Smart Pantry Chef** is a cross-platform React/TypeScript mobile app (iOS/Android/Web) for household pantry management, meal planning, and recipe discovery. Built with Firebase, Capacitor, and Google Gemini AI. Users manage shared household inventories, shopping lists, and meal plans in real time.
 
-**Key Stack:** React 19, TypeScript, Vite, Firebase (Firestore/Auth/Storage/Functions), Capacitor 7, Stripe/PayPal, Gemini AI, Context API
+**Key Stack:** React 19, TypeScript, Vite, Firebase (Firestore/Auth/Storage/Functions), Capacitor 7, Google Play Billing (Android), Gemini AI, Context API
 
 ---
 
@@ -112,7 +112,7 @@ npm run test:ui  # Vitest UI dashboard
 ### Feature Flags & Premium
 - **`featureFlags.ts`:** `canUseGemini(userId)`, `isPremiumUser()` gates AI and premium features
 - **Subscription limits:** Free tier: 5 saved recipes, 10 meals/week, 3 household members
-- **Payment processors:** Stripe (credit card) and PayPal subscriptions; handled via [StripeCheckout.tsx](components/StripeCheckout.tsx) & [PayPalCheckout.tsx](components/PayPalCheckout.tsx)
+- **Payment processor:** Google Play Billing for Android subscriptions; Stripe/PayPal removed for Play Store compliance
 
 ---
 
@@ -161,8 +161,7 @@ npm run test:ui  # Vitest UI dashboard
 
 - **Firebase config:** [firebaseConfig.ts](firebaseConfig.ts) (production) and [VITE_firebaseConfig.ts](VITE_firebaseConfig.ts) (fallback)
 - **Gemini API key:** `process.env.GEMINI_API_KEY` (set in .env.local)
-- **Stripe keys:** `process.env.STRIPE_PUBLIC_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_PREMIUM_PRICE_ID`, `STRIPE_FAMILY_PRICE_ID`
-- **PayPal:** `PAYPAL_CLIENT_ID`, `PAYPAL_SECRET`, `PAYPAL_ENVIRONMENT` (test/live)
+- **Google Play Billing:** Managed via Capacitor plugin and Play Console; no secret keys required in .env.local
 - **Sentry:** DSN in environment for error/perf tracking
 
 ---

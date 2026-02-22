@@ -1362,9 +1362,41 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                         <p>No saved recipes yet.</p>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-3 gap-4">
-                        {savedRecipes.map(r => renderRecipeCard(r, true, true))}
-                    </div>
+                    <>
+                        <div className="grid grid-cols-3 gap-4">
+                            {savedRecipes.map(r => renderRecipeCard(r, true, true))}
+                        </div>
+                        <div className="flex justify-end mt-6">
+                            <button
+                                className="px-4 py-2 bg-[var(--accent-color)] text-white rounded-lg font-bold shadow hover:bg-[var(--accent-color)]/90 transition-colors"
+                                onClick={() => {
+                                    try {
+                                        // Export recipes as JSON
+                                        const dataStr = JSON.stringify(savedRecipes, null, 2);
+                                        const blob = new Blob([dataStr], { type: 'application/json' });
+                                        const url = URL.createObjectURL(blob);
+                                        const a = document.createElement('a');
+                                        a.href = url;
+                                        a.download = 'saved_recipes.json';
+                                        document.body.appendChild(a);
+                                        a.click();
+                                        setTimeout(() => {
+                                            document.body.removeChild(a);
+                                            URL.revokeObjectURL(url);
+                                        }, 100);
+                                        AnalyticsService.trackFeatureUsage('recipe_export', { success: true, count: savedRecipes.length });
+                                    } catch (error) {
+                                        AnalyticsService.trackFeatureUsage('recipe_export', { success: false, error: error?.message || error });
+                                        AnalyticsService.trackError('recipe_export_error', error?.message || error, 'RecipeFinder');
+                                        if (addToast) addToast('Failed to export recipes', 'error');
+                                    }
+                                }}
+                                data-tutorial="export-recipes"
+                            >
+                                Export Recipes
+                            </button>
+                        </div>
+                    </>
                 )}
             </div>
           </PremiumFeature>

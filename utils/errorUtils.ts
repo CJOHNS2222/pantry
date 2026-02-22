@@ -67,6 +67,7 @@ export class AppError extends Error {
 
     switch (firebaseError.code) {
       case 'permission-denied':
+        AnalyticsService.trackError('firestore_error', firebaseError.message || 'Permission denied', 'errorUtils');
         return new AppError(
           ErrorCode.PERMISSION_DENIED,
           firebaseError.message || 'Permission denied',
@@ -74,6 +75,7 @@ export class AppError extends Error {
           { originalError: error, context, retryable: false }
         );
       case 'unavailable':
+        AnalyticsService.trackError('firestore_error', firebaseError.message || 'Service unavailable', 'errorUtils');
         return new AppError(
           ErrorCode.CONNECTION_LOST,
           firebaseError.message || 'Service unavailable',
@@ -81,6 +83,7 @@ export class AppError extends Error {
           { originalError: error, context, retryable: true }
         );
       case 'deadline-exceeded':
+        AnalyticsService.trackError('firestore_error', firebaseError.message || 'Operation timed out', 'errorUtils');
         return new AppError(
           ErrorCode.TIMEOUT_ERROR,
           firebaseError.message || 'Operation timed out',
@@ -88,6 +91,7 @@ export class AppError extends Error {
           { originalError: error, context, retryable: true }
         );
       default:
+        AnalyticsService.trackError('firestore_error', firebaseError.message || 'Database operation failed', 'errorUtils');
         return new AppError(
           ErrorCode.FIRESTORE_ERROR,
           firebaseError.message || 'Database operation failed',

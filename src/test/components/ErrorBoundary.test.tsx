@@ -18,8 +18,10 @@ vi.mock('@sentry/react', () => ({
     setTag: vi.fn(),
     setContext: vi.fn(),
     captureException: vi.fn(),
+    addBreadcrumb: vi.fn(),
   })),
   captureException: vi.fn(),
+  addBreadcrumb: vi.fn(),
 }));
 
 // Component that throws an error

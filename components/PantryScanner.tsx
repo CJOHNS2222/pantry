@@ -250,7 +250,8 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   const handleTakePhoto = useCallback(async () => {
     try {
       // Track feature adoption
-      AnalyticsService.trackFeatureFirstUse('pantry_scanner_camera', { method: 'camera' });
+      setLoadingState(LoadingState.LOADING);      
+      AnalyticsService.trackFeatureUsage('pantry_scanner', { success: true, itemsScanned: items.length, itemsAdded: addedCount });
       
       const photo = await CapacitorCamera.getPhoto({
         resultType: CameraResultType.DataUrl,

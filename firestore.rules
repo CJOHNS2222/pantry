@@ -153,9 +153,9 @@ service cloud.firestore {
       allow read, write: if request.auth != null; // Authenticated users can cache images
     }
 
-    // Price data cache: allow authenticated users to cache price data globally
-    match /price_cache/{docId} {
-      allow read, write: if request.auth != null; // Authenticated users can cache price data
+    // Price data cache: allow authenticated users to read/write the single global cache document.
+    match /price_cache/priceData {
+      allow read, write: if request.auth != null;
     }
 
     // System collection: allow read access for authenticated users (for cached data like popular recipes)

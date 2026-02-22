@@ -49,6 +49,8 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
       error.message,
       errorInfo.componentStack?.split('\n')[1]?.trim() || 'unknown'
     );
+    // Track fatal crash for statistics
+    AnalyticsService.trackAppCrash(error, this.constructor.name);
   }
 
   render() {

@@ -3,6 +3,14 @@ import { logEvent, setUserProperties, setUserId } from 'firebase/analytics';
 
 // Analytics service for tracking user interactions and app performance
 class AnalyticsService {
+    // Track app crash events
+    static trackAppCrash(error: any, component?: string) {
+      this.logEvent('app_crash', {
+        error_message: error?.message || error,
+        component: component || 'unknown',
+        fatal: true
+      });
+    }
   // Track user authentication events
   static trackLogin(method: string = 'email') {
     this.logEvent('login', { method });
@@ -434,8 +442,10 @@ class AnalyticsService {
 
   // Funnel tracking for subscription conversion
   static trackSubscriptionFunnel(step: 'view_pricing' | 'start_trial' | 'upgrade_intent' | 'payment_attempt' | 'payment_success' | 'payment_failed', details?: Record<string, any>) {
+    // Stripe/PayPal removed; funnel now tracks Google Play Billing
     this.logEvent('subscription_funnel', {
       funnel_step: step,
+      payment_provider: 'google_play_billing',
       ...details
     });
   }

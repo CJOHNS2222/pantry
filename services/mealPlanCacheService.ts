@@ -1,21 +1,42 @@
 import { arrayUnion, arrayRemove } from 'firebase/firestore';
-import { db } from '../firebaseConfig';
 import { DayPlan, MealPlanItem } from '../types';
 import DatabaseMonitoringService from './databaseMonitoringService';
 
-const CACHE_VERSION = '1.0';
+export const CACHE_VERSION = '1.0';
+
+// A helper function to recursively remove undefined properties from an object
+const sanitizeObject = (obj: any) => {
+  if (obj === null || typeof obj !== 'object') {
+    return obj;
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map(item => sanitizeObject(item)).filter(item => item !== undefined);
+  }
+
+  const newObj: { [key: string]: any } = {};
+  for (const key in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, key)) {
+      const value = sanitizeObject(obj[key]);
+      if (value !== undefined) {
+        newObj[key] = value;
+      }
+    }
+  }
+  return newObj;
+};
 
 const getCacheRef = (householdId?: string, userId?: string) => {
   if (householdId) {
-    return DatabaseMonitoringService.doc(db, `households/${householdId}/cache/mealPlan`);
+    return DatabaseMonitoringService.doc(`households/${householdId}/cache/mealPlan`);
   } else if (userId) {
-    return DatabaseMonitoringService.doc(db, `users/${userId}/cache/mealPlan`);
+    return DatabaseMonitoringService.doc(`users/${userId}/cache/mealPlan`);
   } else {
     throw new Error('A householdId or userId must be provided');
   }
 };
 
-const setCache = async (mealPlan: DayPlan[], householdId?: string, userId?: string) => {
+const updateCache = async (mealPlan: DayPlan[], householdId?: string, userId?: string) => {
   try {
     const cacheRef = getCacheRef(householdId, userId);
     const dataToCache = {
@@ -39,14 +60,41 @@ const setCache = async (mealPlan: DayPlan[], householdId?: string, userId?: stri
 
 const addMeal = async (date: string, mealType: 'breakfast' | 'lunch' | 'dinner', meal: MealPlanItem, householdId?: string, userId?: string) => {
   try {
-    const cacheRef = getCacheRef(householdId, userId);
-    const fieldPath = `days.${date}.${mealType}`;
+    // Sanitize the meal object to remove any `undefined` values before sending to Firestore.
+    const cleanMeal = sanitizeObject(meal);
 
-    await DatabaseMonitoringService.updateDoc(cacheRef, {
-        [fieldPath]: arrayUnion(meal)
-    });
+    const cacheRef = getCacheRef(householdId, userId);
+    const docSnap = await DatabaseMonitoringService.getDoc(cacheRef);
+
+    if (!docSnap.exists() || !docSnap.data()?.days?.[date]) {
+      // If doc or day object doesn't exist, create it.
+      const dayName = new Date(`${date}T00:00:00`).toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
+      
+      const newDayData = {
+        dayName,
+        breakfast: [],
+        lunch: [],
+        dinner: [],
+      };
+      newDayData[mealType] = [cleanMeal];
+
+      // Ensure the version is always set, especially on document creation.
+      await DatabaseMonitoringService.setDoc(cacheRef, {
+        version: CACHE_VERSION,
+        days: {
+          [date]: newDayData
+        }
+      }, { merge: true });
+    } else {
+      // Day object exists, so we can safely use arrayUnion.
+      const fieldPath = `days.${date}.${mealType}`;
+      await DatabaseMonitoringService.updateDoc(cacheRef, {
+        [fieldPath]: arrayUnion(cleanMeal)
+      });
+    }
   } catch (err: any) {
     console.error(`Failed to add meal for ${date}:`, err);
+    throw err; // Rethrow the error to be handled by the calling component
   }
 };
 
@@ -99,7 +147,7 @@ const removeMeal = async (date: string, mealType: 'breakfast' | 'lunch' | 'dinne
 
 export const MealPlanCacheService = {
   CACHE_VERSION,
-  setCache,
+  updateCache,
   addMeal,
   updateMeal,
   removeMeal,
