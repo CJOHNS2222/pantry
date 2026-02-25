@@ -182,7 +182,10 @@ export const rebuildCommunityRatedRecipesFromRatings = async (days: number = 30,
         try {
           const docRef = DatabaseMonitoringService.doc(`recipes/${item.recipeIds[0]}`);
           const ds = await DatabaseMonitoringService.getDoc(docRef);
-          if (ds && ds.exists && typeof ds.exists === 'function' ? ds.exists() : ds.exists) recipeDoc = { id: ds.id, ...ds.data() };
+          if (ds && ds.exists && typeof ds.exists === 'function' ? ds.exists() : ds.exists) {
+            const d = ds.data() as any;
+            recipeDoc = { id: ds.id, ...d };
+          }
         } catch (e) { /* ignore */ }
       }
 
@@ -190,7 +193,10 @@ export const rebuildCommunityRatedRecipesFromRatings = async (days: number = 30,
         try {
           const recipesQuery = DatabaseMonitoringService.query(DatabaseMonitoringService.collection('recipes'), DatabaseMonitoringService.where('title', '==', item.title), DatabaseMonitoringService.limit(1));
           const rq = await DatabaseMonitoringService.getDocs(recipesQuery);
-          if (rq.docs.length > 0) recipeDoc = { id: rq.docs[0].id, ...rq.docs[0].data() };
+          if (rq.docs.length > 0) {
+            const d = rq.docs[0].data() as any;
+            recipeDoc = { id: rq.docs[0].id, ...d };
+          }
         } catch (e) { /* ignore */ }
       }
 
@@ -240,7 +246,10 @@ export const upsertCommunityRatedRecipeByTitle = async (title: string): Promise<
       const possibleId = (stats as any).recipeId;
       if (possibleId) {
         const rd = await DatabaseMonitoringService.getDoc(DatabaseMonitoringService.doc(`recipes/${possibleId}`));
-        if (rd && rd.exists && typeof rd.exists === 'function' ? rd.exists() : rd.exists) recipeDoc = { id: rd.id, ...rd.data() };
+        if (rd && rd.exists && typeof rd.exists === 'function' ? rd.exists() : rd.exists) {
+          const d = rd.data() as any;
+          recipeDoc = { id: rd.id, ...d };
+        }
       }
     } catch (e) { /* ignore */ }
 
@@ -248,7 +257,10 @@ export const upsertCommunityRatedRecipeByTitle = async (title: string): Promise<
       try {
         const q = DatabaseMonitoringService.query(DatabaseMonitoringService.collection('recipes'), DatabaseMonitoringService.where('title', '==', title), DatabaseMonitoringService.limit(1));
         const rq = await DatabaseMonitoringService.getDocs(q);
-        if (rq && rq.docs && rq.docs.length > 0) recipeDoc = { id: rq.docs[0].id, ...rq.docs[0].data() };
+        if (rq && rq.docs && rq.docs.length > 0) {
+          const d = rq.docs[0].data() as any;
+          recipeDoc = { id: rq.docs[0].id, ...d };
+        }
       } catch (e) { /* ignore */ }
     }
 
@@ -562,9 +574,9 @@ export const getSavedRecipes = async (limitCount: number = 50): Promise<SavedRec
     const q = DatabaseMonitoringService.query(recipesRef, DatabaseMonitoringService.orderBy("dateSaved", "desc"), DatabaseMonitoringService.limit(limitCount));
     const querySnapshot = await DatabaseMonitoringService.getDocs(q);
 
-    return querySnapshot.docs.map(doc => {
-      const d = doc.data();
-      return ({ id: doc.id, ...(d && typeof d === 'object' ? (d as Record<string, any>) : {}) } as SavedRecipe);
+    return querySnapshot.docs.map((doc: any) => {
+      const d = (doc as any).data();
+      return ({ id: (doc as any).id, ...(d && typeof d === 'object' ? (d as Record<string, any>) : {}) } as SavedRecipe);
     });
   } catch (err: any) {
     console.error("Error fetching saved recipes:", err);
@@ -658,7 +670,7 @@ export const getCachedRecipesCache = async (cachePath: string = 'recipe_caches/r
           return sysRecipes as SavedRecipe[];
         }
       } catch (permErr: any) {
-        console.warn(`⚠️ Unable to read ${cachePath} (may be permission denied):`, permErr?.message || permErr);
+        console.warn(`⚠️ Unable to read ${cachePath} (may be permission denied):`, (permErr as any)?.message || permErr);
       }
     }
 
@@ -680,7 +692,7 @@ export const getCachedRecipesCache = async (cachePath: string = 'recipe_caches/r
           return sysRecipes as SavedRecipe[];
         }
       } catch (innerErr) {
-        console.warn('⚠️ System cache read also failed:', innerErr?.message || innerErr);
+        console.warn('⚠️ System cache read also failed:', (innerErr as any)?.message || innerErr);
       }
     }
 
@@ -824,10 +836,10 @@ export const searchRecipesInFirestore = async (searchTerm: string): Promise<Save
 
       const recipeDocs = await Promise.all(recipePromises);
 
-      for (const doc of recipeDocs) {
+      for (const doc of recipeDocs as any[]) {
         if (doc && (typeof (doc as any).exists === 'function' ? (doc as any).exists() : (doc as any).exists)) {
           const d = (doc as any).data ? (doc as any).data() : {};
-          fullRecipes.push({ id: doc.id, ...(d && typeof d === 'object' ? d as Record<string, any> : {}) } as SavedRecipe);
+          fullRecipes.push({ id: (doc as any).id, ...(d && typeof d === 'object' ? d as Record<string, any> : {}) } as SavedRecipe);
         }
       }
     }
@@ -855,16 +867,16 @@ const searchRecipesInFirestoreFallback = async (searchTerm: string): Promise<Sav
     const q = DatabaseMonitoringService.query(recipesRef);
     const querySnapshot = await DatabaseMonitoringService.getDocs(q);
 
-    const allRecipes = querySnapshot.docs.map(doc => {
-      const d = doc.data();
-      return ({ id: doc.id, ...(d && typeof d === 'object' ? d as Record<string, any> : {}) } as SavedRecipe);
+    const allRecipes = querySnapshot.docs.map((doc: any) => {
+      const d = (doc as any).data();
+      return ({ id: (doc as any).id, ...(d && typeof d === 'object' ? d as Record<string, any> : {}) } as SavedRecipe);
     });
 
     // Filter by search term (case-insensitive)
-    const filteredRecipes = allRecipes.filter(recipe =>
-      recipe.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      recipe.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      recipe.ingredients.some(ing => ing.toLowerCase().includes(searchTerm.toLowerCase()))
+    const filteredRecipes = allRecipes.filter((recipe: any) =>
+      String((recipe as any).title || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      String((recipe as any).description || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      Array.isArray((recipe as any).ingredients) && (recipe as any).ingredients.some((ing: any) => String(ing || '').toLowerCase().includes(searchTerm.toLowerCase()))
     );
 
     return filteredRecipes;

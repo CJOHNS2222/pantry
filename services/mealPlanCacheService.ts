@@ -5,13 +5,13 @@ import DatabaseMonitoringService from './databaseMonitoringService';
 export const CACHE_VERSION = '1.0';
 
 // A helper function to recursively remove undefined properties from an object
-const sanitizeObject = (obj: any) => {
+const sanitizeObject = (obj: any): any => {
   if (obj === null || typeof obj !== 'object') {
     return obj;
   }
 
   if (Array.isArray(obj)) {
-    return obj.map(item => sanitizeObject(item)).filter(item => item !== undefined);
+    return obj.map((item: any) => sanitizeObject(item)).filter((item: any) => item !== undefined);
   }
 
   const newObj: { [key: string]: any } = {};
@@ -70,7 +70,7 @@ const addMeal = async (date: string, mealType: 'breakfast' | 'lunch' | 'dinner',
       // If doc or day object doesn't exist, create it.
       const dayName = new Date(`${date}T00:00:00`).toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
       
-      const newDayData = {
+      const newDayData: any = {
         dayName,
         breakfast: [],
         lunch: [],
@@ -150,6 +150,29 @@ export const MealPlanCacheService = {
   updateCache,
   // Backwards-compatible alias: some callers expect `setCache`
   setCache: updateCache,
+  /**
+   * Read cached meal plan and convert to DayPlan[] format used by the app
+   */
+  getCachedMealPlan: async (householdId?: string, userId?: string) => {
+    try {
+      const cacheRef = getCacheRef(householdId, userId);
+      const docSnap = await DatabaseMonitoringService.getDoc(cacheRef);
+      if (!docSnap.exists()) return [] as DayPlan[];
+      const data: any = docSnap.data();
+      const days = data.days || {};
+      const result: DayPlan[] = Object.keys(days).map(date => ({
+        date,
+        dayName: days[date].dayName || new Date(`${date}T00:00:00`).toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' }),
+        breakfast: days[date].breakfast || [],
+        lunch: days[date].lunch || [],
+        dinner: days[date].dinner || [],
+      }));
+      return result;
+    } catch (err: any) {
+      console.error('Failed to read cached meal plan:', err);
+      return [] as DayPlan[];
+    }
+  },
   addMeal,
   updateMeal,
   removeMeal,

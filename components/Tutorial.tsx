@@ -268,7 +268,32 @@ export const Tutorial: React.FC<TutorialProps> = ({
   useEffect(() => {
     if (!currentStepData) return;
 
-    setHighlightedElement(currentStepData.highlight);
+    const computePosition = () => {
+      try {
+        const el = document.querySelector(`[data-tutorial="${currentStepData.highlight}"]`) as HTMLElement | null;
+        const modalWidth = 320; // matches w-80
+        const approxModalHeight = 220;
+        const padding = 12;
+        if (el) {
+          const rect = el.getBoundingClientRect();
+          const vw = window.innerWidth;
+          const vh = window.innerHeight;
+          // Prefer placing below the element if space allows
+          const placeBelow = rect.bottom + approxModalHeight + padding < vh;
+          let left = rect.left + rect.width / 2 - modalWidth / 2;
+          left = Math.max(8, Math.min(left, vw - modalWidth - 8));
+          const top = placeBelow ? Math.min(vh - approxModalHeight - 8, rect.bottom + padding) : Math.max(8, rect.top - approxModalHeight - padding);
+          setModalStyle({ position: 'fixed', left: `${left}px`, top: `${top}px`, zIndex: 50 });
+          return;
+        }
+      } catch (e) {
+        // ignore
+      }
+      // fallback positions
+      setModalStyle(undefined);
+    };
+
+    setHighlightedElement(currentStepData.highlight ?? null);
 
     // Track tutorial step
     AnalyticsService.trackTutorialStep(step, currentStepData.title);
@@ -286,32 +311,6 @@ export const Tutorial: React.FC<TutorialProps> = ({
         element.classList.add('tutorial-glow');
       }
 
-      // Compute modal position near the highlighted element
-      const computePosition = () => {
-        try {
-          const el = document.querySelector(`[data-tutorial="${currentStepData.highlight}"]`) as HTMLElement | null;
-          const modalWidth = 320; // matches w-80
-          const approxModalHeight = 220;
-          const padding = 12;
-          if (el) {
-            const rect = el.getBoundingClientRect();
-            const vw = window.innerWidth;
-            const vh = window.innerHeight;
-            // Prefer placing below the element if space allows
-            const placeBelow = rect.bottom + approxModalHeight + padding < vh;
-            let left = rect.left + rect.width / 2 - modalWidth / 2;
-            left = Math.max(8, Math.min(left, vw - modalWidth - 8));
-            const top = placeBelow ? Math.min(vh - approxModalHeight - 8, rect.bottom + padding) : Math.max(8, rect.top - approxModalHeight - padding);
-            setModalStyle({ position: 'fixed', left: `${left}px`, top: `${top}px`, zIndex: 50 });
-            return;
-          }
-        } catch (e) {
-          // ignore
-        }
-        // fallback positions
-        setModalStyle(undefined);
-      };
-
       computePosition();
       window.addEventListener('resize', computePosition);
       window.addEventListener('scroll', computePosition, true);
@@ -328,7 +327,7 @@ export const Tutorial: React.FC<TutorialProps> = ({
       // Only call actions automatically for non-interactive steps
       const delay = step === 1 ? 2000 : 300;
       setTimeout(() => {
-        currentStepData.action();
+        currentStepData.action?.();
       }, delay);
     }
     return () => {
@@ -386,6 +385,7 @@ export const Tutorial: React.FC<TutorialProps> = ({
     setModalStyle(newStyle);
     setArrowStyle(arrow);
     setArrowClass(placeAbove ? 'arrow-down' : 'arrow-up');
+    return undefined;
   }, [highlightedElement, currentStepData]);
 
   // Detect user interactions with highlighted elements (centralized via tutorialService)
@@ -420,7 +420,7 @@ export const Tutorial: React.FC<TutorialProps> = ({
     }
 
     // If this step is already completed, don't start another wait — prevents update loops
-    if (completedSteps.has(step)) return;
+    if (completedSteps.has(step)) return () => {};
 
     let cancelled = false;
     const highlight = currentStepData.highlight;
@@ -460,18 +460,18 @@ export const Tutorial: React.FC<TutorialProps> = ({
 
   // Watch household modal open/close to mark household step completed when user closes it
   useEffect(() => {
-    if (!currentStepData) return;
+    if (!currentStepData) return () => {};
     if (currentStepData.id !== 'household') {
       prevHouseholdOpenRef.current = undefined;
-      return;
+      return () => {};
     }
 
-    if (typeof isHouseholdOpen === 'undefined') return;
+    if (typeof isHouseholdOpen === 'undefined') return () => {};
 
     const prev = prevHouseholdOpenRef.current;
     if (prev === undefined) {
       prevHouseholdOpenRef.current = isHouseholdOpen;
-      return;
+      return () => {};
     }
 
     // If modal transitioned from open -> closed, mark completed and auto-advance
@@ -497,13 +497,14 @@ export const Tutorial: React.FC<TutorialProps> = ({
     }
 
     prevHouseholdOpenRef.current = isHouseholdOpen;
+    return () => {};
   }, [isHouseholdOpen, currentStepData, step, handleNext]);
 
   // Auto-advance for completed interactive steps
   useEffect(() => {
     if (currentStepData?.interactive && isPlaying && completedSteps.has(step)) {
       // Do not schedule another auto-advance when we've already triggered one
-      if (autoAdvanceRef.current) return;
+      if (autoAdvanceRef.current) return () => {};
 
       // Auto-advance after a short delay when step is completed (fallback)
       const timer = setTimeout(() => {
@@ -514,6 +515,7 @@ export const Tutorial: React.FC<TutorialProps> = ({
 
       return () => clearTimeout(timer);
     }
+    return () => {};
   }, [currentStepData, step, activeSteps.length, handleNext, isPlaying, completedSteps]);
 
   // Track tutorial start

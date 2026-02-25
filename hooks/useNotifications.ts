@@ -13,7 +13,9 @@ interface NotificationSettings {
 }
 
 export function useNotifications(settings: NotificationSettings, userEmail?: string, mealPlan?: DayPlan[]): any {
-  const [notificationPermission, setNotificationPermission] = useState<'default' | 'granted' | 'denied'>('default');
+  // Capacitor PermissionState can vary between platforms; keep this a wide string
+  // so we can assign whatever the plugin returns without narrowing errors.
+  const [notificationPermission, setNotificationPermission] = useState<string>('default');
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) {
@@ -26,7 +28,7 @@ export function useNotifications(settings: NotificationSettings, userEmail?: str
         const permission = await LocalNotifications.checkPermissions();
         setNotificationPermission(permission.display);
       } catch (err: any) {
-        console.error('Error checking notification permissions:', error);
+        console.error('Error checking notification permissions:', err);
       }
     };
 
@@ -48,7 +50,7 @@ export function useNotifications(settings: NotificationSettings, userEmail?: str
           await scheduleNotifications(settings, mealPlan);
         }
       } catch (err: any) {
-        console.error('Error setting up notifications:', error);
+        console.error('Error setting up notifications:', err);
       }
     };
 
@@ -61,7 +63,7 @@ export function useNotifications(settings: NotificationSettings, userEmail?: str
       setNotificationPermission(permission.display);
       return permission.display;
     } catch (err: any) {
-      console.error('Error requesting notification permissions:', error);
+      console.error('Error requesting notification permissions:', err);
       return 'denied';
     }
   };
@@ -97,7 +99,8 @@ export function useNotifications(settings: NotificationSettings, userEmail?: str
       }
 
       if (notifications.length > 0) {
-        await LocalNotifications.schedule({ notifications });
+        // Cast to any to satisfy differing LocalNotificationSchema definitions across platforms
+        await LocalNotifications.schedule({ notifications: notifications as any });
       }
     }
   };

@@ -130,8 +130,8 @@ export const SmartShoppingSuggestions: React.FC<SmartShoppingSuggestionsProps> =
       10: ['cranberries', 'sweet potatoes', 'squash'] // November
     };
 
-    const currentSeasonalItems = seasonalItems[currentMonth] || [];
-    currentSeasonalItems.forEach(item => {
+    const currentSeasonalItems = (seasonalItems as any)[currentMonth] || [];
+    currentSeasonalItems.forEach((item: string) => {
       const hasInPantry = pantryItems.some(p => p.name.toLowerCase().includes(item.toLowerCase()));
       if (!hasInPantry) {
         suggestions.push({

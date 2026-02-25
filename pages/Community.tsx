@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { IonContent, IonPage, IonHeader, IonToolbar, IonTitle, IonList, IonItem, IonLabel, IonSpinner, IonAlert, IonInfiniteScroll, IonInfiniteScrollContent } from '@ionic/react';
+// Using plain HTML elements here to avoid optional Ionic dependency in non-native builds
 import { RecipeRating } from '../types';
 import { useDataManagement } from '../hooks/useDataManagement';
 
@@ -27,38 +27,36 @@ const Community: React.FC = () => {
   }, [loadRatings]);
 
   return (
-    <IonPage>
-      <IonHeader>
-        <IonToolbar>
-          <IonTitle>Community Ratings</IonTitle>
-        </IonToolbar>
-      </IonHeader>
-      <IonContent>
+    <div>
+      <header>
+        <div>
+          <h1>Community Ratings</h1>
+        </div>
+      </header>
+      <main>
         {isLoading ? (
-          <IonSpinner />
+          <span>Loading...</span>
         ) : error ? (
-          <IonAlert
-            isOpen={!!error}
-            message={error}
-            buttons={['OK']}
-            onDidDismiss={() => setError(null)}
-          />
+          <div role="alert">
+            <p>{error}</p>
+            <button onClick={() => setError(null)}>OK</button>
+          </div>
         ) : (
-          <IonList>
-            {ratings.map(rating => (
-              <IonItem key={rating.id}>
-                <IonLabel>
-                  <h2>{rating.recipeTitle}</h2>
-                  <p>Rating: {rating.rating}</p>
-                  <p>{rating.comment}</p>
-                  <p>- {rating.userName}</p>
-                </IonLabel>
-              </IonItem>
+          <ul>
+            {ratings.map(r => (
+              <li key={r.id}>
+                <div>
+                  <h3>{r.recipeTitle}</h3>
+                  <p>Rating: {r.rating}</p>
+                  <p>{r.comment}</p>
+                  <p>- {r.userName}</p>
+                </div>
+              </li>
             ))}
-          </IonList>
+          </ul>
         )}
-      </IonContent>
-    </IonPage>
+      </main>
+    </div>
   );
 };
 

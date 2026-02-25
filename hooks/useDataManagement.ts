@@ -18,7 +18,7 @@ import { useScopedDataListener } from './useDataListener';
 import { firestoreCache } from '../services/cacheService';
 import { HouseholdPreferenceService } from '../services/householdPreferenceService';
 import { InventoryCacheService, CachedInventoryData, CacheMetadata } from '../services/inventoryCacheService';
-import { MealPlanCacheService } from '../services/mealPlanCacheService';
+import { MealPlanCacheService } from '../services/MealPlanCacheService';
 import { RecipesCacheService, CachedRecipesData, RecipesCacheMetadata } from '../services/recipesCacheService';
 import { ShoppingListCacheService, CachedShoppingListData, ShoppingListCacheMetadata } from '../services/shoppingListCacheService';
 import HapticService from '../services/hapticService';
@@ -57,7 +57,7 @@ function createShoppingListListener(
               items.push(ShoppingListCacheService.objectToShoppingItem(itemId, itemArray as CachedShoppingListData[string], householdId));
             }
           }
-          const sortedItems = items.sort((a, b) => b.addedAt.getTime() - a.addedAt.getTime());
+          const sortedItems = items.sort((a, b) => (b.addedAt?.getTime() || 0) - (a.addedAt?.getTime() || 0));
           if (hasArraysChanged(sortedItems, prevShoppingListRef.current)) {
             setRemoteShoppingListUpdate(true);
             setShoppingList(sortedItems);
@@ -96,7 +96,7 @@ function createShoppingListListener(
               items.push(ShoppingListCacheService.objectToShoppingItem(itemId, itemArray as CachedShoppingListData[string], undefined, userId));
             }
           }
-          const sortedItems = items.sort((a, b) => b.addedAt.getTime() - a.addedAt.getTime());
+          const sortedItems = items.sort((a, b) => (b.addedAt?.getTime() || 0) - (a.addedAt?.getTime() || 0));
           if (hasArraysChanged(sortedItems, prevShoppingListRef.current)) {
             setRemoteShoppingListUpdate(true);
             setShoppingList(sortedItems);
@@ -253,10 +253,10 @@ function createMealPlanListener(
 }
 
 export function useDataManagement(
-  user: User | null,
-  addToast: (message: string, type: 'success' | 'error' | 'info' | 'warning', duration?: number) => void,
-  addToShoppingList: (items: string[]) => void,
-  updateSyncStatus: (status: string) => void,
+  user?: User | null,
+  addToast?: (message: string, type: 'success' | 'error' | 'info' | 'warning', duration?: number) => void,
+  addToShoppingList?: (items: string[]) => void,
+  updateSyncStatus?: (status: any) => void,
   loggingOptions?: {
     logItemAdded?: (item: string, itemId: string) => void;
     logItemRemoved?: (item: string, itemId: string) => void;
@@ -307,7 +307,7 @@ export function useDataManagement(
   const mealPlanCleanupDoneRef = useRef(false);
 
   // Ref to track last shopping list collection path for sync
-  const lastShoppingListCollectionPathRef = useRef<string>();
+  const lastShoppingListCollectionPathRef = useRef<string | undefined>(undefined);
 
   // Ref to prevent repeated household clearing on permission errors
   const householdClearedDueToPermissionsRef = useRef(false);
@@ -348,22 +348,27 @@ export function useDataManagement(
 
   // Helper function for offline-aware writes
   const performWrite = async (operation: { type: 'add' | 'update' | 'delete'; collection: string; docId?: string; data?: any }) => {
+    // Ensure operation has a data field to satisfy queue typing
+    if (operation.data === undefined) {
+      operation.data = {};
+    }
+
     if (!isOnline) {
-      await offlineQueue.enqueue(operation);
-      if (updateSyncStatus) {
+      await offlineQueue.enqueue(operation as any);
+      if (typeof updateSyncStatus === 'function') {
         // This needs to be a function to correctly update state
         // updateSyncStatus((prev: any) => ({
         //   ...prev,
         //   pendingOperations: prev.pendingOperations + 1
         // }));
       }
-      addToast('Change queued for when you\'re back online.', 'info');
+      addToast?.('Change queued for when you\'re back online.', 'info');
     } else {
       try {
         if (operation.type === 'add') {
           await DatabaseMonitoringService.addDoc(DatabaseMonitoringService.collection(operation.collection), operation.data);
         } else if (operation.type === 'update' && operation.docId) {
-          await DatabaseMonitoringService.setDoc(DatabaseMonitoringService.doc(operation.collection, operation.docId), operation.data);
+          await DatabaseMonitoringService.updateDoc(DatabaseMonitoringService.doc(operation.collection, operation.docId), operation.data);
         } else if (operation.type === 'delete' && operation.docId) {
           await DatabaseMonitoringService.deleteDoc(DatabaseMonitoringService.doc(operation.collection, operation.docId));
         }
@@ -371,7 +376,7 @@ export function useDataManagement(
         firestoreCache.invalidateCollection(operation.collection);
       } catch (err) {
         log.error('Online write operation failed', err, 'DataManagement');
-        addToast(ERROR_MESSAGES.SAVE_FAILED, 'error');
+        addToast?.(ERROR_MESSAGES.SAVE_FAILED, 'error');
       }
     }
   };
@@ -574,11 +579,8 @@ export function useDataManagement(
       return;
     }
 
-    HouseholdPreferenceService.checkHouseholdInventoryForAllergies(
-      household.id,
-      inventory,
-      user.id
-    ).then(() => {
+    HouseholdPreferenceService.checkHouseholdInventoryForAllergies(household.id)
+    .then(() => {
       lastAllergyCheckRef.current = now;
     }).catch(err => {
       log.error('Failed to check household inventory for allergies:', err, 'DataManagement');
@@ -599,11 +601,11 @@ export function useDataManagement(
 
   useEffect(() => {
     if(isOnline) {
-      offlineQueue.processQueue().then(processedCount => {
-        if (processedCount > 0) {
-          addToast(`Synced ${processedCount} offline changes.`, 'success');
-        }
-      });
+      offlineQueue.processQueue().then((processedCount: any) => {
+          if (typeof processedCount === 'number' && processedCount > 0) {
+            addToast?.(`Synced ${processedCount} offline changes.`, 'success');
+          }
+        });
     }
   }, [isOnline]);
 
@@ -614,7 +616,7 @@ export function useDataManagement(
 
     const canAdd = await checkMealPlanLimit();
     if (!canAdd) {
-      addToast(ERROR_MESSAGES.PLANNING_LIMIT_REACHED, 'error');
+      addToast?.(ERROR_MESSAGES.PLANNING_LIMIT_REACHED, 'error');
       return;
     }
 
@@ -698,7 +700,7 @@ export function useDataManagement(
 
     const canSave = await checkRecipeSaveLimit();
     if (!canSave) {
-      addToast(ERROR_MESSAGES.RECIPE_LIMIT_REACHED, 'error');
+      addToast?.(ERROR_MESSAGES.RECIPE_LIMIT_REACHED, 'error');
       return;
     }
 
@@ -718,10 +720,10 @@ export function useDataManagement(
       // No-op: rating docs include recipe data at submit time, no client-side attachment needed.
       await UsageService.recordRecipeSave(user);
 
-      addToast(`Saved ${recipe.title} to your recipes!`);
+      addToast?.(`Saved ${recipe.title} to your recipes!`, 'success');
     } catch (err) {
       log.error('Error saving recipe:', err, 'DataManagement');
-      addToast(ERROR_MESSAGES.SAVE_FAILED, 'error');
+      addToast?.(ERROR_MESSAGES.SAVE_FAILED, 'error');
     }
   };
 
@@ -734,10 +736,10 @@ export function useDataManagement(
       
       await RecipesCacheService.removeRecipeFromCache(recipe.id, householdId, userId);
       
-      addToast(`Removed ${recipe.title} from your saved recipes.`);
+      addToast?.(`Removed ${recipe.title} from your saved recipes.`, 'success');
     } catch (err) {
       log.error('Error deleting recipe:', err, 'DataManagement');
-      addToast(ERROR_MESSAGES.DELETE_FAILED, 'error');
+      addToast?.(ERROR_MESSAGES.DELETE_FAILED, 'error');
     }
   };
 
@@ -748,19 +750,19 @@ export function useDataManagement(
       
       const validation = validateCustomCategory(name, icon, customCategories);
       if (!validation.valid) {
-        addToast(validation.error!, 'error');
+        addToast?.(validation.error!, 'error');
         return;
       }
 
       const newCategory = createCustomCategory(name, icon, color, user.id);
       const updatedCategories = [...customCategories, newCategory];
           
-      await DatabaseMonitoringService.setDoc(DatabaseMonitoringService.doc(`users/${user.id}/cache/customCategories`), { categories: updatedCategories }, { merge: true });
+      await DatabaseMonitoringService.updateDoc(DatabaseMonitoringService.doc(`users/${user.id}/cache/customCategories`), { categories: updatedCategories });
 
-      addToast(`Created category "${name}"!`);
+      addToast?.(`Created category "${name}"!`, 'success');
     } catch (err) {
       log.error('Error adding custom category:', err, 'DataManagement');
-      addToast('Failed to create category. Please try again.', 'error');
+      addToast?.('Failed to create category. Please try again.', 'error');
     }
   };
 
@@ -785,7 +787,7 @@ export function useDataManagement(
   const recordUndo = async (type: string, data: any) => {
     if (!user?.id) return;
     try {
-      await undoService.recordAction({ type, data }, user.id);
+      await undoService.recordAction({ type: type as any, data }, user.id);
       const actions = await undoService.getRecentActions(user.id);
       setRecentActions(actions);
     } catch (err) {
@@ -858,7 +860,7 @@ export function useDataManagement(
 
   const updateShoppingListItem = async (itemId: string, updates: Partial<ShoppingItem>) => {
     if (!user?.id) return;
-    await ShoppingListCacheService.updateItemInCache(itemId, updates, user?.householdId, user?.id);
+    await ShoppingListCacheService.updateItemsInCache([{ id: itemId, updates }], user?.householdId, user?.id);
   };
 
   const updateShoppingListItems = async (itemsToUpdate: { id: string, updates: Partial<ShoppingItem> }[]) => {
@@ -868,7 +870,7 @@ export function useDataManagement(
 
   const removeShoppingListItem = async (itemId: string) => {
     if (!user?.id) return;
-    await ShoppingListCacheService.removeItemFromCache(itemId, user?.householdId, user?.id);
+    await ShoppingListCacheService.removeItemsFromCache([itemId], user?.householdId, user?.id);
   };
 
   const removeShoppingListItems = async (itemIds: string[]) => {
@@ -886,7 +888,7 @@ export function useDataManagement(
       );
       const snap = await DatabaseMonitoringService.getDocs(q);
       if (snap.empty) return [];
-      return snap.docs.map(d => {
+      return snap.docs.map((d: any) => {
         const data = d.data() as any;
         const dateField = data.date;
         let dateStr: string | null = null;
@@ -935,7 +937,7 @@ export function useDataManagement(
         return;
       }
 
-      const mapped: RecipeRating[] = snap.docs.map(d => {
+      const mapped: RecipeRating[] = snap.docs.map((d: any) => {
         const data = d.data() as any;
         const dateField = data.date;
         let dateStr: string | null = null;
@@ -969,10 +971,10 @@ export function useDataManagement(
     if (!user?.id) return;
     try {
       await MealPlanCacheService.addMeal(date, mealType, meal, user?.householdId, user?.id);
-      addToast(`Added ${meal.recipe.title} to your meal plan!`);
+      addToast?.(`Added ${meal.recipe.title} to your meal plan!`, 'success');
     } catch (err) {
       log.error('Error adding meal to plan:', err, 'DataManagement');
-      addToast(ERROR_MESSAGES.SAVE_FAILED, 'error');
+      addToast?.(ERROR_MESSAGES.SAVE_FAILED, 'error');
     }
   };
 
@@ -980,10 +982,10 @@ export function useDataManagement(
     if (!user?.id) return;
     try {
       await MealPlanCacheService.updateMeal(date, mealType, meal, user?.householdId, user?.id);
-      addToast(`Updated ${meal.recipe.title} on your meal plan!`);
+      addToast?.(`Updated ${meal.recipe.title} on your meal plan!`, 'success');
     } catch (err) {
       log.error('Error updating meal on plan:', err, 'DataManagement');
-      addToast(ERROR_MESSAGES.UPDATE_FAILED, 'error');
+      addToast?.(ERROR_MESSAGES.UPDATE_FAILED, 'error');
     }
   };
 
@@ -991,10 +993,10 @@ export function useDataManagement(
     if (!user?.id) return;
     try {
       await MealPlanCacheService.removeMeal(date, mealType, mealId, user?.householdId, user?.id);
-      addToast('Removed meal from your plan!');
+      addToast?.('Removed meal from your plan!', 'success');
     } catch (err) {
       log.error('Error removing meal from plan:', err, 'DataManagement');
-      addToast(ERROR_MESSAGES.DELETE_FAILED, 'error');
+      addToast?.(ERROR_MESSAGES.DELETE_FAILED, 'error');
     }
   };
 
@@ -1005,10 +1007,10 @@ export function useDataManagement(
       setMealPlan(newPlan);
       // Save the entire new meal plan to the cache
       await MealPlanCacheService.setCache(newPlan, user?.householdId, user?.id);
-      addToast('Meal plan updated successfully!');
+      addToast?.('Meal plan updated successfully!', 'success');
     } catch (err) {
       log.error('Error updating meal plan:', err, 'DataManagement');
-      addToast(ERROR_MESSAGES.UPDATE_FAILED, 'error');
+      addToast?.(ERROR_MESSAGES.UPDATE_FAILED, 'error');
     }
   };
 
@@ -1070,6 +1072,7 @@ export function useDataManagement(
     isLoadingShoppingList,
     isLoadingMealPlan,
     isLoadingSavedRecipes,
+    isLoadingRatings,
     isLoadingHousehold,
   };
 }

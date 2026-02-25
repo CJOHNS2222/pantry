@@ -6,7 +6,7 @@ import { calculatePortionScaling, PORTION_PRESETS, getRecommendedServings, Porti
 interface PortionSelectorProps {
   household: Household | null;
   currentServings: number;
-  onPortionChange: (newServings: number) => void;
+  onPortionChange: (newServings: number, updatedIngredients?: string[]) => void;
   originalIngredients: string[];
   className?: string;
   user?: {

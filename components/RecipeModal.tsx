@@ -109,16 +109,21 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
   const [showSubstitutions, setShowSubstitutions] = useState(false);
   const [missingIngredients, setMissingIngredients] = useState<{ingredient: string, suggestions: string[]}[]>([]);
 
-  // Parse cook time to seconds
-  const parseTimeToSeconds = (timeStr: string): number => {
-    if (!timeStr) return 0;
-    const match = timeStr.match(/(\d+)\s*(min|hour|hr|sec)/i);
-    if (!match) return 0;
-    const value = parseInt(match[1]);
+  // Parse cook time (string like "15 min" or numeric minutes) to seconds
+  const parseTimeToSeconds = (time: string | number | undefined): number => {
+    if (time === undefined || time === null || time === '') return 0;
+    if (typeof time === 'number') return Math.max(0, Math.floor(time)) * 60;
+    const match = (time || '').toString().match(/(\d+)\s*(min|minute|minutes|hour|hours|hr|h|sec|s)/i);
+    if (!match) {
+      const n = parseInt(time as string, 10);
+      return Number.isFinite(n) && !Number.isNaN(n) ? n * 60 : 0;
+    }
+    const value = parseInt(match[1], 10);
     const unit = match[2].toLowerCase();
-    if (unit.includes('h')) return value * 3600;
-    if (unit.includes('m')) return value * 60;
-    return value;
+    if (unit.startsWith('h')) return value * 3600;
+    if (unit.startsWith('m')) return value * 60;
+    if (unit.startsWith('s')) return value;
+    return value * 60;
   };
 
   // Timer effect
@@ -684,7 +689,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
           </div>
           {onRate && (
             <div className={`mt-6 pt-4 border-t border-theme ${showReviewPrompt ? 'bg-[var(--accent-color)]/10 p-4 rounded-lg' : ''}`} ref={ratingRef}>
-             <RecipeRatingUI
+            <RecipeRatingUI
              recipeTitle={recipe.title}
              recipe={recipe}
              onRatingSubmitted={(rating) => {
@@ -692,7 +697,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
               setShowReviewPrompt(false);
               setTimeout(() => onClose(), 300); // Close modal after submitting a rating
             }}
-            householdId={user?.householdId}
+            householdId={household?.id || user?.id}
           />
         </div>
       )}
@@ -838,7 +843,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
                   setShowRatingModal(false);
                   setTimeout(() => onClose(), 300); // Close main modal after submitting a rating
                 }}
-                householdId={user?.householdId}
+                householdId={household?.id || user?.id}
               />
             </div>
             <div className="flex justify-center">

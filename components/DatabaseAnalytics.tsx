@@ -94,11 +94,12 @@ const DatabaseAnalytics: React.FC = () => {
     if (isDragging) {
       document.addEventListener('mousemove', handleMouseMove);
       document.addEventListener('mouseup', handleMouseUp);
-      return () => {
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
-      };
     }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
   }, [isDragging, dragOffset]);
 
   const formatDuration = (ms: number): string => {
@@ -138,7 +139,6 @@ const DatabaseAnalytics: React.FC = () => {
         title="Click to open Database Analytics"
       >
         📊 DB Analytics ({metrics ? `${DatabaseMonitoringService.getMetrics().reads} reads` : '...'})
-        {console.log('Button is rendering!')}
       </button>
     );
   }

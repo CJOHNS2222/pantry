@@ -69,9 +69,11 @@ export const MealPrepPlanner: React.FC<MealPrepPlannerProps> = ({
     return suggestions.sort((a, b) => b.sharedIngredients.length - a.sharedIngredients.length);
   }, [savedRecipes]);
 
-  const parseTimeToMinutes = (timeStr: string): number => {
+  const parseTimeToMinutes = (time: string | number): number => {
+    if (typeof time === 'number') return time;
+    const timeStr = (time || '').toString();
     if (!timeStr) return 30;
-    const match = timeStr.match(/(\d+)\s*(min|hour|hr)/i);
+    const match = timeStr.match(/(\d+)\s*(min|minute|minutes|hour|hr|h)/i);
     if (!match) return 30;
     const value = parseInt(match[1]);
     const unit = match[2].toLowerCase();

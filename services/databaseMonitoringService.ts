@@ -155,11 +155,11 @@ class DatabaseMonitoringService {
 
   // Query builders
   static query(...args: any[]) {
-    return query(...args);
+    return (query as any)(...args);
   }
 
-  static where(field: string, opStr: string, value: any) {
-    return where(field, opStr, value);
+  static where(field: string, opStr: any, value: any) {
+    return (where as any)(field, opStr, value);
   }
 
   static orderBy(field: string, direction?: 'asc' | 'desc') {
@@ -179,14 +179,14 @@ class DatabaseMonitoringService {
   }
 
   // Enhanced document operations with tracking
-  static async getDoc(ref: any): Promise<DocumentSnapshot> {
+  static async getDoc(ref: any): Promise<any> {
     const startTime = Date.now();
     try {
       const result = await getDoc(ref);
       const duration = Date.now() - startTime;
 
       this.metrics.reads++;
-      AnalyticsService.trackDatabaseOperation('read', ref.parent.id, 1, {
+      AnalyticsService.trackDatabaseOperation('read', (ref as any).parent?.id || 'unknown', 1, {
         operation: 'getDoc',
         duration_ms: duration,
         success: true
@@ -194,7 +194,7 @@ class DatabaseMonitoringService {
 
       return result;
     } catch (err: any) {
-      AnalyticsService.trackDatabaseOperation('read', ref.parent.id, 1, {
+      AnalyticsService.trackDatabaseOperation('read', (ref as any).parent?.id || 'unknown', 1, {
         operation: 'getDoc',
         success: false,
         error: err.message
@@ -203,7 +203,7 @@ class DatabaseMonitoringService {
     }
   }
 
-  static async getDocs<T = DocumentData>(queryRef: Query<T>): Promise<QuerySnapshot<T>> {
+  static async getDocs<T = DocumentData>(queryRef: Query<T>): Promise<any> {
     const startTime = Date.now();
     try {
       const result = await getDocs(queryRef);
@@ -213,12 +213,12 @@ class DatabaseMonitoringService {
       this.metrics.reads += result.size;
 
       // Detailed logging for query tracking
-      const queryPath = this.getQueryPath(queryRef);
+      const queryPath = this.getQueryPath(queryRef as any);
       console.log(`🔍 QUERY: ${queryPath} | Results: ${result.size} | Duration: ${duration}ms | Total Queries: ${this.metrics.queries}`);
       console.trace('Query call stack:');
 
       AnalyticsService.trackQueryPerformance(
-        queryRef.parent?.id || 'unknown',
+        (queryRef as any).parent?.id || 'unknown',
         'getDocs',
         result.size,
         duration
@@ -226,10 +226,10 @@ class DatabaseMonitoringService {
 
       return result;
     } catch (err: any) {
-      const queryPath = this.getQueryPath(queryRef);
+      const queryPath = this.getQueryPath(queryRef as any);
       console.error(`❌ QUERY FAILED: ${queryPath} | Error: ${err.message}`);
 
-      AnalyticsService.trackDatabaseOperation('read', 'unknown', 0, {
+        AnalyticsService.trackDatabaseOperation('read', 'unknown', 0, {
         operation: 'getDocs',
         success: false,
         error: err.message
@@ -239,11 +239,11 @@ class DatabaseMonitoringService {
   }
 
   // Helper method to extract query path for logging
-  private static getQueryPath<T = DocumentData>(queryRef: Query<T>): string {
+  private static getQueryPath<T = DocumentData>(queryRef: any): string {
     try {
       // Try multiple ways to get the path
-      if (queryRef.parent?.path) {
-        return queryRef.parent.path;
+      if ((queryRef as any).parent?.path) {
+        return (queryRef as any).parent.path;
       }
 
       // Try to get path from the query itself
@@ -454,24 +454,24 @@ class DatabaseMonitoringService {
     // Override batch operations to count them (use `any` to satisfy overloads)
     (batch as any).set = (...args: any[]) => {
       operationCount++;
-      return originalSet(...args as any);
+      return (originalSet as any)(...args);
     };
 
     (batch as any).update = (...args: any[]) => {
       operationCount++;
-      return originalUpdate(...args as any);
+      return (originalUpdate as any)(...args);
     };
 
     (batch as any).delete = (...args: any[]) => {
       operationCount++;
-      return originalDelete(...args as any);
+      return (originalDelete as any)(...args);
     };
 
     return batch;
   }
 
   // Enhanced real-time subscriptions
-  static onSnapshot(ref: any, callback: (snapshot: any) => void): Unsubscribe {
+  static onSnapshot(ref: any, callback: (snapshot: any) => void, errorCallback?: (err: any) => void): Unsubscribe {
     this.metrics.realtimeSubscriptions++;
 
     const path = ref.parent?.path || ref.path || 'unknown';
@@ -494,7 +494,7 @@ class DatabaseMonitoringService {
         });
       }
       callback(snapshot);
-    });
+    }, errorCallback);
 
     // Return enhanced unsubscribe function
     return () => {

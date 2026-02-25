@@ -389,7 +389,7 @@ export const getUserHouseholds = async (userEmail: string): Promise<Household[]>
 
     const querySnapshot = await DatabaseMonitoringService.getDocs(householdQuery);
 
-    return querySnapshot.docs.map((doc) => {
+    return querySnapshot.docs.map((doc: any) => {
       const d = doc.data() as any;
       return {
         id: doc.id,

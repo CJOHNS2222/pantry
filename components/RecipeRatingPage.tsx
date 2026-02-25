@@ -10,11 +10,11 @@ const exampleRecipe: StructuredRecipe = {
   id: 'spaghetti-carbonara',
   title: 'Spaghetti Carbonara',
   ingredients: [
-    { name: 'spaghetti', amount: '400', unit: 'g' },
-    { name: 'eggs', amount: '4', unit: 'large' },
-    { name: 'pecorino romano', amount: '100', unit: 'g' },
-    { name: 'pancetta', amount: '150', unit: 'g' },
-    { name: 'black pepper', amount: '1', unit: 'tsp' }
+    '400g spaghetti',
+    '4 large eggs',
+    '100g pecorino romano',
+    '150g pancetta',
+    '1 tsp black pepper'
   ],
   instructions: [
     'Bring a large pot of salted water to boil',
@@ -27,13 +27,7 @@ const exampleRecipe: StructuredRecipe = {
   prepTime: 10,
   cookTime: 15,
   servings: 4,
-  tags: ['italian', 'pasta', 'quick'],
-  nutrition: {
-    calories: 450,
-    protein: 18,
-    carbs: 45,
-    fat: 22
-  }
+  description: 'A classic Italian pasta dish made with eggs, cheese, and pancetta.',
 };
 
 export const RecipeRatingPage: React.FC = () => {
@@ -62,14 +56,14 @@ export const RecipeRatingPage: React.FC = () => {
           recipeTitle={exampleRecipe.title}
           recipe={exampleRecipe}
           onRatingSubmitted={handleRatingSubmitted}
-          householdId={user?.householdId}
+          householdId={user?.id}
         />
       </div>
 
       {/* Community Insights */}
       <RecipeCommunityInsights
         recipeTitle={exampleRecipe.title}
-        householdId={user?.householdId}
+        householdId={user?.id}
       />
 
       {/* Personalized Recommendations */}

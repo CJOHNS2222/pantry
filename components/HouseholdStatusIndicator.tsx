@@ -12,7 +12,7 @@ export const HouseholdStatusIndicator: React.FC<HouseholdStatusIndicatorProps> =
   currentUserId
 }) => {
   // Filter out current user and get active members
-  const otherMembers = household.members.filter(m => m.id !== currentUserId && m.status === 'Active');
+  const otherMembers = household.members.filter(m => m.id !== currentUserId && m.status === 'active');
 
   if (otherMembers.length === 0) {
     return null; // No other active members

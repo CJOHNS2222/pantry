@@ -27,6 +27,7 @@ export function useHouseholdActivity(user: User | null, household: Household | n
       [Tab.MEAL_PLAN]: 'viewing meal plan',
       [Tab.RECIPES]: 'viewing recipes',
       [Tab.SETTINGS]: 'viewing settings',
+      [Tab.COMMUNITY]: 'viewing community',
       [Tab.ANALYTICS]: 'viewing analytics'
     };
 
@@ -50,6 +51,7 @@ export function useHouseholdActivity(user: User | null, household: Household | n
           [Tab.MEAL_PLAN]: 'viewing meal plan',
           [Tab.RECIPES]: 'viewing recipes',
           [Tab.SETTINGS]: 'viewing settings',
+          [Tab.COMMUNITY]: 'viewing community',
           [Tab.ANALYTICS]: 'viewing analytics'
         };
         const currentActivity = activityMap[currentTab] || 'using app';

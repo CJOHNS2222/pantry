@@ -79,10 +79,10 @@ export const getNutritionData = onCall(async (request) => {
     return data;
 
   } catch (err: any) {
-    console.error('Error in getNutritionData function:', error);
+    console.error('Error in getNutritionData function:', err);
 
-    if (error instanceof HttpsError) {
-      throw error;
+    if (err instanceof HttpsError) {
+      throw err;
     }
 
     throw new HttpsError('internal', 'Failed to fetch nutrition data');

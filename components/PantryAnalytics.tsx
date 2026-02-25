@@ -28,7 +28,7 @@ export const PantryAnalytics: React.FC<PantryAnalyticsProps> = ({ inventory }) =
   // Items by Storage Location
   const storageData = useMemo(() => {
     const grouped = inventory.reduce((acc, item) => {
-      const storage = item.storage || 'Not Specified';
+      const storage = item.storageLocation || 'Not Specified';
       const existing = acc.find(s => s.name === storage);
       if (existing) existing.value += 1;
       else acc.push({ name: storage, value: 1 });
@@ -49,8 +49,9 @@ export const PantryAnalytics: React.FC<PantryAnalyticsProps> = ({ inventory }) =
     ];
 
     inventory.forEach(item => {
-      if (!item.expiryDate) return;
-      const expiry = new Date(item.expiryDate);
+      const dateStr = item.expiryDate || item.expirationDate || item.expiryDate;
+      if (!dateStr) return;
+      const expiry = new Date(dateStr);
       const daysUntil = Math.floor((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
       
       const bucket = timeline.find(t => daysUntil >= t.min && daysUntil <= t.max);
@@ -62,14 +63,23 @@ export const PantryAnalytics: React.FC<PantryAnalyticsProps> = ({ inventory }) =
 
   // Usage Frequency (based on quantity - lower quantity = more used)
   const usageData = useMemo(() => {
+    const toNumber = (q: any): number => {
+      if (q == null) return 0;
+      if (typeof q === 'number') return q;
+      if (typeof q === 'object' && typeof q.amount === 'number') return q.amount;
+      return 0;
+    };
+
     const sorted = [...inventory]
-      .sort((a, b) => (a.quantity || 0) - (b.quantity || 0))
-      .slice(0, 10)
       .map(item => ({
         name: item.item.substring(0, 15),
-        quantity: item.quantity || 0,
-        fullName: item.item
-      }));
+        quantity: toNumber(item.quantity),
+        fullName: item.item,
+        rawQuantity: item.quantity
+      }))
+      .sort((a, b) => a.quantity - b.quantity)
+      .slice(0, 10);
+
     return sorted;
   }, [inventory]);
 
@@ -243,7 +253,7 @@ export const PantryAnalytics: React.FC<PantryAnalyticsProps> = ({ inventory }) =
                   <div key={idx} className="space-y-1">
                     <div className="flex justify-between text-xs">
                       <span className="text-theme-primary font-medium truncate" title={item.fullName}>{item.name}</span>
-                      <span className="text-theme-secondary opacity-70 ml-2 flex-shrink-0">{formatItemQuantity(item)}</span>
+                      <span className="text-theme-secondary opacity-70 ml-2 flex-shrink-0">{typeof item.rawQuantity === 'number' ? item.rawQuantity : (item.rawQuantity && (item.rawQuantity.amount ? `${item.rawQuantity.amount} ${item.rawQuantity.unit}` : String(item.rawQuantity)))}</span>
                     </div>
                     <div className="w-full bg-theme-primary rounded-full h-2">
                       <div 

@@ -180,25 +180,39 @@ export class RecipeRecommendationService {
       );
 
       const recentRatings = await DatabaseMonitoringService.getDocs(recentRatingsQuery);
-      const ratingData = recentRatings.docs.map(doc => doc.data());
+        const ratingData = recentRatings.docs.map((doc: any) => {
+        const d = doc.data() as any;
+        // Normalize date to a JS Date for safe comparisons
+        let parsedDate: Date;
+        if (d && d.date) {
+          if (typeof d.date.toDate === 'function') parsedDate = d.date.toDate();
+          else if (typeof d.date === 'string') parsedDate = new Date(d.date);
+          else parsedDate = new Date(d.date);
+        } else {
+          parsedDate = new Date();
+        }
+        return { ...d, __parsedDate: parsedDate };
+      });
 
       // Count ratings per recipe in the last 30 days
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
       const trendingRecipes = ratingData
-        .filter(r => r.date.toDate() > thirtyDaysAgo)
-        .reduce((acc, rating) => {
-          acc[rating.recipeTitle] = (acc[rating.recipeTitle] || 0) + 1;
-          return acc;
-        }, {} as Record<string, number>);
+          .filter((r: any) => (r.__parsedDate as Date) > thirtyDaysAgo)
+            .reduce((acc: Record<string, number>, rating: any) => {
+              const title = rating.recipeTitle || 'unknown';
+              acc[title] = (acc[title] || 0) + 1;
+              return acc;
+            }, {} as Record<string, number>);
 
-      const userRatedTitles = new Set(userRatings.map(r => r.recipeTitle));
+      const userRatedTitles = new Set((userRatings as any[]).map((r: any) => r.recipeTitle));
 
       const recommendations: RecipeRecommendation[] = [];
 
-      for (const [recipeTitle, count] of Object.entries(trendingRecipes)) {
-        if (count >= 3 && !userRatedTitles.has(recipeTitle)) {
+      for (const [recipeTitle, count] of Object.entries(trendingRecipes) as [string, number][]) {
+        const cnt = Number(count || 0);
+        if (cnt >= 3 && !userRatedTitles.has(recipeTitle)) {
           const mockRecipe: StructuredRecipe = {
             title: recipeTitle,
             description: recipeTitle,
@@ -210,7 +224,7 @@ export class RecipeRecommendationService {
           recommendations.push({
             recipe: mockRecipe,
             reason: `Trending in the community (${count} recent ratings)`,
-            confidence: Math.min(0.8, count / 10),
+            confidence: Math.min(0.8, cnt / 10),
             type: 'trending',
             basedOn: ['community-trends']
           });
@@ -278,11 +292,11 @@ export class RecipeRecommendationService {
         );
 
         const ratingsSnapshot = await DatabaseMonitoringService.getDocs(ratingsQuery);
-      return ratingsSnapshot.docs.map(doc => {
-        const data = doc.data();
+      return ratingsSnapshot.docs.map((doc: any) => {
+        const data = (doc as any).data();
         return {
           ...data,
-          date: data.date.toDate().toISOString()
+          date: data?.date && typeof data.date.toDate === 'function' ? data.date.toDate().toISOString() : (data?.date || new Date()).toString()
         } as RecipeRating;
       });
     } catch (err: any) {
@@ -304,11 +318,11 @@ export class RecipeRecommendationService {
         );
 
         const ratingsSnapshot = await DatabaseMonitoringService.getDocs(ratingsQuery);
-      return ratingsSnapshot.docs.map(doc => {
-        const data = doc.data();
+      return ratingsSnapshot.docs.map((doc: any) => {
+        const data = (doc as any).data();
         return {
           ...data,
-          date: data.date.toDate().toISOString()
+          date: data?.date && typeof data.date.toDate === 'function' ? data.date.toDate().toISOString() : (data?.date || new Date()).toString()
         } as RecipeRating;
       });
     } catch (err: any) {
@@ -352,7 +366,8 @@ export class RecipeRecommendationService {
 
       return similarRecipes.slice(0, limitCount);
     } catch (err: any) {
-      log.error('Failed to get similar recipes', { error: err, userId, baseRecipeId: baseRecipe.id });
+      const baseRecipeId = (baseRecipe as any)?.id || baseRecipe.title || 'unknown';
+      log.error('Failed to get similar recipes', { error: err, userId, baseRecipeId });
       return [];
     }
   }

@@ -41,11 +41,12 @@ export const useOfflineStatus = () => {
           hasConflicts: conflicts.length > 0
         }));
       } catch (err: any) {
-        console.error('Failed to initialize offline queue:', error);
+        console.error('Failed to initialize offline queue:', err);
       }
     };
 
     initOfflineQueue();
+    return undefined;
   }, []);
 
   useEffect(() => {
@@ -142,7 +143,7 @@ export const useOfflineStatus = () => {
 
       endSync(true);
     } catch (err: any) {
-      const errorMessage = error instanceof Error ? error.message : 'Sync failed';
+      const errorMessage = err instanceof Error ? err.message : 'Sync failed';
       endSync(false, errorMessage);
     }
   }, [syncStatus.isOnline, syncStatus.isSyncing]);
@@ -157,10 +158,12 @@ export const useOfflineStatus = () => {
 
       return () => clearTimeout(timeoutId);
     }
+    return undefined;
   }, [syncStatus.isOnline, syncStatus.pendingOperations, syncStatus.isSyncing, syncNow]);
 
   return {
     syncStatus,
+    isOnline: syncStatus.isOnline,
     updateSyncStatus,
     startSync,
     endSync,
@@ -168,3 +171,4 @@ export const useOfflineStatus = () => {
     syncNow
   };
 };
+

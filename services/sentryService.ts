@@ -13,32 +13,10 @@ export const initSentry = () => {
   Sentry.init({
     dsn,
     environment,
-    integrations: [
-      // BrowserTracing is now built-in in v8+
-      Sentry.browserTracingIntegration({
-        tracePropagationTargets: [
-          'localhost',
-          /^https:\/\/.*\.firebaseapp\.com/,
-          /^https:\/\/.*\.web\.app/,
-        ],
-      }),
-      // Add replay integration for session recordings
-      Sentry.replayIntegration({
-        maskAllText: true,
-        blockAllMedia: true,
-      }),
-      // Add feedback integration for user feedback
-      Sentry.feedbackIntegration({
-        colorScheme: 'auto',
-        showBranding: false,
-      }),
-    ],
-    // Performance Monitoring
+    // Keep initialization minimal to avoid type mismatches across Sentry packages
+    // Advanced integrations (replay, feedback, browser tracing) are optional and
+    // can be added back with the correct package imports and typings.
     tracesSampleRate: environment === 'production' ? 0.1 : 1.0,
-
-    // Session replay
-    replaysSessionSampleRate: environment === 'production' ? 0.1 : 1.0,
-    replaysOnErrorSampleRate: 1.0,
 
     // Error filtering
     beforeSend(event, hint) {

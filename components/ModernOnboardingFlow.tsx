@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { ModernOnboarding } from './ModernOnboarding';
-import { ContextualPermissions } from './ContextualPermissions';
+import { ContextualPermissionManager as ContextualPermissions } from './ContextualPermissions';
 import { ValueDemo } from './ValueDemo';
-import { FeatureDiscovery } from './FeatureDiscovery';
+import { FeatureDiscoveryManager } from './FeatureDiscovery';
 import { ContextualTutorial } from './ContextualTutorial';
 
 interface ModernOnboardingFlowProps {
@@ -103,8 +103,8 @@ export const ModernOnboardingFlow: React.FC<ModernOnboardingFlowProps> = ({
     case 'permissions':
       return (
         <ContextualPermissions
-          permissions={permissionRequests}
-          onPermissionResult={(permission, granted) => {
+          permissions={permissionRequests as any}
+          onPermissionResult={(permission: string, granted: boolean) => {
             setCollectedData(prev => ({
               ...prev,
               permissions: { ...prev.permissions, [permission]: granted }
@@ -132,63 +132,67 @@ export const ModernOnboardingFlow: React.FC<ModernOnboardingFlowProps> = ({
 
     case 'feature-discovery':
       return (
-        <FeatureDiscovery
-          features={[
+        <FeatureDiscoveryManager
+          discoveries={[
             {
-              id: 'pantry-scanner',
+              featureId: 'pantry-scanner',
               title: 'Pantry Scanner',
               description: 'Quickly add items by scanning barcodes or taking photos',
-              element: '.pantry-scanner-button',
+              targetElement: '.pantry-scanner-button',
+              position: 'bottom-right',
               icon: 'camera'
             },
             {
-              id: 'meal-planner',
+              featureId: 'meal-planner',
               title: 'Smart Meal Planner',
               description: 'Plan meals and automatically update your shopping list',
-              element: '.meal-planner-nav',
+              targetElement: '.meal-planner-nav',
+              position: 'bottom-right',
               icon: 'calendar'
             },
             {
-              id: 'recipe-finder',
+              featureId: 'recipe-finder',
               title: 'Recipe Finder',
               description: 'Discover recipes based on what you have in your pantry',
-              element: '.recipe-finder-nav',
+              targetElement: '.recipe-finder-nav',
+              position: 'bottom-right',
               icon: 'chef-hat'
             }
           ]}
-          onComplete={handleFeatureDiscoveryComplete}
-          onSkip={handleFeatureDiscoveryComplete}
+          onDiscoveryDismiss={handleFeatureDiscoveryComplete}
         />
       );
 
     case 'tutorial':
       return (
         <ContextualTutorial
-          tutorials={[
+          tips={[
             {
               id: 'add-first-item',
               title: 'Add Your First Item',
-              content: 'Start by adding items to your pantry. You can type them manually or use the scanner.',
+              description: 'Start by adding items to your pantry. You can type them manually or use the scanner.',
               targetElement: '.add-item-button',
-              position: 'bottom'
+              position: 'bottom',
+              onDismiss: () => {}
             },
             {
               id: 'explore-recipes',
               title: 'Find Recipes',
-              content: 'Click here to discover recipes you can make with your current ingredients.',
+              description: 'Click here to discover recipes you can make with your current ingredients.',
               targetElement: '.recipe-finder-nav',
-              position: 'right'
+              position: 'right',
+              onDismiss: () => {}
             },
             {
               id: 'plan-meals',
               title: 'Plan Your Meals',
-              content: 'Use the meal planner to organize your cooking and automatically generate shopping lists.',
+              description: 'Use the meal planner to organize your cooking and automatically generate shopping lists.',
               targetElement: '.meal-planner-nav',
-              position: 'left'
+              position: 'left',
+              onDismiss: () => {}
             }
           ]}
-          onComplete={handleTutorialComplete}
-          onSkip={handleTutorialComplete}
+          onTipDismiss={(tipId) => { handleTutorialComplete(); }}
         />
       );
 

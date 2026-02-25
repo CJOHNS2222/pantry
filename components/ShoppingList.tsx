@@ -25,7 +25,7 @@ import { canShowAds } from '../utils/appUtils';
 import { useOfflineStatus } from '../hooks/useOfflineStatus';
 import { useDataManagement } from '../hooks/useDataManagement';
 import { useAuth } from '../hooks/useAuth';
-import { offlineQueueService } from '../services/offlineQueueService';
+import { offlineQueue } from '../services/offlineQueueService';
 import { offlineDataCache } from '../services/offlineDataCache';
 import { groceryPriceService } from '../services/groceryPriceService';
 import { priceCacheService } from '../services/priceCacheService';
@@ -39,7 +39,7 @@ interface ShoppingListProps {
   onMoveToPantry: (items: ShoppingItem[]) => void;
   addShoppingListItem: (item: Omit<ShoppingItem, 'id'>) => void;
   user?: User;
-  household?: Household;
+  household?: Household | null;
   isLoadingShoppingList?: boolean;
   pantryItems?: Array<{
     id: string;
@@ -231,8 +231,9 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   }, [items, saveCurrentSession]);
 
   // Hooks for offline functionality
-  const { addToQueue, processQueue } = useDataManagement();
   const { isOnline } = useOfflineStatus();
+  const addToQueue = (op: any) => offlineQueue.enqueue(op);
+  const processQueue = () => offlineQueue.processQueue();
 
   // Suggested items for quick adding
   const suggestedItems = [
@@ -382,11 +383,11 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     
     // Update cache
     const inHousehold = household?.id && user ? isHouseholdMember(household, user) : false;
-    const householdId = inHousehold ? household.id : undefined;
+    const householdId = inHousehold ? household?.id : undefined;
     const userId = inHousehold ? undefined : user?.id;
     
     try {
-      await ShoppingListCacheService.removeItemFromCache(id, householdId, userId);
+      await ShoppingListCacheService.removeItem(id, householdId, userId);
     } catch (error) {
       console.error('Failed to remove item from cache:', error);
     }
@@ -404,16 +405,12 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     if (checkedItems.length === 0) return;
 
     const inHousehold = household?.id && user ? isHouseholdMember(household, user) : false;
-    const householdId = inHousehold ? household.id : undefined;
+    const householdId = inHousehold ? household?.id : undefined;
     const userId = inHousehold ? undefined : user?.id;
 
     // Remove from cache
-    const deletePromises = checkedItems.map(item =>
-      ShoppingListCacheService.removeItemFromCache(item.id, householdId, userId)
-    );
-
     try {
-      await Promise.all(deletePromises);
+      await ShoppingListCacheService.removeItemsFromCache(checkedItems.map(i => i.id), householdId, userId);
       // Remove checked items from local state
       const checkedIds = new Set(checkedItems.map(i => i.id));
       setItems(prev => prev.filter(i => !checkedIds.has(i.id)));
@@ -887,7 +884,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
               item={item}
               onToggleCheck={handleItemToggle}
               onRemove={remove}
-              isOnline={isOnline}
+              isOffline={!isOnline}
               isSelected={item.checked}
               onLongPress={undefined}
             />
@@ -907,10 +904,10 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                         Add Items
                     </button>
                     <button 
-                        onClick={() => setActiveTab(Tab.RECIPES)}
-                        className="px-4 py-2 border border-theme rounded-lg hover:bg-theme-secondary/50 transition-colors"
+                      onClick={() => console.log('Navigate to recipes')}
+                      className="px-4 py-2 border border-theme rounded-lg hover:bg-theme-secondary/50 transition-colors"
                     >
-                        Browse Recipes
+                      Browse Recipes
                     </button>
                 </div>
              </div>

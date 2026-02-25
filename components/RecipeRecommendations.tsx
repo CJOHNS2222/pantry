@@ -188,11 +188,11 @@ export const RecipeRecommendations: React.FC<RecipeRecommendationsProps> = ({
             </div>
 
             {/* Dismiss Button */}
-            {onDismissRecommendation && (
+            {onDismissRecommendation && rec.recipe.id && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  handleDismissRecommendation(rec.recipe.id);
+                  handleDismissRecommendation(rec.recipe.id!);
                 }}
                 className="absolute top-2 right-2 text-theme-secondary hover:text-theme-primary transition-colors"
                 title="Dismiss recommendation"

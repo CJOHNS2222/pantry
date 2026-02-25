@@ -31,13 +31,7 @@ const config: CapacitorConfig = {
     //   toolbarColor: '#2A0A10'
     // }
   },
-  // App icon configuration
-  android: {
-    icon: 'public/icons/smartpantryicon.png'
-  },
-  ios: {
-    icon: 'public/icons/smartpantryicon.png'
-  }
+  // App icon configuration (icons are handled by the build pipeline)
 };
 
 export default config;

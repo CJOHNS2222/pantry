@@ -134,7 +134,7 @@ class GroceryPriceService {
 
       const prices: number[] = [];
 
-      querySnapshot.forEach((doc) => {
+      querySnapshot.forEach((doc: any) => {
         const data = doc.data() as GroceryPrice;
         prices.push(data.price);
       });
@@ -272,7 +272,7 @@ class GroceryPriceService {
 
       const userTrends: GroceryPrice[] = [];
 
-      querySnapshot.forEach((doc) => {
+      querySnapshot.forEach((doc: any) => {
         const data = doc.data() as GroceryPrice;
         userTrends.push(data);
       });
@@ -304,7 +304,7 @@ class GroceryPriceService {
 
       return combinedTrends.sort((a, b) => b.lastUpdated.getTime() - a.lastUpdated.getTime());
     } catch (err: any) {
-      console.error('Error fetching price trends:', error);
+      console.error('Error fetching price trends:', err);
 
       // Fallback to Open Prices API only
       try {
@@ -337,8 +337,8 @@ class GroceryPriceService {
       const sortedTrends = trends.sort((a, b) => b.lastUpdated.getTime() - a.lastUpdated.getTime());
 
       // Current price is the most recent
-      const currentPrice = sortedTrends[0].price;
-      const lastUpdated = sortedTrends[0].lastUpdated;
+      const currentPrice = sortedTrends[0]!.price;
+      const lastUpdated = sortedTrends[0]!.lastUpdated;
 
       // Calculate price change from the oldest available data point
       let priceChange = 0;
@@ -346,7 +346,7 @@ class GroceryPriceService {
 
       if (sortedTrends.length > 1) {
         // Get the oldest price point available
-        const oldestPrice = sortedTrends[sortedTrends.length - 1].price;
+        const oldestPrice = sortedTrends[sortedTrends.length - 1]!.price;
         priceChange = currentPrice - oldestPrice;
         priceChangePercent = (priceChange / oldestPrice) * 100;
       }
@@ -365,7 +365,7 @@ class GroceryPriceService {
         priceHistory
       };
     } catch (err: any) {
-      console.error('Error analyzing price trends:', error);
+      console.error('Error analyzing price trends:', err);
 
       // Return default price on error
       const defaultPrice = this.getDefaultPrice(ingredient);
@@ -411,8 +411,8 @@ class GroceryPriceService {
 
       await DatabaseMonitoringService.updateDoc(priceRef, { votes: newVotes });
     } catch (err: any) {
-      console.error('Error voting on price:', error);
-      throw error;
+      console.error('Error voting on price:', err);
+      throw err;
     }
   }
 
@@ -425,7 +425,7 @@ class GroceryPriceService {
         recordedAt: new Date()
       });
     } catch (err: any) {
-      console.error('Error storing price history:', error);
+      console.error('Error storing price history:', err);
     }
   }
 
@@ -441,7 +441,7 @@ class GroceryPriceService {
 
       const ingredients = new Set<string>();
 
-      querySnapshot.forEach((doc) => {
+      querySnapshot.forEach((doc: any) => {
         const data = doc.data() as GroceryPrice;
         ingredients.add(data.ingredient);
       });
@@ -453,7 +453,7 @@ class GroceryPriceService {
 
       return Array.from(ingredients).sort();
     } catch (err: any) {
-      console.error('Error fetching available ingredients:', error);
+      console.error('Error fetching available ingredients:', err);
       return Object.keys(this.defaultPrices);
     }
   }
@@ -471,13 +471,11 @@ class GroceryPriceService {
       startDate.setDate(startDate.getDate() - days);
       const startDateStr = startDate.toISOString().split('T')[0]; // YYYY-MM-DD format
 
-      const params = new URLSearchParams({
-        product_name__like: ingredient,
-        date__gte: startDateStr, // Greater than or equal to start date
-        currency: 'USD',
-        limit: '100' // Get more data for trends
-        // Note: location parameter may not be supported by the API
-      });
+      const params = new URLSearchParams();
+      params.append('product_name__like', ingredient);
+      params.append('date__gte', startDateStr);
+      params.append('currency', 'USD');
+      params.append('limit', '100');
 
       const response = await fetch(`${this.OPEN_PRICES_BASE_URL}/v1/prices?${params}`, {
         headers: {
@@ -523,7 +521,7 @@ class GroceryPriceService {
           currency: price.currency,
           lastUpdated: new Date(price.date),
           source: 'api' as const,
-          userId: undefined,
+          userId: undefined as any,
           votes: undefined
         }))
         .sort((a, b) => b.lastUpdated.getTime() - a.lastUpdated.getTime()); // Most recent first
@@ -567,7 +565,7 @@ class GroceryPriceService {
         currency: 'USD',
         lastUpdated: new Date(),
         source: 'api',
-        userId: undefined,
+        userId: undefined as any,
         votes: usdPrices.length // Use sample size as "votes"
       };
 
@@ -677,13 +675,12 @@ class GroceryPriceService {
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
       const startDateStr = thirtyDaysAgo.toISOString().split('T')[0]; // YYYY-MM-DD format
 
-      const params = new URLSearchParams({
-        product_name__like: ingredient,
-        date__gte: startDateStr,
-        currency: 'USD',
-        limit: '50', // Get recent prices for current estimate
-        order_by: '-date' // Most recent first
-      });
+      const params = new URLSearchParams();
+      params.append('product_name__like', ingredient);
+      params.append('date__gte', startDateStr);
+      params.append('currency', 'USD');
+      params.append('limit', '50');
+      params.append('order_by', '-date');
 
       if (location) {
         params.append('location__like', location);

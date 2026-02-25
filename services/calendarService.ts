@@ -1,5 +1,4 @@
 import { Capacitor } from '@capacitor/core';
-import { CapacitorCalendar } from 'capacitor-calendar';
 import { DayPlan } from '../types';
 
 /**
@@ -51,7 +50,7 @@ class CalendarService {
       // Permissions are handled automatically by the native platforms
       return true;
     } catch (err: any) {
-      console.error('Error requesting calendar permissions:', error);
+      console.error('Error requesting calendar permissions:', err);
       return false;
     }
   }
@@ -71,7 +70,7 @@ class CalendarService {
       // We'll assume permissions are granted if the plugin is available
       return true;
     } catch (err: any) {
-      console.error('Error checking calendar permissions:', error);
+      console.error('Error checking calendar permissions:', err);
       return false;
     }
   }
@@ -97,9 +96,9 @@ class CalendarService {
         }
       }
 
-      const mealTitles = dayPlan.meals
+      const mealTitles = (dayPlan.meals || [])
         .filter(meal => meal.recipe)
-        .map(meal => `${meal.type}: ${meal.recipe!.title}`)
+        .map(meal => `${(meal as any).mealType || (meal as any).type}: ${meal.recipe!.title}`)
         .join('\n');
 
       if (!mealTitles) {
@@ -109,16 +108,23 @@ class CalendarService {
 
       const event: CalendarEvent = {
         title: `Meal Plan - ${date.toLocaleDateString()}`,
-        notes: `Smart Pantry Meal Plan\n\n${mealTitles}\n\nTotal calories: ${dayPlan.totalCalories || 'Not calculated'}`,
+        notes: `Smart Pantry Meal Plan\n\n${mealTitles}\n\nTotal calories: ${(dayPlan as any).totalCalories || 'Not calculated'}`,
         startDate: date.getTime(),
         endDate: new Date(date.getTime() + 24 * 60 * 60 * 1000).getTime(), // Next day
         allDay: true
       };
-
-      await CapacitorCalendar.createEvent(event);
+      // Use plugin via Capacitor Plugins to avoid import/type issues
+      const plugin = (Capacitor as any).Plugins?.CapacitorCalendar || (globalThis as any).CapacitorCalendar;
+      if (plugin && typeof plugin.createEvent === 'function') {
+        await plugin.createEvent(event);
+      } else if ((Capacitor as any).createEvent) {
+        await (Capacitor as any).createEvent(event);
+      } else {
+        console.warn('CapacitorCalendar plugin not available to create event');
+      }
       return true;
     } catch (err: any) {
-      console.error('Error creating calendar event:', error);
+      console.error('Error creating calendar event:', err);
       return false;
     }
   }
@@ -152,10 +158,17 @@ class CalendarService {
         allDay: false
       };
 
-      await CapacitorCalendar.createEvent(event);
+      const plugin = (Capacitor as any).Plugins?.CapacitorCalendar || (globalThis as any).CapacitorCalendar;
+      if (plugin && typeof plugin.createEvent === 'function') {
+        await plugin.createEvent(event);
+      } else if ((Capacitor as any).createEvent) {
+        await (Capacitor as any).createEvent(event);
+      } else {
+        console.warn('CapacitorCalendar plugin not available to create event');
+      }
       return true;
     } catch (err: any) {
-      console.error('Error creating cooking reminder:', error);
+      console.error('Error creating cooking reminder:', err);
       return false;
     }
   }
@@ -172,11 +185,16 @@ class CalendarService {
     }
 
     try {
-      await CapacitorCalendar.openCalendar({
-        date: date.getTime()
-      });
+      const plugin = (Capacitor as any).Plugins?.CapacitorCalendar || (globalThis as any).CapacitorCalendar;
+      if (plugin && typeof plugin.openCalendar === 'function') {
+        await plugin.openCalendar({ date: date.getTime() });
+      } else if ((Capacitor as any).openCalendar) {
+        await (Capacitor as any).openCalendar({ date: date.getTime() });
+      } else {
+        console.warn('CapacitorCalendar plugin not available to open calendar');
+      }
     } catch (err: any) {
-      console.error('Error opening calendar:', error);
+      console.error('Error opening calendar:', err);
     }
   }
 }

@@ -137,7 +137,7 @@ export const createSubscription = onRequest(
     });
 
   } catch (err: any) {
-    console.error('Subscription creation error:', error);
-    res.status(500).json({ error: (error as Error).message });
+    console.error('Subscription creation error:', err);
+    res.status(500).json({ error: (err as Error).message });
   }
 });

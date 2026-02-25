@@ -4,15 +4,18 @@ export interface PantryItem {
   category: string;
   quantity_estimate: string; // Legacy field, keep for compatibility
   image?: string;
-  storageLocation?: 'pantry' | 'freezer' | 'fridge' | 'spices' | 'other';
+  storageLocation?: string; // legacy values include 'pantry' | 'freezer' | 'fridge' | 'spices' | 'other'
   expirationDate?: string; // ISO date string (YYYY-MM-DD)
+  // Backwards-compatible alias used across components
+  expiryDate?: string;
   expirationType?: 'use-by' | 'best-by'; // Type of expiration date
   dateAdded?: string; // ISO date string when item was first added
   lastRestocked?: string; // ISO date string when item was last restocked
   consumptionHistory?: string[]; // Array of ISO dates when item was consumed/replaced
 
   // Enhanced quantity tracking
-  quantity?: {
+  // Can be a simple numeric estimate or a structured quantity object
+  quantity?: number | {
     amount: number;        // Numeric amount (e.g., 2.5)
     unit: string;          // Unit (cups, lbs, oz, etc.)
     originalAmount?: number; // Original purchase amount
@@ -87,9 +90,20 @@ export interface StructuredRecipe {
   description: string;
   ingredients: string[];
   instructions: string[];
-  cookTime: string;
+  cookTime: string | number;
+  prepTime?: string | number;
+  servings?: number;
+  id?: string;
   type?: string;
   image?: string;
+  nutrition?: {
+    calories?: number;
+    protein?: number;
+    carbs?: number;
+    fat?: number;
+    [key: string]: any;
+  };
+  tags?: string[];
 }
 
 export interface SavedRecipe extends StructuredRecipe {
@@ -204,6 +218,7 @@ export interface RecipeSearchParams {
   maxIngredients?: number;
   measurementSystem: 'Metric' | 'Standard';
   strictMode?: boolean; // Only use inventory
+  userId?: string;
 }
 
 export interface User {
@@ -329,12 +344,12 @@ export interface Settings {
     types: {
       shoppingList: boolean;
       mealPlan: boolean;
-      cookingReminders?: boolean;
+      cookingReminders: boolean;
     };
-    cookingReminderTime?: number;
+    cookingReminderTime: number;
   };
   theme: {
-    mode: 'light' | 'dark' | 'system';
+    mode: string;
     accentColor: string;
     backgroundColor?: string;
     textColor?: string;

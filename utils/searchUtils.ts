@@ -8,7 +8,7 @@ export interface IngredientMatch {
   available: boolean;
   pantryItem?: PantryItem;
   requiredQuantity?: number;
-  availableQuantity?: number;
+  availableQuantity?: number | { amount: number; unit?: string } | undefined;
 }
 
 export interface RecipeIngredientMatch {
@@ -22,11 +22,11 @@ export interface RecipeIngredientMatch {
 }
 
 // Fuzzy search configuration for pantry items
-const pantryItemSearchOptions: Fuse.IFuseOptions<PantryItem> = {
+const pantryItemSearchOptions = {
   keys: [
     { name: 'item', weight: 0.7 },
     { name: 'category', weight: 0.2 },
-    { name: 'location', weight: 0.1 }
+    { name: 'storageLocation', weight: 0.1 }
   ],
   threshold: 0.4, // Lower threshold = more strict matching
   includeScore: true,
@@ -35,7 +35,7 @@ const pantryItemSearchOptions: Fuse.IFuseOptions<PantryItem> = {
 };
 
 // Fuzzy search configuration for recipes
-const recipeSearchOptions: Fuse.IFuseOptions<StructuredRecipe | SavedRecipe> = {
+const recipeSearchOptions = {
   keys: [
     { name: 'title', weight: 0.6 },
     { name: 'ingredients', weight: 0.3 },
@@ -220,7 +220,7 @@ export const filterPantryItems = (items: PantryItem[], filter: PantryFilter): Pa
 
   // Filter by locations
   if (filter.locations.length > 0) {
-    filtered = filtered.filter(item => filter.locations.includes(item.location));
+    filtered = filtered.filter(item => filter.locations.includes(item.storageLocation || 'unknown'));
   }
 
   // Filter by expiration status
@@ -248,7 +248,7 @@ export const filterPantryItems = (items: PantryItem[], filter: PantryFilter): Pa
   // Filter by quantity status
   if (filter.quantityStatus !== 'all') {
     filtered = filtered.filter(item => {
-      const quantity = parseFloat(item.quantity) || 0;
+      const quantity = getQuantityValue(item);
       switch (filter.quantityStatus) {
         case 'out-of-stock':
           return quantity <= 0;
@@ -276,16 +276,16 @@ export const filterPantryItems = (items: PantryItem[], filter: PantryFilter): Pa
         bValue = b.expirationDate ? new Date(b.expirationDate).getTime() : Infinity;
         break;
       case 'quantity':
-        aValue = parseFloat(a.quantity) || 0;
-        bValue = parseFloat(b.quantity) || 0;
+        aValue = getQuantityValue(a);
+        bValue = getQuantityValue(b);
         break;
       case 'category':
         aValue = a.category.toLowerCase();
         bValue = b.category.toLowerCase();
         break;
       case 'location':
-        aValue = a.location.toLowerCase();
-        bValue = b.location.toLowerCase();
+        aValue = (a.storageLocation || '').toLowerCase();
+        bValue = (b.storageLocation || '').toLowerCase();
         break;
       default:
         return 0;
@@ -300,6 +300,15 @@ export const filterPantryItems = (items: PantryItem[], filter: PantryFilter): Pa
 
   return filtered;
 };
+
+// Helper to normalize quantity from PantryItem: handles numeric, structured, or legacy estimate
+function getQuantityValue(item: PantryItem): number {
+  if (typeof item.quantity === 'number') return item.quantity;
+  if (item.quantity && typeof item.quantity === 'object') return (item.quantity as any).amount || 0;
+  // Fallback to legacy estimate string
+  const est = parseFloat(item.quantity_estimate || '0');
+  return isNaN(est) ? 0 : est;
+}
 
 // Search history management
 export interface SearchHistoryItem {
@@ -336,7 +345,7 @@ export const saveSearchToHistory = (query: string, type: 'pantry' | 'recipe', re
 
     localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(recentHistory));
   } catch (err: any) {
-    log.error('Failed to save search history', error, 'SearchUtils');
+    log.error('Failed to save search history', err, 'SearchUtils');
   }
 };
 
@@ -352,7 +361,7 @@ export const loadSearchHistory = (type?: 'pantry' | 'recipe'): SearchHistoryItem
       return history;
     }
   } catch (err: any) {
-    log.error('Failed to load search history', error, 'SearchUtils');
+    log.error('Failed to load search history', err, 'SearchUtils');
   }
   return [];
 };
@@ -374,7 +383,7 @@ export const clearSearchHistory = (type?: 'pantry' | 'recipe'): void => {
       localStorage.removeItem(SEARCH_HISTORY_KEY);
     }
   } catch (err: any) {
-    log.error('Failed to clear search history', error, 'SearchUtils');
+    log.error('Failed to clear search history', err, 'SearchUtils');
   }
 };
 
@@ -385,7 +394,7 @@ export const savePantryFilter = (filter: PantryFilter): void => {
   try {
     localStorage.setItem(PANTRY_FILTER_KEY, JSON.stringify(filter));
   } catch (err: any) {
-    log.error('Failed to save pantry filter', error, 'SearchUtils');
+    log.error('Failed to save pantry filter', err, 'SearchUtils');
   }
 };
 
@@ -398,7 +407,7 @@ export const loadPantryFilter = (): PantryFilter => {
       return { ...defaultPantryFilter, ...parsed };
     }
   } catch (err: any) {
-    log.error('Failed to load pantry filter', error, 'SearchUtils');
+    log.error('Failed to load pantry filter', err, 'SearchUtils');
   }
   return defaultPantryFilter;
 };
@@ -413,7 +422,7 @@ export const matchRecipeIngredients = (
   const missingIngredients: IngredientMatch[] = [];
 
   // Create fuzzy search instance for pantry items
-  const pantrySearchOptions: Fuse.IFuseOptions<PantryItem> = {
+  const pantrySearchOptions = {
     keys: [
       { name: 'item', weight: 0.8 },
       { name: 'category', weight: 0.2 }
@@ -423,7 +432,7 @@ export const matchRecipeIngredients = (
     minMatchCharLength: 2
   };
 
-  const fuse = new Fuse(pantryItems, pantrySearchOptions);
+  const fuse = new Fuse(pantryItems, pantrySearchOptions as any);
 
   ingredients.forEach(ingredient => {
     // Parse ingredient to get name and quantity
@@ -435,24 +444,25 @@ export const matchRecipeIngredients = (
     const bestMatch = searchResults.length > 0 ? searchResults[0] : null;
 
     // Consider it a match if score is good enough and quantities match
+    const availableQty = bestMatch ? getQuantityValue(bestMatch.item) : 0;
     const isAvailable = bestMatch &&
-                       bestMatch.score! < 0.4 && // Good match threshold
-                       (!parsed.quantity || bestMatch.item.quantity >= parsed.quantity);
+                       (bestMatch as any).score < 0.4 && // Good match threshold
+                       (!parsed.quantity || availableQty >= (parsed.quantity || 0));
 
-    if (isAvailable) {
+    if (isAvailable && bestMatch) {
       matchedIngredients.push({
         ingredient: parsed.original,
         available: true,
         pantryItem: bestMatch.item,
         requiredQuantity: parsed.quantity,
-        availableQuantity: bestMatch.item.quantity
+        availableQuantity: availableQty
       });
     } else {
       missingIngredients.push({
         ingredient: parsed.original,
         available: false,
         requiredQuantity: parsed.quantity,
-        availableQuantity: bestMatch?.item.quantity
+        availableQuantity: bestMatch ? getQuantityValue(bestMatch.item) : undefined
       });
     }
   });

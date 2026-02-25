@@ -76,7 +76,7 @@ const objectToShoppingItem = (itemId: string, itemObject: CachedShoppingListData
     id: itemId,
     item: itemObject.item,
     quantity: itemObject.quantity,
-    category: itemObject.category,
+    category: itemObject.category || '',
     checked: false,
     source: itemObject.source,
     addedAt: new Date(0), // Using a static date as it's no longer persisted
@@ -92,8 +92,8 @@ const getCachedShoppingList = async (householdId?: string, userId?: string): Pro
     const cacheRef = DatabaseMonitoringService.doc(cachePath);
     const docSnap = await DatabaseMonitoringService.getDoc(cacheRef);
 
-    if (docSnap.exists()) {
-      const data = docSnap.data() as ShoppingListCache;
+    if (docSnap && docSnap.exists && (typeof (docSnap as any).exists === 'function' ? (docSnap as any).exists() : (docSnap as any).exists)) {
+      const data = (docSnap as any).data() as ShoppingListCache;
       // V2.1 cache structure
       if (data.metadata && data.metadata.version >= CACHE_VERSION) {
         const items: ShoppingItem[] = Object.entries(data.items).map(([itemId, itemObject]) => 

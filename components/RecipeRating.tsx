@@ -122,7 +122,7 @@ export const RecipeRatingUI: React.FC<RecipeRatingUIProps> = ({
       );
 
       setPhotos(prev => [...prev, photo]);
-      addToast('Photo uploaded successfully!', 'success');
+      addToast('Photo uploaded successfully!', 'info');
     } catch (error) {
       console.error('Photo upload failed:', error);
       addToast('Failed to upload photo. Please try again.', 'error');
@@ -169,7 +169,7 @@ export const RecipeRatingUI: React.FC<RecipeRatingUIProps> = ({
       setExistingRating(rating);
       setIsSubmitted(true);
       onRatingSubmitted?.(rating);
-      addToast('Rating submitted successfully!', 'success');
+      addToast('Rating submitted successfully!', 'info');
     } catch (error) {
       console.error('Failed to submit rating:', error);
       addToast('Failed to submit rating. Please try again.', 'error');
@@ -194,7 +194,7 @@ export const RecipeRatingUI: React.FC<RecipeRatingUIProps> = ({
 
       setModificationText('');
       setShowModificationForm(false);
-      addToast('Modification suggestion added!', 'success');
+      addToast('Modification suggestion added!', 'info');
     } catch (error) {
       console.error('Failed to add modification:', error);
       addToast('Failed to add modification. Please try again.', 'error');

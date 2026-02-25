@@ -48,7 +48,7 @@ const PerformanceMonitoringDashboard: React.FC = () => {
     if (!isVisible) return;
 
     // Track Core Web Vitals
-    const trackWebVitals = () => {
+    const trackWebVitals = (): (() => void) | undefined => {
       // Largest Contentful Paint
       if ('PerformanceObserver' in window) {
         try {
@@ -107,12 +107,14 @@ const PerformanceMonitoringDashboard: React.FC = () => {
           };
         } catch (error) {
           log.warn('Performance Observer not fully supported', { error }, 'PerformanceMonitoringDashboard');
+          return undefined;
         }
       }
+      return undefined;
     };
 
     // Track Network Requests
-    const trackNetworkRequests = () => {
+    const trackNetworkRequests = (): (() => void) | undefined => {
       if ('PerformanceObserver' in window) {
         try {
           const networkObserver = new PerformanceObserver((list) => {
@@ -133,8 +135,10 @@ const PerformanceMonitoringDashboard: React.FC = () => {
           return () => networkObserver.disconnect();
         } catch (error) {
           log.warn('Network tracking not supported', { error }, 'PerformanceMonitoringDashboard');
+          return undefined;
         }
       }
+      return undefined;
     };
 
     // Update database metrics

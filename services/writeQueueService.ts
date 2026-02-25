@@ -67,10 +67,10 @@ export async function withRetry<T>(
     try {
       return await operation();
     } catch (err: any) {
-      lastError = error as Error;
+      lastError = err as Error;
 
-      if (attempt === maxAttempts || !isRetryableError(error)) {
-        throw error;
+      if (attempt === maxAttempts || !isRetryableError(err)) {
+        throw err;
       }
 
       const delay = calculateRetryDelay(attempt);
@@ -200,6 +200,7 @@ export async function processQueue() {
     } catch (err) {
       const error = err as Error;
       const attempts = (op.attempts || 0) + 1;
+      let nextAttempt: number | undefined;
 
       if (attempts >= RETRY_CONFIG.maxAttempts || !isRetryableError(error)) {
         log.error(`Operation failed permanently after retries`, { 
@@ -212,8 +213,8 @@ export async function processQueue() {
         if (op.id) await deleteOp(op.id);
       } else {
         // Schedule retry with exponential backoff
-        const delay = calculateRetryDelay(attempts);
-        const nextAttempt = Date.now() + delay;
+      const delay = calculateRetryDelay(attempts);
+      nextAttempt = Date.now() + delay;
 
         log.warn(`Operation failed, scheduling retry`, { 
           type: op.type, 
@@ -231,7 +232,7 @@ export async function processQueue() {
           ...op,
           attempts,
           nextAttempt,
-          lastError: error.message
+          lastError: (error as any)?.message || String(error)
         };
         store.put(updatedOp);
       }
@@ -256,7 +257,7 @@ export async function processQueue() {
           const existing = getReq.result;
           if (existing) {
             existing.attempts = attempts;
-            existing.nextAttempt = nextAttempt;
+            if (typeof nextAttempt !== 'undefined') existing.nextAttempt = nextAttempt;
             store.put(existing);
           }
         };

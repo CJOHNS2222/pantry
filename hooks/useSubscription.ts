@@ -46,8 +46,8 @@ export function useSubscription(user: User | null) {
         await UsageService.updatePlanLimits(user, updates.tier);
       }
     } catch (err: any) {
-      console.error('Error updating subscription:', error);
-      throw error;
+      console.error('Error updating subscription:', err);
+      throw err;
     }
   };
 

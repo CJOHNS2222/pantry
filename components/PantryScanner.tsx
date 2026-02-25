@@ -5,7 +5,7 @@ import { Capacitor } from '@capacitor/core';
 import { FixedSizeList as List } from 'react-window';
 import { analyzePantryImage } from '../services/geminiService';
 import StorageLocationIndicator from './StorageLocationIndicator';
-import { PantryItem, LoadingState, ConsumptionSuggestion, ExpirationAlert, CustomCategory, RecipeSuggestion, PantryFilter } from '../types';
+import { PantryItem, LoadingState, ConsumptionSuggestion, ExpirationAlert, CustomCategory, RecipeSuggestion, PantryFilter, User } from '../types';
 import { Tab } from '../types/app';
 import AnalyticsService from '../services/analyticsService';
 import { BrowserMultiFormatReader } from '@zxing/library';
@@ -18,7 +18,7 @@ import { PantryItemSkeleton } from './SkeletonLoader';
 import { searchPantryItems, getEnhancedAutocompleteSuggestions, filterPantryItems, savePantryFilter, loadPantryFilter, defaultPantryFilter, saveSearchToHistory, getRecentSearchSuggestions, AutocompleteSuggestion } from '../utils/searchUtils';
 import { getMealPrepSuggestions, RecipeIngredientMatch } from '../utils/searchUtils';
 import { debounce } from '../utils/debounceUtils';
-import { formatItemQuantity, getExpirationColor } from '../utils/appUtils';
+import { formatItemQuantity, getExpirationColor, getAllCategories, getItemImage } from '../utils/appUtils';
 import { PantryService } from '../services/pantryService';
 import { useApp } from '../contexts/AppContext';
 import { useAppActions } from '../contexts/AppActionsContext';
@@ -45,12 +45,7 @@ interface PantryScannerProps {
   customCategories?: CustomCategory[];
   setActiveTab?: (tab: Tab) => void;
   setInitialSearchQuery?: (query: string) => void;
-  user?: {
-    id: string;
-    name: string;
-    email: string;
-    avatar?: string;
-  };
+  user?: User | null;
 }
 
 export const PantryScanner: React.FC<PantryScannerProps> = ({ 
@@ -269,8 +264,8 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   const handleTakePhoto = useCallback(async () => {
     try {
       // Track feature adoption
-      setLoadingState(LoadingState.LOADING);      
-      AnalyticsService.trackFeatureUsage('pantry_scanner', { success: true, itemsScanned: items.length, itemsAdded: addedCount });
+      setLoadingState(LoadingState.LOADING);
+      AnalyticsService.trackFeatureUsage('pantry_scanner', { success: true, itemsScanned: 0, itemsAdded: 0 });
       
       const photo = await CapacitorCamera.getPhoto({
         resultType: CameraResultType.DataUrl,
@@ -324,7 +319,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
         setImagePreview(photo.dataUrl);
         
         // Convert data URL to ImageData for barcode detection
-        const img = new Image();
+        const img = new window.Image();
         img.onload = async () => {
           try {
             const codeReader = new BrowserMultiFormatReader();
@@ -380,7 +375,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
     setLoadingState(LoadingState.LOADING);
 
     try {
-      const processedItems = await PantryService.analyzePantryImage(rawBase64, mimeType, user);
+      const processedItems = await PantryService.analyzePantryImage(rawBase64, mimeType, user ?? undefined);
 
       // Instead of immediately saving, open a review modal so user can edit/confirm items
       setScanResults(processedItems);
@@ -480,7 +475,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
 
     const indicesToMove = Array.from(selectedItems).sort((a, b) => b - a); // Delete from highest index first
     const itemsToMove = PantryService.bulkMoveToShoppingList(inventory, indicesToMove);
-    addToShoppingList(itemsToMove, 'pantry scanner');
+    addToShoppingList(itemsToMove);
     for (const index of indicesToMove) {
       await onDeleteItem(index);
     }
@@ -510,7 +505,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
     if (selectedItems.size === 0) return;
     const indicesToUpdate = Array.from(selectedItems);
     for (const index of indicesToUpdate) {
-      await onUpdateItem(index, { location: newLocation });
+      await onUpdateItem(index, { storageLocation: newLocation });
     }
     setSelectedItems(new Set());
     setBulkMode(false);
@@ -520,7 +515,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
     if (selectedItems.size === 0) return;
     const indicesToUpdate = Array.from(selectedItems);
     for (const index of indicesToUpdate) {
-      await onUpdateItem(index, { expiration_date: isoDate, expiration_type: 'best-by' });
+      await onUpdateItem(index, { expirationDate: isoDate, expirationType: 'best-by' });
     }
     setSelectedItems(new Set());
     setBulkMode(false);
@@ -569,7 +564,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
       case 'category':
         return (a.category || '').localeCompare(b.category || '');
       case 'location': {
-        const locationOrder = { pantry: 1, fridge: 2, freezer: 3, spices: 4, other: 5 };
+        const locationOrder: Record<string, number> = { pantry: 1, fridge: 2, freezer: 3, spices: 4, other: 5 };
         const aLoc = a.storageLocation || 'pantry';
         const bLoc = b.storageLocation || 'pantry';
         return locationOrder[aLoc] - locationOrder[bLoc];
@@ -665,63 +660,10 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                 itemSize={64}
                 width={'100%'}
               >
-                {({ index, style }) => renderCategoryItem({ index, style, category })}
+                {(props: { index: number; style: React.CSSProperties }) => renderCategoryItem({ index: props.index, style: props.style, category })}
               </List>
             ) : (
-              items.map((item) => (
-                <div key={item.originalIndex} className={`flex items-center justify-between px-2 py-1 border-b border-theme last:border-b-0 transition-all cursor-pointer ${
-                  bulkMode && selectedItems.has(item.originalIndex)
-                    ? 'bg-[var(--accent-color)]/10 border-[var(--accent-color)]/30'
-                    : 'hover:bg-theme-primary/50'
-                }`}
-                onClick={() => !bulkMode && setSelectedItemIndex(item.originalIndex)}
-                >
-                  {bulkMode && (
-                    <input
-                      type="checkbox"
-                      checked={selectedItems.has(item.originalIndex)}
-                      onChange={() => toggleItemSelection(item.originalIndex)}
-                      className="mr-3 w-4 h-4 text-[var(--accent-color)] bg-theme-primary border-theme rounded focus:ring-[var(--accent-color)]"
-                    />
-                  )}
-
-                  <div className="flex items-center gap-1 flex-1">
-                    <img
-                      src={item.image}
-                      alt={item.item}
-                      className="w-10 h-10 rounded-lg object-cover bg-theme-primary border border-theme"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        target.src = '/images/placeholder.svg';
-                      }}
-                    />
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <div className="font-medium text-theme-primary">{item.item}</div>
-                        <div className="text-xs text-theme-secondary opacity-70 bg-theme-secondary px-1 py-0.5 rounded">Qty: {formatItemQuantity(item)}</div>
-                        {item.expirationDate && (
-                          <div className={`text-xs px-1 py-0.5 rounded font-medium ${
-                            getExpirationColor(item.expirationDate, item.expirationType) === 'red' ? 'bg-red-100 text-red-800' :
-                            getExpirationColor(item.expirationDate, item.expirationType) === 'yellow' ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-green-100 text-green-800'
-                          }`}>
-                            {Math.ceil((new Date(item.expirationDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))}d
-                          </div>
-                        )}
-                        {item.expiryAlertShown && (
-                          <Clock className="w-4 h-4 text-orange-500" title="Expires within 7 days" />
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {!bulkMode && (
-                    <div className="text-theme-secondary opacity-50">
-                      <ChevronRight className="w-5 h-5" />
-                    </div>
-                  )}
-                </div>
-              ))
+              items.map(renderListItem)
             )}
           </div>
         )}
@@ -731,7 +673,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
 
   const storageViewContent = storageSectionOrder.map(location => {
     const items = groupedByStorage[location] || [];
-    const locationLabel = storageLabels[location];
+    const locationLabel = (storageLabels as any)[location] || location;
 
     return (
       <div key={location} className="bg-theme-secondary rounded-lg border border-theme overflow-hidden">
@@ -760,63 +702,10 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
               itemSize={64}
               width={'100%'}
             >
-              {({ index, style }) => renderStorageItem({ index, style, location })}
+              {(props: { index: number; style: React.CSSProperties }) => renderStorageItem({ index: props.index, style: props.style, location })}
             </List>
           ) : (
-            items.map((item) => (
-              <div key={item.originalIndex} className={`flex items-center justify-between px-2 py-1 border-b border-theme last:border-b-0 transition-all cursor-pointer ${
-                bulkMode && selectedItems.has(item.originalIndex)
-                  ? 'bg-[var(--accent-color)]/10 border-[var(--accent-color)]/30'
-                  : 'hover:bg-theme-primary/50'
-              }`}
-              onClick={() => !bulkMode && setSelectedItemIndex(item.originalIndex)}
-              >
-                {bulkMode && (
-                  <input
-                    type="checkbox"
-                    checked={selectedItems.has(item.originalIndex)}
-                    onChange={() => toggleItemSelection(item.originalIndex)}
-                    className="mr-3 w-4 h-4 text-[var(--accent-color)] bg-theme-primary border-theme rounded focus:ring-[var(--accent-color)]"
-                  />
-                )}
-
-                <div className="flex items-center gap-1 flex-1">
-                  <img
-                    src={item.image}
-                    alt={item.item}
-                    className="w-10 h-10 rounded-lg object-cover bg-theme-primary border border-theme"
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement;
-                      target.src = '/images/placeholder.svg';
-                    }}
-                  />
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <div className="font-medium text-theme-primary">{item.item}</div>
-                      <div className="text-xs text-theme-secondary opacity-70 bg-theme-secondary px-1 py-0.5 rounded">Qty: {formatItemQuantity(item)}</div>
-                      {item.expirationDate && (
-                        <div className={`text-xs px-1 py-0.5 rounded font-medium ${
-                          getExpirationColor(item.expirationDate, item.expirationType) === 'red' ? 'bg-red-100 text-red-800' :
-                          getExpirationColor(item.expirationDate, item.expirationType) === 'yellow' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-green-100 text-green-800'
-                        }`}>
-                          {Math.ceil((new Date(item.expirationDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))}d
-                        </div>
-                      )}
-                      {item.expiryAlertShown && (
-                        <Clock className="w-4 h-4 text-orange-500" title="Expires within 7 days" />
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {!bulkMode && (
-                  <div className="text-theme-secondary opacity-50">
-                    <ChevronRight className="w-5 h-5" />
-                  </div>
-                )}
-              </div>
-            ))
+            items.map(renderListItem)
           )}
         </div>
       </div>
@@ -850,7 +739,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
 
         <div className="flex items-center gap-1 flex-1">
           <ProgressiveImage
-            src={item.image}
+            src={item.image || '/images/placeholder.svg'}
             alt={item.item}
             className="w-10 h-10 rounded-lg object-cover bg-theme-primary border border-theme"
             placeholderSrc="/images/placeholder.svg"
@@ -860,15 +749,19 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
             <div className="flex items-center gap-2">
               <div className="font-medium text-theme-primary">{item.item}</div>
               <div className="text-xs text-theme-secondary opacity-70 bg-theme-secondary px-1 py-0.5 rounded">Qty: {formatItemQuantity(item)}</div>
-              {item.expirationDate && (
-                <div className={`text-xs px-1 py-0.5 rounded font-medium ${
-                  getExpirationColor(item.expirationDate, item.expirationType) === 'red' ? 'bg-red-100 text-red-800' :
-                  getExpirationColor(item.expirationDate, item.expirationType) === 'yellow' ? 'bg-yellow-100 text-yellow-800' :
-                  'bg-green-100 text-green-800'
-                }`}>
-                  {Math.ceil((new Date(item.expirationDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))}d
-                </div>
-              )}
+              {item.expirationDate && (() => {
+                const daysRemaining = Math.ceil((new Date(item.expirationDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+                const color = getExpirationColor(daysRemaining, item.expirationType);
+                return (
+                  <div className={`text-xs px-1 py-0.5 rounded font-medium ${
+                    color === 'red' ? 'bg-red-100 text-red-800' :
+                    color === 'yellow' ? 'bg-yellow-100 text-yellow-800' :
+                    'bg-green-100 text-green-800'
+                  }`}>
+                    {daysRemaining}d
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>
@@ -906,7 +799,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
 
         <div className="flex items-center gap-1 flex-1">
           <ProgressiveImage
-            src={item.image}
+            src={item.image || '/images/placeholder.svg'}
             alt={item.item}
             className="w-10 h-10 rounded-lg object-cover bg-theme-primary border border-theme"
             placeholderSrc="/images/placeholder.svg"
@@ -916,15 +809,19 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
             <div className="flex items-center gap-2">
               <div className="font-medium text-theme-primary">{item.item}</div>
               <div className="text-xs text-theme-secondary opacity-70 bg-theme-secondary px-1 py-0.5 rounded">Qty: {formatItemQuantity(item)}</div>
-              {item.expirationDate && (
-                <div className={`text-xs px-1 py-0.5 rounded font-medium ${
-                  getExpirationColor(item.expirationDate, item.expirationType) === 'red' ? 'bg-red-100 text-red-800' :
-                  getExpirationColor(item.expirationDate, item.expirationType) === 'yellow' ? 'bg-yellow-100 text-yellow-800' :
-                  'bg-green-100 text-green-800'
-                }`}>
-                  {Math.ceil((new Date(item.expirationDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))}d
-                </div>
-              )}
+              {item.expirationDate && (() => {
+                const daysRemaining = Math.ceil((new Date(item.expirationDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+                const color = getExpirationColor(daysRemaining, item.expirationType);
+                return (
+                  <div className={`text-xs px-1 py-0.5 rounded font-medium ${
+                    color === 'red' ? 'bg-red-100 text-red-800' :
+                    color === 'yellow' ? 'bg-yellow-100 text-yellow-800' :
+                    'bg-green-100 text-green-800'
+                  }`}>
+                    {daysRemaining}d
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>
@@ -937,6 +834,64 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
       </div>
     );
   };
+
+  // Simple list item renderer used for non-virtualized lists
+  function renderListItem(item: any) {
+    const daysRemaining = item.expirationDate ? Math.ceil((new Date(item.expirationDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : undefined;
+    return (
+      <div
+        key={item.originalIndex}
+        className={`flex items-center justify-between px-2 py-1 border-b border-theme last:border-b-0 transition-all cursor-pointer ${
+          bulkMode && selectedItems.has(item.originalIndex)
+            ? 'bg-[var(--accent-color)]/10 border-[var(--accent-color)]/30'
+            : 'hover:bg-theme-primary/50'
+        }`}
+        onClick={() => !bulkMode && setSelectedItemIndex(item.originalIndex)}
+      >
+        {bulkMode && (
+          <input
+            type="checkbox"
+            checked={selectedItems.has(item.originalIndex)}
+            onChange={() => toggleItemSelection(item.originalIndex)}
+            className="mr-3 w-4 h-4 text-[var(--accent-color)] bg-theme-primary border-theme rounded focus:ring-[var(--accent-color)]"
+          />
+        )}
+
+        <div className="flex items-center gap-1 flex-1">
+          <img
+            src={item.image || '/images/placeholder.svg'}
+            alt={item.item}
+            className="w-10 h-10 rounded-lg object-cover bg-theme-primary border border-theme"
+            onError={(e) => { (e.target as HTMLImageElement).src = '/images/placeholder.svg'; }}
+          />
+          <div className="flex-1">
+            <div className="flex items-center gap-2">
+              <div className="font-medium text-theme-primary">{item.item}</div>
+              <div className="text-xs text-theme-secondary opacity-70 bg-theme-secondary px-1 py-0.5 rounded">Qty: {formatItemQuantity(item)}</div>
+              {typeof daysRemaining === 'number' && (
+                <div className={`text-xs px-1 py-0.5 rounded font-medium ${
+                  getExpirationColor(daysRemaining, item.expirationType) === 'red' ? 'bg-red-100 text-red-800' :
+                  getExpirationColor(daysRemaining, item.expirationType) === 'yellow' ? 'bg-yellow-100 text-yellow-800' :
+                  'bg-green-100 text-green-800'
+                }`}>
+                  {daysRemaining}d
+                </div>
+              )}
+              {item.expiryAlertShown && (
+                <Clock className="w-4 h-4 text-orange-500" aria-label="Expires within 7 days" />
+              )}
+            </div>
+          </div>
+        </div>
+
+        {!bulkMode && (
+          <div className="text-theme-secondary opacity-50">
+            <ChevronRight className="w-5 h-5" />
+          </div>
+        )}
+      </div>
+    );
+  }
 
   const renderRow = ({ index, style }: { index: number; style: React.CSSProperties }) => {
     const item = sortedInventory[index];
@@ -957,22 +912,26 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
         )}
 
         <div className="flex items-center gap-1 flex-1">
-          <img src={item.image} alt={item.item} className="w-10 h-10 rounded-lg object-cover bg-theme-primary border border-theme" onError={(e) => { (e.target as HTMLImageElement).src = '/images/placeholder.svg'; }} />
+          <img src={item.image || '/images/placeholder.svg'} alt={item.item} className="w-10 h-10 rounded-lg object-cover bg-theme-primary border border-theme" onError={(e) => { (e.target as HTMLImageElement).src = '/images/placeholder.svg'; }} />
           <div className="flex-1">
             <div className="flex items-center gap-2">
               <div className="font-medium text-theme-primary">{item.item}</div>
               <div className="text-xs text-theme-secondary opacity-70 bg-theme-secondary px-1 py-0.5 rounded">Qty: {formatItemQuantity(item)}</div>
-              {item.expirationDate && (
-                <div className={`text-xs px-1 py-0.5 rounded font-medium ${
-                  getExpirationColor(item.expirationDate, item.expirationType) === 'red' ? 'bg-red-100 text-red-800' :
-                  getExpirationColor(item.expirationDate, item.expirationType) === 'yellow' ? 'bg-yellow-100 text-yellow-800' :
-                  'bg-green-100 text-green-800'
-                }`}>
-                  {Math.ceil((new Date(item.expirationDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))}d
-                </div>
-              )}
+              {item.expirationDate && (() => {
+                const daysRemaining = Math.ceil((new Date(item.expirationDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+                const color = getExpirationColor(daysRemaining, item.expirationType);
+                return (
+                  <div className={`text-xs px-1 py-0.5 rounded font-medium ${
+                    color === 'red' ? 'bg-red-100 text-red-800' :
+                    color === 'yellow' ? 'bg-yellow-100 text-yellow-800' :
+                    'bg-green-100 text-green-800'
+                  }`}>
+                    {daysRemaining}d
+                  </div>
+                );
+              })()}
               {item.expiryAlertShown && (
-                <Clock className="w-4 h-4 text-orange-500" title="Expires within 7 days" />
+                <Clock className="w-4 h-4 text-orange-500" aria-label="Expires within 7 days" />
               )}
             </div>
           </div>
@@ -1601,7 +1560,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                     {scanResults.map((sItem, idx) => (
                       <div key={sItem.id} className="bg-theme-secondary p-3 rounded-lg border border-theme">
                         <div className="flex items-start gap-3">
-                          <img src={sItem.image} alt={sItem.item} className="w-12 h-12 rounded object-cover flex-shrink-0" onError={(e) => { (e.target as HTMLImageElement).src = '/images/placeholder.svg'; }} />
+                            <img src={sItem.image || '/images/placeholder.svg'} alt={sItem.item} className="w-12 h-12 rounded object-cover flex-shrink-0" onError={(e) => { (e.target as HTMLImageElement).src = '/images/placeholder.svg'; }} />
                           <div className="flex-1 min-w-0">
                             <input value={sItem.item} onChange={(e) => {
                               const updated = [...scanResults];
@@ -1627,12 +1586,12 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                             </div>
                           </div>
                         </div>
-                        <div className="flex justify-end mt-2">
+                          <div className="flex justify-end mt-2">
                           <button onClick={() => {
                             const updated = scanResults.filter((_, i) => i !== idx);
                             setScanResults(updated.length ? updated : null);
                             if (updated.length === 0) setShowScanReviewModal(false);
-                          }} className="px-3 py-1 text-sm rounded bg-red-600 text-white hover:bg-red-700" aria-label={`Remove ${item.item} from scan results`}>Remove</button>
+                          }} className="px-3 py-1 text-sm rounded bg-red-600 text-white hover:bg-red-700" aria-label={`Remove ${sItem.item} from scan results`}>Remove</button>
                         </div>
                       </div>
                     ))}
@@ -1674,7 +1633,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                   <p className="text-xs text-blue-600">{suggestion.reason}</p>
                 </div>
                 <button
-                  onClick={() => addToShoppingList([suggestion.item], 'scanner suggestion')}
+                  onClick={() => addToShoppingList([suggestion.item])}
                   className="ml-3 px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors"
                   aria-label={`Add ${suggestion.item} to shopping list`}
                 >
@@ -1796,7 +1755,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
             <div className="flex gap-3">
               {storageOrder.map(location => {
                 const items = groupedByStorage[location] || [];
-                const locationLabel = storageLabels[location];
+                const locationLabel = (storageLabels as Record<string, string>)[location] || location;
                 return (
                   <div
                     key={location}
@@ -2079,7 +2038,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
           showAddToPlan={modalContext === 'search'}
           inventory={inventory}
           household={household}
-          user={user}
+          user={user ? { id: user.id, name: user.name, email: user.email, avatar: user.avatar } : undefined}
         />
       )}
       {canShowAdBanner && <AdMobBanner />}

@@ -148,10 +148,10 @@ export function checkRecipeAgainstPreferences(
 
   const warnings: string[] = [];
 
-  // Get ingredients from recipe
-  const ingredients = 'ingredients' in recipe
-    ? recipe.ingredients.map(ing => typeof ing === 'string' ? ing : ing.name || ing.item || '')
-    : recipe.ingredients || [];
+  // Get ingredients from recipe (handle StructuredRecipe | SavedRecipe safely)
+  const ingredients: string[] = Array.isArray((recipe as any).ingredients)
+    ? (recipe as any).ingredients.map((ing: any) => typeof ing === 'string' ? ing : ing.name || ing.item || '')
+    : [];
 
   // Check each ingredient
   for (const ingredient of ingredients) {

@@ -102,7 +102,7 @@ export const checkInvitation = onCall(
 
       return { isInvited, household: isInvited ? household : null };
     } catch (err: any) {
-      console.error('Error checking invitation:', error);
+      console.error('Error checking invitation:', err);
       throw new HttpsError("internal", "Unable to join 4: Failed to check invitation.");
     }
   }

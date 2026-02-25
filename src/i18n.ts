@@ -76,4 +76,4 @@ export const t = (id: string, values?: Record<string, any>): string => {
   return getIntl().formatMessage({ id }, values);
 };
 
-export default intl;
+export default getIntl();

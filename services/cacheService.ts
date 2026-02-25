@@ -58,8 +58,8 @@ class ReadThroughCache<T> {
       this.set(key, data, ttl);
       return data;
     } catch (err: any) {
-      log.error(`Failed to fetch data for key: ${key}`, error, 'Cache');
-      throw error;
+      log.error(`Failed to fetch data for key: ${key}`, err, 'Cache');
+      throw err;
     }
   }
 

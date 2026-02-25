@@ -88,12 +88,12 @@ export class RecipeRatingService {
           const householdRatings = await DatabaseMonitoringService.getDocs(householdRatingsQuery);
 
             if (!householdRatings.empty) {
-            const ratings = householdRatings.docs.map(doc => doc.data() as any);
+            const ratings = householdRatings.docs.map((doc: any) => doc.data() as any);
             const wouldMakeAgainCount = ratings.filter((r: any) => r.wouldMakeAgain).length;
 
             householdStats = {
               householdRatings: ratings.length,
-              householdAverageRating: ratings.reduce((sum, r) => sum + r.rating, 0) / ratings.length,
+              householdAverageRating: ratings.reduce((sum: number, r: any) => sum + r.rating, 0) / ratings.length,
               householdWouldMakeAgain: (wouldMakeAgainCount / ratings.length) * 100
             };
           }
@@ -134,7 +134,7 @@ export class RecipeRatingService {
         DatabaseMonitoringService.where('recipeTitle', '==', recipeTitle)
       );
       const ratingsSnapshot = await DatabaseMonitoringService.getDocs(ratingsQuery);
-      const ratings = ratingsSnapshot.docs.map(doc => doc.data() as any);
+      const ratings = ratingsSnapshot.docs.map((doc: any) => doc.data() as any);
 
       if (ratings.length === 0) return;
 
@@ -234,7 +234,7 @@ export class RecipeRatingService {
       );
 
       const modsSnapshot = await DatabaseMonitoringService.getDocs(modsQuery);
-      return modsSnapshot.docs.map(doc => {
+      return modsSnapshot.docs.map((doc: any) => {
         const d = doc.data() as any;
         return {
           ...d,
@@ -288,7 +288,7 @@ export class RecipeRatingService {
       );
 
       const ratingsSnapshot = await DatabaseMonitoringService.getDocs(ratingsQuery);
-      return ratingsSnapshot.docs.map(doc => {
+      return ratingsSnapshot.docs.map((doc: any) => {
         const data = doc.data() as any;
         return {
           ...data,
@@ -319,7 +319,7 @@ export class RecipeRatingService {
         DatabaseMonitoringService.limit(20)
       );
       const userRatings = await DatabaseMonitoringService.getDocs(userRatingsQuery);
-      const userRatingData = userRatings.docs.map(doc => doc.data());
+      const userRatingData = userRatings.docs.map((doc: any) => doc.data());
 
       // Get household preferences
       let householdRatings: any[] = [];
@@ -331,33 +331,35 @@ export class RecipeRatingService {
           DatabaseMonitoringService.limit(50)
         );
         const householdSnapshot = await DatabaseMonitoringService.getDocs(householdQuery);
-        householdRatings = householdSnapshot.docs.map(doc => doc.data());
+        householdRatings = householdSnapshot.docs.map((doc: any) => doc.data());
       }
 
       // Simple recommendation logic (can be enhanced with ML)
-      const recommendations = [];
+      const recommendations: any[] = [];
 
       // Household-loved recipes that user hasn't rated
       if (householdRatings.length > 0) {
         const householdLoved = householdRatings
-          .filter(r => r.wouldMakeAgain)
-          .filter(r => !userRatingData.some(ur => ur.recipeTitle === r.recipeTitle))
-          .reduce((acc, rating) => {
-            acc[rating.recipeTitle] = (acc[rating.recipeTitle] || 0) + 1;
-            return acc;
-          }, {} as Record<string, number>);
+          .filter((r: any) => r.wouldMakeAgain)
+            .filter((r: any) => !userRatingData.some((ur: any) => ur.recipeTitle === r.recipeTitle))
+            .reduce((acc: Record<string, number>, rating: any) => {
+              const title = rating.recipeTitle || 'unknown';
+              acc[title] = (acc[title] || 0) + 1;
+              return acc;
+            }, {} as Record<string, number>);
 
         Object.entries(householdLoved)
-          .sort(([,a], [,b]) => b - a)
-          .slice(0, 2)
-          .forEach(([recipeTitle, count]) => {
-            recommendations.push({
-              recipe: { title: recipeTitle }, // TODO: Get full recipe data
-              reason: `${count} household members loved this`,
-              confidence: Math.min(0.9, count / 5),
-              type: 'household-loved'
-            });
-          });
+              .sort(([,a]: any, [,b]: any) => (b as number) - (a as number))
+              .slice(0, 2)
+              .forEach(([recipeTitle, count]: [string, number]) => {
+                const c = Number(count || 0);
+                recommendations.push({
+                  recipe: { title: recipeTitle }, // TODO: Get full recipe data
+                  reason: `${c} household members loved this`,
+                  confidence: Math.min(0.9, c / 5),
+                  type: 'household-loved'
+                });
+              });
       }
 
       // Recipes with similar ingredients to pantry

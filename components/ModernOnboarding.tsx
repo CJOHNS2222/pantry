@@ -17,10 +17,19 @@ import {
 } from 'lucide-react';
 import { Tab } from '../types/app';
 
+interface OnboardingData {
+  completed: boolean;
+  selectedSetup?: string | null;
+  permissions?: string[];
+}
+
 interface ModernOnboardingProps {
   user: any;
   onComplete: (data: OnboardingData) => void;
   onSkip: () => void;
+  onScanPantry?: () => void;
+  onQuickAddItems?: () => void;
+  onOpenHousehold?: () => void;
 }
 
 type OnboardingStep = 'welcome' | 'quick-setup' | 'permissions' | 'value-demo' | 'complete';
@@ -38,7 +47,10 @@ interface QuickSetupOption {
 export const ModernOnboarding: React.FC<ModernOnboardingProps> = ({
   user,
   onComplete,
-  onSkip
+  onSkip,
+  onScanPantry,
+  onQuickAddItems,
+  onOpenHousehold
 }) => {
   const [currentStep, setCurrentStep] = useState<OnboardingStep>('welcome');
   const [selectedSetupOption, setSelectedSetupOption] = useState<string | null>(null);
@@ -68,7 +80,7 @@ export const ModernOnboarding: React.FC<ModernOnboardingProps> = ({
       title: 'Set Up Household',
       description: 'Add family members to share recipes and collaborate',
       icon: <Users className="w-6 h-6" />,
-      action: () => onOpenHousehold(),
+      action: () => onOpenHousehold?.(),
       estimatedTime: '30 sec'
     }
   ];
@@ -95,7 +107,7 @@ export const ModernOnboarding: React.FC<ModernOnboardingProps> = ({
 
   const handleSkip = () => {
     handleStepTransition('complete');
-    setTimeout(onComplete, 1000);
+    setTimeout(() => onComplete({ completed: false, selectedSetup: null, permissions: [] }), 1000);
   };
 
   const handlePermissionGrant = (permission: string) => {

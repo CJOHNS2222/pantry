@@ -546,7 +546,7 @@ function parseNaturalLanguageRecipes(text: string): StructuredRecipe[] {
     }
     
   } catch (err: any) {
-    console.error("Error parsing natural language recipes:", error);
+    console.error("Error parsing natural language recipes:", err);
     // Return a basic fallback recipe
     recipes.push({
       title: "Search Error",

@@ -29,7 +29,7 @@ export class RecipesCacheService {
       recipe.description,
       JSON.stringify(recipe.ingredients),
       JSON.stringify(recipe.instructions),
-      recipe.cookTime,
+      String(recipe.cookTime || ''),
       recipe.type || '',
       recipe.image || '',
       recipe.dateSaved,
@@ -137,7 +137,7 @@ export class RecipesCacheService {
       const cachePath = this.getCachePath(householdId, userId);
       const cacheRef = DatabaseMonitoringService.doc(cachePath);
 
-      const updateData: Partial<CachedRecipesData & RecipesCacheMetadata> = {
+      const updateData: any = {
         lastUpdated: new Date(),
       };
       (updateData as any)[recipe.id] = this.savedRecipeToArray(recipe);

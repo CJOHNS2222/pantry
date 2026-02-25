@@ -31,13 +31,13 @@ interface AppActionsContextValue {
   addShoppingListItem: (item: Omit<ShoppingItem, 'id'>) => void;
 
   // Settings operations
-  setSettings: (settings: Settings) => void;
+  setSettings: React.Dispatch<React.SetStateAction<Settings>>;
   onAddCustomCategory?: (name: string, icon: string, color?: string) => void;
   onUpdateCustomCategory?: (categoryId: string, updates: Partial<Pick<CustomCategory, 'name' | 'icon' | 'color'>>) => void;
   onDeleteCustomCategory?: (categoryId: string) => void;
 
   // UI operations
-  addToast: (message: string, type?: 'error' | 'info', ttl?: number, actionLabel?: string, action?: () => void) => void;
+  addToast: (message: string, type?: 'success' | 'error' | 'info' | 'warning', ttl?: number, actionLabel?: string, action?: () => void) => void;
   setInitialSearchQuery: (query: string) => void;
   setPersistedRecipeResult: (result: RecipeSearchResult | null) => void;
 
@@ -55,12 +55,47 @@ const AppActionsContext = createContext<AppActionsContextValue | undefined>(unde
 
 interface AppActionsProviderProps {
   children: ReactNode;
-  value: AppActionsContextValue;
+  value?: AppActionsContextValue;
 }
 
+const noop = () => {};
+
+const defaultAppActionsContextValue: AppActionsContextValue = {
+  setActiveTab: noop as any,
+  updateItem: async () => {},
+  deleteItem: async () => {},
+  addItem: async () => {},
+  addItems: async () => {},
+  setInventory: noop as any,
+  setShoppingList: noop as any,
+  setMealPlan: noop as any,
+  updateMealPlan: noop as any,
+  onAddToPlan: noop as any,
+  onSaveRecipe: noop as any,
+  onDeleteRecipe: noop as any,
+  onRateRecipe: noop as any,
+  handleMarkAsMade: noop as any,
+  onMoveToPantry: noop as any,
+  onAddToShoppingList: noop as any,
+  addShoppingListItem: noop as any,
+  setSettings: noop as any,
+  onAddCustomCategory: noop as any,
+  onUpdateCustomCategory: noop as any,
+  onDeleteCustomCategory: noop as any,
+  addToast: noop as any,
+  setInitialSearchQuery: noop as any,
+  setPersistedRecipeResult: noop as any,
+  onLogout: noop as any,
+  onShowTutorial: noop as any,
+  onShowHousehold: noop as any,
+  checkRecipeSaveLimit: async () => false,
+  checkMealPlanLimit: async () => false,
+};
+
 export const AppActionsProvider: React.FC<AppActionsProviderProps> = ({ children, value }) => {
+  const providerValue = value ?? defaultAppActionsContextValue;
   return (
-    <AppActionsContext.Provider value={value}>
+    <AppActionsContext.Provider value={providerValue}>
       {children}
     </AppActionsContext.Provider>
   );

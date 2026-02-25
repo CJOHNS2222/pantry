@@ -2,6 +2,7 @@
 import { PantryItem, User } from '../types';
 import { analyzePantryImage } from './geminiService';
 import { getItemImage, inferCategoryFromItemName, inferStorageLocationFromItemName, getAutoExpirationDate, parseItemText, fetchExternalItemImage, combineQuantities } from '../utils/appUtils';
+import { getQuantityAmount, getQuantityUnit } from '../utils/quantityUtils';
 import { validatePantryItem } from '../utils/validationUtils';
 import AnalyticsService from './analyticsService';
 import { canUseGemini } from './featureFlags';
@@ -20,7 +21,7 @@ export class PantryService {
       throw new Error('Please enable AI features in Settings to use image analysis.');
     }
 
-    const items = await analyzePantryImage(base64Data, mimeType, user);
+    const items = await analyzePantryImage(base64Data, mimeType, user as any);
     if (items.length === 0) {
       throw new Error('No items detected in the image.');
     }
@@ -104,13 +105,15 @@ export class PantryService {
     // Try to get local image first
     let image = getItemImage(itemName, category);
 
-    // If it's a placeholder, try to fetch an external image
+    // If it's a placeholder, try to fetch an external image asynchronously
     if (image === '/images/placeholder.svg') {
       try {
-        const externalImage = fetchExternalItemImage(itemName);
-        if (externalImage) {
-          image = externalImage;
-        }
+        // fetchExternalItemImage returns a Promise; use then to avoid making this function async
+        fetchExternalItemImage(itemName)
+          .then(ext => {
+            if (ext) image = ext;
+          })
+          .catch(e => console.log('Failed to fetch external image for', itemName, e));
       } catch (err: any) {
         console.log('Failed to fetch external image for', itemName, err);
       }
@@ -171,8 +174,8 @@ export class PantryService {
         ? newItem.batches
         : [{
             batchId: crypto.randomUUID(),
-            quantity: newItem.quantity?.amount || parseInt(newItem.quantity_estimate || '1') || 1,
-            unit: newItem.quantity?.unit || (newItem.quantity_estimate ? 'count' : 'count'),
+            quantity: getQuantityAmount(newItem.quantity ?? newItem.quantity_estimate),
+            unit: getQuantityUnit(newItem.quantity ?? newItem.quantity_estimate),
             expires: newItem.expirationDate,
             purchaseDate: newItem.dateAdded || now,
             note: ''
@@ -183,7 +186,8 @@ export class PantryService {
       // Update aggregate quantity where possible using combineQuantities helper
       if (existingItem.quantity && newItem.quantity) {
         try {
-          existingItem.quantity = combineQuantities(existingItem.quantity, newItem.quantity);
+          // Cast to any to satisfy combineQuantities parameter expectations
+          existingItem.quantity = combineQuantities(existingItem.quantity as any, newItem.quantity as any) as any;
         } catch (err) {
           // If combineQuantities fails due to unit mismatch, leave quantity as-is
         }
@@ -217,7 +221,7 @@ export class PantryService {
     const b = {
       batchId: crypto.randomUUID(),
       quantity: batch.quantity,
-      unit: batch.unit || item.quantity?.unit || 'count',
+      unit: batch.unit || (typeof item.quantity === 'number' ? 'count' : (item.quantity as any)?.unit) || 'count',
       expires: batch.expires,
       purchaseDate: batch.purchaseDate || now,
       note: batch.note || ''
@@ -227,7 +231,7 @@ export class PantryService {
     // Update aggregate quantity if applicable
     if (updated.quantity) {
       try {
-        updated.quantity = combineQuantities(updated.quantity, { amount: b.quantity, unit: b.unit });
+        updated.quantity = combineQuantities(updated.quantity as any, { amount: b.quantity, unit: b.unit } as any) as any;
       } catch (err) {
         // ignore unit mismatch
       }
@@ -292,8 +296,8 @@ export class PantryService {
 
     if (!updated.batches || updated.batches.length === 0) {
       // Fallback to legacy quantity
-      if (updated.quantity) {
-        updated.quantity.amount = Math.max(0, updated.quantity.amount - remaining);
+      if (updated.quantity && typeof updated.quantity !== 'number' && 'amount' in updated.quantity) {
+        updated.quantity.amount = Math.max(0, (updated.quantity.amount || 0) - remaining);
         consumed.push({ amount });
       }
       return { updatedItem: updated, consumed };
@@ -432,7 +436,7 @@ export class PantryService {
     inventory: PantryItem[],
     indicesToUpdate: number[],
     expirationDate: string,
-    expirationType: string
+    expirationType: 'use-by' | 'best-by' | undefined
   ): PantryItem[] {
     return inventory.map((item, index) => {
       if (indicesToUpdate.includes(index)) {

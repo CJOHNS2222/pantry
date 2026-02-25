@@ -12,7 +12,7 @@ interface AppHeaderProps {
   user: User;
   household: Household | null;
   settings: any;
-  setSettings: (settings: any) => void;
+  setSettings: React.Dispatch<React.SetStateAction<any>>;
   onShowHousehold: () => void;
   recentActions?: any[];
   onUndo?: (action: any) => void;
@@ -153,7 +153,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             )}
             <button
               data-tutorial="theme-toggle"
-              onClick={() => setSettings(prev => ({
+              onClick={() => setSettings((prev: any) => ({
                 ...prev,
                 theme: {
                   ...prev.theme,

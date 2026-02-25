@@ -32,8 +32,8 @@ async function migrateHouseholdClaimsCore() {
         totalUsersUpdated++;
         console.log(`Set householdId claim for user ${userId} to ${householdId}`);
       } catch (err: any) {
-        console.error(`Error setting claim for user ${userId}:`, error);
-        errors.push(`${userId}: ${(error as Error).message}`);
+        console.error(`Error setting claim for user ${userId}:`, err);
+        errors.push(`${userId}: ${(err as Error).message}`);
       }
     }
 
@@ -63,8 +63,8 @@ export const migrateHouseholdClaims = onCall(async (request) => {
   try {
     return await migrateHouseholdClaimsCore();
   } catch (err: any) {
-    console.error('Migration error:', error);
-    throw new HttpsError('internal', 'Migration failed: ' + (error as Error).message);
+    console.error('Migration error:', err);
+    throw new HttpsError('internal', 'Migration failed: ' + (err as Error).message);
   }
 });
 
@@ -85,10 +85,10 @@ export const migrateHouseholdClaimsHttp = onRequest(
       const result = await migrateHouseholdClaimsCore();
       res.status(200).json(result);
     } catch (err: any) {
-      console.error('HTTP Migration error:', error);
+      console.error('HTTP Migration error:', err);
       res.status(500).json({
         success: false,
-        error: (error as Error).message
+        error: (err as Error).message
       });
     }
   }

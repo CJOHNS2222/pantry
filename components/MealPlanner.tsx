@@ -709,7 +709,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
       
       // Track recipes
       if (!acc[key].recipes.some(r => r.id === item.recipeId)) {
-        acc[key].recipes.push({ name: item.recipeName, id: item.recipeId });
+        acc[key].recipes.push({ name: item.recipeName, id: item.recipeId ?? '' });
       }
       return acc;
     }, {} as Record<string, { ingredient: string; quantity: number; unit: string; recipes: { name: string; id: string }[] }>);
@@ -972,7 +972,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
     } catch (error) {
       console.error('Calendar export error:', error);
       alert('Failed to export to calendar. Please try again.');
-      AnalyticsService.trackEvent('calendar_export_error', { error: error.message });
+      AnalyticsService.trackEvent('calendar_export_error', { error: (error as any)?.message || String(error) });
     }
   };
 

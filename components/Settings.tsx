@@ -8,6 +8,7 @@ import AnalyticsService from '../services/analyticsService';
 import { LanguageSelector } from '../src/components/LanguageSelector';
 import { useNotifications } from '../hooks/useNotifications';
 import { User, UserProfile, CustomCategory, Member } from '../types';
+import type { Settings as AppSettings } from '../types';
 
 type MemberPreferences = Pick<Member, 'dietaryRestrictions' | 'allergies' | 'dietGoal' | 'favoriteCuisines' | 'specialNeeds' | 'preferredProteins' | 'dislikedIngredients'>;
 import { NotificationSettingsComponent } from './NotificationSettings';
@@ -43,8 +44,8 @@ const defaultSettings = {
 };
 
 interface SettingsProps {
-  settings: typeof defaultSettings;
-  setSettings: React.Dispatch<React.SetStateAction<typeof defaultSettings>>;
+  settings: AppSettings;
+  setSettings: React.Dispatch<React.SetStateAction<AppSettings>>;
   user?: User;
   onLogout?: () => void;
   customCategories?: CustomCategory[];
@@ -148,7 +149,9 @@ export const Settings: React.FC<SettingsProps> = ({
       log.info('Member preferences updated', { memberId: selectedMember.id }, 'Settings');
       closeMemberPreferences();
     } catch (error) {
-      log.error(error as Error, 'Settings');
+      const msg = error instanceof Error ? error.message : String(error);
+      const stack = error instanceof Error ? error.stack : undefined;
+      log.error('Failed saving member preferences', { message: msg, stack }, 'Settings');
     } finally {
       setSavingMemberPrefs(false);
     }
@@ -221,7 +224,9 @@ export const Settings: React.FC<SettingsProps> = ({
       setProfileChanged(false);
       alert('Profile updated successfully!');
     } catch (error) {
-      log.error(error as Error, 'Settings');
+      const msg = error instanceof Error ? error.message : String(error);
+      const stack = error instanceof Error ? error.stack : undefined;
+      log.error('Failed saving profile', { message: msg, stack }, 'Settings');
       alert('Failed to update profile. Please try again.');
     } finally {
       setSavingProfile(false);
@@ -241,7 +246,9 @@ export const Settings: React.FC<SettingsProps> = ({
       setShowAvatarSelection(false);
       alert('Avatar updated successfully!');
     } catch (error) {
-      log.error(error as Error, 'Settings');
+      const msg = error instanceof Error ? error.message : String(error);
+      const stack = error instanceof Error ? error.stack : undefined;
+      log.error('Failed updating avatar', { message: msg, stack }, 'Settings');
       alert('Failed to update avatar. Please try again.');
     } finally {
       setUpdatingAvatar(false);
@@ -1053,7 +1060,9 @@ export const Settings: React.FC<SettingsProps> = ({
 
                   alert(`Image update complete!\n\n${result.updatedItems} items updated\n${result.failedItems} items failed\n\nCheck the console for details.`);
                 } catch (error) {
-                  log.error(error as Error, 'Settings');
+                  const msg = error instanceof Error ? error.message : String(error);
+                  const stack = error instanceof Error ? error.stack : undefined;
+                  log.error('Failed bulk image update', { message: msg, stack }, 'Settings');
                   alert('Failed to update images. Check the console for details.');
                 } finally {
                   setUpdatingBulkImages(false);

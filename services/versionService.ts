@@ -172,7 +172,7 @@ class VersionService {
           ? 'https://play.google.com/store/apps/details?id=com.smart.pantry'
           : platform === 'ios'
           ? 'https://apps.apple.com/app/smart-pantry/id1234567890'
-          : null,
+          : undefined,
       };
 
       await DatabaseMonitoringService.setDoc(versionDocRef, {

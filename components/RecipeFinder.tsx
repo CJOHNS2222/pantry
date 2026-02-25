@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Search, Loader2, Sparkles, ExternalLink, Globe, Plus, Clock, List, ChefHat, ToggleLeft, ToggleRight, Star, Heart, Bookmark, Zap, Mic } from 'lucide-react';
 import { searchRecipes } from '../services/geminiService';
-import { getSavedRecipes, getCachedPopularRecipes, saveRecipeToFirestore, uploadRecipeImageFile, submitRecipeForReview } from '../services/recipeService';
+import { getSavedRecipes, getCachedPopularRecipes, saveRecipeToFirestore, saveRecipeToUserCache, uploadRecipeImageFile, submitRecipeForReview } from '../services/recipeService';
 import DatabaseMonitoringService from '../services/databaseMonitoringService';
 import { RecipeSearchResult, LoadingState, RecipeRating, StructuredRecipe, PantryItem, SavedRecipe, User, Household } from '../types';
 import { Tab } from '../types/app';
@@ -206,7 +206,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
 
     // Check for speech recognition support
     useEffect(() => {
-        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+        if ((window as any).webkitSpeechRecognition || (window as any).SpeechRecognition) {
             setVoiceSearchSupported(true);
         }
     }, []);
@@ -232,7 +232,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
             setIsListening(true);
         };
 
-        recognition.onresult = (event) => {
+        recognition.onresult = (event: any) => {
             const transcript = event.results[0][0].transcript;
             setSpecificQuery(transcript);
             setIsListening(false);
@@ -247,10 +247,10 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
             }, 500);
         };
 
-        recognition.onerror = (event) => {
+        recognition.onerror = (event: any) => {
             setIsListening(false);
             // Track failed voice search
-            AnalyticsService.trackVoiceSearch(false, event.error);
+            AnalyticsService.trackVoiceSearch(false, event?.error);
         };
 
         recognition.onend = () => {
@@ -1129,8 +1129,8 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                 newCache.set(cacheKey, { ...data, recipes: filteredRecipes });
                 // Keep only the 20 most recent entries
                 if (newCache.size > 20) {
-                    const oldestKey = newCache.keys().next().value;
-                    newCache.delete(oldestKey);
+                    const oldestKey = newCache.keys().next().value as string | undefined;
+                    if (oldestKey) newCache.delete(oldestKey);
                 }
                 return newCache;
             });
@@ -1199,7 +1199,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
             if (!Array.isArray(normalized.instructions)) {
                 if (typeof normalized.instructions === 'string') {
                     // Split on newlines or numbered steps
-                    normalized.instructions = normalized.instructions.split(/\r?\n+/).map(s => s.trim()).filter(Boolean);
+                    normalized.instructions = normalized.instructions.split(/\r?\n+/).map((s: string) => s.trim()).filter(Boolean);
                 } else if (normalized.instructions && typeof normalized.instructions === 'object') {
                     // If stored as object with numeric keys, convert to array
                     normalized.instructions = Object.values(normalized.instructions).map(String).filter(Boolean);
@@ -1209,7 +1209,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
             }
             if (!Array.isArray(normalized.ingredients)) {
                 if (typeof normalized.ingredients === 'string') {
-                    normalized.ingredients = normalized.ingredients.split(/\r?\n+/).map(s => s.trim()).filter(Boolean);
+                    normalized.ingredients = normalized.ingredients.split(/\r?\n+/).map((s: string) => s.trim()).filter(Boolean);
                 } else if (normalized.ingredients && typeof normalized.ingredients === 'object') {
                     normalized.ingredients = Object.values(normalized.ingredients).map(String).filter(Boolean);
                 } else {
@@ -1257,8 +1257,8 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                 // If user requested submission for inclusion, copy to submissions
                 if (r.__submitForInclusion) {
                     try {
-                        await submitRecipeForReview({ ...recipeToSave, id: recipeId }, user?.id);
-                    } catch (subErr) {
+                        await submitRecipeForReview({ ...(recipeToSave as any), id: recipeId } as any, user?.id);
+                    } catch (subErr: any) {
                         console.error('Failed to submit recipe for review', subErr);
                     }
                 }
@@ -1502,7 +1502,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                                             URL.revokeObjectURL(url);
                                         }, 100);
                                         AnalyticsService.trackFeatureUsage('recipe_export', { success: true, count: savedRecipes.length });
-                                    } catch (error) {
+                                    } catch (error: any) {
                                         AnalyticsService.trackFeatureUsage('recipe_export', { success: false, error: error?.message || error });
                                         AnalyticsService.trackError('recipe_export_error', error?.message || error, 'RecipeFinder');
                                         if (addToast) addToast('Failed to export recipes', 'error');
@@ -1894,19 +1894,19 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                     <div className="flex flex-wrap justify-center gap-2 text-sm">
                         <span className="text-theme-secondary/60">Suggestions:</span>
                         <button 
-                            onClick={() => setSearchQuery('chicken')}
+                            onClick={() => setSpecificQuery('chicken')}
                             className="px-3 py-1 bg-theme-secondary/50 rounded-full hover:bg-theme-secondary/70 transition-colors"
                         >
                             chicken
                         </button>
                         <button 
-                            onClick={() => setSearchQuery('pasta')}
+                            onClick={() => setSpecificQuery('pasta')}
                             className="px-3 py-1 bg-theme-secondary/50 rounded-full hover:bg-theme-secondary/70 transition-colors"
                         >
                             pasta
                         </button>
                         <button 
-                            onClick={() => setSearchQuery('salad')}
+                            onClick={() => setSpecificQuery('salad')}
                             className="px-3 py-1 bg-theme-secondary/50 rounded-full hover:bg-theme-secondary/70 transition-colors"
                         >
                             salad

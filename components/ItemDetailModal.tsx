@@ -3,6 +3,7 @@ import { X, TrendingUp, ShoppingBasket, Trash2, Edit3, Package, Minus, Plus, Zap
 import { PantryItem } from '../types';
 import PriceTrends from './PriceTrends';
 import { getAllCategories, getExpirationColor, cleanItemNameForShopping, formatItemQuantity, parseQuantity } from '../utils/appUtils';
+import { getQuantityAmount, getQuantityUnit } from '../utils/quantityUtils';
 import { getNutritionFactsWithFallback, NutritionFacts, formatNutrition } from '../services/nutritionService';
 import { useKeyboardNavigation } from '../hooks/useKeyboardNavigation';
 import VisualQuantitySelector from './VisualQuantitySelector';
@@ -28,18 +29,8 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   originalIndex
 }) => {
   const [showPriceTrends, setShowPriceTrends] = useState(false);
-  const [editQuantity, setEditQuantity] = useState(() => {
-    if (item.quantity) {
-      return item.quantity.amount;
-    }
-    return parseInt(item.quantity_estimate) || 1;
-  });
-  const [editUnit, setEditUnit] = useState(() => {
-    if (item.quantity) {
-      return item.quantity.unit;
-    }
-    return 'count';
-  });
+  const [editQuantity, setEditQuantity] = useState(() => getQuantityAmount(item.quantity ?? item.quantity_estimate));
+  const [editUnit, setEditUnit] = useState(() => getQuantityUnit(item.quantity ?? item.quantity_estimate));
   const [nutrition, setNutrition] = useState<NutritionFacts | null>(null);
   const [loadingNutrition, setLoadingNutrition] = useState(true);
   const [isEditingExpiration, setIsEditingExpiration] = useState(false);
@@ -86,14 +77,14 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
         quantity_estimate: newQuantity.toString()
       };
 
-      if (item.quantity) {
+      if (item.quantity && typeof item.quantity !== 'number') {
         updates.quantity = {
           ...item.quantity,
           amount: newQuantity,
           unit: editUnit
         };
       } else {
-        // Create new quantity object if it doesn't exist
+        // Create new quantity object if it doesn't exist or was a simple number
         updates.quantity = {
           amount: newQuantity,
           unit: editUnit
@@ -132,7 +123,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
     setIsEditingExpiration(false);
   };
 
-  const handleStorageChange = (storageLocation: string) => {
+  const handleStorageChange = (storageLocation: PantryItem['storageLocation']) => {
     onUpdateItem(originalIndex, { storageLocation });
   };
 
@@ -164,9 +155,9 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                 alt={item.item}
                 className="w-24 h-24 rounded-lg object-cover border-2 border-theme"
                 onError={(e) => {
-                  console.log('Image failed to load:', e.target.src);
-                  const target = e.target as HTMLImageElement;
-                  target.src = '/images/placeholder.svg';
+                  const target = e.target as HTMLImageElement | null;
+                  console.log('Image failed to load:', target?.src);
+                  if (target) target.src = '/images/placeholder.svg';
                 }}
               />
             </div>
@@ -195,13 +186,13 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
             </div>
 
             {/* Original Quantity (from recipe/shopping list) */}
-            {item.originalQuantity && (
+            {(item as any).originalQuantity && (
               <div className="bg-theme-secondary p-2 rounded-lg border border-theme">
                 <label className="block text-xs font-medium text-theme-primary mb-1 uppercase opacity-70">
                   Recipe Qty
                 </label>
                 <div className="text-sm text-theme-primary">
-                  {item.originalQuantity}
+                  {(item as any).originalQuantity}
                 </div>
               </div>
             )}
@@ -363,7 +354,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                 </label>
                 <select
                   value={item.storageLocation || 'pantry'}
-                  onChange={(e) => handleStorageChange(e.target.value)}
+                  onChange={(e) => handleStorageChange(e.target.value as PantryItem['storageLocation'])}
                   className="w-full px-2 py-1.5 text-sm border border-theme rounded-md bg-theme-primary text-theme-primary focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]"
                 >
                   <option value="pantry">Pantry</option>

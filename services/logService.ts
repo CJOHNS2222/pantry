@@ -37,7 +37,7 @@ class Logger {
   }
 
   private addLog(level: LogLevel, message: string, data?: any, context?: string): void {
-    const entry: LogEntry = {
+    const entry = {
       level,
       message,
       data,
@@ -45,7 +45,7 @@ class Logger {
       context
     };
 
-    this.logs.push(entry);
+    this.logs.push(entry as LogEntry);
 
     // Keep only the last maxLogs entries
     if (this.logs.length > this.maxLogs) {

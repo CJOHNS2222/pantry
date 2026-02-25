@@ -310,26 +310,27 @@ export class NotificationService {
       );
 
       const querySnapshot = await DatabaseMonitoringService.getDocs(q);
-      const allNotifications = querySnapshot.docs.map(doc => {
-        const d = doc.data();
-        return ({ id: doc.id, ...(d && typeof d === 'object' ? d as Record<string, any> : {}) } as NotificationItem);
+        const allNotifications = querySnapshot.docs.map((doc: any) => {
+          const d = doc.data();
+          return ({ id: doc.id, ...(d && typeof d === 'object' ? d as Record<string, any> : {}) } as NotificationItem);
       });
 
       // Filter for unread notifications in memory and check snooze status
-      const unreadNotifications = allNotifications.filter(notification => {
-        const isRead = notification.read;
-        const isSnoozed = notification.snoozedUntil && notification.snoozedUntil.toDate() > new Date();
+      const unreadNotifications = allNotifications.filter((notification: any) => {
+         const isRead = Boolean((notification as any).read);
+         const snoozed = (notification as any).snoozedUntil;
+         const isSnoozed = snoozed && typeof snoozed.toDate === 'function' ? snoozed.toDate() > new Date() : false;
         return !isRead && !isSnoozed;
       });
 
       // Remove duplicates and sort by createdAt desc, limit to 20
       const uniqueNotifications = unreadNotifications
-        .filter((notification, index, self) => 
-          index === self.findIndex(n => n.id === notification.id)
+        .filter((notification: any, index: number, self: any[]) =>
+            index === self.findIndex((n: any) => n.id === (notification as any).id)
         )
-        .sort((a, b) => {
-          const aTime = a.createdAt?.toMillis() || 0;
-          const bTime = b.createdAt?.toMillis() || 0;
+        .sort((a: any, b: any) => {
+          const aTime = (a as any).createdAt?.toMillis?.() || 0;
+          const bTime = (b as any).createdAt?.toMillis?.() || 0;
           return bTime - aTime;
         })
         .slice(0, 20);
@@ -430,7 +431,8 @@ export class NotificationService {
         household_activity: true,
         shopping_reminder: true,
         system: true,
-        allergy_alert: true
+        allergy_alert: true,
+        household_invite: true
       }
     };
   }

@@ -62,7 +62,7 @@ export const sendHouseholdInvitation = onCall(
     };
 
   } catch (err: any) {
-    console.error('Error sending household invitation:', error);
+    console.error('Error sending household invitation:', err);
     throw new HttpsError('internal', 'Failed to send invitation email. Please try again.');
   }
 });

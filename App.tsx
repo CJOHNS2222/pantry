@@ -21,6 +21,7 @@ import { useOfflineStatus } from './hooks/useOfflineStatus';
 import AnalyticsService from './services/analyticsService';
 import featureFlags from './services/featureFlags';
 import { isHouseholdMember, inferCategoryFromItemName, inferStorageLocationFromItemName, parseIngredientForShoppingList, getItemImage, fetchExternalItemImage } from './utils/appUtils';
+import { getQuantityAmount } from './utils/quantityUtils';
 import { NotificationBanner } from './components/NotificationBanner';
 import { NotificationService, NotificationItem, NotificationSettings } from './services/notificationService';
 import { pushNotificationService } from './services/pushNotificationService';
@@ -61,15 +62,16 @@ const App: React.FC = () => {
   const switchTab = (tab: Tab) => {
     PerformanceMonitoringService.mark(`tab_switch_start_${tab}`);
     
-    const tabNames = {
+    const tabNames: Record<Tab, string> = {
       [Tab.PANTRY]: 'pantry',
       [Tab.PANTRY_CACHE_TEST]: 'pantry_cache_test',
       [Tab.SHOPPING]: 'shopping',
       [Tab.MEALS]: 'meals',
       [Tab.RECIPES]: 'recipes',
       [Tab.SETTINGS]: 'settings',
-      [Tab.COMMUNITY]: 'community'
-    };
+      [Tab.COMMUNITY]: 'community',
+      [Tab.ANALYTICS]: 'analytics'
+    } as Record<Tab, string>;
     
     trackNavigation(tabNames[activeTab] || 'unknown', tabNames[tab] || 'unknown');
     HapticService.light();
@@ -108,7 +110,7 @@ const App: React.FC = () => {
   const { user, setUser, handleLogout, isAuthReady } = useAuth(); // Use isAuthReady
   const { settings, setSettings } = useSettings();
   const { addToast, toasts, setToasts } = useToasts();
-  const { syncStatus, syncNow } = useOfflineStatus();
+  const { syncStatus, syncNow, updateSyncStatus } = useOfflineStatus();
 
   // Apply theme to document
   useTheme(settings.theme);
@@ -123,10 +125,10 @@ const App: React.FC = () => {
 
   // Load notification settings from user profile
   useEffect(() => {
-    if (user?.profile?.notificationSettings) {
-      setNotificationSettings(user.profile.notificationSettings);
-    }
-  }, [user?.profile?.notificationSettings]);
+    // Some older user profile shapes may not include notificationSettings.
+    const ns = (user as any)?.profile?.notificationSettings;
+    if (ns) setNotificationSettings(ns as NotificationSettings);
+  }, [user]);
 
   // Function to add items to shopping list
   const addToShoppingList = async (items: string[], source: string = 'manual') => {
@@ -137,7 +139,7 @@ const App: React.FC = () => {
     
     const inHousehold = household?.id && isHouseholdMember(household, user);
     const householdId = inHousehold ? household.id : undefined;
-    const userId = inHousehold ? undefined : user.id;
+    const userId = inHousehold ? undefined : user?.id;
     
     const newItems: ShoppingItem[] = [];
     for (const item of items) {
@@ -202,10 +204,17 @@ const App: React.FC = () => {
     addCustomCategory,
     updateCustomCategory,
     deleteCustomCategory,
+    generateRecipeSuggestionsOnDemand,
     handleAddToPlan,
+    addMealToPlan,
+    updateMealOnPlan,
+    removeMealFromPlan,
     handleSaveRecipe,
     handleDeleteRecipe,
-    handleRateRecipe,
+    submitRating,
+    getRatingsForRecipe,
+    getCommunityRatings,
+    refreshCommunityRatings,
     handleMarkAsMade,
     updateItem,
     deleteItem,
@@ -218,18 +227,19 @@ const App: React.FC = () => {
     mealPlanLimitExceeded,
     checkRecipeSaveLimit,
     checkMealPlanLimit,
-    syncShoppingListToDatabase,
-    syncMealPlanToDatabase,
-    syncSavedRecipesToDatabase,
     addShoppingListItem,
+    addShoppingListItems,
+    updateShoppingListItem,
+    updateShoppingListItems,
+    removeShoppingListItem,
+    removeShoppingListItems,
     isLoadingInventory,
     isLoadingShoppingList,
     isLoadingMealPlan,
     isLoadingSavedRecipes,
     isLoadingRatings,
     isLoadingHousehold,
-    refreshCommunityRatings,
-  } = useDataManagement(user, addToast, addToShoppingList, syncStatus.updateSyncStatus, {
+  } = useDataManagement(user, addToast, addToShoppingList, updateSyncStatus, {
     logItemAdded,
     logItemRemoved,
     logShoppingAdded,
@@ -256,7 +266,8 @@ const App: React.FC = () => {
         [Tab.MEALS]: 'viewing meal plan',
         [Tab.RECIPES]: 'viewing recipes',
         [Tab.SETTINGS]: 'viewing settings',
-        [Tab.COMMUNITY]: 'viewing community'
+        [Tab.COMMUNITY]: 'viewing community',
+        [Tab.ANALYTICS]: 'viewing analytics'
       };
 
       const currentActivity = activityMap[activeTab] || 'using app';
@@ -607,7 +618,7 @@ const App: React.FC = () => {
             onOpenHousehold={() => setShowHousehold(true)}
             isHouseholdOpen={showHousehold}
             onCloseHousehold={() => setShowHousehold(false)}
-            onToggleTheme={() => setSettings(prev => ({
+            onToggleTheme={() => setSettings((prev: any) => ({
               ...prev,
               theme: {
                 ...prev.theme,
@@ -638,14 +649,14 @@ const App: React.FC = () => {
             activeTab,
             setActiveTab: switchTab,
             user,
-            household,
+            household: household ?? undefined,
             inventory,
             setInventory,
             shoppingList,
             setShoppingList,
             mealPlan,
             setMealPlan,
-            updateMealPlan,
+            
             savedRecipes,
             ratings,
             persistedRecipeResult,
@@ -661,8 +672,8 @@ const App: React.FC = () => {
             isLoadingShoppingList,
             isLoadingMealPlan,
             isLoadingSavedRecipes,
-            isLoadingRatings,
             isLoadingHousehold,
+            isLoadingRatings,
             consumptionSuggestions,
             expirationAlerts,
             recipeSuggestions,
@@ -684,7 +695,7 @@ const App: React.FC = () => {
               onAddToPlan: handleAddToPlan,
               onSaveRecipe: handleSaveRecipe,
               onDeleteRecipe: handleDeleteRecipe,
-              onRateRecipe: handleRateRecipe,
+              onRateRecipe: submitRating,
               handleMarkAsMade,
               onMoveToPantry: async (items) => {
                 const processedItems = await Promise.all(items.map(async (i) => {
@@ -702,7 +713,7 @@ const App: React.FC = () => {
                     }
                   }
                   
-                  let addQty = i.purchasedQuantity ? i.purchasedQuantity.amount : (i.quantity ? parseFloat(i.quantity.toString()) || 1 : 1);
+                  let addQty = getQuantityAmount(i.purchasedQuantity ?? i.quantity ?? i.purchasedBatch ?? 1);
                   if (addQty < 1) addQty = 1;
                   
                   const reservations: { recipeId: string; recipeName: string; quantity: number; unit: string }[] = [];
@@ -775,7 +786,7 @@ const App: React.FC = () => {
                 setShoppingList(prev => prev.filter(item => !items.find(moved => moved.id === item.id)));
                 
                 setTimeout(() => {
-                  syncShoppingListToDatabase();
+                  syncNow();
                 }, 100);
 
                 addToast(

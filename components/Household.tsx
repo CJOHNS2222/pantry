@@ -10,7 +10,7 @@ import DatabaseMonitoringService from '../services/databaseMonitoringService';
 import { removeMemberFromHousehold } from '../services/householdService';
 import { UsageService } from '../services/usageService';
 import { InventoryCacheService } from '../services/inventoryCacheService';
-import { MealPlanCacheService } from '../services/mealPlanCacheService';
+import { MealPlanCacheService } from '../services/MealPlanCacheService';
 import { RecipesCacheService } from '../services/recipesCacheService';
 import { ShoppingListCacheService } from '../services/shoppingListCacheService';
 
@@ -63,6 +63,11 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
       const functions = getFunctions();
       const inviteMember = httpsCallable(functions, 'inviteMember');
       
+      if (!household) {
+        addToast('No household selected', 'error');
+        return;
+      }
+
       const result = await inviteMember({ email: inviteEmail, householdId: household.id });
       const { newMember } = result.data as { newMember: Member };
 
@@ -100,6 +105,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
     }
 
     try {
+      if (!household) return;
       await removeMemberFromHousehold(household.id, id, user.id);
     } catch (error: any) {
       console.error('Error removing member:', error);
@@ -122,11 +128,15 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
 
     try {
       // Copy household data to user's personal collection using cache services
+      if (!household) {
+        addToast('No household selected', 'error');
+        return;
+      }
       const householdId = household.id;
       const userId = user.id;
 
       const inventory = await InventoryCacheService.getCachedInventory(householdId);
-      await InventoryCacheService.setCache(inventory, undefined, userId);
+      await InventoryCacheService.updateCache(inventory, undefined, userId);
 
       const mealPlan = await MealPlanCacheService.getCachedMealPlan(householdId);
       await MealPlanCacheService.updateCache(mealPlan, undefined, userId);
@@ -135,7 +145,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
       await ShoppingListCacheService.setCache(shoppingList, undefined, userId);
 
       const savedRecipes = await RecipesCacheService.getCachedRecipes(householdId);
-      await RecipesCacheService.setCache(savedRecipes, undefined, userId);
+      await RecipesCacheService.updateCache(savedRecipes, undefined, userId);
 
       const leaveHouseholdFunction = httpsCallable(getFunctions(), 'leaveHousehold');
       await leaveHouseholdFunction({ householdId });
@@ -195,8 +205,8 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
       const householdId = createdRef.id;
 
       const inventory = await InventoryCacheService.getCachedInventory(undefined, userId);
-      await InventoryCacheService.setCache(inventory, householdId, undefined);
-      await InventoryCacheService.setCache([], undefined, userId); // Clear user's cache
+      await InventoryCacheService.updateCache(inventory, householdId, undefined);
+      await InventoryCacheService.updateCache([], undefined, userId); // Clear user's cache
 
       const mealPlan = await MealPlanCacheService.getCachedMealPlan(undefined, userId);
       await MealPlanCacheService.updateCache(mealPlan, householdId, undefined);
@@ -207,8 +217,8 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
       await ShoppingListCacheService.setCache([], undefined, userId); // Clear user's cache
 
       const savedRecipes = await RecipesCacheService.getCachedRecipes(undefined, userId);
-      await RecipesCacheService.setCache(savedRecipes, householdId, undefined);
-      await RecipesCacheService.setCache([], undefined, userId); // Clear user's cache
+      await RecipesCacheService.updateCache(savedRecipes, householdId, undefined);
+      await RecipesCacheService.updateCache([], undefined, userId); // Clear user's cache
       
       console.log('Household created and data migrated successfully');
     } catch (error) {
@@ -306,7 +316,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
         <div className="p-4 border-b border-red-900/50 flex justify-between items-center bg-[#2A0A10]">
           <div className="flex items-center gap-2">
             <Users className="w-5 h-5 text-amber-500" />
-            <h2 className="font-serif font-bold text-amber-50 text-lg">{household.name}</h2>
+            <h2 className="font-serif font-bold text-amber-50 text-lg">{household?.name || 'Household'}</h2>
           </div>
           <div className="flex items-center gap-2">
             <button 
@@ -325,6 +335,14 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
             >
               <Settings className="w-5 h-5" />
             </button>
+
+            <button
+              onClick={leaveHousehold}
+              className="text-red-200/50 hover:text-red-400 p-2 transition-colors"
+              title="Leave Household"
+            >
+              <AlertTriangle className="w-5 h-5" />
+            </button>
             <button onClick={onClose} className="text-red-200/50 hover:text-white">
               <X className="w-6 h-6" />
             </button>
@@ -336,7 +354,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
             feature="householdMembers"
             user={user}
             limit={3}
-            currentCount={household.members?.length || 0}
+            currentCount={household?.members?.length ?? 0}
             fallbackMessage="Upgrade to Family plan to add more than 3 household members"
             onUpgrade={() => setActiveTab(Tab.SETTINGS)}
           >
@@ -370,8 +388,8 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
 
           <h3 className="text-sm font-bold text-amber-500 uppercase mb-3 px-1">Group Members</h3>
           <div className="space-y-2">
-            {household.members && Array.isArray(household.members) && household.members.map((member) => {
-              const currentUser = household.members && Array.isArray(household.members) ? household.members.find(m => m.email === user.email) : null;
+            {household?.members && Array.isArray(household.members) && household.members.map((member) => {
+              const currentUser = household?.members && Array.isArray(household.members) ? household.members.find(m => m.email === user.email) : null;
               return (
               <div key={member.id} className="flex items-center justify-between bg-[#2A0A10] p-3 rounded-lg border border-red-900/30">
                 <div className="flex items-center gap-3 flex-1">
@@ -398,7 +416,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
                 </div>
                 <div className="flex items-center gap-2">
                   {(() => {
-                    const currentUser = household.members && Array.isArray(household.members) ? household.members.find(m => m.email === user.email) : null;
+                    const currentUser = household?.members && Array.isArray(household.members) ? household.members.find(m => m.email === user.email) : null;
                     return member.email !== user.email && currentUser?.role === 'admin' && (
                       <button 
                         onClick={() => removeMember(member.id)}
@@ -418,7 +436,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
 
         <div className="p-4 pb-2.5 bg-[#2A0A10] border-t border-red-900/50">
           {(() => {
-            const currentUser = household.members && Array.isArray(household.members) ? household.members.find(m => m.email === user.email) : null;
+            const currentUser = household?.members && Array.isArray(household.members) ? household.members.find(m => m.email === user.email) : null;
             return currentUser?.role !== 'admin' && (
               <div className="mb-3">
                 <button

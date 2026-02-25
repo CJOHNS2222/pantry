@@ -229,7 +229,7 @@ export const RecipeCommunityInsights: React.FC<RecipeCommunityInsightsProps> = (
                       </div>
                     </div>
                   </div>
-                  {onModificationHelpful && (
+                  {user?.id && (
                     <button
                       onClick={() => handleModificationHelpful(mod.id)}
                       className="flex items-center gap-1 px-2 py-1 text-xs text-theme-secondary hover:text-[var(--accent-color)] transition-colors"

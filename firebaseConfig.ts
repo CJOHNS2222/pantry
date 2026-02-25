@@ -8,8 +8,10 @@ import { getMessaging, onMessage, isSupported } from "firebase/messaging";
 import { Capacitor } from '@capacitor/core';
 import webFirebaseConfig from './VITE_firebaseConfig';
 
-// Initialize monitoring BEFORE any Firebase operations
-import DatabaseMonitoringService from './services/databaseMonitoringService';
+// Note: avoid static import of DatabaseMonitoringService here to prevent a
+// circular initialization (databaseMonitoringService imports `db` from
+// this module). We'll dynamically import and initialize it after `db`
+// is created.
 
 let config;
 // Use the web config for all platforms (including Capacitor)
@@ -21,8 +23,19 @@ export const db = getFirestore(app);
 export const storage = getStorage(app);
 export const functions = getFunctions(app);
 
-// Initialize database monitoring immediately
-DatabaseMonitoringService.initializeMonitoring();
+// Initialize database monitoring asynchronously to avoid circular import
+// issues. This will attempt to initialize monitoring but won't block
+// startup on failure.
+(async () => {
+  try {
+    const mod = await import('./services/databaseMonitoringService');
+    if (mod && typeof mod.default?.initializeMonitoring === 'function') {
+      mod.default.initializeMonitoring();
+    }
+  } catch (err: any) {
+    console.warn('DatabaseMonitoringService failed to initialize (deferred):', err?.message || err);
+  }
+})();
 
 // Initialize messaging (FCM) - only on supported platforms
 let messaging: any = null;
@@ -47,8 +60,8 @@ if (Capacitor.getPlatform() === 'web') {
 }
 
 // Initialize analytics only if measurementId is configured
-let analytics;
-if (config.measurementId) {
+let analytics: any;
+if ((config as any)?.measurementId) {
   analytics = getAnalytics(app);
 }
 export { analytics };

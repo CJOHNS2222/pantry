@@ -15,16 +15,20 @@ export const MonitoringDashboard: React.FC<MonitoringDashboardProps> = ({ user, 
   useEffect(() => {
     const updateMetrics = () => {
       const currentMetrics = DatabaseMonitoringService.getMetrics();
-      setMetrics(currentMetrics);
+      // compute per-minute derived metrics to match UI expectations
+      const sessionDuration = currentMetrics.sessionDuration || 1;
+      const readsPerMinute = Math.round((currentMetrics.reads / sessionDuration) * 60000);
+      const writesPerMinute = Math.round((currentMetrics.writes / sessionDuration) * 60000);
+      setMetrics({ ...currentMetrics, readsPerMinute, writesPerMinute });
 
       // Check for potential issues
       const newAlerts: string[] = [];
 
-      if (currentMetrics.writesPerMinute > 100) {
+      if (writesPerMinute > 100) {
         newAlerts.push('High write activity detected');
       }
 
-      if (currentMetrics.readsPerMinute > 500) {
+      if (readsPerMinute > 500) {
         newAlerts.push('High read activity detected');
       }
 

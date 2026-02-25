@@ -24,7 +24,7 @@ export class HouseholdActivityService {
         [memberPath + '.isOnline']: true
       });
     } catch (err: any) {
-      console.error('Error updating member activity:', error);
+      console.error('Error updating member activity:', err);
     }
   }
 
@@ -40,7 +40,7 @@ export class HouseholdActivityService {
         [memberPath + '.isOnline']: false
       });
     } catch (err: any) {
-      console.error('Error marking member offline:', error);
+      console.error('Error marking member offline:', err);
     }
   }
 
@@ -71,7 +71,7 @@ export class HouseholdActivityService {
       const activityCollection = DatabaseMonitoringService.collection(`households/${householdId}/activity`);
       await DatabaseMonitoringService.addDoc(activityCollection, activityData);
     } catch (err: any) {
-      console.error('Error logging activity:', error);
+      console.error('Error logging activity:', err);
     }
   }
 
@@ -88,12 +88,15 @@ export class HouseholdActivityService {
       );
 
       const snapshot = await DatabaseMonitoringService.getDocs(activitiesQuery);
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+      return (snapshot.docs || []).map((doc: any) => {
+        const d = doc.data() as any;
+        return {
+          id: doc.id,
+          ...d
+        };
+      });
     } catch (err: any) {
-      console.error('Error getting recent activities:', error);
+      console.error('Error getting recent activities:', err);
       return [];
     }
   }
@@ -110,10 +113,13 @@ export class HouseholdActivityService {
     );
 
     return DatabaseMonitoringService.onSnapshot(activitiesQuery, (snapshot) => {
-      const activities = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+      const activities = (snapshot.docs || []).map((doc: any) => {
+        const d = doc.data() as any;
+        return {
+          id: doc.id,
+          ...d
+        };
+      });
       callback(activities);
     });
   }

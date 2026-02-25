@@ -70,5 +70,6 @@ export function useKeyboardNavigation(options: KeyboardNavigationOptions) {
       document.addEventListener('keydown', handleKeyDown);
       return () => document.removeEventListener('keydown', handleKeyDown);
     }
+    return undefined;
   }, [handleKeyDown, enabled]);
 }

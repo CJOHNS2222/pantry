@@ -398,6 +398,11 @@ class AnalyticsService {
     }
   }
 
+  // Backwards-compatible alias used across codebase
+  static trackEvent(eventName: string, parameters?: Record<string, any>) {
+    this.logEvent(eventName, parameters);
+  }
+
   // Track database operations
   static trackDatabaseOperation(operation: 'read' | 'write' | 'delete', collection: string, documentCount: number = 1, details?: Record<string, any>) {
     this.logEvent('database_operation', {

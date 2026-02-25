@@ -108,18 +108,19 @@ export const MainContent: React.FC = () => {
   const handleRemoveFromMealPlan = (recipe: StructuredRecipe) => {
     const recipeTitle = recipe.title;
     const newMealPlan = mealPlan.map(day => ({
-      breakfast: day.breakfast?.filter(meal => meal.recipe.title !== recipeTitle),
-      lunch: day.lunch?.filter(meal => meal.recipe.title !== recipeTitle),
-      dinner: day.dinner?.filter(meal => meal.recipe.title !== recipeTitle),
-    }));
-    
+      ...day,
+      breakfast: day.breakfast?.filter(meal => meal.recipe.title !== recipeTitle) || [],
+      lunch: day.lunch?.filter(meal => meal.recipe.title !== recipeTitle) || [],
+      dinner: day.dinner?.filter(meal => meal.recipe.title !== recipeTitle) || [],
+    } as DayPlan));
+
     updateMealPlan(newMealPlan);
   };
   return (
     <main className="overflow-y-auto overflow-x-hidden pb-safe px-4 scrollbar-hide bg-theme-primary" style={{ paddingTop: '120px', height: 'calc(100vh - 5rem - max(0.5rem, var(--safe-area-inset-bottom, 0px)))', WebkitOverflowScrolling: 'touch', touchAction: 'auto' }}>
       {/* Usage Indicator - Show for free users */}
       <UsageIndicator
-        user={user}
+        user={user || undefined}
         showUpgradeCTA={true}
         onUpgrade={() => setActiveTab(Tab.SETTINGS)}
       />
@@ -143,7 +144,7 @@ export const MainContent: React.FC = () => {
               customCategories={customCategories}
               setActiveTab={setActiveTab}
               setInitialSearchQuery={appActions.setInitialSearchQuery}
-              user={user}
+              user={user as User}
             />
           </Suspense>
         </ComponentErrorBoundary>
@@ -162,7 +163,7 @@ export const MainContent: React.FC = () => {
               onSaveRecipe={onSaveRecipe}
               onMarkAsMade={handleMarkAsMade}
               onRate={onRateRecipe}
-              user={user}
+              user={user || undefined}
               setActiveTab={setActiveTab}
               recipeSaveLimitExceeded={recipeSaveLimitExceeded}
               mealPlanLimitExceeded={mealPlanLimitExceeded}
@@ -186,7 +187,7 @@ export const MainContent: React.FC = () => {
               setItems={appState.setShoppingList}
               onMoveToPantry={onMoveToPantry}
               addShoppingListItem={addShoppingListItem}
-              user={user}
+              user={user || undefined}
               household={appState.household}
               isLoadingShoppingList={isLoadingShoppingList}
             />
@@ -205,19 +206,16 @@ export const MainContent: React.FC = () => {
               ratings={ratings}
               onRate={onRateRecipe}
               savedRecipes={savedRecipes}
-              user={user}
+              user={user || undefined}
               setActiveTab={setActiveTab}
               addToast={addToast}
-              onShareRecipe={(recipe) => {
-                alert(`Recipe shared: ${recipe.title}`);
-              }}
               persistedResult={persistedRecipeResult}
               setPersistedResult={appActions.setPersistedRecipeResult}
               initialSearchQuery={initialSearchQuery}
               recipeSaveLimitExceeded={recipeSaveLimitExceeded}
               mealPlanLimitExceeded={mealPlanLimitExceeded}
               isLoadingSavedRecipes={isLoadingSavedRecipes}
-              household={household}
+              household={household ?? undefined}
             />
           </Suspense>
         </ComponentErrorBoundary>
@@ -228,7 +226,7 @@ export const MainContent: React.FC = () => {
             <Community
               onAddToPlan={onAddToPlan}
               onSaveRecipe={onSaveRecipe}
-              user={user}
+              user={user || undefined}
             />
           </Suspense>
         </ComponentErrorBoundary>
@@ -246,10 +244,9 @@ export const MainContent: React.FC = () => {
               onUpdateCustomCategory={onUpdateCustomCategory}
               onDeleteCustomCategory={onDeleteCustomCategory}
               mealPlan={mealPlan}
-              inventory={inventory}
               onShowTutorial={onShowTutorial}
-              household={household}
-              onShowHousehold={onShowHousehold}
+              household={household ?? undefined}
+              
             />
           </Suspense>
         </ComponentErrorBoundary>

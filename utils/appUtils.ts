@@ -4,6 +4,7 @@ import { DayPlan, User, Household } from '../types';
 import { Capacitor } from '@capacitor/core';
 import { UsageService } from '../services/usageService';
 import { ConsumptionSuggestion, ExpirationAlert, RecipeSuggestion, PantryItem, CustomCategory, Member } from '../types';
+import { getQuantityAmount, getQuantityUnit } from './quantityUtils';
 import { getPerformance, trace } from "firebase/performance";
 
 const performance = getPerformance();
@@ -18,7 +19,7 @@ export async function saveDayPlan(householdId: string, day: DayPlan) {
     dinner: day.dinner || [],
     lastModifiedBy: localStorage.getItem('clientId') || null,
     lastModifiedAt: serverTimestamp()
-  }, { merge: true });
+  });
 }
 
 /**
@@ -1273,7 +1274,21 @@ export function generateRecipeSuggestions(inventory: PantryItem[]): RecipeSugges
  * @param expirationType Type of expiration date
  * @returns Color class name
  */
-export function getExpirationColor(daysRemaining: number, expirationType: 'use-by' | 'best-by' = 'best-by'): string {
+export function getExpirationColor(daysOrDate: number | string, expirationType: 'use-by' | 'best-by' = 'best-by'): string {
+  // Accept either a precomputed daysRemaining number or an ISO date string.
+  let daysRemaining: number;
+  if (typeof daysOrDate === 'number') {
+    daysRemaining = daysOrDate;
+  } else {
+    const date = new Date(daysOrDate);
+    if (isNaN(date.getTime())) {
+      // If invalid date, treat as distant future
+      daysRemaining = 3650;
+    } else {
+      daysRemaining = Math.ceil((date.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+    }
+  }
+
   if (daysRemaining < 0) return 'text-red-600 bg-red-50 border-red-200'; // Expired
   if (daysRemaining === 0) return 'text-red-600 bg-red-50 border-red-200'; // Expires today
   if (daysRemaining <= 1) return 'text-red-600 bg-red-50 border-red-200'; // Critical (1 day)
@@ -1680,11 +1695,11 @@ export function subtractQuantities(total: ParsedQuantity, used: ParsedQuantity):
  * Shows available quantity (total - reserved)
  */
 export function formatItemQuantity(item: PantryItem): string {
-  const totalAmount = item.quantity ? item.quantity.amount : parseInt(item.quantity_estimate) || 1;
-  const unit = item.quantity?.unit || 'count';
+  const totalAmount = getQuantityAmount(item.quantity ?? item.quantity_estimate);
+  const unit = getQuantityUnit(item.quantity ?? item.quantity_estimate);
 
   // Calculate reserved amount
-  const reservedAmount = item.reservations?.reduce((sum, res) => sum + res.quantity, 0) || 0;
+  const reservedAmount = item.reservations?.reduce((sum, res) => sum + (res?.quantity || 0), 0) || 0;
   const availableAmount = Math.max(0, totalAmount - reservedAmount);
 
   // Format common fractions nicely

@@ -18,7 +18,7 @@ export function useDataListener<T>(
     const unsubscribe = DatabaseMonitoringService.onSnapshot(
       DatabaseMonitoringService.collection(collectionPath),
       (snapshot) => {
-        const data = snapshot.docs.map(doc => {
+        const data = snapshot.docs.map((doc: any) => {
           const docData = { id: doc.id, ...doc.data() };
           return validator ? validator(docData) : (docData as T);
         });

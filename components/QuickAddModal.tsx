@@ -35,7 +35,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Voice recognition setup
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const recognitionRef = useRef<any>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -46,31 +46,41 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
   }, [isOpen]);
 
   useEffect(() => {
-    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      recognitionRef.current = new SpeechRecognition();
-      recognitionRef.current.continuous = false;
-      recognitionRef.current.interimResults = false;
-      recognitionRef.current.lang = 'en-US';
+    const win: any = window;
+    if (win.webkitSpeechRecognition || win.SpeechRecognition) {
+      const SpeechRecognition = win.SpeechRecognition || win.webkitSpeechRecognition;
+      try {
+        recognitionRef.current = new SpeechRecognition();
+        recognitionRef.current.continuous = false;
+        recognitionRef.current.interimResults = false;
+        recognitionRef.current.lang = 'en-US';
 
-      recognitionRef.current.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
-        setInput(transcript);
-        setIsListening(false);
-      };
+        recognitionRef.current.onresult = (event: any) => {
+          const transcript = event.results?.[0]?.[0]?.transcript;
+          if (transcript) setInput(transcript);
+          setIsListening(false);
+        };
 
-      recognitionRef.current.onerror = () => {
-        setIsListening(false);
-      };
+        recognitionRef.current.onerror = (_ev: any) => {
+          setIsListening(false);
+        };
 
-      recognitionRef.current.onend = () => {
-        setIsListening(false);
-      };
+        recognitionRef.current.onend = () => {
+          setIsListening(false);
+        };
+      } catch (e) {
+        // Speech API not available or failed to initialize
+        recognitionRef.current = null;
+      }
     }
 
     return () => {
-      if (recognitionRef.current) {
-        recognitionRef.current.stop();
+      try {
+        if (recognitionRef.current && typeof recognitionRef.current.stop === 'function') {
+          recognitionRef.current.stop();
+        }
+      } catch (_) {
+        // ignore
       }
     };
   }, []);

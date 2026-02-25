@@ -30,7 +30,7 @@ export class HouseholdPreferenceService {
       }
 
       // Check if any household member has allergies - if not, skip expensive inventory read
-      const hasAnyAllergies = household.members.some(member => member.allergies?.length > 0);
+      const hasAnyAllergies = household.members.some(member => (member.allergies?.length || 0) > 0);
       if (!hasAnyAllergies) {
         console.log('No household members have allergies set, skipping inventory allergy check');
         return;

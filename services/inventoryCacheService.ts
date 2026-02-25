@@ -46,8 +46,9 @@ export class InventoryCacheService {
       item.item || '',  // item, not name
       item.quantity_estimate || '', // quantity_estimate, not quantity
       item.storageLocation || '', // storageLocation, not location
-      item.recipeId || '',
-      item.recipeName || '',
+      // reservations may contain recipe reservations; use first reservation if available
+      (item.reservations && item.reservations.length > 0 ? item.reservations[0].recipeId : '') || '',
+      (item.reservations && item.reservations.length > 0 ? item.reservations[0].recipeName : '') || '',
       item.expirationDate || '',
       item.expirationType || '',
       item.dateAdded || '',
@@ -66,8 +67,8 @@ export class InventoryCacheService {
       item: itemArray[2] || '',  // item, not name
       quantity_estimate: itemArray[3] || '', // quantity_estimate, not quantity
       storageLocation: itemArray[4] ? itemArray[4] as any : undefined, // storageLocation, not location
-      recipeId: itemArray[5] || '',
-      recipeName: itemArray[6] || '',
+      // Map recipeId/recipeName back into reservations for compatibility with PantryItem type
+      reservations: itemArray[5] || itemArray[6] ? [{ recipeId: itemArray[5] || '', recipeName: itemArray[6] || '', quantity: 0, unit: '' }] : undefined,
       expirationDate: itemArray[7] || '',
       expirationType: itemArray[8] ? itemArray[8] as any : undefined,
       dateAdded: itemArray[9] || '',
@@ -104,9 +105,9 @@ export class InventoryCacheService {
         for (const [itemId, itemArray] of Object.entries(data)) {
           // Skip metadata fields
           if (typeof itemArray === 'object' && Array.isArray(itemArray)) {
-            const item = this.arrayToPantryItem(itemId, itemArray);
-            items.push(item);
-          }
+                const item = this.arrayToPantryItem(itemId, itemArray);
+                items.push(item);
+              }
         }
 
         console.log(`✅ Loaded ${items.length} cached inventory items (1 database read)`);
@@ -169,9 +170,9 @@ export class InventoryCacheService {
       const cacheRef = DatabaseMonitoringService.doc(cachePath);
 
       // Add the item to the cache document
-      const updateData: Partial<CachedInventoryData & CacheMetadata> = {
-        lastUpdated: new Date()
-      };
+      const updateData: any = {
+          lastUpdated: new Date()
+        };
 
       (updateData as any)[item.id] = this.pantryItemToArray(item);
 
@@ -248,7 +249,7 @@ export class InventoryCacheService {
       const updatedItemArray = this.pantryItemToArray(updatedItem);
 
       // Update the cache document
-      const updateData: Partial<CachedInventoryData & CacheMetadata> = {
+      const updateData: any = {
         lastUpdated: new Date()
       };
       (updateData as any)[itemId] = updatedItemArray;
@@ -268,7 +269,7 @@ export class InventoryCacheService {
       const cacheRef = DatabaseMonitoringService.doc(cachePath);
 
       // Remove the item from the cache document
-      const updateData: Partial<CachedInventoryData & CacheMetadata> = {
+      const updateData: any = {
         lastUpdated: new Date()
       };
       (updateData as any)[itemId] = DatabaseMonitoringService.deleteField();

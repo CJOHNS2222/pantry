@@ -132,15 +132,18 @@ export const createScaledRecipe = (
   portionConfig: PortionConfig
 ): StructuredRecipe | SavedRecipe => {
   const scaledIngredients = scaleRecipeIngredients(originalRecipe, portionConfig);
-  const newServings = Math.round(originalRecipe.servings * portionConfig.scalingFactor);
+  const origServings = typeof (originalRecipe as any).servings === 'number' ? (originalRecipe as any).servings : 4;
+  const newServings = Math.round(origServings * portionConfig.scalingFactor);
 
-  return {
+  const result: any = {
     ...originalRecipe,
     ingredients: scaledIngredients,
     servings: newServings,
-    // Add metadata about scaling
-    _scaledFrom: originalRecipe.servings,
+    // Add metadata about scaling (kept in a loose shape to avoid changing core types)
+    _scaledFrom: origServings,
     _scalingFactor: portionConfig.scalingFactor,
     _householdSize: portionConfig.householdSize
   };
+
+  return result as StructuredRecipe | SavedRecipe;
 };

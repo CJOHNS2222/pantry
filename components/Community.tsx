@@ -99,8 +99,8 @@ export const Community: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecipe,
   const sortedRecipes = Object.values(recipeStats)
     .filter((stat): stat is RecipeStats => {
       const s = stat as RecipeStats;
-      return s && typeof s === 'object' && 'count' in s && 'title' in s &&
-             s.count > 0 && s.title && s.title !== 'Untitled';
+      return !!(s && typeof s === 'object' && 'count' in s && 'title' in s &&
+             s.count > 0 && s.title && s.title !== 'Untitled');
     }) // Only show recipes with ratings and valid titles
     .sort((a, b) => (b.totalRating / Math.max(1, b.count)) - (a.totalRating / Math.max(1, a.count)));
   const [showAll, setShowAll] = useState(false);
@@ -269,12 +269,12 @@ export const Community: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecipe,
               cookTime: 'N/A'
             };
         return (
-          <RecipeModal
+            <RecipeModal
             recipe={structured}
             isOpen={showModal}
             onClose={() => setShowModal(false)}
             onAddToPlan={(r) => { onAddToPlan(r); }}
-            onSaveRecipe={(r) => { onSaveRecipe(r); }}
+              onSaveRecipe={(r) => onSaveRecipe?.(r)}
             showSaveButton={true}
             showMarkAsMade={false}
             showAddToPlan={true}
