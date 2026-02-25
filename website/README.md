@@ -1,6 +1,6 @@
-# Smart Pantry Chef Website
+# Stock & Spoon Website
 
-This is the standalone landing page for Smart Pantry Chef, an AI-powered kitchen assistant app.
+This is the standalone landing page for Stock & Spoon, an AI-powered kitchen assistant app.
 
 ## 🚀 Quick Start
 
@@ -25,7 +25,7 @@ website/
 ├── index.html          # Main landing page
 ├── package.json        # NPM configuration
 ├── icons/             # App icons and favicon
-│   ├── smartpantryicon.png
+│   ├── stockspoon-icon.png
 │   ├── icon192.png
 │   └── icon512.png
 └── images/            # Screenshots and assets
@@ -89,4 +89,4 @@ For questions about the website or app, visit [your contact page].
 
 ---
 
-**Smart Pantry Chef** - AI-powered kitchen assistant that helps you manage your pantry, plan meals, and discover delicious recipes.
+**Stock & Spoon** - AI-powered kitchen assistant that helps you manage your pantry, plan meals, and discover delicious recipes.

@@ -2,7 +2,7 @@
 
 ## Overview
 
-Smart Pantry Chef now includes intelligent **"Use Soon" recipe suggestions** that proactively help users avoid food waste by suggesting recipes for items expiring within 7 days.
+Stock & Spoon now includes intelligent **"Use Soon" recipe suggestions** that proactively help users avoid food waste by suggesting recipes for items expiring within 7 days.
 
 ## How It Works
 
@@ -133,4 +133,4 @@ The Smart Expiration Alerts feature transforms passive expiration warnings into 
 - ✅ **Save money** by using items before they expire
 - ✅ **Enjoy cooking** with contextual, helpful recommendations
 
-This feature positions Smart Pantry Chef as a **proactive kitchen assistant** that doesn't just track inventory—it helps users make the most of what they have! 🥬👨‍🍳
+This feature positions Stock & Spoon as a **proactive kitchen assistant** that doesn't just track inventory—it helps users make the most of what they have! 🥬👨‍🍳

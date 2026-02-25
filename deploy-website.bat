@@ -1,8 +1,8 @@
 @echo off
-REM Smart Pantry Chef Website Deployment Script
+REM Stock & Spoon Website Deployment Script
 REM This script helps deploy the website to various hosting platforms
 
-echo 🚀 Smart Pantry Chef Website Deployment
+echo 🚀 Stock & Spoon Website Deployment
 echo =====================================
 
 REM Check if dist exists

@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# Smart Pantry Chef Website Deployment Script
+# Stock & Spoon Website Deployment Script
 # This script helps deploy the website to various hosting platforms
 
 set -e
 
-echo "🚀 Smart Pantry Chef Website Deployment"
+echo "🚀 Stock & Spoon Website Deployment"
 echo "====================================="
 
 # Check if dist exists

@@ -86,10 +86,12 @@
 - Never commit secrets or API keys; use environment/config files already in use (`VITE_firebaseConfig.ts`, local env files).
 - Respect Firestore ownership/membership constraints before changing writes/queries (`firestore.rules`).
 - Preserve auth checks and user scoping in hooks/services (`hooks/useAuth.ts`, `hooks/useDataManagement.ts`).
-- Be careful with notification and analytics payloads to avoid exposing sensitive user data.# AI Agent Instructions for Smart Pantry Chef
+- Be careful with notification and analytics payloads to avoid exposing sensitive user data.
+
+# AI Agent Instructions for Stock & Spoon
 
 ## Project Overview
-**Smart Pantry Chef** is a cross-platform React/TypeScript mobile app (iOS/Android/Web) for household pantry management, meal planning, and recipe discovery. Built with Firebase, Capacitor, and Google Gemini AI. Users manage shared household inventories, shopping lists, and meal plans in real time.
+**Stock & Spoon** is a cross-platform React/TypeScript mobile app (iOS/Android/Web) for household pantry management, meal planning, and recipe discovery. Built with Firebase, Capacitor, and Google Gemini AI. Users manage shared household inventories, shopping lists, and meal plans in real time.
 
 **Key Stack:** React 19, TypeScript, Vite, Firebase (Firestore/Auth/Storage/Functions), Capacitor 7, Google Play Billing (Android), Gemini AI, Context API
 

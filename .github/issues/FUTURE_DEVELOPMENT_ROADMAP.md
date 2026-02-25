@@ -1,4 +1,4 @@
-# Smart Pantry Chef - Future Development Roadmap
+# Stock & Spoon - Future Development Roadmap
 
 This document outlines key areas for improvement identified during the codebase analysis. Items are organized by priority phases with estimated effort and impact levels.
 

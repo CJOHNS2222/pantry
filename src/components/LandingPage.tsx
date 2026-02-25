@@ -34,7 +34,7 @@ const LandingPage: React.FC = () => {
             fontWeight: 700,
             color: '#2A0A10',
             textDecoration: 'none'
-          }}>Smart Pantry Chef</a>
+          }}>Stock & Spoon</a>
           <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
             <a href="#features" style={{
               color: '#2A0A10',
@@ -74,7 +74,7 @@ const LandingPage: React.FC = () => {
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent',
               backgroundClip: 'text'
-            }}>Smart Pantry Chef</h1>
+            }}>Stock & Spoon</h1>
             <p style={{
               fontSize: '1.3rem',
               marginBottom: '2rem',
@@ -278,7 +278,7 @@ const LandingPage: React.FC = () => {
               maxWidth: '600px',
               marginLeft: 'auto',
               marginRight: 'auto'
-            }}>Join thousands of users who have transformed their cooking experience with Smart Pantry Chef.</p>
+            }}>Join thousands of users who have transformed their cooking experience with Stock & Spoon.</p>
             <a href="/app" style={{
               background: 'linear-gradient(135deg, #FFD700 0%, #FFA500 100%)',
               color: '#2A0A10',
@@ -300,7 +300,7 @@ const LandingPage: React.FC = () => {
         color: 'rgba(255, 255, 255, 0.7)'
       }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 20px' }}>
-          <p>&copy; 2026 Smart Pantry Chef. All rights reserved.</p>
+          <p>&copy; 2026 Stock & Spoon. All rights reserved.</p>
         </div>
       </footer>
     </div>

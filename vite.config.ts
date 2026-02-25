@@ -16,8 +16,8 @@ export default defineConfig(({ mode }) => {
         VitePWA({
           registerType: 'autoUpdate',
           manifest: {
-            name: 'Smart Pantry Chef',
-            short_name: 'SmartPantry',
+            name: 'Stock & Spoon',
+            short_name: 'StockSpoon',
             start_url: '/',
             display: 'standalone',
             background_color: '#570404ff',

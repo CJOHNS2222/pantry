@@ -9,6 +9,7 @@ import * as Sentry from '@sentry/react';
 vi.mock('../../../services/analyticsService', () => ({
   default: {
     trackError: vi.fn(),
+    trackAppCrash: vi.fn(),
   },
 }));
 

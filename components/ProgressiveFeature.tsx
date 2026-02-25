@@ -99,7 +99,7 @@ export const ProgressiveFeature: React.FC<ProgressiveFeatureProps> = ({
         <div className="mt-3 pt-3 border-t border-yellow-200 dark:border-yellow-700">
           <div className="text-xs text-yellow-700 dark:text-yellow-300">
             💡 <strong>Pro tip:</strong> This feature becomes available as you use the app more.
-            It helps you get the most out of Smart Pantry Chef!
+            It helps you get the most out of Stock & Spoon!
           </div>
         </div>
       )}

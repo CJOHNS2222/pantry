@@ -49,10 +49,38 @@ describe('Tutorial', () => {
     cleanup();
   });
 
+  // Ensure any pending timers from the component are flushed so the test process can exit cleanly
+  afterEach(() => {
+    try {
+      vi.runAllTimers();
+    } catch (e) {
+      // ignore if timer APIs are not in use
+    }
+    try {
+      vi.useRealTimers();
+    } catch (e) {
+      // ignore
+    }
+  });
+
+  // Force-clear any remaining native timers (JSDOM) so Vitest doesn't wait on open handles
+  afterEach(() => {
+    try {
+      // schedule a no-op timeout to learn the highest timer id
+      const highest = setTimeout(() => {}, 0) as unknown as number;
+      for (let i = highest; i >= 0; i--) {
+        try { clearTimeout(i); } catch (e) {}
+        try { clearInterval(i); } catch (e) {}
+      }
+    } catch (e) {
+      // ignore
+    }
+  });
+
   it('renders the first step of the tutorial', () => {
     render(<Tutorial {...mockProps} />);
 
-    expect(screen.getByText('Welcome to Smart Pantry Chef!')).toBeInTheDocument();
+    expect(screen.getByText('Welcome to Stock & Spoon!')).toBeInTheDocument();
     expect(screen.getByText(/Your AI-powered kitchen assistant/)).toBeInTheDocument();
     expect(screen.getByText('Next')).toBeInTheDocument();
   });
@@ -71,7 +99,7 @@ describe('Tutorial', () => {
     expect(nextButton).not.toBeDisabled();
 
     // The tutorial should show the first step
-    expect(screen.getByText('Welcome to Smart Pantry Chef!')).toBeInTheDocument();
+    expect(screen.getByText('Welcome to Stock & Spoon!')).toBeInTheDocument();
   });
 
   it('navigates to previous step when Previous is clicked', () => {
@@ -83,7 +111,7 @@ describe('Tutorial', () => {
     expect(prevButton).toBeUndefined(); // Previous button not rendered on first step
 
     // Should still be on first step
-    expect(screen.getByText('Welcome to Smart Pantry Chef!')).toBeInTheDocument();
+    expect(screen.getByText('Welcome to Stock & Spoon!')).toBeInTheDocument();
   });
 
   it('calls onOpenHousehold when household button is clicked', async () => {
@@ -232,7 +260,7 @@ describe('Tutorial', () => {
   it('applies correct styling and positioning', () => {
     render(<Tutorial {...mockProps} />);
 
-    const modal = screen.getByText('Welcome to Smart Pantry Chef!').closest('.fixed');
+    const modal = screen.getByText('Welcome to Stock & Spoon!').closest('.fixed');
     expect(modal).toHaveClass('z-50', 'animate-fade-in');
   });
 });

@@ -1,4 +1,4 @@
-// Input validation utilities for the Smart Pantry Chef app
+// Input validation utilities for the Stock & Spoon app
 // Provides comprehensive validation for forms, user inputs, and data integrity
 
 export interface ValidationResult {

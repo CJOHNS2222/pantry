@@ -74,7 +74,7 @@ export const createPayPalSubscription = onRequest(async (req, res) => {
         }
       },
       applicationContext: {
-        brandName: 'Smart Pantry Chef',
+      brandName: 'Stock & Spoon',
         locale: 'en-US',
         shippingPreference: 'NO_SHIPPING',
         userAction: 'SUBSCRIBE_NOW',

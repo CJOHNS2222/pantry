@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { PantryScanner } from '../../../components/PantryScanner';
+import { AppProvider } from '../../../contexts/AppContext';
+import { AppActionsProvider } from '../../../contexts/AppActionsContext';
 import { PantryItem, LoadingState } from '../../../types';
 
 // Mock Capacitor Camera
@@ -40,14 +42,18 @@ describe('PantryScanner Component', () => {
 
   it('renders with initial inventory', () => {
     render(
-      <PantryScanner
-        inventory={initialInventory}
-        addToShoppingList={mockAddToShoppingList}
-        onDeleteItem={mockOnDeleteItem}
-        onAddItem={mockOnAddItem}
-        onAddItems={mockOnAddItems}
-        onUpdateItem={mockOnUpdateItem}
-      />
+      <AppProvider>
+        <AppActionsProvider>
+          <PantryScanner
+            inventory={initialInventory}
+            addToShoppingList={mockAddToShoppingList}
+            onDeleteItem={mockOnDeleteItem}
+            onAddItem={mockOnAddItem}
+            onAddItems={mockOnAddItems}
+            onUpdateItem={mockOnUpdateItem}
+          />
+        </AppActionsProvider>
+      </AppProvider>
     );
 
     expect(screen.getAllByText('Milk')[0]).toBeInTheDocument();
@@ -56,14 +62,18 @@ describe('PantryScanner Component', () => {
 
   it('renders the component title', () => {
     render(
-      <PantryScanner
-        inventory={initialInventory}
-        addToShoppingList={mockAddToShoppingList}
-        onDeleteItem={mockOnDeleteItem}
-        onAddItem={mockOnAddItem}
-        onAddItems={mockOnAddItems}
-        onUpdateItem={mockOnUpdateItem}
-      />
+      <AppProvider>
+        <AppActionsProvider>
+          <PantryScanner
+            inventory={initialInventory}
+            addToShoppingList={mockAddToShoppingList}
+            onDeleteItem={mockOnDeleteItem}
+            onAddItem={mockOnAddItem}
+            onAddItems={mockOnAddItems}
+            onUpdateItem={mockOnUpdateItem}
+          />
+        </AppActionsProvider>
+      </AppProvider>
     );
 
     expect(screen.getAllByText('My Pantry')[0]).toBeInTheDocument();
@@ -71,14 +81,18 @@ describe('PantryScanner Component', () => {
 
   it('shows the scan prompt', () => {
     render(
-      <PantryScanner
-        inventory={[]} // Empty inventory to show scan prompt
-        addToShoppingList={mockAddToShoppingList}
-        onDeleteItem={mockOnDeleteItem}
-        onAddItem={mockOnAddItem}
-        onAddItems={mockOnAddItems}
-        onUpdateItem={mockOnUpdateItem}
-      />
+      <AppProvider>
+        <AppActionsProvider>
+          <PantryScanner
+            inventory={[]} // Empty inventory to show scan prompt
+            addToShoppingList={mockAddToShoppingList}
+            onDeleteItem={mockOnDeleteItem}
+            onAddItem={mockOnAddItem}
+            onAddItems={mockOnAddItems}
+            onUpdateItem={mockOnUpdateItem}
+          />
+        </AppActionsProvider>
+      </AppProvider>
     );
 
     // The scan prompt is in the Add Items modal, so we need to open the modal first

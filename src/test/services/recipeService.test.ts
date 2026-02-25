@@ -21,6 +21,7 @@ vi.mock('firebase/firestore', () => ({
   orderBy: vi.fn(() => 'mock-orderby'),
   limit: vi.fn(() => 'mock-limit'),
   doc: vi.fn(() => 'mock-doc'),
+  serverTimestamp: vi.fn(() => 'mock-server-timestamp'),
   getDoc: vi.fn(() => Promise.resolve({
     exists: vi.fn(() => true),
     data: vi.fn(() => ({})),
@@ -56,6 +57,11 @@ vi.mock('../../../services/databaseMonitoringService', () => ({
     updateDoc: vi.fn(),
     addDoc: vi.fn(),
     deleteDoc: vi.fn()
+    ,doc: vi.fn(() => 'mock-doc-ref'),
+    query: vi.fn(() => 'mock-query-ref'),
+    where: vi.fn(() => 'mock-where'),
+    limit: vi.fn(() => 'mock-limit'),
+    orderBy: vi.fn(() => 'mock-orderby')
   }
 }));
 
@@ -170,13 +176,14 @@ describe('RecipeService', () => {
         tags: ['test'],
       };
 
-      const mockDocRef = { id: 'recipe123' };
-      vi.mocked(addDoc).mockResolvedValueOnce(mockDocRef);
+      // The service now delegates to DatabaseMonitoringService.addDoc
+      const mockDocRef = { id: 'test-doc-id' };
+      vi.mocked(DatabaseMonitoringService.addDoc).mockResolvedValueOnce(mockDocRef as any);
 
       const result = await saveRecipeToFirestore(mockRecipe);
 
-      expect(addDoc).toHaveBeenCalledWith(collection(db, 'recipes'), expect.any(Object));
-      expect(result).toBe('recipe123');
+      expect(DatabaseMonitoringService.addDoc).toHaveBeenCalledWith(DatabaseMonitoringService.collection('recipes'), expect.any(Object));
+      expect(result).toBe('test-doc-id');
     });
 
     it('handles save errors', async () => {
@@ -201,7 +208,8 @@ describe('RecipeService', () => {
         tags: [],
       };
 
-      vi.mocked(addDoc).mockRejectedValueOnce(new Error('Save failed'));
+      // Make the DatabaseMonitoringService.addDoc reject to simulate save failure
+      vi.mocked(DatabaseMonitoringService.addDoc).mockRejectedValueOnce(new Error('Save failed'));
 
       await expect(saveRecipeToFirestore(mockRecipe)).rejects.toThrow('Save failed');
     });
@@ -314,6 +322,12 @@ describe('RecipeService', () => {
       };
 
       vi.mocked(DatabaseMonitoringService.getDocs).mockResolvedValueOnce(mockQuerySnapshot);
+      // The search path will then batch-get the full recipe docs; mock those getDoc results
+      vi.mocked(DatabaseMonitoringService.getDoc).mockResolvedValueOnce({
+        exists: vi.fn(() => true),
+        data: vi.fn(() => mockRecipes[0]),
+        id: 'recipe1'
+      } as any);
 
       const result = await searchRecipesInFirestore('chicken');
 
@@ -394,7 +408,7 @@ describe('RecipeService', () => {
       ];
 
       const mockDocumentSnapshot = {
-        exists: true,
+        exists: vi.fn(() => true),
         data: vi.fn(() => ({ recipes: mockRecipes })),
         id: 'popular-recipes-cache',
         metadata: {
@@ -407,7 +421,7 @@ describe('RecipeService', () => {
         ref: {} as any
       };
 
-      vi.mocked(DatabaseMonitoringService.getDoc).mockResolvedValueOnce(mockDocumentSnapshot);
+      vi.mocked(DatabaseMonitoringService.getDoc).mockResolvedValueOnce(mockDocumentSnapshot as any);
 
       const result = await getCachedPopularRecipes();
 

@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to Smart Pantry Chef will be documented in this file.
+All notable changes to Stock & Spoon will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -510,7 +510,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.0.0] - 2025-12-XX
 
 ### Added
-- Initial release of Smart Pantry Chef
+- Initial release of Stock & Spoon
 - Cross-platform pantry and meal management
 - Real-time household sharing via Firebase
 - Recipe management and meal planning

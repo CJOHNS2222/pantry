@@ -32,7 +32,7 @@ export const FirstTimeFlow: React.FC<FirstTimeFlowProps> = ({
     {
       id: 'welcome',
       title: `Welcome, ${userName}!`,
-      description: 'Let\'s get your Smart Pantry Chef set up for the best experience. We\'ll guide you through the essentials.',
+      description: 'Let\'s get Stock & Spoon set up for the best experience. We\'ll guide you through the essentials.',
       icon: <Sparkles className="w-6 h-6 text-yellow-500" />,
       action: () => {},
       completed: true
@@ -91,8 +91,8 @@ export const FirstTimeFlow: React.FC<FirstTimeFlowProps> = ({
         <div className="p-6 border-b border-theme">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-serif font-bold text-theme-primary">
-              Get Started with Smart Pantry Chef
-            </h2>
+                Get Started with Stock & Spoon
+              </h2>
             <button
               onClick={handleSkip}
               className="text-theme-secondary/60 hover:text-theme-secondary transition-colors"

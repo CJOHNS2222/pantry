@@ -20,10 +20,10 @@ The app now uses Google Play Billing for in-app purchases and subscriptions on A
 - [Capacitor Google Play Billing Plugin](https://github.com/capacitor-community/play-billing)
 - [Google Play Billing Documentation](https://developer.android.com/google/play/billing)
 - [Play Console Testing](https://developer.android.com/google/play/billing/test)
-# Smart Pantry Chef
+# Stock & Spoon
 
 ## Overview
-Smart Pantry Chef is a cross-platform pantry and meal management app built with React, Vite, Firebase, and Capacitor. It supports real-time household sharing, notifications, recipe management, and user customization.
+Stock & Spoon is a cross-platform pantry and meal management app built with React, Vite, Firebase, and Capacitor. It supports real-time household sharing, notifications, recipe management, and user customization.
 
 ## Key Features
 - Household inventory, shopping list, meal plan, and saved recipes shared in real-time via Firebase Firestore

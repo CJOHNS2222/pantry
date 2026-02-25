@@ -118,7 +118,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             style={{color: 'var(--accent-color)'}}
             id="app-title"
           >
-            Smart Pantry Chef
+            Stock & Spoon
           </h1>
           <span 
             className="text-[10px] uppercase tracking-widest text-theme-secondary opacity-60"

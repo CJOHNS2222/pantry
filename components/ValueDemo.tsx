@@ -325,7 +325,7 @@ export const ValueDemo: React.FC<ValueDemoProps> = ({
               <div className="mt-6 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-4 text-center">
                 <Heart className="w-6 h-6 text-red-500 mx-auto mb-2" />
                 <p className="text-sm text-theme-secondary">
-                  <strong>Smart Pantry Chef</strong> automatically suggests recipes based on what you have,
+                  <strong>Stock & Spoon</strong> automatically suggests recipes based on what you have,
                   reducing food waste and inspiring your cooking!
                 </p>
               </div>

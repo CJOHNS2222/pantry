@@ -1,7 +1,7 @@
 # Database Analytics Integration Guide
 
 ## Overview
-The Smart Pantry Chef app now includes comprehensive database analytics to track Firestore reads, writes, and other operations. This helps monitor performance, optimize costs, and understand usage patterns.
+The Stock & Spoon app now includes comprehensive database analytics to track Firestore reads, writes, and other operations. This helps monitor performance, optimize costs, and understand usage patterns.
 
 ## Components Added
 

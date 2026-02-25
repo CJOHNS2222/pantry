@@ -56,8 +56,9 @@ describe('AppHeader', () => {
   it('renders user information', () => {
     render(<AppHeader {...defaultProps} />);
 
-    expect(screen.getByText('test@example.com')).toBeInTheDocument();
-    expect(screen.getByText('Smart Pantry Chef')).toBeInTheDocument();
+    // The header shows the user's display name
+    expect(screen.getByText('Test User')).toBeInTheDocument();
+    expect(screen.getByText('Stock & Spoon')).toBeInTheDocument();
     expect(screen.getByText('AI Kitchen Assistant')).toBeInTheDocument();
   });
 

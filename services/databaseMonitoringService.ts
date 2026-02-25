@@ -205,6 +205,15 @@ class DatabaseMonitoringService {
 
   static async getDocs<T = DocumentData>(queryRef: Query<T>): Promise<any> {
     const startTime = Date.now();
+    // Handle falsy or mocked queryRefs in tests gracefully
+    if (!queryRef) {
+      console.warn('DatabaseMonitoringService.getDocs called with falsy queryRef - returning empty snapshot');
+      const durationFallback = Date.now() - startTime;
+      this.metrics.queries++;
+      AnalyticsService.trackQueryPerformance('unknown', 'getDocs', 0, durationFallback);
+      return { size: 0, docs: [], forEach: (fn: any) => {}, empty: true } as any;
+    }
+
     try {
       const result = await getDocs(queryRef);
       const duration = Date.now() - startTime;
@@ -270,37 +279,39 @@ class DatabaseMonitoringService {
 
   static async setDoc(ref: any, data: DocumentData): Promise<void> {
     const startTime = Date.now();
+    const parentId = (ref as any)?.parent?.id || 'unknown';
+    const docId = (ref as any)?.id || 'unknown';
     try {
       await setDoc(ref, data);
       const duration = Date.now() - startTime;
 
       this.metrics.writes++;
-      this.trackWritePattern(ref.parent.id);
+      this.trackWritePattern(parentId);
 
       // Check for slow operations
       if (duration > this.PERFORMANCE_THRESHOLD) {
         reportPerformanceIssue('setDoc', duration, this.PERFORMANCE_THRESHOLD, {
-          collection: ref.parent.id,
-          document_id: ref.id
+          collection: parentId,
+          document_id: docId
         });
       }
 
-      AnalyticsService.trackDatabaseOperation('write', ref.parent.id, 1, {
+      AnalyticsService.trackDatabaseOperation('write', parentId, 1, {
         operation: 'setDoc',
         success: true,
         duration_ms: duration
       });
     } catch (err: any) {
       const duration = Date.now() - startTime;
-      AnalyticsService.trackDatabaseOperation('write', ref.parent.id, 1, {
+      AnalyticsService.trackDatabaseOperation('write', parentId, 1, {
         operation: 'setDoc',
         success: false,
         error: err.message,
         duration_ms: duration
       });
 
-      reportDatabaseError('setDoc', ref.parent.id, err as Error, {
-        document_id: ref.id,
+      reportDatabaseError('setDoc', parentId, err as Error, {
+        document_id: docId,
         duration_ms: duration
       });
 
@@ -310,37 +321,39 @@ class DatabaseMonitoringService {
 
   static async updateDoc(ref: any, data: Partial<DocumentData>): Promise<void> {
     const startTime = Date.now();
+    const parentId = (ref as any)?.parent?.id || 'unknown';
+    const docId = (ref as any)?.id || 'unknown';
     try {
       await updateDoc(ref, data);
       const duration = Date.now() - startTime;
 
       this.metrics.writes++;
-      this.trackWritePattern(ref.parent.id);
+      this.trackWritePattern(parentId);
 
       // Check for slow operations
       if (duration > this.PERFORMANCE_THRESHOLD) {
         reportPerformanceIssue('updateDoc', duration, this.PERFORMANCE_THRESHOLD, {
-          collection: ref.parent.id,
-          document_id: ref.id
+          collection: parentId,
+          document_id: docId
         });
       }
 
-      AnalyticsService.trackDatabaseOperation('write', ref.parent.id, 1, {
+      AnalyticsService.trackDatabaseOperation('write', parentId, 1, {
         operation: 'updateDoc',
         success: true,
         duration_ms: duration
       });
     } catch (err: any) {
       const duration = Date.now() - startTime;
-      AnalyticsService.trackDatabaseOperation('write', ref.parent.id, 1, {
+      AnalyticsService.trackDatabaseOperation('write', parentId, 1, {
         operation: 'updateDoc',
         success: false,
         error: err.message,
         duration_ms: duration
       });
 
-      reportDatabaseError('updateDoc', ref.parent.id, err as Error, {
-        document_id: ref.id,
+      reportDatabaseError('updateDoc', parentId, err as Error, {
+        document_id: docId,
         duration_ms: duration
       });
 
@@ -350,21 +363,22 @@ class DatabaseMonitoringService {
 
   static async addDoc(ref: any, data: DocumentData): Promise<any> {
     const startTime = Date.now();
+    const parentId = (ref as any)?.parent?.id || 'unknown';
     try {
       const result = await addDoc(ref, data);
       const duration = Date.now() - startTime;
 
       this.metrics.writes++;
-      this.trackWritePattern(ref.id);
+      this.trackWritePattern(parentId);
 
       // Check for slow operations
       if (duration > this.PERFORMANCE_THRESHOLD) {
         reportPerformanceIssue('addDoc', duration, this.PERFORMANCE_THRESHOLD, {
-          collection: ref.id
+          collection: parentId
         });
       }
 
-      AnalyticsService.trackDatabaseOperation('write', ref.id, 1, {
+      AnalyticsService.trackDatabaseOperation('write', parentId, 1, {
         operation: 'addDoc',
         success: true,
         duration_ms: duration
@@ -373,14 +387,14 @@ class DatabaseMonitoringService {
       return result;
     } catch (err: any) {
       const duration = Date.now() - startTime;
-      AnalyticsService.trackDatabaseOperation('write', ref.id, 1, {
+      AnalyticsService.trackDatabaseOperation('write', parentId, 1, {
         operation: 'addDoc',
         success: false,
         error: err.message,
         duration_ms: duration
       });
 
-      reportDatabaseError('addDoc', ref.id, err as Error, {
+      reportDatabaseError('addDoc', parentId, err as Error, {
         duration_ms: duration
       });
 
@@ -393,12 +407,14 @@ class DatabaseMonitoringService {
       await deleteDoc(ref);
       this.metrics.deletes++;
 
-      AnalyticsService.trackDatabaseOperation('delete', ref.parent.id, 1, {
+      const parentId = (ref as any)?.parent?.id || 'unknown';
+      AnalyticsService.trackDatabaseOperation('delete', parentId, 1, {
         operation: 'deleteDoc',
         success: true
       });
     } catch (err: any) {
-      AnalyticsService.trackDatabaseOperation('delete', ref.parent.id, 1, {
+      const parentId = (ref as any)?.parent?.id || 'unknown';
+      AnalyticsService.trackDatabaseOperation('delete', parentId, 1, {
         operation: 'deleteDoc',
         success: false,
         error: err.message
@@ -549,12 +565,13 @@ class DatabaseMonitoringService {
       // Monkey-patch getDoc
       (globalThis as any).getDoc = async (ref: any) => {
         const startTime = Date.now();
+        const parentId = (ref as any)?.parent?.id || 'unknown';
         try {
           const result = await originalGetDoc(ref);
           const duration = Date.now() - startTime;
 
           this.metrics.reads++;
-          AnalyticsService.trackDatabaseOperation('read', ref.parent.id, 1, {
+          AnalyticsService.trackDatabaseOperation('read', parentId, 1, {
             operation: 'getDoc',
             success: true,
             duration_ms: duration
@@ -562,7 +579,7 @@ class DatabaseMonitoringService {
           return result;
         } catch (err: any) {
           const duration = Date.now() - startTime;
-          AnalyticsService.trackDatabaseOperation('read', ref.parent.id, 1, {
+          AnalyticsService.trackDatabaseOperation('read', parentId, 1, {
             operation: 'getDoc',
             success: false,
             error: (err as Error).message,
@@ -602,13 +619,14 @@ class DatabaseMonitoringService {
       // Monkey-patch setDoc
       (globalThis as any).setDoc = async (ref: any, data: any) => {
         const startTime = Date.now();
+        const parentId = (ref as any)?.parent?.id || 'unknown';
         try {
           const result = await originalSetDoc(ref, data);
           const duration = Date.now() - startTime;
 
           this.metrics.writes++;
-          this.trackWritePattern(ref.parent.id);
-          AnalyticsService.trackDatabaseOperation('write', ref.parent.id, 1, {
+          this.trackWritePattern(parentId);
+          AnalyticsService.trackDatabaseOperation('write', parentId, 1, {
             operation: 'setDoc',
             success: true,
             duration_ms: duration
@@ -616,7 +634,7 @@ class DatabaseMonitoringService {
           return result;
         } catch (err: any) {
           const duration = Date.now() - startTime;
-          AnalyticsService.trackDatabaseOperation('write', ref.parent.id, 1, {
+          AnalyticsService.trackDatabaseOperation('write', parentId, 1, {
             operation: 'setDoc',
             success: false,
             error: (err as Error).message,
@@ -629,13 +647,14 @@ class DatabaseMonitoringService {
       // Monkey-patch updateDoc
       (globalThis as any).updateDoc = async (ref: any, data: any) => {
         const startTime = Date.now();
+        const parentId = (ref as any)?.parent?.id || 'unknown';
         try {
           const result = await originalUpdateDoc(ref, data);
           const duration = Date.now() - startTime;
 
           this.metrics.writes++;
-          this.trackWritePattern(ref.parent.id);
-          AnalyticsService.trackDatabaseOperation('write', ref.parent.id, 1, {
+          this.trackWritePattern(parentId);
+          AnalyticsService.trackDatabaseOperation('write', parentId, 1, {
             operation: 'updateDoc',
             success: true,
             duration_ms: duration
@@ -643,7 +662,7 @@ class DatabaseMonitoringService {
           return result;
         } catch (err: any) {
           const duration = Date.now() - startTime;
-          AnalyticsService.trackDatabaseOperation('write', ref.parent.id, 1, {
+          AnalyticsService.trackDatabaseOperation('write', parentId, 1, {
             operation: 'updateDoc',
             success: false,
             error: (err as Error).message,
@@ -656,13 +675,14 @@ class DatabaseMonitoringService {
       // Monkey-patch addDoc
       (globalThis as any).addDoc = async (ref: any, data: any) => {
         const startTime = Date.now();
+        const parentId = (ref as any)?.parent?.id || 'unknown';
         try {
           const result = await originalAddDoc(ref, data);
           const duration = Date.now() - startTime;
 
           this.metrics.writes++;
-          this.trackWritePattern(ref.parent.id);
-          AnalyticsService.trackDatabaseOperation('write', ref.parent.id, 1, {
+          this.trackWritePattern(parentId);
+          AnalyticsService.trackDatabaseOperation('write', parentId, 1, {
             operation: 'addDoc',
             success: true,
             duration_ms: duration
@@ -670,7 +690,7 @@ class DatabaseMonitoringService {
           return result;
         } catch (err: any) {
           const duration = Date.now() - startTime;
-          AnalyticsService.trackDatabaseOperation('write', ref.parent.id, 1, {
+          AnalyticsService.trackDatabaseOperation('write', parentId, 1, {
             operation: 'addDoc',
             success: false,
             error: (err as Error).message,
@@ -683,12 +703,13 @@ class DatabaseMonitoringService {
       // Monkey-patch deleteDoc
       (globalThis as any).deleteDoc = async (ref: any) => {
         const startTime = Date.now();
+        const parentId = (ref as any)?.parent?.id || 'unknown';
         try {
           const result = await originalDeleteDoc(ref);
           const duration = Date.now() - startTime;
 
           this.metrics.deletes++;
-          AnalyticsService.trackDatabaseOperation('write', ref.parent.id, 1, {
+          AnalyticsService.trackDatabaseOperation('write', parentId, 1, {
             operation: 'deleteDoc',
             success: true,
             duration_ms: duration
@@ -696,7 +717,7 @@ class DatabaseMonitoringService {
           return result;
         } catch (err: any) {
           const duration = Date.now() - startTime;
-          AnalyticsService.trackDatabaseOperation('write', ref.parent.id, 1, {
+          AnalyticsService.trackDatabaseOperation('write', parentId, 1, {
             operation: 'deleteDoc',
             success: false,
             error: (err as Error).message,

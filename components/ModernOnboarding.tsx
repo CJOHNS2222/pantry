@@ -122,8 +122,8 @@ export const ModernOnboarding: React.FC<ModernOnboardingProps> = ({
           <ChefHat className="w-10 h-10 text-white" />
         </div>
 
-        <h1 className="text-3xl font-bold text-theme-primary mb-3 font-serif">
-          Welcome to Smart Pantry Chef!
+          <h1 className="text-3xl font-bold text-theme-primary mb-3 font-serif">
+            Welcome to Stock & Spoon!
         </h1>
 
         <p className="text-lg text-theme-secondary mb-6 leading-relaxed">
@@ -350,7 +350,7 @@ export const ModernOnboarding: React.FC<ModernOnboardingProps> = ({
           You're All Set! 🎉
         </h2>
         <p className="text-theme-secondary mb-6">
-          Here's what Smart Pantry Chef can do for you right now
+          Here's what Stock & Spoon can do for you right now
         </p>
       </div>
 
