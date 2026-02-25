@@ -52,7 +52,7 @@ const updateCache = async (mealPlan: DayPlan[], householdId?: string, userId?: s
         return acc;
       }, {} as { [key: string]: any }),
     };
-    await DatabaseMonitoringService.setDoc(cacheRef, dataToCache, { merge: true });
+    await DatabaseMonitoringService.setDoc(cacheRef, dataToCache);
   } catch (err: any) {
     console.error('Failed to update meal plan cache:', err);
   }
@@ -84,7 +84,7 @@ const addMeal = async (date: string, mealType: 'breakfast' | 'lunch' | 'dinner',
         days: {
           [date]: newDayData
         }
-      }, { merge: true });
+      });
     } else {
       // Day object exists, so we can safely use arrayUnion.
       const fieldPath = `days.${date}.${mealType}`;

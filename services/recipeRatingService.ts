@@ -75,7 +75,7 @@ export class RecipeRatingService {
       const statsDoc = await DatabaseMonitoringService.getDoc(statsRef);
 
       if (statsDoc.exists()) {
-        const data = statsDoc.data();
+        const data = statsDoc.data() as any;
         let householdStats = undefined;
 
         if (householdId) {
@@ -87,9 +87,9 @@ export class RecipeRatingService {
           );
           const householdRatings = await DatabaseMonitoringService.getDocs(householdRatingsQuery);
 
-          if (!householdRatings.empty) {
-            const ratings = householdRatings.docs.map(doc => doc.data());
-            const wouldMakeAgainCount = ratings.filter(r => r.wouldMakeAgain).length;
+            if (!householdRatings.empty) {
+            const ratings = householdRatings.docs.map(doc => doc.data() as any);
+            const wouldMakeAgainCount = ratings.filter((r: any) => r.wouldMakeAgain).length;
 
             householdStats = {
               householdRatings: ratings.length,
@@ -134,19 +134,19 @@ export class RecipeRatingService {
         DatabaseMonitoringService.where('recipeTitle', '==', recipeTitle)
       );
       const ratingsSnapshot = await DatabaseMonitoringService.getDocs(ratingsQuery);
-      const ratings = ratingsSnapshot.docs.map(doc => doc.data());
+      const ratings = ratingsSnapshot.docs.map(doc => doc.data() as any);
 
       if (ratings.length === 0) return;
 
       // Calculate stats
       const totalRatings = ratings.length;
-      const averageRating = ratings.reduce((sum, r) => sum + r.rating, 0) / totalRatings;
-      const wouldMakeAgainCount = ratings.filter(r => r.wouldMakeAgain).length;
+      const averageRating = ratings.reduce((sum: number, r: any) => sum + r.rating, 0) / totalRatings;
+      const wouldMakeAgainCount = ratings.filter((r: any) => r.wouldMakeAgain).length;
       const wouldMakeAgainPercentage = (wouldMakeAgainCount / totalRatings) * 100;
 
       // Calculate top feedback
       const feedbackCount: Record<string, number> = {};
-      ratings.forEach(rating => {
+      ratings.forEach((rating: any) => {
         if (rating.feedback) {
           rating.feedback.forEach((fb: RecipeFeedback) => {
             feedbackCount[fb.type] = (feedbackCount[fb.type] || 0) + 1;
@@ -234,10 +234,13 @@ export class RecipeRatingService {
       );
 
       const modsSnapshot = await DatabaseMonitoringService.getDocs(modsQuery);
-      return modsSnapshot.docs.map(doc => ({
-        ...doc.data(),
-        date: normalizeDate(doc.data().date)
-      })) as RecipeModification[];
+      return modsSnapshot.docs.map(doc => {
+        const d = doc.data() as any;
+        return {
+          ...d,
+          date: normalizeDate(d.date)
+        } as RecipeModification;
+      });
     } catch (err: any) {
       log.error('Failed to get top modifications', { err, recipeTitle });
       return [];
@@ -258,7 +261,7 @@ export class RecipeRatingService {
 
       const ratingSnapshot = await DatabaseMonitoringService.getDocs(ratingQuery);
       if (!ratingSnapshot.empty) {
-        const data = ratingSnapshot.docs[0].data();
+        const data = ratingSnapshot.docs[0].data() as any;
         return {
           ...data,
           date: normalizeDate(data.date)
@@ -286,7 +289,7 @@ export class RecipeRatingService {
 
       const ratingsSnapshot = await DatabaseMonitoringService.getDocs(ratingsQuery);
       return ratingsSnapshot.docs.map(doc => {
-        const data = doc.data();
+        const data = doc.data() as any;
         return {
           ...data,
           date: normalizeDate(data.date)

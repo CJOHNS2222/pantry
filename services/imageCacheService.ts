@@ -2,6 +2,15 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '../firebaseConfig';
 import DatabaseMonitoringService from './databaseMonitoringService';
 
+// Simple cached-image shape used locally by this service
+interface CachedImage {
+  originalUrl: string;
+  cachedUrl: string;
+  itemName: string;
+  createdAt: Date;
+  lastUsed: Date;
+}
+
 export interface CachedImageData {
   [cacheKey: string]: CachedImage;
 }
