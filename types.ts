@@ -19,6 +19,8 @@ export interface PantryItem {
     originalUnit?: string;   // Original purchase unit
   };
 
+  // Support multiple purchase batches with independent expirations
+  batches?: Batch[];
   // Visual quantity estimation
   visualLevel?: 'empty' | 'quarter' | 'half' | 'threeQuarter' | 'full';
 
@@ -34,6 +36,15 @@ export interface PantryItem {
   expiryAlertShown?: boolean; // Whether expiry alert has been displayed to user
 }
 
+export interface Batch {
+  batchId: string;
+  quantity: number;
+  unit?: string;
+  expires?: string; // ISO date string (YYYY-MM-DD)
+  purchaseDate?: string; // ISO date when purchased
+  note?: string;
+}
+
 export interface ShoppingItem {
   id: string;
   item: string;
@@ -45,6 +56,12 @@ export interface ShoppingItem {
     amount: number;
     unit: string;
   }; // Quantity actually purchased
+  purchasedBatch?: {
+    amount: number;
+    unit?: string;
+    expires?: string; // ISO date
+    note?: string;
+  };
   addedAt?: Date; // When the item was added to the shopping list
   completedAt?: Date; // When the item was checked off
   estimatedPrice?: number; // Estimated price for analytics
@@ -80,6 +97,8 @@ export interface SavedRecipe extends StructuredRecipe {
   dateSaved: string;
   imagePlaceholder?: string; // CSS color or placeholder ID
   image?: string; // URL to recipe image
+  userId?: string; // Owner UID for private recipes
+  visibility?: 'public' | 'private';
 }
 
 export interface RecipeSearchResult {
@@ -138,8 +157,11 @@ export interface RecipePhoto {
   id: string;
   url: string;
   caption?: string;
-  uploadedBy: string;
+  uploadedBy?: string;
   uploadedAt: string;
+  fileName?: string;
+  ratingId?: string;
+  recipeTitle?: string;
 }
 
 export interface RecipeModification {

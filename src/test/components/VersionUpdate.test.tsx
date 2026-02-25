@@ -43,6 +43,7 @@ describe('VersionUpdate', () => {
       currentVersion: '1.0.0',
       latestVersion: '1.0.0',
       needsUpdate: false,
+      forceUpdate: false,
     });
   });
 
@@ -88,12 +89,12 @@ describe('VersionUpdate', () => {
   });
 
   it('shows loading state while checking', async () => {
-    let resolveCheck: (value: any) => void;
+    let resolveCheck: (value: any) => void = () => {};
     const checkPromise = new Promise(resolve => {
       resolveCheck = resolve;
     });
 
-    vi.mocked(versionService.checkForUpdates).mockReturnValue(checkPromise);
+    vi.mocked(versionService.checkForUpdates).mockReturnValue(checkPromise as any);
 
     render(<VersionUpdate />);
 
@@ -108,6 +109,7 @@ describe('VersionUpdate', () => {
       currentVersion: '1.0.0',
       latestVersion: '1.0.0',
       needsUpdate: false,
+      forceUpdate: false,
     });
 
     await waitFor(() => {
@@ -123,6 +125,7 @@ describe('VersionUpdate', () => {
       needsUpdate: true,
       downloadUrl: 'https://example.com/download',
       releaseNotes: 'Bug fixes and improvements',
+      forceUpdate: false,
     });
 
     render(<VersionUpdate />);
@@ -144,6 +147,7 @@ describe('VersionUpdate', () => {
       latestVersion: '1.1.0',
       needsUpdate: true,
       downloadUrl: 'https://example.com/download',
+      forceUpdate: false,
     });
 
     render(<VersionUpdate />);
@@ -194,6 +198,7 @@ describe('VersionUpdate', () => {
       currentVersion: '1.0.0',
       latestVersion: '1.1.0',
       needsUpdate: true,
+      forceUpdate: false,
     };
 
     vi.mocked(versionService.checkForUpdates).mockResolvedValue(updateResult);
@@ -209,12 +214,12 @@ describe('VersionUpdate', () => {
   });
 
   it('prevents multiple simultaneous update checks', async () => {
-    let resolveCheck: (value: any) => void;
+    let resolveCheck: (value: any) => void = () => {};
     const checkPromise = new Promise(resolve => {
       resolveCheck = resolve;
     });
 
-    vi.mocked(versionService.checkForUpdates).mockReturnValue(checkPromise);
+    vi.mocked(versionService.checkForUpdates).mockReturnValue(checkPromise as any);
 
     render(<VersionUpdate />);
 
@@ -230,6 +235,7 @@ describe('VersionUpdate', () => {
       currentVersion: '1.0.0',
       latestVersion: '1.0.0',
       needsUpdate: false,
+      forceUpdate: false,
     });
 
     await waitFor(() => {

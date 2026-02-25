@@ -13,6 +13,11 @@
             android:name="firebase_performance_logcat_enabled"
             android:value="true" />
 
+        <!-- AdMob App ID (use your real AdMob App ID for production) -->
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="@string/admob_app_id" />
+
         <activity
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation"
             android:name=".MainActivity"

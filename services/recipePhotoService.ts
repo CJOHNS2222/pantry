@@ -36,7 +36,7 @@ export class RecipePhotoService {
         url: downloadURL,
         fileName,
         uploadedAt: new Date().toISOString(),
-        userId,
+        uploadedBy: userId,
         ratingId,
         recipeTitle
       };
@@ -44,8 +44,8 @@ export class RecipePhotoService {
       log.info('Recipe photo uploaded', { recipeTitle, userId, fileName });
       return photo;
     } catch (err: any) {
-      log.error('Failed to upload recipe photo', { error, recipeTitle, userId });
-      throw error;
+      log.error('Failed to upload recipe photo', { error: err, recipeTitle, userId });
+      throw err;
     }
   }
 
@@ -59,8 +59,8 @@ export class RecipePhotoService {
 
       log.info('Recipe photo deleted', { photoId: photo.id });
     } catch (err: any) {
-      log.error('Failed to delete recipe photo', { error, photoId: photo.id });
-      throw error;
+      log.error('Failed to delete recipe photo', { error: err, photoId: photo.id });
+      throw err;
     }
   }
 
@@ -86,22 +86,22 @@ export class RecipePhotoService {
         try {
           const url = await getDownloadURL(item);
           photos.push({
-            id: item.name,
-            url,
-            fileName: item.name,
-            uploadedAt: new Date().toISOString(), // This would come from Firestore in real implementation
-            userId: '', // Would come from Firestore
-            ratingId: '', // Would come from Firestore
-            recipeTitle
-          });
+              id: item.name,
+              url,
+              fileName: item.name,
+              uploadedAt: new Date().toISOString(), // This would come from Firestore in real implementation
+              uploadedBy: '', // Would come from Firestore
+              ratingId: '', // Would come from Firestore
+              recipeTitle
+            });
         } catch (err: any) {
-          log.warn('Failed to get download URL for photo', { fileName: item.name });
+          log.warn('Failed to get download URL for photo', { fileName: item.name, error: err });
         }
       }
 
       return photos;
     } catch (err: any) {
-      log.error('Failed to get recipe photos', { error, recipeTitle });
+      log.error('Failed to get recipe photos', { error: err, recipeTitle });
       return [];
     }
   }

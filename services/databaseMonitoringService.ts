@@ -203,7 +203,7 @@ class DatabaseMonitoringService {
     }
   }
 
-  static async getDocs(queryRef: Query): Promise<QuerySnapshot> {
+  static async getDocs<T = DocumentData>(queryRef: Query<T>): Promise<QuerySnapshot<T>> {
     const startTime = Date.now();
     try {
       const result = await getDocs(queryRef);
@@ -239,7 +239,7 @@ class DatabaseMonitoringService {
   }
 
   // Helper method to extract query path for logging
-  private static getQueryPath(queryRef: Query): string {
+  private static getQueryPath<T = DocumentData>(queryRef: Query<T>): string {
     try {
       // Try multiple ways to get the path
       if (queryRef.parent?.path) {

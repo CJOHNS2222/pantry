@@ -135,7 +135,7 @@ describe('PriceTrends', () => {
     });
 
     const closeButtons = screen.getAllByText('Close');
-    fireEvent.click(closeButtons[0]); // Click the main close button
+    fireEvent.click(closeButtons[0]!); // Click the main close button
 
     expect(mockOnClose).toHaveBeenCalledTimes(1);
   });

@@ -152,6 +152,9 @@ export const EnhancedShoppingListItem: React.FC<ShoppingListItemProps> = ({
             {item.quantity && item.quantity !== '1' && (
               <div className="text-xs text-theme-secondary opacity-70">Needed: {item.quantity}</div>
             )}
+            {item.purchasedBatch && (
+              <div className="text-xs text-green-600 opacity-90 mt-1">Purchased: {item.purchasedBatch.amount} {item.purchasedBatch.unit || ''} {item.purchasedBatch.expires ? `— expires ${item.purchasedBatch.expires}` : ''}</div>
+            )}
             {isOffline && lastSynced && (
               <div className="text-xs text-orange-600 opacity-70 mt-1">
                 ⚠️ Offline - Last synced: {lastSynced.toLocaleTimeString()}

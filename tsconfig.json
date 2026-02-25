@@ -38,4 +38,8 @@
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true
   }
+  ,
+  "exclude": [
+    "src/test"
+  ]
 }

@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useApp } from '../contexts/AppContext';
 import { Star, Clock, ChefHat, Plus, X } from 'lucide-react';
 import { RecipeRating, StructuredRecipe } from '../types';
 import RecipeModal from './RecipeModal';
+import { getCachedCommunityRatedRecipes } from '../services/recipeService';
 
 interface CommunityProps {
-  ratings: RecipeRating[];
   onAddToPlan: (recipe: StructuredRecipe) => void;
   onSaveRecipe?: (recipe: StructuredRecipe) => void;
   user?: {
@@ -26,16 +26,55 @@ interface RecipeStats {
   comments: RecipeRating[];
 }
 
-export const Community: React.FC<CommunityProps> = ({ ratings = [], onAddToPlan, onSaveRecipe, user }) => {
+export const Community: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecipe, user }) => {
   const app = useApp();
   const { isLoadingRatings } = app;
+  const [localLoading, setLocalLoading] = useState(false);
+  const [ratingsState, setRatingsState] = useState<RecipeRating[]>([]);
+  // Load community-rated cache once when the tab/component mounts (don't refresh on focus)
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      try {
+        setLocalLoading(true);
+        const cached = await getCachedCommunityRatedRecipes();
+        if (!mounted) return;
+
+        if (Array.isArray(cached) && cached.length > 0) {
+          // If cached items look like RecipeRating (have recipeTitle), use directly
+          const first = cached[0] as any;
+          if (first && (first.recipeTitle || first.comment || first.userName)) {
+            setRatingsState(cached as unknown as RecipeRating[]);
+          } else {
+            // Convert SavedRecipe[] into synthetic RecipeRating[] so existing UI logic works
+            const synthetic: RecipeRating[] = (cached as any[]).map((r: any, i: number) => ({
+              id: r.id || `community_${i}`,
+              recipeTitle: r.title || 'Untitled',
+              rating: (typeof r.averageRating === 'number' ? Math.round(r.averageRating * 10) / 10 : 0),
+              comment: r.description || '',
+              userName: 'Community',
+              date: r.lastUpdated || r.dateSaved || new Date().toISOString(),
+              recipe: r as any
+            }));
+            setRatingsState(synthetic);
+          }
+        }
+      } catch (e) {
+        console.error('Community: failed to load cached community recipes', e);
+      } finally {
+        if (mounted) setLocalLoading(false);
+      }
+    };
+    load();
+    return () => { mounted = false; };
+  }, []);
     // List of staple items to ignore in ingredient display
     const STAPLES = ['salt', 'pepper', 'oil', 'water', 'flour', 'sugar', 'butter', 'vinegar', 'baking powder', 'baking soda', 'spices', 'seasoning', 'soy sauce', 'cornstarch', 'yeast'];
   const [showModal, setShowModal] = useState(false);
   const [selectedRecipe, setSelectedRecipe] = useState<{ title: string, comments: RecipeRating[] } | null>(null);
   
   // Group ratings by recipe title and calculate average
-  const recipeStats = ratings.reduce((acc, curr) => {
+  const recipeStats = ratingsState.reduce((acc, curr) => {
     const key = curr.recipeTitle || 'Untitled';
     // Skip ratings with no meaningful title or recipe data
     if (!key || key === 'Untitled' || !curr.recipeTitle) {
@@ -94,7 +133,7 @@ export const Community: React.FC<CommunityProps> = ({ ratings = [], onAddToPlan,
 
   return (
     <div className="space-y-6 pb-24 animate-fade-in">
-      {isLoadingRatings && (
+      {(isLoadingRatings || localLoading) && (
         <div className="text-center py-12">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--accent-color)] mx-auto mb-4"></div>
           <p className="text-theme-secondary opacity-70">Loading community ratings…</p>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { db } from '../firebaseConfig';
-import { collection, addDoc, Timestamp, doc, updateDoc } from 'firebase/firestore';
+import { Timestamp } from 'firebase/firestore';
+import DatabaseMonitoringService from '../services/databaseMonitoringService';
 import { SubscriptionManager } from './SubscriptionManager';
 import { CategoryManager } from './CategoryManager';
 import { log } from '../services/logService';
@@ -139,8 +139,8 @@ export const Settings: React.FC<SettingsProps> = ({
       const updatedMembers = [...household.members];
       updatedMembers[memberIndex] = { ...updatedMembers[memberIndex], ...memberPreferences } as Member;
 
-      const householdRef = doc(db, 'households', household.id);
-      await updateDoc(householdRef, {
+      const householdRef = DatabaseMonitoringService.doc('households', household.id);
+      await DatabaseMonitoringService.updateDoc(householdRef, {
         members: updatedMembers,
         updatedAt: Timestamp.now()
       });
@@ -214,7 +214,8 @@ export const Settings: React.FC<SettingsProps> = ({
     if (!user || !userProfile) return;
     setSavingProfile(true);
     try {
-      await updateDoc(doc(db, 'users', user.id), {
+      const userRef = DatabaseMonitoringService.doc('users', user.id);
+      await DatabaseMonitoringService.updateDoc(userRef, {
         profile: userProfile
       });
       setProfileChanged(false);
@@ -233,7 +234,8 @@ export const Settings: React.FC<SettingsProps> = ({
     if (!user) return;
     setUpdatingAvatar(true);
     try {
-      await updateDoc(doc(db, 'users', user.id), {
+      const userRef = DatabaseMonitoringService.doc('users', user.id);
+      await DatabaseMonitoringService.updateDoc(userRef, {
         avatar: avatarPath
       });
       setShowAvatarSelection(false);
@@ -251,7 +253,8 @@ export const Settings: React.FC<SettingsProps> = ({
     if (confirm('Remove your avatar?')) {
       setUpdatingAvatar(true);
       try {
-        await updateDoc(doc(db, 'users', user.id), {
+        const userRef = DatabaseMonitoringService.doc('users', user.id);
+        await DatabaseMonitoringService.updateDoc(userRef, {
           avatar: null
         });
         alert('Avatar removed successfully!');
@@ -268,7 +271,7 @@ export const Settings: React.FC<SettingsProps> = ({
     if (!feedback.trim()) return;
     setSending(true);
     try {
-      await addDoc(collection(db, 'feedback'), {
+      await DatabaseMonitoringService.addDoc(DatabaseMonitoringService.collection('feedback'), {
         text: feedback,
         createdAt: Timestamp.now(),
         user: user ? {
@@ -413,6 +416,70 @@ export const Settings: React.FC<SettingsProps> = ({
               </div>
             )}
           </div>
+              {/* Privacy & Legal Section */}
+              <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden">
+                <div
+                  onClick={() => toggleSection('Privacy & Legal')}
+                  className="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-theme-primary transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    {expandedSections.has('Privacy & Legal') ? (
+                      <ChevronDown className="w-5 h-5 text-theme-primary" />
+                    ) : (
+                      <ChevronRight className="w-5 h-5 text-theme-primary" />
+                    )}
+                    <h3 className="font-semibold text-theme-primary">Privacy & Legal</h3>
+                  </div>
+                </div>
+
+                {expandedSections.has('Privacy & Legal') && (
+                  <div className="border-t border-theme p-4">
+                    <p className="text-sm text-theme-secondary">
+                      We use the device camera to scan barcodes and take pantry item photos. Review our privacy policy for details about data collection and storage.
+                    </p>
+                    <div className="flex gap-2 mt-3">
+                      <button
+                        onClick={() => {
+                          const privacyUrl = (window as any).PRIVACY_POLICY_URL || 'https://smartpantrymobile.page.gd/privacy.html';
+                          window.open(privacyUrl, '_blank');
+                        }}
+                        className="bg-[var(--accent-color)] text-white px-4 py-2 rounded font-medium text-sm hover:bg-opacity-90 transition-colors"
+                      >
+                        View Privacy Policy
+                      </button>
+                      <button
+                        onClick={() => {
+                          const privacyUrl = (window as any).PRIVACY_POLICY_URL || 'https://smartpantrymobile.page.gd/privacy.html';
+                          if (navigator.clipboard) navigator.clipboard.writeText(privacyUrl);
+                          alert('Privacy policy URL copied to clipboard');
+                        }}
+                        className="bg-theme-primary text-theme-secondary px-3 py-2 rounded text-sm hover:bg-theme-secondary transition-colors"
+                      >
+                        Copy URL
+                      </button>
+                      <button
+                        onClick={() => {
+                          const delUrl = (window as any).DELETE_ACCOUNT_URL || 'https://smartpantrymobile.page.gd/delete-account.html';
+                          window.open(delUrl, '_blank');
+                        }}
+                        className="bg-red-500 text-white px-4 py-2 rounded font-medium text-sm hover:bg-red-600 transition-colors"
+                      >
+                        Request Account Deletion
+                      </button>
+                      <button
+                        onClick={() => {
+                          const delUrl = (window as any).DELETE_ACCOUNT_URL || 'https://smartpantrymobile.page.gd/delete-account.html';
+                          if (navigator.clipboard) navigator.clipboard.writeText(delUrl);
+                          alert('Account deletion URL copied to clipboard');
+                        }}
+                        className="bg-theme-primary text-theme-secondary px-3 py-2 rounded text-sm hover:bg-theme-secondary transition-colors"
+                      >
+                        Copy Deletion URL
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
 
           {/* User Profile Information */}
           <div className="space-y-4 mb-4">

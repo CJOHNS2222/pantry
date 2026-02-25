@@ -4,4 +4,6 @@
     <string name="title_activity_main">Smart Pantry</string>
     <string name="package_name">com.smart.pantry</string>
     <string name="custom_url_scheme">com.smart.pantry</string>
+    <!-- AdMob App ID: production value provided by owner -->
+    <string name="admob_app_id">ca-app-pub-5084706792909644~8942926412</string>
 </resources>

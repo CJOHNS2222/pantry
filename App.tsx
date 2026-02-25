@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, Suspense } from 'react';
-import { doc, onSnapshot, collection, addDoc, serverTimestamp, query, where, updateDoc, getDoc } from 'firebase/firestore';
+import { serverTimestamp } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
-import { db } from './firebaseConfig';
+import DatabaseMonitoringService from './services/databaseMonitoringService';
 import { Login } from './components/Login';
 import { HouseholdManager } from './components/Household';
 import { Tutorial } from './components/Tutorial';
@@ -19,6 +19,7 @@ import { useDataManagement } from './hooks/useDataManagement';
 import { useHouseholdActivity } from './hooks/useHouseholdActivity';
 import { useOfflineStatus } from './hooks/useOfflineStatus';
 import AnalyticsService from './services/analyticsService';
+import featureFlags from './services/featureFlags';
 import { isHouseholdMember, inferCategoryFromItemName, inferStorageLocationFromItemName, parseIngredientForShoppingList, getItemImage, fetchExternalItemImage } from './utils/appUtils';
 import { NotificationBanner } from './components/NotificationBanner';
 import { NotificationService, NotificationItem, NotificationSettings } from './services/notificationService';
@@ -396,11 +397,11 @@ const App: React.FC = () => {
   };
 
   const handleLogin = async (loggedInUser: User) => {
-    const userRef = doc(db, 'users', loggedInUser.id);
-    const userDoc = await getDoc(userRef);
+    const userRef = DatabaseMonitoringService.doc('users', loggedInUser.id);
+    const userDoc = await DatabaseMonitoringService.getDoc(userRef);
 
     if (!userDoc.exists()) {
-      await setDoc(userRef, {
+      await DatabaseMonitoringService.setDoc(userRef, {
         name: loggedInUser.name,
         email: loggedInUser.email,
         subscription: {
@@ -415,7 +416,7 @@ const App: React.FC = () => {
     } else {
       const userData = userDoc.data();
       if (!userData?.name || userData.name !== loggedInUser.name) {
-        await updateDoc(userRef, {
+        await DatabaseMonitoringService.updateDoc(userRef, {
           name: loggedInUser.name,
           updatedAt: serverTimestamp()
         });
@@ -430,7 +431,28 @@ const App: React.FC = () => {
       has_seen_tutorial: loggedInUser.hasSeenTutorial
     });
 
-    if (!loggedInUser.hasSeenTutorial) setShowTutorial(true);
+    // Determine whether to show the tutorial on first login.
+    // Use Firestore flag first; support a localStorage fallback for offline/new-device scenarios.
+    try {
+      const seenFlag = !!loggedInUser.hasSeenTutorial;
+      const localSeen = localStorage.getItem('tutorialSeen:v2') === 'true';
+      const rolloutEnabled = typeof featureFlags?.isEnabled === 'function'
+        ? featureFlags.isEnabled('newTutorial', loggedInUser.id)
+        : false;
+
+      if (!seenFlag) {
+        // If the new tutorial rollout is enabled, respect localStorage fallback.
+        if (rolloutEnabled) {
+          if (!localSeen) setShowTutorial(true);
+        } else {
+          // Fallback to legacy behavior (show by default if user hasn't seen it)
+          setShowTutorial(true);
+        }
+      }
+    } catch (err) {
+      // On any error, fall back to legacy behavior to avoid blocking users.
+      if (!loggedInUser.hasSeenTutorial) setShowTutorial(true);
+    }
   };
 
   useEffect(() => {
@@ -564,14 +586,26 @@ const App: React.FC = () => {
           <Tutorial
             onClose={async () => {
               setShowTutorial(false);
+              try {
+                // Always set a local fallback so users on this device don't repeatedly see the tutorial
+                localStorage.setItem('tutorialSeen:v2', 'true');
+              } catch (e) {
+                // ignore localStorage errors
+              }
+
               if (user) {
-                const { doc, updateDoc } = await import('firebase/firestore');
-                await updateDoc(doc(db, 'users', user.id), { hasSeenTutorial: true });
-                setUser({ ...user, hasSeenTutorial: true });
+                try {
+                  await DatabaseMonitoringService.updateDoc(DatabaseMonitoringService.doc('users', user.id), { hasSeenTutorial: true });
+                  setUser({ ...user, hasSeenTutorial: true });
+                } catch (err) {
+                  // If Firestore update fails, we've at least persisted locally
+                  console.warn('Failed to persist tutorial seen flag to Firestore', err);
+                }
               }
             }}
             onSwitchTab={setActiveTab}
             onOpenHousehold={() => setShowHousehold(true)}
+            isHouseholdOpen={showHousehold}
             onCloseHousehold={() => setShowHousehold(false)}
             onToggleTheme={() => setSettings(prev => ({
               ...prev,
@@ -580,92 +614,10 @@ const App: React.FC = () => {
                 mode: prev.theme.mode === 'dark' ? 'light' : 'dark'
               }
             }))}
-            onOpenRecipeSearch={() => {
-              setActiveTab(Tab.MEALS);
-            }}
+            onOpenRecipeSearch={() => { setActiveTab(Tab.MEALS); }}
             onOpenAnalytics={() => setActiveTab(Tab.SETTINGS)}
             currentTab={activeTab}
           />
-        )}
-
-        {showNotificationsModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg max-w-md w-full max-h-[80vh] overflow-y-auto">
-              <div className="p-6 pb-2.5">
-                <h2 className="text-xl font-bold mb-4 text-gray-800">Notifications</h2>
-                <div className="space-y-3">
-                  {notifications.map((notification) => (
-                    <div key={notification.id} className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                      {notification.type === 'household_invite' ? (
-                        <div>
-                          <p className="text-gray-800 font-medium">{notification.message}</p>
-                          <p className="text-sm text-gray-600 mt-1">
-                            You can now share pantry items, meal plans, and shopping lists with your household members.
-                          </p>
-                          <button
-                            onClick={async () => {
-                              const { doc, getDoc, writeBatch } = await import('firebase/firestore');
-                              const householdDoc = await getDoc(doc(db, 'households', notification.householdId));
-                              if (householdDoc.exists()) {
-                                const householdData = householdDoc.data();
-                                setHousehold({
-                                  id: notification.householdId,
-                                  name: householdData.name,
-                                  members: householdData.members || [],
-                                  memberIds: householdData.memberIds || []
-                                });
-                              }
-                              
-                              const batch = writeBatch(db);
-                              batch.update(doc(db, 'notifications', notification.id), { read: true });
-                              await batch.commit();
-                              
-                              setActiveTab(Tab.PANTRY);
-                              setShowNotificationsModal(false);
-                              
-                              setNotifications(prev => prev.filter(n => n.id !== notification.id));
-                            }}
-                            className="mt-3 bg-amber-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-amber-700 transition-colors"
-                          >
-                            Join Household
-                          </button>
-                        </div>
-                      ) : (
-                        <p className="text-gray-800">{notification.message}</p>
-                      )}
-                      <p className="text-sm text-gray-500 mt-2">
-                        {notification.timestamp?.toDate?.()?.toLocaleString() || 'Just now'}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-                <div className="flex gap-3 mt-6">
-                  <button
-                    onClick={() => {
-                      import('firebase/firestore').then(async ({ writeBatch, doc }) => {
-                        const batch = writeBatch(db);
-                        notifications.forEach(notification => {
-                          batch.update(doc(db, 'notifications', notification.id), { read: true });
-                        });
-                        await batch.commit();
-                        setNotifications([]);
-                        setShowNotificationsModal(false);
-                      });
-                    }}
-                    className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-blue-700 transition-colors"
-                  >
-                    Mark as Read
-                  </button>
-                  <button
-                    onClick={() => setShowNotificationsModal(false)}
-                    className="flex-1 bg-gray-200 text-gray-800 py-2 px-4 rounded-lg font-medium hover:bg-gray-300 transition-colors"
-                  >
-                    Close
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
         )}
 
         <AppHeader
@@ -773,6 +725,36 @@ const App: React.FC = () => {
                     }
                   }
                   
+                  // Build pantry item and convert any purchased batch/quantity into batches[]
+                  const batches: any[] = [];
+                  const nowIso = new Date().toISOString();
+
+                  if (i.purchasedBatch) {
+                    batches.push({
+                      batchId: Math.random().toString(36).substr(2,9),
+                      quantity: Math.abs(i.purchasedBatch.amount) || Math.abs(addQty),
+                      unit: i.purchasedBatch.unit || (i.purchasedQuantity?.unit ?? undefined),
+                      expires: i.purchasedBatch.expires,
+                      purchaseDate: nowIso,
+                      note: i.purchasedBatch.note
+                    });
+                  } else if (i.purchasedQuantity) {
+                    batches.push({
+                      batchId: Math.random().toString(36).substr(2,9),
+                      quantity: Math.abs(i.purchasedQuantity.amount) || Math.abs(addQty),
+                      unit: i.purchasedQuantity.unit || undefined,
+                      purchaseDate: nowIso
+                    });
+                  } else {
+                    // Fallback: create a batch from the generic quantity field
+                    batches.push({
+                      batchId: Math.random().toString(36).substr(2,9),
+                      quantity: Math.abs(addQty),
+                      unit: undefined,
+                      purchaseDate: nowIso
+                    });
+                  }
+
                   return {
                     id: Math.random().toString(36).substr(2,9),
                     item: i.item,
@@ -781,7 +763,10 @@ const App: React.FC = () => {
                     storageLocation: inferStorageLocationFromItemName(i.item),
                     image,
                     originalQuantity: i.purchasedQuantity ? `${i.purchasedQuantity.amount} ${i.purchasedQuantity.unit}` : (typeof i.quantity === 'string' ? i.quantity : undefined),
-                    reservations
+                    reservations,
+                    batches,
+                    dateAdded: nowIso,
+                    lastRestocked: nowIso
                   };
                 }));
                 

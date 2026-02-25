@@ -64,7 +64,7 @@ export class HouseholdPreferenceService {
         }
       }
     } catch (err: any) {
-      console.error('Error checking household inventory for allergies:', error);
+      console.error('Error checking household inventory for allergies:', err);
     }
   }
 
@@ -83,7 +83,7 @@ export class HouseholdPreferenceService {
       const household = householdSnap.data() as Household;
       return household.members || [];
     } catch (err: any) {
-      console.error('Error getting household members:', error);
+      console.error('Error getting household members:', err);
       return [];
     }
   }

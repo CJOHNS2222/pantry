@@ -60,6 +60,10 @@ html, body {
   }
 }
 
+/* Tutorial arrow pointers */
+.arrow-up { }
+.arrow-down { }
+
 /* Hide scrollbar for horizontal scrolling */
 .scrollbar-hide {
   -ms-overflow-style: none;  /* Internet Explorer 10+ */

@@ -23,9 +23,17 @@ const useTestAds = (): boolean => {
     return process.env.NODE_ENV !== 'production' || process.env.VITE_ADMOB_USE_TEST === 'true';
   }
 };
+// Temporarily disable AdMob for testing releases.
+// To re-enable: set `ADMOB_ENABLED = true` and ensure `admob_app_id` in Android strings.xml is your production App ID.
+const ADMOB_ENABLED = false;
 
 export const AdMobBanner: React.FC = () => {
   React.useEffect(() => {
+    if (!ADMOB_ENABLED) {
+      // AdMob disabled: skip initialization
+      return;
+    }
+
     if (Capacitor.getPlatform() === 'web') {
       return;
     }

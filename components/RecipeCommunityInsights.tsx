@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Users, TrendingUp, ChefHat, ThumbsUp, MessageSquare, Star, Loader2 } from 'lucide-react';
 import { RecipeCommunityStats, RecipeModification, RecipeRating } from '../types';
 import { RecipeRatingService } from '../services/recipeRatingService';
-import { doc, onSnapshot } from 'firebase/firestore';
-import { db } from '../firebaseConfig';
+import DatabaseMonitoringService from '../services/databaseMonitoringService';
 import { useAuth } from '../hooks/useAuth';
 import { useToasts } from '../hooks/useToasts';
 
@@ -30,8 +29,8 @@ export const RecipeCommunityInsights: React.FC<RecipeCommunityInsightsProps> = (
     // Subscribe to realtime updates for the community stats doc so UI updates when stats are created/updated
     let unsubscribeStats: (() => void) | null = null;
     try {
-      const statsRef = doc(db, 'recipeCommunityStats', recipeTitle);
-      unsubscribeStats = onSnapshot(statsRef, (snap) => {
+      const statsRef = DatabaseMonitoringService.doc('recipeCommunityStats', recipeTitle);
+      unsubscribeStats = DatabaseMonitoringService.onSnapshot(statsRef, (snap) => {
         console.debug('RecipeCommunityInsights: realtime stats snapshot', recipeTitle, snap.exists());
         if (snap.exists()) {
           const data = snap.data();

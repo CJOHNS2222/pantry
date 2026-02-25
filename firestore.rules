@@ -50,6 +50,15 @@ service cloud.firestore {
         && request.auth.uid in get(/databases/$(database)/documents/households/$(householdId)).data.memberIds;
     }
 
+    // Per-user saved recipes cache: single document storing an array of saved recipes
+    match /users/{userId}/cache/savedRecipes {
+      allow read, write: if request.auth != null && request.auth.uid == userId
+        && (
+          // Basic validation on write: recipes array and lastUpdated present
+          request.resource.data.keys().hasAny(['recipes', 'lastUpdated'])
+        );
+    }
+
     // Public ratings collection (Community) - restrict to authenticated users with validation
     match /ratings/{docId} {
       allow read: if request.auth != null; // Require authentication for reading ratings
@@ -117,16 +126,60 @@ service cloud.firestore {
       allow update, delete: if request.auth != null && request.auth.uid == resource.data.userId;
     }
 
-    // Global recipes collection: authenticated users can read, create recipes with validation
+    // Global recipes collection: allow public recipes and private user-owned recipes.
+    // Clients may save recipes as private (visibility: 'private') so only the owner can read them.
     match /recipes/{recipeId} {
-      allow read: if request.auth != null; // Require authentication for recipe database
+      // Read rules:
+      // - Public recipes are readable by any authenticated user
+      // - Private recipes are readable only by their owner
+      allow get, list: if request.auth != null && (
+        // If resource exists, allow read when public
+        (resource.data.visibility == 'public') ||
+        // Or allow read for owner (private or otherwise)
+        (resource.data.userId == request.auth.uid)
+      );
+
+      // Create: authenticated users may create recipes and must set `userId` to their UID.
+      // If `visibility` is present it must be either 'public' or 'private'.
       allow create: if request.auth != null
         && request.resource.data.keys().hasAll(['title', 'userId'])
         && request.resource.data.userId == request.auth.uid
         && request.resource.data.title is string
         && request.resource.data.title.size() > 0
-        && request.resource.data.title.size() < 200; // Reasonable title length
-      allow update, delete: if request.auth != null && request.auth.uid == resource.data.userId;
+        && request.resource.data.title.size() < 200
+        && (
+          !('visibility' in request.resource.data) ||
+          (request.resource.data.visibility in ['public', 'private'])
+        );
+
+      // Update/Delete: only the owner can modify or delete their recipe. Owners can change visibility.
+      allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid
+        && (
+          // On update, if visibility is being set ensure it's valid
+          !(('visibility' in request.resource.data) && !(request.resource.data.visibility in ['public', 'private']))
+        );
+    }
+
+    // Recipe submissions (recipes submitted for staff review) are stored under `recipes/submissions/{submissionId}`
+    // - Any authenticated user may create a submission for their recipe; `submitterId` must match auth uid and `status` must be 'pending'
+    // - Submitter and admins may read the submission; only admins may update status fields
+    match /recipes/submissions/{submissionId} {
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasAll(['title', 'userId', 'submitterId', 'status'])
+        && request.resource.data.submitterId == request.auth.uid
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0
+        && request.resource.data.title.size() < 200
+        && request.resource.data.status == 'pending';
+
+      allow read: if request.auth != null && (
+        resource.data.submitterId == request.auth.uid || isAdmin()
+      );
+
+      // Only admins may change the submission status (approve/reject). Allow admins to update.
+      allow update: if request.auth != null && isAdmin();
+      allow delete: if request.auth != null && (isAdmin() || resource.data.submitterId == request.auth.uid);
     }
 
     // Recipe search index: read-only for authenticated users, admin write access
@@ -170,9 +223,30 @@ service cloud.firestore {
     }
 
     // System collection: allow read access for authenticated users (for cached data like popular recipes)
+    // Allow authenticated users to read any system doc, but allow client writes only to the
+    // single-document community cache `system/community_rated_recipes` with basic validation.
+    match /system/community_rated_recipes {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+        // expect a recipes array and lastUpdated
+        && request.resource.data.keys().hasAny(['recipes', 'lastUpdated'])
+        && request.resource.data.recipes is list
+        // keep document size reasonable
+        && request.resource.data.recipes.size() <= 500;
+    }
+
+    // Other system documents remain admin-only for writes
     match /system/{docId} {
       allow read: if request.auth != null; // Authenticated users can read system data
-      allow write: if isAdmin(); // Only admins can write system data
+      allow write: if isAdmin(); // Only admins can write other system data
+    }
+
+    // Recipe cache documents: allow authenticated users to read cache documents
+    // (These documents are generated by admin scripts and should be readable by
+    // authenticated clients to avoid fan-out reads across many recipe docs.)
+    match /recipe_caches/{cacheDoc} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
     }
 
     // Default deny

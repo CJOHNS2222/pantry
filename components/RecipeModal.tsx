@@ -33,6 +33,7 @@ interface RecipeModalProps {
     email: string;
     avatar?: string;
   };
+  editable?: boolean;
 }
 
 export const RecipeModal: React.FC<RecipeModalProps> = ({
@@ -55,6 +56,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
   mealPlanLimitExceeded = false,
   household = null,
   user
+  , editable = false
 }) => {
   const [servings, setServings] = useState(4); // Default to 4 servings
   const [isSaving, setIsSaving] = useState(false); // Prevent double-clicks
@@ -62,6 +64,16 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
   const ratingRef = useRef<HTMLDivElement>(null);
   const [showReviewPrompt, setShowReviewPrompt] = useState(false);
   const [showRatingModal, setShowRatingModal] = useState(false);
+  // Editable fields for recipe creation
+  const [editTitle, setEditTitle] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editIngredientsText, setEditIngredientsText] = useState('');
+  const [editInstructionsText, setEditInstructionsText] = useState('');
+  const [editCookTime, setEditCookTime] = useState('');
+  const [editType, setEditType] = useState('Dinner');
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [submitForInclusion, setSubmitForInclusion] = useState(false);
   
   // Cooking Timer State
   const [timerActive, setTimerActive] = useState(false);
@@ -76,6 +88,21 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
       setIsSaving(false);
     }
   }, [isOpen]);
+
+  // Populate editable fields when modal opens for editing
+  useEffect(() => {
+    if (isOpen && editable && recipe) {
+      setEditTitle((recipe as any).title || '');
+      setEditDescription((recipe as any).description || '');
+      setEditIngredientsText(Array.isArray((recipe as any).ingredients) ? (recipe as any).ingredients.join('\n') : '');
+      setEditInstructionsText(Array.isArray((recipe as any).instructions) ? (recipe as any).instructions.join('\n') : '');
+      setEditCookTime((recipe as any).cookTime || '');
+      setEditType((recipe as any).type || 'Dinner');
+      setImagePreview((recipe as any).image || null);
+      setImageFile(null);
+      setSubmitForInclusion(false);
+    }
+  }, [isOpen, editable, recipe]);
   const [timerLabel, setTimerLabel] = useState('Cooking Timer');
   
   // Smart Substitutions State
@@ -346,20 +373,45 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
           &times;
         </button>
         <div className="overflow-y-auto p-6 flex-1">
-          <h2 className="text-2xl font-serif font-bold mb-2 text-[var(--accent-color)]">{recipe.title || 'Untitled'}</h2>
-          {recipe.description && <p className="mb-4 text-theme-secondary opacity-70">{recipe.description}</p>}
+          {editable ? (
+            <div className="space-y-3">
+              <input value={editTitle} onChange={e => setEditTitle(e.target.value)} placeholder="Recipe title" className="w-full text-2xl font-serif font-bold mb-2 text-[var(--accent-color)] bg-theme-secondary/10 p-2 rounded" />
+              <textarea value={editDescription} onChange={e => setEditDescription(e.target.value)} placeholder="Short description" className="w-full mb-2 text-theme-secondary p-2 rounded bg-theme-secondary/5" rows={2} />
+            </div>
+          ) : (
+            <>
+              <h2 className="text-2xl font-serif font-bold mb-2 text-[var(--accent-color)]">{recipe.title || 'Untitled'}</h2>
+              {recipe.description && <p className="mb-4 text-theme-secondary opacity-70">{recipe.description}</p>}
+            </>
+          )}
 
           {/* Recipe Image */}
-          {recipe.image && (
-            <div className="mb-6 rounded-lg overflow-hidden border border-theme">
-              <ProgressiveImage
-                src={recipe.image}
-                alt={recipe.title}
-                className="w-full h-48"
-                blurDataURL={generateBlurDataURL(400, 192)}
-                placeholderSrc="/images/placeholder.svg"
-              />
+          {editable ? (
+            <div className="mb-4">
+              <label className="block text-xs font-semibold mb-2">Photo</label>
+              <div className="flex items-center gap-3">
+                <input type="file" accept="image/*" onChange={(e) => {
+                  const f = e.target.files && e.target.files[0];
+                  if (f) {
+                    setImageFile(f);
+                    setImagePreview(URL.createObjectURL(f));
+                  }
+                }} />
+                {imagePreview && <img src={imagePreview} alt="preview" className="w-24 h-24 object-cover rounded" />}
+              </div>
             </div>
+          ) : (
+            recipe.image && (
+              <div className="mb-6 rounded-lg overflow-hidden border border-theme">
+                <ProgressiveImage
+                  src={recipe.image}
+                  alt={recipe.title}
+                  className="w-full h-48"
+                  blurDataURL={generateBlurDataURL(400, 192)}
+                  placeholderSrc="/images/placeholder.svg"
+                />
+              </div>
+            )
           )}
 
           {/* Enhanced Cooking Timer Section */}
@@ -525,13 +577,17 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
                 {servings} serving{servings !== 1 ? 's' : ''}
               </span>
             </div>
-            <ul className="list-disc list-inside text-theme-secondary opacity-80">
-              {Array.isArray(scaledIngredients) && scaledIngredients.length > 0 ? (
-                scaledIngredients.map((ing, i) => <li key={i}>{ing}</li>)
-              ) : (
-                <li>No ingredients available</li>
-              )}
-            </ul>
+            {editable ? (
+              <textarea value={editIngredientsText} onChange={(e) => setEditIngredientsText(e.target.value)} placeholder="One ingredient per line, e.g. '1 cup flour'" className="w-full p-2 rounded bg-theme-secondary/5 text-theme-primary" rows={6} />
+            ) : (
+              <ul className="list-disc list-inside text-theme-secondary opacity-80">
+                {Array.isArray(scaledIngredients) && scaledIngredients.length > 0 ? (
+                  scaledIngredients.map((ing, i) => <li key={i}>{ing}</li>)
+                ) : (
+                  <li>No ingredients available</li>
+                )}
+              </ul>
+            )}
           </div>
 
           {nutritionalInfo && (
@@ -593,7 +649,10 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
 
           <div>
             <h4 className="text-xs font-bold text-[var(--accent-color)] uppercase mb-2">Instructions</h4>
-            <ol className="list-decimal list-inside text-theme-secondary opacity-80 space-y-1">
+            {editable ? (
+              <textarea value={editInstructionsText} onChange={(e) => setEditInstructionsText(e.target.value)} placeholder="One step per line" className="w-full p-2 rounded bg-theme-secondary/5 text-theme-primary" rows={8} />
+            ) : (
+              <ol className="list-decimal list-inside text-theme-secondary opacity-80 space-y-1">
               {(() => {
                 // Process instructions - some recipes have them as arrays with concatenated steps
                 let processedSteps: string[] = [];
@@ -620,7 +679,8 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
                   <li>No instructions available</li>
                 );
               })()}
-            </ol>
+              </ol>
+            )}
           </div>
           {onRate && (
             <div className={`mt-6 pt-4 border-t border-theme ${showReviewPrompt ? 'bg-[var(--accent-color)]/10 p-4 rounded-lg' : ''}`} ref={ratingRef}>
@@ -669,46 +729,88 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
               </button>
             )}
             {showSaveButton && onSaveRecipe && (
-              <button
-                onClick={async () => { 
-                  if (isSaving) return; // Prevent double-clicks
-                  setIsSaving(true);
-                  console.log('🖱️ Save button clicked for recipe:', recipe.title);
-                  try {
-                    // Sanitize placeholder recipe text so we don't persist UI-only messages
-                    const sanitized: StructuredRecipe = {
-                      title: (recipe as any).title || '',
-                      description: (recipe as any).description || '',
-                      ingredients: Array.isArray((recipe as any).ingredients) ? [...(recipe as any).ingredients] : [],
-                      instructions: Array.isArray((recipe as any).instructions) ? [...(recipe as any).instructions] : [],
-                      cookTime: (recipe as any).cookTime || '' ,
-                      image: (recipe as any).image
-                    };
+              <div className="flex-1">
+                {editable ? (
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={submitForInclusion} onChange={e => setSubmitForInclusion(e.target.checked)} /> Submit for inclusion</label>
+                    <button
+                      onClick={async () => {
+                        if (isSaving) return;
+                        setIsSaving(true);
+                        try {
+                          // Build StructuredRecipe from editable fields
+                          const built: any = {
+                            title: editTitle.trim(),
+                            description: editDescription.trim(),
+                            ingredients: editIngredientsText.split('\n').map(s => s.trim()).filter(Boolean),
+                            instructions: editInstructionsText.split('\n').map(s => s.trim()).filter(Boolean),
+                            cookTime: editCookTime.trim(),
+                            type: editType,
+                            image: imagePreview || ''
+                          };
 
-                    const placeholderPattern = /Full recipe not available in this rating/i;
-                    // Remove placeholder entries if present
-                    if (sanitized.ingredients.length === 1 && placeholderPattern.test(String(sanitized.ingredients[0]))) {
-                      sanitized.ingredients = [];
-                    }
-                    if (sanitized.instructions.length === 1 && placeholderPattern.test(String(sanitized.instructions[0]))) {
-                      sanitized.instructions = [];
-                    }
+                          // Attach helper metadata for parent handler
+                          if (imageFile) built.__imageFile = imageFile;
+                          if (submitForInclusion) built.__submitForInclusion = true;
 
-                    await onSaveRecipe(sanitized as StructuredRecipe); 
-                    onClose(); 
-                  } finally {
-                    setIsSaving(false);
-                  }
-                }}
-                disabled={recipeSaveLimitExceeded || isSaving}
-                className={`flex-1 py-3 font-bold border rounded-lg flex items-center justify-center gap-2 ${
-                  recipeSaveLimitExceeded || isSaving
-                    ? 'border-gray-400 text-gray-400 cursor-not-allowed opacity-50'
-                    : 'border-[var(--accent-color)] hover:bg-[var(--accent-color)] hover:text-white'
-                }`}
-              >
-                <Heart className="w-4 h-4" /> {isSaving ? 'Saving...' : recipeSaveLimitExceeded ? 'Limit Reached' : 'Save'}
-              </button>
+                          await onSaveRecipe(built as StructuredRecipe);
+                          onClose();
+                        } finally {
+                          setIsSaving(false);
+                        }
+                      }}
+                      disabled={recipeSaveLimitExceeded || isSaving}
+                      className={`w-full py-3 font-bold border rounded-lg flex items-center justify-center gap-2 ${
+                        recipeSaveLimitExceeded || isSaving
+                          ? 'border-gray-400 text-gray-400 cursor-not-allowed opacity-50'
+                          : 'border-[var(--accent-color)] hover:bg-[var(--accent-color)] hover:text-white'
+                      }`}
+                    >
+                      <Heart className="w-4 h-4" /> {isSaving ? 'Saving...' : recipeSaveLimitExceeded ? 'Limit Reached' : 'Save'}
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={async () => { 
+                      if (isSaving) return; // Prevent double-clicks
+                      setIsSaving(true);
+                      try {
+                        // Sanitize placeholder recipe text so we don't persist UI-only messages
+                        const sanitized: StructuredRecipe = {
+                          title: (recipe as any).title || '',
+                          description: (recipe as any).description || '',
+                          ingredients: Array.isArray((recipe as any).ingredients) ? [...(recipe as any).ingredients] : [],
+                          instructions: Array.isArray((recipe as any).instructions) ? [...(recipe as any).instructions] : [],
+                          cookTime: (recipe as any).cookTime || '' ,
+                          image: (recipe as any).image
+                        };
+
+                        const placeholderPattern = /Full recipe not available in this rating/i;
+                        // Remove placeholder entries if present
+                        if (sanitized.ingredients.length === 1 && placeholderPattern.test(String(sanitized.ingredients[0]))) {
+                          sanitized.ingredients = [];
+                        }
+                        if (sanitized.instructions.length === 1 && placeholderPattern.test(String(sanitized.instructions[0]))) {
+                          sanitized.instructions = [];
+                        }
+
+                        await onSaveRecipe(sanitized as StructuredRecipe); 
+                        onClose(); 
+                      } finally {
+                        setIsSaving(false);
+                      }
+                    }}
+                    disabled={recipeSaveLimitExceeded || isSaving}
+                    className={`flex-1 py-3 font-bold border rounded-lg flex items-center justify-center gap-2 ${
+                      recipeSaveLimitExceeded || isSaving
+                        ? 'border-gray-400 text-gray-400 cursor-not-allowed opacity-50'
+                        : 'border-[var(--accent-color)] hover:bg-[var(--accent-color)] hover:text-white'
+                    }`}
+                  >
+                    <Heart className="w-4 h-4" /> {isSaving ? 'Saving...' : recipeSaveLimitExceeded ? 'Limit Reached' : 'Save'}
+                  </button>
+                )}
+              </div>
             )}
           </div>
         </div>

@@ -1,13 +1,4 @@
-import {
-  collection,
-  query,
-  where,
-  orderBy,
-  limit,
-  getDocs,
-  Timestamp
-} from 'firebase/firestore';
-import { db } from '../firebaseConfig';
+import DatabaseMonitoringService from './databaseMonitoringService';
 import { RecipeRating, StructuredRecipe } from '../types';
 import { log } from './logService';
 
@@ -64,7 +55,7 @@ export class RecipeRecommendationService {
         .slice(0, limitCount);
 
     } catch (err: any) {
-      log.error('Failed to get personalized recommendations', { error, userId });
+      log.error('Failed to get personalized recommendations', { error: err, userId });
       return [];
     }
   }
@@ -94,20 +85,11 @@ export class RecipeRecommendationService {
       if (count >= 2) { // At least 2 household members loved it
         // TODO: Get actual recipe data from recipes collection
         const mockRecipe: StructuredRecipe = {
-          id: recipeTitle,
           title: recipeTitle,
-          ingredients: [], // Would be populated from actual recipe data
+          description: recipeTitle,
+          ingredients: [],
           instructions: [],
-          prepTime: 0,
-          cookTime: 0,
-          servings: 4,
-          tags: [],
-          nutrition: {
-            calories: 0,
-            protein: 0,
-            carbs: 0,
-            fat: 0
-          }
+          cookTime: '0 mins'
         };
 
         recommendations.push({
@@ -164,15 +146,11 @@ export class RecipeRecommendationService {
 
       if (hasIngredients) {
         const mockRecipe: StructuredRecipe = {
-          id: rec.title,
           title: rec.title,
-          ingredients: rec.ingredients.map(ing => ({ name: ing, amount: '', unit: '' })),
+          description: rec.title,
+          ingredients: rec.ingredients,
           instructions: [],
-          prepTime: 15,
-          cookTime: 20,
-          servings: 4,
-          tags: [],
-          nutrition: { calories: 0, protein: 0, carbs: 0, fat: 0 }
+          cookTime: '20 mins'
         };
 
         recommendations.push({
@@ -194,14 +172,14 @@ export class RecipeRecommendationService {
   private static async getTrendingRecommendations(userRatings: RecipeRating[]): Promise<RecipeRecommendation[]> {
     try {
       // Get recent highly-rated recipes
-      const recentRatingsQuery = query(
-        collection(db, this.RATINGS_COLLECTION),
-        where('wouldMakeAgain', '==', true),
-        orderBy('date', 'desc'),
-        limit(50)
+      const recentRatingsQuery = DatabaseMonitoringService.query(
+        DatabaseMonitoringService.collection(this.RATINGS_COLLECTION),
+        DatabaseMonitoringService.where('wouldMakeAgain', '==', true),
+        DatabaseMonitoringService.orderBy('date', 'desc'),
+        DatabaseMonitoringService.limit(50)
       );
 
-      const recentRatings = await getDocs(recentRatingsQuery);
+      const recentRatings = await DatabaseMonitoringService.getDocs(recentRatingsQuery);
       const ratingData = recentRatings.docs.map(doc => doc.data());
 
       // Count ratings per recipe in the last 30 days
@@ -222,15 +200,11 @@ export class RecipeRecommendationService {
       for (const [recipeTitle, count] of Object.entries(trendingRecipes)) {
         if (count >= 3 && !userRatedTitles.has(recipeTitle)) {
           const mockRecipe: StructuredRecipe = {
-            id: recipeTitle,
             title: recipeTitle,
+            description: recipeTitle,
             ingredients: [],
             instructions: [],
-            prepTime: 0,
-            cookTime: 0,
-            servings: 4,
-            tags: [],
-            nutrition: { calories: 0, protein: 0, carbs: 0, fat: 0 }
+            cookTime: '0 mins'
           };
 
           recommendations.push({
@@ -245,7 +219,7 @@ export class RecipeRecommendationService {
 
       return recommendations;
     } catch (err: any) {
-      log.error('Failed to get trending recommendations', { error });
+      log.error('Failed to get trending recommendations', { error: err });
       return [];
     }
   }
@@ -278,15 +252,11 @@ export class RecipeRecommendationService {
 
     return currentSeasonRecipes.slice(0, 2).map(recipeTitle => ({
       recipe: {
-        id: recipeTitle,
         title: recipeTitle,
+        description: recipeTitle,
         ingredients: [],
         instructions: [],
-        prepTime: 0,
-        cookTime: 0,
-        servings: 4,
-        tags: [],
-        nutrition: { calories: 0, protein: 0, carbs: 0, fat: 0 }
+        cookTime: '0 mins'
       },
       reason: 'Perfect for this season',
       confidence: 0.6,
@@ -300,14 +270,14 @@ export class RecipeRecommendationService {
    */
   private static async getUserRatings(userId: string, limitCount: number): Promise<RecipeRating[]> {
     try {
-      const ratingsQuery = query(
-        collection(db, this.RATINGS_COLLECTION),
-        where('userId', '==', userId),
-        orderBy('date', 'desc'),
-        limit(limitCount)
-      );
+      const ratingsQuery = DatabaseMonitoringService.query(
+          DatabaseMonitoringService.collection(this.RATINGS_COLLECTION),
+          DatabaseMonitoringService.where('userId', '==', userId),
+          DatabaseMonitoringService.orderBy('date', 'desc'),
+          DatabaseMonitoringService.limit(limitCount)
+        );
 
-      const ratingsSnapshot = await getDocs(ratingsQuery);
+        const ratingsSnapshot = await DatabaseMonitoringService.getDocs(ratingsQuery);
       return ratingsSnapshot.docs.map(doc => {
         const data = doc.data();
         return {
@@ -316,7 +286,7 @@ export class RecipeRecommendationService {
         } as RecipeRating;
       });
     } catch (err: any) {
-      log.error('Failed to get user ratings', { error, userId });
+      log.error('Failed to get user ratings', { error: err, userId });
       return [];
     }
   }
@@ -326,14 +296,14 @@ export class RecipeRecommendationService {
    */
   private static async getHouseholdRatings(householdId: string, limitCount: number): Promise<RecipeRating[]> {
     try {
-      const ratingsQuery = query(
-        collection(db, this.RATINGS_COLLECTION),
-        where('householdId', '==', householdId),
-        orderBy('date', 'desc'),
-        limit(limitCount)
-      );
+      const ratingsQuery = DatabaseMonitoringService.query(
+          DatabaseMonitoringService.collection(this.RATINGS_COLLECTION),
+          DatabaseMonitoringService.where('householdId', '==', householdId),
+          DatabaseMonitoringService.orderBy('date', 'desc'),
+          DatabaseMonitoringService.limit(limitCount)
+        );
 
-      const ratingsSnapshot = await getDocs(ratingsQuery);
+        const ratingsSnapshot = await DatabaseMonitoringService.getDocs(ratingsQuery);
       return ratingsSnapshot.docs.map(doc => {
         const data = doc.data();
         return {
@@ -342,7 +312,7 @@ export class RecipeRecommendationService {
         } as RecipeRating;
       });
     } catch (err: any) {
-      log.error('Failed to get household ratings', { error, householdId });
+      log.error('Failed to get household ratings', { error: err, householdId });
       return [];
     }
   }
@@ -360,13 +330,19 @@ export class RecipeRecommendationService {
       // TODO: Implement actual similarity algorithm
       // For now, return mock similar recipes
 
+      const similarRecipe: StructuredRecipe = {
+        title: `Similar to ${baseRecipe.title}`,
+        description: baseRecipe.description || `Similar to ${baseRecipe.title}`,
+        ingredients: Array.isArray(baseRecipe.ingredients) ? (baseRecipe.ingredients as string[]) : [],
+        instructions: Array.isArray(baseRecipe.instructions) ? (baseRecipe.instructions as string[]) : [],
+        cookTime: typeof baseRecipe.cookTime === 'string' ? baseRecipe.cookTime : `${(baseRecipe as any).cookTime || 0} mins`,
+        type: (baseRecipe as any).type,
+        image: (baseRecipe as any).image
+      };
+
       const similarRecipes: RecipeRecommendation[] = [
         {
-          recipe: {
-            ...baseRecipe,
-            id: `${baseRecipe.id}_similar_1`,
-            title: `Similar to ${baseRecipe.title}`
-          },
+          recipe: similarRecipe,
           reason: 'Similar ingredients and cooking method',
           confidence: 0.7,
           type: 'personal-preference',
@@ -376,7 +352,7 @@ export class RecipeRecommendationService {
 
       return similarRecipes.slice(0, limitCount);
     } catch (err: any) {
-      log.error('Failed to get similar recipes', { error, userId, baseRecipeId: baseRecipe.id });
+      log.error('Failed to get similar recipes', { error: err, userId, baseRecipeId: baseRecipe.id });
       return [];
     }
   }

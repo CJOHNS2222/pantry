@@ -45,6 +45,16 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   const [isEditingExpiration, setIsEditingExpiration] = useState(false);
   const [editExpirationDate, setEditExpirationDate] = useState(() => item.expirationDate || '');
   const [editExpirationType, setEditExpirationType] = useState(() => item.expirationType || 'best-by');
+  const [editingBatchId, setEditingBatchId] = useState<string | null>(null);
+  const [batchQty, setBatchQty] = useState<number>(1);
+  const [batchUnit, setBatchUnit] = useState<string>('count');
+  const [batchExpires, setBatchExpires] = useState<string | undefined>(undefined);
+
+  // Compute summed total from batches when present
+  const batchTotal = (item.batches && item.batches.length > 0)
+    ? item.batches.reduce((sum, b) => sum + (b.quantity || 0), 0)
+    : 0;
+  const batchUnitDisplay = (item.batches && item.batches.length > 0) ? item.batches[0].unit : undefined;
 
   // Fetch nutrition facts on component mount
   useEffect(() => {
@@ -132,7 +142,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
 
   return (
     <>
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-60 p-4">
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4">
         <div className="bg-theme-primary rounded-lg shadow-xl w-full max-w-md mx-auto max-h-[80vh] flex flex-col border border-theme">
           {/* Header - Fixed */}
           <div className="flex items-center justify-between pt-4 px-3 pb-3 border-b border-theme flex-shrink-0">
@@ -168,6 +178,12 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
               <label className="block text-sm font-medium text-theme-primary mb-1.5">
                 Quantity
               </label>
+              {batchTotal > 0 && (
+                <div className="mb-2 text-sm text-theme-primary flex items-center justify-between">
+                  <div className="opacity-80">Total (batches)</div>
+                  <div className="font-medium">{batchTotal} {batchUnitDisplay || ''}</div>
+                </div>
+              )}
               <QuantityUnitPicker
                 quantity={editQuantity}
                 unit={editUnit}
@@ -191,6 +207,57 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
             )}
 
             {/* Expiration Date */}
+            {/* Batches Section */}
+            <div className="bg-theme-secondary p-2 rounded-lg border border-theme">
+              <label className="block text-xs font-medium text-theme-primary mb-1 uppercase opacity-70">
+                Batches
+              </label>
+              {(item.batches && item.batches.length > 0) ? (
+                <div className="space-y-2">
+                  {item.batches.map((b) => (
+                    <div key={b.batchId} className="flex items-center justify-between bg-theme-primary p-2 rounded">
+                      <div>
+                        <div className="text-sm font-medium text-theme-primary">{b.quantity} {b.unit || ''}</div>
+                        <div className="text-xs text-theme-secondary">{b.expires ? `Expires ${new Date(b.expires).toLocaleDateString()}` : 'No expiry'}</div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button onClick={() => {
+                          setEditingBatchId(b.batchId);
+                          setBatchQty(b.quantity);
+                          setBatchUnit(b.unit || 'count');
+                          setBatchExpires(b.expires);
+                        }} className="p-2 text-theme-secondary hover:text-[var(--accent-color)]">
+                          <Edit3 className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => {
+                          if (confirm('Remove this batch?')) {
+                            const updated = (item.batches || []).filter(x => x.batchId !== b.batchId);
+                            onUpdateItem(originalIndex, { batches: updated });
+                          }
+                        }} className="p-2 text-theme-secondary hover:text-red-600">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-sm text-theme-secondary opacity-70">No purchase batches recorded for this item.</div>
+              )}
+
+              <div className="mt-3 flex gap-2">
+                <button onClick={() => {
+                  // Add a new empty batch with default qty 1
+                  const now = new Date().toISOString();
+                  const newBatch = { batchId: crypto.randomUUID(), quantity: 1, unit: 'count', expires: undefined, purchaseDate: now };
+                  const updated = [...(item.batches || []), newBatch];
+                  onUpdateItem(originalIndex, { batches: updated });
+                }} className="px-3 py-1 bg-[var(--accent-color)] text-white rounded">Add Batch</button>
+                {editingBatchId && (
+                  <button onClick={() => { setEditingBatchId(null); }} className="px-3 py-1 bg-theme-secondary rounded">Close Edit</button>
+                )}
+              </div>
+            </div>
             <div className="bg-theme-secondary p-2 rounded-lg border border-theme">
               <label className="block text-xs font-medium text-theme-primary mb-1 uppercase opacity-70">
                 Expiration
@@ -202,12 +269,12 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                       type="date"
                       value={editExpirationDate}
                       onChange={(e) => setEditExpirationDate(e.target.value)}
-                      className="flex-1 px-2 py-1 text-sm border border-theme rounded-md bg-theme-primary text-theme-primary focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]"
+                      className="flex-1 px-2 py-1 text-sm border border-theme rounded-md bg-theme-primary text-black focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]"
                     />
                     <select
                       value={editExpirationType}
                       onChange={(e) => setEditExpirationType(e.target.value as 'use-by' | 'best-by')}
-                      className="px-2 py-1 text-sm border border-theme rounded-md bg-theme-primary text-theme-primary focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]"
+                      className="px-2 py-1 text-sm border border-theme rounded-md bg-theme-primary text-black focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]"
                     >
                       <option value="best-by">Best By</option>
                       <option value="use-by">Use By</option>
@@ -257,6 +324,36 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                 </div>
               )}
             </div>
+
+            {/* Batch Edit Inline Modal */}
+            {editingBatchId && (
+              <div className="bg-theme-secondary p-3 rounded-lg border border-theme mt-3">
+                <label className="block text-xs font-medium text-theme-primary mb-1 uppercase opacity-70">Edit Batch</label>
+                <div className="space-y-2">
+                  <div>
+                    <label className="text-xs text-theme-secondary">Quantity</label>
+                    <input type="number" min={0} step={0.01} value={batchQty} onChange={(e) => setBatchQty(parseFloat(e.target.value) || 0)} className="w-full mt-1 p-2 rounded border text-black" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-theme-secondary">Unit</label>
+                    <input value={batchUnit} onChange={(e) => setBatchUnit(e.target.value)} className="w-full mt-1 p-2 rounded border" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-theme-secondary">Expiration</label>
+                    <input type="date" value={batchExpires || ''} onChange={(e) => setBatchExpires(e.target.value || undefined)} className="w-full mt-1 p-2 rounded border text-black" />
+                  </div>
+                </div>
+                <div className="flex gap-2 justify-end mt-3">
+                  <button onClick={() => setEditingBatchId(null)} className="px-3 py-1 rounded bg-theme-secondary">Cancel</button>
+                  <button onClick={() => {
+                    // Apply edits to the batch list
+                    const updated = (item.batches || []).map(b => b.batchId === editingBatchId ? { ...b, quantity: batchQty, unit: batchUnit, expires: batchExpires } : b);
+                    onUpdateItem(originalIndex, { batches: updated });
+                    setEditingBatchId(null);
+                  }} className="px-3 py-1 rounded bg-[var(--accent-color)] text-white">Save</button>
+                </div>
+              </div>
+            )}
 
             {/* Storage Location & Category - Side by Side */}
             <div className="grid grid-cols-2 gap-2">

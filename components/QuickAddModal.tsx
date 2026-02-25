@@ -182,7 +182,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-60 p-4" onClick={handleBackdropClick}>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4" onClick={handleBackdropClick}>
       <div className="bg-theme-primary rounded-lg shadow-xl w-full max-w-md mx-auto max-h-[80vh] overflow-hidden border border-theme">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-theme">
@@ -209,7 +209,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
                 onKeyDown={handleKeyPress}
                 onFocus={() => setShowSuggestions(suggestions.length > 0)}
                 placeholder="Add item (e.g., '2 lbs chicken' or 'milk')"
-                className="w-full bg-theme-secondary border border-theme rounded-lg px-3 py-3 text-theme-primary placeholder-theme-secondary/50 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] pr-10"
+                className="w-full bg-theme-secondary border border-theme rounded-lg px-3 py-3 text-black placeholder-theme-secondary/50 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] pr-10"
               />
 
               {input && (

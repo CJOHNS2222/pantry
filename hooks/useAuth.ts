@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth';
-import { doc, setDoc, getDoc, onSnapshot, query, where, getDocs, updateDoc, collection } from 'firebase/firestore';
+import DatabaseMonitoringService from '../services/databaseMonitoringService';
 import { logEvent } from 'firebase/analytics';
 import { User } from '../types';
-import { analytics, db } from '../firebaseConfig';
+import { analytics } from '../firebaseConfig';
 import AnalyticsService from '../services/analyticsService';
 import { setUserContext, clearUserContext, trackAuthEvent } from '../services/sentryService';
 import { PriceDataCacheService } from '../services/priceDataCacheService';
@@ -32,12 +32,12 @@ export function useAuth() {
       }
 
       // Create user document if it doesn't exist
-      const userDocRef = doc(db, 'users', fbUser.uid);
-      const userDocSnap = await getDoc(userDocRef);
+      const userDocRef = DatabaseMonitoringService.doc('users', fbUser.uid);
+      const userDocSnap = await DatabaseMonitoringService.getDoc(userDocRef);
 
       if (!userDocSnap.exists()) {
         try {
-          await setDoc(userDocRef, {
+          await DatabaseMonitoringService.setDoc(userDocRef, {
             subscription: {
               tier: 'premium',
               status: 'active',
@@ -54,20 +54,20 @@ export function useAuth() {
       }
 
       // Set up listener for user document changes
-      userDocUnsubscribe = onSnapshot(userDocRef, async (userDocSnap) => {
+      userDocUnsubscribe = DatabaseMonitoringService.onSnapshot(userDocRef, async (userDocSnap) => {
         const userData = userDocSnap.data();
         const householdId = userData?.householdId;
 
         if (!householdId) {
           try {
-            const householdQuery = query(
-              collection(db, 'households'),
-              where('memberIds', 'array-contains', fbUser.uid)
+            const householdQuery = DatabaseMonitoringService.query(
+              DatabaseMonitoringService.collection('households'),
+              DatabaseMonitoringService.where('memberIds', 'array-contains', fbUser.uid)
             );
-            const querySnapshot = await getDocs(householdQuery);
+            const querySnapshot = await DatabaseMonitoringService.getDocs(householdQuery);
             if (!querySnapshot.empty) {
               const foundHouseholdId = querySnapshot.docs[0].id;
-              await updateDoc(userDocRef, {
+              await DatabaseMonitoringService.updateDoc(userDocRef, {
                 householdId: foundHouseholdId,
                 updatedAt: new Date()
               });

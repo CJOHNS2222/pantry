@@ -1,5 +1,5 @@
-import { doc, setDoc, Timestamp, serverTimestamp } from 'firebase/firestore';
-import { db } from '../firebaseConfig';
+import { Timestamp, serverTimestamp } from 'firebase/firestore';
+import DatabaseMonitoringService from '../services/databaseMonitoringService';
 import { DayPlan, User, Household } from '../types';
 import { Capacitor } from '@capacitor/core';
 import { UsageService } from '../services/usageService';
@@ -10,8 +10,8 @@ const performance = getPerformance();
 
 export async function saveDayPlan(householdId: string, day: DayPlan) {
   const id = day.date; // 'YYYY-MM-DD'
-  const ref = doc(db, 'households', householdId, 'mealPlan', id);
-  await setDoc(ref, {
+  const ref = DatabaseMonitoringService.doc(`households/${householdId}/mealPlan`, id);
+  await DatabaseMonitoringService.setDoc(ref, {
     date: Timestamp.fromDate(new Date(day.date)),
     breakfast: day.breakfast || [],
     lunch: day.lunch || [],
@@ -1042,7 +1042,10 @@ export function generateConsumptionSuggestions(inventory: PantryItem[]): Consump
     // Calculate average interval between purchases
     const intervals: number[] = [];
     for (let i = 1; i < history.length; i++) {
-      const days = Math.floor((history[i].getTime() - history[i - 1].getTime()) / (1000 * 60 * 60 * 24));
+      const prev = history[i - 1];
+      const curr = history[i];
+      if (!curr || !prev) continue;
+      const days = Math.floor((curr.getTime() - prev.getTime()) / (1000 * 60 * 60 * 24));
       if (days > 0 && days < 90) { // Ignore intervals longer than 3 months
         intervals.push(days);
       }
@@ -1052,6 +1055,7 @@ export function generateConsumptionSuggestions(inventory: PantryItem[]): Consump
 
     const averageInterval = intervals.reduce((sum, interval) => sum + interval, 0) / intervals.length;
     const lastPurchase = history[history.length - 1];
+    if (!lastPurchase) return; // defensive
     const daysSinceLastPurchase = Math.floor((today.getTime() - lastPurchase.getTime()) / (1000 * 60 * 60 * 24));
 
     // Suggest restocking if it's been longer than average interval
@@ -1440,7 +1444,7 @@ export interface QuantityResult {
 }
 
 // Unit conversion factors (to grams or milliliters)
-const UNIT_CONVERSIONS = {
+const UNIT_CONVERSIONS: Record<string, number> = {
   // Weight
   'g': 1,
   'gram': 1,
@@ -1526,10 +1530,10 @@ export function parseQuantity(quantityText: string): ParsedQuantity | null {
   let processedText = text;
   const fractionMatch = text.match(fractionRegex);
   if (fractionMatch) {
-    const whole = parseInt(fractionMatch[1]);
-    const numerator = parseInt(fractionMatch[2]);
-    const denominator = parseInt(fractionMatch[3]);
-    const decimal = whole + (numerator / denominator);
+    const whole = parseInt(fractionMatch[1] ?? '0', 10);
+    const numerator = parseInt(fractionMatch[2] ?? '0', 10);
+    const denominator = parseInt(fractionMatch[3] ?? '1', 10);
+    const decimal = whole + (numerator / Math.max(1, denominator));
     processedText = text.replace(fractionMatch[0], decimal.toString());
   }
 
@@ -1537,9 +1541,9 @@ export function parseQuantity(quantityText: string): ParsedQuantity | null {
   const simpleFractionRegex = /(\d+)\/(\d+)/;
   const simpleMatch = processedText.match(simpleFractionRegex);
   if (simpleMatch && !fractionMatch) {
-    const numerator = parseInt(simpleMatch[1]);
-    const denominator = parseInt(simpleMatch[2]);
-    const decimal = numerator / denominator;
+    const numerator = parseInt(simpleMatch[1] ?? '0', 10);
+    const denominator = parseInt(simpleMatch[2] ?? '1', 10);
+    const decimal = numerator / Math.max(1, denominator);
     processedText = processedText.replace(simpleMatch[0], decimal.toString());
   }
 
@@ -1549,17 +1553,22 @@ export function parseQuantity(quantityText: string): ParsedQuantity | null {
     return null;
   }
 
-  const amount = parseFloat(match[1]);
-  const unit = match[2].trim();
+  const amount = parseFloat(match[1] ?? '0');
+  const unitRaw = (match[2] ?? '').trim();
+  const unitKey = unitRaw.toLowerCase();
 
-  // Validate unit exists in our conversions
-  if (!UNIT_CONVERSIONS[unit] && !UNIT_CONVERSIONS[unit + 's']) {
-    return null;
-  }
+  // Find conversion for unit or plural form
+  const resolvedUnit = UNIT_CONVERSIONS[unitKey]
+    ? unitKey
+    : UNIT_CONVERSIONS[unitKey + 's']
+    ? unitKey + 's'
+    : undefined;
+
+  if (!resolvedUnit) return null;
 
   return {
     amount,
-    unit: UNIT_CONVERSIONS[unit] ? unit : unit + 's'
+    unit: resolvedUnit
   };
 }
 
@@ -1567,20 +1576,22 @@ export function parseQuantity(quantityText: string): ParsedQuantity | null {
  * Convert quantity to normalized grams/ml for comparison
  */
 export function normalizeQuantity(quantity: ParsedQuantity): QuantityResult {
-  const conversionFactor = UNIT_CONVERSIONS[quantity.unit.toLowerCase()];
+  const key = quantity.unit.toLowerCase();
+  const conversionFactor = UNIT_CONVERSIONS[key] ?? UNIT_CONVERSIONS[key + 's'];
   if (!conversionFactor) {
     return { ...quantity };
   }
 
   // For weight/volume units, convert to grams/ml
-  if (['g', 'gram', 'grams', 'kg', 'kilogram', 'kilograms', 'oz', 'ounce', 'ounces', 'lb', 'pound', 'pounds'].includes(quantity.unit.toLowerCase())) {
+  const lowUnit = key;
+  if (['g', 'gram', 'grams', 'kg', 'kilogram', 'kilograms', 'oz', 'ounce', 'ounces', 'lb', 'pound', 'pounds'].includes(lowUnit)) {
     return {
       ...quantity,
       normalizedGrams: quantity.amount * conversionFactor
     };
   }
 
-  if (['ml', 'milliliter', 'milliliters', 'l', 'liter', 'liters', 'cup', 'cups', 'tbsp', 'tablespoon', 'tablespoons', 'tsp', 'teaspoon', 'teaspoons', 'qt', 'quart', 'quarts', 'pt', 'pint', 'pints', 'gal', 'gallon', 'gallons'].includes(quantity.unit.toLowerCase())) {
+  if (['ml', 'milliliter', 'milliliters', 'l', 'liter', 'liters', 'cup', 'cups', 'tbsp', 'tablespoon', 'tablespoons', 'tsp', 'teaspoon', 'teaspoons', 'qt', 'quart', 'quarts', 'pt', 'pint', 'pints', 'gal', 'gallon', 'gallons'].includes(lowUnit)) {
     return {
       ...quantity,
       normalizedGrams: quantity.amount * conversionFactor // Using grams field for volume too
@@ -1616,7 +1627,8 @@ export function combineQuantities(q1: ParsedQuantity, q2: ParsedQuantity): Parse
   if (n1.normalizedGrams !== undefined && n2.normalizedGrams !== undefined) {
     // Convert both to grams/ml, add, then convert back to first unit
     const totalGrams = n1.normalizedGrams + n2.normalizedGrams;
-    const amountInOriginalUnit = totalGrams / UNIT_CONVERSIONS[q1.unit.toLowerCase()];
+    const conv = UNIT_CONVERSIONS[q1.unit.toLowerCase()] ?? UNIT_CONVERSIONS[q1.unit.toLowerCase() + 's'];
+    const amountInOriginalUnit = conv ? totalGrams / conv : totalGrams;
     return {
       amount: Math.round(amountInOriginalUnit * 100) / 100, // Round to 2 decimal places
       unit: q1.unit
@@ -1645,7 +1657,8 @@ export function subtractQuantities(total: ParsedQuantity, used: ParsedQuantity):
     const remainingGrams = nTotal.normalizedGrams - nUsed.normalizedGrams;
     if (remainingGrams <= 0) return null; // All used up
 
-    const amountInOriginalUnit = remainingGrams / UNIT_CONVERSIONS[total.unit.toLowerCase()];
+    const conv = UNIT_CONVERSIONS[total.unit.toLowerCase()] ?? UNIT_CONVERSIONS[total.unit.toLowerCase() + 's'];
+    const amountInOriginalUnit = conv ? remainingGrams / conv : remainingGrams;
     return {
       amount: Math.round(amountInOriginalUnit * 100) / 100,
       unit: total.unit

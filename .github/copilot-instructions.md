@@ -1,4 +1,92 @@
-# AI Agent Instructions for Smart Pantry Chef
+# Project Guidelines
+
+## Code Style
+- Stack is React 19 + TypeScript + Vite; follow existing patterns in `App.tsx`, `components/`, `hooks/`, and `services/`.
+- Prefer typed models from `types.ts` and `types/`; avoid introducing new ad-hoc shapes in components.
+- Keep lint behavior aligned with `eslint.config.ts` (some rules are intentionally warnings).
+- Use existing helpers before duplicating logic (`utils/appUtils.ts`, `utils/comparisonUtils.ts`, `utils/errorUtils.ts`).
+- Keep import style and formatting consistent with nearby files; use the `@` alias (root-mapped) when it improves clarity.
+
+## Architecture
+- App startup is provider-driven in `index.tsx`: `I18nProvider` -> `AppProvider` -> `AppActionsProvider`.
+- `App.tsx` orchestrates tab routing, global UI state, top-level effects, and hook composition.
+- Central data flow is in `hooks/useDataManagement.ts`; avoid direct Firestore access from random UI components.
+- Domain logic belongs in `services/` (analytics, notifications, cache sync, monitoring, pantry/recipe logic).
+- UI lives mainly in top-level `components/`; `components/layout/MainContent.tsx` handles lazy-loaded major tabs.
+
+## Build and Test
+- Install: `npm install`
+- Dev: `npm run dev`
+- Build: `npm run build`
+- Lint: `npm run lint`
+- Type-check: `npm run type-check`
+- Unit tests: `npm test`
+- Vitest UI: `npm run test:ui`
+- E2E: `npm run e2e:playwright`
+
+## Project Conventions
+- Preserve household-aware scoping patterns (`users/{uid}/...` vs `households/{householdId}/...`) used in `useDataManagement.ts` and `firestore.rules`.
+- Keep cache-document flows intact (`services/*CacheService.ts`, `services/syncStateService.ts`, `services/databaseMonitoringService.ts`).
+- Route telemetry through `services/analyticsService.ts` and Sentry helpers in `services/sentryService.ts`.
+- Prefer context/hook wiring over prop drilling for global app state (`contexts/AppContext.tsx`, `contexts/AppActionsContext.tsx`).
+- For platform-specific behavior, follow existing Capacitor guards (`Capacitor.getPlatform()` in components/services).
+
+## Integration Points
+- Firebase client setup is centralized in `firebaseConfig.ts` (Auth, Firestore, Storage, Functions, Messaging, Analytics).
+- Security/data constraints are defined in `firestore.rules`, `storage.rules`, and `firestore.indexes.json`.
+- Native/mobile integration is through `capacitor.config.ts` and the `android/` project.
+- PWA settings and chunking strategy are in `vite.config.ts` (`VitePWA`, manual chunks).
+- Server/admin workflows live in `functions/` and utility scripts in `scripts/`.
+
+## Security
+- Never commit secrets; use local env/config patterns already in this repo (`VITE_firebaseConfig.ts`, `.env.local`).
+- Preserve auth and ownership checks when editing data access (`hooks/useAuth.ts`, `hooks/useDataManagement.ts`, `firestore.rules`).
+- Keep household membership validation intact before read/write changes (`utils/appUtils.ts` + Firestore rules).
+- Avoid placing sensitive user data in logs, analytics events, or notifications payloads.# Project Guidelines
+
+## Code Style
+- Stack: React 19 + TypeScript + Vite (`package.json`, `vite.config.ts`).
+- Use functional components and hooks; prefer typed interfaces from `types.ts` and `types/`.
+- Follow existing import style and quote/semicolon conventions (see `App.tsx`, `hooks/useDataManagement.ts`).
+- Keep lint expectations aligned with `eslint.config.ts` (warnings are used intentionally for some TS/React rules).
+- Prefer existing utilities/services over duplicating logic (`utils/appUtils.ts`, `services/*`).
+
+## Architecture
+- App bootstraps through providers in `index.tsx` (`I18nProvider` -> `AppProvider` -> `AppActionsProvider`).
+- `App.tsx` is the orchestration shell (tab routing, UI state, hook composition, top-level effects).
+- Data access is centralized in `hooks/useDataManagement.ts`; do not bypass it with ad-hoc Firestore logic in UI components.
+- Business logic lives in `services/` (analytics, notifications, caching, monitoring, sync helpers).
+- UI is primarily in top-level `components/`; test setup and some shared UI live under `src/`.
+
+## Build and Test
+- Install deps: `npm install`
+- Dev server: `npm run dev`
+- Production build: `npm run build`
+- Lint: `npm run lint`
+- Type-check: `npm run type-check`
+- Unit/integration tests: `npm test`
+- Vitest UI: `npm run test:ui`
+- E2E tests: `npm run e2e:playwright`
+
+## Project Conventions
+- Use `Tab`-driven navigation patterns already defined in `App.tsx` and `types/app`.
+- Preserve household-aware scoping: many flows branch between `users/{uid}/...` and `households/{householdId}/...` (see `useDataManagement.ts`).
+- Keep cache-document sync patterns intact (`services/*CacheService.ts`, `services/syncStateService.ts`).
+- When adding telemetry, route through `services/analyticsService.ts` and Sentry helpers in `services/sentryService.ts`.
+- Use `@` alias (root-mapped in `vite.config.ts`) consistently when it improves readability.
+
+## Integration Points
+- Firebase client setup: `firebaseConfig.ts` (Auth, Firestore, Storage, Functions, Messaging, Analytics).
+- Security and data model constraints: `firestore.rules`, `storage.rules`, `firestore.indexes.json`.
+- Capacitor/native integration: `capacitor.config.ts` and `android/` project.
+- PWA behavior and chunk strategy are defined in `vite.config.ts` (`VitePWA`, manual chunks).
+- Backend/serverless and admin tasks are in `functions/` and scripts under `scripts/`.
+
+## Security
+- Never commit secrets or API keys; use environment/config files already in use (`VITE_firebaseConfig.ts`, local env files).
+- Respect Firestore ownership/membership constraints before changing writes/queries (`firestore.rules`).
+- Preserve auth checks and user scoping in hooks/services (`hooks/useAuth.ts`, `hooks/useDataManagement.ts`).
+- Be careful with notification and analytics payloads to avoid exposing sensitive user data.# AI Agent Instructions for Smart Pantry Chef
 
 ## Project Overview
 **Smart Pantry Chef** is a cross-platform React/TypeScript mobile app (iOS/Android/Web) for household pantry management, meal planning, and recipe discovery. Built with Firebase, Capacitor, and Google Gemini AI. Users manage shared household inventories, shopping lists, and meal plans in real time.
@@ -38,7 +126,7 @@
 - **Cache Collections:** User-scoped Firestore caches at `users/{userId}/cache/` for fast data retrieval:
   - `users/{userId}/cache/inventory` – Cached pantry items, synced from household inventory for quick access
   - `users/{userId}/cache/shoppingList` – Cached shopping list items, synced from household shopping list
-  - Purpose: Reduce real-time listener load, enable faster local-first queries, support offline scenarios
+  - Purpose: Reduce real-time listener load, enable faster local-first queries, support offline scenarios, reduce firestore costs by minimizing reads on main household collections
   - See [inventoryCacheService.ts](services/inventoryCacheService.ts) for cache management patterns
 
 ### Capacitor Integration

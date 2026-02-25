@@ -40,24 +40,31 @@ try {
   process.exit(1);
 }
 
-// Check for service account key
-const serviceAccountPath = join(projectRoot, 'firebase-service-account.json');
-let serviceAccount;
+// Prefer Application Default Credentials if set, otherwise load service account
+let app;
 try {
-  serviceAccount = JSON.parse(readFileSync(serviceAccountPath, 'utf8'));
-  console.log('✅ Found Firebase service account key');
-} catch (error) {
-  console.error('❌ Could not load firebase-service-account.json');
-  console.error('Please ensure you have a Firebase service account key file for admin access.');
-  console.error('Download it from: Firebase Console > Project Settings > Service Accounts > Generate new private key');
+  if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+    console.log('ℹ️ Using GOOGLE_APPLICATION_CREDENTIALS (Application Default Credentials)');
+    app = initializeApp({ projectId: envVars.VITE_PROJECT_ID });
+  } else {
+    // Check for service account key file in project root
+    const serviceAccountPath = join(projectRoot, 'firebase-service-account.json');
+    let serviceAccount;
+    try {
+      serviceAccount = JSON.parse(readFileSync(serviceAccountPath, 'utf8'));
+      console.log('✅ Found Firebase service account key');
+    } catch (error) {
+      console.error('❌ Could not load firebase-service-account.json and GOOGLE_APPLICATION_CREDENTIALS is not set');
+      console.error('Either set GOOGLE_APPLICATION_CREDENTIALS or place a firebase-service-account.json in the project root');
+      process.exit(1);
+    }
+
+    app = initializeApp({ credential: cert(serviceAccount), projectId: envVars.VITE_PROJECT_ID });
+  }
+} catch (initErr) {
+  console.error('❌ Failed to initialize Firebase Admin:', initErr.message || initErr);
   process.exit(1);
 }
-
-// Initialize Firebase Admin
-const app = initializeApp({
-  credential: cert(serviceAccount),
-  projectId: envVars.VITE_PROJECT_ID
-});
 
 const db = getFirestore(app);
 
@@ -77,26 +84,28 @@ async function getSavedRecipes(limitCount = 50) {
   }
 }
 
-// Cache popular recipes in the system collection
+// Cache popular recipes in a top-level collection so it's easy to find in Console
 async function cachePopularRecipes(recipes) {
   try {
-    const popularRecipesRef = db.doc("system/popular_recipes");
+    const popularRecipesRef = db.doc("recipe_caches/popular_recipes");
     await popularRecipesRef.set({
       recipes,
       lastUpdated: new Date(),
       version: 1
     });
-    console.log(`💾 Cached ${recipes.length} recipes for future fast loading`);
+    console.log(`💾 Cached ${recipes.length} recipes at recipe_caches/popular_recipes`);
+
+    
   } catch (error) {
     console.error("❌ Error caching popular recipes:", error);
     throw error;
   }
 }
 
-// Get cached popular recipes
+// Get cached popular recipes (reads from recipe_caches/popular_recipes)
 async function getCachedPopularRecipes() {
   try {
-    const popularRecipesRef = db.doc("system/popular_recipes");
+    const popularRecipesRef = db.doc("recipe_caches/popular_recipes");
     const docSnap = await popularRecipesRef.get();
 
     if (docSnap.exists) {
@@ -190,11 +199,10 @@ async function cachePopularRecipesScript() {
       index === self.findIndex(r => r.title === recipe.title)
     ).slice(0, targetUnique); // Take only the first 50 unique
 
-    console.log(`Loaded ${uniqueRecipes.length} unique recipes from database. Caching them...`);
-    await cachePopularRecipes(uniqueRecipes);
+    console.log(`Loaded ${uniqueRecipes.length} unique recipes from database. Caching them to recipe_caches/popular_recipes...`);
     await cachePopularRecipes(uniqueRecipes);
 
-    console.log(`✅ Successfully cached ${uniqueRecipes.length} popular recipes!`);
+    console.log(`✅ Successfully cached ${uniqueRecipes.length} popular recipes at recipe_caches/popular_recipes!`);
     console.log('The RecipeFinder will now load recipes with just 1 database read instead of 50+.');
 
   } catch (error) {

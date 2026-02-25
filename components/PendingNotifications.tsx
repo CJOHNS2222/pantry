@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Bell, Clock, Check, X, AlertCircle } from 'lucide-react';
 import { NotificationService, NotificationItem } from '../services/notificationService';
 import { User } from '../types';
-import { doc, updateDoc, getDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '../firebaseConfig';
+import { serverTimestamp } from 'firebase/firestore';
+import DatabaseMonitoringService from '../services/databaseMonitoringService';
 
 interface PendingNotificationsProps {
   user: User;
@@ -55,15 +55,15 @@ export const PendingNotifications: React.FC<PendingNotificationsProps> = ({
           if (notification.actionData?.householdId) {
             try {
               // Update user document with householdId
-              const userRef = doc(db, 'users', user.id);
-              await updateDoc(userRef, {
+              const userRef = DatabaseMonitoringService.doc('users', user.id);
+              await DatabaseMonitoringService.updateDoc(userRef, {
                 householdId: notification.actionData.householdId,
                 updatedAt: serverTimestamp()
               });
 
               // Update household document to add member
-              const householdRef = doc(db, 'households', notification.actionData.householdId);
-              const householdDoc = await getDoc(householdRef);
+              const householdRef = DatabaseMonitoringService.doc('households', notification.actionData.householdId);
+              const householdDoc = await DatabaseMonitoringService.getDoc(householdRef);
               
               if (householdDoc.exists()) {
                 const householdData = householdDoc.data();
@@ -89,7 +89,7 @@ export const PendingNotifications: React.FC<PendingNotificationsProps> = ({
                 };
                 const updatedMembers = [...existingMembers, newMember];
                 
-                await updateDoc(householdRef, {
+                await DatabaseMonitoringService.updateDoc(householdRef, {
                   memberIds: updatedMemberIds,
                   members: updatedMembers,
                   updatedAt: serverTimestamp()

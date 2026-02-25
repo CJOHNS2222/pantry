@@ -7,9 +7,8 @@ import { PremiumFeature } from './PremiumFeature';
 import { GroceryCostEstimator } from './GroceryCostEstimator';
 import { Tab } from '../types/app';
 import { searchRecipes as searchRecipesGemini } from '../services/geminiService';
-import { getSavedRecipes, getCachedPopularRecipes } from '../services/recipeService';
-import { collection, getDocs } from 'firebase/firestore';
-import { db } from '../firebaseConfig';
+import { getSavedRecipes, getCachedPopularRecipes, getCachedRecipesCache } from '../services/recipeService';
+// Firestore access is instrumented via DatabaseMonitoringService when needed
 import { parseIngredientForShoppingList } from '../utils/appUtils';
 import AnalyticsService from '../services/analyticsService';
 import { searchRecipes } from '../utils/searchUtils';
@@ -71,12 +70,20 @@ const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
   useEffect(() => {
     const loadCachedRecipes = async () => {
       try {
-        const recipes = await getCachedPopularRecipes();
+        // For the meal planner we prefer the large pre-built cache document to avoid
+        // reading hundreds of recipe docs. Admin script writes `recipe_caches/recipes_cache_1`.
+        const recipes = await getCachedRecipesCache('recipe_caches/recipes_cache_1');
         setCachedRecipes(recipes);
         setCachedRecipesLoaded(true);
       } catch (error) {
-        console.error('Failed to load cached recipes:', error);
-        setCachedRecipesLoaded(true); // Still mark as loaded to avoid infinite loading
+        console.error('Failed to load cached recipes for meal planner, falling back:', error);
+        try {
+          const fallback = await getCachedPopularRecipes();
+          setCachedRecipes(fallback);
+        } catch (e) {
+          console.error('Fallback also failed:', e);
+        }
+        setCachedRecipesLoaded(true);
       }
     };
 
@@ -986,21 +993,33 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
 
   // Helper function to check if a day is today
   const isToday = (dateString: string) => {
-    const today = new Date().toISOString().split('T')[0];
-    return dateString === today;
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const todayLocal = `${yyyy}-${mm}-${dd}`;
+    return dateString === todayLocal;
   };
 
   // Get today's meals for highlighting
   const todaysMeals = useMemo(() => {
-    const today = new Date().toISOString().split('T')[0];
-    const todayPlan = mealPlan.find(day => day.date === today);
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const todayLocal = `${yyyy}-${mm}-${dd}`;
+
+    const todayPlan = mealPlan.find(day => day.date === todayLocal);
     if (!todayPlan) return [];
-    
-    return [
-      ...(todayPlan.breakfast || []),
-      ...(todayPlan.lunch || []),
-      ...(todayPlan.dinner || [])
+
+    // Preserve explicit mealType on each MealPlanItem instead of inferring
+    const items = [
+      ...(todayPlan.breakfast || []).map(item => ({ ...item, mealType: 'breakfast' })),
+      ...(todayPlan.lunch || []).map(item => ({ ...item, mealType: 'lunch' })),
+      ...(todayPlan.dinner || []).map(item => ({ ...item, mealType: 'dinner' })),
     ];
+
+    return items;
   }, [mealPlan]);
 
   return (
@@ -1113,7 +1132,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
                   className="bg-theme-secondary/80 backdrop-blur-sm border border-[var(--accent-color)]/30 rounded-lg p-3 cursor-pointer hover:bg-theme-secondary transition-all hover:shadow-md"
                 >
                   <div className="text-xs font-semibold text-[var(--accent-color)] mb-1 uppercase">
-                    {index < todaysMeals.length / 3 ? 'Breakfast' : index < (todaysMeals.length * 2) / 3 ? 'Lunch' : 'Dinner'}
+                    {meal.mealType ? (meal.mealType.charAt(0).toUpperCase() + meal.mealType.slice(1)) : 'Meal'}
                   </div>
                   <div className="text-sm font-medium text-theme-primary truncate">
                     {meal.recipe.title}

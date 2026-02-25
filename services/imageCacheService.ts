@@ -1,8 +1,6 @@
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '../firebaseConfig';
 import DatabaseMonitoringService from './databaseMonitoringService';
-import { writeBatch, doc, setDoc } from 'firebase/firestore';
-import { db } from '../firebaseConfig';
 
 export interface CachedImageData {
   [cacheKey: string]: CachedImage;
@@ -310,11 +308,11 @@ export async function cacheImageFromUrl(originalUrl: string, itemName: string): 
   };
 
   try {
-    const cacheRef = doc(db, 'image_cache/global');
-    const cacheDoc = await DatabaseMonitoringService.getDoc(cacheRef);
-    const data = cacheDoc.exists() ? cacheDoc.data() as CachedImageData : {};
-    data[cacheKey] = cachedImage;
-    await setDoc(cacheRef, data);
+  const cacheRef = DatabaseMonitoringService.doc('image_cache/global');
+  const cacheDoc = await DatabaseMonitoringService.getDoc(cacheRef);
+  const data = cacheDoc && cacheDoc.exists() ? cacheDoc.data() as CachedImageData : {};
+  data[cacheKey] = cachedImage;
+  await DatabaseMonitoringService.setDoc(cacheRef, data);
 
     // Update local caches
     memoryCache.set(cacheKey, cachedImage);
@@ -384,10 +382,10 @@ export async function cacheImagesFromUrls(imageMap: Map<string, string>): Promis
 
     if (validResults.length > 0) {
       try {
-        const cacheRef = doc(db, 'image_cache/global');
-        const cacheDoc = await DatabaseMonitoringService.getDoc(cacheRef);
-        const data = cacheDoc.exists() ? cacheDoc.data() as CachedImageData : {};
-        const now = new Date();
+      const cacheRef = DatabaseMonitoringService.doc('image_cache/global');
+      const cacheDoc = await DatabaseMonitoringService.getDoc(cacheRef);
+      const data = cacheDoc && cacheDoc.exists() ? cacheDoc.data() as CachedImageData : {};
+      const now = new Date();
 
         validResults.forEach(({ itemName, cachedUrl, cacheKey }) => {
           const cachedImage: CachedImage = {
@@ -405,7 +403,7 @@ export async function cacheImagesFromUrls(imageMap: Map<string, string>): Promis
           results.set(itemName, cachedUrl);
         });
 
-        await setDoc(cacheRef, data);
+        await DatabaseMonitoringService.setDoc(cacheRef, data);
         console.log(`Successfully cached ${validResults.length} images in this batch`);
       } catch (err: any) {
         console.error('Error batch saving to Firestore:', err);

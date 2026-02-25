@@ -1,19 +1,5 @@
-import {
-  collection,
-  doc,
-  setDoc,
-  getDoc,
-  getDocs,
-  query,
-  where,
-  orderBy,
-  limit,
-  updateDoc,
-  increment,
-  arrayUnion,
-  Timestamp
-} from 'firebase/firestore';
-import { db } from '../firebaseConfig';
+import { increment, arrayUnion, Timestamp } from 'firebase/firestore';
+import DatabaseMonitoringService from './databaseMonitoringService';
 import {
   RecipeRating,
   RecipeCommunityStats,
@@ -22,6 +8,7 @@ import {
   RecipeFeedback
 } from '../types';
 import { log } from './logService';
+import { upsertCommunityRatedRecipeByTitle } from './recipeService';
 
 // Recursively remove undefined properties (preserve Timestamp and other non-plain values)
 const sanitizeForFirestore = (obj: any): any => {
@@ -48,7 +35,7 @@ export class RecipeRatingService {
    */
   static async submitRating(rating: RecipeRating, userId: string, householdId?: string): Promise<void> {
     try {
-      const ratingRef = doc(db, this.RATINGS_COLLECTION, rating.id);
+      const ratingRef = DatabaseMonitoringService.doc(this.RATINGS_COLLECTION, rating.id);
       const ratingData = {
         ...rating,
         userId,
@@ -59,10 +46,18 @@ export class RecipeRatingService {
 
       // Remove any undefined fields (Firestore rejects undefined)
       const cleanRatingData = sanitizeForFirestore(ratingData);
-      await setDoc(ratingRef, cleanRatingData, { merge: true });
+      await DatabaseMonitoringService.setDoc(ratingRef, cleanRatingData);
 
       // Update community stats
       await this.updateCommunityStats(rating.recipeTitle, householdId);
+
+      // Update single-doc community-rated cache so UI can read one document
+      try {
+        await upsertCommunityRatedRecipeByTitle(rating.recipeTitle);
+      } catch (e) {
+        // swallow cache errors - rating write must not fail because cache update failed
+        log.warn('Failed to update community-rated cache after rating', { error: e, recipeTitle: rating.recipeTitle });
+      }
 
       log.info('Recipe rating submitted', { recipeTitle: rating.recipeTitle, userId });
     } catch (err: any) {
@@ -76,8 +71,8 @@ export class RecipeRatingService {
    */
   static async getCommunityStats(recipeTitle: string, householdId?: string): Promise<RecipeCommunityStats> {
     try {
-      const statsRef = doc(db, this.COMMUNITY_STATS_COLLECTION, recipeTitle);
-      const statsDoc = await getDoc(statsRef);
+      const statsRef = DatabaseMonitoringService.doc(this.COMMUNITY_STATS_COLLECTION, recipeTitle);
+      const statsDoc = await DatabaseMonitoringService.getDoc(statsRef);
 
       if (statsDoc.exists()) {
         const data = statsDoc.data();
@@ -85,12 +80,12 @@ export class RecipeRatingService {
 
         if (householdId) {
           // Get household-specific stats
-          const householdRatingsQuery = query(
-            collection(db, this.RATINGS_COLLECTION),
-            where('recipeTitle', '==', recipeTitle),
-            where('householdId', '==', householdId)
+          const householdRatingsQuery = DatabaseMonitoringService.query(
+            DatabaseMonitoringService.collection(this.RATINGS_COLLECTION),
+            DatabaseMonitoringService.where('recipeTitle', '==', recipeTitle),
+            DatabaseMonitoringService.where('householdId', '==', householdId)
           );
-          const householdRatings = await getDocs(householdRatingsQuery);
+          const householdRatings = await DatabaseMonitoringService.getDocs(householdRatingsQuery);
 
           if (!householdRatings.empty) {
             const ratings = householdRatings.docs.map(doc => doc.data());
@@ -134,11 +129,11 @@ export class RecipeRatingService {
    */
   private static async updateCommunityStats(recipeTitle: string, householdId?: string): Promise<void> {
     try {
-      const ratingsQuery = query(
-        collection(db, this.RATINGS_COLLECTION),
-        where('recipeTitle', '==', recipeTitle)
+      const ratingsQuery = DatabaseMonitoringService.query(
+        DatabaseMonitoringService.collection(this.RATINGS_COLLECTION),
+        DatabaseMonitoringService.where('recipeTitle', '==', recipeTitle)
       );
-      const ratingsSnapshot = await getDocs(ratingsQuery);
+      const ratingsSnapshot = await DatabaseMonitoringService.getDocs(ratingsQuery);
       const ratings = ratingsSnapshot.docs.map(doc => doc.data());
 
       if (ratings.length === 0) return;
@@ -165,14 +160,14 @@ export class RecipeRatingService {
         .map(([type]) => ({ type: type as RecipeFeedback['type'] }));
 
       // Update stats document
-      const statsRef = doc(db, this.COMMUNITY_STATS_COLLECTION, recipeTitle);
-      await setDoc(statsRef, {
+      const statsRef = DatabaseMonitoringService.doc(this.COMMUNITY_STATS_COLLECTION, recipeTitle);
+      await DatabaseMonitoringService.setDoc(statsRef, {
         totalRatings,
         averageRating,
         wouldMakeAgainPercentage,
         topFeedback,
         lastUpdated: Timestamp.now()
-      }, { merge: true });
+      });
 
     } catch (err: any) {
       log.error('Failed to update community stats', { err, recipeTitle });
@@ -189,9 +184,9 @@ export class RecipeRatingService {
   ): Promise<void> {
     try {
       const modId = `${recipeTitle}_${userId}_${Date.now()}`;
-      const modRef = doc(db, this.MODIFICATIONS_COLLECTION, modId);
+      const modRef = DatabaseMonitoringService.doc(this.MODIFICATIONS_COLLECTION, modId);
 
-      await setDoc(modRef, {
+      await DatabaseMonitoringService.setDoc(modRef, {
         ...modification,
         id: modId,
         recipeTitle,
@@ -212,8 +207,8 @@ export class RecipeRatingService {
    */
   static async markModificationHelpful(modificationId: string, userId: string): Promise<void> {
     try {
-      const modRef = doc(db, this.MODIFICATIONS_COLLECTION, modificationId);
-      await updateDoc(modRef, {
+      const modRef = DatabaseMonitoringService.doc(this.MODIFICATIONS_COLLECTION, modificationId);
+      await DatabaseMonitoringService.updateDoc(modRef, {
         helpful: increment(1),
         helpfulBy: arrayUnion(userId)
       });
@@ -230,15 +225,15 @@ export class RecipeRatingService {
    */
   static async getTopModifications(recipeTitle: string, limitCount: number = 10): Promise<RecipeModification[]> {
     try {
-      const modsQuery = query(
-        collection(db, this.MODIFICATIONS_COLLECTION),
-        where('recipeTitle', '==', recipeTitle),
-        orderBy('helpful', 'desc'),
-        orderBy('date', 'desc'),
-        limit(limitCount)
+      const modsQuery = DatabaseMonitoringService.query(
+        DatabaseMonitoringService.collection(this.MODIFICATIONS_COLLECTION),
+        DatabaseMonitoringService.where('recipeTitle', '==', recipeTitle),
+        DatabaseMonitoringService.orderBy('helpful', 'desc'),
+        DatabaseMonitoringService.orderBy('date', 'desc'),
+        DatabaseMonitoringService.limit(limitCount)
       );
 
-      const modsSnapshot = await getDocs(modsQuery);
+      const modsSnapshot = await DatabaseMonitoringService.getDocs(modsQuery);
       return modsSnapshot.docs.map(doc => ({
         ...doc.data(),
         date: normalizeDate(doc.data().date)
@@ -254,14 +249,14 @@ export class RecipeRatingService {
    */
   static async getUserRating(recipeTitle: string, userId: string): Promise<RecipeRating | null> {
     try {
-      const ratingQuery = query(
-        collection(db, this.RATINGS_COLLECTION),
-        where('recipeTitle', '==', recipeTitle),
-        where('userId', '==', userId),
-        limit(1)
+      const ratingQuery = DatabaseMonitoringService.query(
+        DatabaseMonitoringService.collection(this.RATINGS_COLLECTION),
+        DatabaseMonitoringService.where('recipeTitle', '==', recipeTitle),
+        DatabaseMonitoringService.where('userId', '==', userId),
+        DatabaseMonitoringService.limit(1)
       );
 
-      const ratingSnapshot = await getDocs(ratingQuery);
+      const ratingSnapshot = await DatabaseMonitoringService.getDocs(ratingQuery);
       if (!ratingSnapshot.empty) {
         const data = ratingSnapshot.docs[0].data();
         return {
@@ -281,15 +276,15 @@ export class RecipeRatingService {
    */
   static async getHouseholdRatings(recipeTitle: string, householdId: string): Promise<RecipeRating[]> {
     try {
-      const ratingsQuery = query(
-        collection(db, this.RATINGS_COLLECTION),
-        where('recipeTitle', '==', recipeTitle),
-        where('householdId', '==', householdId),
-        orderBy('date', 'desc'),
-        limit(10)
+      const ratingsQuery = DatabaseMonitoringService.query(
+        DatabaseMonitoringService.collection(this.RATINGS_COLLECTION),
+        DatabaseMonitoringService.where('recipeTitle', '==', recipeTitle),
+        DatabaseMonitoringService.where('householdId', '==', householdId),
+        DatabaseMonitoringService.orderBy('date', 'desc'),
+        DatabaseMonitoringService.limit(10)
       );
 
-      const ratingsSnapshot = await getDocs(ratingsQuery);
+      const ratingsSnapshot = await DatabaseMonitoringService.getDocs(ratingsQuery);
       return ratingsSnapshot.docs.map(doc => {
         const data = doc.data();
         return {
@@ -314,25 +309,25 @@ export class RecipeRatingService {
   ): Promise<any[]> { // TODO: Define proper recommendation type
     try {
       // Get user's rating history
-      const userRatingsQuery = query(
-        collection(db, this.RATINGS_COLLECTION),
-        where('userId', '==', userId),
-        orderBy('date', 'desc'),
-        limit(20)
+      const userRatingsQuery = DatabaseMonitoringService.query(
+        DatabaseMonitoringService.collection(this.RATINGS_COLLECTION),
+        DatabaseMonitoringService.where('userId', '==', userId),
+        DatabaseMonitoringService.orderBy('date', 'desc'),
+        DatabaseMonitoringService.limit(20)
       );
-      const userRatings = await getDocs(userRatingsQuery);
+      const userRatings = await DatabaseMonitoringService.getDocs(userRatingsQuery);
       const userRatingData = userRatings.docs.map(doc => doc.data());
 
       // Get household preferences
       let householdRatings: any[] = [];
       if (householdId) {
-        const householdQuery = query(
-          collection(db, this.RATINGS_COLLECTION),
-          where('householdId', '==', householdId),
-          orderBy('date', 'desc'),
-          limit(50)
+        const householdQuery = DatabaseMonitoringService.query(
+          DatabaseMonitoringService.collection(this.RATINGS_COLLECTION),
+          DatabaseMonitoringService.where('householdId', '==', householdId),
+          DatabaseMonitoringService.orderBy('date', 'desc'),
+          DatabaseMonitoringService.limit(50)
         );
-        const householdSnapshot = await getDocs(householdQuery);
+        const householdSnapshot = await DatabaseMonitoringService.getDocs(householdQuery);
         householdRatings = householdSnapshot.docs.map(doc => doc.data());
       }
 

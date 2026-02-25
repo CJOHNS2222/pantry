@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
-import { ShoppingBasket, Check, Trash2, Archive, Plus, X, Share2, Copy, Download, MessageSquare } from 'lucide-react';
+import { ShoppingBasket, Check, Trash2, Archive, Plus, X, Share2, Copy, Download, MessageSquare, Calendar } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { ShoppingItem, User, Household } from '../types';
 import { inferCategoryFromItemName, getItemImage, isHouseholdMember } from '../utils/appUtils';
@@ -17,6 +17,7 @@ import { HouseholdShoppingShare } from './HouseholdShoppingShare';
 import { QuickAdd } from './QuickAdd';
 import { ShoppingListAnalytics } from './ShoppingListAnalytics';
 import QuantityUnitPicker from './QuantityUnitPicker';
+import VisualQuantitySelector from './VisualQuantitySelector';
 import { AdMobBanner } from './AdMobBanner';
 import { canShowAds } from '../utils/appUtils';
 
@@ -29,9 +30,8 @@ import { offlineDataCache } from '../services/offlineDataCache';
 import { groceryPriceService } from '../services/groceryPriceService';
 import { priceCacheService } from '../services/priceCacheService';
 
-// Firestore imports
-import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '../firebaseConfig';
+// Firestore access is instrumented via DatabaseMonitoringService when needed
+import DatabaseMonitoringService from '../services/databaseMonitoringService';
 
 interface ShoppingListProps {
   items: ShoppingItem[];
@@ -105,6 +105,11 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   const [viewMode, setViewMode] = useState<'list' | 'organized'>('list');
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [undoHistory, setUndoHistory] = useState<Array<{item: ShoppingItem, timestamp: Date}>>([]);
+  const [purchaseModalOpen, setPurchaseModalOpen] = useState(false);
+  const [purchaseTargetItem, setPurchaseTargetItem] = useState<ShoppingItem | null>(null);
+  const [purchaseQty, setPurchaseQty] = useState<number>(1);
+  const [purchaseUnit, setPurchaseUnit] = useState<string>('count');
+  const [purchaseExpires, setPurchaseExpires] = useState<string | undefined>(undefined);
   const [householdActivity, setHouseholdActivity] = useState<Array<{
     id: string;
     memberId: string;
@@ -316,21 +321,42 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     const item = items.find(i => i.id === id);
     if (!item) return;
 
-    const wasChecked = item.checked;
-    const now = new Date();
-
-    setItems(prev => prev.map(i => i.id === id ? {
-      ...i,
-      checked: !i.checked,
-      completedAt: !i.checked ? now : undefined // Set completedAt when checking, clear when unchecking
-    } : i));
-
-    // Add to undo history if checking off
-    if (!wasChecked) {
-      setUndoHistory(prev => [...prev.slice(-4), { item: { ...item, checked: true }, timestamp: now }]);
+    // If checking an item (not unchecking), open purchase modal to capture purchased quantity/expiration
+    if (!item.checked) {
+      setPurchaseTargetItem(item);
+      setPurchaseQty(typeof item.quantity === 'number' ? item.quantity : parseFloat((item.quantity as string) || '1') || 1);
+      setPurchaseUnit((item.purchasedQuantity && item.purchasedQuantity.unit) || 'count');
+      setPurchaseExpires(undefined);
+      setPurchaseModalOpen(true);
+      return;
     }
 
-    // Note: checked state is not persisted to database/cache
+    // Unchecking - simply toggle
+    const now = new Date();
+    setItems(prev => prev.map(i => i.id === id ? { ...i, checked: false, completedAt: undefined } : i));
+  };
+
+  const confirmPurchaseForItem = (itemId: string) => {
+    const now = new Date();
+    setItems(prev => prev.map(i => i.id === itemId ? {
+      ...i,
+      checked: true,
+      completedAt: now,
+      purchasedQuantity: { amount: purchaseQty, unit: purchaseUnit },
+      purchasedBatch: { amount: purchaseQty, unit: purchaseUnit, expires: purchaseExpires }
+    } : i));
+
+    // Add to undo history
+    const original = items.find(it => it.id === itemId);
+    if (original) setUndoHistory(prev => [...prev.slice(-4), { item: { ...original, checked: true }, timestamp: now }]);
+
+    setPurchaseModalOpen(false);
+    setPurchaseTargetItem(null);
+  };
+
+  const closePurchaseModal = () => {
+    setPurchaseModalOpen(false);
+    setPurchaseTargetItem(null);
   };
 
   const undoLastCheck = () => {
@@ -524,8 +550,13 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
 
     // Set default purchased quantities for items that don't have them
     const updatedItems = itemsToMove.map(item => {
+      // Prefer purchasedBatch (from modal) if present, otherwise fall back to purchasedQuantity or estimate
+      if (item.purchasedBatch) {
+        return { ...item, purchasedQuantity: { amount: item.purchasedBatch.amount, unit: item.purchasedBatch.unit || 'count' } };
+      }
+
       if (!item.purchasedQuantity) {
-        const neededQty = item.quantity ? parseFloat(item.quantity) : 1;
+        const neededQty = item.quantity ? parseFloat(item.quantity as string) : 1;
         return { ...item, purchasedQuantity: { amount: neededQty, unit: 'count' } };
       }
       return item;
@@ -668,6 +699,72 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
           >
             Store Order
           </button>
+        </div>
+      )}
+
+      {/* Purchase modal when checking an item */}
+      {purchaseModalOpen && purchaseTargetItem && (
+        <div className="fixed inset-0 z-[9999] bg-black/40 flex items-center justify-center p-4">
+          <div className="bg-theme-primary rounded-lg p-6 max-w-md w-full shadow-xl">
+            <h3 className="text-lg font-bold mb-3">Add purchase for "{purchaseTargetItem.item}"</h3>
+            <div className="space-y-3">
+              <div>
+                <label className="text-sm text-theme-secondary">Quantity purchased</label>
+                <div className="mt-2">
+                  <VisualQuantitySelector
+                    value={purchaseQty}
+                    onChange={(v) => setPurchaseQty(v)}
+                    itemName={purchaseTargetItem.item}
+                    unit={purchaseUnit}
+                    step={0.25}
+                    minValue={0.25}
+                    showTypicalAmounts={false}
+                    className="w-full"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-sm text-theme-secondary">Unit</label>
+                <select value={purchaseUnit} onChange={(e) => setPurchaseUnit(e.target.value)} className="w-full mt-1 p-2 rounded border text-black">
+                  <option value="count">count</option>
+                  <option value="lb">lb</option>
+                  <option value="oz">oz</option>
+                  <option value="kg">kg</option>
+                  <option value="g">g</option>
+                  <option value="pack">pack</option>
+                  <option value="bag">bag</option>
+                  <option value="bunch">bunch</option>
+                  <option value="dozen">dozen</option>
+                  <option value="can">can</option>
+                  <option value="piece">piece</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-sm text-theme-secondary">Expiration date (optional)</label>
+                <div className="flex items-center gap-2 mt-1">
+                  <button
+                    type="button"
+                    onClick={() => document.getElementById('purchase-expires')?.click()}
+                    className="p-2 bg-theme-secondary rounded-md hover:bg-theme-primary transition-colors"
+                    aria-label="Pick expiration date"
+                  >
+                    <Calendar className="w-5 h-5 text-theme-primary" />
+                  </button>
+                  <input
+                    id="purchase-expires"
+                    type="date"
+                    value={purchaseExpires || ''}
+                    onChange={(e) => setPurchaseExpires(e.target.value || undefined)}
+                    className="p-2 rounded border text-black w-36"
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-2 justify-end mt-6">
+              <button onClick={closePurchaseModal} className="px-4 py-2 rounded bg-theme-secondary">Cancel</button>
+              <button onClick={() => confirmPurchaseForItem(purchaseTargetItem.id)} className="px-4 py-2 rounded bg-[var(--accent-color)] text-white">Confirm</button>
+            </div>
+          </div>
         </div>
       )}
 

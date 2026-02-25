@@ -31,8 +31,9 @@ describe('UsageIndicator', () => {
 
   const mockUsageLimits = {
     recipes: { used: 5, max: 10 },
-    searches: { used: 15, weekly: 20 },
+    searches: { used: 15, weekly: 20, resetDate: new Date() },
     mealPlanning: { weeklyUsed: 3, weeklyRecipes: 5 },
+    gemini: { used: 0, max: 0 },
   };
 
   it('renders nothing when loading', () => {
@@ -119,8 +120,9 @@ describe('UsageIndicator', () => {
 
     const highUsageLimits = {
       recipes: { used: 9, max: 10 }, // 90% - critical
-      searches: { used: 15, weekly: 20 },
+      searches: { used: 15, weekly: 20, resetDate: new Date() },
       mealPlanning: { weeklyUsed: 3, weeklyRecipes: 5 },
+      gemini: { used: 0, max: 0 },
     };
 
     const { UsageService } = await import('../../../services/usageService');
@@ -144,8 +146,9 @@ describe('UsageIndicator', () => {
 
     const unlimitedUsageLimits = {
       recipes: { used: 5, max: -1 }, // Unlimited
-      searches: { used: 15, weekly: 20 },
+      searches: { used: 15, weekly: 20, resetDate: new Date() },
       mealPlanning: { weeklyUsed: 3, weeklyRecipes: 5 },
+      gemini: { used: 0, max: 0 },
     };
 
     const { UsageService } = await import('../../../services/usageService');

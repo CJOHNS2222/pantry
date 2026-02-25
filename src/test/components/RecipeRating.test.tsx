@@ -75,8 +75,8 @@ describe('RecipeRatingUI', () => {
   });
 
   it('submits rating with comment', () => {
-    const mockOnRate = vi.fn();
-    (window as any).TEST_USER = defaultProps.user;
+        // Click on 4th star
+        fireEvent.click(starButtons[3]!);
     render(<RecipeRatingUI {...defaultProps} onRatingSubmitted={mockOnRate} />);
 
     // Select 5 stars
@@ -91,7 +91,7 @@ describe('RecipeRatingUI', () => {
 
     // Submit
     const submitButton = screen.getByRole('button', { name: /submit rating/i });
-    fireEvent.click(submitButton);
+        fireEvent.click(starButtons[4]!);
 
     expect(mockOnRate).toHaveBeenCalledWith(expect.objectContaining({
       id: expect.any(String),
@@ -122,7 +122,7 @@ describe('RecipeRatingUI', () => {
 
     const submitButton = screen.getByRole('button', { name: /submit rating/i });
     fireEvent.click(submitButton);
-
+        render(<RecipeRatingUI {...defaultProps} onRatingSubmitted={mockOnRate} />);
     await waitFor(() => {
       expect(screen.getByText('Thanks for your feedback!')).toBeInTheDocument();
     });
@@ -138,7 +138,7 @@ describe('RecipeRatingUI', () => {
     const starButtons = screen.getAllByRole('button').filter(button =>
       button.querySelector('svg') !== null
     );
-    fireEvent.click(starButtons[0]); // 1 star
+    fireEvent.click(starButtons[0]!); // 1 star
 
     const submitButton = screen.getByRole('button', { name: /submit rating/i });
     fireEvent.click(submitButton);

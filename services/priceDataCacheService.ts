@@ -97,7 +97,7 @@ export class PriceDataCacheService {
 
     try {
       const cacheRef = this.getCacheRef();
-      await DatabaseMonitoringService.setDoc(cacheRef, this.priceData, { merge: true });
+      await DatabaseMonitoringService.setDoc(cacheRef, this.priceData);
     } catch (err: any) {
       console.error("Failed to save price data cache:", err);
     }

@@ -152,15 +152,15 @@ class OfflineQueueService {
     try {
       for (const op of operations) {
         try {
-          await this.executeOperationWithConflictResolution(op);
-          await this.remove(op.id);
-          progress.completed++;
+            await this.executeOperationWithConflictResolution(op);
+            await this.remove(op.id);
+            progress.completed++;
         } catch (err: any) {
-          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            const errorMessage = err instanceof Error ? err.message : 'Unknown error';
 
-          if (this.isConflictError(error)) {
+            if (this.isConflictError(err)) {
             // Handle conflict resolution
-            await this.handleConflict(op, error);
+            await this.handleConflict(op, err);
             progress.conflicts++;
           } else {
             // Handle retry logic
@@ -185,7 +185,7 @@ class OfflineQueueService {
     const { type, collection: coll, docId, data } = op;
 
     if (type === 'add') {
-      await addDoc(collection(db, coll), data);
+      await DatabaseMonitoringService.addDoc(DatabaseMonitoringService.collection(coll), data);
     } else if (type === 'update' && docId) {
       // Check for conflicts before updating
       const docRef = DatabaseMonitoringService.doc(coll, docId);
@@ -201,9 +201,9 @@ class OfflineQueueService {
         }
       }
 
-      await updateDoc(docRef, { ...data, updatedAt: serverTimestamp() });
+      await DatabaseMonitoringService.updateDoc(docRef, { ...data, updatedAt: serverTimestamp() });
     } else if (type === 'delete' && docId) {
-      await deleteDoc(doc(db, coll, docId));
+      await DatabaseMonitoringService.deleteDoc(DatabaseMonitoringService.doc(coll, docId));
     }
   }
 

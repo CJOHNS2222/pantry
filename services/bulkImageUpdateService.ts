@@ -1,7 +1,5 @@
 import DatabaseMonitoringService from './databaseMonitoringService';
 import { InventoryCacheService } from './inventoryCacheService';
-import { db } from '../firebaseConfig';
-import { doc, updateDoc } from 'firebase/firestore';
 import { PantryItem, User } from '../types';
 import { fetchExternalItemImage } from '../utils/appUtils';
 import { getCachedImageUrls, cacheImagesFromUrls, initializeImageCache } from './imageCacheService';
@@ -101,8 +99,8 @@ export class BulkImageUpdateService {
         try {
           const finalImageUrl = allImageUrls.get(item.item);
           if (finalImageUrl && finalImageUrl !== item.image) {
-            const itemRef = doc(db, 'users', user.id, 'inventory', item.id);
-            await updateDoc(itemRef, {
+            const itemRef = DatabaseMonitoringService.doc('users', user.id + '/inventory/' + item.id);
+            await DatabaseMonitoringService.updateDoc(itemRef, {
               image: finalImageUrl,
               imageUpdatedAt: new Date().toISOString(),
               imageCached: true // All images in allImageUrls are now cached
@@ -223,8 +221,8 @@ export class BulkImageUpdateService {
         try {
           const finalImageUrl = allImageUrls.get(item.item);
           if (finalImageUrl && finalImageUrl !== item.image) {
-            const itemRef = doc(db, 'households', householdId, 'inventory', item.id);
-            await updateDoc(itemRef, {
+            const itemRef = DatabaseMonitoringService.doc('households', householdId + '/inventory/' + item.id);
+            await DatabaseMonitoringService.updateDoc(itemRef, {
               image: finalImageUrl,
               imageUpdatedAt: new Date().toISOString(),
               imageCached: true

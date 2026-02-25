@@ -17,24 +17,26 @@ vi.mock('../../../services/databaseMonitoringService', () => ({
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
-import GroceryPriceService, { groceryPriceService } from '../../../services/groceryPriceService';
+import { groceryPriceService } from '../../../services/groceryPriceService';
 import DatabaseMonitoringService from '../../../services/databaseMonitoringService';
+
+const DatabaseMonitoringServiceMock = DatabaseMonitoringService as any;
 
 describe('GroceryPriceService', () => {
   let service: typeof groceryPriceService;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    service = groceryPriceService;
+    service = groceryPriceService as any;
 
     // Set up default mock behaviors for dependencies
-    DatabaseMonitoringService.getDoc.mockResolvedValue({
-      exists: vi.fn(() => true),
-      data: vi.fn(() => ({ averagePrice: 2.99, minPrice: 2.49, maxPrice: 3.49, sampleSize: 10, lastUpdated: new Date(), unit: 'lb' })),
+    DatabaseMonitoringServiceMock.getDoc.mockResolvedValue({
+      exists: () => true,
+      data: () => ({ averagePrice: 2.99, minPrice: 2.49, maxPrice: 3.49, sampleSize: 10, lastUpdated: new Date(), unit: 'lb' }),
       id: 'test-doc-id'
     });
 
-    DatabaseMonitoringService.getDocs.mockResolvedValue({
+    DatabaseMonitoringServiceMock.getDocs.mockResolvedValue({
       size: 0,
       docs: [],
       forEach: vi.fn((callback) => {
@@ -43,10 +45,10 @@ describe('GroceryPriceService', () => {
       empty: true
     });
 
-    DatabaseMonitoringService.setDoc.mockResolvedValue(undefined);
-    DatabaseMonitoringService.updateDoc.mockResolvedValue(undefined);
-    DatabaseMonitoringService.addDoc.mockResolvedValue({ id: 'price123' });
-    DatabaseMonitoringService.deleteDoc.mockResolvedValue(undefined);
+    DatabaseMonitoringServiceMock.setDoc.mockResolvedValue(undefined);
+    DatabaseMonitoringServiceMock.updateDoc.mockResolvedValue(undefined);
+    DatabaseMonitoringServiceMock.addDoc.mockResolvedValue({ id: 'price123' });
+    DatabaseMonitoringServiceMock.deleteDoc.mockResolvedValue(undefined);
 
     // Mock fetch for API calls
     mockFetch.mockResolvedValue({

@@ -87,6 +87,15 @@ const DEFAULT_FEATURE_FLAGS: Record<string, FeatureFlag> = {
     description: 'Push notifications and reminders',
     lastModified: new Date(),
   }
+  ,
+  // New interactive tutorial feature flag (off by default for staged rollout)
+  newTutorial: {
+    name: 'newTutorial',
+    enabled: false,
+    rolloutPercentage: 0,
+    description: 'Interactive first-time tutorial with task-driven steps',
+    lastModified: new Date(),
+  }
 };
 
 class FeatureFlagService {

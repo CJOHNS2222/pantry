@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { X, ChevronRight, ChevronLeft, Sparkles, ShoppingBasket, CalendarDays, UtensilsCrossed, Users, Grid3X3, User, ChefHat, Settings, BarChart3, Mic, CheckCircle, Play, Pause, RotateCcw } from 'lucide-react';
 import { Tab } from '../types/app';
 import AnalyticsService from '../services/analyticsService';
+import tutorialService from '../services/tutorialService';
 
 interface TutorialProps {
   onClose: () => void;
@@ -12,6 +13,7 @@ interface TutorialProps {
   onOpenRecipeSearch?: () => void;
   onOpenAnalytics?: () => void;
   currentTab: Tab;
+  isHouseholdOpen?: boolean;
   userProgress?: {
     hasAddedItems: boolean;
     hasPlannedMeals: boolean;
@@ -43,6 +45,7 @@ export const Tutorial: React.FC<TutorialProps> = ({
   onOpenRecipeSearch,
   onOpenAnalytics,
   currentTab,
+  isHouseholdOpen,
   userProgress = {
     hasAddedItems: false,
     hasPlannedMeals: false,
@@ -57,6 +60,11 @@ export const Tutorial: React.FC<TutorialProps> = ({
   const [userInteractions, setUserInteractions] = useState<Set<string>>(new Set());
   const currentHighlightRef = useRef<string | null>(null);
   const currentStepRef = useRef<number>(0);
+  const autoAdvanceRef = useRef<boolean>(false);
+  const [modalStyle, setModalStyle] = useState<React.CSSProperties | undefined>(undefined);
+  const prevHouseholdOpenRef = useRef<boolean | undefined>(undefined);
+  const [arrowStyle, setArrowStyle] = useState<React.CSSProperties | undefined>(undefined);
+  const [arrowClass, setArrowClass] = useState<string>('arrow-down');
 
   const steps: TutorialStep[] = [
     {
@@ -210,8 +218,12 @@ export const Tutorial: React.FC<TutorialProps> = ({
     if (!isPlaying) return;
 
     // Close household modal if it's open and we're moving past the household step
+    // But do NOT auto-close when the step is being auto-advanced due to completion of household (user hasn't closed the modal).
     if (step >= 1 && onCloseHousehold) {
-      onCloseHousehold();
+      const currentStepId = activeSteps[step]?.id;
+      if (!(currentStepId === 'household' && autoAdvanceRef.current)) {
+        onCloseHousehold();
+      }
     }
 
     // After theme toggle step, switch back to dark theme
@@ -273,11 +285,43 @@ export const Tutorial: React.FC<TutorialProps> = ({
       if (element) {
         element.classList.add('tutorial-glow');
       }
+
+      // Compute modal position near the highlighted element
+      const computePosition = () => {
+        try {
+          const el = document.querySelector(`[data-tutorial="${currentStepData.highlight}"]`) as HTMLElement | null;
+          const modalWidth = 320; // matches w-80
+          const approxModalHeight = 220;
+          const padding = 12;
+          if (el) {
+            const rect = el.getBoundingClientRect();
+            const vw = window.innerWidth;
+            const vh = window.innerHeight;
+            // Prefer placing below the element if space allows
+            const placeBelow = rect.bottom + approxModalHeight + padding < vh;
+            let left = rect.left + rect.width / 2 - modalWidth / 2;
+            left = Math.max(8, Math.min(left, vw - modalWidth - 8));
+            const top = placeBelow ? Math.min(vh - approxModalHeight - 8, rect.bottom + padding) : Math.max(8, rect.top - approxModalHeight - padding);
+            setModalStyle({ position: 'fixed', left: `${left}px`, top: `${top}px`, zIndex: 50 });
+            return;
+          }
+        } catch (e) {
+          // ignore
+        }
+        // fallback positions
+        setModalStyle(undefined);
+      };
+
+      computePosition();
+      window.addEventListener('resize', computePosition);
+      window.addEventListener('scroll', computePosition, true);
+      // cleanup added listeners in effect cleanup below
     } else {
       // Remove all glow effects if no highlight
       document.querySelectorAll('.tutorial-glow').forEach(el => {
         el.classList.remove('tutorial-glow');
       });
+      setModalStyle(undefined);
     }
 
     if (currentStepData.action && isPlaying && !currentStepData.interactive) {
@@ -287,50 +331,181 @@ export const Tutorial: React.FC<TutorialProps> = ({
         currentStepData.action();
       }, delay);
     }
+    return () => {
+      try {
+        window.removeEventListener('resize', computePosition);
+        window.removeEventListener('scroll', computePosition, true);
+      } catch (e) {
+        // ignore
+      }
+    };
   }, [step, currentStepData, isPlaying]);
 
-  // Detect user interactions with highlighted elements
+  // Compute modal position near the highlighted element when present
   useEffect(() => {
-    if (currentStepData?.interactive && currentStepData.highlight && isPlaying) {
-      currentHighlightRef.current = currentStepData.highlight;
-      currentStepRef.current = step;
-      
-      const handleElementClick = (event: Event) => {
-        const target = event.target as HTMLElement;
-        let element: HTMLElement | null = target;
-        
-        // Check if the target or any parent has the data-tutorial attribute
-        while (element && element !== document.body) {
-          if (element.hasAttribute('data-tutorial') && element.getAttribute('data-tutorial') === currentHighlightRef.current) {
-            // Mark this step as completed
-            setCompletedSteps(prev => new Set([...prev, currentStepRef.current]));
-            // Call the action after user interaction
-            if (currentStepData.action) {
-              setTimeout(() => {
-                currentStepData.action();
-              }, 500);
-            }
+    if (!highlightedElement) {
+      setModalStyle(undefined);
+      setArrowStyle(undefined);
+      return;
+    }
+
+    const el = document.querySelector(`[data-tutorial="${highlightedElement}"]`) as HTMLElement | null;
+    if (!el) {
+      setModalStyle(undefined);
+      setArrowStyle(undefined);
+      return;
+    }
+
+    const rect = el.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const modalWidth = 320; // ~ w-80
+    const spacing = 12;
+
+    // Prefer placing modal above the element if there's room, otherwise below
+    const placeAbove = rect.top > vh / 2;
+
+    const top = placeAbove ? Math.max(8, rect.top - 12 - 220) : Math.min(vh - 80, rect.bottom + spacing);
+    // Try to align modal horizontally near element center
+    let left = rect.left + rect.width / 2 - modalWidth / 2;
+    left = Math.max(8, Math.min(vw - modalWidth - 8, left));
+
+    const newStyle: React.CSSProperties = {
+      position: 'fixed',
+      top: `${top}px`,
+      left: `${left}px`,
+      zIndex: 9999
+    };
+
+    // Arrow position: point towards element center
+    const arrowLeft = Math.max(10, Math.min(modalWidth - 20, rect.left + rect.width / 2 - left - 8));
+    const arrow: React.CSSProperties = placeAbove
+      ? { left: `${arrowLeft}px`, bottom: '-8px' }
+      : { left: `${arrowLeft}px`, top: '-8px' };
+
+    setModalStyle(newStyle);
+    setArrowStyle(arrow);
+    setArrowClass(placeAbove ? 'arrow-down' : 'arrow-up');
+  }, [highlightedElement, currentStepData]);
+
+  // Detect user interactions with highlighted elements (centralized via tutorialService)
+  useEffect(() => {
+    if (!currentStepData?.interactive || !isPlaying) {
+      return;
+    }
+
+    // Custom-handling for household step: open modal on click but mark completion when modal closed
+    if (currentStepData.id === 'household') {
+      let cancelledHouseClick = false;
+      const handleHouseClick = (ev: Event) => {
+        const target = ev.target as HTMLElement | null;
+        if (!target) return;
+        let el: HTMLElement | null = target;
+        while (el && el !== document.body) {
+          if (el.hasAttribute('data-tutorial') && el.getAttribute('data-tutorial') === 'household-button') {
+            // Open household modal, but do not mark completed here
+            currentStepData.action && currentStepData.action();
             break;
           }
-          element = element.parentElement;
+          el = el.parentElement;
         }
       };
 
-      // Add click listener to the document
-      document.addEventListener('click', handleElementClick);
+      document.addEventListener('click', handleHouseClick, true);
 
       return () => {
-        document.removeEventListener('click', handleElementClick);
+        cancelledHouseClick = true;
+        document.removeEventListener('click', handleHouseClick, true);
       };
-    } else {
-      currentHighlightRef.current = null;
     }
-  }, [currentStepData?.interactive, currentStepData?.highlight, isPlaying]);
+
+    // If this step is already completed, don't start another wait — prevents update loops
+    if (completedSteps.has(step)) return;
+
+    let cancelled = false;
+    const highlight = currentStepData.highlight;
+    const predicate = currentStepData.completionCheck;
+
+    (async () => {
+      const completed = await tutorialService.waitForInteraction(highlight, { predicate });
+      if (cancelled) return;
+      if (completed) {
+        setCompletedSteps(prev => {
+          if (prev.has(step)) return prev;
+          const next = new Set(prev);
+          next.add(step);
+          return next;
+        });
+        if (currentStepData.action) {
+          setTimeout(() => currentStepData.action && currentStepData.action(), 500);
+        }
+
+        // Auto-advance to next step shortly after completion (match fallback timing)
+        autoAdvanceRef.current = true;
+        setTimeout(() => {
+          if (!cancelled) {
+            try {
+              handleNext();
+            } catch (e) {
+              // ignore
+            }
+          }
+          autoAdvanceRef.current = false;
+        }, 1500);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [currentStepData?.interactive, currentStepData?.highlight, isPlaying, step, completedSteps, currentStepData]);
+
+  // Watch household modal open/close to mark household step completed when user closes it
+  useEffect(() => {
+    if (!currentStepData) return;
+    if (currentStepData.id !== 'household') {
+      prevHouseholdOpenRef.current = undefined;
+      return;
+    }
+
+    if (typeof isHouseholdOpen === 'undefined') return;
+
+    const prev = prevHouseholdOpenRef.current;
+    if (prev === undefined) {
+      prevHouseholdOpenRef.current = isHouseholdOpen;
+      return;
+    }
+
+    // If modal transitioned from open -> closed, mark completed and auto-advance
+    if (prev === true && !isHouseholdOpen) {
+      setCompletedSteps(prevSet => {
+        if (prevSet.has(step)) return prevSet;
+        const n = new Set(prevSet);
+        n.add(step);
+        return n;
+      });
+
+      autoAdvanceRef.current = true;
+      const t = setTimeout(() => {
+        try {
+          handleNext();
+        } catch (e) {
+          // ignore
+        }
+        autoAdvanceRef.current = false;
+      }, 1500);
+
+      return () => clearTimeout(t);
+    }
+
+    prevHouseholdOpenRef.current = isHouseholdOpen;
+  }, [isHouseholdOpen, currentStepData, step, handleNext]);
 
   // Auto-advance for completed interactive steps
   useEffect(() => {
     if (currentStepData?.interactive && isPlaying && completedSteps.has(step)) {
-      // Auto-advance after a short delay when step is completed
+      // Do not schedule another auto-advance when we've already triggered one
+      if (autoAdvanceRef.current) return;
+
+      // Auto-advance after a short delay when step is completed (fallback)
       const timer = setTimeout(() => {
         if (step < activeSteps.length - 1) {
           handleNext();
@@ -358,12 +533,16 @@ export const Tutorial: React.FC<TutorialProps> = ({
       )}
 
       {/* Tutorial Modal */}
-      <div className={`fixed z-50 animate-fade-in right-4`} style={
-        highlightedElement?.startsWith('nav-') ? { bottom: '185px' } :
-        highlightedElement === 'add-item-button' || highlightedElement === 'add-recipe-button' ? { top: '20px', right: '20px' } :
-        { bottom: '66px' }
-      }>
+      <div className={`fixed z-50 animate-fade-in`} style={modalStyle}>
         <div className="bg-theme-secondary border border-theme w-80 rounded-2xl shadow-2xl relative overflow-hidden">
+
+          {/* Arrow pointer */}
+          {arrowStyle && (
+            <div
+              className={`absolute w-4 h-4 transform rotate-45 bg-theme-secondary ${arrowClass} z-20`} 
+              style={arrowStyle}
+            />
+          )}
 
           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[var(--accent-color)] to-transparent"></div>
 

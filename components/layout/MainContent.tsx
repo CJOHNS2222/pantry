@@ -226,7 +226,6 @@ export const MainContent: React.FC = () => {
         <ComponentErrorBoundary componentName="Community">
           <Suspense fallback={<LoadingSpinner />}>
             <Community
-              ratings={ratings}
               onAddToPlan={onAddToPlan}
               onSaveRecipe={onSaveRecipe}
               user={user}

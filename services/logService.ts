@@ -96,11 +96,19 @@ class Logger {
     }
   }
 
-  error(message: string, error?: Error | string, context?: string): void {
+  error(message: string, data?: any, context?: string): void {
     if (this.shouldLog(LogLevel.ERROR)) {
-      const message = typeof error === 'string' ? error : error?.message || 'Unknown error';
-      const data = typeof error === 'object' ? { stack: error.stack, ...error } : undefined;
-      this.addLog(LogLevel.ERROR, message, data, context);
+      let logMessage = message;
+      let payload: any = undefined;
+      if (typeof data === 'string') {
+        logMessage = `${message} - ${data}`;
+      } else if (data instanceof Error) {
+        logMessage = `${message} - ${data.message}`;
+        payload = { stack: data.stack, ...data };
+      } else if (data !== undefined) {
+        payload = data;
+      }
+      this.addLog(LogLevel.ERROR, logMessage, payload, context);
     }
   }
 
@@ -154,8 +162,8 @@ class Logger {
       return result;
     } catch (err: any) {
       endTimer();
-      this.error(`Async operation failed: ${label}`, error, context);
-      throw error;
+      this.error(`Async operation failed: ${label}`, err, context);
+      throw err;
     }
   }
 }
@@ -168,7 +176,7 @@ export const log = {
   debug: (message: string, data?: any, context?: string) => logger.debug(message, data, context),
   info: (message: string, data?: any, context?: string) => logger.info(message, data, context),
   warn: (message: string, data?: any, context?: string) => logger.warn(message, data, context),
-  error: (message: string, error?: Error | string, context?: string) => logger.error(message, error, context),
+  error: (message: string, data?: any, context?: string) => logger.error(message, data, context),
 
   // Performance helpers
   startTimer: (label: string, context?: string) => logger.startTimer(label, context),

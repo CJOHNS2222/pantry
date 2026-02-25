@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Camera as CapacitorCamera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { Camera, Upload, Loader2, Plus, Trash2, CheckCircle2, ShoppingBasket, X, Barcode, ChevronDown, ChevronRight, ChevronUp, Image, ChefHat, TrendingUp, Search, Filter, Settings2, Clock, Tag } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
@@ -1363,14 +1363,14 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
       {bulkMode && (
         <div className="bg-theme-secondary p-3 rounded-lg border border-theme mb-4 flex items-center gap-3">
           <div className="text-sm text-theme-primary font-medium">Bulk Mode: {selectedItems.size} selected</div>
-          <select onChange={(e) => bulkChangeLocation(e.target.value as any)} className="px-2 py-1 rounded bg-theme-primary border border-theme text-theme-primary">
+          <select onChange={(e) => bulkChangeLocation(e.target.value as any)} className="px-2 py-1 rounded bg-theme-primary border border-theme text-black">
             <option value="pantry">Move to Pantry</option>
             <option value="fridge">Move to Fridge</option>
             <option value="freezer">Move to Freezer</option>
             <option value="spices">Move to Spices</option>
             <option value="other">Move to Other</option>
           </select>
-          <input type="date" onChange={(e) => bulkSetExpiration(e.target.value)} className="px-2 py-1 rounded bg-theme-primary border border-theme text-theme-primary" />
+          <input type="date" onChange={(e) => bulkSetExpiration(e.target.value)} className="px-2 py-1 rounded bg-theme-primary border border-theme text-black" />
           <button onClick={bulkAddToShoppingListWithRemove} className="px-3 py-1 bg-[var(--accent-color)] text-white rounded" aria-label="Move selected items to shopping list">Move to Shopping</button>
           <button onClick={selectAllItems} className="px-3 py-1 bg-theme-primary border border-theme rounded" aria-label="Toggle select all items">Toggle Select All</button>
           <button onClick={bulkDelete} className="ml-auto px-3 py-1 bg-red-600 text-white rounded" aria-label="Delete selected items">Delete</button>
@@ -1954,7 +1954,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
 
       {/* Bulk Quantity Edit Modal */}
       {showBulkQuantityEdit && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-60 p-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4">
           <div className="bg-theme-primary rounded-lg shadow-xl w-full max-w-md mx-auto max-h-[80vh] overflow-y-auto border border-theme pb-20 pt-20">
             <div className="p-6 pb-2.5">
               <div className="flex items-center justify-between mb-6">

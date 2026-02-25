@@ -1,5 +1,3 @@
-import { collection, doc, getDoc, setDoc, updateDoc, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
-import { db } from '../firebaseConfig';
 import DatabaseMonitoringService from './databaseMonitoringService';
 import { PriceTrend } from '../types/app';
 import { priceCacheService } from './priceCacheService';
@@ -124,18 +122,14 @@ class GroceryPriceService {
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-      const q = query(
-        collection(db, this.COLLECTION_NAME),
-        where('ingredient', '==', ingredientKey),
-        where('lastUpdated', '>=', thirtyDaysAgo),
-        orderBy('lastUpdated', 'desc'),
-        limit(50)
+      const q = DatabaseMonitoringService.query(
+        DatabaseMonitoringService.collection(this.COLLECTION_NAME),
+        DatabaseMonitoringService.where('ingredient', '==', ingredientKey),
+        DatabaseMonitoringService.where('lastUpdated', '>=', thirtyDaysAgo),
+        DatabaseMonitoringService.orderBy('lastUpdated', 'desc'),
+        DatabaseMonitoringService.limit(50)
       );
 
-      // Option 1: Use direct Firestore (current)
-      // const querySnapshot = await getDocs(q);
-
-      // Option 2: Use DatabaseMonitoringService for tracking (recommended for analytics)
       const querySnapshot = await DatabaseMonitoringService.getDocs(q);
 
       const prices: number[] = [];
@@ -248,7 +242,7 @@ class GroceryPriceService {
         priceData.location = location;
       }
 
-      await setDoc(doc(db, this.COLLECTION_NAME, priceId), priceData);
+      await DatabaseMonitoringService.setDoc(DatabaseMonitoringService.doc(this.COLLECTION_NAME, priceId), priceData);
 
       // Also store in price history
       await this.storePriceHistory(priceData);
@@ -267,17 +261,13 @@ class GroceryPriceService {
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - days);
 
-      const q = query(
-        collection(db, this.PRICE_HISTORY_COLLECTION),
-        where('ingredient', '==', ingredientKey),
-        where('lastUpdated', '>=', startDate),
-        orderBy('lastUpdated', 'desc')
+      const q = DatabaseMonitoringService.query(
+        DatabaseMonitoringService.collection(this.PRICE_HISTORY_COLLECTION),
+        DatabaseMonitoringService.where('ingredient', '==', ingredientKey),
+        DatabaseMonitoringService.where('lastUpdated', '>=', startDate),
+        DatabaseMonitoringService.orderBy('lastUpdated', 'desc')
       );
 
-      // Option 1: Use direct Firestore (current)
-      // const querySnapshot = await getDocs(q);
-
-      // Option 2: Use DatabaseMonitoringService for tracking (recommended for analytics)
       const querySnapshot = await DatabaseMonitoringService.getDocs(q);
 
       const userTrends: GroceryPrice[] = [];
@@ -419,7 +409,7 @@ class GroceryPriceService {
       const currentVotes = priceDoc.data().votes || 0;
       const newVotes = vote === 'up' ? currentVotes + 1 : Math.max(0, currentVotes - 1);
 
-      await updateDoc(priceRef, { votes: newVotes });
+      await DatabaseMonitoringService.updateDoc(priceRef, { votes: newVotes });
     } catch (err: any) {
       console.error('Error voting on price:', error);
       throw error;
@@ -430,7 +420,7 @@ class GroceryPriceService {
   private async storePriceHistory(priceData: GroceryPrice): Promise<void> {
     try {
       const historyId = `${priceData.id}_history`;
-      await setDoc(doc(db, this.PRICE_HISTORY_COLLECTION, historyId), {
+      await DatabaseMonitoringService.setDoc(DatabaseMonitoringService.doc(this.PRICE_HISTORY_COLLECTION, historyId), {
         ...priceData,
         recordedAt: new Date()
       });
@@ -447,7 +437,7 @@ class GroceryPriceService {
 
       // Option 2: Use DatabaseMonitoringService for tracking (recommended for analytics)
       const ingredientsRef = DatabaseMonitoringService.collection(this.COLLECTION_NAME);
-      const querySnapshot = await DatabaseMonitoringService.getDocs(query(ingredientsRef));
+      const querySnapshot = await DatabaseMonitoringService.getDocs(DatabaseMonitoringService.query(ingredientsRef));
 
       const ingredients = new Set<string>();
 
@@ -581,7 +571,7 @@ class GroceryPriceService {
         votes: usdPrices.length // Use sample size as "votes"
       };
 
-      await setDoc(doc(db, this.PRICE_HISTORY_COLLECTION, snapshotId), {
+      await DatabaseMonitoringService.setDoc(DatabaseMonitoringService.doc(this.PRICE_HISTORY_COLLECTION, snapshotId), {
         ...snapshotData,
         recordedAt: new Date()
       });
@@ -720,7 +710,7 @@ class GroceryPriceService {
 
   async saveGroceryPrice(priceData: GroceryPrice): Promise<void> {
     try {
-      const priceRef = doc(collection(db, 'prices'), priceData.id);
+      const priceRef = DatabaseMonitoringService.doc(this.COLLECTION_NAME, priceData.id);
       await DatabaseMonitoringService.setDoc(priceRef, {
         ...priceData,
         lastUpdated: new Date()

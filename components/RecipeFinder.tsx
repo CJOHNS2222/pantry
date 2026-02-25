@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Search, Loader2, Sparkles, ExternalLink, Globe, Plus, Clock, List, ChefHat, ToggleLeft, ToggleRight, Star, Heart, Bookmark, Zap, Mic } from 'lucide-react';
 import { searchRecipes } from '../services/geminiService';
-import { getSavedRecipes, getCachedPopularRecipes } from '../services/recipeService';
+import { getSavedRecipes, getCachedPopularRecipes, saveRecipeToFirestore, uploadRecipeImageFile, submitRecipeForReview } from '../services/recipeService';
+import DatabaseMonitoringService from '../services/databaseMonitoringService';
 import { RecipeSearchResult, LoadingState, RecipeRating, StructuredRecipe, PantryItem, SavedRecipe, User, Household } from '../types';
 import { Tab } from '../types/app';
 import { RecipeCardSkeleton } from './SkeletonLoader';
+import PopularRecipes from './PopularRecipes';
 import { PremiumFeature } from './PremiumFeature';
 import { RecipeRatingUI } from './RecipeRating';
 import { ProgressiveImage } from './ProgressiveImage';
@@ -130,6 +132,37 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
     // Firebase recipes state
     const [firebaseRecipes, setFirebaseRecipes] = useState<SavedRecipe[]>([]);
     const [firebaseRecipesLoading, setFirebaseRecipesLoading] = useState(false);
+    // Visible count for incremental rendering from cached doc
+    const [visibleFirebaseCount, setVisibleFirebaseCount] = useState<number>(25);
+
+    // Memoized filtered recipes for category selection so we can paginate easily
+    const filteredFirebaseRecipes = useMemo(() => {
+        return firebaseRecipes.filter(recipe => {
+            if (selectedCategory === 'All') return true;
+
+            const recipeType = recipe.type?.toLowerCase() || '';
+            const filterCategory = selectedCategory.toLowerCase();
+
+            if (recipeType === filterCategory) return true;
+            if (recipeType.includes(filterCategory)) return true;
+
+            const typeMappings: { [key: string]: string[] } = {
+                'dinner': ['dinner', 'main course', 'main dish', 'entree', 'chicken', 'beef', 'pork', 'seafood', 'miscellaneous'],
+                'lunch': ['lunch', 'main course', 'main dish', 'entree', 'chicken', 'beef', 'pork', 'seafood', 'miscellaneous', 'vegetarian'],
+                'breakfast': ['breakfast', 'morning meal', 'brunch'],
+                'dessert': ['dessert', 'sweet', 'cake', 'pie', 'cookie'],
+                'appetizer': ['appetizer', 'starter', 'snack', 'appetiser'],
+                'salad': ['salad', 'green salad', 'side salad', 'vegetarian'],
+                'soup': ['soup', 'stew', 'chowder', 'vegetarian'],
+                'drink': ['drink', 'beverage', 'cocktail', 'smoothie']
+            };
+
+            const mappedTypes = typeMappings[filterCategory] || [];
+            if (mappedTypes.some(type => recipeType.includes(type))) return true;
+
+            return false;
+        });
+    }, [firebaseRecipes, selectedCategory]);
     
     // Recipe cache to avoid duplicate API calls
     const [recipeCache, setRecipeCache] = useState<Map<string, RecipeSearchResult>>(new Map());
@@ -325,6 +358,8 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                 setFirebaseRecipesLoading(true);
                 const recipes = await getCachedPopularRecipes(); // Uses cached recipes (1 read vs 50+ reads)
                 setFirebaseRecipes(recipes);
+                // reset visible count when new recipes arrive
+                setVisibleFirebaseCount(25);
             } catch (error) {
                 log.error('Error loading cached Firebase recipes', { error }, 'RecipeFinder');
             } finally {
@@ -1009,17 +1044,45 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
         if (setPersistedResult) setPersistedResult(null);
         try {
             log.debug('Recipe search params:', params);
-            const data = await searchRecipes({
-                ...params,
-                maxCookTime: parseInt(maxCookTime),
-                maxIngredients: parseInt(maxIngredients),
-                measurementSystem: measurement,
-                type: recipeType,
-                dietaryRestrictions,
-                maxPrepTime: parseInt(maxPrepTime),
-                servings: parseInt(servings),
-                userId: user?.id
-            }, user);
+            // First, if there's a text query, try the cached popular recipes document
+            let data: any = null;
+            if (params.query && String(params.query).trim()) {
+                try {
+                    const cachedList = await getCachedPopularRecipes();
+                    const q = String(params.query).toLowerCase();
+                    const matches = cachedList.filter((r: SavedRecipe) => {
+                        const title = (r.title || '').toLowerCase();
+                        const desc = (r.description || '')?.toLowerCase() || '';
+                        const ingredients = (Array.isArray(r.ingredients) ? r.ingredients.join(' ') : (r.ingredients || '')).toLowerCase();
+                        const keywords = (Array.isArray((r as any).keywords) ? (r as any).keywords.join(' ') : '').toLowerCase();
+                        return title.includes(q) || desc.includes(q) || ingredients.includes(q) || keywords.includes(q);
+                    });
+
+                    if (matches.length > 0) {
+                        data = { recipes: matches };
+                        setIsResultFromCache(true);
+                        AnalyticsService.trackRecipeSearch(params.query, matches.length);
+                    }
+                } catch (e) {
+                    // If cache read or filtering fails, fall back to external search below
+                    log.warn('Cached recipe search failed, falling back to external search', { error: e });
+                }
+            }
+
+            if (!data) {
+                data = await searchRecipes({
+                    ...params,
+                    maxCookTime: parseInt(maxCookTime),
+                    maxIngredients: parseInt(maxIngredients),
+                    measurementSystem: measurement,
+                    type: recipeType,
+                    dietaryRestrictions,
+                    maxPrepTime: parseInt(maxPrepTime),
+                    servings: parseInt(servings),
+                    userId: user?.id
+                }, user);
+                setIsResultFromCache(false);
+            }
             // Filter results by type (quick meal, dinner, dessert)
             let filteredRecipes = data.recipes;
             if (recipeType) {
@@ -1156,6 +1219,59 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
             setModalRecipe(normalized as StructuredRecipe);
             setModalIsSavedView(Boolean(isSavedView));
             setShowRecipeModal(true);
+        };
+
+        const handleModalSaveRecipe = async (r: any) => {
+            try {
+                // Track save event
+                AnalyticsService.trackRecipeSave(r.title || 'Untitled Recipe', r.title || 'Untitled Recipe');
+
+                // Build minimal recipe object for saving
+                const recipeToSave: StructuredRecipe = {
+                    title: r.title || '',
+                    description: r.description || '',
+                    ingredients: Array.isArray(r.ingredients) ? r.ingredients : (typeof r.ingredients === 'string' ? r.ingredients.split('\n').map((s:string)=>s.trim()).filter(Boolean) : []),
+                    instructions: Array.isArray(r.instructions) ? r.instructions : (typeof r.instructions === 'string' ? r.instructions.split('\n').map((s:string)=>s.trim()).filter(Boolean) : []),
+                    cookTime: r.cookTime || '',
+                    type: r.type || 'Dinner',
+                    image: r.image || ''
+                };
+
+                // Save to the user's cache document to obtain an ID (cheap single-doc read for many recipes)
+                const recipeId = await saveRecipeToUserCache(user?.id as string, recipeToSave);
+
+                // If an image File was attached, upload it and update the document
+                if (r.__imageFile) {
+                    try {
+                        const uploaded = await uploadRecipeImageFile(r.__imageFile as File, recipeId);
+                        await DatabaseMonitoringService.setDoc(DatabaseMonitoringService.doc(`recipes/${recipeId}`), { image: uploaded, id: recipeId });
+                        recipeToSave.image = uploaded;
+                    } catch (imgErr) {
+                        console.error('Failed to upload recipe image', imgErr);
+                    }
+                } else {
+                    // Ensure id is set even if no image uploaded
+                    await DatabaseMonitoringService.setDoc(DatabaseMonitoringService.doc(`recipes/${recipeId}`), { id: recipeId });
+                }
+
+                // If user requested submission for inclusion, copy to submissions
+                if (r.__submitForInclusion) {
+                    try {
+                        await submitRecipeForReview({ ...recipeToSave, id: recipeId }, user?.id);
+                    } catch (subErr) {
+                        console.error('Failed to submit recipe for review', subErr);
+                    }
+                }
+
+                // Notify parent/UX
+                if (addToast) addToast('Recipe saved', 'info');
+
+                // Call outer handler so saved lists refresh if parent provided one
+                if (onSaveRecipe) onSaveRecipe(recipeToSave as StructuredRecipe);
+            } catch (err) {
+                console.error('Error saving recipe', err);
+                if (addToast) addToast('Failed to save recipe', 'error');
+            }
         };
 
         const renderRecipeCard = (recipe: StructuredRecipe, isSavedView = false, isCompact = false) => {
@@ -1367,7 +1483,8 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                             {savedRecipes.map(r => renderRecipeCard(r, true, true))}
                         </div>
                         <div className="flex justify-end mt-6">
-                            <button
+                            <div className="flex gap-2">
+                                <button
                                 className="px-4 py-2 bg-[var(--accent-color)] text-white rounded-lg font-bold shadow hover:bg-[var(--accent-color)]/90 transition-colors"
                                 onClick={() => {
                                     try {
@@ -1395,6 +1512,28 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                             >
                                 Export Recipes
                             </button>
+                                <button
+                                    className="px-4 py-2 bg-theme-secondary text-theme-primary rounded-lg font-bold shadow hover:bg-theme-secondary/80 transition-colors"
+                                    onClick={() => {
+                                        // Open editor modal for new recipe
+                                        const empty: any = {
+                                            title: '',
+                                            description: '',
+                                            ingredients: [],
+                                            instructions: [],
+                                            cookTime: '',
+                                            type: 'Dinner',
+                                            image: '',
+                                            __editing: true
+                                        };
+                                        setModalRecipe(empty as StructuredRecipe);
+                                        setModalIsSavedView(false);
+                                        setShowRecipeModal(true);
+                                    }}
+                                >
+                                    <Plus className="w-4 h-4 mr-2" /> Add Recipe
+                                </button>
+                            </div>
                         </div>
                     </>
                 )}
@@ -1776,144 +1915,9 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                 </div>
             )}
 
-            {/* Popular Recipes Section */}
             <div className="mt-12">
                 <h2 className="text-xl font-bold text-theme-primary mb-6">Popular Recipes</h2>
-
-                {/* Category Filter and Surprise Me */}
-                <div className="flex items-center justify-between mb-6">
-                    <div className="flex flex-wrap gap-2">
-                        {['All', 'Dinner', 'Lunch', 'Breakfast', 'Soup', 'Drink'].map((category) => (
-                            <button
-                                key={category}
-                                onClick={() => setSelectedCategory(category)}
-                                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                                    selectedCategory === category
-                                        ? 'bg-theme-primary text-white'
-                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
-                                }`}
-                            >
-                                {category}
-                            </button>
-                        ))}
-                    </div>
-
-                    <button
-                        onClick={handleSurpriseMe}
-                        disabled={firebaseRecipesLoading || firebaseRecipes.length === 0}
-                        className="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-full text-sm font-medium hover:from-purple-600 hover:to-pink-600 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-lg hover:shadow-xl"
-                    >
-                        <Sparkles className="w-4 h-4" />
-                        Surprise Me
-                    </button>
-                </div>
-
-                {firebaseRecipesLoading ? (
-                    <div className="text-center py-12 opacity-50">
-                        <Loader2 className="w-8 h-8 mx-auto mb-2 animate-spin" />
-                        <p>Loading recipes...</p>
-                    </div>
-                ) : firebaseRecipes.length === 0 ? (
-                    <div className="text-center py-12 opacity-60">
-                        <ChefHat className="w-12 h-12 mx-auto mb-4 text-theme-secondary/50" />
-                        <h3 className="text-lg font-semibold text-theme-primary mb-2">No recipes yet</h3>
-                        <p className="text-theme-secondary opacity-70 mb-4">Start building your recipe collection</p>
-                        <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                            <button 
-                                onClick={() => setActiveView('search')}
-                                className="px-4 py-2 bg-[var(--accent-color)] text-white rounded-lg hover:bg-[var(--accent-color)]/90 transition-colors flex items-center gap-2"
-                            >
-                                <Search className="w-4 h-4" />
-                                Search for Recipes
-                            </button>
-                            <button 
-                                onClick={() => setActiveTab(Tab.PANTRY)}
-                                className="px-4 py-2 border border-theme rounded-lg hover:bg-theme-secondary/50 transition-colors"
-                            >
-                                Add Pantry Items First
-                            </button>
-                        </div>
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-3 gap-4">
-                        {firebaseRecipes
-                            .filter(recipe => {
-                                if (selectedCategory === 'All') return true;
-
-                                // Case-insensitive matching and handle variations
-                                const recipeType = recipe.type?.toLowerCase() || '';
-                                const filterCategory = selectedCategory.toLowerCase();
-
-                                // Direct match
-                                if (recipeType === filterCategory) return true;
-
-                                // Check if recipe type contains the filter category (e.g., "italian dinner" contains "dinner")
-                                if (recipeType.includes(filterCategory)) return true;
-
-                                // Handle common variations and map recipe types to categories
-                                const typeMappings: { [key: string]: string[] } = {
-                                    'dinner': ['dinner', 'main course', 'main dish', 'entree', 'chicken', 'beef', 'pork', 'seafood', 'miscellaneous'],
-                                    'lunch': ['lunch', 'main course', 'main dish', 'entree', 'chicken', 'beef', 'pork', 'seafood', 'miscellaneous', 'vegetarian'],
-                                    'breakfast': ['breakfast', 'morning meal', 'brunch'],
-                                    'dessert': ['dessert', 'sweet', 'cake', 'pie', 'cookie'],
-                                    'appetizer': ['appetizer', 'starter', 'snack', 'appetiser'],
-                                    'salad': ['salad', 'green salad', 'side salad', 'vegetarian'],
-                                    'soup': ['soup', 'stew', 'chowder', 'vegetarian'],
-                                    'drink': ['drink', 'beverage', 'cocktail', 'smoothie']
-                                };
-
-                                // Check if the recipe type maps to the selected category
-                                const mappedTypes = typeMappings[filterCategory] || [];
-                                if (mappedTypes.some(type => recipeType.includes(type))) return true;
-
-                                return false;
-                            })
-                            .map((recipe, index) => (
-                                <div
-                                    key={`firebase-${recipe.id || index}`}
-                                    className="bg-theme-secondary rounded-lg overflow-hidden cursor-pointer hover:shadow-xl hover:shadow-theme/20 hover:-translate-y-1 transition-all duration-300 group"
-                                    onClick={() => openRecipeModal(recipe, false)}
-                                    role="button"
-                                    tabIndex={0}
-                                    aria-label={`View recipe: ${recipe.title}, cooking time: ${recipe.cookTime}`}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter' || e.key === ' ') {
-                                            e.preventDefault();
-                                            openRecipeModal(recipe, false);
-                                        }
-                                    }}
-                                >
-                                    {/* Recipe Image */}
-                                    <div className="aspect-square bg-theme-primary/20 relative overflow-hidden">
-                                        {recipe.image ? (
-                                            <ProgressiveImage
-                                                src={recipe.image}
-                                                alt={recipe.title}
-                                                className="w-full h-full group-hover:scale-110 transition-transform duration-500 filter group-hover:brightness-110"
-                                                blurDataURL={generateBlurDataURL(200, 200)}
-                                                placeholderSrc="/images/placeholder.svg"
-                                                lazy={true}
-                                            />
-                                        ) : (
-                                            <div className="w-full h-full flex items-center justify-center bg-theme-primary/10">
-                                                <svg className="w-6 h-6 text-theme-secondary opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
-                                                </svg>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {/* Recipe Info */}
-                                    <div className="p-2 group-hover:bg-theme-secondary/80 transition-colors duration-300">
-                                        <h5 className="font-semibold text-xs text-theme-primary line-clamp-2 leading-tight mb-1 group-hover:text-theme-primary transition-colors duration-300">{recipe.title}</h5>
-                                        <div className="flex items-center justify-between text-xs text-theme-secondary opacity-70 group-hover:opacity-90 transition-opacity duration-300">
-                                            <span>{recipe.cookTime}</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-                    </div>
-                )}
+                <PopularRecipes openRecipeModal={openRecipeModal} onAddToPlan={onAddToPlan} user={user} household={household} />
             </div>
 
         </>
@@ -1930,10 +1934,8 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
           onAddToPlan={(r) => { 
             onAddToPlan(r); 
           }}
-          onSaveRecipe={(r) => {
-            AnalyticsService.trackRecipeSave(r.title || 'Untitled Recipe', r.title || 'Untitled Recipe');
-            onSaveRecipe(r);
-          }}
+                    onSaveRecipe={handleModalSaveRecipe}
+                    editable={Boolean((modalRecipe as any).__editing)}
           onDeleteRecipe={(r) => { onDeleteRecipe(r); }}
           onRate={onRate}
           onMarkAsMade={(r) => { 

@@ -310,10 +310,10 @@ export class NotificationService {
       );
 
       const querySnapshot = await DatabaseMonitoringService.getDocs(q);
-      const allNotifications = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as NotificationItem));
+      const allNotifications = querySnapshot.docs.map(doc => {
+        const d = doc.data();
+        return ({ id: doc.id, ...(d && typeof d === 'object' ? d as Record<string, any> : {}) } as NotificationItem);
+      });
 
       // Filter for unread notifications in memory and check snooze status
       const unreadNotifications = allNotifications.filter(notification => {
@@ -528,7 +528,7 @@ export class NotificationService {
       */
 
     } catch (err: any) {
-      console.error('Failed to prepare push notification:', error);
+      console.error('Failed to prepare push notification:', err);
     }
   }
 }

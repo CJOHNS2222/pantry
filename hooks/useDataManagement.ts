@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { collection, doc, serverTimestamp, query, where, Timestamp, deleteDoc, writeBatch, getDocs, orderBy, limit } from 'firebase/firestore';
-import { db } from '../firebaseConfig';
+import { serverTimestamp, Timestamp } from 'firebase/firestore';
 import DatabaseMonitoringService from '../services/databaseMonitoringService';
 import AnalyticsService from '../services/analyticsService';
 import { UsageService } from '../services/usageService';
@@ -456,7 +455,7 @@ export function useDataManagement(
     const unsubs: (()=>void)[] = [];
 
     if (user?.householdId) {
-      unsubs.push(DatabaseMonitoringService.onSnapshot(doc(db, 'households', user.householdId), snap => {
+      unsubs.push(DatabaseMonitoringService.onSnapshot(DatabaseMonitoringService.doc('households', user.householdId), snap => {
         if (snap.exists()) {
           const householdData = { id: snap.id, ...snap.data() } as Household;
           const hasChanged = JSON.stringify(householdData) !== JSON.stringify(prevHouseholdRef.current);

@@ -140,7 +140,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
       const leaveHouseholdFunction = httpsCallable(getFunctions(), 'leaveHousehold');
       await leaveHouseholdFunction({ householdId });
       
-      const userRef = DatabaseMonitoringService.doc(db, 'users', userId);
+      const userRef = DatabaseMonitoringService.doc('users', userId);
       await DatabaseMonitoringService.updateDoc(userRef, {
         householdId: null,
         updatedAt: serverTimestamp()
@@ -169,7 +169,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
 
     setIsCreating(true);
     try {
-      const householdRef = DatabaseMonitoringService.doc(DatabaseMonitoringService.collection(db, 'households'));
+      const householdsColl = DatabaseMonitoringService.collection('households');
       const newHousehold = {
         name: householdName.trim(),
         memberIds: [user.id],
@@ -182,17 +182,17 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
         }]
       };
 
-      await DatabaseMonitoringService.setDoc(householdRef, newHousehold);
+      const createdRef = await DatabaseMonitoringService.addDoc(householdsColl, newHousehold);
 
-      const userRef = DatabaseMonitoringService.doc(db, 'users', user.id);
+      const userRef = DatabaseMonitoringService.doc('users', user.id);
       await DatabaseMonitoringService.updateDoc(userRef, {
-        householdId: householdRef.id,
+        householdId: createdRef.id,
         updatedAt: serverTimestamp()
       });
 
       // Migrate user data to household using cache services
       const userId = user.id;
-      const householdId = householdRef.id;
+      const householdId = createdRef.id;
 
       const inventory = await InventoryCacheService.getCachedInventory(undefined, userId);
       await InventoryCacheService.setCache(inventory, householdId, undefined);

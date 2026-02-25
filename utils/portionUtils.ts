@@ -66,6 +66,7 @@ export const scaleIngredient = (ingredient: string, scalingFactor: number): stri
 
   if (quantityMatch) {
     const [, qtyStr, rest] = quantityMatch;
+    if (typeof qtyStr !== 'string') return ingredient;
     const quantity = parseFloat(qtyStr);
 
     if (!isNaN(quantity)) {

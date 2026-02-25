@@ -21,7 +21,7 @@ describe('AnalyticsService', () => {
     });
 
     it('tracks meal plan additions', () => {
-      AnalyticsService.trackMealPlanAdd('recipe456', 'Pasta Carbonara', 'dinner');
+      AnalyticsService.trackMealPlanAdd('recipe456', 'Pasta Carbonara', 'dinner', 0);
 
       expect(true).toBe(true);
     });
@@ -57,7 +57,8 @@ describe('AnalyticsService', () => {
   describe('Error Tracking', () => {
     it('tracks errors with context', () => {
       const error = new Error('Test error');
-      AnalyticsService.trackError(error, { component: 'RecipeModal' });
+      // AnalyticsService.trackError expects (errorType, errorMessage, component?)
+      AnalyticsService.trackError('Error', error.message, 'RecipeModal');
 
       expect(true).toBe(true);
     });
