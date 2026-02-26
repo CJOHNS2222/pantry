@@ -2,7 +2,7 @@ const { initializeApp } = require('firebase/app');
 const { getFirestore, doc, setDoc, collection, addDoc } = require('firebase/firestore');
 
 const firebaseConfig = {
-  apiKey: "AIzaSyBqF8bfPIAhLS3eaN_MArjxdlB1DqE0QWY",
+  apiKey: process.env.VITE_API_KEY || "REDACTED_COMMITTED_KEY",
   authDomain: "gen-lang-client-0893655267.firebaseapp.com",
   projectId: "gen-lang-client-0893655267",
   storageBucket: "gen-lang-client-0893655267.appspot.com",

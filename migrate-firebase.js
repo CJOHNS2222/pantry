@@ -15,7 +15,7 @@ const oldServiceAccount = {
 };
 
 const oldConfig = {
-  apiKey: "AIzaSyBqJB2SjnyoKvNPx5jZbGD96DnqMLrVsOc",
+  apiKey: process.env.OLD_FIREBASE_API_KEY || "REDACTED_COMMITTED_KEY",
   authDomain: "gen-lang-client-0893655267.firebaseapp.com",
   projectId: "gen-lang-client-0893655267",
   storageBucket: "gen-lang-client-0893655267.appspot.com",
@@ -32,7 +32,7 @@ const newServiceAccount = {
 };
 
 const newConfig = {
-  apiKey: "AIzaSyCKpvxjip_ojS0ZP6Yu_II-GQcldTD84Kg",
+  apiKey: process.env.NEW_FIREBASE_API_KEY || "REDACTED_COMMITTED_KEY",
   authDomain: "ornate-compass-478504-e1.firebaseapp.com",
   projectId: "ornate-compass-478504-e1",
   storageBucket: "ornate-compass-478504-e1.firebasestorage.app",
