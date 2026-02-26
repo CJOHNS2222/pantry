@@ -18,7 +18,7 @@ import { useScopedDataListener } from './useDataListener';
 import { firestoreCache } from '../services/cacheService';
 import { HouseholdPreferenceService } from '../services/householdPreferenceService';
 import { InventoryCacheService, CachedInventoryData, CacheMetadata } from '../services/inventoryCacheService';
-import { MealPlanCacheService } from '../services/MealPlanCacheService';
+import { MealPlanCacheService } from '../services/mealPlanCacheService';
 import { RecipesCacheService, CachedRecipesData, RecipesCacheMetadata } from '../services/recipesCacheService';
 import { ShoppingListCacheService, CachedShoppingListData, ShoppingListCacheMetadata } from '../services/shoppingListCacheService';
 import HapticService from '../services/hapticService';

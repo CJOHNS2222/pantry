@@ -10,7 +10,7 @@ import DatabaseMonitoringService from '../services/databaseMonitoringService';
 import { removeMemberFromHousehold } from '../services/householdService';
 import { UsageService } from '../services/usageService';
 import { InventoryCacheService } from '../services/inventoryCacheService';
-import { MealPlanCacheService } from '../services/MealPlanCacheService';
+import { MealPlanCacheService } from '../services/mealPlanCacheService';
 import { RecipesCacheService } from '../services/recipesCacheService';
 import { ShoppingListCacheService } from '../services/shoppingListCacheService';
 
