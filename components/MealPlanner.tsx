@@ -1022,6 +1022,57 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
     return items;
   }, [mealPlan]);
 
+  // Display plan rotated to start on today's date. When today's date isn't
+  // present in the saved `mealPlan`, build a 7-day view starting from today
+  // and map display indexes back to the original mealPlan indexes.
+  const { displayPlan, displayToOriginal } = useMemo(() => {
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const todayLocal = `${yyyy}-${mm}-${dd}`;
+
+    const idx = mealPlan.findIndex(day => day.date === todayLocal);
+    if (idx >= 0) {
+      const rotated = [...mealPlan.slice(idx), ...mealPlan.slice(0, idx)];
+      const mapping = rotated.map((_, i) => (i + idx) % mealPlan.length);
+      return { displayPlan: rotated, displayToOriginal: mapping };
+    }
+
+    // Build a 7-day view starting today, prefer any existing day entries
+    const view: DayPlan[] = [];
+    const mapping: number[] = [];
+    for (let i = 0; i < 7; i++) {
+      const dt = new Date();
+      dt.setDate(d.getDate() + i);
+      const y = dt.getFullYear();
+      const m = String(dt.getMonth() + 1).padStart(2, '0');
+      const da = String(dt.getDate()).padStart(2, '0');
+      const iso = `${y}-${m}-${da}`;
+      const found = mealPlan.find(day => day.date === iso);
+      if (found) {
+        view.push(found);
+        mapping.push(mealPlan.indexOf(found));
+      } else {
+        const dayName = dt.toLocaleDateString(undefined, { weekday: 'short' });
+        view.push({ date: iso, dayName, breakfast: [], lunch: [], dinner: [] } as DayPlan);
+        mapping.push(-1);
+      }
+    }
+
+    return { displayPlan: view, displayToOriginal: mapping };
+  }, [mealPlan]);
+
+  // Ensure a DayPlan exists in the canonical mealPlan for a given date.
+  const ensureDayExists = useCallback((dateIso: string, dayName?: string) => {
+    const idx = mealPlan.findIndex(d => d.date === dateIso);
+    if (idx >= 0) return idx;
+    const newDay: DayPlan = { date: dateIso, dayName: dayName || dateIso, breakfast: [], lunch: [], dinner: [] };
+    const newPlan = [...mealPlan, newDay];
+    updateMealPlan(newPlan);
+    return newPlan.length - 1;
+  }, [mealPlan, updateMealPlan]);
+
   return (
     <div className="space-y-6 pb-24 animate-fade-in">
       <div className="text-center mb-1 relative">
@@ -1248,15 +1299,18 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
           /* Calendar Grid */
           <div className="space-y-4">
             <div className="grid grid-cols-3 gap-2">
-              {mealPlan.map((day, dayIndex) => (
-              <div
-                key={dayIndex}
-                onClick={() => setSelectedDayIndex(dayIndex)}
-                className={`bg-theme-secondary rounded-lg p-3 min-h-[250px] border-2 transition-all cursor-pointer flex flex-col hover:shadow-lg hover:scale-[1.02] ${
-                  isToday(day.date) && !showRecipeModal && !showRecipeSearch && !showAddMealDialog && !showMealPrepPlanner
-                    ? 'border-[var(--accent-color)] bg-gradient-to-br from-[var(--accent-color)]/5 to-transparent shadow-md ring-1 ring-[var(--accent-color)]/20'
-                    : 'border-theme'
-                }`}
+                {displayPlan.map((day, displayIndex) => {
+                  const originalIndex = displayToOriginal[displayIndex];
+                  const effectiveIndex = originalIndex >= 0 ? originalIndex : ensureDayExists(day.date, day.dayName);
+                  return (
+                  <div
+                    key={day.date}
+                    onClick={() => setSelectedDayIndex(effectiveIndex)}
+                    className={`bg-theme-secondary rounded-lg p-3 min-h-[250px] border-2 transition-all cursor-pointer flex flex-col hover:shadow-lg hover:scale-[1.02] ${
+                      isToday(day.date) && !showRecipeModal && !showRecipeSearch && !showAddMealDialog && !showMealPrepPlanner
+                        ? 'border-[var(--accent-color)] bg-gradient-to-br from-[var(--accent-color)]/5 to-transparent shadow-md ring-1 ring-[var(--accent-color)]/20'
+                        : 'border-theme'
+                    }`}>
               >
                 <div className="mb-2">
                   <h3 className={`text-sm font-bold ${isToday(day.date) ? 'text-[var(--accent-color)]' : 'text-theme-primary'}`}>
@@ -1271,7 +1325,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
                 <div className="space-y-1 flex-1 overflow-y-auto text-xs">
                   {['Breakfast', 'Lunch', 'Dinner'].map((mealType) => {
                     const mealTypeKey = mealType.toLowerCase() as 'breakfast' | 'lunch' | 'dinner';
-                    const mealsForType = day[mealTypeKey] || [];
+                    const mealsForType = mealPlan[effectiveIndex][mealTypeKey] || [];
 
                     return (
                       <div 
@@ -1281,9 +1335,9 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
                             ? 'bg-[var(--accent-color)]/10 border border-[var(--accent-color)]/30'
                             : 'hover:bg-theme-primary/20'
                         }`}
-                        onDragOver={(e) => handleDragOver(e, dayIndex, mealTypeKey)}
+                            onDragOver={(e) => handleDragOver(e, effectiveIndex, mealTypeKey)}
                         onDragLeave={handleDragLeave}
-                        onDrop={(e) => handleDrop(e, dayIndex, mealTypeKey)}
+                            onDrop={(e) => handleDrop(e, effectiveIndex, mealTypeKey)}
                       >
                         <div className="text-[10px] font-semibold text-theme-primary opacity-60 uppercase">
                           {mealType.slice(0, 1)}
@@ -1301,7 +1355,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
                                   draggable
                                   onDragStart={(e) => {
                                     e.dataTransfer.setData('text/plain', `${mealTypeKey}-${mealIndex}`);
-                                    handleDragStart(e, dayIndex, mealTypeKey, mealIndex);
+                                    handleDragStart(e, effectiveIndex, mealTypeKey, mealIndex);
                                   }}
                                   onDragEnd={handleDragEnd}
                                   className={`bg-theme-primary/60 border border-theme/30 rounded-md p-1.5 text-[9px] cursor-pointer group shadow-sm active:cursor-grabbing transition-all truncate hover:opacity-80 hover:bg-theme-primary/80 hover:border-[var(--accent-color)]/40 hover:shadow-md flex items-center justify-between gap-1 ${
@@ -1591,11 +1645,15 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
                   defaultValue=""
                 >
                   <option value="" disabled>Select a day...</option>
-                  {mealPlan.map((day, index) => (
-                    <option key={day.date} value={index}>
-                      {day.dayName} - {day.date}
-                    </option>
-                  ))}
+                  {displayPlan.map((day, displayIndex) => {
+                      const orig = displayToOriginal[displayIndex];
+                      const valueIndex = orig >= 0 ? orig : ensureDayExists(day.date, day.dayName);
+                      return (
+                        <option key={day.date} value={valueIndex}>
+                          {day.dayName} - {day.date}
+                        </option>
+                      );
+                    })}
                 </select>
               </div>
               
