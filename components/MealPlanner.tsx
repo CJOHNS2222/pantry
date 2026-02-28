@@ -1302,90 +1302,86 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
                 {displayPlan.map((day, displayIndex) => {
                   const originalIndex = displayToOriginal[displayIndex];
                   const effectiveIndex = originalIndex >= 0 ? originalIndex : ensureDayExists(day.date, day.dayName);
+
                   return (
-                  <div
-                    key={day.date}
-                    onClick={() => setSelectedDayIndex(effectiveIndex)}
-                    className={`bg-theme-secondary rounded-lg p-3 min-h-[250px] border-2 transition-all cursor-pointer flex flex-col hover:shadow-lg hover:scale-[1.02] ${
-                      isToday(day.date) && !showRecipeModal && !showRecipeSearch && !showAddMealDialog && !showMealPrepPlanner
-                        ? 'border-[var(--accent-color)] bg-gradient-to-br from-[var(--accent-color)]/5 to-transparent shadow-md ring-1 ring-[var(--accent-color)]/20'
-                        : 'border-theme'
-                    }`}>
-              >
-                <div className="mb-2">
-                  <h3 className={`text-sm font-bold ${isToday(day.date) ? 'text-[var(--accent-color)]' : 'text-theme-primary'}`}>
-                    {day.dayName}
-                    {isToday(day.date) && <span className="ml-1 text-xs">📅</span>}
-                  </h3>
-                  <p className={`text-xs font-mono ${isToday(day.date) ? 'text-[var(--accent-color)] font-semibold' : 'opacity-50'}`}>
-                    {day.date}
-                  </p>
-                </div>
+                    <div
+                      key={day.date}
+                      onClick={() => setSelectedDayIndex(effectiveIndex)}
+                      className={`bg-theme-secondary rounded-lg p-3 min-h-[250px] border-2 transition-all cursor-pointer flex flex-col hover:shadow-lg hover:scale-[1.02] ${
+                        isToday(day.date) && !showRecipeModal && !showRecipeSearch && !showAddMealDialog && !showMealPrepPlanner
+                          ? 'border-[var(--accent-color)] bg-gradient-to-br from-[var(--accent-color)]/5 to-transparent shadow-md ring-1 ring-[var(--accent-color)]/20'
+                          : 'border-theme'
+                      }`}>
 
-                <div className="space-y-1 flex-1 overflow-y-auto text-xs">
-                  {['Breakfast', 'Lunch', 'Dinner'].map((mealType) => {
-                    const mealTypeKey = mealType.toLowerCase() as 'breakfast' | 'lunch' | 'dinner';
-                    const mealsForType = mealPlan[effectiveIndex][mealTypeKey] || [];
-
-                    return (
-                      <div 
-                        key={mealType} 
-                        className={`space-y-1 p-1 rounded transition-colors ${
-                          dragOverMealType?.dayIndex === dayIndex && dragOverMealType?.mealType === mealTypeKey
-                            ? 'bg-[var(--accent-color)]/10 border border-[var(--accent-color)]/30'
-                            : 'hover:bg-theme-primary/20'
-                        }`}
-                            onDragOver={(e) => handleDragOver(e, effectiveIndex, mealTypeKey)}
-                        onDragLeave={handleDragLeave}
-                            onDrop={(e) => handleDrop(e, effectiveIndex, mealTypeKey)}
-                      >
-                        <div className="text-[10px] font-semibold text-theme-primary opacity-60 uppercase">
-                          {mealType.slice(0, 1)}
-                        </div>
-                        <div className="space-y-1">
-                          {mealsForType.length === 0 ? (
-                            <div className="h-6 flex items-center text-[9px] opacity-30">
-                              Drop here
-                            </div>
-                          ) : (
-                            mealsForType.map((meal, mealIndex) => {
-                              return (
-                                <div
-                                  key={meal.id}
-                                  draggable
-                                  onDragStart={(e) => {
-                                    e.dataTransfer.setData('text/plain', `${mealTypeKey}-${mealIndex}`);
-                                    handleDragStart(e, effectiveIndex, mealTypeKey, mealIndex);
-                                  }}
-                                  onDragEnd={handleDragEnd}
-                                  className={`bg-theme-primary/60 border border-theme/30 rounded-md p-1.5 text-[9px] cursor-pointer group shadow-sm active:cursor-grabbing transition-all truncate hover:opacity-80 hover:bg-theme-primary/80 hover:border-[var(--accent-color)]/40 hover:shadow-md flex items-center justify-between gap-1 ${
-                                    draggedMeal?.dayIndex === dayIndex && draggedMeal?.mealType === mealTypeKey && draggedMeal?.mealIndex === mealIndex
-                                      ? 'opacity-50 scale-95'
-                                      : ''
-                                  }`}
-                                  onClick={(e) => { 
-                                    e.stopPropagation();
-                                    setModalRecipe(meal.recipe);
-                                    setModalContext('scheduled');
-                                    setShowRecipeModal(true); 
-                                  }}
-                                  title={meal.recipe.title}
-                                >
-                                  <span className="text-[var(--accent-color)] font-semibold truncate flex-1">
-                                    {meal.recipe.title}
-                                  </span>
-                                  <span className="text-[8px] opacity-60 group-hover:opacity-80">👁️</span>
-                                </div>
-                              );
-                            })
-                          )}
-                        </div>
+                      <div className="mb-2">
+                        <h3 className={`text-sm font-bold ${isToday(day.date) ? 'text-[var(--accent-color)]' : 'text-theme-primary'}`}>
+                          {day.dayName}
+                          {isToday(day.date) && <span className="ml-1 text-xs">📅</span>}
+                        </h3>
+                        <p className={`text-xs font-mono ${isToday(day.date) ? 'text-[var(--accent-color)] font-semibold' : 'opacity-50'}`}>
+                          {day.date}
+                        </p>
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
+
+                      <div className="space-y-1 flex-1 overflow-y-auto text-xs">
+                        {['Breakfast', 'Lunch', 'Dinner'].map((mealType) => {
+                          const mealTypeKey = mealType.toLowerCase() as 'breakfast' | 'lunch' | 'dinner';
+                          const mealsForType = mealPlan[effectiveIndex][mealTypeKey] || [];
+
+                          return (
+                            <div
+                              key={mealType}
+                              className={`space-y-1 p-1 rounded transition-colors ${
+                                dragOverMealType?.dayIndex === effectiveIndex && dragOverMealType?.mealType === mealTypeKey
+                                  ? 'bg-[var(--accent-color)]/10 border border-[var(--accent-color)]/30'
+                                  : 'hover:bg-theme-primary/20'
+                              }`}
+                              onDragOver={(e) => handleDragOver(e, effectiveIndex, mealTypeKey)}
+                              onDragLeave={handleDragLeave}
+                              onDrop={(e) => handleDrop(e, effectiveIndex, mealTypeKey)}
+                            >
+                              <div className="text-[10px] font-semibold text-theme-primary opacity-60 uppercase">
+                                {mealType.slice(0, 1)}
+                              </div>
+                              <div className="space-y-1">
+                                {mealsForType.length === 0 ? (
+                                  <div className="h-6 flex items-center text-[9px] opacity-30">Drop here</div>
+                                ) : (
+                                  mealsForType.map((meal, mealIndex) => (
+                                    <div
+                                      key={meal.id}
+                                      draggable
+                                      onDragStart={(e) => {
+                                        e.dataTransfer.setData('text/plain', `${mealTypeKey}-${mealIndex}`);
+                                        handleDragStart(e, effectiveIndex, mealTypeKey, mealIndex);
+                                      }}
+                                      onDragEnd={handleDragEnd}
+                                      className={`bg-theme-primary/60 border border-theme/30 rounded-md p-1.5 text-[9px] cursor-pointer group shadow-sm active:cursor-grabbing transition-all truncate hover:opacity-80 hover:bg-theme-primary/80 hover:border-[var(--accent-color)]/40 hover:shadow-md flex items-center justify-between gap-1 ${
+                                        draggedMeal?.dayIndex === effectiveIndex && draggedMeal?.mealType === mealTypeKey && draggedMeal?.mealIndex === mealIndex
+                                          ? 'opacity-50 scale-95'
+                                          : ''
+                                      }`}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setModalRecipe(meal.recipe);
+                                        setModalContext('scheduled');
+                                        setShowRecipeModal(true);
+                                      }}
+                                      title={meal.recipe.title}
+                                    >
+                                      <span className="text-[var(--accent-color)] font-semibold truncate flex-1">{meal.recipe.title}</span>
+                                      <span className="text-[8px] opacity-60 group-hover:opacity-80">👁️</span>
+                                    </div>
+                                  ))
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
           </div>
         </div>
         )}

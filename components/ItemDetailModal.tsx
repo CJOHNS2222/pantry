@@ -40,6 +40,27 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   const [batchQty, setBatchQty] = useState<number>(1);
   const [batchUnit, setBatchUnit] = useState<string>('count');
   const [batchExpires, setBatchExpires] = useState<string | undefined>(undefined);
+  const BATCH_MIN = 1;
+  const BATCH_MAX = 100;
+  // Local-only state while modal is open; persist on close
+  const [localQuantity, setLocalQuantity] = useState<number>(getQuantityAmount(item.quantity ?? item.quantity_estimate));
+  const [localUnit, setLocalUnit] = useState<string>(getQuantityUnit(item.quantity ?? item.quantity_estimate));
+  const [localBatches, setLocalBatches] = useState(() => (item.batches ? JSON.parse(JSON.stringify(item.batches)) : []));
+  const [localStorageLocation, setLocalStorageLocation] = useState<PantryItem['storageLocation']>(item.storageLocation || 'pantry');
+  const [localCategory, setLocalCategory] = useState<string>(item.category || 'Manual');
+  const [localExpirationDate, setLocalExpirationDate] = useState<string>(item.expirationDate || '');
+  const [localExpirationType, setLocalExpirationType] = useState<'use-by' | 'best-by'>(item.expirationType || 'best-by');
+
+  useEffect(() => {
+    // Reset local state when item prop changes
+    setLocalQuantity(getQuantityAmount(item.quantity ?? item.quantity_estimate));
+    setLocalUnit(getQuantityUnit(item.quantity ?? item.quantity_estimate));
+    setLocalBatches(item.batches ? JSON.parse(JSON.stringify(item.batches)) : []);
+    setLocalStorageLocation(item.storageLocation || 'pantry');
+    setLocalCategory(item.category || 'Manual');
+    setLocalExpirationDate(item.expirationDate || '');
+    setLocalExpirationType(item.expirationType || 'best-by');
+  }, [item]);
 
   // Compute summed total from batches when present
   const batchTotal = (item.batches && item.batches.length > 0)
@@ -70,65 +91,87 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
     enabled: true
   });
 
+  // Local-only change while modal is open; will persist on close
   const handleQuantityChange = (newQuantity: number) => {
     if (newQuantity >= 0) {
-      // Update both old and new quantity systems for compatibility
-      const updates: Partial<PantryItem> = {
-        quantity_estimate: newQuantity.toString()
-      };
-
-      if (item.quantity && typeof item.quantity !== 'number') {
-        updates.quantity = {
-          ...item.quantity,
-          amount: newQuantity,
-          unit: editUnit
-        };
-      } else {
-        // Create new quantity object if it doesn't exist or was a simple number
-        updates.quantity = {
-          amount: newQuantity,
-          unit: editUnit
-        };
-      }
-
-      onUpdateItem(originalIndex, updates);
+      setLocalQuantity(newQuantity);
       setEditQuantity(newQuantity);
     }
   };
 
   const handleUnitChange = (newUnit: string) => {
-    const updates: Partial<PantryItem> = {
-      quantity: {
-        amount: editQuantity,
-        unit: newUnit
-      }
-    };
-
-    onUpdateItem(originalIndex, updates);
+    setLocalUnit(newUnit);
     setEditUnit(newUnit);
   };
 
   const handleSaveExpiration = () => {
-    const updates: Partial<PantryItem> = {
-      expirationDate: editExpirationDate || undefined,
-      expirationType: editExpirationType
-    };
-    onUpdateItem(originalIndex, updates);
+    setLocalExpirationDate(editExpirationDate || '');
+    setLocalExpirationType(editExpirationType as 'use-by' | 'best-by');
     setIsEditingExpiration(false);
   };
 
   const handleCancelExpirationEdit = () => {
-    setEditExpirationDate(item.expirationDate || '');
-    setEditExpirationType(item.expirationType || 'best-by');
+    setEditExpirationDate(localExpirationDate || item.expirationDate || '');
+    setEditExpirationType(localExpirationType || (item.expirationType || 'best-by'));
     setIsEditingExpiration(false);
   };
 
   const handleStorageChange = (storageLocation: PantryItem['storageLocation']) => {
-    onUpdateItem(originalIndex, { storageLocation });
+    setLocalStorageLocation(storageLocation);
   };
 
   const handleCategoryChange = (category: string) => {
-    onUpdateItem(originalIndex, { category });
+    setLocalCategory(category);
+  };
+
+  const handleAddBatchLocal = () => {
+    const now = new Date().toISOString();
+    const newBatch = { batchId: crypto.randomUUID(), quantity: 1, unit: 'count', expires: undefined, purchaseDate: now };
+    setLocalBatches([...(localBatches || []), newBatch]);
+  };
+
+  const handleSaveBatchLocal = () => {
+    // Ensure integer quantity and clamp
+    const intQty = Math.max(BATCH_MIN, Math.min(BATCH_MAX, Math.floor(batchQty)));
+    const updated = (localBatches || []).map((b: any) => b.batchId === editingBatchId ? { ...b, quantity: intQty, unit: batchUnit, expires: batchExpires } : b);
+    setLocalBatches(updated);
+    setEditingBatchId(null);
+  };
+
+  const handleDeleteBatchLocal = (batchId: string) => {
+    setLocalBatches((localBatches || []).filter((x: any) => x.batchId !== batchId));
+  };
+
+  const handleCloseAndPersist = () => {
+    const updates: Partial<PantryItem> = {};
+
+    // Quantity
+    if (localQuantity !== getQuantityAmount(item.quantity ?? item.quantity_estimate) || localUnit !== getQuantityUnit(item.quantity ?? item.quantity_estimate)) {
+      updates.quantity = { amount: localQuantity, unit: localUnit } as any;
+      updates.quantity_estimate = String(localQuantity);
+    }
+
+    // Batches
+    // Compare JSON strings for simplicity
+    if (JSON.stringify(localBatches || []) !== JSON.stringify(item.batches || [])) {
+      updates.batches = localBatches;
+    }
+
+    // Storage & Category
+    if (localStorageLocation !== (item.storageLocation || 'pantry')) updates.storageLocation = localStorageLocation;
+    if (localCategory !== (item.category || 'Manual')) updates.category = localCategory;
+
+    // Expiration
+    if (localExpirationDate !== (item.expirationDate || '') || localExpirationType !== (item.expirationType || 'best-by')) {
+      updates.expirationDate = localExpirationDate || undefined;
+      updates.expirationType = localExpirationType;
+    }
+
+    if (Object.keys(updates).length > 0) {
+      onUpdateItem(originalIndex, updates);
+    }
+
+    onClose();
   };
 
   return (
@@ -139,7 +182,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
           <div className="flex items-center justify-between pt-4 px-3 pb-3 border-b border-theme flex-shrink-0">
             <h3 className="text-lg font-semibold text-theme-primary">{item.item}</h3>
             <button
-              onClick={onClose}
+              onClick={handleCloseAndPersist}
               className="text-theme-secondary opacity-70 hover:opacity-100 hover:text-theme-primary"
             >
               <X className="w-6 h-6" />
@@ -149,7 +192,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
           {/* Scrollable Content */}
           <div className="flex-1 overflow-y-auto px-3 py-2">
             {/* Item Image */}
-            <div className="pb-2 flex justify-center">
+              <div className="pb-2 flex justify-center">
               <img
                 src={item.image}
                 alt={item.item}
@@ -203,12 +246,12 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
               <label className="block text-xs font-medium text-theme-primary mb-1 uppercase opacity-70">
                 Batches
               </label>
-              {(item.batches && item.batches.length > 0) ? (
+              {(localBatches && localBatches.length > 0) ? (
                 <div className="space-y-2">
-                  {item.batches.map((b) => (
+                  {localBatches.map((b: any) => (
                     <div key={b.batchId} className="flex items-center justify-between bg-theme-primary p-2 rounded">
                       <div>
-                        <div className="text-sm font-medium text-theme-primary">{b.quantity} {b.unit || ''}</div>
+                        <div className="text-sm font-medium text-theme-primary">{Math.round(b.quantity)} {b.unit || ''}</div>
                         <div className="text-xs text-theme-secondary">{b.expires ? `Expires ${new Date(b.expires).toLocaleDateString()}` : 'No expiry'}</div>
                       </div>
                       <div className="flex items-center gap-2">
@@ -222,8 +265,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                         </button>
                         <button onClick={() => {
                           if (confirm('Remove this batch?')) {
-                            const updated = (item.batches || []).filter(x => x.batchId !== b.batchId);
-                            onUpdateItem(originalIndex, { batches: updated });
+                            handleDeleteBatchLocal(b.batchId);
                           }
                         }} className="p-2 text-theme-secondary hover:text-red-600">
                           <Trash2 className="w-4 h-4" />
@@ -237,13 +279,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
               )}
 
               <div className="mt-3 flex gap-2">
-                <button onClick={() => {
-                  // Add a new empty batch with default qty 1
-                  const now = new Date().toISOString();
-                  const newBatch = { batchId: crypto.randomUUID(), quantity: 1, unit: 'count', expires: undefined, purchaseDate: now };
-                  const updated = [...(item.batches || []), newBatch];
-                  onUpdateItem(originalIndex, { batches: updated });
-                }} className="px-3 py-1 bg-[var(--accent-color)] text-white rounded">Add Batch</button>
+                <button onClick={handleAddBatchLocal} className="px-3 py-1 bg-[var(--accent-color)] text-white rounded">Add Batch</button>
                 {editingBatchId && (
                   <button onClick={() => { setEditingBatchId(null); }} className="px-3 py-1 bg-theme-secondary rounded">Close Edit</button>
                 )}
@@ -320,29 +356,57 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
             {editingBatchId && (
               <div className="bg-theme-secondary p-3 rounded-lg border border-theme mt-3">
                 <label className="block text-xs font-medium text-theme-primary mb-1 uppercase opacity-70">Edit Batch</label>
-                <div className="space-y-2">
-                  <div>
-                    <label className="text-xs text-theme-secondary">Quantity</label>
-                    <input type="number" min={0} step={0.01} value={batchQty} onChange={(e) => setBatchQty(parseFloat(e.target.value) || 0)} className="w-full mt-1 p-2 rounded border text-black" />
+                  <div className="space-y-2">
+                    <div>
+                      <label className="text-xs text-theme-secondary">Quantity</label>
+                      <div className="flex items-center gap-2 mt-1">
+                        <input
+                          type="range"
+                          min={BATCH_MIN}
+                          max={BATCH_MAX}
+                          step={1}
+                          value={batchQty}
+                          onChange={(e) => setBatchQty(parseInt(e.target.value || String(BATCH_MIN), 10))}
+                          className="flex-1"
+                        />
+                        <input
+                          type="number"
+                          min={BATCH_MIN}
+                          max={BATCH_MAX}
+                          step={1}
+                          value={batchQty}
+                          onChange={(e) => {
+                            const v = parseInt(e.target.value, 10);
+                            if (Number.isNaN(v)) {
+                              setBatchQty(BATCH_MIN);
+                            } else {
+                              setBatchQty(Math.max(BATCH_MIN, Math.min(BATCH_MAX, v)));
+                            }
+                          }}
+                          className="w-20 p-2 rounded border text-black"
+                        />
+                      </div>
+                      <div className="text-xs text-theme-secondary mt-1">Quantity must be a whole number between {BATCH_MIN} and {BATCH_MAX}.</div>
+                    </div>
+                    <div>
+                      <label className="text-xs text-theme-secondary">Unit</label>
+                      <input value={batchUnit} onChange={(e) => setBatchUnit(e.target.value)} className="w-full mt-1 p-2 rounded border" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-theme-secondary">Expiration</label>
+                      <input type="date" value={batchExpires || ''} onChange={(e) => setBatchExpires(e.target.value || undefined)} className="w-full mt-1 p-2 rounded border text-black" />
+                    </div>
                   </div>
-                  <div>
-                    <label className="text-xs text-theme-secondary">Unit</label>
-                    <input value={batchUnit} onChange={(e) => setBatchUnit(e.target.value)} className="w-full mt-1 p-2 rounded border" />
+                  <div className="flex gap-2 justify-end mt-3">
+                    <button onClick={() => setEditingBatchId(null)} className="px-3 py-1 rounded bg-theme-secondary">Cancel</button>
+                    <button onClick={() => {
+                      // Ensure integer quantity and clamp to bounds
+                      const intQty = Math.max(BATCH_MIN, Math.min(BATCH_MAX, Math.floor(batchQty)));
+                      const updated = (item.batches || []).map(b => b.batchId === editingBatchId ? { ...b, quantity: intQty, unit: batchUnit, expires: batchExpires } : b);
+                      onUpdateItem(originalIndex, { batches: updated });
+                      setEditingBatchId(null);
+                    }} className="px-3 py-1 rounded bg-[var(--accent-color)] text-white">Save</button>
                   </div>
-                  <div>
-                    <label className="text-xs text-theme-secondary">Expiration</label>
-                    <input type="date" value={batchExpires || ''} onChange={(e) => setBatchExpires(e.target.value || undefined)} className="w-full mt-1 p-2 rounded border text-black" />
-                  </div>
-                </div>
-                <div className="flex gap-2 justify-end mt-3">
-                  <button onClick={() => setEditingBatchId(null)} className="px-3 py-1 rounded bg-theme-secondary">Cancel</button>
-                  <button onClick={() => {
-                    // Apply edits to the batch list
-                    const updated = (item.batches || []).map(b => b.batchId === editingBatchId ? { ...b, quantity: batchQty, unit: batchUnit, expires: batchExpires } : b);
-                    onUpdateItem(originalIndex, { batches: updated });
-                    setEditingBatchId(null);
-                  }} className="px-3 py-1 rounded bg-[var(--accent-color)] text-white">Save</button>
-                </div>
               </div>
             )}
 

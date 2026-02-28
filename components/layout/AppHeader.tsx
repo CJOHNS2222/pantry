@@ -6,7 +6,8 @@ import { HouseholdStatusIndicator } from '../HouseholdStatusIndicator';
 import { SyncIndicator } from '../SyncIndicator';
 import { OnlineIndicator } from '../OnlineIndicator';
 import { SyncStatus } from '../../hooks/useOfflineStatus';
-import { NotificationService } from '../../services/notificationService';
+import useUserNotifications from '../../hooks/useUserNotifications';
+import notificationsService, { markAllNotificationsRead } from '../../services/notificationsService';
 
 interface AppHeaderProps {
   user: User;
@@ -33,29 +34,23 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   onSyncClick,
   onNavigateToSettings
 }) => {
-  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const throttleMs = 5000; // UI update throttle for notifications
+  const { items } = useUserNotifications(user?.id, throttleMs);
+  const unreadNotificationsCount = (items || []).filter(i => !i.read).length;
 
-  useEffect(() => {
-    const loadUnreadCount = async () => {
-      // Only load notifications if user is authenticated
-      if (!user?.id) return;
-      
-      try {
-        const unreadNotifications = await NotificationService.getUnreadNotifications(user.id, user.email);
-        setUnreadNotificationsCount(unreadNotifications.length);
-      } catch (error) {
-        console.error('Error loading unread notifications count:', error);
-        // Don't show error to user, just set count to 0
-        setUnreadNotificationsCount(0);
-      }
-    };
+  const handleToggleNotifications = () => {
+    setShowNotifications(prev => !prev);
+  };
 
-    loadUnreadCount();
-
-    // Refresh count every 5 minutes (reduced from 30 seconds to minimize queries)
-    const interval = setInterval(loadUnreadCount, 300000);
-    return () => clearInterval(interval);
-  }, [user?.id, user?.email]);
+  const handleMarkAllRead = async () => {
+    if (!user?.id) return;
+    try {
+      await markAllNotificationsRead(user.id);
+    } catch (err) {
+      console.error('Failed to mark notifications read:', err);
+    }
+  };
   return (
     <header 
       className="bg-theme-secondary p-3 pt-[20px] pb-0 fixed top-0 left-0 right-0 max-w-md mx-auto z-20 shadow-md border-b border-theme transition-colors duration-300"
@@ -67,18 +62,41 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             <div className="text-sm font-medium text-theme-primary opacity-80 truncate" id="user-email">
               {user.name || user.email.split('@')[0]}
             </div>
-            {unreadNotificationsCount > 0 && user?.id && onNavigateToSettings && (
-              <button
-                onClick={onNavigateToSettings}
-                className="relative p-1 text-amber-500 hover:text-amber-400 transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 rounded"
-                aria-label={`${unreadNotificationsCount} unread notifications`}
-                title="View pending notifications"
-              >
-                <Bell className="w-3 h-3" />
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-medium text-[10px]">
-                  {unreadNotificationsCount > 99 ? '99+' : unreadNotificationsCount}
-                </span>
-              </button>
+            {user?.id && (
+              <div className="relative">
+                <button
+                  onClick={handleToggleNotifications}
+                  className="relative p-1 text-amber-500 hover:text-amber-400 transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 rounded"
+                  aria-label={`${unreadNotificationsCount} unread notifications`}
+                  title="View pending notifications"
+                >
+                  <Bell className="w-4 h-4" />
+                  {unreadNotificationsCount > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-medium text-[10px]">
+                      {unreadNotificationsCount > 99 ? '99+' : unreadNotificationsCount}
+                    </span>
+                  )}
+                </button>
+
+                {showNotifications && (
+                  <div className="absolute right-0 mt-2 w-80 max-h-96 overflow-auto bg-theme-primary border border-theme rounded shadow-lg z-50 p-2">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-sm font-semibold">Notifications</div>
+                      <button onClick={handleMarkAllRead} className="text-xs text-theme-secondary hover:underline">Mark all read</button>
+                    </div>
+                    <div className="space-y-2">
+                      {(items || []).slice().reverse().slice(0, 50).map((n: any) => (
+                        <div key={n.id} className={`p-2 rounded ${n.read ? 'bg-theme-secondary' : 'bg-theme-primary/20'}`}>
+                          <div className="text-sm font-medium">{n.title}</div>
+                          {n.body && <div className="text-xs text-theme-secondary">{n.body}</div>}
+                          <div className="text-xs text-theme-secondary mt-1">{n.createdAt?.toString ? n.createdAt.toString() : ''}</div>
+                        </div>
+                      ))}
+                      {(items || []).length === 0 && <div className="text-xs text-theme-secondary">No notifications</div>}
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
           </div>
           <div className="flex items-center gap-1">

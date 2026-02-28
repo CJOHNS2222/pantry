@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Bell, Clock, Check, X, AlertCircle } from 'lucide-react';
 import { NotificationService, NotificationItem } from '../services/notificationService';
+import { markNotificationRead, snoozeNotificationInCache } from '../services/notificationsService';
 import { User } from '../types';
 import { serverTimestamp } from 'firebase/firestore';
 import DatabaseMonitoringService from '../services/databaseMonitoringService';
@@ -104,7 +105,11 @@ export const PendingNotifications: React.FC<PendingNotificationsProps> = ({
           break;
       }
 
-      await NotificationService.markAsRead(notification.id);
+      if (user?.id) {
+        await markNotificationRead(user.id, notification.id);
+      } else {
+        await NotificationService.markAsRead(notification.id);
+      }
       await loadNotifications(); // Refresh the list
     } catch (error) {
       console.error('Error accepting notification:', error);
@@ -116,7 +121,11 @@ export const PendingNotifications: React.FC<PendingNotificationsProps> = ({
   const handleSnoozeNotification = async (notification: NotificationItem, minutes: number) => {
     setProcessing(notification.id);
     try {
-      await NotificationService.snoozeNotification(notification.id, minutes);
+      if (user?.id) {
+        await snoozeNotificationInCache(user.id, notification.id, minutes);
+      } else {
+        await NotificationService.snoozeNotification(notification.id, minutes);
+      }
       await loadNotifications(); // Refresh the list
     } catch (error) {
       console.error('Error snoozing notification:', error);
@@ -128,7 +137,11 @@ export const PendingNotifications: React.FC<PendingNotificationsProps> = ({
   const handleDismissNotification = async (notification: NotificationItem) => {
     setProcessing(notification.id);
     try {
-      await NotificationService.markAsRead(notification.id);
+      if (user?.id) {
+        await markNotificationRead(user.id, notification.id);
+      } else {
+        await NotificationService.markAsRead(notification.id);
+      }
       await loadNotifications(); // Refresh the list
     } catch (error) {
       console.error('Error dismissing notification:', error);

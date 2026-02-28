@@ -28,6 +28,7 @@ import { AdMobBanner } from './AdMobBanner';
 import { canShowAds } from '../utils/appUtils';
 
 import { InventoryCacheService } from '../services/inventoryCacheService';
+import ImportModal from './ImportModal';
 
 // Constants for virtualization threshold
 
@@ -88,6 +89,15 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
     return () => { mounted = false; };
   }, [user]);
 
+  // Cleanup imported timer on unmount
+  useEffect(() => {
+    return () => {
+      if (importedTimerRef.current) {
+        window.clearTimeout(importedTimerRef.current);
+      }
+    };
+  }, []);
+
   // Constants for virtualization threshold
   const CATEGORY_VIRTUALIZE_THRESHOLD = 20;
 
@@ -111,6 +121,9 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   const [newQty, setNewQty] = useState(1);
   const [newUnit, setNewUnit] = useState('count');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [lastImportedBatch, setLastImportedBatch] = useState<import('../types').PantryItem[] | null>(null);
+  const importedTimerRef = useRef<number | null>(null);
   const [bulkMode, setBulkMode] = useState(false);
   const [selectedItems, setSelectedItems] = useState<Set<number>>(new Set());
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
@@ -774,6 +787,14 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
       </div>
     );
   };
+                  
+                  <button
+                    onClick={() => setShowImportModal(true)}
+                    className="flex-1 py-2 px-3 rounded-lg border border-theme text-theme-secondary hover:bg-theme-primary transition-colors flex items-center justify-center gap-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:ring-offset-2"
+                    aria-label="Import items or recipes"
+                  >
+                    Import
+                  </button>
 
   // Virtualized storage item renderer
   const renderStorageItem = ({ index, style, location }: { index: number; style: React.CSSProperties; location: string }) => {
@@ -976,8 +997,52 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
             <option value="location">Sort by Location</option>
           </select>
           <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-theme-primary pointer-events-none" />
+          <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-theme-primary pointer-events-none" />
         </div>
       </div>
+
+      {lastImportedBatch && (
+        <div className="w-full bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4 flex items-center justify-between">
+          <div className="text-sm text-yellow-900">Imported {lastImportedBatch.length} items</div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={async () => {
+                try {
+                  // Remove imported items from the cache
+                  for (const it of lastImportedBatch) {
+                    try {
+                      await InventoryCacheService.removeItemFromCache(it.id, household?.id, user?.id);
+                    } catch (err) {
+                      console.error('Failed to remove imported item from cache', err);
+                    }
+                  }
+                } finally {
+                  setLastImportedBatch(null);
+                  if (importedTimerRef.current) {
+                    window.clearTimeout(importedTimerRef.current);
+                    importedTimerRef.current = null;
+                  }
+                }
+              }}
+              className="px-3 py-1 bg-theme-primary text-white rounded"
+            >
+              Undo
+            </button>
+            <button
+              onClick={() => {
+                setLastImportedBatch(null);
+                if (importedTimerRef.current) {
+                  window.clearTimeout(importedTimerRef.current);
+                  importedTimerRef.current = null;
+                }
+              }}
+              className="px-3 py-1 bg-theme-secondary rounded border border-theme"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Meal Prep Suggestions - Recipes You Can Make Immediately */}
       {mealPrepSuggestions.length > 0 && (
@@ -1072,6 +1137,22 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
             </div>
           )}
         </div>
+      )}
+
+      {showImportModal && (
+        <ImportModal
+          open={showImportModal}
+          onClose={() => setShowImportModal(false)}
+          defaultTab="pantry"
+          onImported={async (items) => {
+            try {
+              // Add to current session via provided prop
+              await onAddItems(items);
+            } catch (err) {
+              console.error('Failed to add imported items to session', err);
+            }
+          }}
+        />
       )}
 
       {/* Search and Filter Bar */}

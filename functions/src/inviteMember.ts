@@ -1,13 +1,11 @@
 
 import {onCall, onRequest, HttpsError} from "firebase-functions/v2/https";
-import { defineJsonSecret } from "firebase-functions/params";
 import admin from 'firebase-admin';
 import {getFirestore, FieldValue} from "firebase-admin/firestore";
 import { getAuth } from 'firebase-admin/auth';
 import { sendEmail } from './helpers/sendEmail.js';
 
-// Define the secret for Gmail configuration
-const gmailConfigSecret = defineJsonSecret("EMAILSECRET");
+// (email secret removed — email sending disabled temporarily)
 
 // Ensure the Admin SDK is initialized
 if (!admin.apps?.length) {
@@ -135,19 +133,85 @@ async function inviteMemberCore(inviterUid: string, email: string, householdId: 
     }
   }
 
-  const notificationsRef = db.collection('notifications');
-  await notificationsRef.add({ 
-    userId: memberIdToStore, 
-    type: 'household_invite',
-    title: 'Household Invitation',
-    message: `${inviterName} has invited you to join the "${householdName}" household on Smart Pantry!`, 
-    priority: 'medium',
-    actionType: 'join_household',
-    actionLabel: 'Accept',
-    actionData: { householdId },
-    read: false,
-    createdAt: FieldValue.serverTimestamp()
-  });
+  // Append notification to the invited user's per-user notifications cache
+  try {
+    const cacheRef = db.collection('users').doc(memberIdToStore).collection('cache').doc('notifications');
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(cacheRef);
+      const data = snap.exists ? snap.data() : {};
+      const existing = Array.isArray(data?.items) ? data.items : [];
+      const next = [
+        ...existing,
+        {
+          id: `${Date.now().toString()}-${Math.random().toString(36).slice(2,8)}`,
+          userId: memberIdToStore,
+          type: 'household_invite',
+          title: 'Household Invitation',
+          message: `${inviterName} has invited you to join the "${householdName}" household on Smart Pantry!`,
+          priority: 'medium',
+          actionType: 'join_household',
+          actionLabel: 'Accept',
+          actionData: { householdId },
+          read: false,
+          createdAt: FieldValue.serverTimestamp()
+        }
+      ];
+
+      const MAX_ITEMS = 200;
+      const trimmed = next.slice(-MAX_ITEMS);
+      tx.set(cacheRef, { items: trimmed }, { merge: true });
+    });
+  } catch (err) {
+    console.error('Failed to append invite notification to user cache, falling back to notifications collection:', err);
+    // Fallback to writing to global notifications collection
+    // Append an important invite notification to the invited user's per-user notifications cache
+    try {
+      const cacheRef = db.collection('users').doc(memberIdToStore).collection('cache').doc('notifications');
+      await db.runTransaction(async (tx) => {
+        const snap = await tx.get(cacheRef);
+        const data = snap.exists ? snap.data() : {};
+        const existing = Array.isArray(data?.items) ? data.items : [];
+        const next = [
+          ...existing,
+          {
+            id: `${Date.now().toString()}-${Math.random().toString(36).slice(2,8)}`,
+            userId: memberIdToStore,
+            type: 'household_invite',
+            title: 'Household Invitation',
+            message: `${inviterName} has invited you to join the "${householdName}" household on Smart Pantry!`,
+            priority: 'high',
+            forceShow: true,
+            actionType: 'join_household',
+            actionLabel: 'Accept',
+            actionData: { householdId },
+            read: false,
+            createdAt: FieldValue.serverTimestamp()
+          }
+        ];
+
+        const MAX_ITEMS = 200;
+        const trimmed = next.slice(-MAX_ITEMS);
+        tx.set(cacheRef, { items: trimmed }, { merge: true });
+      });
+    } catch (err) {
+      console.error('Failed to append invite notification to user cache, falling back to notifications collection:', err);
+      // Fallback to writing to global notifications collection
+      const notificationsRef = db.collection('notifications');
+      await notificationsRef.add({ 
+        userId: memberIdToStore, 
+        type: 'household_invite',
+        title: 'Household Invitation',
+        message: `${inviterName} has invited you to join the "${householdName}" household on Smart Pantry!`, 
+        priority: 'high',
+        forceShow: true,
+        actionType: 'join_household',
+        actionLabel: 'Accept',
+        actionData: { householdId },
+        read: false,
+        createdAt: FieldValue.serverTimestamp()
+      });
+    }
+  }
 
   // Send email invitation
   try {
@@ -195,9 +259,7 @@ async function inviteMemberCore(inviterUid: string, email: string, householdId: 
   return { success: true, newMember };
 }
 
-export const inviteMember = onCall(
-  { secrets: [gmailConfigSecret] },
-  async (request) => {
+export const inviteMember = onCall(async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'You must be logged in to invite members.');
   const inviterUid = request.auth.uid;
   const { email, householdId } = request.data;
@@ -236,9 +298,7 @@ export const inviteMemberHttp = onRequest(async (req, res) => {
 });
 
 // Leave household function (admin privileges to bypass security rules)
-export const leaveHousehold = onCall(
-  { secrets: [gmailConfigSecret] },
-  async (request) => {
+export const leaveHousehold = onCall(async (request) => {
     const { householdId } = request.data;
     const userId = request.auth?.uid;
 
@@ -374,7 +434,6 @@ export const leaveHousehold = onCall(
 
 // HTTP handler for leaving household
 export const leaveHouseholdHttp = onRequest(
-  { secrets: [gmailConfigSecret] },
   async (req, res) => {
     try {
       if (req.method !== 'POST') { res.status(405).json({ error: 'method not allowed' }); return; }

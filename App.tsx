@@ -24,6 +24,7 @@ import { isHouseholdMember, inferCategoryFromItemName, inferStorageLocationFromI
 import { getQuantityAmount } from './utils/quantityUtils';
 import { NotificationBanner } from './components/NotificationBanner';
 import { NotificationService, NotificationItem, NotificationSettings } from './services/notificationService';
+import { markNotificationRead, snoozeNotificationInCache } from './services/notificationsService';
 import { pushNotificationService } from './services/pushNotificationService';
 import { log } from './services/logService';
 import { HouseholdActivityService } from './services/householdActivityService';
@@ -347,7 +348,11 @@ const App: React.FC = () => {
   };
 
   const handleNotificationDismiss = async (notificationId: string) => {
-    await NotificationService.markAsRead(notificationId);
+    if (user?.id) {
+      await markNotificationRead(user.id, notificationId);
+    } else {
+      await NotificationService.markAsRead(notificationId);
+    }
     setNotifications([]);
   };
 
@@ -355,7 +360,11 @@ const App: React.FC = () => {
     setNotifications([]);
     
     try {
-      await NotificationService.markAsRead(notification.id);
+      if (user?.id) {
+        await markNotificationRead(user.id, notification.id);
+      } else {
+        await NotificationService.markAsRead(notification.id);
+      }
 
       switch (notification.actionType) {
         case 'add_to_shopping':
@@ -403,7 +412,11 @@ const App: React.FC = () => {
   };
 
   const handleNotificationSnooze = async (notificationId: string, minutes: number) => {
-    await NotificationService.snoozeNotification(notificationId, minutes);
+    if (user?.id) {
+      await snoozeNotificationInCache(user.id, notificationId, minutes);
+    } else {
+      await NotificationService.snoozeNotification(notificationId, minutes);
+    }
     setNotifications([]);
   };
 

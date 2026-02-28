@@ -7,6 +7,7 @@ import DatabaseMonitoringService from './databaseMonitoringService';
 import { serverTimestamp, Timestamp } from 'firebase/firestore';
 import { User } from '../types';
 import { pushNotificationService } from './pushNotificationService';
+import { appendNotificationToUser, getNotificationsOnce, markNotificationRead, snoozeNotificationInCache } from './notificationsService';
 
 export interface NotificationItem {
   id: string;
@@ -52,12 +53,29 @@ export class NotificationService {
     userId: string,
     notification: Omit<NotificationItem, 'id' | 'userId' | 'read' | 'createdAt'>
   ): Promise<string> {
-    const docRef = await DatabaseMonitoringService.addDoc(DatabaseMonitoringService.collection(this.COLLECTION), {
+    // Use per-user cached notifications to reduce reads/writes
+    const id = crypto.randomUUID();
+    const item: any = {
+      id,
       userId,
       read: false,
       createdAt: serverTimestamp(),
       ...notification
-    });
+    };
+
+    try {
+      await appendNotificationToUser(userId, item as any);
+    } catch (err) {
+      console.error('Failed to append notification to user cache:', err);
+      // fallback to writing to collection if cache fails
+      const docRef = await DatabaseMonitoringService.addDoc(DatabaseMonitoringService.collection(this.COLLECTION), {
+        userId,
+        read: false,
+        createdAt: serverTimestamp(),
+        ...notification
+      });
+      return docRef.id;
+    }
 
     // Send push notification for urgent notifications only (expired items)
     if (notification.priority === 'urgent') {
@@ -65,11 +83,10 @@ export class NotificationService {
         await this.sendPushNotification(userId, notification);
       } catch (err: any) {
         console.error('Failed to send push notification:', err);
-        // Don't fail the whole operation if push notification fails
       }
     }
 
-    return docRef.id;
+    return id;
   }
 
   /**
@@ -301,41 +318,23 @@ export class NotificationService {
    */
   static async getUnreadNotifications(userId: string, userEmail?: string): Promise<NotificationItem[]> {
     try {
-      // Query for notifications where userId matches the user's ID
-      const q = DatabaseMonitoringService.query(
-        DatabaseMonitoringService.collection(this.COLLECTION),
-        DatabaseMonitoringService.where('userId', '==', userId),
-        DatabaseMonitoringService.orderBy('createdAt', 'desc'),
-        DatabaseMonitoringService.limit(50)
-      );
-
-      const querySnapshot = await DatabaseMonitoringService.getDocs(q);
-        const allNotifications = querySnapshot.docs.map((doc: any) => {
-          const d = doc.data();
-          return ({ id: doc.id, ...(d && typeof d === 'object' ? d as Record<string, any> : {}) } as NotificationItem);
-      });
-
-      // Filter for unread notifications in memory and check snooze status
-      const unreadNotifications = allNotifications.filter((notification: any) => {
-         const isRead = Boolean((notification as any).read);
-         const snoozed = (notification as any).snoozedUntil;
-         const isSnoozed = snoozed && typeof snoozed.toDate === 'function' ? snoozed.toDate() > new Date() : false;
+      // Read from per-user notifications cache to avoid expensive collection queries
+      const items = await getNotificationsOnce(userId);
+      const unreadNotifications = (items || []).filter((notification: any) => {
+        const isRead = Boolean(notification.read);
+        const snoozed = notification.snoozedUntil;
+        const isSnoozed = snoozed ? (new Date(snoozed) > new Date()) : false;
         return !isRead && !isSnoozed;
       });
 
-      // Remove duplicates and sort by createdAt desc, limit to 20
-      const uniqueNotifications = unreadNotifications
-        .filter((notification: any, index: number, self: any[]) =>
-            index === self.findIndex((n: any) => n.id === (notification as any).id)
-        )
-        .sort((a: any, b: any) => {
-          const aTime = (a as any).createdAt?.toMillis?.() || 0;
-          const bTime = (b as any).createdAt?.toMillis?.() || 0;
-          return bTime - aTime;
-        })
-        .slice(0, 20);
+      // Sort by createdAt desc (createdAt may be serverTimestamp placeholder)
+      const sorted = unreadNotifications.slice().sort((a: any, b: any) => {
+        const aTime = a.createdAt && a.createdAt.toMillis ? a.createdAt.toMillis() : (a.createdAt ? new Date(a.createdAt).getTime() : 0);
+        const bTime = b.createdAt && b.createdAt.toMillis ? b.createdAt.toMillis() : (b.createdAt ? new Date(b.createdAt).getTime() : 0);
+        return bTime - aTime;
+      }).slice(0, 20);
 
-      return uniqueNotifications;
+      return sorted as NotificationItem[];
     } catch (err: any) {
       console.error('Error getting unread notifications:', err);
       // Return empty array instead of throwing to prevent UI crashes
@@ -347,19 +346,31 @@ export class NotificationService {
    * Mark notification as read
    */
   static async markAsRead(notificationId: string): Promise<void> {
-    await DatabaseMonitoringService.updateDoc(DatabaseMonitoringService.doc(this.COLLECTION + '/' + notificationId), {
-      read: true
-    });
+    // Try to mark read in per-user cache; fall back to collection update if needed
+    try {
+      // We don't know the uid here; the callers usually have it. As a fallback,
+      // update by scanning user's cache is not feasible without uid. Keep collection fallback here.
+      await DatabaseMonitoringService.updateDoc(DatabaseMonitoringService.doc(this.COLLECTION + '/' + notificationId), {
+        read: true
+      });
+    } catch (err) {
+      console.error('Failed to mark notification read in collection fallback:', err);
+    }
   }
 
   /**
    * Snooze notification
    */
   static async snoozeNotification(notificationId: string, minutes: number): Promise<void> {
+    // Snooze in cache is per-user; here we fallback to collection update as we don't have uid
     const snoozedUntil = new Date(Date.now() + minutes * 60 * 1000);
-    await DatabaseMonitoringService.updateDoc(DatabaseMonitoringService.doc(this.COLLECTION + '/' + notificationId), {
-      snoozedUntil: Timestamp.fromDate(snoozedUntil)
-    });
+    try {
+      await DatabaseMonitoringService.updateDoc(DatabaseMonitoringService.doc(this.COLLECTION + '/' + notificationId), {
+        snoozedUntil: Timestamp.fromDate(snoozedUntil)
+      });
+    } catch (err) {
+      console.error('Failed to snooze notification in collection fallback:', err);
+    }
   }
 
   /**
