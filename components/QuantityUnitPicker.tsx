@@ -12,10 +12,82 @@ interface QuantityUnitPickerProps {
   maxQuantity?: number;
 }
 
-const COMMON_UNITS = [
+export const COMMON_UNITS = [
   'count', 'pieces', 'lbs', 'kg', 'oz', 'g', 'cups', 'tbsp', 'tsp', 'ml', 'l', 'gallons', 'quarts', 'pints',
   'dozen', 'loaves', 'cans', 'bottles', 'bags', 'boxes', 'packages', 'slices', 'sticks', 'heads'
 ];
+
+export const getSmartUnits = (itemName: string) => {
+  const name = (itemName || '').toLowerCase();
+
+  // Beverages and liquids
+  if (name.includes('milk') || name.includes('juice') || name.includes('soda') ||
+      name.includes('water') || name.includes('coffee') || name.includes('tea') ||
+      name.includes('oil') || name.includes('vinegar')) {
+    return ['gallons', 'quarts', 'pints', 'cups', 'ml', 'l', 'bottles'];
+  }
+
+  // Bread and baked goods
+  if (name.includes('bread') || name.includes('loaf') || name.includes('baguette') ||
+      name.includes('roll') || name.includes('bun') || name.includes('cake') ||
+      name.includes('pie')) {
+    return ['loaves', 'pieces', 'slices'];
+  }
+
+  // Eggs
+  if (name.includes('egg')) {
+    return ['dozen', 'count', 'pieces'];
+  }
+
+  // Cheese
+  if (name.includes('cheese')) {
+    return ['lbs', 'kg', 'oz', 'g', 'blocks', 'pieces'];
+  }
+
+  // Pasta, rice, grains
+  if (name.includes('pasta') || name.includes('rice') || name.includes('quinoa') ||
+      name.includes('oat') || name.includes('cereal') || name.includes('flour') ||
+      name.includes('sugar')) {
+    return ['lbs', 'kg', 'oz', 'g', 'cups', 'bags', 'boxes'];
+  }
+
+  // Fruits and vegetables
+  if (name.includes('apple') || name.includes('orange') || name.includes('banana') ||
+      name.includes('tomato') || name.includes('potato') || name.includes('onion') ||
+      name.includes('carrot') || name.includes('lettuce') || name.includes('garlic') ||
+      name.includes('ginger')) {
+    return ['count', 'pieces', 'lbs', 'kg', 'heads', 'bunches'];
+  }
+
+  // Meat and proteins
+  if (name.includes('chicken') || name.includes('beef') || name.includes('pork') ||
+      name.includes('fish') || name.includes('turkey') || name.includes('sausage') ||
+      name.includes('bacon')) {
+    return ['lbs', 'kg', 'oz', 'g', 'pieces'];
+  }
+
+  // Canned goods
+  if (name.includes('can') || name.includes('tin') || name.includes('soup') ||
+      name.includes('bean') || name.includes('corn') || name.includes('peas') ||
+      name.includes('tomato') || name.includes('tuna')) {
+    return ['cans', 'count', 'pieces'];
+  }
+
+  // Snacks
+  if (name.includes('chip') || name.includes('cracker') || name.includes('cookie') ||
+      name.includes('candy') || name.includes('chocolate') || name.includes('nut')) {
+    return ['bags', 'boxes', 'lbs', 'kg', 'oz', 'g'];
+  }
+
+  // Spices and seasonings
+  if (name.includes('salt') || name.includes('pepper') || name.includes('spice') ||
+      name.includes('herb') || name.includes('seasoning')) {
+    return ['tbsp', 'tsp', 'cups', 'oz', 'g'];
+  }
+
+  // Default units
+  return ['count', 'pieces', 'lbs', 'cups'];
+};
 
 const QuantityUnitPicker: React.FC<QuantityUnitPickerProps> = ({
   quantity,
@@ -33,79 +105,6 @@ const QuantityUnitPicker: React.FC<QuantityUnitPickerProps> = ({
   useEffect(() => {
     setLocalQuantity(quantity.toString());
   }, [quantity]);
-
-  // Get smart unit suggestions based on item name
-  const getSmartUnits = (itemName: string) => {
-    const name = itemName.toLowerCase();
-
-    // Beverages and liquids
-    if (name.includes('milk') || name.includes('juice') || name.includes('soda') ||
-        name.includes('water') || name.includes('coffee') || name.includes('tea') ||
-        name.includes('oil') || name.includes('vinegar')) {
-      return ['gallons', 'quarts', 'pints', 'cups', 'ml', 'l', 'bottles'];
-    }
-
-    // Bread and baked goods
-    if (name.includes('bread') || name.includes('loaf') || name.includes('baguette') ||
-        name.includes('roll') || name.includes('bun') || name.includes('cake') ||
-        name.includes('pie')) {
-      return ['loaves', 'pieces', 'slices'];
-    }
-
-    // Eggs
-    if (name.includes('egg')) {
-      return ['dozen', 'count', 'pieces'];
-    }
-
-    // Cheese
-    if (name.includes('cheese')) {
-      return ['lbs', 'kg', 'oz', 'g', 'blocks', 'pieces'];
-    }
-
-    // Pasta, rice, grains
-    if (name.includes('pasta') || name.includes('rice') || name.includes('quinoa') ||
-        name.includes('oat') || name.includes('cereal') || name.includes('flour') ||
-        name.includes('sugar')) {
-      return ['lbs', 'kg', 'oz', 'g', 'cups', 'bags', 'boxes'];
-    }
-
-    // Fruits and vegetables
-    if (name.includes('apple') || name.includes('orange') || name.includes('banana') ||
-        name.includes('tomato') || name.includes('potato') || name.includes('onion') ||
-        name.includes('carrot') || name.includes('lettuce') || name.includes('garlic') ||
-        name.includes('ginger')) {
-      return ['count', 'pieces', 'lbs', 'kg', 'heads', 'bunches'];
-    }
-
-    // Meat and proteins
-    if (name.includes('chicken') || name.includes('beef') || name.includes('pork') ||
-        name.includes('fish') || name.includes('turkey') || name.includes('sausage') ||
-        name.includes('bacon')) {
-      return ['lbs', 'kg', 'oz', 'g', 'pieces'];
-    }
-
-    // Canned goods
-    if (name.includes('can') || name.includes('tin') || name.includes('soup') ||
-        name.includes('bean') || name.includes('corn') || name.includes('peas') ||
-        name.includes('tomato') || name.includes('tuna')) {
-      return ['cans', 'count', 'pieces'];
-    }
-
-    // Snacks
-    if (name.includes('chip') || name.includes('cracker') || name.includes('cookie') ||
-        name.includes('candy') || name.includes('chocolate') || name.includes('nut')) {
-      return ['bags', 'boxes', 'lbs', 'kg', 'oz', 'g'];
-    }
-
-    // Spices and seasonings
-    if (name.includes('salt') || name.includes('pepper') || name.includes('spice') ||
-        name.includes('herb') || name.includes('seasoning')) {
-      return ['tbsp', 'tsp', 'cups', 'oz', 'g'];
-    }
-
-    // Default units
-    return ['count', 'pieces', 'lbs', 'cups'];
-  };
 
   const smartUnits = getSmartUnits(itemName);
 

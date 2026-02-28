@@ -13,6 +13,7 @@ import { ProgressiveImage } from './ProgressiveImage';
 import { log } from '../services/logService';
 import { generateBlurDataURL } from '../utils/appUtils';
 import RecipeModal from './RecipeModal';
+import ImportModal from './ImportModal';
 import AnalyticsService from '../services/analyticsService';
 import { UsageService } from '../services/usageService';
 import { searchPantryItems, getEnhancedAutocompleteSuggestions, filterPantryItems, savePantryFilter, loadPantryFilter, defaultPantryFilter, saveSearchToHistory, getRecentSearchSuggestions, AutocompleteSuggestion } from '../utils/searchUtils';
@@ -83,6 +84,9 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
             canMake
         };
     };
+
+    // Import modal state
+    const [showImportModal, setShowImportModal] = useState(false);
     
     // Get recipe suggestions based on inventory
     const getRecipeSuggestions = useMemo(() => {
@@ -1465,7 +1469,11 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
             fallbackMessage="Upgrade to Premium to save more than 10 recipes"
             onUpgrade={() => setActiveTab(Tab.SETTINGS)}
           >
-            <div className="space-y-4">
+                        <div className="space-y-4">
+                                {/* Import modal state and rendering */}
+                                {showImportModal && (
+                                    <ImportModal open={showImportModal} onClose={() => setShowImportModal(false)} defaultTab="recipes" />
+                                )}
                 {isLoadingSavedRecipes ? (
                     <div className="grid grid-cols-3 gap-4">
                         {Array.from({ length: 8 }).map((_, index) => (
@@ -1484,6 +1492,12 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                         </div>
                         <div className="flex justify-end mt-6">
                             <div className="flex gap-2">
+                                <button
+                                className="px-4 py-2 bg-theme-secondary text-theme-primary rounded-lg font-bold shadow hover:bg-theme-secondary/90 transition-colors"
+                                onClick={() => setShowImportModal(true)}
+                                >
+                                  Import
+                                </button>
                                 <button
                                 className="px-4 py-2 bg-[var(--accent-color)] text-white rounded-lg font-bold shadow hover:bg-[var(--accent-color)]/90 transition-colors"
                                 onClick={() => {

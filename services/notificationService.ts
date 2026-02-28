@@ -8,6 +8,7 @@ import { serverTimestamp, Timestamp } from 'firebase/firestore';
 import { User } from '../types';
 import { pushNotificationService } from './pushNotificationService';
 import { appendNotificationToUser, getNotificationsOnce, markNotificationRead, snoozeNotificationInCache } from './notificationsService';
+import { formatDangerSummary, DangerItem } from './notificationHelpers';
 
 export interface NotificationItem {
   id: string;
@@ -59,7 +60,9 @@ export class NotificationService {
       id,
       userId,
       read: false,
-      createdAt: serverTimestamp(),
+      // Use client-side ISO timestamp for cached array entries (serverTimestamp
+      // is not supported inside arrays).
+      createdAt: new Date().toISOString(),
       ...notification
     };
 
@@ -90,13 +93,35 @@ export class NotificationService {
   }
 
   /**
+   * Create an aggregated Danger Zone notification for multiple high-risk items
+   */
+  static async createDangerZoneAlert(userId: string, items: DangerItem[]) {
+    if (!items || items.length === 0) return ''
+    const { title, message, priority } = formatDangerSummary(items)
+
+    const actionData = { items: items.map(i => ({ itemId: i.itemId, itemName: i.itemName })) }
+
+    return this.createNotification(userId, {
+      type: 'expiration',
+      title,
+      message,
+      actionLabel: 'View Items',
+      actionType: 'view_item',
+      actionData,
+      priority: priority,
+      expiresAt: Timestamp.fromDate(new Date(Date.now() + 3 * 24 * 60 * 60 * 1000))
+    })
+  }
+
+  /**
    * Create expiration alert notification
    */
   static async createExpirationAlert(
     userId: string,
     itemName: string,
     daysUntilExpiry: number,
-    itemId: string
+    itemId: string,
+    userRiskLevel?: number
   ): Promise<string> {
     // Check if notification already exists for this item
     const existingNotifications = await this.getUnreadNotifications(userId);
@@ -151,6 +176,16 @@ export class NotificationService {
       title = 'Expires This Week';
       message = `${itemName} expires in ${daysUntilExpiry} days`;
       actionLabel = 'View Item';
+    }
+
+    // Adjust priority for high-risk users (userRiskLevel >=4)
+    if (userRiskLevel && userRiskLevel >= 4) {
+      // bump priority one level for items within 3 days
+      if (daysUntilExpiry <= 3) {
+        if (priority === 'low') priority = 'medium'
+        else if (priority === 'medium') priority = 'high'
+        else if (priority === 'high') priority = 'urgent'
+      }
     }
 
     return this.createNotification(userId, {

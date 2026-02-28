@@ -1,0 +1,58 @@
+Gemini Suggestions — Consolidated Modifications
+
+Purpose: capture the phone conversation ideas and convert them into a concise, actionable plan to finish final app polish.
+
+1) UI Tweaks
+- Make unit pickers consistent across UI: share `QuantityUnitPicker` options (include "1/2 gallon").
+- Ensure Import modal stacks above other modals (keep z-[99999]) and accepts .txt lists.
+- Match the batch/purchase editor units to the main unit selector; use same ordered list.
+- Add small helper/tooltips where behavior might be surprising (e.g., "purchases are saved when you close this dialog").
+- Increase modal accessibility: focus management, proper aria-labels for inputs/buttons.
+
+2) UX Flow Improvements
+- Inline batch (purchase) editor inside `ItemDetailModal` (open edit in-place, persist on modal close).
+- Replace confusing placeholders; make labels explicit (Add Purchase vs Add Batch).
+- Keep "Use Soon — Recipe Ideas" green box; remove top orange "Expiration Alerts" widget.
+- Allow plain-text `.txt` import: convert newline lists to CSV rows for import flow.
+
+3) Spoonacular / API & Vendor
+- Keep generated Spoonacular client optional: maintain shim in `typescript/dist` for tests.
+- Continue lazy dynamic import + REST fallback pattern for all Spoonacular calls.
+- Plan for vendor cleanup: remove committed generated artifacts from repo, ensure CI installs/generated client during build.
+- Reduce Spoonacular quota use: prefer local parsing, cached results, and minimal REST fallbacks.
+
+4) Data/Firestore fixes
+- Avoid using serverTimestamp() inside array elements (replace with ISO string `new Date().toISOString()` before array append).
+- Keep serverTimestamp() for top-level collection writes only where appropriate.
+
+5) Tests, CI, and Reliability
+- Ensure tests set `process.env.SPOONACULAR_API_KEY` or rely on shims; read API key at call-time.
+- Add/adjust unit tests for import flow, ItemDetailModal batch edits, and quantity/unit pickers.
+- Run full test suite and fix regressions; update CI to run `npm run type-check` and `npm test` before merging.
+
+6) Polishing & Release Tasks
+- Run accessibility audit and fix ARIA/label issues discovered.
+- Performance: lazy-load heavy components, memoize expensive computations (large lists), and verify bundle size after vendor removal.
+- Update README/release notes describing how to generate/install Spoonacular client in CI (avoid committing generated code).
+- Tag a release candidate and run E2E smoke tests (Playwright) before publishing.
+
+Prioritization (first pass)
+1. Tests & CI (type-check + tests) — prevent regressions.
+2. Spoonacular runtime safety + vendor cleanup plan — avoid committing generated clients while keeping CI stable.
+3. ItemDetailModal batch UX & unit picker sync (including "1/2 gallon").
+4. Import modal `.txt` support and z-index fix.
+5. Accessibility polish, performance, docs, E2E.
+
+Next Actions (recommended)
+- Confirm which Gemini suggestions to prioritize (UI / API / tests / release).
+- I can implement items 2–4 in small, reviewable PRs: each PR limited to 1 area (e.g., `ItemDetailModal` changes; `spoonacular` client adapter; `ImportModal` fixes).
+- Run full type-check and tests locally, then iterate on any failing tests.
+
+Commands to run locally
+
+npm run type-check
+npm test
+npm run lint
+
+
+If you want, I can now: 1) break this list into tracked TODOs/PRs, or 2) start implementing a specific high-priority item you pick.

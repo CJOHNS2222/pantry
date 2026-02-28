@@ -21,7 +21,8 @@
     "clean-duplicate-descriptions": "node scripts/clean-duplicate-descriptions.js",
     "test-spoonacular": "node scripts/test-spoonacular.js",
     "migrate-firebase": "node migrate-firebase.js",
-    "test-firebase": "node test-firebase.js"
+    "test-firebase": "node test-firebase.js",
+    "seed:product-master": "node scripts/seedProductMaster.cjs"
   },
   "dependencies": {
     "@capacitor-community/admob": "^8.0.0",
@@ -36,6 +37,7 @@
     "@capacitor/local-notifications": "^7.0.0",
     "@capacitor/push-notifications": "^7.0.4",
     "@google/genai": "^1.31.0",
+    "@opentelemetry/api": "^1.9.0",
     "@sentry/react": "^10.36.0",
     "@sentry/tracing": "^7.120.4",
     "@stripe/react-stripe-js": "^5.4.1",

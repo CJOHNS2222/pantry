@@ -26,8 +26,18 @@ const ImportModal: React.FC<ImportModalProps> = ({ open, onClose, defaultTab = '
   const handleFile = async (file?: File) => {
     if (!file) return;
     const text = await file.text();
-    setCsvText(text);
-    const items = parseCsvToPantryItems(text);
+
+    // If the file is plain text (or .txt), convert newline-separated list
+    // into a simple CSV with a single 'name' header so the CSV parser can handle it.
+    const isPlainText = file.type === 'text/plain' || file.name.toLowerCase().endsWith('.txt');
+    let csvPayload = text;
+    if (isPlainText) {
+      const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+      csvPayload = ['name', ...lines].join('\n');
+    }
+
+    setCsvText(csvPayload);
+    const items = parseCsvToPantryItems(csvPayload);
     setPreviewCount(items.length);
   };
 
@@ -77,7 +87,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ open, onClose, defaultTab = '
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black bg-opacity-50 p-4">
       <div className="w-full max-w-2xl bg-theme-primary rounded shadow-lg border border-theme">
         <div className="flex items-center justify-between p-3 border-b border-theme">
           <h3 className="text-lg font-semibold">Import</h3>
@@ -91,8 +101,8 @@ const ImportModal: React.FC<ImportModalProps> = ({ open, onClose, defaultTab = '
 
           {tab === 'pantry' ? (
             <div className="space-y-2">
-              <div className="text-sm text-theme-primary">Upload a CSV file with columns like <code>item,name,amount,quantity,storageLocation,expirationDate,category</code>. Preview shows parsed rows count.</div>
-              <input type="file" accept=".csv,text/csv" onChange={(e) => handleFile(e.target.files?.[0])} />
+              <div className="text-sm text-theme-primary">Upload a CSV or plain-text list. CSV columns like <code>item,name,amount,quantity,storageLocation,expirationDate,category</code>. Preview shows parsed rows count.</div>
+              <input type="file" accept=".csv,.txt,text/csv,text/plain" onChange={(e) => handleFile(e.target.files?.[0])} />
               <textarea value={csvText} onChange={(e) => { setCsvText(e.target.value); const items = parseCsvToPantryItems(e.target.value); setPreviewCount(items.length); }} rows={8} className="w-full p-2 rounded border text-black" />
               <div className="flex items-center justify-between">
                 <div className="text-sm opacity-70">Parsed rows: {previewCount}</div>

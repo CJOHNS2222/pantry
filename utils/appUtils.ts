@@ -1003,6 +1003,9 @@ export function getAutoExpirationDate(itemName: string, category: string): strin
  * @returns True if an alert should be shown
  */
 export function shouldShowExpiryAlert(item: PantryItem): boolean {
+  // Never show expiry alerts for immortal items
+  if (item.is_immortal) return false;
+
   if (!item.expirationDate || item.expiryAlertShown) {
     return false;
   }
@@ -1103,6 +1106,8 @@ export function generateExpirationAlerts(inventory: PantryItem[]): ExpirationAle
   const today = new Date().toISOString().slice(0, 10);
 
   inventory.forEach(item => {
+    // Skip immortal items entirely
+    if (item.is_immortal) return;
     if (!item.expirationDate) return;
 
     const expirationDate = new Date(item.expirationDate);

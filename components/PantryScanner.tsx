@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Camera as CapacitorCamera, CameraResultType, CameraSource } from '@capacitor/camera';
-import { Camera, Upload, Loader2, Plus, Trash2, CheckCircle2, ShoppingBasket, X, Barcode, ChevronDown, ChevronRight, ChevronUp, Image, ChefHat, TrendingUp, Search, Filter, Settings2, Clock, Tag } from 'lucide-react';
+import { Camera, Upload, Loader2, Plus, Trash2, CheckCircle2, ShoppingBasket, X, Barcode, ChevronDown, ChevronRight, ChevronUp, Image, ChefHat, TrendingUp, Search, Filter, Settings2, Clock, Tag, FilePlus } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { FixedSizeList as List } from 'react-window';
 import { analyzePantryImage } from '../services/geminiService';
@@ -787,14 +787,6 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
       </div>
     );
   };
-                  
-                  <button
-                    onClick={() => setShowImportModal(true)}
-                    className="flex-1 py-2 px-3 rounded-lg border border-theme text-theme-secondary hover:bg-theme-primary transition-colors flex items-center justify-center gap-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:ring-offset-2"
-                    aria-label="Import items or recipes"
-                  >
-                    Import
-                  </button>
 
   // Virtualized storage item renderer
   const renderStorageItem = ({ index, style, location }: { index: number; style: React.CSSProperties; location: string }) => {
@@ -900,6 +892,12 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
               )}
               {item.expiryAlertShown && (
                 <Clock className="w-4 h-4 text-orange-500" aria-label="Expires within 7 days" />
+              )}
+              {item.is_immortal && (
+                <span className="text-xs px-1 py-0.5 rounded font-medium bg-blue-100 text-blue-800 flex items-center gap-1">
+                  <span aria-hidden>∞</span>
+                  <span className="opacity-90">Shelf Stable</span>
+                </span>
               )}
             </div>
           </div>
@@ -1532,6 +1530,15 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                     <Barcode className="w-4 h-4" aria-hidden="true" />
                     Barcode
                   </button>
+                  
+                  <button
+                    onClick={() => setShowImportModal(true)}
+                    className="flex-1 py-2 px-3 rounded-lg border border-theme text-theme-secondary hover:bg-theme-primary transition-colors flex items-center justify-center gap-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:ring-offset-2"
+                    aria-label="Import items or recipes"
+                  >
+                    <FilePlus className="w-4 h-4" aria-hidden="true" />
+                    Import
+                  </button>
                 </div>
 
                 {imagePreview && loadingState !== LoadingState.SUCCESS && (
@@ -1726,25 +1733,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
         </div>
       )}
 
-      {/* Expiration Alerts */}
-      {expirationAlerts.length > 0 && (
-        <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 mb-4">
-          <h3 className="text-sm font-semibold text-orange-800 mb-2 flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4" />
-            Expiration Alerts
-          </h3>
-          <div className="space-y-2">
-            {expirationAlerts.slice(0, 3).map((alert) => (
-              <div key={alert.itemId} className={`p-3 rounded border ${getExpirationColor(alert.daysRemaining)}`}>
-                <p className="text-sm font-medium">{alert.message}</p>
-                <p className="text-xs opacity-75 mt-1">
-                  {alert.expirationType === 'use-by' ? 'Use by' : 'Best by'} date
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* Expiration Alerts removed per UX request; keep recipe/use-soon recommendations below */}
 
       {/* Recipe Suggestions - Use Soon */}
       {recipeSuggestions.length > 0 && (

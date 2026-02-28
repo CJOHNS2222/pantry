@@ -26,7 +26,12 @@ export async function appendNotificationToUser(uid: string, notification: Notifi
     const snap = await tx.get(ref as any);
     const data = snap.exists() ? (snap.data() as any) : {};
     const existing = Array.isArray(data.items) ? (data.items as NotificationItem[]) : [];
-    const next = [...existing, { ...notification, createdAt: serverTimestamp() }];
+    // Firestore does not support serverTimestamp() inside arrays.
+    // Use a client timestamp (ISO string) for items stored in arrays.
+    const createdAtValue = notification && typeof notification.createdAt === 'string'
+      ? notification.createdAt
+      : new Date().toISOString();
+    const next = [...existing, { ...notification, createdAt: createdAtValue }];
     // Trim oldest if over cap
     const trimmed = next.slice(-maxItems);
     tx.set(ref as any, { items: trimmed }, { merge: true });

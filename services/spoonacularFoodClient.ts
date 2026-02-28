@@ -10,7 +10,7 @@ async function loadGeneratedClient() {
   try {
     // dynamic import: only attempt when actually needed
     // @ts-ignore - optional generated client may be absent from repo
-    _generated = await import('../typescript/dist');
+    _generated = await import(/* @vite-ignore */ '../typescript/dist');
   } catch (err) {
     _generated = null;
   }

@@ -1,19 +1,22 @@
 const BASE_URL = 'https://api.spoonacular.com';
 
-const API_KEY = import.meta.env?.VITE_SPOONACULAR_API_KEY || process.env.VITE_SPOONACULAR_API_KEY || process.env.SPOONACULAR_API_KEY;
+function getApiKey() {
+  return import.meta.env?.VITE_SPOONACULAR_API_KEY || process.env.VITE_SPOONACULAR_API_KEY || process.env.SPOONACULAR_API_KEY;
+}
 
 let _cachedRecipesApi: any | null | undefined = undefined;
 async function getRecipesApi(): Promise<any | null> {
   if (_cachedRecipesApi !== undefined) return _cachedRecipesApi;
   try {
     // @ts-ignore - optional generated client may be absent from repo
-    const mod = await import('../typescript/dist');
+    const mod = await import(/* @vite-ignore */ '../typescript/dist');
     const { createConfiguration, RecipesApi } = mod as any;
-    if (!API_KEY) {
+    const apiKey = getApiKey();
+    if (!apiKey) {
       _cachedRecipesApi = null;
       return null;
     }
-    const config = createConfiguration({ authMethods: { apiKeyScheme: API_KEY } as any });
+    const config = createConfiguration({ authMethods: { apiKeyScheme: apiKey } as any });
     const api = new RecipesApi(config);
     _cachedRecipesApi = api;
     return api;
@@ -33,10 +36,12 @@ export default class SpoonacularRecipeClient {
         // Try generated client method names that may exist
         const api: any = recipesApi as any;
         if (api.extractRecipeFromUrl) {
-          return await api.extractRecipeFromUrl(url);
+          const out = await api.extractRecipeFromUrl(url);
+          if (out) return out;
         }
         if (api.getRecipeInformationFromUrl) {
-          return await api.getRecipeInformationFromUrl(url);
+          const out2 = await api.getRecipeInformationFromUrl(url);
+          if (out2) return out2;
         }
         // Fall back to fetch to the extract endpoint
       } catch (err) {
@@ -44,9 +49,10 @@ export default class SpoonacularRecipeClient {
       }
     }
 
-    if (!API_KEY) return null;
+    const apiKey = getApiKey();
+    if (!apiKey) return null;
     try {
-      const params = new URLSearchParams({ apiKey: API_KEY, url });
+      const params = new URLSearchParams({ apiKey: apiKey, url });
       const res = await fetch(`${BASE_URL}/recipes/extract?${params.toString()}`);
       if (!res.ok) {
         console.warn('Spoonacular extract returned non-ok status', res.status);
@@ -75,9 +81,10 @@ export default class SpoonacularRecipeClient {
     }
 
     // Fallback to REST complexSearch
-    if (!API_KEY) return null;
+    const apiKey = getApiKey();
+    if (!apiKey) return null;
     try {
-      const params = new URLSearchParams({ apiKey: API_KEY, number: number.toString(), offset: offset.toString(), addRecipeInformation: 'true', fillIngredients: 'true' });
+      const params = new URLSearchParams({ apiKey: apiKey, number: number.toString(), offset: offset.toString(), addRecipeInformation: 'true', fillIngredients: 'true' });
       if (query) params.append('query', query);
       const res = await fetch(`${BASE_URL}/recipes/complexSearch?${params.toString()}`);
       if (!res.ok) return null;
@@ -101,9 +108,10 @@ export default class SpoonacularRecipeClient {
       }
     }
 
-    if (!API_KEY) return null;
+    const apiKey = getApiKey();
+    if (!apiKey) return null;
     try {
-      const params = new URLSearchParams({ apiKey: API_KEY });
+      const params = new URLSearchParams({ apiKey: apiKey });
       const res = await fetch(`${BASE_URL}/recipes/${recipeId}/information?${params.toString()}`);
       if (!res.ok) return null;
       return await res.json();
@@ -125,9 +133,10 @@ export default class SpoonacularRecipeClient {
       }
     }
 
-    if (!API_KEY) return null;
+    const apiKey = getApiKey();
+    if (!apiKey) return null;
     try {
-      const params = new URLSearchParams({ apiKey: API_KEY });
+      const params = new URLSearchParams({ apiKey: apiKey });
       const res = await fetch(`${BASE_URL}/recipes/${recipeId}/priceBreakdown?${params.toString()}`);
       if (!res.ok) return null;
       return await res.json();

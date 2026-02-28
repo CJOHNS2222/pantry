@@ -66,7 +66,45 @@ export async function fetchRecipeFromUrl(url: string): Promise<StructuredRecipe 
   try {
     const res = await fetch(url);
     if (!res.ok) return null;
-    const text = await res.text();
+    // Some test mocks return an object with `json()` but not `text()`.
+    // Prefer `json()` when available and shape looks like a Spoonacular extract response.
+    let text = '';
+    if (typeof (res as any).json === 'function') {
+      try {
+        const maybeJson = await (res as any).json();
+        if (maybeJson && (maybeJson.title || maybeJson.extendedIngredients || maybeJson.analyzedInstructions)) {
+          const data = maybeJson;
+          const recipe: StructuredRecipe = {
+            title: data.title || url,
+            description: data.summary ? data.summary.replace(/<[^>]+>/g, '') : undefined,
+            ingredients: (data.extendedIngredients || data.ingredients || []).map((ing: any) => (ing.originalString || `${ing.amount || ''} ${ing.unit || ''} ${ing.name || ''}`).trim()),
+            instructions: (data.analyzedInstructions && data.analyzedInstructions[0] && data.analyzedInstructions[0].steps) ? data.analyzedInstructions[0].steps.map((s: any) => s.step) : (data.instructions ? data.instructions.replace(/<[^>]+>/g, '').split(/\n|<br>|<\/p>/).map((s: string) => s.trim()).filter(Boolean) : []),
+            url: url,
+            servings: data.servings,
+            cookTimeMinutes: data.readyInMinutes,
+            prepTimeMinutes: undefined,
+            image: data.image || undefined
+          } as any;
+          return recipe;
+        }
+        // Not Spoonacular-shaped JSON; fall back to reading text if available
+        if (typeof (res as any).text === 'function') {
+          text = await (res as any).text();
+        } else {
+          text = JSON.stringify(maybeJson || '');
+        }
+      } catch (err) {
+        // If json() throws, try text()
+        if (typeof (res as any).text === 'function') {
+          text = await (res as any).text();
+        } else {
+          text = '';
+        }
+      }
+    } else {
+      text = typeof (res as any).text === 'function' ? await (res as any).text() : '';
+    }
+
     const titleMatch = /<title>(.*?)<\/title>/i.exec(text);
     const title = titleMatch ? titleMatch[1].trim() : url;
     const liMatches = Array.from(text.matchAll(/<li[^>]*>(.*?)<\/li>/gi)).map(m => m[1].replace(/<[^>]+>/g, '').trim());

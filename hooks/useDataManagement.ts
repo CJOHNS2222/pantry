@@ -13,6 +13,7 @@ import { generateConsumptionSuggestions, generateExpirationAlerts, generateRecip
 import { offlineQueue } from '../services/offlineQueueService';
 import { undoService } from '../services/undoService';
 import { NotificationService } from '../services/notificationService';
+import RiskProfileService from '../services/riskProfileService';
 import { ERROR_MESSAGES } from '../constants/errorMessages';
 import { useScopedDataListener } from './useDataListener';
 import { firestoreCache } from '../services/cacheService';
@@ -288,6 +289,8 @@ export function useDataManagement(
   const [isLoadingMealPlan, setIsLoadingMealPlan] = useState(true);
   const [isLoadingSavedRecipes, setIsLoadingSavedRecipes] = useState(true);
   const [isLoadingHousehold, setIsLoadingHousehold] = useState(true);
+  const [showRiskQuestionnaire, setShowRiskQuestionnaire] = useState(false);
+  const questionnaireShownRef = useRef(false);
   const [isLoadingRatings, setIsLoadingRatings] = useState(true);
 
   // Community ratings (global) - keep a lightweight realtime listener to populate Community tab
@@ -556,17 +559,43 @@ export function useDataManagement(
 
     const now = Date.now();
     if (now - lastExpirationCheckRef.current > 5 * 60 * 1000) { // 5 minutes
-      const itemsExpiringSoon = inventory.filter(item => {
-        if (!item.expirationDate) return false;
-        const daysUntilExpiry = Math.ceil((new Date(item.expirationDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
-        return daysUntilExpiry > 0 && daysUntilExpiry <= 7;
-      });
+      const runExpirationChecks = async () => {
+        const itemsExpiringSoon = inventory.filter(item => {
+          // Never notify or create alerts for immortal items
+          if (item.is_immortal) return false;
+          if (!item.expirationDate) return false;
+          const daysUntilExpiry = Math.ceil((new Date(item.expirationDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+          return daysUntilExpiry > 0 && daysUntilExpiry <= 7;
+        });
 
-      itemsExpiringSoon.slice(0, 3).forEach(async (item) => {
-        const daysUntilExpiry = Math.ceil((new Date(item.expirationDate!).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
-        await NotificationService.createExpirationAlert(user.id, item.item, daysUntilExpiry, item.id);
-      });
-      lastExpirationCheckRef.current = now;
+        // Build danger-list for aggregation: prioritize items expiring within 3 days
+        const dangerCandidates = itemsExpiringSoon.map(item => {
+          const daysUntilExpiry = Math.ceil((new Date(item.expirationDate!).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+          return { itemId: item.id, itemName: item.item, daysUntilExpiry };
+        }).filter(x => x.daysUntilExpiry <= 3).slice(0, 6);
+
+        try {
+          if (dangerCandidates.length >= 2) {
+            // Create a single aggregated Danger Zone notification
+            await NotificationService.createDangerZoneAlert(user.id, dangerCandidates as any);
+          } else {
+            // Fallback to individual notifications for up to 3 items
+            for (const item of itemsExpiringSoon.slice(0, 3)) {
+              const daysUntilExpiry = Math.ceil((new Date(item.expirationDate!).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+              // pass user risk level to tailor priority
+              // eslint-disable-next-line no-await-in-loop
+              await NotificationService.createExpirationAlert(user.id, item.item, daysUntilExpiry, item.id, user?.profile?.riskLevel);
+            }
+          }
+        } catch (err) {
+          log.error('Failed to create expiration notifications', err, 'DataManagement');
+        } finally {
+          lastExpirationCheckRef.current = Date.now();
+        }
+      };
+
+      // Trigger the async checks without making the effect callback async
+      void runExpirationChecks();
     }
 
   }, [inventory, user?.id, addToShoppingList, addToast]);
@@ -608,6 +637,17 @@ export function useDataManagement(
         });
     }
   }, [isOnline]);
+
+  // Show risk questionnaire to new users shortly after first login
+  useEffect(() => {
+    if (!user) return;
+    if (questionnaireShownRef.current) return;
+    // Show when user hasn't set a riskLevel and hasn't seen tutorial yet
+    if (!user.profile?.riskLevel && user.hasSeenTutorial === false) {
+      setShowRiskQuestionnaire(true);
+      questionnaireShownRef.current = true;
+    }
+  }, [user]);
 
 
   // Handlers
@@ -740,6 +780,19 @@ export function useDataManagement(
     } catch (err) {
       log.error('Error deleting recipe:', err, 'DataManagement');
       addToast?.(ERROR_MESSAGES.DELETE_FAILED, 'error');
+    }
+  };
+
+  // Handler called when user completes the risk questionnaire
+  const handleRiskQuestionnaireComplete = async (level: number, sensitive?: boolean) => {
+    if (!user?.id) return;
+    try {
+      await RiskProfileService.setUserRiskLevel(user.id, level, sensitive);
+      setShowRiskQuestionnaire(false);
+      addToast?.('Saved safety preferences.', 'success');
+    } catch (err) {
+      log.error('Failed to save risk profile:', err, 'DataManagement');
+      addToast?.(ERROR_MESSAGES.SAVE_FAILED, 'error');
     }
   };
 
@@ -1062,6 +1115,9 @@ export function useDataManagement(
     mealPlanLimitExceeded,
     checkRecipeSaveLimit,
     checkMealPlanLimit,
+    // Risk questionnaire state & handler
+    showRiskQuestionnaire,
+    handleRiskQuestionnaireComplete,
     addShoppingListItem,
     addShoppingListItems,
     updateShoppingListItem,

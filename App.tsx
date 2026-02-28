@@ -16,6 +16,7 @@ import { useTheme } from './hooks/useTheme';
 import { useSettings } from './hooks/useSettings';
 import { useToasts } from './hooks/useToasts';
 import { useDataManagement } from './hooks/useDataManagement';
+import RiskAssessmentQuestionnaire from './components/RiskAssessmentQuestionnaire';
 import { useHouseholdActivity } from './hooks/useHouseholdActivity';
 import { useOfflineStatus } from './hooks/useOfflineStatus';
 import AnalyticsService from './services/analyticsService';
@@ -240,6 +241,8 @@ const App: React.FC = () => {
     isLoadingSavedRecipes,
     isLoadingRatings,
     isLoadingHousehold,
+    showRiskQuestionnaire,
+    handleRiskQuestionnaireComplete,
   } = useDataManagement(user, addToast, addToShoppingList, updateSyncStatus, {
     logItemAdded,
     logItemRemoved,
@@ -641,6 +644,21 @@ const App: React.FC = () => {
             onOpenRecipeSearch={() => { setActiveTab(Tab.MEALS); }}
             onOpenAnalytics={() => setActiveTab(Tab.SETTINGS)}
             currentTab={activeTab}
+          />
+        )}
+
+        {showRiskQuestionnaire && (
+          <RiskAssessmentQuestionnaire
+            userId={user.id}
+            onComplete={async (level: number, sensitive?: boolean) => {
+              try {
+                await handleRiskQuestionnaireComplete(level, sensitive);
+                // Optimistically update local user object if available
+                setUser(prev => prev ? { ...prev, profile: { ...prev.profile, riskLevel: level, sensitiveHealthMode: !!sensitive } } : prev);
+              } catch (err) {
+                // handler already logs; no-op here
+              }
+            }}
           />
         )}
 

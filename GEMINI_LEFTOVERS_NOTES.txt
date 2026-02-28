@@ -1,0 +1,255 @@
+Gemini Notes — Contextual Actions, Visual Hierarchy & Leftovers
+
+Summary
+- Capture ideas around gestures/context menus, heat-map urgency, iconography, FAB, and a dedicated "Leftovers" timed-asset system.
+
+1) Contextual Action Overload (Gestures / Context Menus)
+- Primary gestures to implement on pantry list items:
+  - Swipe Right: "Consume" (decrement 1 unit). Provide undo snackbar.
+  - Swipe Left: "Add to Shopping List" quick action.
+  - Long Press: Open context menu to Edit details or Move storage location (Fridge/Freezer/Pantry).
+- Implementation notes:
+  - Update list item component (likely `PantryScanner` item row) to support pointer/touch gestures and keyboard equivalents.
+  - Provide accessible fallback buttons/context menu for non-touch users.
+  - Animation/feedback: subtle micro-interaction with haptic + toast.
+  - Consider rate-limiting/confirmation for bulk accidental swipes; include undo.
+
+2) Visual Hierarchy & Micro-Clarity (Heat Map, Icons, FAB)
+- Heat map expiry:
+  - Items expiring within 48 hours → soft orange background (scanable urgency). 48–72hr → softer; >72hr neutral.
+  - Use subtle background color + left accent, avoid extra text.
+- Iconography over labels for storage locations: use standard small icons for Pantry/Fridge/Freezer.
+- FAB: single floating action button for quick-add (barcode/scanner/manual). Keep persistent but minimal.
+- Micro-clarity:
+  - Use whitespace, type scale, and single icon-centric affordances to reduce on-screen clutter.
+
+3) Leftovers as Timed Assets (Feature Design)
+- Rationale: Leftovers are time-sensitive and need a high-visibility UI separate from staples.
+- Data model suggestion:
+  - `Leftover` { id, title, photoUrl?, servingsRemaining, birthDate (ISO), bestBeforeDays (number), bestBeforeDate, storageLocation, notes }
+  - Store under household scope: `households/{id}/leftovers` or `pantry` items with type="leftover".
+- "Birth" UX (zero-friction entry):
+  - Trigger: when user marks a planned meal as "Cooked" → prompt: "Making a lunchbox? 🍱"
+  - One-tap quantities: `[1 Serving] [2 Servings] [The Rest]` to set `servingsRemaining`.
+  - Allow 2-second photo snap for quick thumbnail attach.
+  - Default `bestBeforeDays` per meal type (configurable, e.g., 3 days by default).
+- Freshness Dashboard / Hot Zone:
+  - Dedicated top-of-screen card or section showing active leftovers with countdown progress bar.
+  - Visual mapping: Day 1–2 Green, Day 3 Amber, Day 4 Expired (or per household setting).
+  - Provide quick actions in the Hot Zone: Mark consumed, Pack to go, Discard.
+- Notifications & Reminders:
+  - Optional local reminders (e.g., 24h before best-before).
+  - Toasts for quick-capture actions; allow dismiss.
+
+4) Implementation & Integration Notes
+- UI components to add/update:
+  - `LeftoverCard` / `LeftoversHotZone` + list; integrate into `MainContent` or a top area.
+  - Gesture-enabled `PantryItemRow` with ARIA and keyboard fallbacks.
+  - Quick-capture flow tied to `MealPlanner` or where meals are cooked.
+- Data + Firestore:
+  - Add `leftovers` collection or extend `pantry` schema with `type: 'leftover'`.
+  - Update Firestore rules to validate `birthDate`, `bestBeforeDays`, household membership.
+  - Consider caching/offline UX for quick-entry (use local cache then sync).
+- Analytics & Telemetry:
+  - Track quick-capture usage, conversions (leftovers consumed), and dismissals to tune defaults.
+- Tests:
+  - Unit tests for leftover creation flow, countdown logic, and gesture handlers.
+  - E2E for quick-capture + Hot Zone visibility + undo flows.
+
+5) Prioritization Suggestions
+1. Implement zero-friction leftover capture ("Cooked It" trigger + quick quantities + photo). High value.
+2. Add Hot Zone UI for leftovers (progress bar + quick actions).
+3. Implement simple gesture set on list rows with keyboard fallbacks.
+4. Heat-map expiry visuals for list rows (non-blocking visual change).
+5. Add analytics, reminders, and extended config.
+
+Remember (Key Constraints & UX guardrails)
+- Avoid adding too many visible buttons; prioritize gestures + context menus.
+- Keep colors subtle—use background tints not full saturated banners.
+- Ensure accessibility: keyboard equivalents, readable contrast, labels for screen readers.
+- Provide easy undo for destructive quick actions (consume/discard).
+- Keep backend rules/ownership checks intact (household scoping).
+
+Next steps
+- Confirm priority between zero-friction leftover capture vs gestures vs visual heat map.
+- I can draft small PRs for the highest-priority item you choose: (A) leftover capture flow, (B) gestures on pantry rows, or (C) heat-map expiry visuals.
+
+Additional Notes (Fridge Map, Meal-Plan Swap, Ghost Leftover, Freezer Bridge)
+
+- Day mapping for freshness visualization:
+  - Day 1-2: Green (Fresh)
+  - Day 3-4: Yellow (Eat Soon)
+  - Day 5+: Red/Flashing (Toss/Expired)
+
+- "Fridge Map" (optional): allow users to set Top/Middle/Bottom shelf for fridge items to help find containers.
+
+- Meal Plan Integration (Swap mechanic):
+  - "Swap for Leftovers" button in meal plan to replace a planned meal with an available leftover.
+  - If swapping causes conflicts (Domino Effect), prompt user with choices (push original meal to another day, or return ingredients to pantry).
+  - "Auto-fill Lunch with Leftovers" setting to populate lunches automatically.
+
+- Ghost Leftover / Analytics:
+  - Force action when leftover hits 5 days: [I Ate It] or [I Tossed It].
+  - Monthly report: show savings vs waste (e.g., "$45 saved, $12 tossed").
+
+- Leftover Card UI concept:
+  - Photo, title, countdown, servings, quick actions ([Eat Now][Freeze][Add to Plan]).
+
+- Freezer Bridge logic:
+  - Trigger via swipe or smart prompt when 48h from expiry.
+  - On move to freezer: reset best-before to freezer-safe constant (+3-6 months), change location to Freezer, and optionally split unit (1 pot -> multiple servings).
+
+Implementation reminders:
+ - Add tests for swap mechanic and freezer bridge resets.
+ - Keep undo for destructive actions and ensure household scoping in Firestore rules.
+
+These additions align with the earlier prioritized steps; tell me which of these to pick first and I'll draft a short implementation plan and start a PR-sized change.
+
+Freezer & Location Tagging (additional detailed notes)
+
+- Location Sub-Tags & Zones:
+  - Support granular freezer/pantry zones: e.g., [Top Drawer], [Bottom Drawer], [Chest Freezer Left], [Door], [Top Shelf], [Middle Shelf], [Bottom Shelf].
+  - Mandatory "Label" field when moving to freezer (allow quick photo of container lid as alternative).
+
+- Transition Modal (when user selects "Freeze" or moves an item):
+  - Quick popup fields with sensible defaults:
+    - New Expiry: auto-set to +90 days (user override allowed).
+    - Portions: [1] [2] [4] [Custom]
+    - Zone: dropdown of freezer zones
+    - Label Photo: "Tap to Snap" (optional)
+  - Keep the modal ultra-fast with large tap targets and default choices.
+
+- Preventing the "Ice Abyss" (retention/visibility):
+  - Defrost suggestion: when meal planning, surface freezer leftovers first as suggestions for swap/inclusion.
+  - Freezer Burn warning: when item reaches 90% of freezer life, surface in "Use It or Lose It" area on home screen.
+  - Visual badges: freezer items show ❄️, ready-to-eat leftovers show 🍱.
+  - Search index: unify `Pantry` and `Freezer` results so search returns both raw ingredients and cooked leftovers.
+
+- Reverse Flow: Defrosting
+  - When moving item from Freezer -> Fridge, ask: "Are you cooking this today?"
+    - If Yes: move to today's Meal Plan (Supper/Lunch as chosen).
+    - If No: set expiry to a default defrost window (e.g., 3 days) and move to Fridge inventory.
+
+- Magic Numbers: Default expiry/reset constants (developer reference)
+  - Raw Red Meat: Fridge 3–5 days, Freezer 6–12 months, on defrost add +2 days
+  - Raw Poultry: Fridge 1–2 days, Freezer 9 months, on defrost add +1 day
+  - Cooked Meals / Leftovers: Fridge 3–4 days, Freezer 3 months, on defrost add +2 days
+  - Dairy: Fridge 7–14 days, Freezer 3–6 months, use immediately on defrost
+  - Fresh Greens/Produce: Fridge 5–7 days, Freezer 8 months if blanched, use immediately on defrost
+  - Bread/Bakery: Fridge 7 days, Freezer 3 months
+
+Implementation reminders:
+ - Add data model fields: `zone`, `labelPhotoUrl`, `isFrozen`, `originalLocation`, `freezerExpiryDate`, `portionCount`.
+ - Add UI components: `FreezeTransitionModal`, `FreezerBadge`, `UseItOrLoseItSection`.
+ - Firestore rules: validate `zone` values and ownership; ensure offline-friendly quick-capture.
+ - Tests: unit tests for expiry reset logic, defrost flows, and freezer-life thresholds.
+
+These augment the earlier leftovers plan and are ready to be implemented in phases. Pick a phase and I'll produce a precise PR plan.
+
+Database Schema & Defrost Logic (Developer Reference)
+
+1) Product vs Inventory (relational separation)
+  - Table: `product_master` (global product definitions)
+    - `id` (PK)
+    - `name` (string)
+    - `category_id` (FK -> Categories)
+    - `default_fridge_life` (int: days)
+    - `default_freezer_life` (int: months)
+    - `image_url` (string)
+
+  - Table: `inventory_items` (household instances)
+    - `id` (PK)
+    - `product_id` (FK -> product_master)
+    - `household_id` (FK)
+    - `location_id` (enum: Fridge, Freezer, Pantry)
+    - `sub_location` (string: "Top Shelf", "Drawer 2")
+    - `status` (enum: Raw, Cooked, Leftover, Open, Sealed)
+    - `quantity` (float)
+    - `unit` (string)
+    - `entry_date` (timestamp)
+    - `expiry_date` (timestamp)
+    - `is_frozen` (boolean)
+
+  - Table: `leftover_metadata`
+    - `inventory_id` (FK -> inventory_items)
+    - `original_recipe_id` (nullable)
+    - `photo_url` (nullable)
+    - `servings_remaining` (int)
+
+2) MoveToFreezer / Freezer Bridge (server-side logic)
+  - Pseudocode:
+    FUNCTION MoveToFreezer(itemID):
+      item = GetItem(itemID)
+      product = GetProduct(item.product_id)
+      new_expiry = now + product.default_freezer_life (months -> add months)
+      UPDATE inventory_items SET location_id='Freezer', expiry_date=new_expiry, is_frozen=true, status='Cooked' WHERE id=itemID
+      RETURN success, new_expiry
+
+3) Smart Defrost Logic (Defrost Penalty)
+  - When moving from Freezer -> Fridge (defrost):
+    - Default new expiry = now + 48 hours (2 days) for thawed items (configurable per category)
+    - Optionally prompt: "Cooking today? Move to Meal Plan?"
+
+4) Safety Persona & Grace Periods (onboarding + learning)
+  - Onboarding: quick "Vibe Check" with 2-second scenario slides to classify user as Purist/Pragmatist/Adventurer.
+  - Personas map to notification & grace-period behavior:
+    - Purist: strict, alert 24h before expiry
+    - Pragmatist: friendly, alert on date
+    - Adventurer: relaxed, alert 48h after date
+  - Post-mortem learning: when user marks an expired item as [I Ate It] or [Tossed It], update per-user adjustments for that category (increase or decrease grace window).
+
+5) UI: Gray Zone & Non-Perishable Exceptions
+  - Gray Zone: items in a grace period should be dimmed/gray (not full red) and grouped separately to avoid notification fatigue.
+  - Non-Perishable list: treat salt/honey/vinegar as infinite, no expiry notifications.
+
+Developer Implementation Checklist
+  - Add DB migrations/schema for `product_master`, `inventory_items`, `leftover_metadata` (or map to Firestore collections with similar fields).
+  - Implement `MoveToFreezer` server/cloud function or service method with appropriate tests.
+  - Implement defrost flow and default 48-hour penalty; add unit tests covering category-specific overrides.
+  - Add onboarding UI and persist persona selection to user settings; wire persona to notification engine.
+  - Add per-user learning adjustments and analytics capture when users override expiry behavior.
+  - Ensure search index includes freezer + pantry inventory and that badges/icons render correctly in lists.
+
+If you'd like, I can scaffold the DB model changes (TypeScript interfaces + Firestore migration plan) and implement the `MoveToFreezer` service method next.
+
+
+isk & Immortals Summary
+
+Absolute Immortals: honey, salt, sugar, distilled white vinegar, cornstarch, pure vanilla extract, white rice — treat as no-expiry; UI: show ∞ / "Shelf Stable".
+Long-Haulers (10+ yrs): dried beans/lentils, pure maple syrup, soy sauce, bouillon, instant coffee — treat as staple unless user marks low.
+Anti-Immortals: brown rice, whole wheat flour, spices — do not mark immortal; prefer "Refresh" suggestions.
+Danger Zone Top 10 (hard guards)
+
+Ground meats, fresh poultry, leafy greens (bagged), raw shellfish, deli meats (opened), soft cheeses (opened), sprouts, leftover rice, raw eggs (cracked), pre-cut melons.
+Behavior: zero grace period for some (ground meats: max 2 days fridge), forced actions for others (leftover rice hard 4-day cap).
+Fried Rice Syndrome
+
+If a user logs Cooked Rice (or type: 'leftover' + name matches "rice"), enforce hard cap = 4 days since capture; notification copy: "Cooked Rice alert! 🍚 It’s been 4 days. Even if it looks fine, Bacillus cereus isn't worth the risk. Time to toss."
+Risk Levels / Product Master
+
+Add columns on product_master:
+is_immortal: boolean
+risk_level: number (1–5)
+Semantics:
+Level 5: High-risk (ground beef, raw fish) — urgent, daily loud notifications; no grace.
+Level 4: Perishables (milk, cooked meals) — strong suggestions (cook/freeze).
+Level 3: Produce — waste-conscious suggestions.
+Level 2: Hardy fridge — casual check-ins.
+Level 1: Staples — inventory reminders only.
+Notification & UI rules
+
+is_immortal === true → bypass expiry checks and notifications; show "Shelf Stable" badge in PantryScanner/ItemDetailModal.
+
+
+For risk-level 5 items: when expiry date == today → urgent notification: "🚨 Action Required: Use your [Item] by tonight or move it to the freezer." and prominent red UI (Warning Red).
+For multiple expiring high-risk items: aggregate into one stack notification: "You've got N items in the 'Danger Zone' today, including X and Y..."
+Sensitive-Health mode: onboarding toggle sensitiveHealth: boolean on User.profile or Settings; when enabled, lower thresholds and escalate risk-level notifications (e.g., deli meats, soft cheeses trigger earlier alerts).
+Tone varies by risk level to avoid fatigue.
+Implementation notes / enforcement
+
+Source of truth: product_master fields; inventory items inherit is_immortal and risk_level at creation (or reference product_master on checks).
+Expiry-check code paths to update:
+appUtils.ts (expiry heuristics & generateExpirationAlerts)
+useDataManagement.ts (periodic expiration checks & calls to NotificationService.createExpirationAlert)
+notificationService.ts (notification copy selection based on risk_level, aggregation logic)
+Special-case leftover capture flow: when creating a leftover with itemName or type: 'leftover', compute bestBeforeDays from product master; if name matches "cooked rice" enforce 4 days.

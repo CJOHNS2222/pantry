@@ -37,6 +37,10 @@ export interface PantryItem {
 
   // Expiry alert tracking
   expiryAlertShown?: boolean; // Whether expiry alert has been displayed to user
+  // Product-level immortal flag: when true, item should never be treated as expired
+  // (e.g., salt, sugar, honey). UI will show a 'Shelf Stable' badge and expiry
+  // checks/notifications will be bypassed for these items.
+  is_immortal?: boolean;
 }
 
 export interface Batch {
@@ -245,6 +249,10 @@ export interface UserProfile {
   dietaryRestrictions?: string[];
   allergies?: string[];
   householdSize?: number; // number of people in household
+  // Optional risk level for safety notifications (1 = low, 5 = highest)
+  riskLevel?: number;
+  // If true, user prefers stricter health/safety notifications
+  sensitiveHealthMode?: boolean;
 }
 
 export interface HouseholdMember {
