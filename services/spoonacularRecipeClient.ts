@@ -6,6 +6,7 @@ let _cachedRecipesApi: any | null | undefined = undefined;
 async function getRecipesApi(): Promise<any | null> {
   if (_cachedRecipesApi !== undefined) return _cachedRecipesApi;
   try {
+    // @ts-ignore - optional generated client may be absent from repo
     const mod = await import('../typescript/dist');
     const { createConfiguration, RecipesApi } = mod as any;
     if (!API_KEY) {
