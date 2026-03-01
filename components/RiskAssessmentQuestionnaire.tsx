@@ -3,7 +3,7 @@ import RiskProfileService from '../services/riskProfileService'
 
 type Props = {
   userId: string
-  onComplete?: (riskLevel: number) => void
+  onComplete?: (riskLevel: number, preferStrict?: boolean) => void
 }
 
 export default function RiskAssessmentQuestionnaire({ userId, onComplete }: Props) {

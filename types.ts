@@ -41,6 +41,13 @@ export interface PantryItem {
   // (e.g., salt, sugar, honey). UI will show a 'Shelf Stable' badge and expiry
   // checks/notifications will be bypassed for these items.
   is_immortal?: boolean;
+  // Leftover support: flag inventory items that represent leftovers
+  is_leftover?: boolean;
+  leftoverMeta?: LeftoverMeta;
+  // Freezer/frozen state
+  is_frozen?: boolean;
+  frozenAt?: string; // ISO date when item was moved to freezer
+  freezerExpiry?: string; // ISO date for freezer-specific expiry
 }
 
 export interface Batch {
@@ -50,6 +57,15 @@ export interface Batch {
   expires?: string; // ISO date string (YYYY-MM-DD)
   purchaseDate?: string; // ISO date when purchased
   note?: string;
+}
+
+export interface LeftoverMeta {
+  createdAt?: string; // ISO date
+  createdBy?: string; // UID
+  sourcePantryItemId?: string; // linked pantry item id when created from an existing item
+  computedBestBefore?: string; // ISO date computed by leftoverService
+  riskLevel?: number; // 1-5 user risk mapping at creation
+  notes?: string;
 }
 
 export interface ShoppingItem {
@@ -253,6 +269,8 @@ export interface UserProfile {
   riskLevel?: number;
   // If true, user prefers stricter health/safety notifications
   sensitiveHealthMode?: boolean;
+  // Leftover persona for food-safety guidance: 'strict' | 'normal' | 'relaxed'
+  leftoverPersona?: 'strict' | 'normal' | 'relaxed';
 }
 
 export interface HouseholdMember {

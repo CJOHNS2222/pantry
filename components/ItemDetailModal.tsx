@@ -9,6 +9,8 @@ import { useKeyboardNavigation } from '../hooks/useKeyboardNavigation';
 import VisualQuantitySelector from './VisualQuantitySelector';
 import QuantityUnitPicker from './QuantityUnitPicker';
 import { COMMON_UNITS, getSmartUnits } from './QuantityUnitPicker';
+import { useApp } from '../contexts/AppContext';
+import { uploadItemImage } from '../services/imageService';
 
 interface ItemDetailModalProps {
   item: PantryItem;
@@ -51,6 +53,12 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   const [localCategory, setLocalCategory] = useState<string>(item.category || 'Manual');
   const [localExpirationDate, setLocalExpirationDate] = useState<string>(item.expirationDate || '');
   const [localExpirationType, setLocalExpirationType] = useState<'use-by' | 'best-by'>(item.expirationType || 'best-by');
+  // Image upload state
+  const { household, user } = useApp();
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [cacheScope, setCacheScope] = useState<'none' | 'household' | 'user' | 'global'>('household');
 
   useEffect(() => {
     // Reset local state when item prop changes
@@ -167,6 +175,37 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
     setLocalBatches((localBatches || []).filter((x: any) => x.batchId !== batchId));
   };
 
+  // Image handlers
+  const handleFileInput = (file?: File) => {
+    if (!file) return;
+    setSelectedFile(file);
+    try {
+      const url = URL.createObjectURL(file);
+      setPreviewUrl(url);
+    } catch (err) {
+      setPreviewUrl(null);
+    }
+  };
+
+  const handleUploadImage = async () => {
+    if (!selectedFile) return;
+    setUploadingImage(true);
+    try {
+      const householdId = household?.id || 'unknown_household';
+      const downloadUrl = await uploadItemImage(selectedFile, householdId, item.item, cacheScope, user?.id);
+      // Persist image URL via provided update callback
+      onUpdateItem(originalIndex, { image: downloadUrl });
+      // clear local selection after success
+      setSelectedFile(null);
+      setPreviewUrl(null);
+    } catch (err: any) {
+      console.error('Failed to upload image:', err);
+      alert('Failed to upload image.');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
   const handleCloseAndPersist = () => {
     const updates: Partial<PantryItem> = {};
 
@@ -216,18 +255,46 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
 
           {/* Scrollable Content */}
           <div className="flex-1 overflow-y-auto px-3 py-2">
-            {/* Item Image */}
-              <div className="pb-2 flex justify-center">
-              <img
-                src={item.image}
-                alt={item.item}
-                className="w-24 h-24 rounded-lg object-cover border-2 border-theme"
-                onError={(e) => {
-                  const target = e.target as HTMLImageElement | null;
-                  console.log('Image failed to load:', target?.src);
-                  if (target) target.src = '/images/placeholder.svg';
-                }}
-              />
+            {/* Item Image + upload */}
+            <div className="pb-2 flex flex-col items-center gap-2">
+              <div>
+                <img
+                  src={previewUrl || item.image || '/images/placeholder.svg'}
+                  alt={item.item}
+                  className="w-24 h-24 rounded-lg object-cover border-2 border-theme"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement | null;
+                    if (target) target.src = '/images/placeholder.svg';
+                  }}
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => handleFileInput(e.target.files?.[0])}
+                  className="text-xs"
+                />
+                <label className="flex items-center gap-2 text-xs">
+                  <span className="mr-1">Cache:</span>
+                  <select value={cacheScope} onChange={(e) => setCacheScope(e.target.value as any)} className="text-xs bg-theme-primary rounded border border-theme p-1">
+                    <option value="none">No cache</option>
+                    <option value="household">Household</option>
+                    <option value="user">Private (only me)</option>
+                    <option value="global">Shared (public)</option>
+                  </select>
+                </label>
+              </div>
+              <div className="flex gap-2">
+                <button onClick={handleUploadImage} disabled={!selectedFile || uploadingImage} className="px-3 py-1 bg-[var(--accent-color)] text-white rounded text-sm">
+                  {uploadingImage ? 'Uploading…' : 'Upload & Save'}
+                </button>
+                {item.image && (
+                  <button onClick={() => onUpdateItem(originalIndex, { image: undefined })} className="px-3 py-1 bg-theme-secondary rounded text-sm">
+                    Remove Photo
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Item Details */}
@@ -666,6 +733,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
               </div>
             </div>
           </div>
+
         </div>
       </div>
 

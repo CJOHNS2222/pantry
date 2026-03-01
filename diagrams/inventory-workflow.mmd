@@ -1,0 +1,41 @@
+flowchart LR
+  A[Start: Add / Update Inventory Item] --> B{Is item marked is_leftover?}
+  B -- Yes --> C[Set is_leftover = true]
+  C --> C1[Set leftoverMeta.createdAt and createdBy]
+  C1 --> C2{Compute best-before?}
+  C2 -- Client --> C3[Client computes computedBestBefore]
+  C2 -- Server/None --> C4[Leave for later / backfill]
+  C3 --> D1[Write inventory doc - leftover]
+  C4 --> D1
+  D1 --> E1[Emit analytics: leftover_created]
+  E1 --> F[Update per-user cache users/UID/cache/inventory]
+  F --> G{Hot Zone inclusion?}
+  G -- High risk / soon --> H[Show in Hot Zone with quick actions]
+  H --> H1[Eat, call consumeLeftover, update inventory/cache, analytics leftover_consumed]
+  H --> H2[Freeze, call FreezerService.moveToFreezer, set is_frozen/frozenAt/freezerExpiry, analytics move_to_freezer]
+  H --> H3[Discard, call discardLeftover, remove/mark, analytics leftover_discarded]
+
+  B -- No --> I[Normal inventory flow]
+  I --> I1{Has explicit expirationDate or batches?}
+  I1 -- Yes --> I2[Use provided expiration/batch expires]
+  I1 -- No --> I3[Lookup product_master default expiry]
+  I2 --> D2[Write inventory doc - expiration set]
+  I3 --> D2
+  D2 --> E2[Emit analytics: inventory_added]
+  E2 --> F
+  F --> J{Expiry notifications}
+  J -- Item is_immortal --> K[Skip expiry notifications]
+  J -- Not immortal --> L[Schedule / trigger expiry alerts]
+
+  %% Fallback / compatibility
+  D1 -.-> M[If inventory write fails -> fallback to leftovers collection]
+  D2 -.-> M
+
+  %% Undo paths
+  H1 --> U1[Undo available via toast, restoreLeftover]
+  H2 --> U1
+  H3 --> U1
+
+  style A fill:#f9f,stroke:#333,stroke-width:1px
+  style H fill:#ffe6e6,stroke:#b33,stroke-width:1px
+  style L fill:#fff3bf,stroke:#b8860b,stroke-width:1px

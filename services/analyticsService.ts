@@ -124,6 +124,24 @@ class AnalyticsService {
     });
   }
 
+  // Leftover-specific analytics
+  static trackLeftoverCreated(householdId: string, createdBy: string, servings: number, tags?: string[]) {
+    this.logEvent('leftover_created', {
+      household_id: householdId,
+      created_by: createdBy,
+      servings,
+      tags
+    });
+  }
+
+  static trackMoveToFreezer(householdId: string, itemId: string, previousLocation?: string) {
+    this.logEvent('move_to_freezer', {
+      household_id: householdId,
+      item_id: itemId,
+      from: previousLocation || 'unknown'
+    });
+  }
+
   static trackPantryScan(itemsCount: number, successCount: number) {
     this.logEvent('scan_items', {
       items_scanned: itemsCount,

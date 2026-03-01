@@ -17,6 +17,7 @@ import { useSettings } from './hooks/useSettings';
 import { useToasts } from './hooks/useToasts';
 import { useDataManagement } from './hooks/useDataManagement';
 import RiskAssessmentQuestionnaire from './components/RiskAssessmentQuestionnaire';
+import LeftoversHotZone from './components/LeftoversHotZone';
 import { useHouseholdActivity } from './hooks/useHouseholdActivity';
 import { useOfflineStatus } from './hooks/useOfflineStatus';
 import AnalyticsService from './services/analyticsService';
@@ -847,6 +848,7 @@ const App: React.FC = () => {
               addShoppingListItem
             }}
           >
+            {household?.id && <LeftoversHotZone householdId={household.id} />}
             <MainContent />
           </AppActionsProvider>
         </AppProvider>

@@ -71,6 +71,24 @@ export class PantryService {
       dateAdded: now,
       lastRestocked: now,
       consumptionHistory: [now] // Add current date to consumption history
+      // Denormalized safety hints for item-level expiry logic
+      ,tags: (() => {
+        const t: string[] = [];
+        const low = description.toLowerCase();
+        if (low.includes('rice') && low.includes('cooked')) t.push('cooked-rice');
+        if (low.includes('rice') && !t.includes('cooked-rice') && low.includes('leftover')) t.push('cooked-rice');
+        return t.length ? t : undefined;
+      })(),
+      productRiskLevel: (() => {
+        const low = description.toLowerCase();
+        if (low.includes('rice') && low.includes('cooked')) return 4;
+        return undefined;
+      })(),
+      is_immortal: (() => {
+        const low = description.toLowerCase();
+        if (low.includes('honey') || low.includes('salt') || low.includes('sugar')) return true;
+        return undefined;
+      })()
     };
   }
 
@@ -145,7 +163,25 @@ export class PantryService {
       expirationType: 'best-by', // Default to best-by for manual additions
       dateAdded: now,
       lastRestocked: now,
-      consumptionHistory: [now] // Add current date to consumption history
+      consumptionHistory: [now], // Add current date to consumption history
+      // Denormalized safety hints for item-level expiry logic
+      tags: (() => {
+        const t: string[] = [];
+        const low = itemName.toLowerCase();
+        if (low.includes('rice') && low.includes('cooked')) t.push('cooked-rice');
+        if (low.includes('honey') || low.includes('salt') || low.includes('sugar')) t.push('shelf-stable');
+        return t.length ? t : undefined;
+      })(),
+      productRiskLevel: (() => {
+        const low = itemName.toLowerCase();
+        if (low.includes('rice') && low.includes('cooked')) return 4;
+        return undefined;
+      })(),
+      is_immortal: (() => {
+        const low = itemName.toLowerCase();
+        if (low.includes('honey') || low.includes('salt') || low.includes('sugar')) return true;
+        return undefined;
+      })()
     };
   }
 

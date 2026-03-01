@@ -20,6 +20,7 @@ import { userOptedInToGemini, setUserGeminiOptIn, getGeminiUsage } from '../serv
 import { VersionUpdate } from './VersionUpdate';
 import { MonitoringDashboard } from './MonitoringDashboard';
 import { Household } from '../types';
+import LeftoverPersonaQuestionnaire from './LeftoverPersonaQuestionnaire';
 
 const defaultSettings = {
   notifications: {
@@ -666,6 +667,13 @@ export const Settings: React.FC<SettingsProps> = ({
                 className="w-full p-1 text-xs border rounded text-black bg-white"
               />
             </div>
+
+            {/* Leftover Persona Questionnaire */}
+            <LeftoverPersonaQuestionnaire
+              user={user}
+              userProfile={userProfile}
+              onChange={(persona) => handleProfileChange('leftoverPersona', persona)}
+            />
 
             {profileChanged && (
               <button

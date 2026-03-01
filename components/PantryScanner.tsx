@@ -8,6 +8,7 @@ import StorageLocationIndicator from './StorageLocationIndicator';
 import { PantryItem, LoadingState, ConsumptionSuggestion, ExpirationAlert, CustomCategory, RecipeSuggestion, PantryFilter, User } from '../types';
 import { Tab } from '../types/app';
 import AnalyticsService from '../services/analyticsService';
+import FreezerService from '../services/freezerService';
 import { BrowserMultiFormatReader } from '@zxing/library';
 import VisualQuantitySelector from './VisualQuantitySelector';
 import QuantityUnitPicker from './QuantityUnitPicker';
@@ -780,7 +781,37 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
         </div>
 
         {!bulkMode && (
-          <div className="text-theme-secondary opacity-50">
+          <div className="flex items-center gap-2 text-theme-secondary opacity-50">
+            {household?.id && item.id && item.storageLocation !== 'freezer' && (
+              <button
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  if (!household?.id) {
+                    appActions.addToast('No household selected', 'error');
+                    return;
+                  }
+                  try {
+                    const prev = { storageLocation: item.storageLocation, is_frozen: item.is_frozen, expirationDate: item.expirationDate } as any;
+                    const result = await FreezerService.moveToFreezer(household.id, item.id);
+                    await onUpdateItem(item.originalIndex, { storageLocation: 'freezer', is_frozen: true, expirationDate: result.newExpiry });
+                    AnalyticsService.trackMoveToFreezer(household.id, item.id);
+                    appActions.addToast('Moved to freezer', 'success', 5000, 'Undo', async () => {
+                      try {
+                        await onUpdateItem(item.originalIndex, { storageLocation: prev.storageLocation, is_frozen: prev.is_frozen, expirationDate: prev.expirationDate });
+                      } catch (err) {
+                        // ignore
+                      }
+                    });
+                  } catch (err) {
+                    appActions.addToast('Failed to move to freezer', 'error');
+                  }
+                }}
+                className="px-2 py-1 rounded bg-theme-secondary hover:bg-theme-primary text-xs"
+                title="Move to freezer"
+              >
+                ❄️ Freeze
+              </button>
+            )}
             <ChevronRight className="w-5 h-5" />
           </div>
         )}
@@ -793,8 +824,15 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
     const items = groupedByStorage[location] || [];
     const item = items[index];
     if (!item) return null;
+    const daysRemaining = item.expirationDate ? Math.ceil((new Date(item.expirationDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : undefined;
+    const expirationBorderClass = (d?: number) => {
+      if (d == null) return ''
+      const c = getExpirationColor(d, item.expirationType)
+      return c === 'red' ? 'ring-2 ring-red-300/40' : c === 'yellow' ? 'ring-2 ring-yellow-300/30' : 'ring-2 ring-green-300/15'
+    }
+
     return (
-      <div style={style} key={item.originalIndex} className={`flex items-center justify-between px-2 py-1 border-b border-theme last:border-b-0 transition-all cursor-pointer ${
+      <div style={style} key={item.originalIndex} className={`flex items-center justify-between px-2 py-1 border-b border-theme last:border-b-0 transition-all cursor-pointer ${expirationBorderClass(daysRemaining)} ${
         bulkMode && selectedItems.has(item.originalIndex)
           ? 'bg-[var(--accent-color)]/10 border-[var(--accent-color)]/30'
           : 'hover:bg-theme-primary/50'
@@ -851,10 +889,15 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   // Simple list item renderer used for non-virtualized lists
   function renderListItem(item: any) {
     const daysRemaining = item.expirationDate ? Math.ceil((new Date(item.expirationDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : undefined;
+    const expirationBorderClass = (d?: number) => {
+      if (d == null) return ''
+      const c = getExpirationColor(d, item.expirationType)
+      return c === 'red' ? 'ring-2 ring-red-300/40' : c === 'yellow' ? 'ring-2 ring-yellow-300/30' : 'ring-2 ring-green-300/15'
+    }
     return (
       <div
         key={item.originalIndex}
-        className={`flex items-center justify-between px-2 py-1 border-b border-theme last:border-b-0 transition-all cursor-pointer ${
+        className={`flex items-center justify-between px-2 py-1 border-b border-theme last:border-b-0 transition-all cursor-pointer ${expirationBorderClass(daysRemaining)} ${
           bulkMode && selectedItems.has(item.originalIndex)
             ? 'bg-[var(--accent-color)]/10 border-[var(--accent-color)]/30'
             : 'hover:bg-theme-primary/50'
@@ -915,8 +958,15 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   const renderRow = ({ index, style }: { index: number; style: React.CSSProperties }) => {
     const item = sortedInventory[index];
     if (!item) return null;
+    const daysRemaining = item.expirationDate ? Math.ceil((new Date(item.expirationDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : undefined;
+    const expirationBorderClass = (d?: number) => {
+      if (d == null) return ''
+      const c = getExpirationColor(d, item.expirationType)
+      return c === 'red' ? 'ring-2 ring-red-300/40' : c === 'yellow' ? 'ring-2 ring-yellow-300/30' : 'ring-2 ring-green-300/15'
+    }
+
     return (
-      <div style={style} key={item.originalIndex} className={`flex items-center justify-between px-2 py-1 border-b border-theme last:border-b-0 transition-all cursor-pointer ${
+      <div style={style} key={item.originalIndex} className={`flex items-center justify-between px-2 py-1 border-b border-theme last:border-b-0 transition-all cursor-pointer ${expirationBorderClass(daysRemaining)} ${
         bulkMode && selectedItems.has(item.originalIndex)
           ? 'bg-[var(--accent-color)]/10 border-[var(--accent-color)]/30'
           : 'hover:bg-theme-primary/50'

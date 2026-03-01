@@ -71,6 +71,9 @@ export async function fetchGroceryItemImage(itemName: string): Promise<string | 
   }
 }
 
+// Re-export upload helper for general item image uploads
+export { uploadItemImage } from './leftoverImageService';
+
 async function fetchUnsplashImage(query: string): Promise<string | null> {
   const accessKey = (import.meta as any)?.env?.VITE_UNSPLASH_ACCESS_KEY;
   if (!accessKey) {
