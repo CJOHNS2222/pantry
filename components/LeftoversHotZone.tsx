@@ -29,14 +29,29 @@ export default function LeftoversHotZone({ householdId }: Props) {
         if (snap.exists()) {
           const data = snap.data() as any
           const items: any[] = (data.items || []).filter((it: any) => it && it.is_leftover)
-          const docs: Leftover[] = items.map((it: any) => ({ id: it.id || it.itemId || Math.random().toString(36).slice(2), ...(it as any) } as Leftover))
+          const docs: Leftover[] = items.map((it: any) => ({
+            id: it.id || it.itemId || Math.random().toString(36).slice(2),
+            ...(it as any),
+            servings: (it?.leftoverMeta?.servings ?? it?.servings ?? 1),
+            computedBestBefore: (it?.leftoverMeta?.computedBestBefore ?? it?.computedBestBefore),
+            sourcePantryItemId: (it?.sourcePantryItemId ?? it?.leftoverMeta?.sourcePantryItemId),
+          } as Leftover))
           setLeftovers(docs)
         } else {
           // fallback to inventory query
           const q = query(collection(db, 'households', householdId, 'inventory'), where('is_leftover', '==', true), orderBy('leftoverMeta.createdAt', 'desc'))
           const invUnsub = onSnapshot(q, snap2 => {
             const docs: Leftover[] = []
-            snap2.forEach(d => docs.push({ id: d.id, ...(d.data() as any) }))
+            snap2.forEach(d => {
+              const raw = d.data() as any
+              docs.push({
+                id: d.id,
+                ...raw,
+                servings: (raw?.leftoverMeta?.servings ?? raw?.servings ?? 1),
+                computedBestBefore: (raw?.leftoverMeta?.computedBestBefore ?? raw?.computedBestBefore),
+                sourcePantryItemId: (raw?.sourcePantryItemId ?? raw?.leftoverMeta?.sourcePantryItemId),
+              } as Leftover)
+            })
             setLeftovers(docs)
           })
           // replace unsub to ensure we can cleanup invUnsub later
@@ -49,7 +64,16 @@ export default function LeftoversHotZone({ householdId }: Props) {
       const q = query(collection(db, 'households', householdId, 'inventory'), where('is_leftover', '==', true), orderBy('leftoverMeta.createdAt', 'desc'))
       unsub = onSnapshot(q, snap => {
         const docs: Leftover[] = []
-        snap.forEach(d => docs.push({ id: d.id, ...(d.data() as any) }))
+        snap.forEach(d => {
+          const raw = d.data() as any
+          docs.push({
+            id: d.id,
+            ...raw,
+            servings: (raw?.leftoverMeta?.servings ?? raw?.servings ?? 1),
+            computedBestBefore: (raw?.leftoverMeta?.computedBestBefore ?? raw?.computedBestBefore),
+            sourcePantryItemId: (raw?.sourcePantryItemId ?? raw?.leftoverMeta?.sourcePantryItemId),
+          } as Leftover)
+        })
         setLeftovers(docs)
       })
     }
@@ -66,7 +90,8 @@ export default function LeftoversHotZone({ householdId }: Props) {
       <h4 style={{ margin: '4px 0 8px' }}>Leftovers — Hot Zone</h4>
       <div style={{ display: 'flex', gap: 8, overflowX: 'auto' }}>
         {leftovers.map(l => {
-          const daysRemaining = Math.ceil((new Date(l.computedBestBefore).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+          const bestBefore = l.computedBestBefore || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+          const daysRemaining = Math.ceil((new Date(bestBefore).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
           const color = getExpirationColor(daysRemaining)
           const border = color === 'red' ? '2px solid rgba(248,113,113,0.3)' : color === 'yellow' ? '2px solid rgba(250,204,21,0.25)' : '2px solid rgba(34,197,94,0.16)'
           return (
@@ -75,7 +100,7 @@ export default function LeftoversHotZone({ householdId }: Props) {
               <div style={{ fontSize: 12, color: '#666' }}>{l.servings} servings</div>
               <div style={{ marginTop: 8 }}>
                 <div style={{ height: 8, background: '#eee', borderRadius: 4 }}>
-                  <div style={{ width: `${Math.max(0, Math.min(100, ((new Date(l.computedBestBefore).getTime() - Date.now()) / (1000*60*60*24)) / 7 * 100))}%`, height: '100%', background: color === 'red' ? '#f87171' : color === 'yellow' ? '#facc15' : '#34d399', borderRadius: 4 }} />
+                  <div style={{ width: `${Math.max(0, Math.min(100, ((new Date(bestBefore).getTime() - Date.now()) / (1000*60*60*24)) / 7 * 100))}%`, height: '100%', background: color === 'red' ? '#f87171' : color === 'yellow' ? '#facc15' : '#34d399', borderRadius: 4 }} />
                 </div>
                 <div style={{ fontSize: 12, marginTop: 6 }}>{daysRemaining} days</div>
               </div>
@@ -108,9 +133,10 @@ export default function LeftoversHotZone({ householdId }: Props) {
                   onClick={async () => {
                     try {
                       // If leftover has a sourcePantryItemId try to move inventory; otherwise no-op
-                      if ((l as any).sourcePantryItemId) {
-                        const result = await FreezerService.moveToFreezer(householdId, (l as any).sourcePantryItemId)
-                        AnalyticsService.trackMoveToFreezer(householdId, (l as any).sourcePantryItemId)
+                      const inventoryTargetId = (l as any).sourcePantryItemId || l.id
+                      if (inventoryTargetId) {
+                        const result = await FreezerService.moveToFreezer(householdId, inventoryTargetId)
+                        AnalyticsService.trackMoveToFreezer(householdId, inventoryTargetId)
                         addToast('Moved to freezer', 'success')
                       } else {
                         addToast('No source item to freeze', 'warning')

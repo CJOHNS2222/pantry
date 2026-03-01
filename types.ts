@@ -37,6 +37,9 @@ export interface PantryItem {
 
   // Expiry alert tracking
   expiryAlertShown?: boolean; // Whether expiry alert has been displayed to user
+  tags?: string[];
+  // Denormalized product-level risk score (1-5)
+  productRiskLevel?: number;
   // Product-level immortal flag: when true, item should never be treated as expired
   // (e.g., salt, sugar, honey). UI will show a 'Shelf Stable' badge and expiry
   // checks/notifications will be bypassed for these items.
@@ -44,10 +47,16 @@ export interface PantryItem {
   // Leftover support: flag inventory items that represent leftovers
   is_leftover?: boolean;
   leftoverMeta?: LeftoverMeta;
+  // Cooked rice flag: denormalized boolean to indicate this item contains cooked rice
+  // (affects safety window calculations). New writes should set this when applicable.
+  cooked_rice?: boolean;
   // Freezer/frozen state
   is_frozen?: boolean;
   frozenAt?: string; // ISO date when item was moved to freezer
   freezerExpiry?: string; // ISO date for freezer-specific expiry
+  freezerZone?: string; // Freezer zone hint (e.g., top, middle, bottom, door, drawer)
+  freezerLabelPhotoUrl?: string; // Optional photo URL of freezer label/container
+  freezerPortionCount?: number; // Optional portion count for frozen leftovers/items
 }
 
 export interface Batch {

@@ -9,6 +9,8 @@ export type LeftoverCreate = {
   notes?: string
   sourcePantryItemId?: string
   productMasterId?: string
+  // Denormalized cooked-rice boolean (preferred over product master hints)
+  cooked_rice?: boolean
   // Optional hints when product master is not provided
   productMasterTags?: string[]
   productMasterRiskLevel?: number
@@ -29,7 +31,7 @@ const DAYS_MS = (days: number) => days * 24 * 60 * 60 * 1000
 export default class LeftoverService {
   static computeBestBeforeISO(
     createdAtISO: string,
-    opts?: { productMaster?: { risk_level?: number; tags?: string[] } | null; clientProvidedBestBeforeISO?: string; persona?: 'relaxed' | 'normal' | 'strict' }
+    opts?: { productMaster?: { risk_level?: number; tags?: string[] } | null; risk_level?: number; tags?: string[]; cooked_rice?: boolean; clientProvidedBestBeforeISO?: string; persona?: 'relaxed' | 'normal' | 'strict' }
   ) {
     const createdAt = new Date(createdAtISO)
     let candidate: Date | null = null
@@ -38,8 +40,9 @@ export default class LeftoverService {
       candidate = new Date(opts.clientProvidedBestBeforeISO)
     }
 
-    if (!candidate && opts?.productMaster?.risk_level) {
-      const rl = opts.productMaster.risk_level
+    // Prefer explicit denormalized risk_level, fall back to legacy productMaster.risk_level
+    const rl = opts?.risk_level ?? opts?.productMaster?.risk_level
+    if (!candidate && typeof rl === 'number') {
       const days = rl >= 5 ? 2 : rl === 4 ? 4 : rl === 3 ? 7 : rl === 2 ? 14 : 30
       candidate = new Date(createdAt.getTime() + DAYS_MS(days))
     }
@@ -57,7 +60,12 @@ export default class LeftoverService {
       candidate = new Date(candidate.getTime() + DAYS_MS(1))
     }
 
-    const isCookedRice = Boolean(opts?.productMaster?.tags?.includes('cooked-rice'))
+    // Determine cooked-rice from explicit flag, denormalized tags, or legacy productMaster tags
+    const isCookedRice = Boolean(
+      opts?.cooked_rice ||
+      opts?.tags?.includes('cooked-rice') ||
+      opts?.productMaster?.tags?.includes('cooked-rice')
+    )
     if (isCookedRice) {
       const cap = new Date(createdAt.getTime() + DAYS_MS(4))
       if (candidate.getTime() > cap.getTime()) candidate = cap
@@ -72,6 +80,7 @@ export default class LeftoverService {
 
     // Prefer lightweight hints provided on the payload (denormalized item fields).
     // Do NOT perform a product_master lookup — we avoid extra DB calls per user request.
+    // Preserve any lightweight denormalized hints (compatibility with older UI)
     if (payload.productMasterTags || payload.productMasterRiskLevel) {
       productMaster = {
         tags: payload.productMasterTags || [],
@@ -81,6 +90,9 @@ export default class LeftoverService {
 
     const computedBestBefore = LeftoverService.computeBestBeforeISO(nowISO, {
       productMaster,
+      risk_level: payload.productMasterRiskLevel,
+      tags: payload.tags || payload.productMasterTags,
+      cooked_rice: payload.cooked_rice,
       clientProvidedBestBeforeISO: payload.clientProvidedBestBeforeISO,
       persona: payload.persona,
     })
@@ -136,8 +148,9 @@ export default class LeftoverService {
           createdBy: payload.createdBy || null,
         },
         // Preserve any denormalized safety hints on the inventory doc
-        tags: payload.productMasterTags || undefined,
+        tags: payload.tags || payload.productMasterTags || undefined,
         productRiskLevel: payload.productMasterRiskLevel || undefined,
+        cooked_rice: payload.cooked_rice || (payload.productMasterTags || []).includes?.('cooked-rice') || undefined,
         is_immortal: (payload as any).is_immortal || undefined,
         createdAt: nowISO,
         createdAt_serverTs: serverTimestamp(),
@@ -258,12 +271,15 @@ export async function simpleAddOrMarkLeftover(payload: {
   clientProvidedBestBeforeISO?: string
   productMasterRiskLevel?: number
   productMasterTags?: string[]
+  cooked_rice?: boolean
   persona?: 'relaxed' | 'normal' | 'strict'
 }) {
   const nowISO = new Date().toISOString()
 
   const computedBestBefore = LeftoverService.computeBestBeforeISO(nowISO, {
-    productMaster: payload.productMasterTags || payload.productMasterRiskLevel ? { tags: payload.productMasterTags || [], risk_level: payload.productMasterRiskLevel } : undefined,
+    tags: payload.productMasterTags,
+    risk_level: payload.productMasterRiskLevel,
+    cooked_rice: payload.cooked_rice,
     clientProvidedBestBeforeISO: payload.clientProvidedBestBeforeISO,
     persona: payload.persona,
   } as any)
@@ -322,6 +338,8 @@ export async function simpleAddOrMarkLeftover(payload: {
       servings: payload.servings || 1,
       notes: payload.notes,
       sourcePantryItemId: payload.sourcePantryItemId,
+      cooked_rice: payload.cooked_rice,
+      tags: payload.productMasterTags,
       clientProvidedBestBeforeISO: payload.clientProvidedBestBeforeISO,
       productMasterRiskLevel: payload.productMasterRiskLevel,
       productMasterTags: payload.productMasterTags,

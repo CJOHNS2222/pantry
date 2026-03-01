@@ -21,8 +21,7 @@
     "clean-duplicate-descriptions": "node scripts/clean-duplicate-descriptions.js",
     "test-spoonacular": "node scripts/test-spoonacular.js",
     "migrate-firebase": "node migrate-firebase.js",
-    "test-firebase": "node test-firebase.js",
-    "seed:product-master": "node scripts/seedProductMaster.cjs"
+    "test-firebase": "node test-firebase.js"
   },
   "dependencies": {
     "@capacitor-community/admob": "^8.0.0",

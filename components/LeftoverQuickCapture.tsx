@@ -8,17 +8,19 @@ type Props = {
   householdId: string
   createdBy: string
   sourcePantryItemId?: string
+  initialServings?: number
+  initialNotes?: string
   onSaved?: (id: string) => void
   onClose?: () => void
 }
 
-export default function LeftoverQuickCapture({ householdId, createdBy, sourcePantryItemId, onSaved, onClose }: Props) {
+export default function LeftoverQuickCapture({ householdId, createdBy, sourcePantryItemId, initialServings = 1, initialNotes = '', onSaved, onClose }: Props) {
   const { user } = useApp()
   const [photoUrl, setPhotoUrl] = useState<string | undefined>(undefined)
   const [file, setFile] = useState<File | null>(null)
   const [updateItemPicture, setUpdateItemPicture] = useState(false)
-  const [servings, setServings] = useState<number>(1)
-  const [notes, setNotes] = useState('')
+  const [servings, setServings] = useState<number>(initialServings)
+  const [notes, setNotes] = useState(initialNotes)
   const [isCooked, setIsCooked] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -67,7 +69,10 @@ export default function LeftoverQuickCapture({ householdId, createdBy, sourcePan
       notes,
       sourcePantryItemId,
       // Prefer explicit cooked marker from quick-capture UI, otherwise inherit from item
-      productMasterTags: isCooked ? ['cooked-rice'] : inferredTags,
+      // New denormalized cooked flag
+      cooked_rice: isCooked || inferredTags?.includes('cooked-rice') || undefined,
+      // Preserve denormalized tags/risk level for compatibility
+      tags: isCooked ? ['cooked-rice'] : inferredTags,
       productMasterRiskLevel: isCooked ? 4 : inferredRiskLevel,
       is_immortal: inferredIsImmortal,
       persona: user?.profile?.leftoverPersona || undefined,

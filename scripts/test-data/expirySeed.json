@@ -1,0 +1,47 @@
+[
+  {
+    "id": "seed-immortal-1",
+    "item": "Salt",
+    "category": "baking supplies",
+    "quantity_estimate": "1",
+    "storageLocation": "pantry",
+    "is_immortal": true
+  },
+  {
+    "id": "seed-milk-1",
+    "item": "Whole Milk",
+    "category": "Dairy",
+    "quantity_estimate": "1",
+    "storageLocation": "fridge",
+    "expirationDate": "2026-03-03"
+  },
+  {
+    "id": "seed-bread-1",
+    "item": "Sandwich Bread",
+    "category": "bakery",
+    "quantity_estimate": "1",
+    "storageLocation": "pantry",
+    "expirationDate": "2026-03-01"
+  },
+  {
+    "id": "seed-cheese-1",
+    "item": "Soft Cheese",
+    "category": "Dairy",
+    "quantity_estimate": "1",
+    "storageLocation": "fridge",
+    "expirationDate": "2026-02-26"
+  },
+  {
+    "id": "seed-leftover-rice-1",
+    "item": "Leftover Fried Rice",
+    "category": "leftover",
+    "quantity_estimate": "2",
+    "storageLocation": "fridge",
+    "is_leftover": true,
+    "leftoverMeta": {
+      "createdAt": "2026-03-01T05:22:44.157Z",
+      "computedBestBefore": "2026-03-05",
+      "notes": "Cooked rice leftover"
+    }
+  }
+]

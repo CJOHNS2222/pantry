@@ -27,6 +27,7 @@ import { useKeyboardNavigation } from '../hooks/useKeyboardNavigation';
 import RecipeModal from './RecipeModal';
 import { AdMobBanner } from './AdMobBanner';
 import { canShowAds } from '../utils/appUtils';
+import FreezeTransitionModal from './FreezeTransitionModal';
 
 import { InventoryCacheService } from '../services/inventoryCacheService';
 import ImportModal from './ImportModal';
@@ -96,6 +97,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
       if (importedTimerRef.current) {
         window.clearTimeout(importedTimerRef.current);
       }
+      clearLongPressTimer();
     };
   }, []);
 
@@ -156,8 +158,109 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   const [showRecipeModal, setShowRecipeModal] = useState(false);
   const [modalRecipe, setModalRecipe] = useState<any>(null);
   const [modalContext, setModalContext] = useState<'search' | 'scheduled'>('search');
+  const [freezeTargetIndex, setFreezeTargetIndex] = useState<number | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const gestureStartRef = useRef<{ x: number; y: number } | null>(null);
+  const longPressTimerRef = useRef<number | null>(null);
+  const gestureActionTriggeredRef = useRef(false);
+
+  const clearLongPressTimer = () => {
+    if (longPressTimerRef.current) {
+      window.clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
+  const applyQuickConsume = useCallback(async (item: any) => {
+    const original = inventory[item.originalIndex];
+    if (!original) return;
+
+    const previous = {
+      quantity: original.quantity,
+      quantity_estimate: original.quantity_estimate,
+      batches: original.batches,
+      consumptionHistory: original.consumptionHistory,
+    };
+
+    const { updatedItem } = PantryService.consumeFromItem(original, 1, 'FEFO');
+    const updates: Partial<PantryItem> = {
+      quantity: updatedItem.quantity,
+      batches: updatedItem.batches,
+      quantity_estimate: (() => {
+        const current = Number(original.quantity_estimate || 0);
+        return String(Math.max(0, current - 1));
+      })(),
+      consumptionHistory: [...(original.consumptionHistory || []), new Date().toISOString()],
+    };
+
+    await onUpdateItem(item.originalIndex, updates);
+    appActions.addToast('Consumed 1 unit', 'success', 5000, 'Undo', async () => {
+      await onUpdateItem(item.originalIndex, previous);
+    });
+  }, [inventory, onUpdateItem, appActions]);
+
+  const applyQuickAddToShopping = useCallback((item: any) => {
+    addToShoppingList([item.item]);
+    appActions.addToast(`Added ${item.item} to shopping list`, 'info');
+  }, [addToShoppingList, appActions]);
+
+  const getRowActionHandlers = useCallback((item: any) => {
+    return {
+      tabIndex: 0,
+      onContextMenu: (e: React.MouseEvent) => {
+        e.preventDefault();
+        setSelectedItemIndex(item.originalIndex);
+      },
+      onKeyDown: (e: React.KeyboardEvent) => {
+        if (bulkMode) return;
+        if (e.key === 'ArrowRight') {
+          e.preventDefault();
+          void applyQuickConsume(item);
+        } else if (e.key === 'ArrowLeft') {
+          e.preventDefault();
+          applyQuickAddToShopping(item);
+        } else if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          setSelectedItemIndex(item.originalIndex);
+        }
+      },
+      onPointerDown: (e: React.PointerEvent) => {
+        if (bulkMode) return;
+        gestureStartRef.current = { x: e.clientX, y: e.clientY };
+        clearLongPressTimer();
+        longPressTimerRef.current = window.setTimeout(() => {
+          setSelectedItemIndex(item.originalIndex);
+        }, 550);
+      },
+      onPointerMove: (e: React.PointerEvent) => {
+        if (!gestureStartRef.current) return;
+        const dx = Math.abs(e.clientX - gestureStartRef.current.x);
+        const dy = Math.abs(e.clientY - gestureStartRef.current.y);
+        if (dx > 10 || dy > 10) {
+          clearLongPressTimer();
+        }
+      },
+      onPointerUp: async (e: React.PointerEvent) => {
+        clearLongPressTimer();
+        if (bulkMode || !gestureStartRef.current) return;
+        const dx = e.clientX - gestureStartRef.current.x;
+        const dy = e.clientY - gestureStartRef.current.y;
+        gestureStartRef.current = null;
+        if (Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy)) return;
+        if (dx > 0) {
+          gestureActionTriggeredRef.current = true;
+          await applyQuickConsume(item);
+        } else {
+          gestureActionTriggeredRef.current = true;
+          applyQuickAddToShopping(item);
+        }
+      },
+      onPointerLeave: () => {
+        clearLongPressTimer();
+      },
+    };
+  }, [bulkMode, applyQuickConsume, applyQuickAddToShopping]);
 
   // Calculate meal prep suggestions when recipes or inventory change
   React.useEffect(() => {
@@ -734,13 +837,29 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
     const items = groupedItems[category];
     const item = items[index];
     if (!item) return null;
+    const expirationHeatClass = (d?: number) => {
+      if (d == null) return '';
+      if (d <= 2) return 'bg-orange-50/60 border-l-4 border-l-orange-300';
+      if (d <= 3) return 'bg-orange-50/30 border-l-4 border-l-orange-200';
+      return '';
+    };
+    const daysRemaining = item.expirationDate ? Math.ceil((new Date(item.expirationDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : undefined;
     return (
       <div style={style} key={item.originalIndex} className={`flex items-center justify-between px-2 py-1 border-b border-theme last:border-b-0 transition-all cursor-pointer ${
+        expirationHeatClass(daysRemaining)
+      } ${
         bulkMode && selectedItems.has(item.originalIndex)
           ? 'bg-[var(--accent-color)]/10 border-[var(--accent-color)]/30'
           : 'hover:bg-theme-primary/50'
       }`}
-      onClick={() => !bulkMode && setSelectedItemIndex(item.originalIndex)}
+      {...getRowActionHandlers(item)}
+      onClick={() => {
+        if (gestureActionTriggeredRef.current) {
+          gestureActionTriggeredRef.current = false;
+          return;
+        }
+        if (!bulkMode) setSelectedItemIndex(item.originalIndex)
+      }}
       >
         {bulkMode && (
           <input
@@ -784,6 +903,18 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
           <div className="flex items-center gap-2 text-theme-secondary opacity-50">
             {household?.id && item.id && item.storageLocation !== 'freezer' && (
               <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setFreezeTargetIndex(item.originalIndex);
+                }}
+                className="px-2 py-1 rounded bg-theme-secondary hover:bg-theme-primary text-xs"
+                title="Move to freezer"
+              >
+                ❄️ Freeze
+              </button>
+            )}
+            {household?.id && item.id && (item.storageLocation === 'freezer' || item.is_frozen) && (
+              <button
                 onClick={async (e) => {
                   e.stopPropagation();
                   if (!household?.id) {
@@ -791,25 +922,31 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                     return;
                   }
                   try {
+                    const cookingToday = window.confirm('Are you cooking this today?\nOK = Yes (shorter window), Cancel = No (default defrost window)');
                     const prev = { storageLocation: item.storageLocation, is_frozen: item.is_frozen, expirationDate: item.expirationDate } as any;
-                    const result = await FreezerService.moveToFreezer(household.id, item.id);
-                    await onUpdateItem(item.originalIndex, { storageLocation: 'freezer', is_frozen: true, expirationDate: result.newExpiry });
-                    AnalyticsService.trackMoveToFreezer(household.id, item.id);
-                    appActions.addToast('Moved to freezer', 'success', 5000, 'Undo', async () => {
-                      try {
-                        await onUpdateItem(item.originalIndex, { storageLocation: prev.storageLocation, is_frozen: prev.is_frozen, expirationDate: prev.expirationDate });
-                      } catch (err) {
-                        // ignore
+                    const result = await FreezerService.moveToFridgeFromFreezer(household.id, item.id, { cookingToday });
+                    await onUpdateItem(item.originalIndex, { storageLocation: 'fridge', is_frozen: false, expirationDate: result.newExpiry });
+                    appActions.addToast(
+                      cookingToday ? 'Defrosted for today' : 'Defrosted to fridge',
+                      'success',
+                      5000,
+                      'Undo',
+                      async () => {
+                        try {
+                          await onUpdateItem(item.originalIndex, { storageLocation: prev.storageLocation, is_frozen: prev.is_frozen, expirationDate: prev.expirationDate });
+                        } catch {
+                          // ignore
+                        }
                       }
-                    });
-                  } catch (err) {
-                    appActions.addToast('Failed to move to freezer', 'error');
+                    );
+                  } catch {
+                    appActions.addToast('Failed to defrost item', 'error');
                   }
                 }}
                 className="px-2 py-1 rounded bg-theme-secondary hover:bg-theme-primary text-xs"
-                title="Move to freezer"
+                title="Move to fridge (defrost)"
               >
-                ❄️ Freeze
+                🌡️ Defrost
               </button>
             )}
             <ChevronRight className="w-5 h-5" />
@@ -830,14 +967,27 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
       const c = getExpirationColor(d, item.expirationType)
       return c === 'red' ? 'ring-2 ring-red-300/40' : c === 'yellow' ? 'ring-2 ring-yellow-300/30' : 'ring-2 ring-green-300/15'
     }
+    const expirationHeatClass = (d?: number) => {
+      if (d == null) return '';
+      if (d <= 2) return 'bg-orange-50/60 border-l-4 border-l-orange-300';
+      if (d <= 3) return 'bg-orange-50/30 border-l-4 border-l-orange-200';
+      return '';
+    }
 
     return (
-      <div style={style} key={item.originalIndex} className={`flex items-center justify-between px-2 py-1 border-b border-theme last:border-b-0 transition-all cursor-pointer ${expirationBorderClass(daysRemaining)} ${
+      <div style={style} key={item.originalIndex} className={`flex items-center justify-between px-2 py-1 border-b border-theme last:border-b-0 transition-all cursor-pointer ${expirationBorderClass(daysRemaining)} ${expirationHeatClass(daysRemaining)} ${
         bulkMode && selectedItems.has(item.originalIndex)
           ? 'bg-[var(--accent-color)]/10 border-[var(--accent-color)]/30'
           : 'hover:bg-theme-primary/50'
       }`}
-      onClick={() => !bulkMode && setSelectedItemIndex(item.originalIndex)}
+      {...getRowActionHandlers(item)}
+      onClick={() => {
+        if (gestureActionTriggeredRef.current) {
+          gestureActionTriggeredRef.current = false;
+          return;
+        }
+        if (!bulkMode) setSelectedItemIndex(item.originalIndex)
+      }}
       >
         {bulkMode && (
           <input
@@ -894,15 +1044,28 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
       const c = getExpirationColor(d, item.expirationType)
       return c === 'red' ? 'ring-2 ring-red-300/40' : c === 'yellow' ? 'ring-2 ring-yellow-300/30' : 'ring-2 ring-green-300/15'
     }
+    const expirationHeatClass = (d?: number) => {
+      if (d == null) return '';
+      if (d <= 2) return 'bg-orange-50/60 border-l-4 border-l-orange-300';
+      if (d <= 3) return 'bg-orange-50/30 border-l-4 border-l-orange-200';
+      return '';
+    }
     return (
       <div
         key={item.originalIndex}
-        className={`flex items-center justify-between px-2 py-1 border-b border-theme last:border-b-0 transition-all cursor-pointer ${expirationBorderClass(daysRemaining)} ${
+        className={`flex items-center justify-between px-2 py-1 border-b border-theme last:border-b-0 transition-all cursor-pointer ${expirationBorderClass(daysRemaining)} ${expirationHeatClass(daysRemaining)} ${
           bulkMode && selectedItems.has(item.originalIndex)
             ? 'bg-[var(--accent-color)]/10 border-[var(--accent-color)]/30'
             : 'hover:bg-theme-primary/50'
         }`}
-        onClick={() => !bulkMode && setSelectedItemIndex(item.originalIndex)}
+        {...getRowActionHandlers(item)}
+        onClick={() => {
+          if (gestureActionTriggeredRef.current) {
+            gestureActionTriggeredRef.current = false;
+            return;
+          }
+          if (!bulkMode) setSelectedItemIndex(item.originalIndex)
+        }}
       >
         {bulkMode && (
           <input
@@ -2143,6 +2306,54 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
           customCategories={customCategories}
           originalIndex={selectedItemIndex}
         />
+      )}
+
+      {/* Freeze Transition Modal */}
+      {freezeTargetIndex !== null && household?.id && inventory[freezeTargetIndex]?.id && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4">
+          <div className="bg-theme-primary rounded-lg shadow-xl w-full max-w-md mx-auto border border-theme">
+            <FreezeTransitionModal
+              householdId={household.id}
+              inventoryId={inventory[freezeTargetIndex].id}
+              onClose={() => setFreezeTargetIndex(null)}
+              onDone={async (res?: any) => {
+                const current = inventory[freezeTargetIndex];
+                if (!current) {
+                  setFreezeTargetIndex(null);
+                  return;
+                }
+                const previous = {
+                  storageLocation: current.storageLocation,
+                  is_frozen: current.is_frozen,
+                  expirationDate: current.expirationDate,
+                  freezerZone: current.freezerZone,
+                  freezerLabelPhotoUrl: current.freezerLabelPhotoUrl,
+                  freezerPortionCount: current.freezerPortionCount,
+                };
+
+                const updates: Partial<PantryItem> = {
+                  storageLocation: 'freezer',
+                  is_frozen: true,
+                  expirationDate: res?.newExpiry,
+                  freezerZone: res?.updates?.freezerZone,
+                  freezerLabelPhotoUrl: res?.updates?.freezerLabelPhotoUrl,
+                  freezerPortionCount: res?.updates?.freezerPortionCount,
+                };
+
+                await onUpdateItem(freezeTargetIndex, updates);
+                AnalyticsService.trackMoveToFreezer(household.id, current.id);
+                appActions.addToast('Moved to freezer', 'success', 5000, 'Undo', async () => {
+                  try {
+                    await onUpdateItem(freezeTargetIndex, previous);
+                  } catch {
+                    // ignore
+                  }
+                });
+                setFreezeTargetIndex(null);
+              }}
+            />
+          </div>
+        </div>
       )}
 
       {/* Recipe Modal */}

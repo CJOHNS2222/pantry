@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { CalendarClock, Plus, Move, AlertCircle, ShoppingBasket, Trash2, HelpCircle, Search } from 'lucide-react';
 import { DayPlan, MealPlanItem, PantryItem, StructuredRecipe, User, SavedRecipe, ShoppingItem } from '../types';
 import RecipeModal from './RecipeModal';
+import LeftoverQuickCapture from './LeftoverQuickCapture';
 import { MealPrepPlanner } from './MealPrepPlanner';
 import { PremiumFeature } from './PremiumFeature';
 import { GroceryCostEstimator } from './GroceryCostEstimator';
@@ -11,6 +12,7 @@ import { getSavedRecipes, getCachedPopularRecipes, getCachedRecipesCache } from 
 // Firestore access is instrumented via DatabaseMonitoringService when needed
 import { parseIngredientForShoppingList } from '../utils/appUtils';
 import AnalyticsService from '../services/analyticsService';
+import { useApp } from '../contexts/AppContext';
 import { searchRecipes } from '../utils/searchUtils';
 import { debounce } from '../utils/debounceUtils';
 import { CompactRecipeCardSkeleton, MealPlanSkeleton } from './SkeletonLoader';
@@ -564,6 +566,7 @@ const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
 };
 
 export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPlan, inventory, shoppingList, addToShoppingList, onAddToPlan, onSaveRecipe, onMarkAsMade, onRate, user, setActiveTab, recipeSaveLimitExceeded = false, mealPlanLimitExceeded = false, isLoadingMealPlan = false, isLoadingSavedRecipes = false, savedRecipes: propSavedRecipes = [], settings, onOpenRecipeSearch }) => {
+  const { household } = useApp();
     // List of staple items to ignore (unless user wants them included)
     const STAPLES = ['salt', 'pepper', 'oil', 'water', 'flour', 'sugar', 'butter', 'vinegar', 'baking powder', 'baking soda', 'spices', 'seasoning', 'soy sauce', 'cornstarch', 'yeast'];
     const includeStaples = settings?.shopping?.includeStaples || false;
@@ -589,6 +592,12 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
   const [showMealPrepPlanner, setShowMealPrepPlanner] = useState(false);
   const [showAddMealDialog, setShowAddMealDialog] = useState(false);
   const [pendingRecipe, setPendingRecipe] = useState<StructuredRecipe | null>(null);
+  const [showLeftoverPrompt, setShowLeftoverPrompt] = useState(false);
+  const [showLeftoverCapture, setShowLeftoverCapture] = useState(false);
+  const [leftoverServings, setLeftoverServings] = useState<number>(1);
+  const [leftoverNotes, setLeftoverNotes] = useState<string>('');
+  const [showLeftoverSwapModal, setShowLeftoverSwapModal] = useState(false);
+  const [swapSource, setSwapSource] = useState<{ dayIndex: number; mealType: 'breakfast' | 'lunch' | 'dinner'; mealIndex: number } | null>(null);
 
   // Wrapper for onAddToPlan that shows day/meal selection dialog
   const handleAddToPlan = (recipe: StructuredRecipe) => {
@@ -991,6 +1000,76 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
       updateMealPlan(newPlan);
   };
 
+  const handleCookedIt = (meal: MealPlanItem) => {
+    if (onMarkAsMade) {
+      onMarkAsMade(meal.recipe as StructuredRecipe);
+    }
+    const suggestedServings = typeof meal.recipe?.servings === 'number' && meal.recipe.servings > 0 ? meal.recipe.servings : 2;
+    setLeftoverServings(Math.max(1, Math.min(6, suggestedServings)));
+    setLeftoverNotes(meal.recipe?.title || 'Leftover');
+    setShowLeftoverPrompt(true);
+    AnalyticsService.logEvent('leftover_prompt_opened_from_mealplanner', {
+      recipe_title: meal.recipe?.title,
+      household_id: household?.id,
+    });
+  };
+
+  const leftovers = useMemo(() => {
+    return (inventory || []).filter(item => item.is_leftover)
+  }, [inventory]);
+
+  const handleOpenSwapWithLeftover = (dayIndex: number, mealType: 'breakfast' | 'lunch' | 'dinner', mealIndex: number) => {
+    setSwapSource({ dayIndex, mealType, mealIndex });
+    setShowLeftoverSwapModal(true);
+  };
+
+  const handleSwapWithLeftover = (leftoverItem: PantryItem) => {
+    if (!swapSource) return;
+
+    const newPlan = [...mealPlan];
+    const { dayIndex, mealType, mealIndex } = swapSource;
+    const existingMeal = newPlan[dayIndex][mealType][mealIndex];
+
+    const leftoverRecipe: StructuredRecipe = {
+      id: `leftover-${leftoverItem.id}`,
+      title: `Leftover: ${leftoverItem.item}`,
+      description: 'Scheduled from leftovers',
+      ingredients: [leftoverItem.item],
+      instructions: [
+        'Take from fridge/freezer and heat safely.',
+        'Consume before computed best-before date.'
+      ],
+      cookTime: '10 mins',
+      servings: typeof leftoverItem.leftoverMeta?.servings === 'number' ? leftoverItem.leftoverMeta?.servings : undefined,
+      tags: ['leftover']
+    };
+
+    newPlan[dayIndex][mealType][mealIndex] = {
+      id: `swap-${Date.now()}`,
+      mealType,
+      recipe: leftoverRecipe,
+    };
+
+    const pushForward = window.confirm('Swap may create a conflict. Push original meal to the next day?\nOK = Push to next day, Cancel = Replace only.');
+    if (pushForward && existingMeal) {
+      const targetDayIndex = (dayIndex + 1) % newPlan.length;
+      if (!newPlan[targetDayIndex][mealType]) newPlan[targetDayIndex][mealType] = [];
+      newPlan[targetDayIndex][mealType].push(existingMeal);
+    }
+
+    updateMealPlan(newPlan);
+    setShowLeftoverSwapModal(false);
+    setSwapSource(null);
+
+    AnalyticsService.logEvent('meal_swapped_with_leftover', {
+      leftover_id: leftoverItem.id,
+      leftover_name: leftoverItem.item,
+      source_day: dayIndex,
+      source_meal_type: mealType,
+      household_id: household?.id,
+    });
+  };
+
   // Helper function to check if a day is today
   const isToday = (dateString: string) => {
     const d = new Date();
@@ -1370,6 +1449,30 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
                                       title={meal.recipe.title}
                                     >
                                       <span className="text-[var(--accent-color)] font-semibold truncate flex-1">{meal.recipe.title}</span>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleCookedIt(meal);
+                                        }}
+                                        className="text-[8px] px-1 py-0.5 rounded bg-theme-secondary/70 hover:bg-[var(--accent-color)] hover:text-white transition-colors"
+                                        title="Cooked it / capture leftovers"
+                                        aria-label={`Mark ${meal.recipe.title} as cooked and capture leftovers`}
+                                      >
+                                        ✓
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleOpenSwapWithLeftover(effectiveIndex, mealTypeKey, mealIndex);
+                                        }}
+                                        className="text-[8px] px-1 py-0.5 rounded bg-theme-secondary/70 hover:bg-[var(--accent-color)] hover:text-white transition-colors"
+                                        title="Swap with leftover"
+                                        aria-label={`Swap ${meal.recipe.title} with an available leftover`}
+                                      >
+                                        🍱
+                                      </button>
                                       <span className="text-[8px] opacity-60 group-hover:opacity-80">👁️</span>
                                     </div>
                                   ))
@@ -1622,6 +1725,77 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
           onAddToPlan={onAddToPlan!}
           onClose={() => setShowMealPrepPlanner(false)}
         />
+      )}
+
+      {showLeftoverPrompt && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-theme-primary border border-theme rounded-xl p-4 max-w-sm w-full">
+            <h3 className="text-lg font-semibold text-theme-primary mb-2">Making a lunchbox? 🍱</h3>
+            <p className="text-sm text-theme-secondary mb-3">Save leftovers now for quick reminders and expiry tracking.</p>
+            <div className="grid grid-cols-3 gap-2 mb-3">
+              <button className="px-3 py-2 rounded border border-theme bg-theme-secondary hover:bg-theme-primary" onClick={() => { setLeftoverServings(1); setShowLeftoverPrompt(false); setShowLeftoverCapture(true); }}>1 Serving</button>
+              <button className="px-3 py-2 rounded border border-theme bg-theme-secondary hover:bg-theme-primary" onClick={() => { setLeftoverServings(2); setShowLeftoverPrompt(false); setShowLeftoverCapture(true); }}>2 Servings</button>
+              <button className="px-3 py-2 rounded border border-theme bg-theme-secondary hover:bg-theme-primary" onClick={() => { setShowLeftoverPrompt(false); setShowLeftoverCapture(true); }}>The Rest</button>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button className="px-3 py-2 rounded border border-theme" onClick={() => setShowLeftoverPrompt(false)}>Skip</button>
+              <button className="px-3 py-2 rounded bg-[var(--accent-color)] text-white" onClick={() => { setShowLeftoverPrompt(false); setShowLeftoverCapture(true); }}>Capture</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showLeftoverCapture && household?.id && user?.id && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-theme-primary rounded-xl max-w-xl w-full">
+            <LeftoverQuickCapture
+              householdId={household.id}
+              createdBy={user.id}
+              initialServings={leftoverServings}
+              initialNotes={leftoverNotes}
+              onSaved={() => {
+                setShowLeftoverCapture(false);
+                AnalyticsService.logEvent('leftover_captured_from_mealplanner', { household_id: household.id });
+              }}
+              onClose={() => setShowLeftoverCapture(false)}
+            />
+          </div>
+        </div>
+      )}
+
+      {showLeftoverSwapModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-theme-primary border border-theme rounded-xl p-4 max-w-md w-full">
+            <h3 className="text-lg font-semibold text-theme-primary mb-2">Swap for Leftovers</h3>
+            <p className="text-sm text-theme-secondary mb-3">Choose a leftover to replace this planned meal.</p>
+
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {leftovers.length === 0 ? (
+                <div className="text-sm text-theme-secondary">No leftovers available right now.</div>
+              ) : leftovers.map(item => {
+                const bestBefore = item.leftoverMeta?.computedBestBefore;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => handleSwapWithLeftover(item)}
+                    className="w-full text-left p-3 rounded border border-theme bg-theme-secondary hover:bg-theme-primary transition-colors"
+                  >
+                    <div className="font-medium text-theme-primary">{item.item}</div>
+                    <div className="text-xs text-theme-secondary">
+                      {typeof item.leftoverMeta?.servings === 'number' ? `${item.leftoverMeta?.servings} servings` : 'Leftover'}
+                      {bestBefore ? ` • best before ${new Date(bestBefore).toLocaleDateString()}` : ''}
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+
+            <div className="flex justify-end gap-2 mt-3">
+              <button className="px-3 py-2 rounded border border-theme" onClick={() => { setShowLeftoverSwapModal(false); setSwapSource(null); }}>Cancel</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Add Meal Dialog */}

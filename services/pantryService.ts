@@ -84,6 +84,10 @@ export class PantryService {
         if (low.includes('rice') && low.includes('cooked')) return 4;
         return undefined;
       })(),
+      cooked_rice: (() => {
+        const low = description.toLowerCase();
+        return (low.includes('rice') && low.includes('cooked')) || undefined;
+      })(),
       is_immortal: (() => {
         const low = description.toLowerCase();
         if (low.includes('honey') || low.includes('salt') || low.includes('sugar')) return true;
@@ -181,6 +185,10 @@ export class PantryService {
         const low = itemName.toLowerCase();
         if (low.includes('honey') || low.includes('salt') || low.includes('sugar')) return true;
         return undefined;
+      })()
+      ,cooked_rice: (() => {
+        const low = itemName.toLowerCase();
+        return (low.includes('rice') && low.includes('cooked')) || undefined;
       })()
     };
   }

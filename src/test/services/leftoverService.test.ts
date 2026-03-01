@@ -10,8 +10,8 @@ describe('LeftoverService.computeBestBeforeISO', () => {
     expect(result).toBe(provided);
   });
 
-  it('maps product master risk_level to shorter windows', () => {
-    const res = LeftoverService.computeBestBeforeISO(createdAt, { productMaster: { risk_level: 5 } });
+  it('maps risk_level to shorter windows', () => {
+    const res = LeftoverService.computeBestBeforeISO(createdAt, { risk_level: 5 });
     const expected = new Date(createdAt);
     expected.setDate(expected.getDate() + 2);
     expect(res).toBe(expected.toISOString());
@@ -25,7 +25,7 @@ describe('LeftoverService.computeBestBeforeISO', () => {
   });
 
   it('applies cooked-rice cap to 4 days', () => {
-    const res = LeftoverService.computeBestBeforeISO(createdAt, { productMaster: { tags: ['cooked-rice'] } });
+    const res = LeftoverService.computeBestBeforeISO(createdAt, { cooked_rice: true });
     const expected = new Date(createdAt);
     expected.setDate(expected.getDate() + 4);
     expect(res).toBe(expected.toISOString());
