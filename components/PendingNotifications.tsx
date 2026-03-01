@@ -220,7 +220,15 @@ export const PendingNotifications: React.FC<PendingNotificationsProps> = ({
                   </span>
                 </div>
                 <span className="text-xs text-theme-secondary">
-                  {notification.createdAt.toDate().toLocaleDateString()}
+                  {(() => {
+                    const v: any = notification.createdAt;
+                    let d: Date | null = null;
+                    if (!v) return '—';
+                    if (typeof v.toDate === 'function') d = v.toDate();
+                    else if (typeof v.toMillis === 'function') d = new Date(v.toMillis());
+                    else if (typeof v === 'string' || typeof v === 'number') d = new Date(v as any);
+                    return d ? d.toLocaleDateString() : '—';
+                  })()}
                 </span>
               </div>
 

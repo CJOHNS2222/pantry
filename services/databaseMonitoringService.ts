@@ -238,11 +238,20 @@ class DatabaseMonitoringService {
       const queryPath = this.getQueryPath(queryRef as any);
       console.error(`❌ QUERY FAILED: ${queryPath} | Error: ${err.message}`);
 
-        AnalyticsService.trackDatabaseOperation('read', 'unknown', 0, {
+      AnalyticsService.trackDatabaseOperation('read', 'unknown', 0, {
         operation: 'getDocs',
         success: false,
         error: err.message
       });
+
+      // If this query failed due to security rules (permission denied),
+      // return an empty snapshot so callers can gracefully handle lack
+      // of access without crashing the UI.
+      if (err?.code === 'permission-denied' || /permission/i.test(err?.message || '')) {
+        console.warn(`Permission denied for query ${queryPath}; returning empty snapshot.`);
+        return { size: 0, docs: [], forEach: (fn: any) => {}, empty: true } as any;
+      }
+
       throw err;
     }
   }
