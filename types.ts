@@ -73,6 +73,7 @@ export interface LeftoverMeta {
   createdBy?: string; // UID
   sourcePantryItemId?: string; // linked pantry item id when created from an existing item
   computedBestBefore?: string; // ISO date computed by leftoverService
+  servings?: number; // Number of servings contained in this leftover
   riskLevel?: number; // 1-5 user risk mapping at creation
   notes?: string;
 }
