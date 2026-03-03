@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Search, Loader2, Sparkles, ExternalLink, Globe, Plus, Clock, List, ChefHat, ToggleLeft, ToggleRight, Star, Heart, Bookmark, Zap, Mic } from 'lucide-react';
+import { Search, Loader2, Sparkles, ExternalLink, Globe, Plus, Clock, List, ChefHat, Star, Heart, Bookmark, Zap, Mic } from 'lucide-react';
 import { searchRecipes } from '../services/geminiService';
 import { getSavedRecipes, getCachedPopularRecipes, saveRecipeToFirestore, saveRecipeToUserCache, uploadRecipeImageFile, submitRecipeForReview } from '../services/recipeService';
 import DatabaseMonitoringService from '../services/databaseMonitoringService';
@@ -20,6 +20,7 @@ import { searchPantryItems, getEnhancedAutocompleteSuggestions, filterPantryItem
 import { useKeyboardNavigation } from '../hooks/useKeyboardNavigation';
 import { debounce } from '../utils/debounceUtils';
 import { filterRecipesByHouseholdPreferences } from '../utils/preferenceUtils';
+import { getUserMeasurementSystem } from '../utils/measurementUtils';
 
 interface RecipeFinderProps {
     onAddToPlan: (recipe: StructuredRecipe) => void;
@@ -115,7 +116,8 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
     const [maxCookTime, setMaxCookTime] = useState<string>('60');
     const [maxIngredients, setMaxIngredients] = useState<string>('10');
     const [recipeType, setRecipeType] = useState<'Snack' | 'Dinner' | 'Dessert' | ''>('');
-    const [measurement, setMeasurement] = useState<'Metric' | 'Standard'>('Standard');
+    // Use user's measurement preference instead of local state
+    const measurement = getUserMeasurementSystem(user?.profile);
     const [strictMode, setStrictMode] = useState(false);
     
     // New smart filters
@@ -1555,68 +1557,8 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
           </PremiumFeature>
       ) : (
         <>
-            {/* Recipe Suggestions - Show above search when there are suggestions */}
-            {(getRecipeSuggestions.canMake.length > 0 || getRecipeSuggestions.needMore.length > 0) && (
-                <div className="space-y-3">
-                    {/* Can Make Now Section */}
-                    {getRecipeSuggestions.canMake.length > 0 && (
-                        <div className="bg-theme-secondary rounded-lg p-3 border border-theme">
-                            <h3 className="text-xs font-semibold text-theme-primary mb-2 flex items-center gap-1">
-                                <span className="text-green-500 text-sm">✅</span>
-                                Can Make Now
-                            </h3>
-                            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide flex-nowrap">
-                                {getRecipeSuggestions.canMake.slice(0, 6).map(({ recipe, feasibility }) => (
-                                    <button
-                                        key={`can-make-${recipe.id}`}
-                                        onClick={() => openRecipeModal(recipe, true)}
-                                        className="flex-shrink-0 flex flex-col items-center gap-1 p-2 bg-theme-primary rounded-md border border-theme hover:border-green-500 hover:bg-green-500/5 transition-all group min-w-[65px]"
-                                    >
-                                        <div className="w-7 h-7 rounded-md bg-theme-secondary border border-theme flex items-center justify-center">
-                                            <ChefHat className="w-3.5 h-3.5 text-theme-primary opacity-60" />
-                                        </div>
-                                        <span className="text-[10px] font-medium text-theme-primary text-center leading-tight group-hover:text-green-500 transition-colors line-clamp-2">
-                                            {recipe.title}
-                                        </span>
-                                        <div className="text-[8px] text-green-500 font-medium">
-                                            {Math.round(feasibility.matchPercentage)}%
-                                        </div>
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    )}
 
-                    {/* Need More Items Section */}
-                    {getRecipeSuggestions.needMore.length > 0 && (
-                        <div className="bg-theme-secondary rounded-lg p-3 border border-theme">
-                            <h3 className="text-xs font-semibold text-theme-primary mb-2 flex items-center gap-1">
-                                <span className="text-orange-500 text-sm">🛒</span>
-                                Almost There
-                            </h3>
-                            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide flex-nowrap">
-                                {getRecipeSuggestions.needMore.slice(0, 6).map(({ recipe, feasibility }) => (
-                                    <button
-                                        key={`need-more-${recipe.id}`}
-                                        onClick={() => openRecipeModal(recipe, true)}
-                                        className="flex-shrink-0 flex flex-col items-center gap-1 p-2 bg-theme-primary rounded-md border border-theme hover:border-orange-500 hover:bg-orange-500/5 transition-all group min-w-[65px]"
-                                    >
-                                        <div className="w-7 h-7 rounded-md bg-theme-secondary border border-theme flex items-center justify-center">
-                                            <ChefHat className="w-3.5 h-3.5 text-theme-primary opacity-60" />
-                                        </div>
-                                        <span className="text-[10px] font-medium text-theme-primary text-center leading-tight group-hover:text-orange-500 transition-colors line-clamp-2">
-                                            {recipe.title}
-                                        </span>
-                                        <div className="text-[8px] text-orange-500 font-medium">
-                                            +{feasibility.missingIngredients.length}
-                                        </div>
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                </div>
-            )}
+
 
             <div className="bg-theme-secondary p-5 rounded-2xl border border-theme shadow-lg">
                 <div className="flex gap-2">
@@ -1693,59 +1635,38 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
 
                 <form onSubmit={handleGenerate} className="space-y-4 relative z-10">
                     {/* Toggles Row */}
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 gap-3">
                         {/* Inventory Toggle */}
-                        <div 
-                            onClick={() => setStrictMode(!strictMode)}
-                            className="flex flex-col justify-between bg-theme-primary p-3 rounded-xl border border-theme cursor-pointer hover:border-[var(--accent-color)]/30 transition-all group"
-                        >
-                            <div>
-                                <span className="text-xs font-bold text-theme-primary block">Use Inventory Only</span>
-                                <span className="text-[10px] text-theme-secondary opacity-60 leading-tight block mt-0.5">
-                                    {strictMode ? "Strict match" : "Allow extra items"}
-                                </span>
-                            </div>
-                            <div className="self-end mt-1">
-                                {strictMode ? (
-                                    <ToggleRight className="w-7 h-7 text-[var(--accent-color)]" />
-                                ) : (
-                                    <ToggleLeft className="w-7 h-7 text-theme-secondary opacity-30" />
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Measurement Toggle */}
                         <div className="flex flex-col justify-between bg-theme-primary p-3 rounded-xl border border-theme">
-                             <span className="text-[10px] text-[var(--accent-color)] font-bold uppercase mb-1">Measurement</span>
-                             <div className="flex bg-theme-secondary rounded-lg p-1 border border-theme h-8">
+                             <div className="flex bg-theme-secondary rounded-lg p-1 border border-theme h-10">
                                 <button
                                     type="button"
-                                    onClick={() => setMeasurement('Standard')}
-                                    className={`flex-1 text-[10px] font-bold rounded transition-all ${measurement === 'Standard' ? 'bg-[var(--accent-color)] text-white shadow-sm' : 'text-theme-secondary opacity-50'}`}
+                                    onClick={() => setStrictMode(true)}
+                                    className={`flex-1 text-xs font-bold rounded transition-all ${strictMode ? 'bg-[var(--accent-color)] text-white shadow-sm' : 'text-theme-secondary opacity-50'}`}
                                 >
-                                    Standard
+                                    Use Inventory Only
                                 </button>
                                 <button
                                     type="button"
-                                    onClick={() => setMeasurement('Metric')}
-                                    className={`flex-1 text-[10px] font-bold rounded transition-all ${measurement === 'Metric' ? 'bg-[var(--accent-color)] text-white shadow-sm' : 'text-theme-secondary opacity-50'}`}
+                                    onClick={() => setStrictMode(false)}
+                                    className={`flex-1 text-xs font-bold rounded transition-all ${!strictMode ? 'bg-[var(--accent-color)] text-white shadow-sm' : 'text-theme-secondary opacity-50'}`}
                                 >
-                                    Metric
+                                    Allow Extra Items
                                 </button>
                             </div>
                         </div>
                     </div>
 
                     {/* Recipe Type Selector & Inputs Row */}
-                                        <div className="grid grid-cols-6 gap-2">
+                                        <div className="grid grid-cols-3 gap-3">
                                                 <div>
-                                                        <label htmlFor="recipeType" className="text-[10px] text-[var(--accent-color)] font-bold uppercase mb-1 block">Type</label>
+                                                        <label htmlFor="recipeType" className="text-sm text-[var(--accent-color)] font-bold uppercase mb-1 block">Type</label>
                                                         <select
                                                             id="recipeType"
                                                             name="recipeType"
                                                             value={recipeType}
                                                             onChange={e => setRecipeType(e.target.value as 'Snack' | 'Dinner' | 'Dessert' | '')}
-                                                            className="w-full p-2 rounded-lg border border-theme bg-theme-primary text-theme-primary focus:border-[var(--accent-color)] outline-none text-xs"
+                                                            className="w-full p-2 rounded-lg border border-theme bg-theme-primary text-theme-primary focus:border-[var(--accent-color)] outline-none text-sm"
                                                         >
                                                             <option value="">Any</option>
                                                             <option value="Snack">Snack</option>
@@ -1754,13 +1675,13 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                                                         </select>
                                                 </div>
                                                 <div>
-                                                        <label htmlFor="dietaryRestrictions" className="text-[10px] text-[var(--accent-color)] font-bold uppercase mb-1 block">Diet</label>
+                                                        <label htmlFor="dietaryRestrictions" className="text-sm text-[var(--accent-color)] font-bold uppercase mb-1 block">Diet</label>
                                                         <select
                                                             id="dietaryRestrictions"
                                                             name="dietaryRestrictions"
                                                             value={dietaryRestrictions[0] || ''}
                                                             onChange={(e) => setDietaryRestrictions(e.target.value ? [e.target.value] : [])}
-                                                            className="w-full p-2 rounded-lg border border-theme bg-theme-primary text-theme-primary focus:border-[var(--accent-color)] outline-none text-xs"
+                                                            className="w-full p-2 rounded-lg border border-theme bg-theme-primary text-theme-primary focus:border-[var(--accent-color)] outline-none text-sm"
                                                         >
                                                             <option value="">Any</option>
                                                             <option value="vegetarian">Veg</option>
@@ -1772,7 +1693,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                                                         </select>
                                                 </div>
                                                 <div>
-                                                        <label htmlFor="maxPrepTime" className="text-[10px] text-[var(--accent-color)] font-bold uppercase mb-1 block">Prep</label>
+                                                        <label htmlFor="maxPrepTime" className="text-sm text-[var(--accent-color)] font-bold uppercase mb-1 block">Prep</label>
                                                         <div className="relative">
                                                                 <input
                                                                 id="maxPrepTime"
@@ -1780,24 +1701,24 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                                                                 type="number"
                                                                 value={maxPrepTime}
                                                                 onChange={(e) => setMaxPrepTime(e.target.value)}
-                                                                className="w-14 p-2 rounded-lg border border-theme bg-theme-primary text-theme-primary focus:border-[var(--accent-color)] outline-none text-xs"
+                                                                className="w-full p-2 rounded-lg border border-theme bg-theme-primary text-theme-primary focus:border-[var(--accent-color)] outline-none text-sm"
                                                                 />
                                                                 <span className="absolute right-1 top-1.5 opacity-50 text-[8px] font-bold">MIN</span>
                                                         </div>
                                                 </div>
                                                 <div>
-                                                        <label htmlFor="servings" className="text-[10px] text-[var(--accent-color)] font-bold uppercase mb-1 block">Serves</label>
+                                                        <label htmlFor="servings" className="text-sm text-[var(--accent-color)] font-bold uppercase mb-1 block">Serves</label>
                                                         <input
                                                                 id="servings"
                                                                 name="servings"
                                                                 type="number"
                                                                 value={servings}
                                                                 onChange={(e) => setServings(e.target.value)}
-                                                                className="w-14 p-2 rounded-lg border border-theme bg-theme-primary text-theme-primary focus:border-[var(--accent-color)] outline-none text-xs"
+                                                                className="w-full p-2 rounded-lg border border-theme bg-theme-primary text-theme-primary focus:border-[var(--accent-color)] outline-none text-sm"
                                                         />
                                                 </div>
                                                 <div>
-                                                        <label htmlFor="maxCookTime" className="text-[10px] text-[var(--accent-color)] font-bold uppercase mb-1 block">Cook</label>
+                                                        <label htmlFor="maxCookTime" className="text-sm text-[var(--accent-color)] font-bold uppercase mb-1 block">Cook</label>
                                                         <div className="relative">
                                                                 <input
                                                                 id="maxCookTime"
@@ -1805,20 +1726,20 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                                                                 type="number"
                                                                 value={maxCookTime}
                                                                 onChange={(e) => setMaxCookTime(e.target.value)}
-                                                                className="w-14 p-2 rounded-lg border border-theme bg-theme-primary text-theme-primary focus:border-[var(--accent-color)] outline-none text-xs"
+                                                                className="w-full p-2 rounded-lg border border-theme bg-theme-primary text-theme-primary focus:border-[var(--accent-color)] outline-none text-sm"
                                                                 />
                                                                 <span className="absolute right-1 top-1.5 opacity-50 text-[8px] font-bold">MIN</span>
                                                         </div>
                                                 </div>
                                                 <div>
-                                                        <label htmlFor="maxIngredients" className="text-[10px] text-[var(--accent-color)] font-bold uppercase mb-1 block">Items</label>
+                                                        <label htmlFor="maxIngredients" className="text-sm text-[var(--accent-color)] font-bold uppercase mb-1 block">Items</label>
                                                         <input
                                                                 id="maxIngredients"
                                                                 name="maxIngredients"
                                                                 type="number"
                                                                 value={maxIngredients}
                                                                 onChange={(e) => setMaxIngredients(e.target.value)}
-                                                                className="w-14 p-2 rounded-lg border border-theme bg-theme-primary text-theme-primary focus:border-[var(--accent-color)] outline-none text-xs"
+                                                                className="w-full p-2 rounded-lg border border-theme bg-theme-primary text-theme-primary focus:border-[var(--accent-color)] outline-none text-sm"
                                                         />
                                                 </div>
                                         </div>

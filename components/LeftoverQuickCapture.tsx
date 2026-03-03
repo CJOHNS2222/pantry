@@ -1,27 +1,37 @@
 import React, { useState } from 'react'
-import LeftoverService, { simpleAddOrMarkLeftover } from '../services/leftoverService'
+import { X } from 'lucide-react'
 import { useApp } from '../contexts/AppContext'
 import { uploadLeftoverImage } from '../services/leftoverImageService'
-import DatabaseMonitoringService from '../services/databaseMonitoringService'
+import { LeftoverService, LeftoverCreateData } from '../services/leftoverService'
+import { useDataManagement } from '../hooks/useDataManagement'
 
-type Props = {
-  householdId: string
+interface LeftoverQuickCaptureProps {
   createdBy: string
-  sourcePantryItemId?: string
+  // Tags inferred by the caller (e.g., recipe/meal context) to apply to the leftover
+  initialTags?: string[]
+  recipeImageUrl?: string
   initialServings?: number
   initialNotes?: string
   onSaved?: (id: string) => void
   onClose?: () => void
 }
 
-export default function LeftoverQuickCapture({ householdId, createdBy, sourcePantryItemId, initialServings = 1, initialNotes = '', onSaved, onClose }: Props) {
-  const { user } = useApp()
-  const [photoUrl, setPhotoUrl] = useState<string | undefined>(undefined)
+export default function LeftoverQuickCapture({
+  createdBy,
+  initialTags,
+  recipeImageUrl,
+  initialServings = 1,
+  initialNotes = '',
+  onSaved,
+  onClose
+}: LeftoverQuickCaptureProps) {
+  const { user, household } = useApp()
+  const dm = useDataManagement(user)
+  const [photoUrl, setPhotoUrl] = useState<string | undefined>(recipeImageUrl)
   const [file, setFile] = useState<File | null>(null)
-  const [updateItemPicture, setUpdateItemPicture] = useState(false)
   const [servings, setServings] = useState<number>(initialServings)
   const [notes, setNotes] = useState(initialNotes)
-  const [isCooked, setIsCooked] = useState(false)
+  const [isCookedRice, setIsCookedRice] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -29,138 +39,166 @@ export default function LeftoverQuickCapture({ householdId, createdBy, sourcePan
     setLoading(true)
     setError(null)
 
-    // If a file was selected, upload first and use the resulting URL
     try {
+      // Upload image if provided
+      let uploadedPhotoUrl = photoUrl
       if (file) {
-        // Default to household-scoped cache for quick-capture to avoid public sharing
-        const uploaded = await uploadLeftoverImage(file, householdId, notes || 'leftover', 'household', user?.id)
-        setPhotoUrl(uploaded)
+        const uploadTarget = household?.id || user?.id || 'user'
+        const scopeToUse: 'household' | 'user' = household?.id ? 'household' : 'user'
+        const uploaded = await uploadLeftoverImage(file, uploadTarget, notes || 'leftover', scopeToUse, user?.id)
+        uploadedPhotoUrl = uploaded
       }
-    } catch (err: any) {
-      console.warn('Image upload failed, continuing without photo', err)
-    }
-    // If this leftover is linked to an existing pantry item, prefer item-level hints
-    // (tags, risk level, is_immortal) so we don't need an extra product_master lookup.
-    let inferredTags: string[] | undefined = undefined
-    let inferredRiskLevel: number | undefined = undefined
-    let inferredIsImmortal: boolean | undefined = undefined
 
-    if (sourcePantryItemId) {
-      try {
-        const itemRef = DatabaseMonitoringService.doc(`households/${householdId}/inventory`, sourcePantryItemId)
-        const itemSnap = await DatabaseMonitoringService.getDoc(itemRef)
-        if (itemSnap && itemSnap.exists && typeof itemSnap.exists === 'function' ? itemSnap.exists() : itemSnap.exists) {
-          const itemData = (itemSnap.data && typeof itemSnap.data === 'function') ? itemSnap.data() : itemSnap.data
-          inferredTags = itemData?.tags || itemData?.productTags || undefined
-          inferredRiskLevel = itemData?.productRiskLevel || itemData?.riskLevel || undefined
-          inferredIsImmortal = itemData?.is_immortal || undefined
-        }
-      } catch (e) {
-        // non-fatal, continue without item hints
-        console.warn('Failed to read pantry item for hints; falling back to defaults', e)
+      // Prepare leftover data
+      const leftoverData: LeftoverCreateData = {
+        householdId: household?.id || user?.id || '',
+        createdBy,
+        photoUrl: uploadedPhotoUrl,
+        servings,
+        notes: notes || undefined,
+        tags: initialTags,
+        cooked_rice: isCookedRice,
+        persona: user?.profile?.leftoverPersona || 'normal',
       }
-    }
 
-    const payload = {
-      householdId,
-      createdBy,
-      photoUrl,
-      servings,
-      notes,
-      sourcePantryItemId,
-      // Prefer explicit cooked marker from quick-capture UI, otherwise inherit from item
-      // New denormalized cooked flag
-      cooked_rice: isCooked || inferredTags?.includes('cooked-rice') || undefined,
-      // Preserve denormalized tags/risk level for compatibility
-      tags: isCooked ? ['cooked-rice'] : inferredTags,
-      productMasterRiskLevel: isCooked ? 4 : inferredRiskLevel,
-      is_immortal: inferredIsImmortal,
-      persona: user?.profile?.leftoverPersona || undefined,
-    } as any
+      // Create the leftover
+      const leftover = await LeftoverService.create(leftoverData)
 
-    try {
-      const res = await simpleAddOrMarkLeftover(payload)
-        // If user chose to update the linked pantry item's picture, do that now
-        if (updateItemPicture && file && sourcePantryItemId) {
-          try {
-            // uploadLeftoverImage was already called above; photoUrl state updated
-              if (photoUrl) {
-                const itemRef = DatabaseMonitoringService.doc(`households/${householdId}/inventory`, sourcePantryItemId)
-                await DatabaseMonitoringService.updateDoc(itemRef, { image: photoUrl })
-              }
-          } catch (err) {
-            console.warn('Failed to update pantry item image', err)
-          }
-        }
       setLoading(false)
-      onSaved?.(res.id)
+      onSaved?.(leftover.id)
       onClose?.()
-    } catch (e: any) {
-      try {
-        const doc = await LeftoverService.createLeftover(payload)
-        setLoading(false)
-        onSaved?.(doc.id)
-        onClose?.()
-      } catch (err: any) {
-        // If we uploaded an image but fallback creation failed, keep UI informed
-        setLoading(false)
-        setError(err?.message || 'Save failed')
-        console.error('Leftover save failed', err)
-      }
+    } catch (err: any) {
+      setLoading(false)
+      setError(err?.message || 'Failed to save leftover')
+      console.error('Leftover save failed', err)
     }
   }
 
   return (
-    <div style={{ padding: 12, maxWidth: 520, borderRadius: 8, border: '1px solid #eee' }}>
-      <h3 style={{ margin: '4px 0' }}>Save Leftover</h3>
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
-        <div style={{ width: 96, height: 72, background: '#f5f5f5', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-          {photoUrl ? <img src={photoUrl} alt="leftover" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ color: '#888' }}>Photo</span>}
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4">
+      <div className="bg-theme-primary rounded-lg shadow-xl w-full max-w-md mx-auto max-h-[80vh] flex flex-col border border-theme">
+        {/* Header */}
+        <div className="flex items-center justify-between pt-4 px-3 pb-3 border-b border-theme flex-shrink-0">
+          <h3 className="text-lg font-semibold text-theme-primary">Save Leftover</h3>
+          <button
+            onClick={onClose}
+            className="p-1 hover:bg-theme-secondary rounded transition-colors"
+            aria-label="Close"
+          >
+            <X className="w-5 h-5 text-theme-primary" />
+          </button>
         </div>
-        <div style={{ flex: 1 }}>
-          <label style={{ display: 'block', fontSize: 12, color: '#444' }}>Servings</label>
-          <input type="number" min={1} value={servings} onChange={(e) => setServings(Number(e.target.value) || 1)} style={{ width: 96, padding: 6 }} />
+
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto px-3 py-2">
+          {/* Image Upload */}
+          <div className="pb-2 flex flex-col items-center gap-2">
+            <div>
+              <img
+                src={photoUrl || '/images/placeholder.svg'}
+                alt="Leftover container"
+                className="w-24 h-24 rounded-lg object-cover border-2 border-theme"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement
+                  if (target) target.src = '/images/placeholder.svg'
+                }}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="cursor-pointer px-3 py-1 bg-theme-secondary text-theme-primary rounded text-sm hover:bg-theme-primary hover:text-theme-secondary border border-theme">
+                Change photo
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0]
+                    if (f) {
+                      setFile(f)
+                      const url = URL.createObjectURL(f)
+                      setPhotoUrl(url)
+                    }
+                  }}
+                  className="hidden"
+                />
+              </label>
+            </div>
+          </div>
+
+          {/* Form Fields */}
+          <div className="space-y-3">
+            {/* Servings */}
+            <div className="bg-theme-secondary p-2 rounded-lg border border-theme">
+              <label className="block text-sm font-medium text-theme-primary mb-1">
+                Servings
+              </label>
+              <input
+                type="number"
+                min={1}
+                value={servings}
+                onChange={(e) => setServings(Number(e.target.value) || 1)}
+                className="w-full px-2 py-1 text-sm border border-theme rounded-md bg-theme-primary text-theme-primary focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]"
+              />
+            </div>
+
+            {/* Notes */}
+            <div className="bg-theme-secondary p-2 rounded-lg border border-theme">
+              <label className="block text-sm font-medium text-theme-primary mb-1">
+                Notes (optional)
+              </label>
+              <input
+                type="text"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="e.g., Chicken stir fry, pasta sauce..."
+                className="w-full px-2 py-1 text-sm border border-theme rounded-md bg-theme-primary text-theme-primary focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]"
+              />
+            </div>
+
+            {/* Cooked Rice Warning */}
+            <div className="bg-theme-secondary p-2 rounded-lg border border-theme">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={isCookedRice}
+                  onChange={(e) => setIsCookedRice(e.target.checked)}
+                  className="rounded border-theme"
+                />
+                <span className="text-sm text-theme-primary">
+                  Contains cooked rice (shorter safety window)
+                </span>
+              </label>
+            </div>
+
+            {/* Error Message */}
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-2">
+                <p className="text-sm text-red-600">{error}</p>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
 
-      <div style={{ marginBottom: 8 }}>
-        <label style={{ display: 'block', fontSize: 12, color: '#444' }}>Photo of container (optional)</label>
-        <div style={{ fontSize: 11, color: '#666', marginBottom: 6 }}>A quick photo of the container helps you and your household identify stored leftovers.</div>
-        <input
-          type="file"
-          accept="image/*"
-          onChange={(e) => {
-            const f = e.target.files && e.target.files[0]
-            if (f) {
-              setFile(f)
-              // show temporary preview
-              const url = URL.createObjectURL(f)
-              setPhotoUrl(url)
-            }
-          }}
-        />
-        {sourcePantryItemId && (
-          <label style={{ display: 'block', marginTop: 6 }}>
-            <input type="checkbox" checked={updateItemPicture} onChange={(e) => setUpdateItemPicture(e.target.checked)} /> Update item's picture with this photo
-          </label>
-        )}
-      </div>
-
-      <div style={{ marginBottom: 8 }}>
-        <label style={{ display: 'block', fontSize: 12, color: '#444' }}>Notes (optional)</label>
-        <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} style={{ width: '100%', padding: 8 }} />
-      </div>
-
-      <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
-        <input id="contains-cooked-rice-checkbox" type="checkbox" checked={isCooked} onChange={(e) => setIsCooked(e.target.checked)} />
-        <label htmlFor="contains-cooked-rice-checkbox" style={{ fontSize: 13, color: '#333' }}>Contains cooked rice (shorter safety window)</label>
-      </div>
-
-      {error && <div style={{ color: 'crimson', marginBottom: 8 }}>{error}</div>}
-
-      <div style={{ display: 'flex', gap: 8 }}>
-        <button onClick={onClose} style={{ padding: '8px 12px' }} disabled={loading}>Cancel</button>
-        <button onClick={handleSave} style={{ padding: '8px 12px' }} disabled={loading}>{loading ? 'Saving…' : 'Save'}</button>
+        {/* Action Buttons */}
+        <div className="flex-shrink-0 border-t border-theme bg-theme-primary">
+          <div className="p-3 space-y-2">
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={onClose}
+                className="flex items-center justify-center gap-2 px-4 py-2 bg-theme-secondary text-theme-primary border border-theme rounded-lg hover:bg-theme-primary transition-colors"
+                disabled={loading}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSave}
+                className="flex items-center justify-center gap-2 px-4 py-2 bg-[var(--accent-color)] text-white rounded-lg hover:bg-[var(--accent-color)]/80 transition-colors"
+                disabled={loading}
+              >
+                {loading ? 'Saving…' : 'Save Leftover'}
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   )

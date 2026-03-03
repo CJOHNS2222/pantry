@@ -13,6 +13,8 @@ import { generateConsumptionSuggestions, generateExpirationAlerts, generateRecip
 import { offlineQueue } from '../services/offlineQueueService';
 import { undoService } from '../services/undoService';
 import { NotificationService } from '../services/notificationService';
+import { LeftoverNotificationService } from '../services/leftoverNotificationService';
+import { auth } from '../firebaseConfig';
 import RiskProfileService from '../services/riskProfileService';
 import { ERROR_MESSAGES } from '../constants/errorMessages';
 import { useScopedDataListener } from './useDataListener';
@@ -315,6 +317,9 @@ export function useDataManagement(
   // Ref to prevent repeated household clearing on permission errors
   const householdClearedDueToPermissionsRef = useRef(false);
 
+  // Ref to store leftover notification cleanup function
+  const leftoverNotificationCleanupRef = useRef<(() => void) | null>(null);
+
   // Refs to track previous states to prevent unnecessary updates
   const prevMealPlanRef = useRef<DayPlan[]>([]);
   const prevShoppingListRef = useRef<ShoppingItem[]>([]);
@@ -471,6 +476,12 @@ export function useDataManagement(
           if (hasChanged) {
             prevHouseholdRef.current = householdData;
             setHousehold(householdData);
+            
+            // Start leftover notification checks for the new household
+            if (leftoverNotificationCleanupRef.current) {
+              leftoverNotificationCleanupRef.current();
+            }
+            leftoverNotificationCleanupRef.current = LeftoverNotificationService.startPeriodicChecks(householdData.id, user.id);
           }
         }
         setIsLoadingHousehold(false);
@@ -480,12 +491,22 @@ export function useDataManagement(
           log.warn('Permission denied on household listener, clearing household state.', {userId: user.id}, 'DataManagement');
           householdClearedDueToPermissionsRef.current = true; // Prevent loop
           setHousehold(null);
+          // Clean up leftover notification checks when household is cleared
+          if (leftoverNotificationCleanupRef.current) {
+            leftoverNotificationCleanupRef.current();
+            leftoverNotificationCleanupRef.current = null;
+          }
         }
         setIsLoadingHousehold(false);
       }));
     } else {
       setHousehold(null);
       setIsLoadingHousehold(false);
+      // Clean up leftover notification checks when no household
+      if (leftoverNotificationCleanupRef.current) {
+        leftoverNotificationCleanupRef.current();
+        leftoverNotificationCleanupRef.current = null;
+      }
     }
 
     const inHousehold = !!user?.householdId;
@@ -542,6 +563,11 @@ export function useDataManagement(
 
     return () => {
       unsubs.forEach(unsub => unsub());
+      // Clean up leftover notification checks
+      if (leftoverNotificationCleanupRef.current) {
+        leftoverNotificationCleanupRef.current();
+        leftoverNotificationCleanupRef.current = null;
+      }
     };
   }, [user?.id, user?.householdId]);
 
@@ -575,16 +601,23 @@ export function useDataManagement(
         }).filter(x => x.daysUntilExpiry <= 3).slice(0, 6);
 
         try {
-          if (dangerCandidates.length >= 2) {
-            // Create a single aggregated Danger Zone notification
-            await NotificationService.createDangerZoneAlert(user.id, dangerCandidates as any);
+          // Ensure the currently authenticated user matches the `user` passed
+          // into this hook. If they don't match (or auth not ready), skip
+          // creating notifications to avoid Firestore permission-denied errors.
+          if (!auth?.currentUser || auth.currentUser.uid !== user.id) {
+            log.warn('Skipping expiration notifications: auth user mismatch', { expectedUid: user.id, actualUid: auth?.currentUser?.uid }, 'DataManagement');
           } else {
-            // Fallback to individual notifications for up to 3 items
-            for (const item of itemsExpiringSoon.slice(0, 3)) {
-              const daysUntilExpiry = Math.ceil((new Date(item.expirationDate!).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
-              // pass user risk level to tailor priority
-              // eslint-disable-next-line no-await-in-loop
-              await NotificationService.createExpirationAlert(user.id, item.item, daysUntilExpiry, item.id, user?.profile?.riskLevel);
+            if (dangerCandidates.length >= 2) {
+              // Create a single aggregated Danger Zone notification
+              await NotificationService.createDangerZoneAlert(user.id, dangerCandidates as any);
+            } else {
+              // Fallback to individual notifications for up to 3 items
+              for (const item of itemsExpiringSoon.slice(0, 3)) {
+                const daysUntilExpiry = Math.ceil((new Date(item.expirationDate!).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+                // pass user risk level to tailor priority
+                // eslint-disable-next-line no-await-in-loop
+                await NotificationService.createExpirationAlert(user.id, item.item, daysUntilExpiry, item.id, user?.profile?.riskLevel);
+              }
             }
           }
         } catch (err) {

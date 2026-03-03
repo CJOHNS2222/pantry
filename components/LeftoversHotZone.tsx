@@ -1,173 +1,182 @@
 import React, { useEffect, useState } from 'react'
-import { collection, query, orderBy, onSnapshot, where, doc } from 'firebase/firestore'
+import { collection, query, orderBy, onSnapshot, where } from 'firebase/firestore'
 import { db } from '../firebaseConfig'
-import LeftoverService, { Leftover } from '../services/leftoverService'
+import { LeftoverService } from '../services/leftoverService'
 import FreezerService from '../services/freezerService'
 import AnalyticsService from '../services/analyticsService'
 import { getExpirationColor } from '../utils/appUtils'
 import { useAppActions } from '../contexts/AppActionsContext'
 import { useApp } from '../contexts/AppContext'
+import { InventoryCacheService } from '../services/inventoryCacheService'
+import { PantryItem } from '../types'
 
-type Props = {
+interface LeftoversHotZoneProps {
   householdId: string
 }
 
-export default function LeftoversHotZone({ householdId }: Props) {
-  const [leftovers, setLeftovers] = useState<Leftover[]>([])
+export default function LeftoversHotZone({ householdId }: LeftoversHotZoneProps) {
+  const [leftovers, setLeftovers] = useState<PantryItem[]>([])
   const { addToast } = useAppActions()
-
-  const app = useApp()
+  const { user } = useApp()
 
   useEffect(() => {
     if (!householdId) return
-    let unsub: (() => void) | null = null
 
-    // Prefer the per-user inventory cache (single-doc read) for cheap Hot Zone reads
-    if (app?.user?.id) {
-      const cacheRef = doc(db, 'users', app.user.id, 'cache', 'inventory')
-      unsub = onSnapshot(cacheRef, snap => {
-        if (snap.exists()) {
-          const data = snap.data() as any
-          const items: any[] = (data.items || []).filter((it: any) => it && it.is_leftover)
-          const docs: Leftover[] = items.map((it: any) => ({
-            id: it.id || it.itemId || Math.random().toString(36).slice(2),
-            ...(it as any),
-            servings: (it?.leftoverMeta?.servings ?? it?.servings ?? 1),
-            computedBestBefore: (it?.leftoverMeta?.computedBestBefore ?? it?.computedBestBefore),
-            sourcePantryItemId: (it?.sourcePantryItemId ?? it?.leftoverMeta?.sourcePantryItemId),
-          } as Leftover))
-          setLeftovers(docs)
-        } else {
-          // fallback to inventory query
-          const q = query(collection(db, 'households', householdId, 'inventory'), where('is_leftover', '==', true), orderBy('leftoverMeta.createdAt', 'desc'))
-          const invUnsub = onSnapshot(q, snap2 => {
-            const docs: Leftover[] = []
-            snap2.forEach(d => {
-              const raw = d.data() as any
-              docs.push({
-                id: d.id,
-                ...raw,
-                servings: (raw?.leftoverMeta?.servings ?? raw?.servings ?? 1),
-                computedBestBefore: (raw?.leftoverMeta?.computedBestBefore ?? raw?.computedBestBefore),
-                sourcePantryItemId: (raw?.sourcePantryItemId ?? raw?.leftoverMeta?.sourcePantryItemId),
-              } as Leftover)
-            })
-            setLeftovers(docs)
-          })
-          // replace unsub to ensure we can cleanup invUnsub later
-          if (unsub) unsub()
-          unsub = invUnsub
+    const cacheRef = collection(db, 'users', user.id, 'cache')
+    const q = query(cacheRef, where('is_leftover', '==', true), orderBy('leftoverMeta.createdAt', 'desc'))
+    const unsub = onSnapshot(q, snap => {
+      const docs: PantryItem[] = []
+      snap.forEach(d => {
+        const data = d.data() as PantryItem
+        if (data.is_leftover) {
+          docs.push(data)
         }
       })
-    } else {
-      // No cache available; query inventory collection for flagged leftovers
-      const q = query(collection(db, 'households', householdId, 'inventory'), where('is_leftover', '==', true), orderBy('leftoverMeta.createdAt', 'desc'))
-      unsub = onSnapshot(q, snap => {
-        const docs: Leftover[] = []
-        snap.forEach(d => {
-          const raw = d.data() as any
-          docs.push({
-            id: d.id,
-            ...raw,
-            servings: (raw?.leftoverMeta?.servings ?? raw?.servings ?? 1),
-            computedBestBefore: (raw?.leftoverMeta?.computedBestBefore ?? raw?.computedBestBefore),
-            sourcePantryItemId: (raw?.sourcePantryItemId ?? raw?.leftoverMeta?.sourcePantryItemId),
-          } as Leftover)
-        })
-        setLeftovers(docs)
-      })
-    }
+      setLeftovers(docs)
+    })
 
     return () => {
-      if (unsub) unsub()
+      unsub()
     }
-  }, [householdId, app?.user?.id])
+  }, [householdId, user.id])
 
   if (!leftovers.length) return null
 
+  const handleConsume = async (leftover: PantryItem) => {
+    try {
+      const result = await LeftoverService.consumeServing(householdId, leftover.id)
+
+      const servingsLeft = result.deleted ? 0 : (leftover.leftoverMeta?.servings ?? 1) - 1
+      AnalyticsService.trackLeftoverConsumed(householdId, leftover.id, servingsLeft)
+      addToast(
+        servingsLeft > 0 ? `Consumed 1 serving (${servingsLeft} left)` : 'Consumed last serving',
+        'success',
+        5000,
+        servingsLeft === 0 ? undefined : 'Undo',
+        servingsLeft === 0 ? undefined : async () => {
+          // Note: Undo functionality would need to be implemented
+          // For now, just show a message
+          addToast('Undo not implemented yet', 'info')
+        }
+      )
+    } catch (err) {
+      addToast('Could not consume leftover', 'error')
+    }
+  }
+
+  const handleFreeze = async (leftover: PantryItem) => {
+    try {
+      await LeftoverService.moveToFreezer(householdId, leftover.id)
+      AnalyticsService.trackMoveToFreezer(householdId, leftover.id)
+      addToast('Moved to freezer', 'success')
+    } catch (err) {
+      addToast('Failed to move to freezer', 'error')
+    }
+  }
+
+  const handleDiscard = async (leftover: PantryItem) => {
+    try {
+      await LeftoverService.discard(householdId, leftover.id)
+      AnalyticsService.trackLeftoverDiscarded(householdId, leftover.id)
+      addToast('Discarded leftover', 'info', 5000, 'Undo', async () => {
+        // Note: Restore functionality would need to be implemented
+        addToast('Undo not implemented yet', 'info')
+      })
+    } catch (err) {
+      addToast('Could not discard leftover', 'error')
+    }
+  }
+
   return (
-    <section style={{ padding: 12 }} aria-label="Leftovers Hot Zone">
-      <h4 style={{ margin: '4px 0 8px' }}>Leftovers — Hot Zone</h4>
-      <div style={{ display: 'flex', gap: 8, overflowX: 'auto' }}>
-        {leftovers.map(l => {
-          const bestBefore = l.computedBestBefore || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
-          const daysRemaining = Math.ceil((new Date(bestBefore).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+    <section className="px-3 py-2" aria-label="Leftovers Hot Zone">
+      <h4 className="text-sm font-semibold text-theme-primary mb-3">🥡 Leftovers</h4>
+      <div className="flex gap-3 overflow-x-auto pb-2">
+        {leftovers.map(leftover => {
+          const bestBefore = leftover.expirationDate ? new Date(leftover.expirationDate) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+          const daysRemaining = Math.ceil((bestBefore.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
           const color = getExpirationColor(daysRemaining)
-          const border = color === 'red' ? '2px solid rgba(248,113,113,0.3)' : color === 'yellow' ? '2px solid rgba(250,204,21,0.25)' : '2px solid rgba(34,197,94,0.16)'
+          const attentionLevel = LeftoverService.needsAttention(leftover)
+
           return (
-            <div key={l.id} style={{ minWidth: 220, borderRadius: 8, padding: 8, border, background: '#fff' }}>
-              <div style={{ fontWeight: 600 }}>{(l as any).title || 'Leftover'}</div>
-              <div style={{ fontSize: 12, color: '#666' }}>{l.servings} servings</div>
-              <div style={{ marginTop: 8 }}>
-                <div style={{ height: 8, background: '#eee', borderRadius: 4 }}>
-                  <div style={{ width: `${Math.max(0, Math.min(100, ((new Date(bestBefore).getTime() - Date.now()) / (1000*60*60*24)) / 7 * 100))}%`, height: '100%', background: color === 'red' ? '#f87171' : color === 'yellow' ? '#facc15' : '#34d399', borderRadius: 4 }} />
-                </div>
-                <div style={{ fontSize: 12, marginTop: 6 }}>{daysRemaining} days</div>
-              </div>
-              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                <button
-                  aria-label={`Eat one serving from ${l.id}`}
-                  onClick={async () => {
-                    try {
-                      const res = await LeftoverService.consumeLeftover(householdId, l.id)
-                      AnalyticsService.logEvent('leftover_consumed', { household_id: householdId, leftover_id: l.id })
-                      addToast('Consumed 1 serving', 'success', 5000, 'Undo', async () => {
-                        try {
-                          if (res && res.previous) {
-                            await LeftoverService.restoreLeftover(householdId, l.id, res.previous)
-                          }
-                        } catch (err) {
-                          // ignore
-                        }
-                      })
-                    } catch (err) {
-                      addToast('Could not consume leftover', 'error')
-                    }
+            <div
+              key={leftover.id}
+              className={`min-w-[200px] bg-theme-secondary rounded-lg p-3 border ${
+                attentionLevel === 'urgent' ? 'border-red-300 bg-red-50' :
+                attentionLevel === 'warning' ? 'border-yellow-300 bg-yellow-50' :
+                attentionLevel === 'freeze' ? 'border-blue-300 bg-blue-50' :
+                'border-theme'
+              }`}
+            >
+              {/* Image and Title */}
+              <div className="flex items-center gap-2 mb-2">
+                <img
+                  src={leftover.image || '/images/placeholder.svg'}
+                  alt={leftover.item}
+                  className="w-8 h-8 rounded object-cover"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement
+                    if (target) target.src = '/images/placeholder.svg'
                   }}
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium text-theme-primary truncate">
+                    {leftover.item || 'Leftover'}
+                  </div>
+                  <div className="text-xs text-theme-secondary">
+                    {leftover.leftoverMeta?.servings ?? 1} serving{(leftover.leftoverMeta?.servings ?? 1) !== 1 ? 's' : ''}
+                  </div>
+                </div>
+              </div>
+
+              {/* Expiry Progress */}
+              <div className="mb-3">
+                <div className="flex justify-between items-center mb-1">
+                  <span className="text-xs text-theme-secondary">
+                    {daysRemaining > 0 ? `${daysRemaining} days` : 'Expired'}
+                  </span>
+                  {attentionLevel === 'urgent' && (
+                    <span className="text-xs text-red-600 font-medium">⚠️ Urgent</span>
+                  )}
+                  {attentionLevel === 'freeze' && (
+                    <span className="text-xs text-blue-600 font-medium">🧊 Consider freezing</span>
+                  )}
+                </div>
+                <div className="w-full bg-theme-primary/20 rounded-full h-2">
+                  <div
+                    className={`h-2 rounded-full transition-all ${
+                      color === 'red' ? 'bg-red-500' :
+                      color === 'yellow' ? 'bg-yellow-500' :
+                      'bg-green-500'
+                    }`}
+                    style={{
+                      width: `${Math.max(0, Math.min(100, ((bestBefore.getTime() - Date.now()) / (1000*60*60*24)) / 7 * 100))}%`
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="grid grid-cols-3 gap-1">
+                <button
+                  onClick={() => handleConsume(leftover)}
+                  className="px-2 py-1.5 text-xs bg-[var(--accent-color)] text-white rounded hover:bg-[var(--accent-color)]/80 transition-colors"
+                  aria-label={`Consume one serving from ${leftover.item}`}
                 >
                   Eat
                 </button>
 
                 <button
-                  aria-label={`Move ${l.id} to freezer`}
-                  onClick={async () => {
-                    try {
-                      // If leftover has a sourcePantryItemId try to move inventory; otherwise no-op
-                      const inventoryTargetId = (l as any).sourcePantryItemId || l.id
-                      if (inventoryTargetId) {
-                        const result = await FreezerService.moveToFreezer(householdId, inventoryTargetId)
-                        AnalyticsService.trackMoveToFreezer(householdId, inventoryTargetId)
-                        addToast('Moved to freezer', 'success')
-                      } else {
-                        addToast('No source item to freeze', 'warning')
-                      }
-                    } catch (err) {
-                      addToast('Failed to move to freezer', 'error')
-                    }
-                  }}
+                  onClick={() => handleFreeze(leftover)}
+                  className="px-2 py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                  aria-label={`Move ${leftover.item} to freezer`}
                 >
                   Freeze
                 </button>
 
                 <button
-                  aria-label={`Discard leftover ${l.id}`}
-                  onClick={async () => {
-                    try {
-                      const res = await LeftoverService.discardLeftover(householdId, l.id)
-                      AnalyticsService.logEvent('leftover_discarded', { household_id: householdId, leftover_id: l.id })
-                      addToast('Discarded leftover', 'info', 5000, 'Undo', async () => {
-                        try {
-                          if (res && res.previous) {
-                            await LeftoverService.restoreLeftover(householdId, l.id, res.previous)
-                          }
-                        } catch (err) {
-                          // ignore
-                        }
-                      })
-                    } catch (err) {
-                      addToast('Could not discard leftover', 'error')
-                    }
-                  }}
+                  onClick={() => handleDiscard(leftover)}
+                  className="px-2 py-1.5 text-xs bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+                  aria-label={`Discard leftover ${leftover.item}`}
                 >
                   Discard
                 </button>

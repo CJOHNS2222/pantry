@@ -4,6 +4,8 @@ export interface PantryItem {
   category: string;
   quantity_estimate: string; // Legacy field, keep for compatibility
   image?: string;
+  // Optional photo of the container/storage for leftovers (user-supplied)
+  containerImage?: string;
   storageLocation?: string; // legacy values include 'pantry' | 'freezer' | 'fridge' | 'spices' | 'other'
   expirationDate?: string; // ISO date string (YYYY-MM-DD)
   // Backwards-compatible alias used across components
@@ -71,11 +73,12 @@ export interface Batch {
 export interface LeftoverMeta {
   createdAt?: string; // ISO date
   createdBy?: string; // UID
-  sourcePantryItemId?: string; // linked pantry item id when created from an existing item
+  // sourcePantryItemId removed: leftovers are independent of pantry items
   computedBestBefore?: string; // ISO date computed by leftoverService
   servings?: number; // Number of servings contained in this leftover
   riskLevel?: number; // 1-5 user risk mapping at creation
   notes?: string;
+  lastConsumedAt?: string; // ISO date when last serving was consumed
 }
 
 export interface ShoppingItem {
@@ -281,6 +284,8 @@ export interface UserProfile {
   sensitiveHealthMode?: boolean;
   // Leftover persona for food-safety guidance: 'strict' | 'normal' | 'relaxed'
   leftoverPersona?: 'strict' | 'normal' | 'relaxed';
+  // Measurement system preference: 'Standard' (imperial) or 'Metric'
+  measurementSystem?: 'Standard' | 'Metric';
 }
 
 export interface HouseholdMember {

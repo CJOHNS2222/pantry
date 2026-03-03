@@ -129,6 +129,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   const importedTimerRef = useRef<number | null>(null);
   const [bulkMode, setBulkMode] = useState(false);
   const [selectedItems, setSelectedItems] = useState<Set<number>>(new Set());
+  const [bulkLocationValue, setBulkLocationValue] = useState<string>('');
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [categoryOrder, setCategoryOrder] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<'category' | 'storage'>('storage');
@@ -554,7 +555,8 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   const toggleBulkMode = useCallback(() => {
     setBulkMode(!bulkMode);
     setSelectedItems(new Set());
-  }, [bulkMode, setBulkMode, setSelectedItems]);
+    setBulkLocationValue('');
+  }, [bulkMode, setBulkMode, setSelectedItems, setBulkLocationValue]);
 
   const toggleItemSelection = useCallback((index: number) => {
     const newSelected = new Set(selectedItems);
@@ -693,7 +695,9 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
 
   // Group inventory by category
   const groupedItems = sortedInventory.reduce((acc, item) => {
-    const category = item.category || 'Uncategorized';
+    // Show a dedicated "Leftovers" category for leftover items so it's
+    // visible in the category view only when leftovers exist.
+    const category = item.is_leftover ? 'Leftovers' : (item.category || 'Uncategorized');
     if (!acc[category]) {
       acc[category] = [];
     }
@@ -794,7 +798,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
 
     return (
       <div key={location} className="bg-theme-secondary rounded-lg border border-theme overflow-hidden">
-        <div className="w-full flex items-center justify-between p-4">
+        <div className="w-full flex items-center justify-center p-4">
           <div className="flex items-center gap-3">
             <StorageLocationIndicator
               location={location as 'pantry' | 'freezer' | 'fridge' | 'spices' | 'other'}
@@ -1610,23 +1614,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
         )}
       </div>
 
-      {/* Bulk Action Toolbar */}
-      {bulkMode && (
-        <div className="bg-theme-secondary p-3 rounded-lg border border-theme mb-4 flex items-center gap-3">
-          <div className="text-sm text-theme-primary font-medium">Bulk Mode: {selectedItems.size} selected</div>
-          <select onChange={(e) => bulkChangeLocation(e.target.value as any)} className="px-2 py-1 rounded bg-theme-primary border border-theme text-black">
-            <option value="pantry">Move to Pantry</option>
-            <option value="fridge">Move to Fridge</option>
-            <option value="freezer">Move to Freezer</option>
-            <option value="spices">Move to Spices</option>
-            <option value="other">Move to Other</option>
-          </select>
-          <input type="date" onChange={(e) => bulkSetExpiration(e.target.value)} className="px-2 py-1 rounded bg-theme-primary border border-theme text-black" />
-          <button onClick={bulkAddToShoppingListWithRemove} className="px-3 py-1 bg-[var(--accent-color)] text-white rounded" aria-label="Move selected items to shopping list">Move to Shopping</button>
-          <button onClick={selectAllItems} className="px-3 py-1 bg-theme-primary border border-theme rounded" aria-label="Toggle select all items">Toggle Select All</button>
-          <button onClick={bulkDelete} className="ml-auto px-3 py-1 bg-red-600 text-white rounded" aria-label="Delete selected items">Delete</button>
-        </div>
-      )}
+
 
       {/* Floating Action Button */}
       <button
@@ -2070,7 +2058,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
             <h3 className="text-lg font-bold text-theme-primary">
               {viewMode === 'category' ? 'Pantry Items' : 'Storage Items'}
             </h3>
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-center">
               {viewMode === 'category' && (
                 <button
                   onClick={collapseAllCategories}
@@ -2079,6 +2067,27 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                 >
                   Collapse All
                 </button>
+              )}
+              {bulkMode && selectedItems.size > 0 && (
+                <select
+                  value={bulkLocationValue}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value) {
+                      bulkChangeLocation(value as any);
+                      setBulkLocationValue('');
+                    }
+                  }}
+                  className="px-3 py-1 rounded-lg text-sm font-medium bg-theme-secondary text-theme-primary hover:bg-theme-primary border border-theme transition-colors"
+                  aria-label="Change storage location for selected items"
+                >
+                  <option value="">Change Location</option>
+                  <option value="pantry">📦 Pantry</option>
+                  <option value="fridge">🧊 Fridge</option>
+                  <option value="freezer">❄️ Freezer</option>
+                  <option value="spices">🌿 Spices</option>
+                  <option value="other">📦 Other</option>
+                </select>
               )}
               <button
                 onClick={toggleBulkMode}
@@ -2094,40 +2103,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
             </div>
           </div>
 
-          {bulkMode && (
-            <div className="flex items-center justify-between p-3 bg-theme-secondary rounded-lg mb-4">
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={selectAllItems}
-                  className="text-sm text-[var(--accent-color)] hover:underline"
-                  aria-label={selectedItems.size === inventory.length ? 'Deselect all items' : 'Select all items'}
-                >
-                  {selectedItems.size === inventory.length ? 'Deselect All' : 'Select All'}
-                </button>
-                <span className="text-sm text-theme-secondary">
-                  {selectedItems.size} selected
-                </span>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={bulkMoveToShoppingList}
-                  disabled={selectedItems.size === 0}
-                  className="px-3 py-1 bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm rounded transition-colors"
-                  aria-label="Move selected items to shopping list"
-                >
-                  Move to Shopping
-                </button>
-                <button
-                  onClick={bulkDelete}
-                  disabled={selectedItems.size === 0}
-                  className="px-3 py-1 bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm rounded transition-colors"
-                  aria-label="Delete selected items from pantry"
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
-          )}
+
 
           {/* Render the appropriate view */}
           {isLoadingInventory ? (

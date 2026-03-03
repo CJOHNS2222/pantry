@@ -6,6 +6,7 @@ interface ShoppingListItemProps {
   item: ShoppingItem;
   onToggleCheck: (id: string) => void;
   onRemove: (id: string) => void;
+  onQuantityChange?: (id: string, quantity: string) => void;
   onLongPress?: (id: string) => void;
   isSelected?: boolean;
   isOffline?: boolean;
@@ -16,6 +17,7 @@ export const EnhancedShoppingListItem: React.FC<ShoppingListItemProps> = ({
   item,
   onToggleCheck,
   onRemove,
+  onQuantityChange,
   onLongPress,
   isSelected = false,
   isOffline = false,
@@ -146,7 +148,7 @@ export const EnhancedShoppingListItem: React.FC<ShoppingListItemProps> = ({
                 {item.source === 'meal planner' && '📅 From meal planner'}
                 {item.source === 'pantry scanner' && '📷 From pantry scanner'}
                 {item.source === 'scanner suggestion' && '🤖 Scanner suggestion'}
-                {item.source?.startsWith('recipe:') && `🍳 ${item.source.substring(8)}`}
+                {item.source?.startsWith('recipe:') && `🍳 ${item.source.substring(8).replace(/^need\s+/, '')}`}
               </div>
             )}
             {item.quantity && item.quantity !== '1' && (
@@ -164,10 +166,15 @@ export const EnhancedShoppingListItem: React.FC<ShoppingListItemProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
-          {item.quantity && item.quantity !== '1' && (
-            <div className="text-xs font-medium text-theme-secondary opacity-70 bg-theme-primary px-2 py-1 rounded">
-              {item.quantity}
-            </div>
+          {onQuantityChange && (
+            <input
+              type="text"
+              value={item.quantity || ''}
+              onChange={(e) => onQuantityChange(item.id, e.target.value)}
+              onClick={(e) => e.stopPropagation()}
+              className="w-16 px-2 py-1 text-xs border border-theme rounded bg-theme-primary text-theme-primary focus:outline-none focus:ring-1 focus:ring-[var(--accent-color)]"
+              placeholder="qty"
+            />
           )}
           {item.estimatedPrice && item.estimatedPrice > 0 && (
             <div className="text-xs font-medium text-green-600 opacity-70 bg-green-50 px-2 py-1 rounded border border-green-200">
@@ -183,7 +190,7 @@ export const EnhancedShoppingListItem: React.FC<ShoppingListItemProps> = ({
             }}
             className="p-2 text-theme-secondary opacity-30 hover:opacity-100 hover:text-red-500 transition-opacity"
           >
-            <Package className="w-4 h-4" />
+            <Trash2 className="w-4 h-4" />
           </button>
         </div>
       </div>

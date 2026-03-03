@@ -17,6 +17,7 @@ import { searchRecipes } from '../utils/searchUtils';
 import { debounce } from '../utils/debounceUtils';
 import { CompactRecipeCardSkeleton, MealPlanSkeleton } from './SkeletonLoader';
 import { getMealPrepSuggestions, RecipeIngredientMatch } from '../utils/searchUtils';
+import { getUserMeasurementSystem } from '../utils/measurementUtils';
 // import CalendarService from '../services/calendarService'; // Temporarily disabled
 
 interface MealPlannerProps {
@@ -149,7 +150,7 @@ const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
           restrictions: '',
           maxCookTime: 60,
           maxIngredients: 15,
-          measurementSystem: 'Standard',
+          measurementSystem: getUserMeasurementSystem(user?.profile),
           strictMode: false,
           userId: user?.id
         }, user);
@@ -630,110 +631,6 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
     // No longer need to load recipes since we use prop savedRecipes
   }, [propSavedRecipes.length]);
 
-  // Memoized missing ingredients computation
-  const missingIngredients = useMemo(() => {
-    const missingWithRecipes = mealPlan.flatMap(day => 
-      [...(day.breakfast || []), ...(day.lunch || []), ...(day.dinner || [])].flatMap(meal => 
-        meal.recipe.ingredients.map(ingredient => ({
-          ingredient,
-          recipeName: meal.recipe.title,
-          recipeId: meal.recipe.id
-        }))
-      )
-    );
-    
-    // Filter out staple items and duplicates (unless user wants staples included)
-    const missing = missingWithRecipes.filter(item => {
-      const neededLower = item.ingredient.toLowerCase();
-      if (!includeStaples && STAPLES.some(staple => neededLower.includes(staple))) return false;
-      
-      // Check if ingredient is already in inventory
-      const inInventory = inventory.some(pantryItem => 
-        neededLower.includes(pantryItem.item.toLowerCase()) || 
-        pantryItem.item.toLowerCase().includes(neededLower)
-      );
-      
-      // Check if ingredient is already in shopping list
-      const inShoppingList = shoppingList.some(shoppingItem => 
-        neededLower.includes(shoppingItem.item.toLowerCase()) || 
-        shoppingItem.item.toLowerCase().includes(neededLower)
-      );
-      
-      return !inInventory && !inShoppingList;
-    });
-
-    // Group by ingredient and aggregate quantities
-    const grouped = missing.reduce((acc, item) => {
-      const parsed = parseIngredientForShoppingList(item.ingredient);
-      const key = parsed.itemName;
-      
-      if (!acc[key]) {
-        // Extract unit from quantity string more intelligently
-        let unit = 'count';
-        const qtyParts = parsed.quantity.split(' ');
-        
-        if (qtyParts.length > 1) {
-          // Check if the second part looks like a unit
-          const potentialUnit = qtyParts[1].toLowerCase();
-          const commonUnits = ['tbs', 'tbsp', 'tsp', 'cup', 'cups', 'oz', 'ounce', 'lb', 'pound', 'g', 'gram', 'kg', 'liter', 'l', 'ml', 'clove', 'cloves', 'bunch', 'bunches', 'sprig', 'sprigs', 'head', 'heads', 'stalk', 'stalks', 'slice', 'slices', 'piece', 'pieces'];
-          
-          if (commonUnits.includes(potentialUnit) || potentialUnit.endsWith('s')) {
-            unit = potentialUnit;
-          } else if (parsed.quantity.match(/\d+\s*(g|kg|ml|l|oz|lb)$/i)) {
-            // Handle cases like "200g" where unit is attached to number
-            const unitMatch = parsed.quantity.match(/\d+\s*(g|kg|ml|l|oz|lb)$/i);
-            if (unitMatch) {
-              unit = unitMatch[1].toLowerCase();
-            }
-          }
-        } else if (parsed.quantity.match(/\d+(g|kg|ml|l|oz|lb)$/i)) {
-          // Handle cases like "200g" without space
-          const unitMatch = parsed.quantity.match(/\d+(g|kg|ml|l|oz|lb)$/i);
-          if (unitMatch) {
-            unit = unitMatch[1].toLowerCase();
-          }
-        }
-        
-        acc[key] = {
-          ingredient: parsed.itemName,
-          quantity: 0, // Will be calculated
-          unit: unit,
-          recipes: []
-        };
-      }
-      
-      // Add quantity (parse numeric value, handling fractions)
-      let qtyValue = 1;
-      const qtyStr = parsed.quantity.split(' ')[0];
-      
-      if (qtyStr.includes('/')) {
-        // Handle fractions like "1/2"
-        const [numerator, denominator] = qtyStr.split('/').map(Number);
-        qtyValue = numerator / denominator;
-      } else {
-        qtyValue = parseFloat(qtyStr) || 1;
-      }
-      
-      acc[key].quantity += qtyValue;
-      
-      // Track recipes
-      if (!acc[key].recipes.some(r => r.id === item.recipeId)) {
-        acc[key].recipes.push({ name: item.recipeName, id: item.recipeId ?? '' });
-      }
-      return acc;
-    }, {} as Record<string, { ingredient: string; quantity: number; unit: string; recipes: { name: string; id: string }[] }>);
-
-    // Format quantities back to strings
-    Object.values(grouped).forEach(item => {
-      if (item.unit === 'count' && item.quantity % 1 === 0) {
-        // Keep as number for count items
-      }
-      // For other units, keep as number for now, will format when displaying
-    });
-
-    return Object.values(grouped);
-  }, [mealPlan, inventory, shoppingList, includeStaples]);
-
   // Legacy function for backward compatibility
   const getMissingIngredients = () => missingIngredients;
 
@@ -1141,6 +1038,117 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
 
     return { displayPlan: view, displayToOriginal: mapping };
   }, [mealPlan]);
+
+  // Memoized missing ingredients computation
+  const missingIngredients = useMemo(() => {
+    const missingWithRecipes = displayPlan.flatMap(day => 
+      [...(day.breakfast || []), ...(day.lunch || []), ...(day.dinner || [])].flatMap(meal => 
+        meal.recipe.ingredients.map(ingredient => ({
+          ingredient,
+          recipeName: meal.recipe.title,
+          recipeId: meal.recipe.id
+        }))
+      )
+    );
+    
+    // Filter out staple items and duplicates (unless user wants staples included)
+    const missing = missingWithRecipes.filter(item => {
+      const neededLower = item.ingredient.toLowerCase();
+      if (!includeStaples && STAPLES.some(staple => neededLower.includes(staple))) return false;
+      
+      // Check if ingredient is already in inventory
+      const inInventory = inventory.some(pantryItem => 
+        neededLower.includes(pantryItem.item.toLowerCase()) || 
+        pantryItem.item.toLowerCase().includes(neededLower)
+      );
+      
+      // Check if ingredient is already in shopping list
+      const inShoppingList = shoppingList.some(shoppingItem => 
+        neededLower.includes(shoppingItem.item.toLowerCase()) || 
+        shoppingItem.item.toLowerCase().includes(neededLower)
+      );
+      
+      return !inInventory && !inShoppingList;
+    });
+
+    // Group by ingredient and aggregate quantities
+    const grouped = missing.reduce((acc, item) => {
+      const parsed = parseIngredientForShoppingList(item.ingredient);
+      const key = parsed.itemName;
+      
+      if (!acc[key]) {
+        // Extract unit from quantity string more intelligently
+        let unit = 'count';
+        const qtyParts = parsed.quantity.split(' ');
+        
+        if (qtyParts.length > 1) {
+          // Check if the second part looks like a unit
+          const potentialUnit = qtyParts[1].toLowerCase();
+          const commonUnits = ['tbs', 'tbsp', 'tsp', 'cup', 'cups', 'oz', 'ounce', 'lb', 'pound', 'g', 'gram', 'kg', 'liter', 'l', 'ml', 'clove', 'cloves', 'bunch', 'bunches', 'sprig', 'sprigs', 'head', 'heads', 'stalk', 'stalks', 'slice', 'slices', 'piece', 'pieces'];
+          
+          if (commonUnits.includes(potentialUnit) || potentialUnit.endsWith('s')) {
+            unit = potentialUnit;
+          } else if (parsed.quantity.match(/\d+\s*(g|kg|ml|l|oz|lb)$/i)) {
+            // Handle cases like "200g" where unit is attached to number
+            const unitMatch = parsed.quantity.match(/\d+\s*(g|kg|ml|l|oz|lb)$/i);
+            if (unitMatch) {
+              unit = unitMatch[1].toLowerCase();
+            }
+          }
+        } else if (parsed.quantity.match(/\d+(g|kg|ml|l|oz|lb)$/i)) {
+          // Handle cases like "200g" without space
+          const unitMatch = parsed.quantity.match(/\d+(g|kg|ml|l|oz|lb)$/i);
+          if (unitMatch) {
+            unit = unitMatch[1].toLowerCase();
+          }
+        }
+        
+        acc[key] = {
+          ingredient: parsed.itemName,
+          quantity: 0, // Will be calculated
+          unit: unit,
+          recipes: []
+        };
+      }
+      
+      // Add quantity (parse numeric value, handling fractions)
+      let qtyValue = 1;
+      const qtyStr = parsed.quantity.split(' ')[0];
+      
+      if (qtyStr.includes('/')) {
+        // Handle fractions like "1/2"
+        const [numerator, denominator] = qtyStr.split('/').map(Number);
+        qtyValue = numerator / denominator;
+      } else {
+        qtyValue = parseFloat(qtyStr) || 1;
+      }
+      
+      acc[key].quantity += qtyValue;
+      
+      // Track recipes
+      if (!acc[key].recipes.some(r => r.id === item.recipeId)) {
+        acc[key].recipes.push({ name: item.recipeName, id: item.recipeId ?? '' });
+      }
+      return acc;
+    }, {} as Record<string, { ingredient: string; quantity: number; unit: string; recipes: { name: string; id: string }[] }>);
+
+    // Format quantities back to strings
+    Object.values(grouped).forEach(item => {
+      if (item.unit === 'count' && item.quantity % 1 === 0) {
+        // Keep as number for count items
+      }
+      // For other units, keep as number for now, will format when displaying
+    });
+
+    return Object.values(grouped);
+  }, [displayPlan, inventory, shoppingList, includeStaples]);
+
+  // Legacy function for backward compatibility
+  const getMissingIngredients = () => missingIngredients;
+
+  useEffect(() => {
+    setMissingItemsCount(missingIngredients.length);
+  }, [missingIngredients]);
 
   // Ensure a DayPlan exists in the canonical mealPlan for a given date.
   const ensureDayExists = useCallback((dateIso: string, dayName?: string) => {
@@ -1710,6 +1718,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
           onMarkAsMade={modalContext === 'scheduled' ? onMarkAsMade : undefined}
           showSaveButton={true}
           showMarkAsMade={modalContext === 'scheduled'}
+          isFromMealPlan={modalContext === 'scheduled'}
           showAddToPlan={modalContext === 'search'}
           recipeSaveLimitExceeded={recipeSaveLimitExceeded}
           mealPlanLimitExceeded={mealPlanLimitExceeded}
@@ -1745,17 +1754,16 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
         </div>
       )}
 
-      {showLeftoverCapture && household?.id && user?.id && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-theme-primary rounded-xl max-w-xl w-full">
+      {showLeftoverCapture && user?.id && (
+        <div onClick={(e) => e.stopPropagation()} style={{ zIndex: 99999 }} className="fixed inset-0 flex items-center justify-center bg-black/50 p-4">
+          <div onClick={(e) => e.stopPropagation()} className="bg-theme-primary rounded-xl max-w-xl w-full">
             <LeftoverQuickCapture
-              householdId={household.id}
               createdBy={user.id}
               initialServings={leftoverServings}
               initialNotes={leftoverNotes}
               onSaved={() => {
                 setShowLeftoverCapture(false);
-                AnalyticsService.logEvent('leftover_captured_from_mealplanner', { household_id: household.id });
+                AnalyticsService.logEvent('leftover_captured_from_mealplanner', { household_id: household?.id });
               }}
               onClose={() => setShowLeftoverCapture(false)}
             />

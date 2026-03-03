@@ -8,6 +8,7 @@ import { serverTimestamp, Timestamp } from 'firebase/firestore';
 import { User } from '../types';
 import { pushNotificationService } from './pushNotificationService';
 import { appendNotificationToUser, getNotificationsOnce, markNotificationRead, snoozeNotificationInCache } from './notificationsService';
+import { auth } from '../firebaseConfig';
 import { formatDangerSummary, DangerItem } from './notificationHelpers';
 
 export interface NotificationItem {
@@ -68,16 +69,32 @@ export class NotificationService {
 
     try {
       await appendNotificationToUser(userId, item as any);
-    } catch (err) {
-      console.error('Failed to append notification to user cache:', err);
-      // fallback to writing to collection if cache fails
-      const docRef = await DatabaseMonitoringService.addDoc(DatabaseMonitoringService.collection(this.COLLECTION), {
-        userId,
-        read: false,
-        createdAt: serverTimestamp(),
-        ...notification
+    } catch (err: any) {
+      // Add richer debug output to help diagnose permission issues
+      console.error('Failed to append notification to user cache:', {
+        error: err?.message || err,
+        authUid: auth?.currentUser?.uid,
+        targetUid: userId,
+        payload: item
       });
-      return docRef.id;
+      // fallback to writing to collection if cache fails
+      try {
+        const docRef = await DatabaseMonitoringService.addDoc(DatabaseMonitoringService.collection(this.COLLECTION), {
+          userId,
+          read: false,
+          createdAt: serverTimestamp(),
+          ...notification
+        });
+        return docRef.id;
+      } catch (fallbackErr: any) {
+        console.error('Failed to write notification to top-level collection (fallback):', {
+          error: fallbackErr?.message || fallbackErr,
+          authUid: auth?.currentUser?.uid,
+          targetUid: userId,
+          payload: notification
+        });
+        throw fallbackErr;
+      }
     }
 
     // Send push notification for urgent notifications only (expired items)
@@ -139,14 +156,39 @@ export class NotificationService {
                          daysUntilExpiry <= 3 ? 'medium' : 'low';
 
       if (currentPriority !== newPriority) {
-        await DatabaseMonitoringService.updateDoc(DatabaseMonitoringService.doc(this.COLLECTION + '/' + existingNotification.id), {
+        const updateData = {
           priority: newPriority,
           title: daysUntilExpiry <= 0 ? 'Item Expired!' :
                  daysUntilExpiry === 1 ? 'Expires Tomorrow!' :
                  daysUntilExpiry <= 3 ? 'Expires Soon' : 'Expires This Week',
           message: daysUntilExpiry <= 0 ? `${itemName} has expired and was moved to shopping list` :
                   `${itemName} expires in ${daysUntilExpiry} days`
-        });
+        };
+
+        // Try to update the top-level notification document; if that fails
+        // (e.g., the notification only exists in the per-user cache or the
+        // client is not authorized to write to the collection), fall back
+        // to updating the per-user cache document.
+        try {
+          const docRef = DatabaseMonitoringService.doc(this.COLLECTION + '/' + existingNotification.id);
+          // Check existence first to avoid permission-denied when doc is missing
+          const topSnap = await DatabaseMonitoringService.getDoc(docRef);
+          if (topSnap && topSnap.exists()) {
+            await DatabaseMonitoringService.updateDoc(docRef, updateData as any);
+          } else {
+            // No top-level doc — update the per-user cache instead
+            const { updateNotificationInCache } = await import('./notificationsService');
+            await updateNotificationInCache(userId, existingNotification.id, updateData as any);
+          }
+        } catch (err: any) {
+          console.warn('Failed updating top-level notification; falling back to cache update', { error: err?.message || err, userId });
+          try {
+            const { updateNotificationInCache } = await import('./notificationsService');
+            await updateNotificationInCache(userId, existingNotification.id, updateData as any);
+          } catch (cacheErr: any) {
+            console.error('Failed to update notification in user cache fallback:', { error: cacheErr?.message || cacheErr, userId, notificationId: existingNotification.id });
+          }
+        }
       }
       return existingNotification.id;
     }
@@ -523,60 +565,114 @@ export class NotificationService {
   }
 
   /**
-   * Send push notification for high-priority notifications
-   * Note: In production, this should be done server-side via Firebase Admin SDK
+   * Create leftover expiration alert notification
    */
-  private static async sendPushNotification(
+  static async createLeftoverExpirationAlert(
     userId: string,
-    notification: Omit<NotificationItem, 'id' | 'userId' | 'read' | 'createdAt'>
-  ): Promise<void> {
-    // For now, we'll use local notifications on the device
-    // In production, you'd send to FCM server which would then push to device
+    leftoverName: string,
+    daysUntilExpiry: number,
+    leftoverId: string,
+    isCookedRice: boolean = false
+  ): Promise<string> {
+    let priority: 'low' | 'medium' | 'high' | 'urgent' = 'low'
+    let title = ''
+    let message = ''
+    let actionLabel = ''
 
-    if (!pushNotificationService.isSupported()) {
-      return; // Only send push notifications on native platforms
+    if (daysUntilExpiry <= 0) {
+      priority = 'urgent'
+      title = isCookedRice ? 'Cooked Rice Alert!' : 'Leftover Expired!'
+      message = isCookedRice
+        ? `🍚 ${leftoverName} has been in fridge for 4+ days. Even if it looks fine, Bacillus cereus isn't worth the risk. Time to toss!`
+        : `${leftoverName} has expired. Please discard immediately.`
+      actionLabel = 'View Leftovers'
+    } else if (daysUntilExpiry === 1) {
+      priority = 'high'
+      title = 'Leftover Expires Tomorrow!'
+      message = `${leftoverName} expires tomorrow. Consider eating or freezing today.`
+      actionLabel = 'View Leftovers'
+    } else if (daysUntilExpiry <= 3) {
+      priority = 'medium'
+      title = 'Leftover Expires Soon'
+      message = `${leftoverName} expires in ${daysUntilExpiry} days.`
+      actionLabel = 'View Leftovers'
+    } else if (daysUntilExpiry <= 5) {
+      priority = 'low'
+      title = 'Consider Freezing Leftover'
+      message = `${leftoverName} expires in ${daysUntilExpiry} days. Move to freezer for longer storage?`
+      actionLabel = 'View Leftovers'
     }
 
-    try {
-      // Get the user's FCM token (stored locally for this demo)
-      const token = pushNotificationService.getToken();
-      if (!token) {
-        console.log('No FCM token available for push notification');
-        return;
-      }
+    return this.createNotification(userId, {
+      type: 'expiration',
+      title,
+      message,
+      actionLabel,
+      actionType: 'view_item',
+      actionData: { leftoverId, itemName: leftoverName, tab: 'pantry' },
+      priority,
+      expiresAt: Timestamp.fromDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)) // Expire in 7 days
+    })
+  }
 
-      // Prepare notification data for FCM
-      const fcmPayload = {
-        to: token,
-        notification: {
-          title: notification.title,
-          body: notification.message,
-          sound: 'default',
-          badge: 1,
-          click_action: 'FLUTTER_NOTIFICATION_CLICK' // For Android
-        },
-        data: {
-          type: notification.type,
-          actionType: notification.actionType,
-          actionData: JSON.stringify(notification.actionData || {}),
-          priority: notification.priority
-        },
-        priority: notification.priority === 'urgent' ? 'high' : 'normal'
-      };
+  /**
+   * Create aggregated leftover attention notification
+   */
+  static async createLeftoverAttentionAlert(
+    userId: string,
+    urgentLeftovers: Array<{ id: string; name: string; daysUntilExpiry: number; isCookedRice: boolean }>
+  ): Promise<string> {
+    if (!urgentLeftovers || urgentLeftovers.length === 0) return ''
 
-      // In a real app, you'd send this to your server, which would use Firebase Admin SDK
-      // For this demo, we'll log it (server-side implementation would be needed for production)
-      console.log('FCM Payload (send to server):', JSON.stringify(fcmPayload, null, 2));
+    const urgentCount = urgentLeftovers.filter(l => l.daysUntilExpiry <= 0).length
+    const expiringSoonCount = urgentLeftovers.filter(l => l.daysUntilExpiry > 0 && l.daysUntilExpiry <= 3).length
 
-      // For development/testing, you could implement a server endpoint that receives this payload
-      // and sends it to FCM. Here's how you would do it server-side with Firebase Admin SDK:
-      /*
-      const admin = require('firebase-admin');
-      await admin.messaging().send(fcmPayload);
-      */
+    let title = 'Leftovers Need Attention'
+    let message = ''
+    let priority: 'low' | 'medium' | 'high' | 'urgent' = 'medium'
 
-    } catch (err: any) {
-      console.error('Failed to prepare push notification:', err);
+    if (urgentCount > 0) {
+      title = `${urgentCount} Leftover${urgentCount > 1 ? 's' : ''} Expired!`
+      message = urgentLeftovers
+        .filter(l => l.daysUntilExpiry <= 0)
+        .slice(0, 3)
+        .map(l => l.name)
+        .join(', ')
+      if (urgentLeftovers.length > 3) message += ` and ${urgentLeftovers.length - 3} more`
+      message += ' have expired. Please discard immediately.'
+      priority = 'urgent'
+    } else if (expiringSoonCount > 0) {
+      title = 'Leftovers Expiring Soon'
+      message = `${expiringSoonCount} leftover${expiringSoonCount > 1 ? 's' : ''} expiring within 3 days: `
+      message += urgentLeftovers
+        .filter(l => l.daysUntilExpiry > 0 && l.daysUntilExpiry <= 3)
+        .slice(0, 2)
+        .map(l => l.name)
+        .join(', ')
+      priority = 'high'
     }
+
+    return this.createNotification(userId, {
+      type: 'expiration',
+      title,
+      message,
+      actionLabel: 'View Leftovers',
+      actionType: 'view_item',
+      actionData: {
+        tab: 'pantry',
+        leftovers: urgentLeftovers.map(l => ({ id: l.id, name: l.name }))
+      },
+      priority,
+      expiresAt: Timestamp.fromDate(new Date(Date.now() + 3 * 24 * 60 * 60 * 1000)) // Expire in 3 days
+    })
+  }
+
+  /**
+   * Send a push notification (placeholder - push notifications are typically sent server-side)
+   */
+  private static async sendPushNotification(userId: string, notification: any): Promise<void> {
+    // Push notifications are sent server-side via Firebase Cloud Messaging
+    // This is a placeholder method for client-side notification creation
+    console.log('Push notification would be sent for user:', userId, notification);
   }
 }

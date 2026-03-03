@@ -134,6 +134,29 @@ class AnalyticsService {
     });
   }
 
+  static trackLeftoverConsumed(householdId: string, leftoverId: string, servingsRemaining: number) {
+    this.logEvent('leftover_consumed', {
+      household_id: householdId,
+      leftover_id: leftoverId,
+      servings_remaining: servingsRemaining
+    });
+  }
+
+  static trackLeftoverDiscarded(householdId: string, leftoverId: string) {
+    this.logEvent('leftover_discarded', {
+      household_id: householdId,
+      leftover_id: leftoverId
+    });
+  }
+
+  static trackLeftoverNotificationSent(userId: string, notificationType: 'expiration' | 'attention', itemCount: number) {
+    this.logEvent('leftover_notification_sent', {
+      user_id: userId,
+      notification_type: notificationType,
+      item_count: itemCount
+    });
+  }
+
   static trackMoveToFreezer(householdId: string, itemId: string, previousLocation?: string) {
     this.logEvent('move_to_freezer', {
       household_id: householdId,

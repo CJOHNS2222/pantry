@@ -22,20 +22,30 @@ function getNotificationsDocRef(uid: string): DocumentReference {
  */
 export async function appendNotificationToUser(uid: string, notification: NotificationItem, maxItems = DEFAULT_MAX_NOTIFICATIONS) {
   const ref = getNotificationsDocRef(uid);
-  await runTransaction(db, async (tx) => {
-    const snap = await tx.get(ref as any);
-    const data = snap.exists() ? (snap.data() as any) : {};
-    const existing = Array.isArray(data.items) ? (data.items as NotificationItem[]) : [];
-    // Firestore does not support serverTimestamp() inside arrays.
-    // Use a client timestamp (ISO string) for items stored in arrays.
-    const createdAtValue = notification && typeof notification.createdAt === 'string'
-      ? notification.createdAt
-      : new Date().toISOString();
-    const next = [...existing, { ...notification, createdAt: createdAtValue }];
-    // Trim oldest if over cap
-    const trimmed = next.slice(-maxItems);
-    tx.set(ref as any, { items: trimmed }, { merge: true });
-  });
+  try {
+    await runTransaction(db, async (tx) => {
+      const snap = await tx.get(ref as any);
+      const data = snap.exists() ? (snap.data() as any) : {};
+      const existing = Array.isArray(data.items) ? (data.items as NotificationItem[]) : [];
+      // Firestore does not support serverTimestamp() inside arrays.
+      // Use a client timestamp (ISO string) for items stored in arrays.
+      const createdAtValue = notification && typeof notification.createdAt === 'string'
+        ? notification.createdAt
+        : new Date().toISOString();
+      const next = [...existing, { ...notification, createdAt: createdAtValue }];
+      // Trim oldest if over cap
+      const trimmed = next.slice(-maxItems);
+      tx.set(ref as any, { items: trimmed }, { merge: true });
+    });
+  } catch (err: any) {
+    // Provide contextual debug info to help troubleshoot permission errors
+    console.error('appendNotificationToUser failed', {
+      error: err?.message || err,
+      targetUid: uid,
+      notification
+    });
+    throw err;
+  }
 }
 
 /**
@@ -96,6 +106,23 @@ export async function markNotificationRead(uid: string, notificationId: string) 
     const data = snap.data() as any;
     const items = Array.isArray(data.items) ? data.items as NotificationItem[] : [];
     const updated = items.map(i => i.id === notificationId ? { ...i, read: true } : i);
+    tx.set(ref as any, { items: updated }, { merge: true });
+  });
+}
+
+/**
+ * Update fields of a notification in the per-user notifications cache.
+ * This is a best-effort update for clients that cannot write to the
+ * top-level `notifications` collection (e.g., due to security rules).
+ */
+export async function updateNotificationInCache(uid: string, notificationId: string, patch: Partial<NotificationItem>) {
+  const ref = getNotificationsDocRef(uid);
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref as any);
+    if (!snap.exists()) return;
+    const data = snap.data() as any;
+    const items = Array.isArray(data.items) ? data.items as NotificationItem[] : [];
+    const updated = items.map(i => i.id === notificationId ? { ...i, ...patch } : i);
     tx.set(ref as any, { items: updated }, { merge: true });
   });
 }

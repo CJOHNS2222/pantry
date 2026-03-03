@@ -5,6 +5,26 @@ All notable changes to Stock & Spoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.2] - 2026-03-03
+
+### Added
+- **Recipe Creation UX**: Completely redesigned the add recipe modal for better user experience
+  - Added meal type dropdown (vegan, keto, paleo, gluten-free, dairy-free, etc.)
+  - Implemented dynamic ingredient/step inputs that start with 4 fields and expand automatically
+  - Changed from confusing portions section to simple servings count
+  - Clarified "submit for inclusion" checkbox with better explanation
+
+### Fixed
+- **Missing Ingredients Count**: Fixed missing ingredients to only count current/future meals in the 7-day meal plan view
+  - Previously included past meals that hadn't been manually removed
+  - Now automatically excludes meals that have "passed" as days progress
+  - Button resets to 0 when meals move from today to yesterday
+
+### Changed
+- **Recipe Modal**: Removed "Mark as Made" and "Add to Schedule" buttons from recipe creation mode
+- **Recipe Modal**: Removed nutrition facts display from recipe creation (kept only in view mode)
+- **Recipe Modal**: Changed from textarea inputs to single-line inputs for ingredients and instructions
+
 ## [Unreleased] - 2026-02-13
 
 ### Added

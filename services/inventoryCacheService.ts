@@ -25,6 +25,7 @@ export class InventoryCacheService {
   private static readonly ITEM_FIELD_ORDER = [
     'category',
     'image', // Note: actual field is 'image', not 'imageUrl'
+    'containerImage', // Optional secondary image (container photo)
     'item',  // Note: actual field is 'item', not 'name'
     'quantity_estimate', // Note: actual field is 'quantity_estimate', not 'quantity'
     'storageLocation', // Note: actual field is 'storageLocation', not 'location'
@@ -43,6 +44,7 @@ export class InventoryCacheService {
     return [
       item.category || '',
       item.image || '', // image, not imageUrl
+      item.containerImage || '',
       item.item || '',  // item, not name
       item.quantity_estimate || '', // quantity_estimate, not quantity
       item.storageLocation || '', // storageLocation, not location
@@ -64,15 +66,16 @@ export class InventoryCacheService {
       id: itemId,
       category: itemArray[0] || '',
       image: itemArray[1] || '', // image, not imageUrl
-      item: itemArray[2] || '',  // item, not name
-      quantity_estimate: itemArray[3] || '', // quantity_estimate, not quantity
-      storageLocation: itemArray[4] ? itemArray[4] as any : undefined, // storageLocation, not location
+      containerImage: itemArray[2] || '',
+      item: itemArray[3] || '',  // item, not name
+      quantity_estimate: itemArray[4] || '', // quantity_estimate, not quantity
+      storageLocation: itemArray[5] ? itemArray[5] as any : undefined, // storageLocation, not location
       // Map recipeId/recipeName back into reservations for compatibility with PantryItem type
-      reservations: itemArray[5] || itemArray[6] ? [{ recipeId: itemArray[5] || '', recipeName: itemArray[6] || '', quantity: 0, unit: '' }] : undefined,
-      expirationDate: itemArray[7] || '',
-      expirationType: itemArray[8] ? itemArray[8] as any : undefined,
-      dateAdded: itemArray[9] || '',
-      lastRestocked: itemArray[10] || ''
+      reservations: itemArray[6] || itemArray[7] ? [{ recipeId: itemArray[6] || '', recipeName: itemArray[7] || '', quantity: 0, unit: '' }] : undefined,
+      expirationDate: itemArray[8] || '',
+      expirationType: itemArray[9] ? itemArray[9] as any : undefined,
+      dateAdded: itemArray[10] || '',
+      lastRestocked: itemArray[11] || ''
     };
   }
 

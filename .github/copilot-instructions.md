@@ -36,8 +36,7 @@ Use this file as the authoritative project context. Keep changes minimal, typed,
 
 ## 4) Firebase & Household Scoping
 - Preserve household-aware scoping patterns:
-  - `users/{uid}/...` for user-scoped data/cache.
-  - `households/{householdId}/...` for shared household data.
+ 
 - Maintain membership/ownership checks used by app logic and `firestore.rules`.
 - Keep cache sync flows intact (`services/*CacheService.ts`, `services/syncStateService.ts`).
 
@@ -102,7 +101,8 @@ Use this file as the authoritative project context. Keep changes minimal, typed,
 1. Implement/update in recipe services.
 2. Wire through existing recipe components and context flows.
 3. Preserve save/rating/meal-plan behaviors and limits.
-
+ - `users/{uid}/...` for user-scoped data/cache.
+  - `households/{householdId}/...` for shared household data.
 ---
 
 If two rules conflict, prioritize:

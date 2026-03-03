@@ -318,23 +318,17 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     }]);
   };
 
-  const toggleCheck = (id: string) => {
+  const handleItemToggle = (id: string) => {
     const item = items.find(i => i.id === id);
     if (!item) return;
 
-    // If checking an item (not unchecking), open purchase modal to capture purchased quantity/expiration
-    if (!item.checked) {
-      setPurchaseTargetItem(item);
-      setPurchaseQty(typeof item.quantity === 'number' ? item.quantity : parseFloat((item.quantity as string) || '1') || 1);
-      setPurchaseUnit((item.purchasedQuantity && item.purchasedQuantity.unit) || 'count');
-      setPurchaseExpires(undefined);
-      setPurchaseModalOpen(true);
-      return;
-    }
-
-    // Unchecking - simply toggle
+    // Simply toggle the checked state without opening purchase modal
     const now = new Date();
-    setItems(prev => prev.map(i => i.id === id ? { ...i, checked: false, completedAt: undefined } : i));
+    setItems(prev => prev.map(i => i.id === id ? {
+      ...i,
+      checked: !i.checked,
+      completedAt: !i.checked ? now : undefined
+    } : i));
   };
 
   const confirmPurchaseForItem = (itemId: string) => {
@@ -395,9 +389,10 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
 
   // Multi-selection functions
 
-  // Toggle an item's checked state (uses existing helper to keep undo history)
-  const handleItemToggle = (id: string) => {
-    toggleCheck(id);
+  const handleQuantityChange = (id: string, quantity: string) => {
+    setItems(prev => prev.map(item => 
+      item.id === id ? { ...item, quantity } : item
+    ));
   };
 
   const deleteCheckedItems = async () => {
@@ -873,6 +868,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
             items={items}
             onToggleCheck={handleItemToggle}
             onRemove={remove}
+            onQuantityChange={handleQuantityChange}
             isSelected={(id) => items.some(it => it.id === id && it.checked)}
             onLongPress={undefined}
           />
@@ -884,6 +880,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
               item={item}
               onToggleCheck={handleItemToggle}
               onRemove={remove}
+              onQuantityChange={handleQuantityChange}
               isOffline={!isOnline}
               isSelected={item.checked}
               onLongPress={undefined}

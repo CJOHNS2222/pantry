@@ -36,8 +36,9 @@ export async function uploadItemImage(
           };
           await DatabaseMonitoringService.setDoc(cacheRef, data);
         } else if (cacheScope === 'household') {
-          const path = `image_cache/households/${householdId}`;
-          const cacheRef = DatabaseMonitoringService.doc(path);
+          // Store household-specific cache entry under a single image_cache document
+          // keyed by household to produce an even-numbered document path.
+          const cacheRef = DatabaseMonitoringService.doc('image_cache', `households_${householdId}`);
           const snap = await DatabaseMonitoringService.getDoc(cacheRef);
           const data = snap && snap.exists() ? (snap.data() as any) : {};
           data[cacheKey] = {
@@ -53,8 +54,9 @@ export async function uploadItemImage(
           if (!userId) {
             console.warn('userId required for user-scoped image cache; skipping cache write');
           } else {
-            const path = `users/${userId}/image_cache`;
-            const cacheRef = DatabaseMonitoringService.doc(path);
+            // Use a single image_cache document keyed by user to ensure an even-numbered
+            // document reference (collection + doc).
+            const cacheRef = DatabaseMonitoringService.doc('image_cache', `user_${userId}`);
             const snap = await DatabaseMonitoringService.getDoc(cacheRef);
             const data = snap && snap.exists() ? (snap.data() as any) : {};
             data[cacheKey] = {

@@ -1378,7 +1378,8 @@ export function getCategoryIcon(categoryName: string, customCategories: CustomCa
     'Frozen Foods': '🧊',
     'Baking Supplies': '🧁',
     'Breakfast Foods': '🥞',
-    'Canned Goods': '🥫'
+    'Canned Goods': '🥫',
+    'Leftovers': '🥡'
   };
 
   return defaultIcons[categoryName] || '📦';

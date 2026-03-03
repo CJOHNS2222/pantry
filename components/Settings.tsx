@@ -21,6 +21,7 @@ import { VersionUpdate } from './VersionUpdate';
 import { MonitoringDashboard } from './MonitoringDashboard';
 import { Household } from '../types';
 import LeftoverPersonaQuestionnaire from './LeftoverPersonaQuestionnaire';
+import { LeftoverAnalytics } from './LeftoverAnalytics';
 
 const defaultSettings = {
   notifications: {
@@ -321,6 +322,27 @@ export const Settings: React.FC<SettingsProps> = ({
 
           {expandedSections.has('Profile') && (
             <div className="border-t border-theme p-4">
+          {/* Measurement System Preference */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium mb-2 text-theme-primary">Measurement System</label>
+            <div className="flex bg-theme-secondary rounded-lg p-1 border border-theme h-10">
+              <button
+                type="button"
+                onClick={() => handleProfileChange('measurementSystem', 'Standard')}
+                className={`flex-1 text-sm font-bold rounded transition-all ${userProfile?.measurementSystem === 'Standard' || (!userProfile?.measurementSystem && 'Standard' === 'Standard') ? 'bg-[var(--accent-color)] text-white shadow-sm' : 'text-theme-secondary opacity-50'}`}
+              >
+                Standard (Imperial)
+              </button>
+              <button
+                type="button"
+                onClick={() => handleProfileChange('measurementSystem', 'Metric')}
+                className={`flex-1 text-sm font-bold rounded transition-all ${userProfile?.measurementSystem === 'Metric' ? 'bg-[var(--accent-color)] text-white shadow-sm' : 'text-theme-secondary opacity-50'}`}
+              >
+                Metric
+              </button>
+            </div>
+          </div>
+
           {/* AI Opt-in and Shopping Preferences - Side by side */}
           <div className="mb-4">
             <div className="flex items-center justify-between gap-4">
@@ -1023,6 +1045,31 @@ export const Settings: React.FC<SettingsProps> = ({
           {expandedSections.has('Database Monitoring') && (
             <div className="border-t border-theme p-4">
               <MonitoringDashboard user={user} />
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Leftover Analytics Section */}
+      {user && (
+        <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden">
+          <div
+            onClick={() => toggleSection('Leftover Analytics')}
+            className="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-theme-primary transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              {expandedSections.has('Leftover Analytics') ? (
+                <ChevronDown className="w-5 h-5 text-theme-primary" />
+              ) : (
+                <ChevronRight className="w-5 h-5 text-theme-primary" />
+              )}
+              <h3 className="font-semibold text-theme-primary">Leftover Analytics</h3>
+            </div>
+          </div>
+
+          {expandedSections.has('Leftover Analytics') && (
+            <div className="border-t border-theme p-4">
+              <LeftoverAnalytics householdId={household?.id} userId={user.id} />
             </div>
           )}
         </div>

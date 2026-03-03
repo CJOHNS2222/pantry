@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { X, TrendingUp, ShoppingBasket, Trash2, Edit3, Package, Minus, Plus, Zap, History } from 'lucide-react';
+import { X, TrendingUp, ShoppingBasket, Trash2, Edit3, Zap, History } from 'lucide-react';
 import { PantryItem } from '../types';
 import PriceTrends from './PriceTrends';
 import { getAllCategories, getExpirationColor, cleanItemNameForShopping, formatItemQuantity, parseQuantity } from '../utils/appUtils';
 import { getQuantityAmount, getQuantityUnit } from '../utils/quantityUtils';
 import { getNutritionFactsWithFallback, NutritionFacts, formatNutrition } from '../services/nutritionService';
 import { useKeyboardNavigation } from '../hooks/useKeyboardNavigation';
-import VisualQuantitySelector from './VisualQuantitySelector';
 import QuantityUnitPicker from './QuantityUnitPicker';
 import { COMMON_UNITS, getSmartUnits } from './QuantityUnitPicker';
 import { useApp } from '../contexts/AppContext';
@@ -39,16 +38,9 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   const [isEditingExpiration, setIsEditingExpiration] = useState(false);
   const [editExpirationDate, setEditExpirationDate] = useState(() => item.expirationDate || '');
   const [editExpirationType, setEditExpirationType] = useState(() => item.expirationType || 'best-by');
-  const [editingBatchId, setEditingBatchId] = useState<string | null>(null);
-  const [batchQty, setBatchQty] = useState<number>(1);
-  const [batchUnit, setBatchUnit] = useState<string>('count');
-  const [batchExpires, setBatchExpires] = useState<string | undefined>(undefined);
-  const BATCH_MIN = 1;
-  const BATCH_MAX = 100;
   // Local-only state while modal is open; persist on close
   const [localQuantity, setLocalQuantity] = useState<number>(getQuantityAmount(item.quantity ?? item.quantity_estimate));
   const [localUnit, setLocalUnit] = useState<string>(getQuantityUnit(item.quantity ?? item.quantity_estimate));
-  const [localBatches, setLocalBatches] = useState(() => (item.batches ? JSON.parse(JSON.stringify(item.batches)) : []));
   const [localStorageLocation, setLocalStorageLocation] = useState<PantryItem['storageLocation']>(item.storageLocation || 'pantry');
   const [localCategory, setLocalCategory] = useState<string>(item.category || 'Manual');
   const [localExpirationDate, setLocalExpirationDate] = useState<string>(item.expirationDate || '');
@@ -58,24 +50,16 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
-  const [cacheScope, setCacheScope] = useState<'none' | 'household' | 'user' | 'global'>('household');
 
   useEffect(() => {
     // Reset local state when item prop changes
     setLocalQuantity(getQuantityAmount(item.quantity ?? item.quantity_estimate));
     setLocalUnit(getQuantityUnit(item.quantity ?? item.quantity_estimate));
-    setLocalBatches(item.batches ? JSON.parse(JSON.stringify(item.batches)) : []);
     setLocalStorageLocation(item.storageLocation || 'pantry');
     setLocalCategory(item.category || 'Manual');
     setLocalExpirationDate(item.expirationDate || '');
     setLocalExpirationType(item.expirationType || 'best-by');
   }, [item]);
-
-  // Compute summed total from batches when present
-  const batchTotal = (item.batches && item.batches.length > 0)
-    ? item.batches.reduce((sum, b) => sum + (b.quantity || 0), 0)
-    : 0;
-  const batchUnitDisplay = (item.batches && item.batches.length > 0) ? item.batches[0].unit : undefined;
 
   // Fetch nutrition facts on component mount
   useEffect(() => {
@@ -133,48 +117,6 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
     setLocalCategory(category);
   };
 
-  const handleAddBatchLocal = () => {
-    // Open inline purchase form for user to enter quantity + expiration
-    const now = new Date().toISOString();
-    const newBatchId = crypto.randomUUID();
-    const newBatch = { batchId: newBatchId, quantity: 1, unit: 'count', expires: undefined, purchaseDate: now };
-    setLocalBatches([...(localBatches || []), newBatch]);
-    setEditingBatchId(newBatchId);
-    setBatchQty(1);
-    setBatchUnit('count');
-    setBatchExpires(undefined);
-  };
-
-  const batchUnitOptions = React.useMemo(() => {
-    const smart = getSmartUnits(item.item || '');
-    const combined = [...smart, ...COMMON_UNITS.filter(u => !smart.includes(u))];
-    if (!combined.includes('1/2 gallon')) {
-      const idx = combined.indexOf('gallons');
-      const insertAt = idx >= 0 ? idx + 1 : combined.length;
-      combined.splice(insertAt, 0, '1/2 gallon');
-    }
-    return combined;
-  }, [item.item]);
-
-  const handleSaveBatchLocal = () => {
-    // Ensure integer quantity and clamp
-    const intQty = Math.max(BATCH_MIN, Math.min(BATCH_MAX, Math.floor(batchQty)));
-    const exists = (localBatches || []).some((b: any) => b.batchId === editingBatchId);
-    let updated;
-    if (exists) {
-      updated = (localBatches || []).map((b: any) => b.batchId === editingBatchId ? { ...b, quantity: intQty, unit: batchUnit, expires: batchExpires } : b);
-    } else {
-      // safety: add as new
-      updated = [...(localBatches || []), { batchId: editingBatchId || crypto.randomUUID(), quantity: intQty, unit: batchUnit, expires: batchExpires, purchaseDate: new Date().toISOString() }];
-    }
-    setLocalBatches(updated);
-    setEditingBatchId(null);
-  };
-
-  const handleDeleteBatchLocal = (batchId: string) => {
-    setLocalBatches((localBatches || []).filter((x: any) => x.batchId !== batchId));
-  };
-
   // Image handlers
   const handleFileInput = (file?: File) => {
     if (!file) return;
@@ -191,8 +133,10 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
     if (!selectedFile) return;
     setUploadingImage(true);
     try {
-      const householdId = household?.id || 'unknown_household';
-      const downloadUrl = await uploadItemImage(selectedFile, householdId, item.item, cacheScope, user?.id);
+      // Choose upload target and scope automatically: household if available, otherwise user
+      const targetId = household?.id || user?.id || 'user';
+      const scopeToUse: 'household' | 'user' = household?.id ? 'household' : 'user';
+      const downloadUrl = await uploadItemImage(selectedFile, targetId, item.item, scopeToUse, user?.id);
       // Persist image URL via provided update callback
       onUpdateItem(originalIndex, { image: downloadUrl });
       // clear local selection after success
@@ -213,12 +157,6 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
     if (localQuantity !== getQuantityAmount(item.quantity ?? item.quantity_estimate) || localUnit !== getQuantityUnit(item.quantity ?? item.quantity_estimate)) {
       updates.quantity = { amount: localQuantity, unit: localUnit } as any;
       updates.quantity_estimate = String(localQuantity);
-    }
-
-    // Batches
-    // Compare JSON strings for simplicity
-    if (JSON.stringify(localBatches || []) !== JSON.stringify(item.batches || [])) {
-      updates.batches = localBatches;
     }
 
     // Storage & Category
@@ -245,12 +183,9 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
           {/* Header - Fixed */}
           <div className="flex items-center justify-between pt-4 px-3 pb-3 border-b border-theme flex-shrink-0">
             <h3 className="text-lg font-semibold text-theme-primary">{item.item}</h3>
-            <button
-              onClick={handleCloseAndPersist}
-              className="text-theme-secondary opacity-70 hover:opacity-100 hover:text-theme-primary"
-            >
-              <X className="w-6 h-6" />
-            </button>
+            <div className="text-sm text-theme-secondary">
+              Added on {item.dateAdded ? new Date(item.dateAdded).toLocaleDateString() : 'Unknown'}
+            </div>
           </div>
 
           {/* Scrollable Content */}
@@ -269,27 +204,21 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                 />
               </div>
               <div className="flex items-center gap-2">
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => handleFileInput(e.target.files?.[0])}
-                  className="text-xs"
-                />
-                <label className="flex items-center gap-2 text-xs">
-                  <span className="mr-1">Cache:</span>
-                  <select value={cacheScope} onChange={(e) => setCacheScope(e.target.value as any)} className="text-xs bg-theme-primary rounded border border-theme p-1">
-                    <option value="none">No cache</option>
-                    <option value="household">Household</option>
-                    <option value="user">Private (only me)</option>
-                    <option value="global">Shared (public)</option>
-                  </select>
+                <label className="cursor-pointer px-3 py-1 bg-theme-secondary text-theme-primary rounded text-sm hover:bg-theme-primary hover:text-theme-secondary border border-theme">
+                  Change picture
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handleFileInput(e.target.files?.[0])}
+                    className="hidden"
+                  />
                 </label>
               </div>
               <div className="flex gap-2">
                 <button onClick={handleUploadImage} disabled={!selectedFile || uploadingImage} className="px-3 py-1 bg-[var(--accent-color)] text-white rounded text-sm">
                   {uploadingImage ? 'Uploading…' : 'Upload & Save'}
                 </button>
-                {item.image && (
+                {item.image && item.image !== '/images/placeholder.svg' && (
                   <button onClick={() => onUpdateItem(originalIndex, { image: undefined })} className="px-3 py-1 bg-theme-secondary rounded text-sm">
                     Remove Photo
                   </button>
@@ -304,12 +233,6 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
               <label className="block text-sm font-medium text-theme-primary mb-1.5">
                 Quantity
               </label>
-              {batchTotal > 0 && (
-                <div className="mb-2 text-sm text-theme-primary flex items-center justify-between">
-                  <div className="opacity-80">Total (batches)</div>
-                  <div className="font-medium">{batchTotal} {batchUnitDisplay || ''}</div>
-                </div>
-              )}
               <QuantityUnitPicker
                 quantity={editQuantity}
                 unit={editUnit}
@@ -333,115 +256,6 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
             )}
 
             {/* Expiration Date */}
-            {/* Batches Section */}
-            <div className="bg-theme-secondary p-2 rounded-lg border border-theme">
-              <label className="block text-xs font-medium text-theme-primary mb-1 uppercase opacity-70">
-                Batches
-              </label>
-              {(localBatches && localBatches.length > 0) ? (
-                <div className="space-y-2">
-                  {localBatches.map((b: any) => (
-                    <div key={b.batchId} className="bg-theme-primary p-2 rounded">
-                      {editingBatchId === b.batchId ? (
-                        // Inline editor for this batch
-                        <div className="space-y-2">
-                          <div className="text-sm font-medium text-theme-primary">Edit Purchase</div>
-                          <div>
-                            <label className="text-xs text-theme-secondary">Quantity</label>
-                            <div className="flex items-center gap-2 mt-1">
-                              <input
-                                type="range"
-                                min={BATCH_MIN}
-                                max={BATCH_MAX}
-                                step={1}
-                                value={batchQty}
-                                onChange={(e) => setBatchQty(parseInt(e.target.value || String(BATCH_MIN), 10))}
-                                className="flex-1"
-                              />
-                              <input
-                                type="number"
-                                min={BATCH_MIN}
-                                max={BATCH_MAX}
-                                step={1}
-                                value={batchQty}
-                                onChange={(e) => {
-                                  const v = parseInt(e.target.value, 10);
-                                  if (Number.isNaN(v)) {
-                                    setBatchQty(BATCH_MIN);
-                                  } else {
-                                    setBatchQty(Math.max(BATCH_MIN, Math.min(BATCH_MAX, v)));
-                                  }
-                                }}
-                                className="w-20 p-2 rounded border text-black"
-                              />
-                            </div>
-                          </div>
-                          <div>
-                            <label className="text-xs text-theme-secondary">Unit</label>
-                            <select value={batchUnit} onChange={(e) => setBatchUnit(e.target.value)} className="w-full mt-1 p-2 rounded border bg-theme-primary text-theme-primary">
-                              {batchUnitOptions.map(opt => (
-                                <option key={opt} value={opt}>{opt}</option>
-                              ))}
-                            </select>
-                          </div>
-                          <div>
-                            <label className="text-xs text-theme-secondary">Expiration</label>
-                            <input type="date" value={batchExpires || ''} onChange={(e) => setBatchExpires(e.target.value || undefined)} className="w-full mt-1 p-2 rounded border text-black" />
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <div className="text-xs text-theme-primary/70">{b.expires ? `Originally: ${b.expires}` : ''}</div>
-                            <div className="flex gap-2">
-                              <button onClick={() => setEditingBatchId(null)} className="px-3 py-1 rounded bg-theme-secondary">Cancel</button>
-                              <button onClick={() => { handleSaveBatchLocal(); }} className="px-3 py-1 rounded bg-[var(--accent-color)] text-white">Save</button>
-                            </div>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <div className="text-sm font-medium text-theme-primary">{Math.round(b.quantity)} {b.unit || ''}</div>
-                            <div className="text-xs text-theme-secondary">{b.expires ? `Expires ${new Date(b.expires).toLocaleDateString()}` : 'No expiry'}</div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <button onClick={() => {
-                              setEditingBatchId(b.batchId);
-                              setBatchQty(b.quantity);
-                              setBatchUnit(b.unit || 'count');
-                              setBatchExpires(b.expires);
-                            }} className="p-2 text-theme-secondary hover:text-[var(--accent-color)]">
-                              <Edit3 className="w-4 h-4" />
-                            </button>
-                            <button onClick={() => {
-                              if (confirm('Remove this batch?')) {
-                                handleDeleteBatchLocal(b.batchId);
-                              }
-                            }} className="p-2 text-theme-secondary hover:text-red-600">
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ) : null}
-
-              <div className="mt-3 flex flex-col gap-2">
-                <div className="flex gap-2">
-                  <button
-                    onClick={handleAddBatchLocal}
-                    title="Open inline purchase editor — purchases are saved when you close the modal"
-                    className="px-3 py-1 bg-[var(--accent-color)] text-white rounded"
-                  >
-                    Add Purchase
-                  </button>
-                  {editingBatchId && (
-                    <button onClick={() => { setEditingBatchId(null); }} className="px-3 py-1 bg-theme-secondary rounded">Close Edit</button>
-                  )}
-                </div>
-                <div className="text-xs text-theme-primary/70">Purchase entries are saved when you close this dialog.</div>
-              </div>
-            </div>
             <div className="bg-theme-secondary p-2 rounded-lg border border-theme">
               <label className="block text-xs font-medium text-theme-primary mb-1 uppercase opacity-70">
                 Expiration
@@ -508,65 +322,6 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                 </div>
               )}
             </div>
-
-            {/* Batch Edit Inline Modal */}
-            {editingBatchId && (
-              <div className="bg-theme-secondary p-3 rounded-lg border border-theme mt-3">
-                <label className="block text-xs font-medium text-theme-primary mb-1 uppercase opacity-70">Edit Batch</label>
-                  <div className="space-y-2">
-                    <div>
-                      <label className="text-xs text-theme-secondary">Quantity</label>
-                      <div className="flex items-center gap-2 mt-1">
-                        <input
-                          type="range"
-                          min={BATCH_MIN}
-                          max={BATCH_MAX}
-                          step={1}
-                          value={batchQty}
-                          onChange={(e) => setBatchQty(parseInt(e.target.value || String(BATCH_MIN), 10))}
-                          className="flex-1"
-                        />
-                        <input
-                          type="number"
-                          min={BATCH_MIN}
-                          max={BATCH_MAX}
-                          step={1}
-                          value={batchQty}
-                          onChange={(e) => {
-                            const v = parseInt(e.target.value, 10);
-                            if (Number.isNaN(v)) {
-                              setBatchQty(BATCH_MIN);
-                            } else {
-                              setBatchQty(Math.max(BATCH_MIN, Math.min(BATCH_MAX, v)));
-                            }
-                          }}
-                          className="w-20 p-2 rounded border text-black"
-                        />
-                      </div>
-                      <div className="text-xs text-theme-secondary mt-1">Quantity must be a whole number between {BATCH_MIN} and {BATCH_MAX}.</div>
-                    </div>
-                    <div>
-                      <label className="text-xs text-theme-secondary">Unit</label>
-                      <select value={batchUnit} onChange={(e) => setBatchUnit(e.target.value)} className="w-full mt-1 p-2 rounded border bg-theme-primary text-theme-primary">
-                        {batchUnitOptions.map(opt => (
-                          <option key={opt} value={opt}>{opt}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-xs text-theme-secondary">Expiration</label>
-                      <input type="date" value={batchExpires || ''} onChange={(e) => setBatchExpires(e.target.value || undefined)} className="w-full mt-1 p-2 rounded border text-black" />
-                    </div>
-                  </div>
-                  <div className="flex gap-2 justify-end mt-3">
-                    <button onClick={() => setEditingBatchId(null)} className="px-3 py-1 rounded bg-theme-secondary">Cancel</button>
-                    <button onClick={() => {
-                      // Save to local batches (persist on modal close)
-                      handleSaveBatchLocal();
-                    }} className="px-3 py-1 rounded bg-[var(--accent-color)] text-white">Save</button>
-                  </div>
-              </div>
-            )}
 
             {/* Storage Location & Category - Side by Side */}
             <div className="grid grid-cols-2 gap-2">

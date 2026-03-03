@@ -14,6 +14,7 @@ interface SmartShoppingListOrganizerProps {
   items: ShoppingItem[];
   onToggleCheck: (id: string) => void;
   onRemove: (id: string) => void;
+  onQuantityChange?: (id: string, quantity: string) => void;
   isOffline?: boolean;
   lastSynced?: Date;
   isSelected?: (id: string) => boolean;
@@ -24,6 +25,7 @@ export const SmartShoppingListOrganizer: React.FC<SmartShoppingListOrganizerProp
   items,
   onToggleCheck,
   onRemove,
+  onQuantityChange,
   isOffline = false,
   lastSynced,
   isSelected,
@@ -145,6 +147,7 @@ export const SmartShoppingListOrganizer: React.FC<SmartShoppingListOrganizerProp
                 item={item}
                 onToggleCheck={onToggleCheck}
                 onRemove={onRemove}
+                onQuantityChange={onQuantityChange}
                 isOffline={isOffline}
                 lastSynced={lastSynced}
                 isSelected={isSelected ? isSelected(item.id) : false}
