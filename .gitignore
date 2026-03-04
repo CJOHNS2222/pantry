@@ -44,3 +44,4 @@ scripts/ornate-compass-478504-e1-firebase-adminsdk-fbsvc-b421e3c5e1.json
 # Ignore generated TypeScript client node_modules and lockfile
 /typescript/node_modules/
 /typescript/package-lock.json
+public/images/Screenshot_*.jpg
