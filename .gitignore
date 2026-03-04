@@ -28,6 +28,10 @@ yarn-error.log*
 new-service-account.json
 old-service-account.json
 
+# Firebase configuration
+google-services.json
+android/app/google-services.json
+
 # Android release keystore
 pantry-release.keystore
 
