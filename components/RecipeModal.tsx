@@ -715,7 +715,9 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
                     if (imageFile) built.__imageFile = imageFile;
                     if (submitForInclusion) built.__submitForInclusion = true;
 
-                    await onSaveRecipe(built as StructuredRecipe);
+                    if (onSaveRecipe) {
+                      await onSaveRecipe(built as StructuredRecipe);
+                    }
                     onClose();
                   } finally {
                     setIsSaving(false);

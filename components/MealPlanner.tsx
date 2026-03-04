@@ -631,13 +631,6 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
     // No longer need to load recipes since we use prop savedRecipes
   }, [propSavedRecipes.length]);
 
-  // Legacy function for backward compatibility
-  const getMissingIngredients = () => missingIngredients;
-
-  useEffect(() => {
-    setMissingItemsCount(missingIngredients.length);
-  }, [missingIngredients]);
-
   // Close help tooltip when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -1142,9 +1135,6 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
 
     return Object.values(grouped);
   }, [displayPlan, inventory, shoppingList, includeStaples]);
-
-  // Legacy function for backward compatibility
-  const getMissingIngredients = () => missingIngredients;
 
   useEffect(() => {
     setMissingItemsCount(missingIngredients.length);
