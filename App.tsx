@@ -547,6 +547,14 @@ const App: React.FC = () => {
       log.error('Failed to add back button listener', { error }, 'App');
     });
 
+    // Handle app URL open for Firebase auth redirects
+    CapacitorApp.addListener('appUrlOpen', (event) => {
+      console.log('App opened with URL:', event.url);
+      // The Login component will handle getRedirectResult
+    }).catch((error) => {
+      log.error('Failed to add app URL open listener', { error }, 'App');
+    });
+
     return () => {
       if (backButtonListenerRef.current && backButtonListenerRef.current.remove) {
         backButtonListenerRef.current.remove();

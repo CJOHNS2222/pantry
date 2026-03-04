@@ -24,6 +24,19 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [error, setError] = useState<React.ReactNode | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
+  // Debug timer to track when crash occurs
+  useEffect(() => {
+    console.log('Login component mounted at:', new Date().toISOString());
+    const interval = setInterval(() => {
+      console.log('Login component still alive at:', new Date().toISOString());
+    }, 1000);
+
+    return () => {
+      console.log('Login component unmounting at:', new Date().toISOString());
+      clearInterval(interval);
+    };
+  }, []);
+
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -125,7 +138,8 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
       if ((window as any).Capacitor && Browser) {
         // Set the redirect URL for mobile
         googleProvider.setCustomParameters({
-          prompt: 'select_account'
+          prompt: 'select_account',
+          redirect_uri: 'com.smart.pantry://'
         });
 
         // Use redirect for mobile with Capacitor Browser
@@ -165,12 +179,15 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
   // Handle Google redirect result (for mobile and fallback)
   useEffect(() => {
+    console.log('Login component mounted, checking for redirect result...');
     const checkRedirect = async () => {
-      const auth = getAuth();
       try {
+        console.log('Checking redirect result...');
         const result = await getRedirectResult(auth);
+        console.log('Redirect result:', result);
         if (result && result.user) {
           const user = result.user;
+          console.log('User from redirect:', user);
           if (analytics) {
             logEvent(analytics, 'login', { email: user.email, provider: 'google' });
           }
@@ -181,6 +198,8 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
             provider: 'google',
             hasSeenTutorial: false
           });
+        } else {
+          console.log('No redirect result found');
         }
       } catch (error: any) {
         console.log('Redirect result error:', error);

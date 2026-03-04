@@ -10,6 +10,15 @@ import { AppActionsProvider } from './contexts/AppActionsContext';
 // Initialize Sentry for error reporting
 // initSentry(); // DISABLED for testing
 
+// Add global error handlers for debugging
+window.addEventListener('error', (event) => {
+  console.error('Global error caught:', event.error);
+});
+
+window.addEventListener('unhandledrejection', (event) => {
+  console.error('Unhandled promise rejection:', event.reason);
+});
+
 const rootElement = document.getElementById('root');
 if (!rootElement) {
   throw new Error("Could not find root element to mount to");

@@ -4,6 +4,10 @@ const config: CapacitorConfig = {
   appId: 'com.smart.pantry',
   appName: 'Smart Pantry',
   webDir: 'dist',
+  server: {
+    androidScheme: 'com.smart.pantry',
+    iosScheme: 'com.smart.pantry'
+  },
   plugins: {
     App: {
       // App plugin configuration
@@ -27,9 +31,9 @@ const config: CapacitorConfig = {
     //   enabled: true,
     //   excludePatterns: ["*firestore.googleapis.com*"]
     // },
-    // Browser: {
-    //   toolbarColor: '#2A0A10'
-    // }
+    Browser: {
+      // toolbarColor: '#2A0A10'
+    }
   },
   // App icon configuration (icons are handled by the build pipeline)
 };
