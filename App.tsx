@@ -550,7 +550,12 @@ const App: React.FC = () => {
     // Handle app URL open for Firebase auth redirects
     CapacitorApp.addListener('appUrlOpen', (event) => {
       console.log('App opened with URL:', event.url);
-      // The Login component will handle getRedirectResult
+      // Check if this is a Firebase auth redirect
+      if (event.url && event.url.startsWith('com.smart.pantry://')) {
+        console.log('Firebase auth redirect detected, URL:', event.url);
+        // The redirect result will be handled by the Login component
+        // when it mounts and calls getRedirectResult
+      }
     }).catch((error) => {
       log.error('Failed to add app URL open listener', { error }, 'App');
     });
