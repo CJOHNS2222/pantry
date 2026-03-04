@@ -44,7 +44,7 @@ import { groceryPriceService } from './services/groceryPriceService';
 import { PriceDataCacheService } from './services/priceDataCacheService'; // Import the service
 
 // Lazy load monitoring components
-const DatabaseAnalytics = React.lazy(() => import('./components/DatabaseAnalytics').then(module => ({ default: module.default })));
+// const DatabaseAnalytics = React.lazy(() => import('./components/DatabaseAnalytics').then(module => ({ default: module.default })));
 
 // Loading component for lazy-loaded components
 const LoadingSpinner: React.FC = () => (
@@ -926,9 +926,10 @@ const App: React.FC = () => {
 
       <GlobalUpdatePrompt />
 
-      <Suspense fallback={<LoadingSpinner />}>
+      {/* DatabaseAnalytics component - temporarily disabled due to import issues */}
+      {/* <Suspense fallback={<LoadingSpinner />}>
         <DatabaseAnalytics />
-      </Suspense>
+      </Suspense> */}
     </>
   );
 };
