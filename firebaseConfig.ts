@@ -19,9 +19,10 @@ config = webFirebaseConfig;
 
 const app = initializeApp(config);
 export const auth = getAuth(app);
-auth.settings = {
-  appVerificationDisabledForTesting: true
-};
+// Temporarily enable app verification for production builds
+// auth.settings = {
+//   appVerificationDisabledForTesting: true
+// };
 export const db = getFirestore(app);
 export const storage = getStorage(app);
 export const functions = getFunctions(app);
