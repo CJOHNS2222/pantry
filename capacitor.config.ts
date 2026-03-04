@@ -4,10 +4,11 @@ const config: CapacitorConfig = {
   appId: 'com.smart.pantry',
   appName: 'Smart Pantry',
   webDir: 'dist',
-  server: {
-    androidScheme: 'com.smart.pantry',
-    iosScheme: 'com.smart.pantry'
-  },
+  // Remove server config for production builds - Capacitor will load from webDir
+  // server: {
+  //   androidScheme: 'com.smart.pantry',
+  //   iosScheme: 'com.smart.pantry'
+  // },
   plugins: {
     App: {
       // App plugin configuration
