@@ -1366,7 +1366,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
         {/* Loading state */}
         {isLoadingMealPlan ? (
           <div className="space-y-4">
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               {Array.from({ length: 7 }).map((_, index) => (
                 <MealPlanSkeleton key={`loading-${index}`} />
               ))}
@@ -1375,7 +1375,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
         ) : (
           /* Calendar Grid */
           <div className="space-y-4">
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
                 {displayPlan.map((day, displayIndex) => {
                   const originalIndex = displayToOriginal[displayIndex];
                   const effectiveIndex = originalIndex >= 0 ? originalIndex : ensureDayExists(day.date, day.dayName);
@@ -1384,7 +1384,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
                     <div
                       key={day.date}
                       onClick={() => setSelectedDayIndex(effectiveIndex)}
-                      className={`bg-theme-secondary rounded-lg p-3 min-h-[250px] border-2 transition-all cursor-pointer flex flex-col hover:shadow-lg hover:scale-[1.02] ${
+                      className={`bg-theme-secondary rounded-lg p-3 min-h-[320px] border-2 transition-all cursor-pointer flex flex-col hover:shadow-lg hover:scale-[1.02] ${
                         isToday(day.date) && !showRecipeModal && !showRecipeSearch && !showAddMealDialog && !showMealPrepPlanner
                           ? 'border-[var(--accent-color)] bg-gradient-to-br from-[var(--accent-color)]/5 to-transparent shadow-md ring-1 ring-[var(--accent-color)]/20'
                           : 'border-theme'

@@ -178,21 +178,42 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
 
   return (
     <>
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4">
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4 pb-24">
         <div className="bg-theme-primary rounded-lg shadow-xl w-full max-w-md mx-auto max-h-[80vh] flex flex-col border border-theme">
           {/* Header - Fixed */}
           <div className="flex items-center justify-between pt-4 px-3 pb-3 border-b border-theme flex-shrink-0">
             <h3 className="text-lg font-semibold text-theme-primary">{item.item}</h3>
-            <div className="text-sm text-theme-secondary">
-              Added on {item.dateAdded ? new Date(item.dateAdded).toLocaleDateString() : 'Unknown'}
+            <div className="flex items-center gap-2">
+              <div className="text-sm text-theme-secondary">
+                Added on {item.dateAdded ? new Date(item.dateAdded).toLocaleDateString() : 'Unknown'}
+              </div>
+              <button
+                onClick={onClose}
+                className="p-1 hover:bg-theme-secondary rounded-full transition-colors"
+                aria-label="Close modal"
+              >
+                <X className="w-5 h-5 text-theme-secondary" />
+              </button>
             </div>
           </div>
 
           {/* Scrollable Content */}
           <div className="flex-1 overflow-y-auto px-3 py-2">
             {/* Item Image + upload */}
-            <div className="pb-2 flex flex-col items-center gap-2">
-              <div>
+            <div className="pb-2 flex items-center gap-4">
+              {/* Change picture button - left side */}
+              <label className="cursor-pointer px-2 py-1 bg-theme-secondary text-theme-primary rounded text-xs hover:bg-theme-primary hover:text-theme-secondary border border-theme flex-shrink-0">
+                Change
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => handleFileInput(e.target.files?.[0])}
+                  className="hidden"
+                />
+              </label>
+
+              {/* Image in center */}
+              <div className="flex-1 flex justify-center">
                 <img
                   src={previewUrl || item.image || '/images/placeholder.svg'}
                   alt={item.item}
@@ -203,27 +224,15 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                   }}
                 />
               </div>
-              <div className="flex items-center gap-2">
-                <label className="cursor-pointer px-3 py-1 bg-theme-secondary text-theme-primary rounded text-sm hover:bg-theme-primary hover:text-theme-secondary border border-theme">
-                  Change picture
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => handleFileInput(e.target.files?.[0])}
-                    className="hidden"
-                  />
-                </label>
-              </div>
-              <div className="flex gap-2">
-                <button onClick={handleUploadImage} disabled={!selectedFile || uploadingImage} className="px-3 py-1 bg-[var(--accent-color)] text-white rounded text-sm">
-                  {uploadingImage ? 'Uploading…' : 'Upload & Save'}
-                </button>
-                {item.image && item.image !== '/images/placeholder.svg' && (
-                  <button onClick={() => onUpdateItem(originalIndex, { image: undefined })} className="px-3 py-1 bg-theme-secondary rounded text-sm">
-                    Remove Photo
-                  </button>
-                )}
-              </div>
+
+              {/* Upload button - right side */}
+              <button
+                onClick={handleUploadImage}
+                disabled={!selectedFile || uploadingImage}
+                className="px-2 py-1 bg-[var(--accent-color)] text-white rounded text-xs flex-shrink-0 disabled:opacity-50"
+              >
+                {uploadingImage ? 'Uploading…' : 'Upload'}
+              </button>
             </div>
 
             {/* Item Details */}
@@ -267,12 +276,12 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                       type="date"
                       value={editExpirationDate}
                       onChange={(e) => setEditExpirationDate(e.target.value)}
-                      className="flex-1 px-2 py-1 text-sm border border-theme rounded-md bg-theme-primary text-black focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]"
+                      className="flex-1 px-2 py-1 text-sm border border-theme rounded-md bg-white text-black focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]"
                     />
                     <select
                       value={editExpirationType}
                       onChange={(e) => setEditExpirationType(e.target.value as 'use-by' | 'best-by')}
-                      className="px-2 py-1 text-sm border border-theme rounded-md bg-theme-primary text-black focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]"
+                      className="px-2 py-1 text-sm border border-theme rounded-md bg-white text-black focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]"
                     >
                       <option value="best-by">Best By</option>
                       <option value="use-by">Use By</option>

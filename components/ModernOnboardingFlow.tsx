@@ -4,6 +4,7 @@ import { ContextualPermissionManager as ContextualPermissions } from './Contextu
 import { ValueDemo } from './ValueDemo';
 import { FeatureDiscoveryManager } from './FeatureDiscovery';
 import { ContextualTutorial } from './ContextualTutorial';
+import RiskAssessmentQuestionnaire from './RiskAssessmentQuestionnaire';
 
 interface ModernOnboardingFlowProps {
   user: any; // User object from auth context
@@ -16,12 +17,13 @@ export const ModernOnboardingFlow: React.FC<ModernOnboardingFlowProps> = ({
   onComplete,
   onSkip
 }) => {
-  const [currentPhase, setCurrentPhase] = useState<'onboarding' | 'permissions' | 'value-demo' | 'feature-discovery' | 'tutorial' | 'complete'>('onboarding');
+  const [currentPhase, setCurrentPhase] = useState<'onboarding' | 'permissions' | 'value-demo' | 'feature-discovery' | 'risk-assessment' | 'tutorial' | 'complete'>('onboarding');
   const [collectedData, setCollectedData] = useState({
     householdName: '',
     preferences: [] as string[],
     permissions: {} as Record<string, boolean>,
-    userItems: [] as string[]
+    userItems: [] as string[],
+    riskLevel: 3 as number // Default moderate risk level
   });
 
   // Phase transition handlers
@@ -36,6 +38,11 @@ export const ModernOnboardingFlow: React.FC<ModernOnboardingFlowProps> = ({
   };
 
   const handleFeatureDiscoveryComplete = () => {
+    setCurrentPhase('risk-assessment');
+  };
+
+  const handleRiskAssessmentComplete = (riskLevel: number) => {
+    setCollectedData(prev => ({ ...prev, riskLevel }));
     setCurrentPhase('tutorial');
   };
 
@@ -56,7 +63,8 @@ export const ModernOnboardingFlow: React.FC<ModernOnboardingFlowProps> = ({
           household_name: collectedData.householdName,
           preferences_count: collectedData.preferences.length,
           permissions_granted: Object.values(collectedData.permissions).filter(Boolean).length,
-          items_added: collectedData.userItems.length
+          items_added: collectedData.userItems.length,
+          risk_level: collectedData.riskLevel
         });
       }
 
@@ -160,6 +168,14 @@ export const ModernOnboardingFlow: React.FC<ModernOnboardingFlowProps> = ({
             }
           ]}
           onDiscoveryDismiss={handleFeatureDiscoveryComplete}
+        />
+      );
+
+    case 'risk-assessment':
+      return (
+        <RiskAssessmentQuestionnaire
+          userId={user?.uid || ''}
+          onComplete={handleRiskAssessmentComplete}
         />
       );
 

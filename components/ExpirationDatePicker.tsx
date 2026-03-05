@@ -151,7 +151,7 @@ const ExpirationDatePicker: React.FC<ExpirationDatePickerProps> = ({
               type="date"
               value={value}
               onChange={(e) => handleCustomDate(e.target.value)}
-              className="w-full px-3 py-2 text-sm border border-theme rounded-lg bg-theme-primary text-theme-primary focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]"
+              className="w-full px-3 py-2 text-sm border border-theme rounded-lg bg-theme-primary text-theme-secondary focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]"
             />
           </div>
 

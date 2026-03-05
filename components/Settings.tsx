@@ -57,6 +57,7 @@ interface SettingsProps {
   mealPlan?: DayPlan[];
   onShowTutorial?: () => void;
   household?: Household | null;
+  onShowHousehold?: () => void;
 }
 
 export const Settings: React.FC<SettingsProps> = ({ 
@@ -70,7 +71,8 @@ export const Settings: React.FC<SettingsProps> = ({
   onDeleteCustomCategory,
   mealPlan,
   onShowTutorial,
-  household
+  household,
+  onShowHousehold
 }) => {
   const [feedback, setFeedback] = useState('');
   const [sending, setSending] = useState(false);
@@ -749,6 +751,12 @@ export const Settings: React.FC<SettingsProps> = ({
                         {household.members && Array.isArray(household.members) ? household.members.length : 0} member{household.members && Array.isArray(household.members) && household.members.length === 1 ? '' : 's'}
                       </p>
                     </div>
+                    <button
+                      onClick={() => onShowHousehold?.()}
+                      className="px-3 py-2 bg-[var(--accent-color)] text-white rounded-lg hover:bg-[var(--accent-color)]/80 transition-colors text-sm font-medium"
+                    >
+                      Manage Household
+                    </button>
                   </div>
 
                   {/* Member List */}

@@ -121,6 +121,10 @@ const updateMeal = async (date: string, mealType: 'breakfast' | 'lunch' | 'dinne
   }
 };
 
+const setCache = async (mealPlan: DayPlan[], householdId?: string, userId?: string) => {
+  return updateCache(mealPlan, householdId, userId);
+};
+
 const removeMeal = async (date: string, mealType: 'breakfast' | 'lunch' | 'dinner', mealId: string, householdId?: string, userId?: string) => {
   try {
     const cacheRef = getCacheRef(householdId, userId);
@@ -148,6 +152,7 @@ const removeMeal = async (date: string, mealType: 'breakfast' | 'lunch' | 'dinne
 export const MealPlanCacheService = {
   CACHE_VERSION,
   updateCache,
+  setCache,
   addMeal,
   updateMeal,
   removeMeal,

@@ -53,7 +53,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   };
   return (
     <header 
-      className="bg-theme-secondary p-3 pt-[20px] pb-0 fixed top-0 left-0 right-0 max-w-md mx-auto z-20 shadow-md border-b border-theme transition-colors duration-300"
+      className="bg-theme-secondary p-3 pt-[30px] pb-0 fixed top-0 left-0 right-0 max-w-md mx-auto z-20 shadow-md border-b border-theme transition-colors duration-300"
       role="banner"
     >
       <div className="flex justify-between items-center">

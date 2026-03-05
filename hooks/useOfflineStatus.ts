@@ -27,6 +27,38 @@ export const useOfflineStatus = () => {
     hasConflicts: false
   });
 
+  // Function to test actual internet connectivity
+  const testConnectivity = useCallback(async (): Promise<boolean> => {
+    try {
+      // Try to fetch a small resource from a reliable endpoint
+      const response = await fetch('https://www.google.com/favicon.ico', {
+        method: 'HEAD',
+        mode: 'no-cors',
+        cache: 'no-cache',
+        signal: AbortSignal.timeout(5000) // 5 second timeout
+      });
+      return true;
+    } catch (error) {
+      // If we can't reach the internet, try Firebase connectivity
+      try {
+        // Test Firebase connectivity by checking if we can reach Firestore
+        const testDoc = await DatabaseMonitoringService.getDoc(DatabaseMonitoringService.doc('test-connectivity'));
+        return true;
+      } catch (firebaseError) {
+        return false;
+      }
+    }
+  }, []);
+
+  // Update online status with actual connectivity test
+  const updateOnlineStatus = useCallback(async () => {
+    const isActuallyOnline = await testConnectivity();
+    setSyncStatus(prev => ({
+      ...prev,
+      isOnline: isActuallyOnline
+    }));
+  }, [testConnectivity]);
+
   // Initialize offline queue and load initial state
   useEffect(() => {
     const initOfflineQueue = async () => {
@@ -50,10 +82,12 @@ export const useOfflineStatus = () => {
   }, []);
 
   useEffect(() => {
-    const handleOnline = () => {
+    const handleOnline = async () => {
+      // Test actual connectivity when browser reports online
+      const isActuallyOnline = await testConnectivity();
       setSyncStatus(prev => ({
         ...prev,
-        isOnline: true,
+        isOnline: isActuallyOnline,
         syncError: null
       }));
     };
@@ -69,17 +103,18 @@ export const useOfflineStatus = () => {
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
-    // Initial check
-    setSyncStatus(prev => ({
-      ...prev,
-      isOnline: navigator.onLine
-    }));
+    // Initial connectivity check
+    updateOnlineStatus();
+
+    // Periodic connectivity checks every 30 seconds
+    const connectivityInterval = setInterval(updateOnlineStatus, 30000);
 
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+      clearInterval(connectivityInterval);
     };
-  }, []);
+  }, [testConnectivity, updateOnlineStatus]);
 
   const updateSyncStatus = (updates: Partial<SyncStatus>) => {
     setSyncStatus(prev => ({

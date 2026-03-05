@@ -159,7 +159,7 @@ export const Tutorial: React.FC<TutorialProps> = ({
       title: "Add Your First Recipe",
       description: "Click on any day in the meal planner, then click 'Add Recipe' to search our recipe database.",
       icon: <UtensilsCrossed className="w-6 h-6 text-[var(--accent-color)]" />,
-      highlight: 'add-recipe-button',
+      highlight: 'meal-plan-day-0',
       interactive: true,
       completionCheck: () => userProgress.hasPlannedMeals || userInteractions.has('recipe-added'),
       helpText: "Click on a day in the meal planner, then click 'Add Recipe'",
@@ -176,17 +176,6 @@ export const Tutorial: React.FC<TutorialProps> = ({
       completionCheck: () => currentTab === Tab.RECIPES,
       helpText: "Click the Chef tab to explore AI recipe finding",
       skipIf: (progress) => progress.hasSearchedRecipes
-    },
-    {
-      id: 'voice-search',
-      title: "Voice Search - Hands-Free Cooking",
-      description: "Try voice search! Click the microphone and say 'Find chicken recipes' or 'Make pasta dish'.",
-      icon: <Mic className="w-6 h-6 text-[var(--accent-color)]" />,
-      highlight: 'voice-search',
-      interactive: true,
-      completionCheck: () => userProgress.hasUsedVoiceSearch || userInteractions.has('voice-used'),
-      helpText: "Click the microphone icon to try voice search",
-      skipIf: (progress) => progress.hasUsedVoiceSearch
     },
     {
       id: 'community',
@@ -294,7 +283,16 @@ export const Tutorial: React.FC<TutorialProps> = ({
         const placeBelow = rect.bottom + approxModalHeight + padding < vh;
         let left = rect.left + rect.width / 2 - modalWidth / 2;
         left = Math.max(8, Math.min(left, vw - modalWidth - 8));
-        const top = placeBelow ? Math.min(vh - approxModalHeight - 8, rect.bottom + padding) : Math.max(8, rect.top - approxModalHeight - padding);
+        
+        // Apply position adjustments based on step
+        let topAdjustment = 0;
+        if (currentStepData.id === 'household') {
+          topAdjustment = 10; // drop 10px
+        } else if (['pantry-intro', 'add-first-item', 'shopping-list', 'meal-planning', 'recipe-finder'].includes(currentStepData.id)) {
+          topAdjustment = -30; // raise 30px
+        }
+        
+        const top = (placeBelow ? Math.min(vh - approxModalHeight - 8, rect.bottom + padding) : Math.max(8, rect.top - approxModalHeight - padding)) + topAdjustment;
         const nextStyle = { position: 'fixed', left: `${left}px`, top: `${top}px`, zIndex: 50 } as React.CSSProperties;
         setModalStyle(prev => {
           // shallow compare
@@ -307,8 +305,20 @@ export const Tutorial: React.FC<TutorialProps> = ({
     } catch (e) {
       // ignore
     }
-    setModalStyle(prev => prev ? undefined : prev);
-  }, [currentStepData?.highlight]);
+    
+    // Center the modal when no highlight element (like welcome step)
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const modalWidth = 320;
+    const modalHeight = 220;
+    const centerStyle = {
+      position: 'fixed',
+      left: `${(vw - modalWidth) / 2}px`,
+      top: `${(vh - modalHeight) / 2}px`,
+      zIndex: 50
+    } as React.CSSProperties;
+    setModalStyle(centerStyle);
+  }, [currentStepData?.highlight, currentStepData?.id]);
 
   useEffect(() => {
     if (!currentStepData) return;
@@ -320,9 +330,16 @@ export const Tutorial: React.FC<TutorialProps> = ({
 
     // Add glow effect to highlighted elements
     document.querySelectorAll('.tutorial-glow').forEach(el => el.classList.remove('tutorial-glow'));
+    document.querySelectorAll('.tutorial-glow-green').forEach(el => el.classList.remove('tutorial-glow-green'));
     if (currentStepData.highlight) {
       const element = document.querySelector(`[data-tutorial="${currentStepData.highlight}"]`);
-      if (element) element.classList.add('tutorial-glow');
+      if (element) {
+        if (currentStepData.id === 'add-recipe') {
+          element.classList.add('tutorial-glow-green');
+        } else {
+          element.classList.add('tutorial-glow');
+        }
+      }
 
       computePosition();
       window.addEventListener('resize', computePosition);
@@ -599,7 +616,7 @@ export const Tutorial: React.FC<TutorialProps> = ({
   return (
     <>
       {/* Highlight Overlay */}
-      {highlightedElement && (
+      {highlightedElement && currentStepData?.id !== 'add-recipe' && (
         <div className="fixed inset-0 z-40 pointer-events-none">
           <div className="absolute inset-0 bg-black/25 backdrop-blur-[1px]" />
         </div>

@@ -190,6 +190,7 @@ export const MainContent: React.FC = () => {
               user={user || undefined}
               household={appState.household}
               isLoadingShoppingList={isLoadingShoppingList}
+              activeTab={activeTab}
             />
           </Suspense>
         </ComponentErrorBoundary>

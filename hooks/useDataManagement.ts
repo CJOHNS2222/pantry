@@ -597,7 +597,7 @@ export function useDataManagement(
         // Build danger-list for aggregation: prioritize items expiring within 3 days
         const dangerCandidates = itemsExpiringSoon.map(item => {
           const daysUntilExpiry = Math.ceil((new Date(item.expirationDate!).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
-          return { itemId: item.id, itemName: item.item, daysUntilExpiry };
+          return { itemId: item.id, itemName: item.item, daysUntilExpiry, risk_level: item.productRiskLevel };
         }).filter(x => x.daysUntilExpiry <= 3).slice(0, 6);
 
         try {
@@ -616,7 +616,7 @@ export function useDataManagement(
                 const daysUntilExpiry = Math.ceil((new Date(item.expirationDate!).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
                 // pass user risk level to tailor priority
                 // eslint-disable-next-line no-await-in-loop
-                await NotificationService.createExpirationAlert(user.id, item.item, daysUntilExpiry, item.id, user?.profile?.riskLevel);
+                await NotificationService.createExpirationAlert(user.id, item.item, daysUntilExpiry, item.id, user?.profile?.riskLevel, item.category);
               }
             }
           }

@@ -2069,25 +2069,41 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                 </button>
               )}
               {bulkMode && selectedItems.size > 0 && (
-                <select
-                  value={bulkLocationValue}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    if (value) {
-                      bulkChangeLocation(value as any);
-                      setBulkLocationValue('');
-                    }
-                  }}
-                  className="px-3 py-1 rounded-lg text-sm font-medium bg-theme-secondary text-theme-primary hover:bg-theme-primary border border-theme transition-colors"
-                  aria-label="Change storage location for selected items"
-                >
-                  <option value="">Change Location</option>
-                  <option value="pantry">📦 Pantry</option>
-                  <option value="fridge">🧊 Fridge</option>
-                  <option value="freezer">❄️ Freezer</option>
-                  <option value="spices">🌿 Spices</option>
-                  <option value="other">📦 Other</option>
-                </select>
+                <>
+                  <button
+                    onClick={selectAllItems}
+                    className="px-3 py-1 rounded-lg text-sm font-medium bg-theme-secondary text-theme-primary hover:bg-theme-primary border border-theme transition-colors"
+                    aria-label={selectedItems.size === inventory.length ? 'Deselect all items' : 'Select all items'}
+                  >
+                    {selectedItems.size === inventory.length ? 'Deselect All' : 'Select All'}
+                  </button>
+                  <button
+                    onClick={bulkDelete}
+                    className="px-3 py-1 rounded-lg text-sm font-medium bg-red-500 text-white hover:bg-red-600 transition-colors"
+                    aria-label={`Delete ${selectedItems.size} selected items`}
+                  >
+                    Delete Selected ({selectedItems.size})
+                  </button>
+                  <select
+                    value={bulkLocationValue}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value) {
+                        bulkChangeLocation(value as any);
+                        setBulkLocationValue('');
+                      }
+                    }}
+                    className="px-3 py-1 rounded-lg text-sm font-medium bg-theme-secondary text-theme-primary hover:bg-theme-primary border border-theme transition-colors"
+                    aria-label="Change storage location for selected items"
+                  >
+                    <option value="">Change Location</option>
+                    <option value="pantry">📦 Pantry</option>
+                    <option value="fridge">🧊 Fridge</option>
+                    <option value="freezer">❄️ Freezer</option>
+                    <option value="spices">🌿 Spices</option>
+                    <option value="other">📦 Other</option>
+                  </select>
+                </>
               )}
               <button
                 onClick={toggleBulkMode}

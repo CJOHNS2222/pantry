@@ -314,8 +314,8 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
         </div>
       )}
       <div className="bg-theme-primary rounded-2xl shadow-2xl max-w-lg w-full relative flex flex-col max-h-[85vh] overflow-hidden" onClick={e => e.stopPropagation()}>
-        <button className="absolute top-3 right-3 text-theme-secondary opacity-50 hover:opacity-100 z-20" onClick={onClose} aria-label="Close recipe details">
-          &times;
+        <button className="absolute top-3 right-3 text-theme-secondary opacity-50 hover:opacity-100 z-20 p-1" onClick={onClose} aria-label="Close recipe details">
+          <X className="w-6 h-6" />
         </button>
         <div className="overflow-y-auto p-6 flex-1">
           {editable ? (
@@ -773,88 +773,45 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
                   </button>
                 )}
                 {showSaveButton && onSaveRecipe && (
-                  <div className="flex-1">
-                    {editable ? (
-                      <div className="space-y-2">
-                        <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={submitForInclusion} onChange={e => setSubmitForInclusion(e.target.checked)} /> Submit for inclusion</label>
-                        <button
-                          onClick={async () => {
-                            if (isSaving) return;
-                            setIsSaving(true);
-                            try {
-                              // Build StructuredRecipe from editable fields
-                              const built: any = {
-                                title: editTitle.trim(),
-                                description: editDescription.trim(),
-                                ingredients: editIngredientsText.split('\n').map(s => s.trim()).filter(Boolean),
-                                instructions: editInstructionsText.split('\n').map(s => s.trim()).filter(Boolean),
-                                cookTime: editCookTime.trim(),
-                                type: editType,
-                                image: imagePreview || ''
-                              };
+                  <button
+                    onClick={async () => { 
+                      if (isSaving) return; // Prevent double-clicks
+                      setIsSaving(true);
+                      try {
+                        // Sanitize placeholder recipe text so we don't persist UI-only messages
+                        const sanitized: StructuredRecipe = {
+                          title: (recipe as any).title || '',
+                          description: (recipe as any).description || '',
+                          ingredients: Array.isArray((recipe as any).ingredients) ? [...(recipe as any).ingredients] : [],
+                          instructions: Array.isArray((recipe as any).instructions) ? [...(recipe as any).instructions] : [],
+                          cookTime: (recipe as any).cookTime || '' ,
+                          image: (recipe as any).image
+                        };
 
-                              // Attach helper metadata for parent handler
-                              if (imageFile) built.__imageFile = imageFile;
-                              if (submitForInclusion) built.__submitForInclusion = true;
+                        const placeholderPattern = /Full recipe not available in this rating/i;
+                        // Remove placeholder entries if present
+                        if (sanitized.ingredients.length === 1 && placeholderPattern.test(String(sanitized.ingredients[0]))) {
+                          sanitized.ingredients = [];
+                        }
+                        if (sanitized.instructions.length === 1 && placeholderPattern.test(String(sanitized.instructions[0]))) {
+                          sanitized.instructions = [];
+                        }
 
-                              await onSaveRecipe(built as StructuredRecipe);
-                              onClose();
-                            } finally {
-                              setIsSaving(false);
-                            }
-                          }}
-                          disabled={recipeSaveLimitExceeded || isSaving}
-                          className={`w-full py-3 font-bold border rounded-lg flex items-center justify-center gap-2 ${
-                            recipeSaveLimitExceeded || isSaving
-                              ? 'border-gray-400 text-gray-400 cursor-not-allowed opacity-50'
-                              : 'border-[var(--accent-color)] hover:bg-[var(--accent-color)] hover:text-white'
-                          }`}
-                        >
-                          <Heart className="w-4 h-4" /> {isSaving ? 'Saving...' : recipeSaveLimitExceeded ? 'Limit Reached' : 'Save'}
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={async () => { 
-                          if (isSaving) return; // Prevent double-clicks
-                          setIsSaving(true);
-                          try {
-                            // Sanitize placeholder recipe text so we don't persist UI-only messages
-                            const sanitized: StructuredRecipe = {
-                              title: (recipe as any).title || '',
-                              description: (recipe as any).description || '',
-                              ingredients: Array.isArray((recipe as any).ingredients) ? [...(recipe as any).ingredients] : [],
-                              instructions: Array.isArray((recipe as any).instructions) ? [...(recipe as any).instructions] : [],
-                              cookTime: (recipe as any).cookTime || '' ,
-                              image: (recipe as any).image
-                            };
-
-                            const placeholderPattern = /Full recipe not available in this rating/i;
-                            // Remove placeholder entries if present
-                            if (sanitized.ingredients.length === 1 && placeholderPattern.test(String(sanitized.ingredients[0]))) {
-                              sanitized.ingredients = [];
-                            }
-                            if (sanitized.instructions.length === 1 && placeholderPattern.test(String(sanitized.instructions[0]))) {
-                              sanitized.instructions = [];
-                            }
-
-                            await onSaveRecipe(sanitized as StructuredRecipe); 
-                            onClose(); 
-                          } finally {
-                            setIsSaving(false);
-                          }
-                        }}
-                        disabled={recipeSaveLimitExceeded || isSaving}
-                        className={`flex-1 py-3 font-bold border rounded-lg flex items-center justify-center gap-2 ${
-                          recipeSaveLimitExceeded || isSaving
-                            ? 'border-gray-400 text-gray-400 cursor-not-allowed opacity-50'
-                            : 'border-[var(--accent-color)] hover:bg-[var(--accent-color)] hover:text-white'
-                        }`}
-                      >
-                        <Heart className="w-4 h-4" /> {isSaving ? 'Saving...' : recipeSaveLimitExceeded ? 'Limit Reached' : 'Save'}
-                      </button>
-                    )}
-                  </div>
+                        await onSaveRecipe(sanitized as StructuredRecipe); 
+                        onClose(); 
+                      } finally {
+                        setIsSaving(false);
+                      }
+                    }}
+                    disabled={recipeSaveLimitExceeded || isSaving}
+                    className={`flex-1 py-3 font-bold border rounded-lg flex items-center justify-center gap-2 ${
+                      recipeSaveLimitExceeded || isSaving
+                        ? 'border-gray-400 text-gray-400 cursor-not-allowed opacity-50'
+                        : 'border-[var(--accent-color)] hover:bg-[var(--accent-color)] hover:text-white'
+                    }`}
+                  >
+                    <Heart className="w-4 h-4" /> {isSaving ? 'Saving...' : recipeSaveLimitExceeded ? 'Limit Reached' : 'Save Recipe'}
+                  </button>
                 )}
               </div>
             </>

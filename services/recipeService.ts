@@ -526,14 +526,18 @@ export const saveRecipeToUserCache = async (uid: string, recipe: StructuredRecip
         visibility: 'private'
       };
 
-      if (snap && (snap as any).exists && (snap as any).data && (snap as any).data().recipes) {
-        const existing = (snap as any).data();
-        const arr = Array.isArray(existing.recipes) ? existing.recipes : [];
-        // prepend new recipe
-        arr.unshift(savedItem);
-        // Optionally trim to reasonable length (e.g., 500)
-        if (arr.length > 500) arr.length = 500;
-        await DatabaseMonitoringService.updateDoc(cacheRef, { recipes: arr, lastUpdated: serverTimestamp() });
+      if (snap && snap.exists()) {
+        const existing = snap.data();
+        if (existing && existing.recipes && Array.isArray(existing.recipes)) {
+          const arr = existing.recipes;
+          // prepend new recipe
+          arr.unshift(savedItem);
+          // Optionally trim to reasonable length (e.g., 500)
+          if (arr.length > 500) arr.length = 500;
+          await DatabaseMonitoringService.updateDoc(cacheRef, { recipes: arr, lastUpdated: serverTimestamp() });
+        } else {
+          await DatabaseMonitoringService.setDoc(cacheRef, { recipes: [savedItem], lastUpdated: serverTimestamp() });
+        }
       } else {
         await DatabaseMonitoringService.setDoc(cacheRef, { recipes: [savedItem], lastUpdated: serverTimestamp() });
       }

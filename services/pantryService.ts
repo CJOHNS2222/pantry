@@ -6,6 +6,7 @@ import { getQuantityAmount, getQuantityUnit } from '../utils/quantityUtils';
 import { validatePantryItem } from '../utils/validationUtils';
 import AnalyticsService from './analyticsService';
 import { canUseGemini } from './featureFlags';
+import { getFoodRiskLevel } from '../utils/foodRiskClassification';
 
 export class PantryService {
   /**
@@ -80,9 +81,7 @@ export class PantryService {
         return t.length ? t : undefined;
       })(),
       productRiskLevel: (() => {
-        const low = description.toLowerCase();
-        if (low.includes('rice') && low.includes('cooked')) return 4;
-        return undefined;
+        return getFoodRiskLevel(description, category);
       })(),
       cooked_rice: (() => {
         const low = description.toLowerCase();

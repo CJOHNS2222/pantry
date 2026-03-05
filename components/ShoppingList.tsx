@@ -856,6 +856,35 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
 
       {/* Multi-selection controls removed — using checked state only */}
 
+      {/* Batch Operations - Quick Actions Only */}
+      {items.length > 0 && (
+        <BatchOperations
+          items={items}
+          onBatchCheck={(itemIds) => {
+            setItems(prev => prev.map(item =>
+              itemIds.includes(item.id) ? { ...item, checked: true } : item
+            ));
+          }}
+          onBatchUncheck={(itemIds) => {
+            setItems(prev => prev.map(item =>
+              itemIds.includes(item.id) ? { ...item, checked: false } : item
+            ));
+          }}
+          onDeleteSelected={async (itemIds) => {
+            const inHousehold = household?.id && user ? isHouseholdMember(household, user) : false;
+            const householdId = inHousehold ? household?.id : undefined;
+            const userId = inHousehold ? undefined : user?.id;
+
+            try {
+              await ShoppingListCacheService.removeItemsFromCache(itemIds, householdId, userId);
+              setItems(prev => prev.filter(item => !itemIds.includes(item.id)));
+            } catch (error) {
+              console.error('Failed to delete selected items from cache:', error);
+            }
+          }}
+        />
+      )}
+
       <div className="space-y-2">
         {isLoadingShoppingList ? (
           // Show skeleton loading items
@@ -910,24 +939,6 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
              </div>
         )}
       </div>
-
-      {/* Batch Operations - Moved below the list */}
-      {items.length > 0 && (
-        <BatchOperations
-          items={items}
-          onBatchCheck={(itemIds) => {
-            setItems(prev => prev.map(item =>
-              itemIds.includes(item.id) ? { ...item, checked: true } : item
-            ));
-          }}
-          onBatchUncheck={(itemIds) => {
-            setItems(prev => prev.map(item =>
-              itemIds.includes(item.id) ? { ...item, checked: false } : item
-            ));
-          }}
-          onMoveToPantry={onMoveToPantry}
-        />
-      )}
 
       {/* Analytics Section */}
       {showAnalytics && items.length > 0 && (

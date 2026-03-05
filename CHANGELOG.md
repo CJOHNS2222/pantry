@@ -28,6 +28,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased] - 2026-02-13
 
 ### Added
+- **Risk-Based Notification System**: Implemented comprehensive 5-tier food safety risk classification system
+  - **Risk Levels**: High-risk (meat/fish/poultry), Perishables (produce/eggs/dairy), Fridge items (cheese/yogurt), Hardy fridge (condiments), Staples (canned/pasta)
+  - **Contextual Messaging**: Notifications vary in tone and urgency based on food safety risk to prevent "notification fatigue"
+  - **Notification Stacking**: Multiple expiring items are grouped to avoid spam notifications
+  - **Waste Notifications**: Guilt-free messaging when items are tossed with learning insights
+- **Scenario-Based Onboarding**: Replaced boring direct risk tolerance questions with engaging "Vibe Check"
+  - **Milk Test**: "Expired milk scenario" with conservative/moderate/risk-taking response options
+  - **Meat Test**: "Chicken at Use By date scenario" with freezer/storage decision options
+  - **Risk Level Computation**: Responses mapped to 5-tier safety levels (Purist=5, Pragmatist=3, Adventurer=1)
+  - **Visual Interface**: Clean button-based selection instead of checkbox questions
+- **Onboarding Flow Integration**: Risk assessment now occurs before tutorial to ensure completion
+  - **Mandatory Phase**: Users must complete risk assessment before accessing interactive tutorials
+  - **Data Persistence**: Risk levels saved to user profile in Firestore for personalized notifications
+  - **Analytics Tracking**: Risk levels included in onboarding completion metrics
 - **Expiry Alerts**: Added persistent expiry alert system with visual indicators
   - Items expiring within 7 days now show a clock icon in the pantry view
   - Alert status is stored with each item to avoid constant database queries

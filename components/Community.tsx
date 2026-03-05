@@ -166,9 +166,24 @@ export const Community: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecipe,
                className="bg-theme-secondary rounded-xl border border-theme shadow-lg overflow-hidden group hover:shadow-xl transition-all cursor-pointer"
                onClick={() => { setSelectedRecipe(stat); setShowModal(true); }}
              >
-                {/* Simulated Image Header */}
+                {/* Recipe Image Header */}
                 <div className="h-32 bg-gray-200 relative overflow-hidden">
-                    <div className="absolute inset-0 flex items-center justify-center text-theme-secondary opacity-10 font-serif text-4xl font-bold bg-theme-primary">
+                    {fullRecipe?.image ? (
+                        <img
+                            src={fullRecipe.image}
+                            alt={stat.title}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                if (target) {
+                                    target.style.display = 'none';
+                                    const fallback = target.parentElement?.querySelector('.fallback-text') as HTMLElement;
+                                    if (fallback) fallback.style.display = 'flex';
+                                }
+                            }}
+                        />
+                    ) : null}
+                    <div className={`absolute inset-0 flex items-center justify-center text-theme-secondary opacity-10 font-serif text-4xl font-bold bg-theme-primary ${fullRecipe?.image ? 'hidden fallback-text' : ''}`}>
                         {(stat.title && String(stat.title).charAt ? String(stat.title).charAt(0) : '?')}
                     </div>
                      <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black/80 to-transparent p-4">

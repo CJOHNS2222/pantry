@@ -10,6 +10,7 @@ import { pushNotificationService } from './pushNotificationService';
 import { appendNotificationToUser, getNotificationsOnce, markNotificationRead, snoozeNotificationInCache } from './notificationsService';
 import { auth } from '../firebaseConfig';
 import { formatDangerSummary, DangerItem } from './notificationHelpers';
+import { getFoodRiskLevel, generateExpirationMessage, getNotificationTone } from '../utils/foodRiskClassification';
 
 export interface NotificationItem {
   id: string;
@@ -131,6 +132,92 @@ export class NotificationService {
   }
 
   /**
+   * Create notification stack for multiple expiring items (prevents notification fatigue)
+   */
+  static async createNotificationStack(
+    userId: string,
+    items: Array<{ itemName: string; daysUntilExpiry: number; riskLevel: number; itemId: string }>
+  ): Promise<string> {
+    if (!items || items.length <= 1) return '';
+
+    // Only create stack notification if there are multiple items expiring today or high-risk items
+    const urgentItems = items.filter(item => item.daysUntilExpiry <= 0 || item.riskLevel >= 5);
+    const highRiskItems = items.filter(item => item.riskLevel >= 4);
+
+    if (urgentItems.length <= 1 && highRiskItems.length <= 1) return '';
+
+    // Check if stack notification already exists
+    const existingNotifications = await this.getUnreadNotifications(userId);
+    const existingStack = existingNotifications.find(n =>
+      n.type === 'expiration' &&
+      n.actionData?.isStack === true &&
+      !n.read
+    );
+
+    if (existingStack) {
+      // Update existing stack notification
+      const { generateNotificationStackMessage } = await import('../utils/foodRiskClassification');
+      const { title, message } = generateNotificationStackMessage(items);
+
+      const updateData = {
+        title,
+        message,
+        actionData: { isStack: true, items: items.map(i => ({ itemId: i.itemId, itemName: i.itemName, daysUntilExpiry: i.daysUntilExpiry, riskLevel: i.riskLevel })) }
+      };
+
+      try {
+        const { updateNotificationInCache } = await import('./notificationsService');
+        await updateNotificationInCache(userId, existingStack.id, updateData as any);
+      } catch (err: any) {
+        console.error('Failed to update stack notification:', err);
+      }
+
+      return existingStack.id;
+    }
+
+    // Create new stack notification
+    const { generateNotificationStackMessage } = await import('../utils/foodRiskClassification');
+    const { title, message } = generateNotificationStackMessage(items);
+
+    return this.createNotification(userId, {
+      type: 'expiration',
+      title,
+      message,
+      actionLabel: 'View Items',
+      actionType: 'view_item',
+      actionData: {
+        isStack: true,
+        items: items.map(i => ({ itemId: i.itemId, itemName: i.itemName, daysUntilExpiry: i.daysUntilExpiry, riskLevel: i.riskLevel }))
+      },
+      priority: urgentItems.length > 0 ? 'urgent' : highRiskItems.length > 0 ? 'high' : 'medium',
+      expiresAt: Timestamp.fromDate(new Date(Date.now() + 3 * 24 * 60 * 60 * 1000))
+    });
+  }
+
+  /**
+   * Create waste notification when user tosses an item
+   */
+  static async createWasteNotification(
+    userId: string,
+    itemName: string,
+    itemId: string
+  ): Promise<string> {
+    const { generateWasteNotificationMessage } = await import('../utils/foodRiskClassification');
+    const { title, message, actionLabel, actionType } = generateWasteNotificationMessage(itemName);
+
+    return this.createNotification(userId, {
+      type: 'system',
+      title,
+      message,
+      actionLabel,
+      actionType,
+      actionData: { itemId, itemName, wasteNotification: true },
+      priority: 'low',
+      expiresAt: Timestamp.fromDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000))
+    });
+  }
+
+  /**
    * Create expiration alert notification
    */
   static async createExpirationAlert(
@@ -138,7 +225,8 @@ export class NotificationService {
     itemName: string,
     daysUntilExpiry: number,
     itemId: string,
-    userRiskLevel?: number
+    userRiskLevel?: number,
+    itemCategory?: string
   ): Promise<string> {
     // Check if notification already exists for this item
     const existingNotifications = await this.getUnreadNotifications(userId);
@@ -148,21 +236,37 @@ export class NotificationService {
       !n.read
     );
 
+    // Determine risk level for this item
+    const itemRiskLevel = getFoodRiskLevel(itemName, itemCategory);
+    const { priority: basePriority } = getNotificationTone(itemRiskLevel);
+
+    // Adjust priority based on user risk level and time sensitivity
+    let finalPriority = basePriority;
+    if (userRiskLevel && userRiskLevel >= 4) {
+      // Bump priority for high-risk users
+      if (daysUntilExpiry <= 3) {
+        if (finalPriority === 'low') finalPriority = 'medium';
+        else if (finalPriority === 'medium') finalPriority = 'high';
+        else if (finalPriority === 'high') finalPriority = 'urgent';
+      }
+    }
+
+    // Override for expired items
+    if (daysUntilExpiry <= 0) {
+      finalPriority = 'urgent';
+    }
+
     if (existingNotification) {
       // Update existing notification if priority changed or days changed
       const currentPriority = existingNotification.priority;
-      const newPriority = daysUntilExpiry <= 0 ? 'urgent' :
-                         daysUntilExpiry === 1 ? 'high' :
-                         daysUntilExpiry <= 3 ? 'medium' : 'low';
 
-      if (currentPriority !== newPriority) {
+      if (currentPriority !== finalPriority) {
+        const { title, message } = generateExpirationMessage(itemName, daysUntilExpiry, itemRiskLevel);
+
         const updateData = {
-          priority: newPriority,
-          title: daysUntilExpiry <= 0 ? 'Item Expired!' :
-                 daysUntilExpiry === 1 ? 'Expires Tomorrow!' :
-                 daysUntilExpiry <= 3 ? 'Expires Soon' : 'Expires This Week',
-          message: daysUntilExpiry <= 0 ? `${itemName} has expired and was moved to shopping list` :
-                  `${itemName} expires in ${daysUntilExpiry} days`
+          priority: finalPriority,
+          title,
+          message
         };
 
         // Try to update the top-level notification document; if that fails
@@ -193,41 +297,15 @@ export class NotificationService {
       return existingNotification.id;
     }
 
-    let priority: 'low' | 'medium' | 'high' | 'urgent' = 'low';
-    let title = '';
-    let message = '';
-    let actionLabel = '';
+    // Generate contextual message based on risk level
+    const { title, message, actionLabel } = generateExpirationMessage(itemName, daysUntilExpiry, itemRiskLevel);
 
-    if (daysUntilExpiry <= 0) {
-      priority = 'urgent';
-      title = 'Item Expired!';
-      message = `${itemName} has expired and was moved to shopping list`;
-      actionLabel = 'View Shopping List';
-    } else if (daysUntilExpiry === 1) {
-      priority = 'high';
-      title = 'Expires Tomorrow!';
-      message = `${itemName} expires tomorrow`;
-      actionLabel = 'Add to Shopping List';
-    } else if (daysUntilExpiry <= 3) {
-      priority = 'medium';
-      title = 'Expires Soon';
-      message = `${itemName} expires in ${daysUntilExpiry} days`;
-      actionLabel = 'Add to Shopping List';
-    } else if (daysUntilExpiry <= 7) {
-      priority = 'low';
-      title = 'Expires This Week';
-      message = `${itemName} expires in ${daysUntilExpiry} days`;
-      actionLabel = 'View Item';
-    }
+    // Determine action type based on context
+    let actionType: 'add_to_shopping' | 'view_item' = 'view_item';
+    let actionData: any = { itemId, itemName };
 
-    // Adjust priority for high-risk users (userRiskLevel >=4)
-    if (userRiskLevel && userRiskLevel >= 4) {
-      // bump priority one level for items within 3 days
-      if (daysUntilExpiry <= 3) {
-        if (priority === 'low') priority = 'medium'
-        else if (priority === 'medium') priority = 'high'
-        else if (priority === 'high') priority = 'urgent'
-      }
+    if (daysUntilExpiry <= 1 || itemRiskLevel >= 4) {
+      actionType = 'add_to_shopping';
     }
 
     return this.createNotification(userId, {
@@ -235,9 +313,9 @@ export class NotificationService {
       title,
       message,
       actionLabel,
-      actionType: daysUntilExpiry <= 1 ? 'add_to_shopping' : 'view_item',
-      actionData: { itemId, itemName },
-      priority,
+      actionType,
+      actionData,
+      priority: finalPriority,
       expiresAt: Timestamp.fromDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)) // Expire in 7 days
     });
   }
