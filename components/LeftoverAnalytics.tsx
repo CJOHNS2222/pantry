@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { LeftoverService } from '../services/leftoverService';
 import { InventoryCacheService } from '../services/inventoryCacheService';
+import FoodWasteAnalyticsService, { FoodWasteAnalytics } from '../services/foodWasteAnalyticsService';
 import { PantryItem } from '../types';
-import { TrendingUp, TrendingDown, DollarSign, AlertTriangle } from 'lucide-react';
+import { TrendingUp, TrendingDown, DollarSign, AlertTriangle, Trash2, ChefHat, X } from 'lucide-react';
 
 interface LeftoverAnalyticsProps {
   householdId?: string;
@@ -16,15 +17,42 @@ interface LeftoverSavings {
   estimatedValueWasted: number;
   mealsReplaced: number;
   wasteReductionPercentage: number;
+  // Food waste analytics
+  totalItemsDisposed: number;
+  itemsThrownAway: number;
+  itemsCooked: number;
+  itemsRemoved: number;
+  averageDaysExpired: number;
+  totalWasteValue: number;
 }
 
 export const LeftoverAnalytics: React.FC<LeftoverAnalyticsProps> = ({ householdId, userId }) => {
   const [analytics, setAnalytics] = useState<LeftoverSavings | null>(null);
+  const [foodWasteAnalytics, setFoodWasteAnalytics] = useState<FoodWasteAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    calculateLeftoverAnalytics();
+    const fetchAnalytics = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        // Fetch food waste analytics
+        const foodWasteData = await FoodWasteAnalyticsService.getAnalytics(householdId, userId);
+        setFoodWasteAnalytics(foodWasteData);
+
+        // Calculate leftover analytics (keeping existing logic for now)
+        await calculateLeftoverAnalytics();
+      } catch (err) {
+        console.error('Error fetching analytics:', err);
+        setError('Failed to load analytics data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAnalytics();
   }, [householdId, userId]);
 
   const calculateLeftoverAnalytics = async () => {
@@ -75,7 +103,14 @@ export const LeftoverAnalytics: React.FC<LeftoverAnalyticsProps> = ({ householdI
         estimatedValueSaved,
         estimatedValueWasted,
         mealsReplaced,
-        wasteReductionPercentage
+        wasteReductionPercentage,
+        // Include food waste analytics
+        totalItemsDisposed: foodWasteAnalytics?.totalItemsDisposed || 0,
+        itemsThrownAway: foodWasteAnalytics?.itemsByReason.thrown_away || 0,
+        itemsCooked: foodWasteAnalytics?.itemsByReason.cooked || 0,
+        itemsRemoved: foodWasteAnalytics?.itemsByReason.remove || 0,
+        averageDaysExpired: foodWasteAnalytics?.averageDaysExpired || 0,
+        totalWasteValue: foodWasteAnalytics?.totalEstimatedValue || 0
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to calculate analytics');
@@ -158,22 +193,41 @@ export const LeftoverAnalytics: React.FC<LeftoverAnalyticsProps> = ({ householdI
         </div>
 
         <div className="bg-theme-secondary rounded-lg p-4 border border-theme">
-          <h4 className="font-semibold text-theme-primary mb-3">Leftover Usage</h4>
+          <h4 className="font-semibold text-theme-primary mb-3 flex items-center gap-2">
+            <Trash2 className="w-4 h-4" />
+            Food Waste Analytics
+          </h4>
           <div className="space-y-2">
             <div className="flex justify-between">
-              <span>Servings Consumed:</span>
-              <span className="font-semibold">{analytics.totalServingsConsumed.toFixed(1)}</span>
+              <span>Total Items Disposed:</span>
+              <span className="font-semibold">{analytics.totalItemsDisposed}</span>
             </div>
             <div className="flex justify-between">
-              <span>Estimated Waste:</span>
-              <span className="font-semibold">{analytics.totalServingsWasted.toFixed(1)}</span>
+              <span>Thrown Away:</span>
+              <span className="font-semibold text-red-400">{analytics.itemsThrownAway}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Cooked With:</span>
+              <span className="font-semibold text-green-400">{analytics.itemsCooked}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Just Removed:</span>
+              <span className="font-semibold text-yellow-400">{analytics.itemsRemoved}</span>
+            </div>
+            <div className="flex justify-between border-t border-theme pt-2">
+              <span>Avg Days Expired:</span>
+              <span className="font-semibold">{analytics.averageDaysExpired.toFixed(1)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Total Waste Value:</span>
+              <span className="font-semibold text-red-400">${analytics.totalWasteValue.toFixed(2)}</span>
             </div>
           </div>
         </div>
       </div>
 
       <div className="text-center text-sm text-theme-secondary">
-        <p>Analytics based on current leftover data</p>
+        <p>Analytics based on current leftover data and disposal history</p>
         <p>Values are estimates and may vary based on actual food costs</p>
       </div>
     </div>

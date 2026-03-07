@@ -1,3 +1,20 @@
+/* Theme utility classes */
+.bg-theme-primary { background-color: var(--bg-primary); }
+.bg-theme-secondary { background-color: var(--bg-secondary); }
+.text-theme-primary { color: var(--text-primary); }
+.text-theme-secondary { color: var(--text-secondary); }
+.border-theme { border-color: var(--border-color); }
+
+.theme-transition {
+  transition: all 0.3s ease;
+}
+
+.gold-gradient {
+  background: linear-gradient(135deg, #FCD34D 0%, #F59E0B 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
 /* Premium Feature Overlay Styles */
 .premium-overlay-container {
   position: relative;

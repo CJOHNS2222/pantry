@@ -50,6 +50,7 @@ export const ValueDemo: React.FC<ValueDemoProps> = ({
           servings: 4,
           difficulty: 'easy',
           rating: 4.5,
+          image: 'https://images.unsplash.com/photo-1621996346565-e3dbc353d2e5?w=400&h=300&fit=crop',
           tags: ['vegetarian', 'quick', 'healthy'],
           ingredients: ['pasta', 'broccoli', 'bell peppers', 'garlic', 'olive oil', 'parmesan'],
           instructions: [
@@ -67,6 +68,7 @@ export const ValueDemo: React.FC<ValueDemoProps> = ({
           servings: 2,
           difficulty: 'medium',
           rating: 4.8,
+          image: 'https://images.unsplash.com/photo-1603133872878-684f208fb84b?w=400&h=300&fit=crop',
           tags: ['protein', 'asian', 'quick'],
           ingredients: ['chicken breast', 'rice', 'soy sauce', 'vegetables', 'ginger'],
           instructions: [
@@ -84,6 +86,7 @@ export const ValueDemo: React.FC<ValueDemoProps> = ({
           servings: 1,
           difficulty: 'easy',
           rating: 4.2,
+          image: 'https://images.unsplash.com/photo-1541519227354-08fa5d50c44d?w=400&h=300&fit=crop',
           tags: ['breakfast', 'healthy', 'vegetarian'],
           ingredients: ['bread', 'avocado', 'eggs', 'tomatoes', 'salt', 'pepper'],
           instructions: [
@@ -246,7 +249,7 @@ export const ValueDemo: React.FC<ValueDemoProps> = ({
         </div>
 
         {/* Content */}
-        <div className="p-6">
+        <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
 
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-12">
@@ -264,9 +267,24 @@ export const ValueDemo: React.FC<ValueDemoProps> = ({
                     className="bg-theme/5 hover:bg-theme/10 rounded-xl p-4 cursor-pointer transition-all duration-200 transform hover:scale-[1.02] border border-transparent hover:border-[var(--accent-color)]/20"
                   >
 
-                    {/* Recipe image placeholder */}
-                    <div className="w-full h-32 bg-gradient-to-br from-orange-100 to-red-100 rounded-lg mb-3 flex items-center justify-center">
-                      <ChefHat className="w-8 h-8 text-orange-500" />
+                    {/* Recipe image */}
+                    <div className="w-full h-32 bg-gradient-to-br from-orange-100 to-red-100 rounded-lg mb-3 overflow-hidden">
+                      {recipe.image ? (
+                        <img
+                          src={recipe.image}
+                          alt={recipe.title}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            // Fallback to icon if image fails to load
+                            e.currentTarget.style.display = 'none';
+                            e.currentTarget.parentElement!.innerHTML = '<div class="w-full h-full flex items-center justify-center"><svg class="w-8 h-8 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4"></path></svg></div>';
+                          }}
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <ChefHat className="w-8 h-8 text-orange-500" />
+                        </div>
+                      )}
                     </div>
 
                     {/* Recipe info */}
@@ -324,7 +342,7 @@ export const ValueDemo: React.FC<ValueDemoProps> = ({
               {/* Value proposition */}
               <div className="mt-6 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-4 text-center">
                 <Heart className="w-6 h-6 text-red-500 mx-auto mb-2" />
-                <p className="text-sm text-theme-secondary">
+                <p className="text-sm text-gray-700">
                   <strong>Stock & Spoon</strong> automatically suggests recipes based on what you have,
                   reducing food waste and inspiring your cooking!
                 </p>

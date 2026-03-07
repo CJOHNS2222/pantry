@@ -4,7 +4,9 @@ import { getAuth } from 'firebase/auth';
 import DatabaseMonitoringService from './services/databaseMonitoringService';
 import { Login } from './components/Login';
 import { HouseholdManager } from './components/Household';
+import { HouseholdInviteModal } from './components/HouseholdInviteModal';
 import { Tutorial } from './components/Tutorial';
+import { ModernOnboardingFlow } from './components/ModernOnboardingFlow';
 import ErrorBoundary from './components/ErrorBoundary';
 import { AppHeader } from './components/layout/AppHeader';
 import { AppNavigation } from './components/layout/AppNavigation';
@@ -42,6 +44,8 @@ import HapticService from './services/hapticService';
 import { ShoppingListCacheService } from './services/shoppingListCacheService';
 import { groceryPriceService } from './services/groceryPriceService';
 import { PriceDataCacheService } from './services/priceDataCacheService'; // Import the service
+import ExpiredItemsModal from './components/ExpiredItemsModal';
+import { InventoryCacheService } from './services/inventoryCacheService';
 
 // Lazy load monitoring components
 // const DatabaseAnalytics = React.lazy(() => import('./components/DatabaseAnalytics').then(module => ({ default: module.default })));
@@ -88,7 +92,11 @@ const App: React.FC = () => {
   // UI States
   const [showHousehold, setShowHousehold] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const [showNotificationsModal, setShowNotificationsModal] = useState(false);
+  const [showHouseholdInviteModal, setShowHouseholdInviteModal] = useState(false);
+  const [showExpiredItemsModal, setShowExpiredItemsModal] = useState(false);
+  const [householdInvites, setHouseholdInvites] = useState<NotificationItem[]>([]);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>({
     enabled: true,
@@ -104,7 +112,8 @@ const App: React.FC = () => {
       shopping_reminder: true,
       system: true,
       allergy_alert: true,
-      household_invite: true
+      household_invite: true,
+      expired_items_check: false
     }
   });
 
@@ -424,6 +433,94 @@ const App: React.FC = () => {
     setNotifications([]);
   };
 
+  const handleHouseholdInviteAccept = async (invite: NotificationItem) => {
+    if (!user) return;
+
+    try {
+      // Mark notification as read first
+      await markNotificationRead(user.id, invite.id);
+
+      // Join the household
+      const updatedHousehold = await joinHousehold(invite.actionData.householdId, user);
+      
+      if (updatedHousehold) {
+        setUser({ ...user, householdId: invite.actionData.householdId });
+        setHousehold(updatedHousehold);
+        setHouseholdInvites(prev => prev.filter(i => i.id !== invite.id));
+        
+        // Close modal if no more invites
+        if (householdInvites.length <= 1) {
+          setShowHouseholdInviteModal(false);
+        }
+        
+        addToast('Successfully joined household!', 'success');
+      } else {
+        addToast('Failed to join household - invitation not found', 'error');
+      }
+    } catch (error: any) {
+      log.error('Error accepting household invite', { error }, 'App');
+      let message = 'Failed to join household';
+      if (error.message?.includes('not invited')) {
+        message = 'Unable to join: You are not invited to this household or have already joined';
+      }
+      addToast(message, 'error');
+    }
+  };
+
+  const handleHouseholdInviteDecline = async (invite: NotificationItem) => {
+    if (!user) return;
+
+    try {
+      // Mark notification as read (declined)
+      await markNotificationRead(user.id, invite.id);
+      
+      // Remove from invites list
+      setHouseholdInvites(prev => prev.filter(i => i.id !== invite.id));
+      
+      // Close modal if no more invites
+      if (householdInvites.length <= 1) {
+        setShowHouseholdInviteModal(false);
+      }
+      
+      addToast('Household invitation declined', 'info');
+    } catch (error: any) {
+      log.error('Error declining household invite', { error }, 'App');
+      addToast('Failed to decline invitation', 'error');
+    }
+  };
+
+  const handleRemoveExpiredItems = async (itemIds: string[], disposalReason: string) => {
+    try {
+      // Find items to remove
+      const itemsToRemove = inventory.filter(item => itemIds.includes(item.id));
+      
+      // Remove from inventory
+      setInventory(prev => prev.filter(item => !itemIds.includes(item.id)));
+      
+      // Remove from cache
+      const inHousehold = household?.id && isHouseholdMember(household, user);
+      const householdId = inHousehold ? household.id : undefined;
+      const userId = inHousehold ? undefined : user?.id;
+      
+      await Promise.all(
+        itemIds.map(itemId => 
+          InventoryCacheService.removeItemFromCache(itemId, householdId, userId)
+        )
+      );
+      
+      // Log activity for each removed item
+      for (const item of itemsToRemove) {
+        logItemRemoved(item.item, item.id);
+      }
+      
+      addToast(`${itemIds.length} expired item${itemIds.length !== 1 ? 's' : ''} removed`, 'success');
+    } catch (error) {
+      console.error('Failed to remove expired items:', error);
+      addToast('Failed to remove expired items', 'error');
+      throw error;
+    }
+  };
+
   const handleLogin = async (loggedInUser: User) => {
     const userRef = DatabaseMonitoringService.doc('users', loggedInUser.id);
     const userDoc = await DatabaseMonitoringService.getDoc(userRef);
@@ -464,11 +561,12 @@ const App: React.FC = () => {
     try {
       const seenFlag = !!loggedInUser.hasSeenTutorial;
       const localSeen = localStorage.getItem('tutorialSeen:v2') === 'true';
+      const onboardingCompleted = localStorage.getItem('onboarding-completed') === 'true';
       const rolloutEnabled = typeof featureFlags?.isEnabled === 'function'
         ? featureFlags.isEnabled('newTutorial', loggedInUser.id)
         : false;
 
-      if (!seenFlag) {
+      if (!seenFlag && onboardingCompleted) {
         // If the new tutorial rollout is enabled, respect localStorage fallback.
         if (rolloutEnabled) {
           if (!localSeen) setShowTutorial(true);
@@ -479,7 +577,12 @@ const App: React.FC = () => {
       }
     } catch (err) {
       // On any error, fall back to legacy behavior to avoid blocking users.
-      if (!loggedInUser.hasSeenTutorial) setShowTutorial(true);
+      if (!loggedInUser.hasSeenTutorial && localStorage.getItem('onboarding-completed') === 'true') setShowTutorial(true);
+    }
+
+    // Show onboarding if not completed
+    if (localStorage.getItem('onboarding-completed') !== 'true') {
+      setShowOnboarding(true);
     }
   };
 
@@ -525,6 +628,16 @@ const App: React.FC = () => {
         return;
       }
 
+      if (showHouseholdInviteModal) {
+        setShowHouseholdInviteModal(false);
+        return;
+      }
+
+      if (showExpiredItemsModal) {
+        setShowExpiredItemsModal(false);
+        return;
+      }
+
       if (activeTab !== Tab.PANTRY) {
         setActiveTab(Tab.PANTRY);
         return;
@@ -566,7 +679,7 @@ const App: React.FC = () => {
         backButtonListenerRef.current = null;
       }
     };
-  }, [showNotificationsModal, showTutorial, showHousehold, activeTab, lastBackPress, addToast]);
+  }, [showNotificationsModal, showTutorial, showHousehold, showHouseholdInviteModal, showExpiredItemsModal, showOnboarding, activeTab, lastBackPress, addToast]);
 
   const [previousTab, setPreviousTab] = useState<Tab>(Tab.PANTRY);
   useEffect(() => {
@@ -575,6 +688,51 @@ const App: React.FC = () => {
       setPreviousTab(activeTab);
     }
   }, [activeTab, previousTab]);
+
+  // Check for household invites when user logs in
+  useEffect(() => {
+    const checkHouseholdInvites = async () => {
+      if (user && !user.householdId) {
+        console.log('Checking household invites for user:', user.id, user.email);
+        try {
+          const unreadNotifications = await NotificationService.getUnreadNotifications(user.id, user.email);
+          console.log('Unread notifications:', unreadNotifications);
+          const invites = unreadNotifications.filter(n => n.type === 'household_invite' && n.actionType === 'join_household');
+          console.log('Household invites found:', invites);
+          if (invites.length > 0) {
+            setHouseholdInvites(invites);
+            setShowHouseholdInviteModal(true);
+          }
+        } catch (error) {
+          console.error('Error checking household invites:', error);
+        }
+      } else {
+        console.log('Skipping household invite check - user has householdId or no user:', user?.householdId);
+      }
+    };
+
+    checkHouseholdInvites();
+  }, [user]);
+
+  // Check for expired items when user logs in and has opted in
+  useEffect(() => {
+    const checkExpiredItems = async () => {
+      if (user && notificationSettings.types.expired_items_check && inventory.length > 0) {
+        const today = new Date().toISOString().slice(0, 10);
+        const expiredItems = inventory.filter(item =>
+          item.expirationDate && item.expirationDate <= today && !item.is_immortal
+        );
+
+        if (expiredItems.length > 0) {
+          setShowExpiredItemsModal(true);
+        }
+      }
+    };
+
+    // Delay check to allow inventory to load
+    const timer = setTimeout(checkExpiredItems, 2000);
+    return () => clearTimeout(timer);
+  }, [user, notificationSettings.types.expired_items_check, inventory]);
 
   // Show a loading spinner while waiting for auth to be ready
   if (!isAuthReady) {
@@ -620,6 +778,22 @@ const App: React.FC = () => {
               onClose={() => setShowHousehold(false)}
               setActiveTab={setActiveTab}
               addToast={addToast}
+          />
+        )}
+
+        {showOnboarding && user && (
+          <ModernOnboardingFlow
+            user={user}
+            onComplete={async () => {
+              setShowOnboarding(false);
+              try {
+                // Mark onboarding as completed in localStorage
+                localStorage.setItem('onboarding-completed', 'true');
+              } catch (error) {
+                console.error('Failed to mark onboarding complete:', error);
+              }
+            }}
+            onSkip={() => setShowOnboarding(false)}
           />
         )}
 
@@ -673,6 +847,28 @@ const App: React.FC = () => {
                 // handler already logs; no-op here
               }
             }}
+          />
+        )}
+
+        {showHouseholdInviteModal && user && (
+          <HouseholdInviteModal
+            invites={householdInvites}
+            user={user}
+            onClose={() => setShowHouseholdInviteModal(false)}
+            onAccept={handleHouseholdInviteAccept}
+            onDecline={handleHouseholdInviteDecline}
+          />
+        )}
+
+        {showExpiredItemsModal && (
+          <ExpiredItemsModal
+            isOpen={showExpiredItemsModal}
+            onClose={() => setShowExpiredItemsModal(false)}
+            inventory={inventory}
+            onRemoveItems={handleRemoveExpiredItems}
+            householdId={household?.id}
+            userId={user?.id}
+            userName={user?.name}
           />
         )}
 

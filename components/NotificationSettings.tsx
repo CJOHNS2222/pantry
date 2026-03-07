@@ -175,6 +175,20 @@ export const NotificationSettingsComponent: React.FC<NotificationSettingsProps> 
           />
         </div>
 
+        {/* Expired items modal */}
+        <div className="flex items-center justify-between">
+          <div>
+            <span className="text-white text-sm font-medium">Expired Items Check</span>
+            <p className="text-xs text-red-200/60">Show expired items list on app load</p>
+          </div>
+          <input
+            type="checkbox"
+            checked={settings.types.expired_items_check}
+            onChange={(e) => updateTypeSetting('expired_items_check', e.target.checked)}
+            className="w-4 h-4 text-amber-600 bg-gray-100 border-gray-300 rounded focus:ring-amber-500"
+          />
+        </div>
+
         {/* Shopping reminders */}
         <div className="flex items-center justify-between">
           <div>

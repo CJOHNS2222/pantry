@@ -11,7 +11,7 @@ vi.mock('../../../hooks/useDataManagement', () => ({
 
 // Mock LeftoverService.create
 const mockCreateLeftover = vi.fn()
-vi.mock('../../../services/LeftoverService', () => ({
+vi.mock('../../../services/leftoverService', () => ({
   LeftoverService: {
     create: mockCreateLeftover
   }
@@ -19,7 +19,14 @@ vi.mock('../../../services/LeftoverService', () => ({
 
 // Minimal mocks for services that might be imported by the component
 vi.mock('../../../services/leftoverImageService', () => ({ uploadLeftoverImage: vi.fn() }))
-vi.mock('../../../services/databaseMonitoringService', () => ({ doc: vi.fn(), getDoc: vi.fn(), updateDoc: vi.fn() }))
+vi.mock('../../../services/databaseMonitoringService', () => ({
+  default: {
+    doc: vi.fn(),
+    getDoc: vi.fn().mockResolvedValue({ exists: () => false, data: () => ({}) }),
+    updateDoc: vi.fn(),
+    setDoc: vi.fn().mockResolvedValue(undefined)
+  }
+}))
 
 import LeftoverQuickCapture from '../../../components/LeftoverQuickCapture'
 
@@ -76,7 +83,7 @@ describe('LeftoverQuickCapture', () => {
     fireEvent.click(checkbox)
     expect(checkbox.checked).toBe(true)
 
-    const saveButton = screen.getByText('Save Leftover')
+    const saveButton = screen.getByRole('button', { name: /Save Leftover/i })
     fireEvent.click(saveButton)
 
     await waitFor(() => {

@@ -43,6 +43,7 @@ export interface NotificationSettings {
     system: boolean;
     allergy_alert: boolean;
     household_invite: boolean;
+    expired_items_check: boolean;
   };
 }
 
@@ -598,7 +599,8 @@ export class NotificationService {
         shopping_reminder: true,
         system: true,
         allergy_alert: true,
-        household_invite: true
+        household_invite: true,
+        expired_items_check: false
       }
     };
   }

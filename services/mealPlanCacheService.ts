@@ -5,13 +5,13 @@ import DatabaseMonitoringService from './databaseMonitoringService';
 export const CACHE_VERSION = '1.0';
 
 // A helper function to recursively remove undefined properties from an object
-const sanitizeObject = (obj: any) => {
+const sanitizeObject = (obj: any): any => {
   if (obj === null || typeof obj !== 'object') {
     return obj;
   }
 
   if (Array.isArray(obj)) {
-    return obj.map(item => sanitizeObject(item)).filter(item => item !== undefined);
+    return obj.map((item: any) => sanitizeObject(item)).filter((item: any) => item !== undefined);
   }
 
   const newObj: { [key: string]: any } = {};
@@ -70,7 +70,7 @@ const addMeal = async (date: string, mealType: 'breakfast' | 'lunch' | 'dinner',
       // If doc or day object doesn't exist, create it.
       const dayName = new Date(`${date}T00:00:00`).toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
       
-      const newDayData = {
+      const newDayData: { dayName: string; breakfast: any[]; lunch: any[]; dinner: any[] } = {
         dayName,
         breakfast: [],
         lunch: [],
@@ -125,6 +125,27 @@ const setCache = async (mealPlan: DayPlan[], householdId?: string, userId?: stri
   return updateCache(mealPlan, householdId, userId);
 };
 
+const getCachedMealPlan = async (householdId?: string, userId?: string): Promise<DayPlan[]> => {
+  try {
+    const cacheRef = getCacheRef(householdId, userId);
+    const docSnap = await DatabaseMonitoringService.getDoc(cacheRef);
+    if (!docSnap.exists()) return [];
+    const data = docSnap.data();
+    if (!data?.days) return [];
+    const days: DayPlan[] = Object.entries(data.days).map(([date, dayData]: [string, any]) => ({
+      date,
+      dayName: dayData.dayName || '',
+      breakfast: dayData.breakfast || [],
+      lunch: dayData.lunch || [],
+      dinner: dayData.dinner || [],
+    }));
+    return days;
+  } catch (err: any) {
+    console.error('Failed to get cached meal plan:', err);
+    return [];
+  }
+};
+
 const removeMeal = async (date: string, mealType: 'breakfast' | 'lunch' | 'dinner', mealId: string, householdId?: string, userId?: string) => {
   try {
     const cacheRef = getCacheRef(householdId, userId);
@@ -153,6 +174,7 @@ export const MealPlanCacheService = {
   CACHE_VERSION,
   updateCache,
   setCache,
+  getCachedMealPlan,
   addMeal,
   updateMeal,
   removeMeal,

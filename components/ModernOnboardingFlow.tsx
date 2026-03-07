@@ -4,6 +4,7 @@ import { ContextualPermissionManager as ContextualPermissions } from './Contextu
 import { ValueDemo } from './ValueDemo';
 import { FeatureDiscoveryManager } from './FeatureDiscovery';
 import { ContextualTutorial } from './ContextualTutorial';
+import { RiskExplanationModal } from './RiskExplanationModal';
 import RiskAssessmentQuestionnaire from './RiskAssessmentQuestionnaire';
 
 interface ModernOnboardingFlowProps {
@@ -17,7 +18,7 @@ export const ModernOnboardingFlow: React.FC<ModernOnboardingFlowProps> = ({
   onComplete,
   onSkip
 }) => {
-  const [currentPhase, setCurrentPhase] = useState<'onboarding' | 'permissions' | 'value-demo' | 'feature-discovery' | 'risk-assessment' | 'tutorial' | 'complete'>('onboarding');
+  const [currentPhase, setCurrentPhase] = useState<'onboarding' | 'permissions' | 'value-demo' | 'feature-discovery' | 'risk-explanation' | 'risk-assessment' | 'tutorial' | 'complete'>('onboarding');
   const [collectedData, setCollectedData] = useState({
     householdName: '',
     preferences: [] as string[],
@@ -38,7 +39,16 @@ export const ModernOnboardingFlow: React.FC<ModernOnboardingFlowProps> = ({
   };
 
   const handleFeatureDiscoveryComplete = () => {
+    setCurrentPhase('risk-explanation');
+  };
+
+  const handleRiskExplanationContinue = () => {
     setCurrentPhase('risk-assessment');
+  };
+
+  const handleRiskExplanationSkip = () => {
+    // Skip directly to tutorial, using default risk level
+    setCurrentPhase('tutorial');
   };
 
   const handleRiskAssessmentComplete = (riskLevel: number) => {
@@ -50,27 +60,20 @@ export const ModernOnboardingFlow: React.FC<ModernOnboardingFlowProps> = ({
     setCurrentPhase('complete');
   };
 
-  // Final completion
+  // Monitor permission completion and transition to next phase
   useEffect(() => {
-    if (currentPhase === 'complete') {
-      // Save onboarding data to user preferences
-      localStorage.setItem('onboarding-completed', 'true');
-      localStorage.setItem('onboarding-data', JSON.stringify(collectedData));
-
-      // Mark as completed in analytics
-      if (window.gtag) {
-        window.gtag('event', 'onboarding_complete', {
-          household_name: collectedData.householdName,
-          preferences_count: collectedData.preferences.length,
-          permissions_granted: Object.values(collectedData.permissions).filter(Boolean).length,
-          items_added: collectedData.userItems.length,
-          risk_level: collectedData.riskLevel
-        });
+    if (currentPhase === 'permissions') {
+      const totalPermissions = 3; // camera, notifications, location
+      const collectedPermissions = Object.keys(collectedData.permissions).length;
+      
+      if (collectedPermissions >= totalPermissions) {
+        // All permissions have been handled, transition to value demo
+        setTimeout(() => {
+          setCurrentPhase('value-demo');
+        }, 500); // Small delay to allow last permission UI to disappear
       }
-
-      onComplete();
     }
-  }, [currentPhase, collectedData, onComplete]);
+  }, [currentPhase, collectedData.permissions]);
 
   // Permission requests for the permissions phase
   const permissionRequests = [
@@ -171,10 +174,18 @@ export const ModernOnboardingFlow: React.FC<ModernOnboardingFlowProps> = ({
         />
       );
 
+    case 'risk-explanation':
+      return (
+        <RiskExplanationModal
+          onContinue={handleRiskExplanationContinue}
+          onSkip={handleRiskExplanationSkip}
+        />
+      );
+
     case 'risk-assessment':
       return (
         <RiskAssessmentQuestionnaire
-          userId={user?.uid || ''}
+          userId={user?.id || ''}
           onComplete={handleRiskAssessmentComplete}
         />
       );

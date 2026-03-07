@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Plus, Heart, Trash2, Minus, Users, CheckCircle2, Play, Pause, RotateCcw, AlertCircle } from 'lucide-react';
+import { Plus, Heart, Trash2, Minus, Users, CheckCircle2, Play, Pause, RotateCcw, AlertCircle, X } from 'lucide-react';
 import { StructuredRecipe, RecipeRating, SavedRecipe, PantryItem, Household } from '../types';
 import LeftoverQuickCapture from './LeftoverQuickCapture';
 import { RecipeRatingUI } from './RecipeRating';

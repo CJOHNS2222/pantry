@@ -21,9 +21,9 @@ import { useScopedDataListener } from './useDataListener';
 import { firestoreCache } from '../services/cacheService';
 import { HouseholdPreferenceService } from '../services/householdPreferenceService';
 import { InventoryCacheService, CachedInventoryData, CacheMetadata } from '../services/inventoryCacheService';
-import { MealPlanCacheService } from '../services/mealPlanCacheService';
+import { MealPlanCacheService } from '../services/MealPlanCacheService';
 import { RecipesCacheService, CachedRecipesData, RecipesCacheMetadata } from '../services/recipesCacheService';
-import { ShoppingListCacheService, CachedShoppingListData, ShoppingListCacheMetadata } from '../services/shoppingListCacheService';
+import { ShoppingListCacheService, CachedShoppingListData, ShoppingListCacheMetadata, ShoppingListCache } from '../services/shoppingListCacheService';
 import HapticService from '../services/hapticService';
 
 // Global flag to prevent multiple meal plan syncs
@@ -52,13 +52,11 @@ function createShoppingListListener(
     const cachePath = `households/${householdId}/cache/shoppingList`;
     return DatabaseMonitoringService.onSnapshot(DatabaseMonitoringService.doc(cachePath), snap => {
       if (snap.exists()) {
-        const data = snap.data() as CachedShoppingListData & ShoppingListCacheMetadata;
-        if (data.version === ShoppingListCacheService.CACHE_VERSION) {
+        const data = snap.data() as ShoppingListCache;
+        if (data.metadata && data.metadata.version === ShoppingListCacheService.CACHE_VERSION) {
           const items: ShoppingItem[] = [];
-          for (const [itemId, itemArray] of Object.entries(data)) {
-            if (itemId !== 'lastUpdated' && itemId !== 'version' && itemId !== 'totalItems') {
-              items.push(ShoppingListCacheService.objectToShoppingItem(itemId, itemArray as CachedShoppingListData[string], householdId));
-            }
+          for (const [itemId, itemArray] of Object.entries(data.items)) {
+            items.push(ShoppingListCacheService.objectToShoppingItem(itemId, itemArray as CachedShoppingListData[string], householdId));
           }
           const sortedItems = items.sort((a, b) => (b.addedAt?.getTime() || 0) - (a.addedAt?.getTime() || 0));
           if (hasArraysChanged(sortedItems, prevShoppingListRef.current)) {
@@ -91,13 +89,11 @@ function createShoppingListListener(
     const cachePath = `users/${userId}/cache/shoppingList`;
     return DatabaseMonitoringService.onSnapshot(DatabaseMonitoringService.doc(cachePath), snap => {
       if (snap.exists()) {
-        const data = snap.data() as CachedShoppingListData & ShoppingListCacheMetadata;
-        if (data.version === ShoppingListCacheService.CACHE_VERSION) {
+        const data = snap.data() as ShoppingListCache;
+        if (data.metadata && data.metadata.version === ShoppingListCacheService.CACHE_VERSION) {
           const items: ShoppingItem[] = [];
-          for (const [itemId, itemArray] of Object.entries(data)) {
-            if (itemId !== 'lastUpdated' && itemId !== 'version' && itemId !== 'totalItems') {
-              items.push(ShoppingListCacheService.objectToShoppingItem(itemId, itemArray as CachedShoppingListData[string], undefined, userId));
-            }
+          for (const [itemId, itemArray] of Object.entries(data.items)) {
+            items.push(ShoppingListCacheService.objectToShoppingItem(itemId, itemArray as CachedShoppingListData[string], undefined, userId));
           }
           const sortedItems = items.sort((a, b) => (b.addedAt?.getTime() || 0) - (a.addedAt?.getTime() || 0));
           if (hasArraysChanged(sortedItems, prevShoppingListRef.current)) {

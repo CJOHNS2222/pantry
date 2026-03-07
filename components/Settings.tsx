@@ -22,6 +22,12 @@ import { MonitoringDashboard } from './MonitoringDashboard';
 import { Household } from '../types';
 import LeftoverPersonaQuestionnaire from './LeftoverPersonaQuestionnaire';
 import { LeftoverAnalytics } from './LeftoverAnalytics';
+import { serverTimestamp } from 'firebase/firestore';
+import { InventoryCacheService } from '../services/inventoryCacheService';
+import { MealPlanCacheService } from '../services/MealPlanCacheService';
+import { RecipesCacheService } from '../services/recipesCacheService';
+import { ShoppingListCacheService } from '../services/shoppingListCacheService';
+import { setDoc } from 'firebase/firestore';
 
 const defaultSettings = {
   notifications: {
@@ -58,6 +64,7 @@ interface SettingsProps {
   onShowTutorial?: () => void;
   household?: Household | null;
   onShowHousehold?: () => void;
+  addToast?: (message: string, type: 'success' | 'error' | 'info' | 'warning', duration?: number) => void;
 }
 
 export const Settings: React.FC<SettingsProps> = ({ 
@@ -72,7 +79,8 @@ export const Settings: React.FC<SettingsProps> = ({
   mealPlan,
   onShowTutorial,
   household,
-  onShowHousehold
+  onShowHousehold,
+  addToast
 }) => {
   const [feedback, setFeedback] = useState('');
   const [sending, setSending] = useState(false);
@@ -93,12 +101,17 @@ export const Settings: React.FC<SettingsProps> = ({
     NotificationService.getDefaultSettings()
   );
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['Profile', 'Household', 'Notifications']));
+  const [activeSettingsTab, setActiveSettingsTab] = useState<'account' | 'preferences' | 'more'>('account');
 
   // Member preferences state
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [memberPreferences, setMemberPreferences] = useState<Partial<MemberPreferences>>({});
   const [savingMemberPrefs, setSavingMemberPrefs] = useState(false);
   const [showMemberPreferencesModal, setShowMemberPreferencesModal] = useState(false);
+
+  // Household creation state
+  const [householdName, setHouseholdName] = useState('');
+  const [isCreatingHousehold, setIsCreatingHousehold] = useState(false);
 
   const toggleSection = (section: string) => {
     setExpandedSections(prev => {
@@ -158,6 +171,116 @@ export const Settings: React.FC<SettingsProps> = ({
       log.error('Failed saving member preferences', { message: msg, stack }, 'Settings');
     } finally {
       setSavingMemberPrefs(false);
+    }
+  };
+
+  const removeMemberFromHousehold = async (member: Member) => {
+    if (!household || !user) return;
+    
+    const confirmMessage = `Are you sure you want to remove ${member.name} from the household? All their household data will be copied to their personal account.`;
+    
+    if (!confirm(confirmMessage)) return;
+
+    try {
+      // Copy household data to user's personal collections
+      await copyHouseholdDataToUser(member.id);
+      
+      // Remove member from household
+      const updatedMembers = household.members.filter(m => m.id !== member.id);
+      const updatedMemberIds = household.memberIds.filter(id => id !== member.id);
+
+      const householdRef = DatabaseMonitoringService.doc('households', household.id);
+      await DatabaseMonitoringService.updateDoc(householdRef, {
+        members: updatedMembers,
+        memberIds: updatedMemberIds,
+        updatedAt: Timestamp.now()
+      });
+
+      // Update user's householdId to null
+      const userRef = DatabaseMonitoringService.doc('users', member.id);
+      await DatabaseMonitoringService.updateDoc(userRef, {
+        householdId: null
+      });
+
+      log.info('Member removed from household', { memberId: member.id, householdId: household.id }, 'Settings');
+      addToast?.(`${member.name} has been removed from the household`, 'info');
+      
+      // Refresh household data
+      // This would need to be implemented to refresh the household state
+      
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      const stack = error instanceof Error ? error.stack : undefined;
+      log.error('Failed removing member from household', { message: msg, stack }, 'Settings');
+      addToast?.('Failed to remove member from household', 'error');
+    }
+  };
+
+  const copyHouseholdDataToUser = async (userId: string) => {
+    try {
+      // Copy inventory data
+      const inventoryQuery = DatabaseMonitoringService.query(
+        DatabaseMonitoringService.collection(`households/${household!.id}/inventory`)
+      );
+      const inventorySnapshot = await DatabaseMonitoringService.getDocs(inventoryQuery);
+      
+      for (const doc of inventorySnapshot.docs) {
+        const itemData = doc.data();
+        await setDoc(
+          DatabaseMonitoringService.doc(`users/${userId}/inventory`, doc.id),
+          itemData
+        );
+      }
+
+      // Copy shopping list data
+      const shoppingQuery = DatabaseMonitoringService.query(
+        DatabaseMonitoringService.collection(`households/${household!.id}/shoppingList`)
+      );
+      const shoppingSnapshot = await DatabaseMonitoringService.getDocs(shoppingQuery);
+      
+      for (const doc of shoppingSnapshot.docs) {
+        const itemData = doc.data();
+        await setDoc(
+          DatabaseMonitoringService.doc(`users/${userId}/shoppingList`, doc.id),
+          itemData
+        );
+      }
+
+      // Copy meal plan data
+      const mealPlanQuery = DatabaseMonitoringService.query(
+        DatabaseMonitoringService.collection(`households/${household!.id}/mealPlan`)
+      );
+      const mealPlanSnapshot = await DatabaseMonitoringService.getDocs(mealPlanQuery);
+      
+      for (const doc of mealPlanSnapshot.docs) {
+        const itemData = doc.data();
+        await setDoc(
+          DatabaseMonitoringService.doc(`users/${userId}/mealPlan`, doc.id),
+          itemData
+        );
+      }
+
+      // Copy recipes data
+      const recipesQuery = DatabaseMonitoringService.query(
+        DatabaseMonitoringService.collection(`households/${household!.id}/recipes`)
+      );
+      const recipesSnapshot = await DatabaseMonitoringService.getDocs(recipesQuery);
+      
+      for (const doc of recipesSnapshot.docs) {
+        const itemData = doc.data();
+        await setDoc(
+          DatabaseMonitoringService.doc(`users/${userId}/recipes`, doc.id),
+          itemData
+        );
+      }
+
+      log.info('Household data copied to user', { userId, householdId: household!.id }, 'Settings');
+      
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      const stack = error instanceof Error ? error.stack : undefined;
+      log.error('Failed copying household data to user', { message: msg, stack }, 'Settings');
+      throw error;
     }
   };
 
@@ -237,6 +360,68 @@ export const Settings: React.FC<SettingsProps> = ({
     }
   };
 
+  const createHousehold = async () => {
+    if (!householdName.trim() || isCreatingHousehold || !user) return;
+
+    setIsCreatingHousehold(true);
+    try {
+      const householdsColl = DatabaseMonitoringService.collection('households');
+      const newHousehold = {
+        name: householdName.trim(),
+        memberIds: [user.id],
+        members: [{
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: 'admin',
+          status: 'active'
+        }]
+      };
+
+      const createdRef = await DatabaseMonitoringService.addDoc(householdsColl, newHousehold);
+
+      const userRef = DatabaseMonitoringService.doc('users', user.id);
+      await DatabaseMonitoringService.updateDoc(userRef, {
+        householdId: createdRef.id,
+        updatedAt: serverTimestamp()
+      });
+
+      // Migrate user data to household using cache services
+      const userId = user.id;
+      const householdId = createdRef.id;
+
+      const inventory = await InventoryCacheService.getCachedInventory(undefined, userId);
+      await InventoryCacheService.updateCache(inventory, householdId, undefined);
+      await InventoryCacheService.updateCache([], undefined, userId); // Clear user's cache
+
+      const mealPlan = await MealPlanCacheService.getCachedMealPlan(undefined, userId);
+      await MealPlanCacheService.updateCache(mealPlan, householdId, undefined);
+      await MealPlanCacheService.updateCache([], undefined, userId); // Clear user's cache
+
+      const shoppingList = await ShoppingListCacheService.getCachedShoppingList(undefined, userId);
+      await ShoppingListCacheService.setCache(shoppingList, householdId, undefined);
+      await ShoppingListCacheService.setCache([], undefined, userId); // Clear user's cache
+
+      const savedRecipes = await RecipesCacheService.getCachedRecipes(undefined, userId);
+      await RecipesCacheService.updateCache(savedRecipes, householdId, undefined);
+      await RecipesCacheService.updateCache([], undefined, userId); // Clear user's cache
+
+      setHouseholdName('');
+      alert('Household created successfully!');
+
+      // Refresh the page to show the new household
+      window.location.reload();
+
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      const stack = error instanceof Error ? error.stack : undefined;
+      log.error('Failed creating household', { message: msg, stack }, 'Settings');
+      alert('Failed to create household. Please try again.');
+    } finally {
+      setIsCreatingHousehold(false);
+    }
+  };
+
   const avatarOptions = Array.from({ length: 35 }, (_, i) => `/avatars/memo_${i + 1}.png`);
 
   const handleAvatarSelect = async (avatarPath: string) => {
@@ -303,7 +488,33 @@ export const Settings: React.FC<SettingsProps> = ({
   return (
     <>
 
-      <div className="p-6 pb-24 max-w-md mx-auto space-y-6">
+      <div className="pb-24 max-w-md mx-auto">
+
+      {/* Settings Tab Pills */}
+      <div className="sticky top-0 z-10 bg-theme-primary border-b border-theme px-4 py-3">
+        <div className="flex gap-1 bg-theme-secondary rounded-xl p-1">
+          {(['account', 'preferences', 'more'] as const).map((tab) => {
+            const labels: Record<string, string> = { account: 'Account', preferences: 'Preferences', more: 'More' };
+            return (
+              <button
+                key={tab}
+                onClick={() => setActiveSettingsTab(tab)}
+                className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
+                  activeSettingsTab === tab
+                    ? 'bg-[var(--accent-color)] text-white shadow-sm'
+                    : 'text-theme-secondary hover:text-theme-primary'
+                }`}
+              >
+                {labels[tab]}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="p-6 space-y-6">
+
+      {activeSettingsTab === 'account' && <>
 
       {/* Profile Section */}
       {user && onLogout && (
@@ -761,28 +972,57 @@ export const Settings: React.FC<SettingsProps> = ({
 
                   {/* Member List */}
                   <div className="space-y-3 mb-4">
-                    {household.members && Array.isArray(household.members) && household.members.map((member) => (
-                      <div key={member.id} className="bg-theme-secondary/50 rounded-lg p-3 border border-theme">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 bg-theme-primary rounded-full flex items-center justify-center text-sm font-medium text-theme-secondary">
-                              {member.name.charAt(0).toUpperCase()}
+                    {household.members && Array.isArray(household.members) && household.members.map((member) => {
+                      const isCurrentUser = member.id === user.id;
+                      const isAdmin = member.role === 'admin';
+                      const currentUserIsAdmin = household.members.find(m => m.id === user.id)?.role === 'admin';
+                      
+                      return (
+                        <div key={member.id} className="bg-theme-secondary/50 rounded-lg p-3 border border-theme">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 bg-theme-primary rounded-full flex items-center justify-center text-sm font-medium text-theme-secondary">
+                                {member.name.charAt(0).toUpperCase()}
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <p className="text-sm font-medium text-theme-primary">{member.name}</p>
+                                  {isAdmin && (
+                                    <span className="px-2 py-0.5 bg-[var(--accent-color)] text-white text-xs rounded-full">
+                                      Admin
+                                    </span>
+                                  )}
+                                  {isCurrentUser && (
+                                    <span className="px-2 py-0.5 bg-blue-500 text-white text-xs rounded-full">
+                                      You
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-xs text-theme-secondary">{member.email}</p>
+                              </div>
                             </div>
-                            <div>
-                              <p className="text-sm font-medium text-theme-primary">{member.name}</p>
-                              <p className="text-xs text-theme-secondary">{member.email}</p>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => openMemberPreferences(member)}
+                                className="flex items-center gap-2 px-3 py-1 bg-theme-primary hover:bg-theme-secondary text-theme-secondary hover:text-theme-primary rounded-lg text-sm transition-colors"
+                              >
+                                <Edit2 className="w-4 h-4" />
+                                {currentUserIsAdmin ? 'Edit' : 'Preferences'}
+                              </button>
+                              {currentUserIsAdmin && !isCurrentUser && (
+                                <button
+                                  onClick={() => removeMemberFromHousehold(member)}
+                                  className="flex items-center gap-2 px-3 py-1 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm transition-colors"
+                                >
+                                  <X className="w-4 h-4" />
+                                  Remove
+                                </button>
+                              )}
                             </div>
                           </div>
-                          <button
-                            onClick={() => openMemberPreferences(member)}
-                            className="flex items-center gap-2 px-3 py-1 bg-theme-primary hover:bg-theme-secondary text-theme-secondary hover:text-theme-primary rounded-lg text-sm transition-colors"
-                          >
-                            <Edit2 className="w-4 h-4" />
-                            Preferences
-                          </button>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
 
                   {/* Member Preferences Form - Now handled in modal */}
@@ -793,16 +1033,46 @@ export const Settings: React.FC<SettingsProps> = ({
                   </p>
                 </>
               ) : (
-                <p className="text-sm text-theme-secondary">
-                  Create a household to share your pantry with family members. Click your avatar above to get started.
-                </p>
+                <div className="space-y-4">
+                  <p className="text-sm text-theme-secondary">
+                    Create a household to share your pantry with family members.
+                  </p>
+                  
+                  <div className="space-y-3">
+                    <div>
+                      <label htmlFor="householdName" className="block text-sm font-medium text-theme-primary mb-1">
+                        Household Name
+                      </label>
+                      <input
+                        id="householdName"
+                        type="text"
+                        value={householdName}
+                        onChange={(e) => setHouseholdName(e.target.value)}
+                        placeholder="e.g., Smith Family"
+                        className="w-full px-3 py-2 border border-theme rounded-lg bg-theme-primary text-theme-secondary placeholder-theme-secondary/50 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:border-transparent"
+                        disabled={isCreatingHousehold}
+                      />
+                    </div>
+                    
+                    <button
+                      onClick={createHousehold}
+                      disabled={!householdName.trim() || isCreatingHousehold}
+                      className="w-full bg-[var(--accent-color)] text-white px-4 py-2 rounded-lg font-medium hover:bg-[var(--accent-color)]/80 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors"
+                    >
+                      {isCreatingHousehold && <Loader2 className="w-4 h-4 animate-spin" />}
+                      {isCreatingHousehold ? 'Creating...' : 'Create Household'}
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
           )}
         </div>
       )}
 
+      </>}
 
+      {activeSettingsTab === 'preferences' && <>
 
       {/* Categories Section */}
       {user && (
@@ -968,6 +1238,10 @@ export const Settings: React.FC<SettingsProps> = ({
           </div>
         )}
       </div>
+
+      </>}
+
+      {activeSettingsTab === 'more' && <>
 
       {/* Feedback Section */}
       <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden">
@@ -1201,6 +1475,10 @@ export const Settings: React.FC<SettingsProps> = ({
           </div>
         )}
       </div>
+
+      </>}
+
+      </div> {/* end tab content */}
 
       {/* Category Manager Modal */}
       {user && (

@@ -15,6 +15,7 @@ import {
   writeBatch,
   onSnapshot,
   deleteField,
+  SetOptions,
   Query,
   DocumentData,
   QuerySnapshot,
@@ -286,12 +287,12 @@ class DatabaseMonitoringService {
     }
   }
 
-  static async setDoc(ref: any, data: DocumentData): Promise<void> {
+  static async setDoc(ref: any, data: DocumentData, options?: SetOptions): Promise<void> {
     const startTime = Date.now();
     const parentId = (ref as any)?.parent?.id || 'unknown';
     const docId = (ref as any)?.id || 'unknown';
     try {
-      await setDoc(ref, data);
+      await setDoc(ref, data, options as any);
       const duration = Date.now() - startTime;
 
       this.metrics.writes++;

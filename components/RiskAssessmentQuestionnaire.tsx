@@ -57,171 +57,128 @@ export default function RiskAssessmentQuestionnaire({ userId, onComplete }: Prop
   const canProceed = milkResponse !== null && meatResponse !== null
 
   return (
-    <div style={{ padding: 20, maxWidth: 600, margin: '0 auto' }}>
-      <div style={{ textAlign: 'center', marginBottom: 32 }}>
-        <h2 style={{ margin: '0 0 8px 0', fontSize: '24px', fontWeight: 'bold' }}>🍽️ Vibe Check</h2>
-        <p style={{ margin: 0, color: '#666', fontSize: '16px' }}>
+    <div className="max-w-2xl mx-auto p-5">
+      <div className="text-center mb-8">
+        <h2 className="text-2xl font-bold mb-2 text-theme-primary">🍽️ Vibe Check</h2>
+        <p className="text-theme-secondary text-base">
           Let's find your food safety style with a couple quick scenarios
         </p>
       </div>
 
       {/* Milk Scenario */}
-      <div style={{
-        background: '#f8f9fa',
-        borderRadius: '12px',
-        padding: '24px',
-        marginBottom: '24px',
-        border: '1px solid #e9ecef'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', marginBottom: '16px' }}>
-          <Milk style={{ width: '24px', height: '24px', marginRight: '12px', color: '#007bff' }} />
-          <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '600' }}>The Milk Test</h3>
+      <div className="bg-theme-secondary rounded-xl p-6 mb-8 border border-theme">
+        <div className="flex items-center mb-4">
+          <Milk className="w-6 h-6 mr-3 text-blue-500" />
+          <h3 className="m-0 text-lg font-semibold text-theme-primary">The Milk Test</h3>
         </div>
 
-        <p style={{ margin: '0 0 20px 0', color: '#555', lineHeight: '1.5' }}>
+        <p className="m-0 mb-5 text-theme-secondary leading-relaxed">
           The milk expired yesterday. It smells fine. What do you do?
         </p>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <div className="flex flex-col gap-3">
           <button
             type="button"
             onClick={() => setMilkResponse('A')}
-            style={{
-              padding: '16px',
-              border: milkResponse === 'A' ? '2px solid #007bff' : '1px solid #ddd',
-              borderRadius: '8px',
-              background: milkResponse === 'A' ? '#e7f3ff' : 'white',
-              textAlign: 'left',
-              cursor: 'pointer',
-              transition: 'all 0.2s'
-            }}
+            className={`p-4 border rounded-lg text-left cursor-pointer transition-all ${
+              milkResponse === 'A'
+                ? 'border-green-500 bg-green-100 text-gray-900'
+                : 'border-theme bg-white text-black hover:bg-green-100'
+            }`}
           >
-            <div style={{ fontWeight: '600', marginBottom: '4px' }}>🛡️ Toss it immediately.</div>
-            <div style={{ fontSize: '14px', color: '#666' }}>The Purist</div>
+            <div className="font-semibold mb-1">🛡️ Toss it immediately.</div>
+            <div className="text-sm text-black">The Purist</div>
           </button>
 
           <button
             type="button"
             onClick={() => setMilkResponse('B')}
-            style={{
-              padding: '16px',
-              border: milkResponse === 'B' ? '2px solid #007bff' : '1px solid #ddd',
-              borderRadius: '8px',
-              background: milkResponse === 'B' ? '#e7f3ff' : 'white',
-              textAlign: 'left',
-              cursor: 'pointer',
-              transition: 'all 0.2s'
-            }}
+            className={`p-4 border rounded-lg text-left cursor-pointer transition-all ${
+              milkResponse === 'B'
+                ? 'border-green-500 bg-green-100 text-gray-900'
+                : 'border-theme bg-white text-black hover:bg-green-100'
+            }`}
           >
-            <div style={{ fontWeight: '600', marginBottom: '4px' }}>🥣 Use it in cereal today.</div>
-            <div style={{ fontSize: '14px', color: '#666' }}>The Pragmatist</div>
+            <div className="font-semibold mb-1">🥣 Use it in cereal today.</div>
+            <div className="text-sm text-black">The Pragmatist</div>
           </button>
 
           <button
             type="button"
             onClick={() => setMilkResponse('C')}
-            style={{
-              padding: '16px',
-              border: milkResponse === 'C' ? '2px solid #007bff' : '1px solid #ddd',
-              borderRadius: '8px',
-              background: milkResponse === 'C' ? '#e7f3ff' : 'white',
-              textAlign: 'left',
-              cursor: 'pointer',
-              transition: 'all 0.2s'
-            }}
+            className={`p-4 border rounded-lg text-left cursor-pointer transition-all ${
+              milkResponse === 'C'
+                ? 'border-green-500 bg-green-100 text-gray-900'
+                : 'border-theme bg-white text-black hover:bg-green-100'
+            }`}
           >
-            <div style={{ fontWeight: '600', marginBottom: '4px' }}>⏰ It's fine for another 3 days.</div>
-            <div style={{ fontSize: '14px', color: '#666' }}>The Adventurer</div>
+            <div className="font-semibold mb-1">⏰ It's fine for another 3 days.</div>
+            <div className="text-sm text-black">The Adventurer</div>
           </button>
         </div>
       </div>
 
       {/* Meat Scenario */}
-      <div style={{
-        background: '#f8f9fa',
-        borderRadius: '12px',
-        padding: '24px',
-        marginBottom: '32px',
-        border: '1px solid #e9ecef'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', marginBottom: '16px' }}>
-          <Beef style={{ width: '24px', height: '24px', marginRight: '12px', color: '#dc3545' }} />
-          <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '600' }}>The Meat Test</h3>
+      <div className="bg-theme-secondary rounded-xl p-6 mb-8 border border-theme">
+        <div className="flex items-center mb-4">
+          <Beef className="w-6 h-6 mr-3 text-red-500" />
+          <h3 className="m-0 text-lg font-semibold text-theme-primary">The Meat Test</h3>
         </div>
 
-        <p style={{ margin: '0 0 20px 0', color: '#555', lineHeight: '1.5' }}>
+        <p className="m-0 mb-5 text-theme-secondary leading-relaxed">
           The chicken is at its "Use By" date. You aren't cooking it until tomorrow.
         </p>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <div className="flex flex-col gap-3">
           <button
             type="button"
             onClick={() => setMeatResponse('A')}
-            style={{
-              padding: '16px',
-              border: meatResponse === 'A' ? '2px solid #007bff' : '1px solid #ddd',
-              borderRadius: '8px',
-              background: meatResponse === 'A' ? '#e7f3ff' : 'white',
-              textAlign: 'left',
-              cursor: 'pointer',
-              transition: 'all 0.2s'
-            }}
+            className={`p-4 border rounded-lg text-left cursor-pointer transition-all ${
+              meatResponse === 'A'
+                ? 'border-green-500 bg-green-100 text-gray-900'
+                : 'border-theme bg-white text-black hover:bg-green-100'
+            }`}
           >
-            <div style={{ fontWeight: '600', marginBottom: '4px' }}>🗑️ Into the trash.</div>
-            <div style={{ fontSize: '14px', color: '#666' }}>The Purist</div>
+            <div className="font-semibold mb-1">🗑️ Into the trash.</div>
+            <div className="text-sm text-black">The Purist</div>
           </button>
 
           <button
             type="button"
             onClick={() => setMeatResponse('B')}
-            style={{
-              padding: '16px',
-              border: meatResponse === 'B' ? '2px solid #007bff' : '1px solid #ddd',
-              borderRadius: '8px',
-              background: meatResponse === 'B' ? '#e7f3ff' : 'white',
-              textAlign: 'left',
-              cursor: 'pointer',
-              transition: 'all 0.2s'
-            }}
+            className={`p-4 border rounded-lg text-left cursor-pointer transition-all ${
+              meatResponse === 'B'
+                ? 'border-green-500 bg-green-100 text-gray-900'
+                : 'border-theme bg-white text-black hover:bg-green-100'
+            }`}
           >
-            <div style={{ fontWeight: '600', marginBottom: '4px' }}>🧊 Move it to the freezer NOW.</div>
-            <div style={{ fontSize: '14px', color: '#666' }}>The Pragmatist</div>
+            <div className="font-semibold mb-1">🧊 Move it to the freezer NOW.</div>
+            <div className="text-sm text-black">The Pragmatist</div>
           </button>
 
           <button
             type="button"
             onClick={() => setMeatResponse('C')}
-            style={{
-              padding: '16px',
-              border: meatResponse === 'C' ? '2px solid #007bff' : '1px solid #ddd',
-              borderRadius: '8px',
-              background: meatResponse === 'C' ? '#e7f3ff' : 'white',
-              textAlign: 'left',
-              cursor: 'pointer',
-              transition: 'all 0.2s'
-            }}
+            className={`p-4 border rounded-lg text-left cursor-pointer transition-all ${
+              meatResponse === 'C'
+                ? 'border-green-500 bg-green-100 text-gray-900'
+                : 'border-theme bg-white text-black hover:bg-green-100'
+            }`}
           >
-            <div style={{ fontWeight: '600', marginBottom: '4px' }}>😎 It'll be fine in the fridge one more night.</div>
-            <div style={{ fontSize: '14px', color: '#666' }}>The Adventurer</div>
+            <div className="font-semibold mb-1">😎 It'll be fine in the fridge one more night.</div>
+            <div className="text-sm text-black">The Adventurer</div>
           </button>
         </div>
       </div>
 
-      {error && <div style={{ color: 'crimson', marginBottom: 16, textAlign: 'center' }}>{error}</div>}
+      {error && <div className="text-red-500 mb-4 text-center">{error}</div>}
 
-      <div style={{ display: 'flex', justifyContent: 'center', gap: 12 }}>
+      <div className="flex justify-center gap-3">
         <button
           type="button"
           onClick={() => onComplete?.(3)} // Default moderate risk level
           disabled={loading}
-          style={{
-            padding: '12px 24px',
-            border: '1px solid #ddd',
-            borderRadius: '8px',
-            background: 'white',
-            cursor: 'pointer',
-            fontSize: '16px'
-          }}
+          className="px-6 py-3 border border-theme rounded-lg bg-theme-primary text-theme-primary cursor-pointer hover:bg-theme-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Skip
         </button>
@@ -229,16 +186,11 @@ export default function RiskAssessmentQuestionnaire({ userId, onComplete }: Prop
           type="button"
           onClick={handleSubmit}
           disabled={loading || !canProceed}
-          style={{
-            padding: '12px 24px',
-            border: 'none',
-            borderRadius: '8px',
-            background: canProceed ? '#007bff' : '#ccc',
-            color: 'white',
-            cursor: canProceed ? 'pointer' : 'not-allowed',
-            fontSize: '16px',
-            fontWeight: '600'
-          }}
+          className={`px-6 py-3 rounded-lg font-semibold transition-colors ${
+            canProceed && !loading
+              ? 'bg-blue-500 hover:bg-blue-600 text-white cursor-pointer'
+              : 'bg-gray-400 text-gray-200 cursor-not-allowed'
+          }`}
         >
           {loading ? 'Saving…' : 'Complete Setup'}
         </button>

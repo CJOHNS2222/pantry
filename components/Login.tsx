@@ -271,6 +271,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
                 onChange={(e) => setName(e.target.value)}
                 className="w-full bg-[#2A0A10] border border-red-900/50 rounded-xl px-4 py-3 text-white placeholder-red-900/50 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none transition-all"
                 placeholder={intl.formatMessage({ id: "auth.yourName" })}
+                autoComplete="name"
                 required
               />
             </div>
@@ -287,6 +288,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
               onChange={(e) => setEmail(e.target.value)}
               className="w-full bg-[#2A0A10] border border-red-900/50 rounded-xl px-4 py-3 text-white placeholder-red-900/50 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none transition-all"
               placeholder={intl.formatMessage({ id: "auth.emailPlaceholder" })}
+              autoComplete="email"
               required
             />
           </div>
@@ -328,6 +330,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 className="w-full bg-[#2A0A10] border border-red-900/50 rounded-xl px-4 py-3 text-white placeholder-red-900/50 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none transition-all"
                 placeholder={intl.formatMessage({ id: "auth.confirmPasswordPlaceholder" })}
+                autoComplete="new-password"
                 required
               />
             </div>

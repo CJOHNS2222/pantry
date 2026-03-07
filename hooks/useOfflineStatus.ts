@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { offlineQueue } from '../services/offlineQueueService';
+import DatabaseMonitoringService from '../services/databaseMonitoringService';
 
 export interface SyncStatus {
   isOnline: boolean;

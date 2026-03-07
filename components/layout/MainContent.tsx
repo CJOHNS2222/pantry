@@ -190,7 +190,6 @@ export const MainContent: React.FC = () => {
               user={user || undefined}
               household={appState.household}
               isLoadingShoppingList={isLoadingShoppingList}
-              activeTab={activeTab}
             />
           </Suspense>
         </ComponentErrorBoundary>
@@ -247,7 +246,8 @@ export const MainContent: React.FC = () => {
               mealPlan={mealPlan}
               onShowTutorial={onShowTutorial}
               household={household ?? undefined}
-              
+              onShowHousehold={onShowHousehold}
+              addToast={addToast}
             />
           </Suspense>
         </ComponentErrorBoundary>

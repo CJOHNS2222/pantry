@@ -51,8 +51,8 @@ describe('PantryScanner bulk behavior and virtualization', () => {
     expect(checkboxes.length).toBeGreaterThan(0);
     fireEvent.click(checkboxes[0]);
 
-    // Change the bulk location select to 'fridge'
-    const moveOption = screen.getAllByText('Move to Pantry')[0];
+    // Change the bulk location select to 'fridge' (select shows 'Change Location')
+    const moveOption = screen.getAllByText('Change Location')[0];
     const combobox = moveOption.closest('select');
     expect(combobox).not.toBeNull();
     if (combobox) fireEvent.change(combobox, { target: { value: 'fridge' } });

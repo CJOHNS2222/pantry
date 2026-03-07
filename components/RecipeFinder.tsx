@@ -36,7 +36,7 @@ interface RecipeFinderProps {
     persistedResult?: RecipeSearchResult | null;
     setPersistedResult?: (result: RecipeSearchResult | null) => void;
     initialSearchQuery?: string;
-    addToast?: (message: string, type?: 'error' | 'info', ttl?: number, actionLabel?: string, action?: () => void) => void;
+    addToast?: (message: string, type?: 'error' | 'info' | 'success', ttl?: number, actionLabel?: string, action?: () => void) => void;
     // Usage limit states
     recipeSaveLimitExceeded?: boolean;
     mealPlanLimitExceeded?: boolean;

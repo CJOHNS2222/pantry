@@ -749,7 +749,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
       <div key={category} className="bg-theme-secondary rounded-lg border border-theme overflow-hidden">
         <div
           onClick={() => toggleCategory(category)}
-          className="w-full flex items-center justify-between p-4 hover:bg-theme-primary transition-colors cursor-pointer"
+          className="w-full flex items-center p-4 bg-[var(--accent-color)]/10 hover:bg-[var(--accent-color)]/20 transition-colors cursor-pointer"
         >
           <div className="flex items-center gap-3">
             <div
@@ -798,14 +798,14 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
 
     return (
       <div key={location} className="bg-theme-secondary rounded-lg border border-theme overflow-hidden">
-        <div className="w-full flex items-center justify-center p-4">
+        <div className="w-full flex items-center px-4 py-2 bg-green-200">
           <div className="flex items-center gap-3">
             <StorageLocationIndicator
               location={location as 'pantry' | 'freezer' | 'fridge' | 'spices' | 'other'}
               size="md"
             />
-            <h4 className="font-semibold text-theme-primary">{locationLabel}</h4>
-            <span className="text-sm text-theme-secondary opacity-70">
+            <h4 className="font-semibold text-black">{locationLabel}</h4>
+            <span className="text-sm text-gray-700">
               ({items.length} item{items.length !== 1 ? 's' : ''})
             </span>
           </div>
