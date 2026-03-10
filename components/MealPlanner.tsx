@@ -173,16 +173,16 @@ const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
   // Debounced search function for input changes
   const debouncedSearch = useMemo(
     () => debounce(() => {
-      if (searchQuery.trim()) {
+      if (searchQuery.trim() && searchQuery.trim().length >= 2) {
         handleSearch();
       }
-    }, 500), // 500ms delay
+    }, 800), // 800ms delay
     [searchQuery]
   );
 
   // Effect to trigger debounced search when query changes
   useEffect(() => {
-    if (searchQuery.trim()) {
+    if (searchQuery.trim() && searchQuery.trim().length >= 2) {
       debouncedSearch();
     }
   }, [searchQuery, debouncedSearch]);
@@ -201,8 +201,8 @@ const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
       .filter((recipe, index, self) =>
         index === self.findIndex(r => r.title === recipe.title)
       )
-      .filter(recipe => !searchResults.some(searchResult => searchResult.title === recipe.title))
-      .filter(recipe => !filteredSavedRecipes.some(saved => saved.title === recipe.title)), // Avoid duplicates with saved recipes
+      .filter(recipe => !filteredSavedRecipes.some(saved => saved.title === recipe.title)) // Avoid duplicates with saved recipes
+      .filter(recipe => !searchResults.some(searchResult => searchResult.title === recipe.title)), // Avoid duplicates with search results
     [cachedRecipes, searchQuery, searchResults, filteredSavedRecipes]
   );
 
@@ -312,16 +312,6 @@ const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
           </div>
         )}
 
-        {!recipesLoaded && (
-          <div>
-            <h4 className="text-sm font-semibold text-theme-secondary mb-2">Saved Recipes</h4>
-            <div className="grid grid-cols-3 gap-2">
-              {Array.from({ length: 6 }).map((_, index) => (
-                <CompactRecipeCardSkeleton key={`saved-skeleton-${index}`} />
-              ))}
-            </div>
-          </div>
-        )}
         {filteredSavedRecipes.length > 0 && recipesLoaded && (
           <div>
             <h4 className="text-sm font-semibold text-theme-secondary mb-2">Saved Recipes</h4>
@@ -579,8 +569,10 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
   const [modalRecipe, setModalRecipe] = useState<StructuredRecipe | null>(null);
   const [modalContext, setModalContext] = useState<'search' | 'scheduled'>('search');
   const [showHelpTooltip, setShowHelpTooltip] = useState(false);
-  const [selectedDayIndex, setSelectedDayIndex] = useState<number | null>(null);
+  const [currentDayIndex, setCurrentDayIndex] = useState(0);
   const [isEstimatorOpen, setIsEstimatorOpen] = useState(false);
+  const [isCalendarExpanded, setIsCalendarExpanded] = useState(false);
+  const [currentCalendarMonth, setCurrentCalendarMonth] = useState(new Date());
 
   // Use prop savedRecipes or local state as fallback
   const [localSavedRecipes, setLocalSavedRecipes] = useState<SavedRecipe[]>([]);
@@ -592,6 +584,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
   const [searchMealType, setSearchMealType] = useState<'breakfast' | 'lunch' | 'dinner' | null>(null);
   const [showMealPrepPlanner, setShowMealPrepPlanner] = useState(false);
   const [showAddMealDialog, setShowAddMealDialog] = useState(false);
+  const [selectedDayForDialog, setSelectedDayForDialog] = useState<number | null>(null);
   const [pendingRecipe, setPendingRecipe] = useState<StructuredRecipe | null>(null);
   const [showLeftoverPrompt, setShowLeftoverPrompt] = useState(false);
   const [showLeftoverCapture, setShowLeftoverCapture] = useState(false);
@@ -599,6 +592,15 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
   const [leftoverNotes, setLeftoverNotes] = useState<string>('');
   const [showLeftoverSwapModal, setShowLeftoverSwapModal] = useState(false);
   const [swapSource, setSwapSource] = useState<{ dayIndex: number; mealType: 'breakfast' | 'lunch' | 'dinner'; mealIndex: number } | null>(null);
+
+  // Check if a day has any meals scheduled
+  const hasMealsScheduled = useCallback((dayIndex: number) => {
+    const day = mealPlan[dayIndex];
+    if (!day) return false;
+    return (day.breakfast?.length || 0) > 0 || 
+           (day.lunch?.length || 0) > 0 || 
+           (day.dinner?.length || 0) > 0;
+  }, [mealPlan]);
 
   // Wrapper for onAddToPlan that shows day/meal selection dialog
   const handleAddToPlan = (recipe: StructuredRecipe) => {
@@ -831,10 +833,10 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
         }))
       );
       
-      // Add each item with its specific recipe source
-      itemsToAdd.forEach(item => {
-        addToShoppingList([item.ingredient], item.source);
-      });
+      // Batch add all items at once
+      const allIngredients = itemsToAdd.map(item => item.ingredient);
+      const batchSource = `meal plan: ${missing.length} missing ingredients for planned meals`;
+      addToShoppingList(allIngredients, batchSource);
       
       alert(`Added ${missing.length} items to your shopping list.`);
     }
@@ -1136,6 +1138,17 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
     return Object.values(grouped);
   }, [displayPlan, inventory, shoppingList, includeStaples]);
 
+  // Initialize current day to today when displayPlan is available
+  useEffect(() => {
+    if (displayPlan.length > 0) {
+      const today = new Date().toISOString().slice(0, 10);
+      const todayIndex = displayPlan.findIndex(day => day.date === today);
+      if (todayIndex >= 0 && todayIndex !== currentDayIndex) {
+        setCurrentDayIndex(todayIndex);
+      }
+    }
+  }, [displayPlan]);
+
   useEffect(() => {
     setMissingItemsCount(missingIngredients.length);
   }, [missingIngredients]);
@@ -1373,118 +1386,346 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
             </div>
           </div>
         ) : (
-          /* Calendar Grid */
+          /* Single Day View with Navigation */
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-2">
-                {displayPlan.map((day, displayIndex) => {
-                  const originalIndex = displayToOriginal[displayIndex];
-                  const effectiveIndex = originalIndex >= 0 ? originalIndex : ensureDayExists(day.date, day.dayName);
+        {/* Calendar View - Compact or Expanded */}
+        <div className="bg-theme-secondary rounded-xl p-3 border border-theme">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setIsCalendarExpanded(false)}
+                className={`px-3 py-1 text-xs font-medium rounded-lg transition-colors ${
+                  !isCalendarExpanded
+                    ? 'bg-[var(--accent-color)] text-white'
+                    : 'text-theme-secondary hover:bg-theme-primary/20'
+                }`}
+              >
+                This Week
+              </button>
+              <button
+                onClick={() => setIsCalendarExpanded(true)}
+                className={`px-3 py-1 text-xs font-medium rounded-lg transition-colors ${
+                  isCalendarExpanded
+                    ? 'bg-[var(--accent-color)] text-white'
+                    : 'text-theme-secondary hover:bg-theme-primary/20'
+                }`}
+              >
+                This Month
+              </button>
+            </div>
+            <div className="flex items-center gap-2 text-xs">
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 bg-theme-primary/50 rounded"></span>
+                <span className="text-theme-secondary opacity-70">Has meals</span>
+              </span>
+              <span className="text-theme-secondary opacity-40">•</span>
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 bg-[var(--accent-color)] rounded"></span>
+                <span className="text-theme-secondary opacity-70">Today</span>
+              </span>
+            </div>
+          </div>
+          
+          {isCalendarExpanded ? (
+            /* Full Month Calendar View */
+            <div className="space-y-2">
+              {/* Month Navigation */}
+              <div className="flex items-center justify-between">
+                <button
+                  onClick={() => {
+                    const newMonth = new Date(currentCalendarMonth);
+                    newMonth.setMonth(newMonth.getMonth() - 1);
+                    setCurrentCalendarMonth(newMonth);
+                  }}
+                  className="p-1 rounded hover:bg-theme-primary/20 text-theme-secondary"
+                >
+                  ‹
+                </button>
+                <div className="flex items-center gap-2">
+                  <h5 className="text-sm font-medium text-theme-primary">
+                    {currentCalendarMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                  </h5>
+                  <button
+                    onClick={() => setCurrentCalendarMonth(new Date())}
+                    className="text-xs px-2 py-1 rounded bg-theme-primary/20 hover:bg-theme-primary/30 text-theme-secondary"
+                    title="Go to today"
+                  >
+                    Today
+                  </button>
+                </div>
+                <button
+                  onClick={() => {
+                    const newMonth = new Date(currentCalendarMonth);
+                    newMonth.setMonth(newMonth.getMonth() + 1);
+                    setCurrentCalendarMonth(newMonth);
+                  }}
+                  className="p-1 rounded hover:bg-theme-primary/20 text-theme-secondary"
+                >
+                  ›
+                </button>
+              </div>
+              
+              {/* Day headers */}
+              <div className="grid grid-cols-7 gap-1 text-center">
+                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                  <div key={day} className="text-xs text-theme-secondary opacity-60 py-1">
+                    {day}
+                  </div>
+                ))}
+              </div>
+              
+              {/* Calendar Grid */}
+              <div className="grid grid-cols-7 gap-1">
+                {/* Generate calendar days for current calendar month */}
+                {(() => {
+                  const today = new Date();
+                  const firstDay = new Date(currentCalendarMonth.getFullYear(), currentCalendarMonth.getMonth(), 1);
+                  const lastDay = new Date(currentCalendarMonth.getFullYear(), currentCalendarMonth.getMonth() + 1, 0);
+                  const startDate = new Date(firstDay);
+                  startDate.setDate(startDate.getDate() - firstDay.getDay()); // Start from Sunday
+                  
+                  const days = [];
+                  const currentDate = new Date(startDate);
+                  
+                  // Generate 6 weeks to ensure full coverage
+                  for (let week = 0; week < 6; week++) {
+                    for (let dayOfWeek = 0; dayOfWeek < 7; dayOfWeek++) {
+                      const dateStr = currentDate.toISOString().split('T')[0];
+                      const isCurrentMonth = currentDate.getMonth() === currentCalendarMonth.getMonth() && currentDate.getFullYear() === currentCalendarMonth.getFullYear();
+                      const isToday = currentDate.toDateString() === today.toDateString();
+                      
+                      // Find if this date has meals scheduled
+                      const dayIndex = displayPlan.findIndex(day => day.date === dateStr);
+                      const hasMeals = dayIndex >= 0 && hasMealsScheduled(displayToOriginal[dayIndex] ?? dayIndex);
+                      const isSelected = dayIndex === currentDayIndex;
+                      
+                      days.push(
+                        <button
+                          key={dateStr}
+                          onClick={() => {
+                            const planIndex = displayPlan.findIndex(day => day.date === dateStr);
+                            if (planIndex >= 0) {
+                              setCurrentDayIndex(planIndex);
+                            }
+                          }}
+                          className={`aspect-square text-xs rounded-lg transition-all relative ${
+                            !isCurrentMonth
+                              ? 'text-theme-secondary opacity-30'
+                              : isSelected
+                              ? 'bg-[var(--accent-color)] text-white font-bold ring-2 ring-[var(--accent-color)]/50'
+                              : isToday
+                              ? 'bg-[var(--accent-color)]/20 text-[var(--accent-color)] border border-[var(--accent-color)]/30'
+                              : hasMeals
+                              ? 'bg-theme-primary/50 text-theme-primary hover:bg-theme-primary/70 border border-theme-primary/30'
+                              : 'text-theme-secondary opacity-50 hover:bg-theme-primary/20'
+                          }`}
+                          title={`${currentDate.toLocaleDateString()}${hasMeals ? ' - Has meals scheduled' : ' - No meals'}`}
+                        >
+                          {hasMeals ? (
+                            <div className="flex flex-col items-center leading-tight h-full justify-center">
+                              <span className="font-bold">✓</span>
+                              <span className="text-[10px]">{currentDate.getDate()}</span>
+                            </div>
+                          ) : (
+                            <span className="flex items-center justify-center h-full">
+                              {currentDate.getDate()}
+                            </span>
+                          )}
+                          {isSelected && (
+                            <div className="absolute -top-1 -right-1 w-2 h-2 bg-white rounded-full border border-[var(--accent-color)]"></div>
+                          )}
+                        </button>
+                      );
+                      
+                      currentDate.setDate(currentDate.getDate() + 1);
+                    }
+                  }
+                  
+                  return days;
+                })()}
+              </div>
+            </div>
+          ) : (
+            /* Compact Week View */
+            <div className="grid grid-cols-7 gap-1 text-center">
+              {displayPlan.slice(0, 7).map((day, index) => {
+                const originalIndex = displayToOriginal[index];
+                const effectiveIndex = originalIndex >= 0 ? originalIndex : ensureDayExists(day.date, day.dayName);
+                const hasMeals = hasMealsScheduled(effectiveIndex);
+                const isCurrentDay = index === currentDayIndex;
+                const isTodayDate = isToday(day.date);
+
+                return (
+                  <div key={day.date} className="flex flex-col items-center">
+                    <div className="text-xs text-theme-secondary opacity-60 mb-1">
+                      {day.dayName.slice(0, 3)}
+                    </div>
+                    <button
+                      onClick={() => setCurrentDayIndex(index)}
+                      className={`w-full py-1 text-xs rounded-lg transition-all relative ${
+                        isCurrentDay
+                          ? 'bg-[var(--accent-color)] text-white font-bold ring-2 ring-[var(--accent-color)]/50'
+                          : isTodayDate
+                          ? 'bg-[var(--accent-color)]/20 text-[var(--accent-color)] border border-[var(--accent-color)]/30'
+                          : hasMeals
+                          ? 'bg-theme-primary/50 text-theme-primary hover:bg-theme-primary/70 border border-theme-primary/30'
+                          : 'text-theme-secondary opacity-50 hover:bg-theme-primary/20'
+                      }`}
+                      title={`${day.dayName} ${day.date}${hasMeals ? ' - Has meals scheduled' : ' - No meals'}`}
+                    >
+                      {hasMeals ? (
+                        <div className="flex flex-col items-center leading-tight">
+                          <span className="font-bold">✓</span>
+                          <span className="text-[10px]">{new Date(day.date).getDate()}</span>
+                        </div>
+                      ) : (
+                        new Date(day.date).getDate()
+                      )}
+                      {isCurrentDay && (
+                        <div className="absolute -top-1 -right-1 w-2 h-2 bg-white rounded-full border border-[var(--accent-color)]"></div>
+                      )}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+            {/* Navigation Header */}
+            <div className="flex items-center justify-between bg-theme-secondary rounded-xl p-4 border border-theme">
+              <button
+                onClick={() => setCurrentDayIndex(Math.max(0, currentDayIndex - 1))}
+                disabled={currentDayIndex === 0}
+                className="p-2 rounded-lg hover:bg-theme-primary/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                aria-label="Previous day"
+              >
+                <svg className="w-6 h-6 text-theme-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+
+              <div className="text-center">
+                <h2 className={`text-xl font-bold ${isToday(displayPlan[currentDayIndex]?.date) ? 'text-[var(--accent-color)]' : 'text-theme-primary'}`}>
+                  {displayPlan[currentDayIndex]?.dayName}
+                  {isToday(displayPlan[currentDayIndex]?.date) && <span className="ml-2 text-sm">📅</span>}
+                </h2>
+                <p className={`text-sm font-mono ${isToday(displayPlan[currentDayIndex]?.date) ? 'text-[var(--accent-color)] font-semibold' : 'text-theme-secondary opacity-70'}`}>
+                  {displayPlan[currentDayIndex]?.date}
+                </p>
+              </div>
+
+              <button
+                onClick={() => setCurrentDayIndex(Math.min(displayPlan.length - 1, currentDayIndex + 1))}
+                disabled={currentDayIndex === displayPlan.length - 1}
+                className="p-2 rounded-lg hover:bg-theme-primary/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                aria-label="Next day"
+              >
+                <svg className="w-6 h-6 text-theme-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Current Day Meals */}
+            <div className="bg-theme-secondary rounded-xl p-6 border border-theme min-h-[400px]">
+              <div className="space-y-6">
+                {['Breakfast', 'Lunch', 'Dinner'].map((mealType) => {
+                  const mealTypeKey = mealType.toLowerCase() as 'breakfast' | 'lunch' | 'dinner';
+                  const originalIndex = displayToOriginal[currentDayIndex];
+                  const effectiveIndex = originalIndex >= 0 ? originalIndex : ensureDayExists(displayPlan[currentDayIndex].date, displayPlan[currentDayIndex].dayName);
+                  const mealsForType = mealPlan[effectiveIndex][mealTypeKey] || [];
 
                   return (
-                    <div
-                      key={day.date}
-                      onClick={() => setSelectedDayIndex(effectiveIndex)}
-                      className={`bg-theme-secondary rounded-lg p-3 min-h-[320px] border-2 transition-all cursor-pointer flex flex-col hover:shadow-lg hover:scale-[1.02] ${
-                        isToday(day.date) && !showRecipeModal && !showRecipeSearch && !showAddMealDialog && !showMealPrepPlanner
-                          ? 'border-[var(--accent-color)] bg-gradient-to-br from-[var(--accent-color)]/5 to-transparent shadow-md ring-1 ring-[var(--accent-color)]/20'
-                          : 'border-theme'
-                      }`}>
+                    <div key={mealType} className="space-y-3">
+                      <h3 className="text-lg font-semibold text-theme-primary flex items-center gap-2">
+                        {mealType}
+                        <span className="text-sm opacity-60">({mealsForType.length})</span>
+                      </h3>
 
-                      <div className="mb-2">
-                        <h3 className={`text-sm font-bold ${isToday(day.date) ? 'text-[var(--accent-color)]' : 'text-theme-primary'}`}>
-                          {day.dayName}
-                          {isToday(day.date) && <span className="ml-1 text-xs">📅</span>}
-                        </h3>
-                        <p className={`text-xs font-mono ${isToday(day.date) ? 'text-[var(--accent-color)] font-semibold' : 'opacity-50'}`}>
-                          {day.date}
-                        </p>
-                      </div>
-
-                      <div className="space-y-1 flex-1 overflow-y-auto text-xs">
-                        {['Breakfast', 'Lunch', 'Dinner'].map((mealType) => {
-                          const mealTypeKey = mealType.toLowerCase() as 'breakfast' | 'lunch' | 'dinner';
-                          const mealsForType = mealPlan[effectiveIndex][mealTypeKey] || [];
-
-                          return (
+                      {mealsForType.length === 0 ? (
+                        <button
+                          onClick={() => {
+                            setSearchMealType(mealTypeKey);
+                            setShowRecipeSearch(true);
+                          }}
+                          data-tutorial="add-recipe-button"
+                          className="w-full border-2 border-dashed border-theme/50 rounded-lg p-6 text-center hover:border-[var(--accent-color)] hover:bg-[var(--accent-color)]/5 transition-all"
+                        >
+                          <Plus className="w-8 h-8 mx-auto mb-2 text-theme-secondary opacity-50" />
+                          <span className="text-theme-secondary opacity-70">Add Recipe</span>
+                        </button>
+                      ) : (
+                        <div className="space-y-3">
+                          {mealsForType.map((meal, mealIndex) => (
                             <div
-                              key={mealType}
-                              className={`space-y-1 p-1 rounded transition-colors ${
-                                dragOverMealType?.dayIndex === effectiveIndex && dragOverMealType?.mealType === mealTypeKey
-                                  ? 'bg-[var(--accent-color)]/10 border border-[var(--accent-color)]/30'
-                                  : 'hover:bg-theme-primary/20'
-                              }`}
-                              onDragOver={(e) => handleDragOver(e, effectiveIndex, mealTypeKey)}
-                              onDragLeave={handleDragLeave}
-                              onDrop={(e) => handleDrop(e, effectiveIndex, mealTypeKey)}
+                              key={meal.id}
+                              className="bg-theme-primary/60 border border-theme/30 rounded-lg p-4 hover:bg-theme-primary/80 transition-all"
                             >
-                              <div className="text-[10px] font-semibold text-theme-primary opacity-60 uppercase">
-                                {mealType.slice(0, 1)}
-                              </div>
-                              <div className="space-y-1">
-                                {mealsForType.length === 0 ? (
-                                  <div className="h-6 flex items-center text-[9px] opacity-30">Drop here</div>
-                                ) : (
-                                  mealsForType.map((meal, mealIndex) => (
-                                    <div
-                                      key={meal.id}
-                                      draggable
-                                      onDragStart={(e) => {
-                                        e.dataTransfer.setData('text/plain', `${mealTypeKey}-${mealIndex}`);
-                                        handleDragStart(e, effectiveIndex, mealTypeKey, mealIndex);
-                                      }}
-                                      onDragEnd={handleDragEnd}
-                                      className={`bg-theme-primary/60 border border-theme/30 rounded-md p-1.5 text-[9px] cursor-pointer group shadow-sm active:cursor-grabbing transition-all truncate hover:opacity-80 hover:bg-theme-primary/80 hover:border-[var(--accent-color)]/40 hover:shadow-md flex items-center justify-between gap-1 ${
-                                        draggedMeal?.dayIndex === effectiveIndex && draggedMeal?.mealType === mealTypeKey && draggedMeal?.mealIndex === mealIndex
-                                          ? 'opacity-50 scale-95'
-                                          : ''
-                                      }`}
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setModalRecipe(meal.recipe);
-                                        setModalContext('scheduled');
-                                        setShowRecipeModal(true);
-                                      }}
-                                      title={meal.recipe.title}
-                                    >
-                                      <span className="text-[var(--accent-color)] font-semibold truncate flex-1">{meal.recipe.title}</span>
-                                      <button
-                                        type="button"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleCookedIt(meal);
-                                        }}
-                                        className="text-[8px] px-1 py-0.5 rounded bg-theme-secondary/70 hover:bg-[var(--accent-color)] hover:text-white transition-colors"
-                                        title="Cooked it / capture leftovers"
-                                        aria-label={`Mark ${meal.recipe.title} as cooked and capture leftovers`}
-                                      >
-                                        ✓
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleOpenSwapWithLeftover(effectiveIndex, mealTypeKey, mealIndex);
-                                        }}
-                                        className="text-[8px] px-1 py-0.5 rounded bg-theme-secondary/70 hover:bg-[var(--accent-color)] hover:text-white transition-colors"
-                                        title="Swap with leftover"
-                                        aria-label={`Swap ${meal.recipe.title} with an available leftover`}
-                                      >
-                                        🍱
-                                      </button>
-                                      <span className="text-[8px] opacity-60 group-hover:opacity-80">👁️</span>
-                                    </div>
-                                  ))
+                              <div className="mb-3">
+                                <span 
+                                  className="text-[var(--accent-color)] font-semibold text-lg cursor-pointer hover:opacity-80 transition-opacity"
+                                  onClick={() => {
+                                    setModalRecipe(meal.recipe);
+                                    setModalContext('scheduled');
+                                    setShowRecipeModal(true);
+                                  }}
+                                >
+                                  {meal.recipe.title}
+                                </span>
+                                <span className="text-sm opacity-60 ml-2">
+                                  • {meal.recipe.cookTime}
+                                </span>
+                                {meal.recipe.servings && (
+                                  <span className="text-sm opacity-60 ml-2">
+                                    • Serves {meal.recipe.servings}
+                                  </span>
                                 )}
                               </div>
+                              <div className="flex gap-1.5 flex-wrap">
+                                <button
+                                  onClick={() => {
+                                    setModalRecipe(meal.recipe);
+                                    setModalContext('scheduled');
+                                    setShowRecipeModal(true);
+                                  }}
+                                  className="px-1 py-2 bg-theme-secondary border border-theme rounded-lg hover:bg-theme-primary transition-colors text-sm"
+                                  title="View recipe"
+                                >
+                                  👁️ View
+                                </button>
+                                <button
+                                  onClick={() => handleCookedIt(meal)}
+                                  className="px-1 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
+                                  title="Mark as cooked"
+                                >
+                                  ✓ Cooked
+                                </button>
+                                <button
+                                  onClick={() => handleOpenSwapWithLeftover(effectiveIndex, mealTypeKey, mealIndex)}
+                                  className="px-1 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+                                  title="Swap with leftover"
+                                >
+                                  🍱 Swap
+                                </button>
+                                <button
+                                  onClick={() => removeMeal(effectiveIndex, mealTypeKey, mealIndex)}
+                                  className="px-1 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm"
+                                  title="Remove meal"
+                                >
+                                  🗑️ Remove
+                                </button>
+                              </div>
                             </div>
-                          );
-                        })}
-                      </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
+              </div>
+            </div>
           </div>
-        </div>
         )}
 
         {/* Trash can for removing meals */}
@@ -1518,127 +1759,6 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
         )}
       </PremiumFeature>
       
-      {/* Day Detail Modal */}
-      {selectedDayIndex !== null && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-theme-primary rounded-xl max-w-2xl w-full max-h-[90vh] overflow-hidden shadow-2xl">
-            <div className="p-6 border-b border-theme">
-              <div className="flex items-center justify-between">
-                <button
-                  onClick={() => setSelectedDayIndex(Math.max(0, selectedDayIndex - 1))}
-                  disabled={selectedDayIndex === 0}
-                  className="text-theme-secondary opacity-60 hover:opacity-100 p-2 disabled:opacity-30 disabled:cursor-not-allowed"
-                  aria-label="Previous day"
-                >
-                  ‹
-                </button>
-                <div className="text-center">
-                  <h2 className="text-2xl font-bold text-theme-secondary">
-                    {mealPlan[selectedDayIndex].dayName}
-                  </h2>
-                  <p className="text-theme-secondary opacity-60">{mealPlan[selectedDayIndex].date}</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setSelectedDayIndex(Math.min(mealPlan.length - 1, selectedDayIndex + 1))}
-                    disabled={selectedDayIndex === mealPlan.length - 1}
-                    className="text-theme-secondary opacity-60 hover:opacity-100 p-2 disabled:opacity-30 disabled:cursor-not-allowed"
-                    aria-label="Next day"
-                  >
-                    ›
-                  </button>
-                  <button
-                    onClick={() => setSelectedDayIndex(null)}
-                    className="text-theme-secondary opacity-60 hover:opacity-100 p-2"
-                    aria-label="Close day details"
-                  >
-                    ✕
-                  </button>
-                </div>
-              </div>
-            </div>
-            
-            <div className="p-6 max-h-[calc(90vh-120px)] overflow-y-auto">
-              <div className="space-y-6">
-                {['Breakfast', 'Lunch', 'Dinner'].map((mealType) => {
-                  const mealTypeKey = mealType.toLowerCase() as 'breakfast' | 'lunch' | 'dinner';
-                  const mealsForType = mealPlan[selectedDayIndex][mealTypeKey] || [];
-
-                  return (
-                    <div key={mealType} className="space-y-3">
-                      <h3 className="text-lg font-semibold text-theme-secondary">{mealType}</h3>
-                      
-                      {mealsForType.length === 0 ? (
-                        <button
-                          onClick={() => {
-                            setSearchMealType(mealTypeKey);
-                            setShowRecipeSearch(true);
-                          }}
-                          data-tutorial="add-recipe-button"
-                          className="w-full border-2 border-dashed border-theme/50 rounded-lg p-4 text-center hover:border-[var(--accent-color)] hover:bg-[var(--accent-color)]/5 transition-all"
-                        >
-                          <Plus className="w-8 h-8 mx-auto mb-2 text-theme-secondary opacity-50" />
-                          <span className="text-theme-secondary opacity-70">Add Recipe</span>
-                        </button>
-                      ) : (
-                        <div className="space-y-3">
-                          {mealsForType.map((meal, mealIndex) => (
-                            <div
-                              key={meal.id}
-                              className="bg-theme-secondary rounded-lg p-4 flex justify-between items-center"
-                            >
-                              <div className="flex-1">
-                                <span className="text-[var(--accent-color)] font-semibold">
-                                  {meal.recipe.title}
-                                </span>
-                                <span className="text-sm opacity-60 ml-2">
-                                  • {meal.recipe.cookTime}
-                                </span>
-                              </div>
-                              <div className="flex gap-2">
-                                <button
-                                  onClick={() => {
-                                    setModalRecipe(meal.recipe);
-                                    setModalContext('scheduled');
-                                    setShowRecipeModal(true);
-                                  }}
-                                  className="text-theme-secondary opacity-60 hover:opacity-100 p-2"
-                                  aria-label={`View recipe: ${meal.recipe.title}`}
-                                >
-                                  👁
-                                </button>
-                                <button
-                                  onClick={() => removeMeal(selectedDayIndex, mealTypeKey, mealIndex)}
-                                  className="text-red-400 opacity-60 hover:opacity-100 p-2"
-                                  aria-label={`Remove ${meal.recipe.title} from ${mealTypeKey}`}
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </div>
-                            </div>
-                          ))}
-                          <button
-                            onClick={() => {
-                              setSearchMealType(mealTypeKey);
-                              setShowRecipeSearch(true);
-                            }}
-                            data-tutorial="add-recipe-button"
-                            className="w-full border border-theme/50 rounded-lg p-3 text-center hover:border-[var(--accent-color)] hover:bg-[var(--accent-color)]/5 transition-all"
-                          >
-                            <Plus className="w-5 h-5 mx-auto mb-1 text-theme-secondary opacity-50" />
-                            <span className="text-sm text-theme-secondary opacity-70">Add Another Recipe</span>
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Recipe Search Modal */}
       {showRecipeSearch && searchMealType && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -1650,7 +1770,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
                     Add {searchMealType.charAt(0).toUpperCase() + searchMealType.slice(1)} Recipe
                   </h2>
                   <p className="text-theme-secondary opacity-60">
-                    {mealPlan[selectedDayIndex!].dayName} - {mealPlan[selectedDayIndex!].date}
+                    {mealPlan[currentDayIndex].dayName} - {mealPlan[currentDayIndex].date}
                   </p>
                 </div>
                 <button
@@ -1668,13 +1788,17 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
             <div className="p-6">
               <RecipeSearchModal
                 mealType={searchMealType}
-                dayIndex={selectedDayIndex!}
+                dayIndex={currentDayIndex}
                 onAddRecipe={(recipe, dayIndex) => {
                   const newPlan = [...mealPlan];
-                  if (!newPlan[dayIndex][searchMealType]) {
-                    newPlan[dayIndex][searchMealType] = [];
+                  // Map displayPlan index to mealPlan index
+                  const originalIndex = displayToOriginal[dayIndex];
+                  const effectiveIndex = originalIndex >= 0 ? originalIndex : ensureDayExists(displayPlan[dayIndex].date, displayPlan[dayIndex].dayName);
+                  
+                  if (!newPlan[effectiveIndex][searchMealType]) {
+                    newPlan[effectiveIndex][searchMealType] = [];
                   }
-                  newPlan[dayIndex][searchMealType].push({
+                  newPlan[effectiveIndex][searchMealType].push({
                     id: Date.now().toString(),
                     recipe,
                     mealType: searchMealType
@@ -1809,7 +1933,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
                 <label className="block text-sm font-medium text-theme-text mb-2">Select Day:</label>
                 <select
                   className="w-full p-3 bg-theme-secondary border border-theme rounded-lg text-theme-text"
-                  onChange={(e) => setSelectedDayIndex(parseInt(e.target.value))}
+                  onChange={(e) => setSelectedDayForDialog(parseInt(e.target.value))}
                   defaultValue=""
                 >
                   <option value="" disabled>Select a day...</option>
@@ -1831,7 +1955,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
                   {(['breakfast', 'lunch', 'dinner'] as const).map((mealType) => (
                     <button
                       key={mealType}
-                      onClick={() => selectedDayIndex !== null && confirmAddToPlan(selectedDayIndex, mealType)}
+                      onClick={() => selectedDayForDialog !== null && confirmAddToPlan(selectedDayForDialog, mealType)}
                       className="p-3 bg-theme-secondary hover:bg-[var(--accent-color)] hover:text-white border border-theme rounded-lg text-theme-text capitalize transition-colors"
                     >
                       {mealType}
@@ -1846,7 +1970,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
                 onClick={() => {
                   setShowAddMealDialog(false);
                   setPendingRecipe(null);
-                  setSelectedDayIndex(null);
+                  setSelectedDayForDialog(null);
                 }}
                 className="flex-1 py-3 font-medium bg-theme-secondary text-theme-text rounded-lg hover:bg-theme-primary transition-colors"
               >

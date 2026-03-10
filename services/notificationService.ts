@@ -7,10 +7,10 @@ import DatabaseMonitoringService from './databaseMonitoringService';
 import { serverTimestamp, Timestamp } from 'firebase/firestore';
 import { User } from '../types';
 import { pushNotificationService } from './pushNotificationService';
-import { appendNotificationToUser, getNotificationsOnce, markNotificationRead, snoozeNotificationInCache } from './notificationsService';
+import { appendNotificationToUser, markNotificationRead, snoozeNotificationInCache, updateNotificationInCache } from './notificationsService';
 import { auth } from '../firebaseConfig';
 import { formatDangerSummary, DangerItem } from './notificationHelpers';
-import { getFoodRiskLevel, generateExpirationMessage, getNotificationTone } from '../utils/foodRiskClassification';
+import { getFoodRiskLevel, generateExpirationMessage, getNotificationTone, generateNotificationStackMessage, generateWasteNotificationMessage } from '../utils/foodRiskClassification';
 
 export interface NotificationItem {
   id: string;
@@ -157,7 +157,6 @@ export class NotificationService {
 
     if (existingStack) {
       // Update existing stack notification
-      const { generateNotificationStackMessage } = await import('../utils/foodRiskClassification');
       const { title, message } = generateNotificationStackMessage(items);
 
       const updateData = {
@@ -167,7 +166,6 @@ export class NotificationService {
       };
 
       try {
-        const { updateNotificationInCache } = await import('./notificationsService');
         await updateNotificationInCache(userId, existingStack.id, updateData as any);
       } catch (err: any) {
         console.error('Failed to update stack notification:', err);
@@ -177,7 +175,6 @@ export class NotificationService {
     }
 
     // Create new stack notification
-    const { generateNotificationStackMessage } = await import('../utils/foodRiskClassification');
     const { title, message } = generateNotificationStackMessage(items);
 
     return this.createNotification(userId, {
@@ -203,7 +200,6 @@ export class NotificationService {
     itemName: string,
     itemId: string
   ): Promise<string> {
-    const { generateWasteNotificationMessage } = await import('../utils/foodRiskClassification');
     const { title, message, actionLabel, actionType } = generateWasteNotificationMessage(itemName);
 
     return this.createNotification(userId, {
@@ -282,13 +278,11 @@ export class NotificationService {
             await DatabaseMonitoringService.updateDoc(docRef, updateData as any);
           } else {
             // No top-level doc — update the per-user cache instead
-            const { updateNotificationInCache } = await import('./notificationsService');
             await updateNotificationInCache(userId, existingNotification.id, updateData as any);
           }
         } catch (err: any) {
           console.warn('Failed updating top-level notification; falling back to cache update', { error: err?.message || err, userId });
           try {
-            const { updateNotificationInCache } = await import('./notificationsService');
             await updateNotificationInCache(userId, existingNotification.id, updateData as any);
           } catch (cacheErr: any) {
             console.error('Failed to update notification in user cache fallback:', { error: cacheErr?.message || cacheErr, userId, notificationId: existingNotification.id });
@@ -474,23 +468,31 @@ export class NotificationService {
    */
   static async getUnreadNotifications(userId: string, userEmail?: string): Promise<NotificationItem[]> {
     try {
-      // Read from per-user notifications cache to avoid expensive collection queries
-      const items = await getNotificationsOnce(userId);
-      const unreadNotifications = (items || []).filter((notification: any) => {
-        const isRead = Boolean(notification.read);
-        const snoozed = notification.snoozedUntil;
-        const isSnoozed = snoozed ? (new Date(snoozed) > new Date()) : false;
-        return !isRead && !isSnoozed;
-      });
+      // Query the top-level notifications collection for unread notifications for this user from the last 30 days
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-      // Sort by createdAt desc (createdAt may be serverTimestamp placeholder)
+      const notificationsQuery = DatabaseMonitoringService.query(
+        DatabaseMonitoringService.collection('notifications'),
+        DatabaseMonitoringService.where('userId', '==', userId),
+        DatabaseMonitoringService.where('read', '==', false),
+        DatabaseMonitoringService.where('createdAt', '>=', Timestamp.fromDate(thirtyDaysAgo))
+      );
+
+      const querySnapshot = await DatabaseMonitoringService.getDocs(notificationsQuery);
+      const unreadNotifications = querySnapshot.docs.map((doc: any) => ({
+        id: doc.id,
+        ...doc.data()
+      })) as NotificationItem[];
+
+      // Sort by createdAt desc
       const sorted = unreadNotifications.slice().sort((a: any, b: any) => {
         const aTime = a.createdAt && a.createdAt.toMillis ? a.createdAt.toMillis() : (a.createdAt ? new Date(a.createdAt).getTime() : 0);
         const bTime = b.createdAt && b.createdAt.toMillis ? b.createdAt.toMillis() : (b.createdAt ? new Date(b.createdAt).getTime() : 0);
         return bTime - aTime;
       }).slice(0, 20);
 
-      return sorted as NotificationItem[];
+      return sorted;
     } catch (err: any) {
       console.error('Error getting unread notifications:', err);
       // Return empty array instead of throwing to prevent UI crashes

@@ -1,5 +1,5 @@
 import { db } from '../firebaseConfig';
-import { doc, runTransaction, serverTimestamp, onSnapshot, DocumentReference } from 'firebase/firestore';
+import { doc, runTransaction, serverTimestamp, onSnapshot, DocumentReference, updateDoc, deleteDoc } from 'firebase/firestore';
 
 export interface NotificationItem {
   id: string;
@@ -99,15 +99,15 @@ export async function getNotificationsOnce(uid: string): Promise<NotificationIte
 }
 
 export async function markNotificationRead(uid: string, notificationId: string) {
-  const ref = getNotificationsDocRef(uid);
-  await runTransaction(db, async (tx) => {
-    const snap = await tx.get(ref as any);
-    if (!snap.exists()) return;
-    const data = snap.data() as any;
-    const items = Array.isArray(data.items) ? data.items as NotificationItem[] : [];
-    const updated = items.map(i => i.id === notificationId ? { ...i, read: true } : i);
-    tx.set(ref as any, { items: updated }, { merge: true });
-  });
+  // Update the notification in the top-level notifications collection
+  const notificationRef = doc(db, 'notifications', notificationId);
+  await updateDoc(notificationRef, { read: true });
+}
+
+export async function deleteNotification(uid: string, notificationId: string) {
+  // Delete the notification from the top-level notifications collection
+  const notificationRef = doc(db, 'notifications', notificationId);
+  await deleteDoc(notificationRef);
 }
 
 /**

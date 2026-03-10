@@ -28,7 +28,7 @@ import { isHouseholdMember, inferCategoryFromItemName, inferStorageLocationFromI
 import { getQuantityAmount } from './utils/quantityUtils';
 import { NotificationBanner } from './components/NotificationBanner';
 import { NotificationService, NotificationItem, NotificationSettings } from './services/notificationService';
-import { markNotificationRead, snoozeNotificationInCache } from './services/notificationsService';
+import { markNotificationRead, deleteNotification, snoozeNotificationInCache } from './services/notificationsService';
 import { pushNotificationService } from './services/pushNotificationService';
 import { log } from './services/logService';
 import { HouseholdActivityService } from './services/householdActivityService';
@@ -48,7 +48,7 @@ import ExpiredItemsModal from './components/ExpiredItemsModal';
 import { InventoryCacheService } from './services/inventoryCacheService';
 
 // Lazy load monitoring components
-// const DatabaseAnalytics = React.lazy(() => import('./components/DatabaseAnalytics').then(module => ({ default: module.default })));
+const DatabaseAnalytics = React.lazy(() => import('./components/DatabaseAnalytics').then(module => ({ default: module.default })));
 
 // Loading component for lazy-loaded components
 const LoadingSpinner: React.FC = () => (
@@ -96,6 +96,10 @@ const App: React.FC = () => {
   const [showNotificationsModal, setShowNotificationsModal] = useState(false);
   const [showHouseholdInviteModal, setShowHouseholdInviteModal] = useState(false);
   const [showExpiredItemsModal, setShowExpiredItemsModal] = useState(false);
+  const [showAddToPlanDialog, setShowAddToPlanDialog] = useState(false);
+  const [pendingRecipeForPlan, setPendingRecipeForPlan] = useState<StructuredRecipe | null>(null);
+  const [selectedDayForPlan, setSelectedDayForPlan] = useState<number | null>(null);
+  const [selectedMealForPlan, setSelectedMealForPlan] = useState<'breakfast' | 'lunch' | 'dinner' | null>(null);
   const [householdInvites, setHouseholdInvites] = useState<NotificationItem[]>([]);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>({
@@ -153,11 +157,20 @@ const App: React.FC = () => {
     const householdId = inHousehold ? household.id : undefined;
     const userId = inHousehold ? undefined : user?.id;
     
-    const newItems: ShoppingItem[] = [];
-    for (const item of items) {
+    // Fetch prices in parallel
+    const pricePromises = items.map(async (item) => {
       const parsed = parseIngredientForShoppingList(item);
-      const estimatedPrice = await groceryPriceService.getIngredientPrice(parsed.itemName).then(priceData => priceData?.averagePrice || 0).catch(() => 0);
-      
+      const priceData = await groceryPriceService.getIngredientPrice(parsed.itemName).catch(() => null);
+      return {
+        parsed,
+        estimatedPrice: priceData?.averagePrice || 0
+      };
+    });
+    
+    const priceResults = await Promise.all(pricePromises);
+    
+    const newItems: ShoppingItem[] = [];
+    for (const { parsed, estimatedPrice } of priceResults) {
       newItems.push({
         id: Math.random().toString(36).substr(2, 9),
         item: parsed.itemName,
@@ -172,11 +185,7 @@ const App: React.FC = () => {
     
     setShoppingList(prev => [...prev, ...newItems]);
     
-    const batch = [];
-    for (const item of newItems) {
-      batch.push(ShoppingListCacheService.addItemToCache(item, householdId, userId));
-    }
-    await Promise.all(batch);
+    await ShoppingListCacheService.addItemsToCache(newItems, householdId, userId);
     
     setActiveTab(Tab.SHOPPING);
     
@@ -226,7 +235,6 @@ const App: React.FC = () => {
     submitRating,
     getRatingsForRecipe,
     getCommunityRatings,
-    refreshCommunityRatings,
     handleMarkAsMade,
     updateItem,
     deleteItem,
@@ -260,16 +268,28 @@ const App: React.FC = () => {
     logRecipeSaved,
     logMealCompleted
   }, {
-    disableInventoryListeners: activeTab === Tab.PANTRY_CACHE_TEST
+    disableInventoryListeners: activeTab === Tab.PANTRY_CACHE_TEST,
+    onShowAddToPlanDialog: (recipe: any) => {
+      setPendingRecipeForPlan(recipe);
+      setSelectedDayForPlan(0); // Default to first day
+      setSelectedMealForPlan('dinner'); // Default to dinner
+      setShowAddToPlanDialog(true);
+    }
   });
 
-  useEffect(() => {
-    // Refresh community ratings only when the tab transitions to COMMUNITY
-    if (activeTab === Tab.COMMUNITY && prevActiveTabRef.current !== Tab.COMMUNITY && typeof refreshCommunityRatings === 'function') {
-      refreshCommunityRatings().catch(error => log.error('Failed to refresh community ratings on tab activate', { error }, 'App'));
+  // Confirm add to plan from dialog
+  const confirmAddToPlan = (dayIndex: number, mealType: 'breakfast' | 'lunch' | 'dinner') => {
+    if (pendingRecipeForPlan && handleAddToPlan) {
+      handleAddToPlan(pendingRecipeForPlan, dayIndex, mealType);
+      setPendingRecipeForPlan(null);
+      setShowAddToPlanDialog(false);
     }
+  };
+
+  useEffect(() => {
+    // Community component handles its own data loading
     prevActiveTabRef.current = activeTab;
-  }, [activeTab, refreshCommunityRatings]);
+  }, [activeTab]);
 
   useEffect(() => {
     if (user?.id && household?.id) {
@@ -471,8 +491,8 @@ const App: React.FC = () => {
     if (!user) return;
 
     try {
-      // Mark notification as read (declined)
-      await markNotificationRead(user.id, invite.id);
+      // Delete the notification (declined invites are removed)
+      await deleteNotification(user.id, invite.id);
       
       // Remove from invites list
       setHouseholdInvites(prev => prev.filter(i => i.id !== invite.id));
@@ -482,7 +502,7 @@ const App: React.FC = () => {
         setShowHouseholdInviteModal(false);
       }
       
-      addToast('Household invitation declined', 'info');
+      addToast('Household invitation declined and removed', 'info');
     } catch (error: any) {
       log.error('Error declining household invite', { error }, 'App');
       addToast('Failed to decline invitation', 'error');
@@ -525,6 +545,8 @@ const App: React.FC = () => {
     const userRef = DatabaseMonitoringService.doc('users', loggedInUser.id);
     const userDoc = await DatabaseMonitoringService.getDoc(userRef);
 
+    let finalUser = loggedInUser;
+
     if (!userDoc.exists()) {
       await DatabaseMonitoringService.setDoc(userRef, {
         name: loggedInUser.name,
@@ -546,24 +568,29 @@ const App: React.FC = () => {
           updatedAt: serverTimestamp()
         });
       }
+      // Merge Firestore data with the logged in user data
+      finalUser = {
+        ...loggedInUser,
+        hasSeenTutorial: userData?.hasSeenTutorial ?? false
+      };
     }
 
-    setUser(loggedInUser);
-    AnalyticsService.trackLogin(loggedInUser.provider || 'email');
-    AnalyticsService.setUser(loggedInUser.id, {
-      email: loggedInUser.email,
-      provider: loggedInUser.provider,
-      has_seen_tutorial: loggedInUser.hasSeenTutorial
+    setUser(finalUser);
+    AnalyticsService.trackLogin(finalUser.provider || 'email');
+    AnalyticsService.setUser(finalUser.id, {
+      email: finalUser.email,
+      provider: finalUser.provider,
+      has_seen_tutorial: finalUser.hasSeenTutorial
     });
 
     // Determine whether to show the tutorial on first login.
     // Use Firestore flag first; support a localStorage fallback for offline/new-device scenarios.
     try {
-      const seenFlag = !!loggedInUser.hasSeenTutorial;
+      const seenFlag = !!finalUser.hasSeenTutorial;
       const localSeen = localStorage.getItem('tutorialSeen:v2') === 'true';
       const onboardingCompleted = localStorage.getItem('onboarding-completed') === 'true';
       const rolloutEnabled = typeof featureFlags?.isEnabled === 'function'
-        ? featureFlags.isEnabled('newTutorial', loggedInUser.id)
+        ? featureFlags.isEnabled('newTutorial', finalUser.id)
         : false;
 
       if (!seenFlag && onboardingCompleted) {
@@ -577,7 +604,7 @@ const App: React.FC = () => {
       }
     } catch (err) {
       // On any error, fall back to legacy behavior to avoid blocking users.
-      if (!loggedInUser.hasSeenTutorial && localStorage.getItem('onboarding-completed') === 'true') setShowTutorial(true);
+      if (!finalUser.hasSeenTutorial && localStorage.getItem('onboarding-completed') === 'true') setShowTutorial(true);
     }
 
     // Show onboarding if not completed
@@ -872,6 +899,67 @@ const App: React.FC = () => {
           />
         )}
 
+        {showAddToPlanDialog && pendingRecipeForPlan && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-theme-primary p-6 rounded-lg shadow-lg max-w-md w-full mx-4">
+              <h3 className="text-lg font-semibold mb-4 text-theme-text">Add to Meal Plan</h3>
+              <p className="mb-4 text-theme-text-secondary">Select a day and meal for "{pendingRecipeForPlan.title}"</p>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-theme-text">Day</label>
+                  <select 
+                    className="w-full p-2 border border-theme-border rounded bg-white text-black"
+                    onChange={(e) => setSelectedDayForPlan(parseInt(e.target.value))}
+                    value={selectedDayForPlan ?? 0}
+                  >
+                    {mealPlan?.map((day, index) => (
+                      <option key={index} value={index}>
+                        {day.dayName} ({new Date(day.date).toLocaleDateString()})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-theme-text">Meal</label>
+                  <select 
+                    className="w-full p-2 border border-theme-border rounded bg-white text-black"
+                    onChange={(e) => setSelectedMealForPlan(e.target.value as 'breakfast' | 'lunch' | 'dinner')}
+                    value={selectedMealForPlan ?? 'dinner'}
+                  >
+                    <option value="breakfast">Breakfast</option>
+                    <option value="lunch">Lunch</option>
+                    <option value="dinner">Dinner</option>
+                  </select>
+                </div>
+              </div>
+              
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() => {
+                    setShowAddToPlanDialog(false);
+                    setPendingRecipeForPlan(null);
+                  }}
+                  className="flex-1 px-4 py-2 border border-theme-border rounded text-theme-text hover:bg-theme-hover"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    if (selectedDayForPlan !== null && selectedMealForPlan) {
+                      confirmAddToPlan(selectedDayForPlan, selectedMealForPlan);
+                    }
+                  }}
+                  className="flex-1 px-4 py-2 bg-[var(--accent-color)] text-white rounded border border-[var(--accent-color)] hover:opacity-90"
+                >
+                  Add to Plan
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <AppHeader
           user={user}
           household={household}
@@ -1122,10 +1210,9 @@ const App: React.FC = () => {
 
       <GlobalUpdatePrompt />
 
-      {/* DatabaseAnalytics component - temporarily disabled due to import issues */}
-      {/* <Suspense fallback={<LoadingSpinner />}>
+      <Suspense fallback={<LoadingSpinner />}>
         <DatabaseAnalytics />
-      </Suspense> */}
+      </Suspense>
     </>
   );
 };

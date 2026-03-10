@@ -263,6 +263,12 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     [uncheckedItemsText]
   );
 
+  // Memoize recent items to prevent infinite re-renders in QuickAddModal
+  const recentItems = useMemo(() => 
+    items.map(i => i.item),
+    [items]
+  );
+
   const addSuggestedItem = async (itemName: string) => {
     // Check if item already exists
     const exists = items.some(item => item.item.toLowerCase() === itemName.toLowerCase());
@@ -637,7 +643,6 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     <div className="space-y-6 pb-24 max-w-2xl mx-auto animate-fade-in relative">
       <div className="text-center mb-6">
         <h2 className="text-3xl font-serif font-bold text-theme-secondary">Shopping List</h2>
-        <p className="text-theme-secondary opacity-60 text-sm mt-1">Items to purchase</p>
       </div>
 
       {/* Household Sharing */}
@@ -656,7 +661,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
         onScanBarcode={async () => null} // TODO: Implement barcode scanning
         onVoiceInput={async () => null} // TODO: Implement voice input
         isOnline={isOnline}
-        recentItems={items.map(i => i.item)}
+        recentItems={recentItems}
         suggestedItems={suggestedItems}
         onAddSuggestedItem={addSuggestedItem}
         pantryItems={pantryItems}

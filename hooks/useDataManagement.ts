@@ -184,13 +184,17 @@ function createMealPlanListener(
     // 1. Always generate the base plan structure first.
     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     const today = new Date();
-    let daysToShow = 7;
-    if (user?.subscription?.tier === 'family' || user?.subscription?.tier === 'premium') {
-      daysToShow = 14;
-    }
-
+    
+    // Generate a full year of meal plan data (6 months past + 6 months future)
+    // This allows users to view history and plan far ahead
+    const monthsBack = 6;
+    const monthsForward = 6;
+    const totalDays = (monthsBack + monthsForward) * 31; // Rough estimate
+    
     const basePlan = new Map<string, DayPlan>();
-    for (let i = 0; i < daysToShow; i++) {
+    
+    // Generate dates from 6 months ago to 6 months in the future
+    for (let i = -monthsBack * 30; i < monthsForward * 30; i++) {
       const d = new Date(today);
       d.setDate(today.getDate() + i);
       const iso = d.toISOString().slice(0, 10);
@@ -265,6 +269,7 @@ export function useDataManagement(
   },
   options?: {
     disableInventoryListeners?: boolean;
+    onShowAddToPlanDialog?: (recipe: StructuredRecipe) => void;
   }
 ) {
 
@@ -682,6 +687,12 @@ export function useDataManagement(
   // Handlers
   const handleAddToPlan = async (recipe: any, targetDayIndex?: number, targetMealType?: 'breakfast' | 'lunch' | 'dinner') => {
     if (!mealPlan) return;
+
+    // If no target specified, show dialog
+    if (targetDayIndex === undefined && targetMealType === undefined) {
+      options?.onShowAddToPlanDialog?.(recipe);
+      return;
+    }
 
     const canAdd = await checkMealPlanLimit();
     if (!canAdd) {
@@ -1131,7 +1142,6 @@ export function useDataManagement(
     submitRating,
     getRatingsForRecipe,
     getCommunityRatings,
-    refreshCommunityRatings,
     handleMarkAsMade,
     updateItem,
     deleteItem,

@@ -45,6 +45,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   const [localCategory, setLocalCategory] = useState<string>(item.category || 'Manual');
   const [localExpirationDate, setLocalExpirationDate] = useState<string>(item.expirationDate || '');
   const [localExpirationType, setLocalExpirationType] = useState<'use-by' | 'best-by'>(item.expirationType || 'best-by');
+  const [localNotes, setLocalNotes] = useState<string>(item.notes || '');
   // Image upload state
   const { household, user } = useApp();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -59,6 +60,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
     setLocalCategory(item.category || 'Manual');
     setLocalExpirationDate(item.expirationDate || '');
     setLocalExpirationType(item.expirationType || 'best-by');
+    setLocalNotes(item.notes || '');
   }, [item]);
 
   // Fetch nutrition facts on component mount
@@ -169,6 +171,11 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
       updates.expirationType = localExpirationType;
     }
 
+    // Notes
+    if (localNotes !== (item.notes || '')) {
+      updates.notes = localNotes || undefined;
+    }
+
     if (Object.keys(updates).length > 0) {
       onUpdateItem(originalIndex, updates);
     }
@@ -178,10 +185,10 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
 
   return (
     <>
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4 pb-24">
-        <div className="bg-theme-primary rounded-lg shadow-xl w-full max-w-md mx-auto max-h-[80vh] flex flex-col border border-theme">
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start sm:items-center justify-center z-[9999] p-4">
+        <div className="bg-theme-primary rounded-lg shadow-xl w-full max-w-md mx-auto max-h-[85vh] flex flex-col border border-theme">
           {/* Header - Fixed */}
-          <div className="flex items-center justify-between pt-4 px-3 pb-3 border-b border-theme flex-shrink-0">
+          <div className="flex items-center justify-between p-4 pb-3 border-b border-theme flex-shrink-0 rounded-t-lg">
             <h3 className="text-lg font-semibold text-theme-primary">{item.item}</h3>
             <div className="flex items-center gap-2">
               <div className="text-sm text-theme-secondary">
@@ -198,7 +205,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
           </div>
 
           {/* Scrollable Content */}
-          <div className="flex-1 overflow-y-auto px-3 py-2">
+          <div className="flex-1 overflow-y-auto p-4">
             {/* Item Image + upload */}
             <div className="pb-2 flex items-center gap-4">
               {/* Change picture button - left side */}
@@ -369,6 +376,20 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
               </div>
             </div>
 
+            {/* User Notes Section */}
+            <div className="bg-theme-secondary p-2 rounded-lg border border-theme">
+              <label className="block text-xs font-medium text-theme-primary mb-1 uppercase opacity-70">
+                Notes
+              </label>
+              <textarea
+                value={localNotes}
+                onChange={(e) => setLocalNotes(e.target.value)}
+                placeholder="Add any notes about this item..."
+                className="w-full px-2 py-1.5 text-sm border border-theme rounded-md bg-theme-primary text-theme-primary focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] resize-none"
+                rows={3}
+              />
+            </div>
+
             {/* Nutrition Facts Section */}
             {loadingNutrition ? (
               <div className="bg-theme-secondary p-3 rounded-lg border border-theme">
@@ -453,54 +474,51 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
               </div>
             )}
           </div>
-          </div>
+
 
           {/* Action Buttons - Fixed at bottom */}
-          <div className="flex-shrink-0 border-t border-theme bg-theme-primary">
-            <div className="p-3 space-y-2">
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={() => onAddToShoppingList([cleanItemNameForShopping(item.item)])}
-                  className="flex items-center justify-center gap-2 px-4 py-2 bg-[var(--accent-color)] text-[var(--text-theme-primary)] rounded-lg hover:bg-[var(--accent-color)]/80 transition-colors"
-                >
-                  <ShoppingBasket className="w-4 h-4" />
-                  Buy More
-                </button>
-                <button
-                  onClick={() => setShowPriceTrends(true)}
-                  className="flex items-center justify-center gap-2 px-4 py-2 bg-[var(--bg-theme-secondary)] text-[var(--text-theme-primary)] border border-[var(--border-theme)] rounded-lg hover:bg-[var(--bg-theme-primary)] transition-colors"
-                >
-                  <TrendingUp className="w-4 h-4" />
-                  Price Trends
-                </button>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={() => {
-                    if (window.confirm(`Are you sure you want to delete ${item.item}?`)) {
-                      onDeleteItem(originalIndex);
-                      onClose();
-                    }
-                  }}
-                  className="flex items-center justify-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  Delete Item
-                </button>
-                <button
-                  onClick={onClose}
-                  className="flex items-center justify-center gap-2 px-4 py-2 bg-[var(--bg-theme-secondary)] text-[var(--text-theme-primary)] border border-[var(--border-theme)] rounded-lg hover:bg-[var(--bg-theme-primary)] transition-colors"
-                >
-                  <X className="w-4 h-4" />
-                  Close
-                </button>
-              </div>
+          <div className="flex-shrink-0 border-t border-theme bg-theme-primary p-4 rounded-b-lg space-y-3">
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => onAddToShoppingList([cleanItemNameForShopping(item.item)])}
+                className="flex items-center justify-center gap-2 px-4 py-2 bg-[var(--accent-color)] text-[var(--text-theme-primary)] rounded-lg hover:bg-[var(--accent-color)]/80 transition-colors"
+              >
+                <ShoppingBasket className="w-4 h-4" />
+                Buy More
+              </button>
+              <button
+                onClick={() => setShowPriceTrends(true)}
+                className="flex items-center justify-center gap-2 px-4 py-2 bg-[var(--bg-theme-secondary)] text-[var(--text-theme-primary)] border border-[var(--border-theme)] rounded-lg hover:bg-[var(--bg-theme-primary)] transition-colors"
+              >
+                <TrendingUp className="w-4 h-4" />
+                Price Trends
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => {
+                  if (window.confirm(`Are you sure you want to delete ${item.item}?`)) {
+                    onDeleteItem(originalIndex);
+                    onClose();
+                  }
+                }}
+                className="flex items-center justify-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+              >
+                <Trash2 className="w-4 h-4" />
+                Delete Item
+              </button>
+              <button
+                onClick={onClose}
+                className="flex items-center justify-center gap-2 px-4 py-2 bg-[var(--bg-theme-secondary)] text-[var(--text-theme-primary)] border border-[var(--border-theme)] rounded-lg hover:bg-[var(--bg-theme-primary)] transition-colors"
+              >
+                <X className="w-4 h-4" />
+                Close
+              </button>
             </div>
           </div>
 
         </div>
-      </div>
-
+      </div>      </div>
       {/* Price Trends Modal */}
       {showPriceTrends && (
         <PriceTrends

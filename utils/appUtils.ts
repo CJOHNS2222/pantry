@@ -116,12 +116,40 @@ export function parseIngredientForShoppingList(ingredientText: string): { quanti
         // Check if next word is a unit
         if (words.length > 1) {
           const potentialUnit = (words[1] || '').toLowerCase();
-          // Common units that should be included in quantity
-          const units = ['tbs', 'tbsp', 'tsp', 'cup', 'cups', 'oz', 'ounce', 'ounces', 'lb', 'pound', 'pounds', 
-                        'g', 'gram', 'grams', 'kg', 'liter', 'l', 'ml', 'clove', 'cloves', 'bunch', 'bunches', 
-                        'sprig', 'sprigs', 'head', 'heads', 'stalk', 'stalks', 'slice', 'slices', 'piece', 'pieces',
-                        'can', 'cans', 'bottle', 'bottles', 'package', 'packages', 'box', 'boxes', 'bag', 'bags',
-                        'dash', 'dashes', 'pinch', 'pinches', 'teaspoon', 'teaspoons', 'tablespoon', 'tablespoons'];
+          // Comprehensive list of units including abbreviations and common terms
+          const units = [
+            // Volume - Imperial/US Customary
+            't', 'tsp', 'teaspoon', 'teaspoons',
+            'tbs', 'tb', 'tbl', 'tbsp', 'tablespoon', 'tablespoons',
+            'c', 'cup', 'cups',
+            'fl oz', 'fluid ounce', 'fluid ounces',
+            'pt', 'pint', 'pints',
+            'qt', 'quart', 'quarts',
+            'gal', 'gallon', 'gallons',
+            
+            // Volume - Metric
+            'ml', 'milliliter', 'milliliters',
+            'l', 'liter', 'liters',
+            'cl', 'centiliter', 'centiliters',
+            
+            // Weight - Imperial/US Customary
+            'oz', 'ounce', 'ounces',
+            'lb', 'lbs', 'pound', 'pounds',
+            
+            // Weight - Metric
+            'g', 'gram', 'grams',
+            'kg', 'kilogram', 'kilograms',
+            
+            // Count/Pieces
+            'clove', 'cloves', 'bunch', 'bunches', 'sprig', 'sprigs', 'head', 'heads', 
+            'stalk', 'stalks', 'slice', 'slices', 'piece', 'pieces', 'dozen',
+            'can', 'cans', 'bottle', 'bottles', 'package', 'packages', 'box', 'boxes', 
+            'bag', 'bags', 'jar', 'jars', 'container', 'containers',
+            
+            // Cooking measurements
+            'dash', 'dashes', 'pinch', 'pinches', 'handful', 'handfuls', 'scoop', 'scoops',
+            'loaf', 'loaves', 'stick', 'sticks', 'block', 'blocks'
+          ];
           
           if (units.includes(potentialUnit) || potentialUnit.endsWith('s')) {
             // Check if it's a plural of a known unit
@@ -139,6 +167,20 @@ export function parseIngredientForShoppingList(ingredientText: string): { quanti
           itemName = words.slice(1).join(' ');
         }
         perfTrace.putAttribute('parsing_method', 'word_analysis');
+      } else if (firstPart.toLowerCase() === 'a' && words.length > 1) {
+        // Handle "a slice of", "a pinch of", "a dash of", etc.
+        const secondPart = words[1]!.toLowerCase();
+        const commonQuantities = ['slice', 'pinch', 'dash', 'handful', 'scoop', 'clove', 'bunch', 'sprig', 'head', 'stalk', 'piece', 'loaf', 'stick', 'block'];
+        
+        if (commonQuantities.includes(secondPart)) {
+          quantity = '1 ' + secondPart;
+          itemName = words.slice(2).join(' ');
+          // Remove "of" if it follows
+          itemName = itemName.replace(/^of\s+/i, '');
+          perfTrace.putAttribute('parsing_method', 'article_quantity');
+        } else {
+          perfTrace.putAttribute('parsing_method', 'no_quantity');
+        }
       } else {
         perfTrace.putAttribute('parsing_method', 'no_quantity');
       }
@@ -148,6 +190,8 @@ export function parseIngredientForShoppingList(ingredientText: string): { quanti
     itemName = itemName
       // Remove common size descriptors
       .replace(/\b(large|medium|small|big|tiny|huge|giant)\s+/gi, '')
+      // Remove "of" preposition
+      .replace(/\bof\s+/gi, '')
       // Keep colors for distinguishing items (like red vs green apples)
       // Keep preparation descriptors for shopping list clarity (user wants to see "chopped", "minced", etc.)
       // Remove common quality descriptors

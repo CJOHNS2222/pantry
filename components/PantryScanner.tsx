@@ -798,14 +798,14 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
 
     return (
       <div key={location} className="bg-theme-secondary rounded-lg border border-theme overflow-hidden">
-        <div className="w-full flex items-center px-4 py-2 bg-green-200">
+        <div className="w-full flex items-center px-4 py-2 bg-theme-primary">
           <div className="flex items-center gap-3">
             <StorageLocationIndicator
               location={location as 'pantry' | 'freezer' | 'fridge' | 'spices' | 'other'}
               size="md"
             />
-            <h4 className="font-semibold text-black">{locationLabel}</h4>
-            <span className="text-sm text-gray-700">
+            <h4 className="font-semibold text-theme-primary">{locationLabel}</h4>
+            <span className="text-sm text-theme-secondary">
               ({items.length} item{items.length !== 1 ? 's' : ''})
             </span>
           </div>

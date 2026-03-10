@@ -12,7 +12,7 @@ const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
 let performance: ReturnType<typeof getPerformance> | null = null;
 try {
   performance = getPerformance();
-} catch (e) {
+} catch {
   // Firebase app may not be initialized in tests or certain environments
   performance = null;
 }
@@ -256,8 +256,8 @@ If an item doesn't fit these categories, use "Uncategorized".`,
 
       // Add custom metrics (if performance available)
       if (perfTrace) {
-        perfTrace.putMetric('image_size_kb', base64Image.length / 1024);
-        perfTrace.putMetric('items_detected', items.length);
+        perfTrace.putMetric('image_size_kb', Math.round(base64Image.length / 1024));
+        perfTrace.putMetric('items_detected', Number(items.length));
       }
 
       // Record usage in Firebase
@@ -431,9 +431,9 @@ const performSearch = async (params: RecipeSearchParams, user: User | undefined,
 
     // Add custom metrics (if performance available)
     if (perfTrace) {
-      perfTrace.putMetric('query_length', params.query?.length || 0);
-      perfTrace.putMetric('ingredients_count', params.ingredients?.split(', ').length || 0);
-      perfTrace.putMetric('recipes_returned', recipes.length);
+      perfTrace.putMetric('query_length', Number(params.query?.length || 0));
+      perfTrace.putMetric('ingredients_count', Number(params.ingredients?.split(', ').length || 0));
+      perfTrace.putMetric('recipes_returned', Number(recipes.length));
       perfTrace.putAttribute('search_mode', params.query ? 'specific' : 'pantry_based');
       perfTrace.putAttribute('strict_mode', params.strictMode ? 'true' : 'false');
     }

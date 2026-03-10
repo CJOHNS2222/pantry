@@ -304,7 +304,7 @@ export const rebuildCommunityRatedRecipesFromRatings = async (days: number = 30,
  * Fetches the `recipeCommunityStats/{title}` document and the `recipes` doc (by id or title)
  * and writes/updates the entry inside the cached array so reads become a single document.
  */
-export const upsertCommunityRatedRecipeByTitle = async (title: string): Promise<void> => {
+export const upsertCommunityRatedRecipeByTitle = async (title: string, recipeId?: string): Promise<void> => {
   try {
     // Fetch community stats
     const statsRef = DatabaseMonitoringService.doc(`recipeCommunityStats/${title}`);
@@ -314,18 +314,27 @@ export const upsertCommunityRatedRecipeByTitle = async (title: string): Promise<
     // Try to locate the recipe document by title (or id if stats contains one)
     let recipeDoc: any = null;
     try {
-      // If stats contains a recipeId, try that first
-      const possibleId = (stats as any).recipeId;
-      if (possibleId) {
-        const rd = await DatabaseMonitoringService.getDoc(DatabaseMonitoringService.doc(`recipes/${possibleId}`));
+      // If recipeId is provided, use it directly
+      if (recipeId) {
+        const rd = await DatabaseMonitoringService.getDoc(DatabaseMonitoringService.doc(`recipes/${recipeId}`));
         if (rd && rd.exists && typeof rd.exists === 'function' ? rd.exists() : rd.exists) {
           const d = rd.data() as any;
           recipeDoc = { id: rd.id, ...d };
         }
+      } else {
+        // If stats contains a recipeId, try that first
+        const possibleId = (stats as any).recipeId;
+        if (possibleId) {
+          const rd = await DatabaseMonitoringService.getDoc(DatabaseMonitoringService.doc(`recipes/${possibleId}`));
+          if (rd && rd.exists && typeof rd.exists === 'function' ? rd.exists() : rd.exists) {
+            const d = rd.data() as any;
+            recipeDoc = { id: rd.id, ...d };
+          }
+        }
       }
     } catch (e) { /* ignore */ }
 
-    if (!recipeDoc) {
+    if (!recipeDoc && !recipeId) {
       try {
         const q = DatabaseMonitoringService.query(DatabaseMonitoringService.collection('recipes'), DatabaseMonitoringService.where('title', '==', title), DatabaseMonitoringService.limit(1));
         const rq = await DatabaseMonitoringService.getDocs(q);

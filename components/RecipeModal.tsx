@@ -314,10 +314,16 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
         </div>
       )}
       <div className="bg-theme-primary rounded-2xl shadow-2xl max-w-lg w-full relative flex flex-col max-h-[85vh] overflow-hidden" onClick={e => e.stopPropagation()}>
-        <button className="absolute top-3 right-3 text-theme-secondary opacity-50 hover:opacity-100 z-20 p-1" onClick={onClose} aria-label="Close recipe details">
-          <X className="w-6 h-6" />
-        </button>
-        <div className="overflow-y-auto p-6 flex-1">
+        {/* Fixed Header */}
+        <div className="flex items-center justify-between p-4 pb-3 border-b border-theme flex-shrink-0 rounded-t-2xl">
+          <h2 className="text-lg font-semibold text-theme-primary truncate pr-2">{recipe.title}</h2>
+          <button className="p-1 hover:bg-theme-secondary rounded-full transition-colors" onClick={onClose} aria-label="Close recipe details">
+            <X className="w-5 h-5 text-theme-secondary" />
+          </button>
+        </div>
+
+        {/* Scrollable Content */}
+        <div className="overflow-y-auto flex-1 p-4">
           {editable ? (
             <div className="space-y-4">
               <div>
@@ -735,87 +741,93 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
             </div>
           ) : (
             <>
-              {/* Primary action buttons - Mark as Made and Add to Schedule */}
-              <div className="flex items-center gap-2 mb-2">
-                {showMarkAsMade && onMarkAsMade && (
-                  <button onClick={handleMarkAsMadeClick} className="flex-1 py-3 font-bold bg-[var(--accent-color)] text-white rounded-lg flex items-center justify-center gap-2">
-                    <CheckCircle2 className="w-4 h-4" /> Mark as Made
-                  </button>
-                )}
-                {showAddToPlan && onAddToPlan && (
-                  <button
-                    onClick={() => { onAddToPlan(recipe as StructuredRecipe); onClose(); }}
-                    disabled={mealPlanLimitExceeded}
-                    className={`flex-1 py-3 font-bold rounded-lg flex items-center justify-center gap-2 ${
-                      mealPlanLimitExceeded
-                        ? 'bg-gray-400 text-gray-600 cursor-not-allowed opacity-50'
-                        : 'bg-[var(--accent-color)] text-white'
-                    }`}
-                  >
-                    <Plus className="w-4 h-4" /> {mealPlanLimitExceeded ? 'Limit Reached' : 'Add to Schedule'}
-                  </button>
-                )}
-              </div>
-
-              {/* Secondary action buttons - Save, Delete, Close */}
-              <div className="flex items-center gap-2">
-                <button className="flex-1 py-3 font-bold border border-[var(--accent-color)] rounded-lg flex items-center justify-center gap-2" onClick={onClose}>CLOSE</button>
-                {isFromMealPlan && (
-                  <div className="flex-1">
-                    <button onClick={() => setShowLeftoverCapture(true)} className="w-full py-3 font-bold bg-yellow-500 text-black rounded-lg flex items-center justify-center gap-2">
-                      <RotateCcw className="w-4 h-4" /> Save Leftovers
-                    </button>
-                  </div>
-                )}
-                {showDeleteButton && onDeleteRecipe && (
-                  <button onClick={() => { onDeleteRecipe(recipe as SavedRecipe); onClose(); }} className="flex-1 py-3 font-bold bg-red-500 text-white rounded-lg flex items-center justify-center gap-2">
-                    <Trash2 className="w-4 h-4" /> Delete
-                  </button>
-                )}
-                {showSaveButton && onSaveRecipe && (
-                  <button
-                    onClick={async () => { 
-                      if (isSaving) return; // Prevent double-clicks
-                      setIsSaving(true);
-                      try {
-                        // Sanitize placeholder recipe text so we don't persist UI-only messages
-                        const sanitized: StructuredRecipe = {
-                          title: (recipe as any).title || '',
-                          description: (recipe as any).description || '',
-                          ingredients: Array.isArray((recipe as any).ingredients) ? [...(recipe as any).ingredients] : [],
-                          instructions: Array.isArray((recipe as any).instructions) ? [...(recipe as any).instructions] : [],
-                          cookTime: (recipe as any).cookTime || '' ,
-                          image: (recipe as any).image
-                        };
-
-                        const placeholderPattern = /Full recipe not available in this rating/i;
-                        // Remove placeholder entries if present
-                        if (sanitized.ingredients.length === 1 && placeholderPattern.test(String(sanitized.ingredients[0]))) {
-                          sanitized.ingredients = [];
-                        }
-                        if (sanitized.instructions.length === 1 && placeholderPattern.test(String(sanitized.instructions[0]))) {
-                          sanitized.instructions = [];
-                        }
-
-                        await onSaveRecipe(sanitized as StructuredRecipe); 
-                        onClose(); 
-                      } finally {
-                        setIsSaving(false);
-                      }
-                    }}
-                    disabled={recipeSaveLimitExceeded || isSaving}
-                    className={`flex-1 py-3 font-bold border rounded-lg flex items-center justify-center gap-2 ${
-                      recipeSaveLimitExceeded || isSaving
-                        ? 'border-gray-400 text-gray-400 cursor-not-allowed opacity-50'
-                        : 'border-[var(--accent-color)] hover:bg-[var(--accent-color)] hover:text-white'
-                    }`}
-                  >
-                    <Heart className="w-4 h-4" /> {isSaving ? 'Saving...' : recipeSaveLimitExceeded ? 'Limit Reached' : 'Save Recipe'}
-                  </button>
-                )}
-              </div>
+              {/* Content for non-editable mode */}
             </>
           )}
+        </div>
+
+        {/* Fixed Action Buttons */}
+        <div className="flex-shrink-0 border-t border-theme bg-theme-primary p-4 rounded-b-2xl space-y-3">
+          {/* Primary action buttons - Add to Plan, Rate, Mark as Made */}
+          {showMarkAsMade && onMarkAsMade && (
+            <button onClick={handleMarkAsMadeClick} className="w-full py-3 font-bold bg-[var(--accent-color)] text-white rounded-lg flex items-center justify-center gap-2">
+              <CheckCircle2 className="w-4 h-4" /> Mark as Made
+            </button>
+          )}
+          {showAddToPlan && onAddToPlan && (
+            <button
+              onClick={() => {
+                onAddToPlan(recipe);
+                onClose();
+              }}
+              disabled={mealPlanLimitExceeded}
+              className={`w-full py-3 font-bold rounded-lg flex items-center justify-center gap-2 ${
+                mealPlanLimitExceeded
+                  ? 'bg-gray-400 text-gray-600 cursor-not-allowed opacity-50'
+                  : 'bg-[var(--accent-color)] text-white'
+              }`}
+            >
+              <Plus className="w-4 h-4" /> {mealPlanLimitExceeded ? 'Limit Reached' : 'Add to Schedule'}
+            </button>
+          )}
+
+          {/* Secondary action buttons - Save, Delete, Close */}
+          <div className="flex items-center gap-2">
+            <button className="flex-1 py-3 font-bold border border-[var(--accent-color)] rounded-lg flex items-center justify-center gap-2" onClick={onClose}>CLOSE</button>
+            {isFromMealPlan && (
+              <div className="flex-1">
+                <button onClick={() => setShowLeftoverCapture(true)} className="w-full py-3 font-bold bg-yellow-500 text-black rounded-lg flex items-center justify-center gap-2">
+                  <RotateCcw className="w-4 h-4" /> Save Leftovers
+                </button>
+              </div>
+            )}
+            {showDeleteButton && onDeleteRecipe && (
+              <button onClick={() => { onDeleteRecipe(recipe as SavedRecipe); onClose(); }} className="flex-1 py-3 font-bold bg-red-500 text-white rounded-lg flex items-center justify-center gap-2">
+                <Trash2 className="w-4 h-4" /> Delete
+              </button>
+            )}
+            {showSaveButton && onSaveRecipe && (
+              <button
+                onClick={async () => { 
+                  if (isSaving) return; // Prevent double-clicks
+                  setIsSaving(true);
+                  try {
+                    // Sanitize placeholder recipe text so we don't persist UI-only messages
+                    const sanitized: StructuredRecipe = {
+                      title: (recipe as any).title || '',
+                      description: (recipe as any).description || '',
+                      ingredients: Array.isArray((recipe as any).ingredients) ? [...(recipe as any).ingredients] : [],
+                      instructions: Array.isArray((recipe as any).instructions) ? [...(recipe as any).instructions] : [],
+                      cookTime: (recipe as any).cookTime || '' ,
+                      image: (recipe as any).image
+                    };
+
+                    const placeholderPattern = /Full recipe not available in this rating/i;
+                    // Remove placeholder entries if present
+                    if (sanitized.ingredients.length === 1 && placeholderPattern.test(String(sanitized.ingredients[0]))) {
+                      sanitized.ingredients = [];
+                    }
+                    if (sanitized.instructions.length === 1 && placeholderPattern.test(String(sanitized.instructions[0]))) {
+                      sanitized.instructions = [];
+                    }
+
+                    await onSaveRecipe(sanitized as StructuredRecipe); 
+                    onClose(); 
+                  } finally {
+                    setIsSaving(false);
+                  }
+                }}
+                disabled={recipeSaveLimitExceeded || isSaving}
+                className={`flex-1 py-3 font-bold border rounded-lg flex items-center justify-center gap-2 ${
+                  recipeSaveLimitExceeded || isSaving
+                    ? 'border-gray-400 text-gray-400 cursor-not-allowed opacity-50'
+                    : 'border-[var(--accent-color)] hover:bg-[var(--accent-color)] hover:text-white'
+                }`}
+              >
+                <Heart className="w-4 h-4" /> {isSaving ? 'Saving...' : recipeSaveLimitExceeded ? 'Limit Reached' : 'Save Recipe'}
+              </button>
+            )}
+          </div>
         </div>
       </div>
 

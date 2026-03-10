@@ -30,16 +30,16 @@ export const functions = getFunctions(app);
 // Initialize database monitoring asynchronously to avoid circular import
 // issues. This will attempt to initialize monitoring but won't block
 // startup on failure.
-// (async () => {
-//   try {
-//     const mod = await import('./services/databaseMonitoringService');
-//     if (mod && typeof mod.default?.initializeMonitoring === 'function') {
-//       mod.default.initializeMonitoring();
-//     }
-//   } catch (err: any) {
-//     console.warn('DatabaseMonitoringService failed to initialize (deferred):', err?.message || err);
-//   }
-// })();
+(async () => {
+  try {
+    const mod = await import('./services/databaseMonitoringService');
+    if (mod && typeof mod.default?.initializeMonitoring === 'function') {
+      mod.default.initializeMonitoring();
+    }
+  } catch (err: any) {
+    console.warn('DatabaseMonitoringService failed to initialize (deferred):', err?.message || err);
+  }
+})();
 
 // Initialize messaging (FCM) - only on supported platforms
 let messaging: any = null;

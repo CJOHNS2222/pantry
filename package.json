@@ -1,7 +1,7 @@
 {
   "name": "smartpantry",
   "private": false,
-  "version": "1.3.8",
+  "version": "1.3.9",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -20,6 +20,7 @@
     "bulk-delete-incomplete-recipes": "node scripts/bulk-delete-incomplete-recipes.js",
     "clean-duplicate-descriptions": "node scripts/clean-duplicate-descriptions.js",
     "test-spoonacular": "node scripts/test-spoonacular.js",
+    "rebuild-community-cache": "node scripts/rebuild-community-cache.js",
     "migrate-firebase": "node migrate-firebase.js",
     "test-firebase": "node test-firebase.js"
   },
@@ -67,6 +68,7 @@
     "@types/react-dom": "^19.2.3",
     "@types/react-window": "^1.8.8",
     "@vitejs/plugin-react": "^5.0.0",
+    "@vitest/ui": "^4.0.18",
     "autoprefixer": "^10.4.27",
     "eslint": "^9.39.2",
     "eslint-plugin-import": "^2.32.0",

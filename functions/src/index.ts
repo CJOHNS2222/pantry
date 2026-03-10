@@ -5,5 +5,5 @@ export {checkInvitation} from "./checkInvitation";
 // export {createSubscription} from "./stripe"; // Temporarily disabled due to Secret Manager requirement
 export {migrateHouseholdClaims, migrateHouseholdClaimsHttp} from "./migrateHouseholdClaims";
 export {getNutritionData} from "./nutrition";
-export {resetWeeklyUsageLimits} from "./resetUsageLimits";
+export {resetWeeklyUsageLimits, resetUsageLimitsNow} from "./resetUsageLimits";
 // export {createPayPalSubscription, approvePayPalSubscription} from "./paypal"; // Temporarily disabled

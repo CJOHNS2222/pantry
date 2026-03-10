@@ -48,6 +48,8 @@ export interface PantryItem {
   is_immortal?: boolean;
   // Leftover support: flag inventory items that represent leftovers
   is_leftover?: boolean;
+  // User notes about the item
+  notes?: string;
   leftoverMeta?: LeftoverMeta;
   // Cooked rice flag: denormalized boolean to indicate this item contains cooked rice
   // (affects safety window calculations). New writes should set this when applicable.

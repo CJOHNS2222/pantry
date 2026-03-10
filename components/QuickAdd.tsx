@@ -299,27 +299,12 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
   return (
     <div>
       <div className="bg-theme-secondary rounded-xl p-4 border border-theme">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <Plus className="w-4 h-4 text-[var(--accent-color)]" />
-            <span className="text-sm font-semibold text-theme-primary">Add Items</span>
-          </div>
-
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="p-2 bg-[var(--accent-color)] text-white rounded-lg hover:bg-[var(--accent-color)]/90 transition-colors"
-            aria-label="Add new item"
-          >
-            <Plus className="w-4 h-4" />
-          </button>
-        </div>
-
         {/* Combined Suggestions */}
         {(suggestedItems.length > 0 || suggestions.length > 0) && (
           <div className="mt-4">
             {/* Quick Add Suggestions - Always visible */}
             {suggestedItems.length > 0 && (
-              <div className="mb-4">
+              <div className="mb-2">
                 <h4 className="text-sm font-semibold text-theme-primary mb-3 flex items-center gap-2">
                   <Plus className="w-4 h-4" />
                   Quick Add Suggestions

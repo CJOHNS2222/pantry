@@ -1,4 +1,4 @@
-import { increment, arrayUnion, Timestamp } from 'firebase/firestore';
+import { increment, arrayUnion, Timestamp, serverTimestamp } from 'firebase/firestore';
 import DatabaseMonitoringService from './databaseMonitoringService';
 import {
   RecipeRating,
@@ -8,7 +8,7 @@ import {
   RecipeFeedback
 } from '../types';
 import { log } from './logService';
-import { upsertCommunityRatedRecipeByTitle } from './recipeService';
+import { upsertCommunityRatedRecipeByTitle, saveRecipeToFirestore } from './recipeService';
 
 // Recursively remove undefined properties (preserve Timestamp and other non-plain values)
 const sanitizeForFirestore = (obj: any): any => {
@@ -48,15 +48,30 @@ export class RecipeRatingService {
       const cleanRatingData = sanitizeForFirestore(ratingData);
       await DatabaseMonitoringService.setDoc(ratingRef, cleanRatingData);
 
-      // Update community stats
-      await this.updateCommunityStats(rating.recipeTitle, householdId);
+      // If the rating includes recipe data, ensure it's saved to the recipes collection
+      if (rating.recipe) {
+        const recipeId = await this.ensureRecipeExists(rating.recipe, userId);
+        // Update community stats
+        await this.updateCommunityStats(rating.recipeTitle, householdId);
 
-      // Update single-doc community-rated cache so UI can read one document
-      try {
-        await upsertCommunityRatedRecipeByTitle(rating.recipeTitle);
-      } catch (e) {
-        // swallow cache errors - rating write must not fail because cache update failed
-        log.warn('Failed to update community-rated cache after rating', { error: e, recipeTitle: rating.recipeTitle });
+        // Update single-doc community-rated cache so UI can read one document
+        try {
+          await upsertCommunityRatedRecipeByTitle(rating.recipeTitle, recipeId);
+        } catch (e) {
+          // swallow cache errors - rating write must not fail because cache update failed
+          log.warn('Failed to update community-rated cache after rating', { error: e, recipeTitle: rating.recipeTitle });
+        }
+      } else {
+        // Update community stats
+        await this.updateCommunityStats(rating.recipeTitle, householdId);
+
+        // Update single-doc community-rated cache so UI can read one document
+        try {
+          await upsertCommunityRatedRecipeByTitle(rating.recipeTitle);
+        } catch (e) {
+          // swallow cache errors - rating write must not fail because cache update failed
+          log.warn('Failed to update community-rated cache after rating', { error: e, recipeTitle: rating.recipeTitle });
+        }
       }
 
       log.info('Recipe rating submitted', { recipeTitle: rating.recipeTitle, userId });
@@ -67,8 +82,84 @@ export class RecipeRatingService {
   }
 
   /**
-   * Get community stats for a recipe
+   * Ensure a recipe exists in the recipes collection, creating it if necessary
    */
+  private static async ensureRecipeExists(recipe: StructuredRecipe, userId: string): Promise<string> {
+    try {
+      // Check if recipe already exists by title
+      const existingQuery = DatabaseMonitoringService.query(
+        DatabaseMonitoringService.collection('recipes'),
+        DatabaseMonitoringService.where('title', '==', recipe.title),
+        DatabaseMonitoringService.limit(1)
+      );
+      const existingDocs = await DatabaseMonitoringService.getDocs(existingQuery);
+
+      let recipeId: string;
+      if (!existingDocs.empty) {
+        // Recipe already exists, get its ID
+        recipeId = existingDocs.docs[0].id;
+      } else {
+        // Recipe doesn't exist, save it
+        recipeId = await saveRecipeToFirestore(recipe, { userId, visibility: 'public' });
+      }
+
+      // Immediately update the community cache with this recipe data
+      await this.updateCommunityCacheWithRecipe(recipe, recipeId);
+
+      log.info('Recipe ensured to exist during rating', { recipeTitle: recipe.title, recipeId, userId });
+      return recipeId;
+    } catch (err: any) {
+      // Don't fail the rating if recipe saving fails
+      log.warn('Failed to ensure recipe exists during rating', { error: err, recipeTitle: recipe.title });
+      throw err;
+    }
+  }
+
+  /**
+   * Update the community cache with recipe data immediately after saving
+   */
+  private static async updateCommunityCacheWithRecipe(recipe: StructuredRecipe, recipeId: string): Promise<void> {
+    try {
+      const cacheRef = DatabaseMonitoringService.doc('system/community_rated_recipes');
+      const cacheSnap = await DatabaseMonitoringService.getDoc(cacheRef);
+
+      let arr: any[] = [];
+      if (cacheSnap && cacheSnap.exists && typeof cacheSnap.exists === 'function' ? cacheSnap.exists() : cacheSnap.exists) {
+        const data = cacheSnap.data();
+        arr = Array.isArray(data.recipes) ? data.recipes : [];
+      }
+
+      // Find existing entry by title
+      const idx = arr.findIndex(r => r.title === recipe.title);
+      if (idx >= 0) {
+        // Update existing entry with full recipe data
+        arr[idx] = {
+          ...arr[idx],
+          ...recipe,
+          id: recipeId
+        };
+      } else {
+        // Add new entry
+        arr.unshift({
+          ...recipe,
+          id: recipeId,
+          totalRatings: 1,
+          averageRating: null,
+          wouldMakeAgainPercentage: null,
+          topFeedback: [],
+          lastUpdated: new Date().toISOString()
+        });
+      }
+
+      // Optional trim to keep document size reasonable
+      if (arr.length > 500) arr.length = 500;
+
+      await DatabaseMonitoringService.setDoc(cacheRef, { recipes: arr, lastUpdated: serverTimestamp(), version: 1 });
+      log.info('Updated community cache with recipe data', { recipeTitle: recipe.title, recipeId });
+    } catch (err: any) {
+      log.warn('Failed to update community cache with recipe', { error: err, recipeTitle: recipe.title });
+    }
+  }
   static async getCommunityStats(recipeTitle: string, householdId?: string): Promise<RecipeCommunityStats> {
     try {
       const statsRef = DatabaseMonitoringService.doc(this.COMMUNITY_STATS_COLLECTION, recipeTitle);

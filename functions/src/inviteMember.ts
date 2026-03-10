@@ -3,7 +3,6 @@ import {onCall, onRequest, HttpsError} from "firebase-functions/v2/https";
 import admin from 'firebase-admin';
 import {getFirestore, FieldValue} from "firebase-admin/firestore";
 import { getAuth } from 'firebase-admin/auth';
-import { sendEmail } from './helpers/sendEmail.js';
 
 // (email secret removed — email sending disabled temporarily)
 
@@ -133,127 +132,24 @@ async function inviteMemberCore(inviterUid: string, email: string, householdId: 
     }
   }
 
-  // Append notification to the invited user's per-user notifications cache
+  // Send notification to invited user via top-level notifications collection
   try {
-    const cacheRef = db.collection('users').doc(memberIdToStore).collection('cache').doc('notifications');
-    await db.runTransaction(async (tx) => {
-      const snap = await tx.get(cacheRef);
-      const data = snap.exists ? snap.data() : {};
-      const existing = Array.isArray(data?.items) ? data.items : [];
-      const next = [
-        ...existing,
-        {
-          id: `${Date.now().toString()}-${Math.random().toString(36).slice(2,8)}`,
-          userId: memberIdToStore,
-          type: 'household_invite',
-          title: 'Household Invitation',
-          message: `${inviterName} has invited you to join the "${householdName}" household on Smart Pantry!`,
-          priority: 'medium',
-          actionType: 'join_household',
-          actionLabel: 'Accept',
-          actionData: { householdId },
-          read: false,
-          createdAt: FieldValue.serverTimestamp()
-        }
-      ];
-
-      const MAX_ITEMS = 200;
-      const trimmed = next.slice(-MAX_ITEMS);
-      tx.set(cacheRef, { items: trimmed }, { merge: true });
+    const notificationsRef = db.collection('notifications');
+    await notificationsRef.add({
+      userId: memberIdToStore,
+      type: 'household_invite',
+      title: 'Household Invitation',
+      message: `${inviterName} has invited you to join the "${householdName}" household on Smart Pantry!`,
+      priority: 'medium',
+      actionType: 'join_household',
+      actionLabel: 'Accept',
+      actionData: { householdId },
+      read: false,
+      createdAt: FieldValue.serverTimestamp()
     });
   } catch (err) {
-    console.error('Failed to append invite notification to user cache, falling back to notifications collection:', err);
-    // Fallback to writing to global notifications collection
-    // Append an important invite notification to the invited user's per-user notifications cache
-    try {
-      const cacheRef = db.collection('users').doc(memberIdToStore).collection('cache').doc('notifications');
-      await db.runTransaction(async (tx) => {
-        const snap = await tx.get(cacheRef);
-        const data = snap.exists ? snap.data() : {};
-        const existing = Array.isArray(data?.items) ? data.items : [];
-        const next = [
-          ...existing,
-          {
-            id: `${Date.now().toString()}-${Math.random().toString(36).slice(2,8)}`,
-            userId: memberIdToStore,
-            type: 'household_invite',
-            title: 'Household Invitation',
-            message: `${inviterName} has invited you to join the "${householdName}" household on Smart Pantry!`,
-            priority: 'high',
-            forceShow: true,
-            actionType: 'join_household',
-            actionLabel: 'Accept',
-            actionData: { householdId },
-            read: false,
-            createdAt: FieldValue.serverTimestamp()
-          }
-        ];
-
-        const MAX_ITEMS = 200;
-        const trimmed = next.slice(-MAX_ITEMS);
-        tx.set(cacheRef, { items: trimmed }, { merge: true });
-      });
-    } catch (err) {
-      console.error('Failed to append invite notification to user cache, falling back to notifications collection:', err);
-      // Fallback to writing to global notifications collection
-      const notificationsRef = db.collection('notifications');
-      await notificationsRef.add({ 
-        userId: memberIdToStore, 
-        type: 'household_invite',
-        title: 'Household Invitation',
-        message: `${inviterName} has invited you to join the "${householdName}" household on Smart Pantry!`, 
-        priority: 'high',
-        forceShow: true,
-        actionType: 'join_household',
-        actionLabel: 'Accept',
-        actionData: { householdId },
-        read: false,
-        createdAt: FieldValue.serverTimestamp()
-      });
-    }
-  }
-
-  // Send email invitation
-  try {
-    const subject = `You're invited to join ${householdName} on Smart Pantry!`;
-    const body = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2 style="color: #a51401;">Household Invitation</h2>
-        <p>Hi there!</p>
-        <p><strong>${inviterName}</strong> has invited you to join their household <strong>"${householdName}"</strong> on Smart Pantry!</p>
-
-        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
-          <h3>What you can do:</h3>
-          <ul>
-            <li>Share pantry inventory with family members</li>
-            <li>Collaborate on meal planning</li>
-            <li>View and rate community recipes</li>
-            <li>Keep shopping lists in sync</li>
-          </ul>
-        </div>
-
-        <p style="margin-top: 30px;">
-          <a href="https://smartpantry.app" style="background-color: #a51401; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">
-            Open Smart Pantry
-          </a>
-        </p>
-
-        <p style="color: #666; font-size: 14px; margin-top: 30px;">
-          If you don't have an account yet, you can sign up for free at <a href="https://smartpantry.app">smartpantry.app</a>
-        </p>
-
-        <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
-        <p style="color: #999; font-size: 12px;">
-          This invitation was sent by ${inviterName}. If you believe this was sent in error, you can safely ignore this email.
-        </p>
-      </div>
-    `;
-
-    await sendEmail(email, subject, body);
-    console.log('Email invitation sent successfully to:', email);
-  } catch (emailError) {
-    console.error('Failed to send email invitation:', emailError);
-    // Don't fail the whole invite process if email fails
+    console.error('Failed to create household invite notification:', err);
+    throw new HttpsError("internal", "Failed to send invitation notification.");
   }
 
   return { success: true, newMember };

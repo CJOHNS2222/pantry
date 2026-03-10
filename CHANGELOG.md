@@ -5,6 +5,18 @@ All notable changes to Stock & Spoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.9] - 2026-03-09
+
+### Performance
+- Optimized database writes when adding multiple missing ingredients to shopping list
+- Parallelized price lookups to reduce sequential query delays
+- Improved caching batch operations for better performance
+
+### Fixed
+- Reduced excessive database reads on Community tab
+- Fixed recipe images not saving with ratings
+- Corrected usage limits reset function for all users
+
 ## [1.3.8] - 2026-03-07
 
 ### Added
