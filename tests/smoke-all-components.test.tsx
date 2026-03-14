@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import React from 'react';
 import { render } from './test-utils';
+import { describe, test } from 'vitest';
 
 const componentsDir = path.resolve(__dirname, '..', 'components');
 

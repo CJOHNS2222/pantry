@@ -8,6 +8,7 @@ export interface NotificationItem {
   data?: Record<string, any>;
   createdAt?: any;
   read?: boolean;
+  dedupeKey?: string; // When set, replaces any existing notification with the same key
 }
 
 const DEFAULT_MAX_NOTIFICATIONS = 200;
@@ -27,12 +28,25 @@ export async function appendNotificationToUser(uid: string, notification: Notifi
       const snap = await tx.get(ref as any);
       const data = snap.exists() ? (snap.data() as any) : {};
       const existing = Array.isArray(data.items) ? (data.items as NotificationItem[]) : [];
-      // Firestore does not support serverTimestamp() inside arrays.
-      // Use a client timestamp (ISO string) for items stored in arrays.
       const createdAtValue = notification && typeof notification.createdAt === 'string'
         ? notification.createdAt
         : new Date().toISOString();
-      const next = [...existing, { ...notification, createdAt: createdAtValue }];
+      const newItem = { ...notification, createdAt: createdAtValue };
+
+      let next: NotificationItem[];
+      if (newItem.dedupeKey) {
+        // Replace any existing notification with the same dedupeKey, preserving array position order
+        const idx = existing.findIndex(n => n.dedupeKey === newItem.dedupeKey);
+        if (idx !== -1) {
+          next = [...existing];
+          next[idx] = { ...newItem, createdAt: createdAtValue };
+        } else {
+          next = [...existing, newItem];
+        }
+      } else {
+        next = [...existing, newItem];
+      }
+
       // Trim oldest if over cap
       const trimmed = next.slice(-maxItems);
       tx.set(ref as any, { items: trimmed }, { merge: true });

@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.smart.pantry',
-  appName: 'Smart Pantry',
+  appName: 'Stock & Spoon',
   webDir: 'dist',
   // Remove server config for production builds - Capacitor will load from webDir
   // server: {

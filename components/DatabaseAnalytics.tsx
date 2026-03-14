@@ -17,25 +17,38 @@ const DatabaseAnalytics: React.FC = () => {
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [modalPosition, setModalPosition] = useState({ x: 0, y: 0 });
+  const [isDraggingModal, setIsDraggingModal] = useState(false);
+  const [modalDragOffset, setModalDragOffset] = useState({ x: 0, y: 0 });
   const buttonRef = useRef<HTMLButtonElement>(null);
 
   // Load saved position from localStorage
   useEffect(() => {
     const savedPosition = localStorage.getItem('dbAnalyticsButtonPosition');
+    const savedModalPosition = localStorage.getItem('dbAnalyticsModalPosition');
+    
     if (savedPosition) {
       try {
         const parsed = JSON.parse(savedPosition);
         setPosition(parsed);
       } catch (error) {
         console.error('Failed to parse saved position:', error);
-        // Reset to default if parsing fails
-        setPosition({ x: window.innerWidth - 120, y: window.innerHeight - 60 });
+        setPosition({ x: 20, y: 20 });
       }
     } else {
-      // Default position (top-left for testing) - use a safer calculation
-      setTimeout(() => {
-        setPosition({ x: 20, y: 20 });
-      }, 100);
+      setPosition({ x: 20, y: 20 });
+    }
+
+    if (savedModalPosition) {
+      try {
+        const parsed = JSON.parse(savedModalPosition);
+        setModalPosition(parsed);
+      } catch (error) {
+        console.error('Failed to parse saved modal position:', error);
+        setModalPosition({ x: 100, y: 100 });
+      }
+    } else {
+      setModalPosition({ x: 100, y: 100 });
     }
   }, []);
 
@@ -87,20 +100,53 @@ const DatabaseAnalytics: React.FC = () => {
 
   const handleMouseUp = () => {
     setIsDragging(false);
+    // Save button position
+    localStorage.setItem('dbAnalyticsButtonPosition', JSON.stringify(position));
+  };
+
+  const handleModalMouseDown = (e: React.MouseEvent) => {
+    setModalDragOffset({
+      x: e.clientX - modalPosition.x,
+      y: e.clientY - modalPosition.y
+    });
+    setIsDraggingModal(true);
+  };
+
+  const handleModalMouseMove = (e: MouseEvent) => {
+    if (isDraggingModal) {
+      const newX = e.clientX - modalDragOffset.x;
+      const newY = e.clientY - modalDragOffset.y;
+
+      // Constrain to viewport bounds
+      const maxX = window.innerWidth - 320; // Modal width + margin
+      const maxY = window.innerHeight - 400; // Modal height + margin
+      const constrainedX = Math.max(0, Math.min(newX, maxX));
+      const constrainedY = Math.max(0, Math.min(newY, maxY));
+
+      setModalPosition({ x: constrainedX, y: constrainedY });
+    }
+  };
+
+  const handleModalMouseUp = () => {
+    setIsDraggingModal(false);
+    // Save modal position
+    localStorage.setItem('dbAnalyticsModalPosition', JSON.stringify(modalPosition));
   };
 
   // Add global mouse event listeners when dragging
   useEffect(() => {
-    if (isDragging) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
+    if (isDragging || isDraggingModal) {
+      document.addEventListener('mousemove', isDragging ? handleMouseMove : handleModalMouseMove);
+      document.addEventListener('mouseup', isDragging ? handleMouseUp : handleModalMouseUp);
     }
 
     return () => {
       document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mousemove', handleModalMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('mouseup', handleModalMouseUp);
     };
-  }, [isDragging, dragOffset]);
+  }, [isDragging, isDraggingModal, dragOffset, modalDragOffset]);
 
   const formatDuration = (ms: number): string => {
     const seconds = Math.floor(ms / 1000);
@@ -148,11 +194,15 @@ const DatabaseAnalytics: React.FC = () => {
       className="bg-white border border-gray-300 rounded-lg shadow-xl p-4 max-w-sm z-50"
       style={{
         position: 'fixed',
-        left: `${Math.max(16, Math.min(position.x - 320, window.innerWidth - 336))}px`,
-        top: `${Math.max(16, Math.min(position.y - 400, window.innerHeight - 416))}px`
+        left: `${modalPosition.x}px`,
+        top: `${modalPosition.y}px`,
+        cursor: isDraggingModal ? 'grabbing' : 'default'
       }}
     >
-      <div className="flex justify-between items-center mb-3">
+      <div 
+        className="flex justify-between items-center mb-3 cursor-grab active:cursor-grabbing select-none"
+        onMouseDown={handleModalMouseDown}
+      >
         <h3 className="text-lg font-semibold text-gray-800">Database Analytics</h3>
         <button
           onClick={() => setIsVisible(false)}

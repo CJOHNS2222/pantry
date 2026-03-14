@@ -46,6 +46,9 @@ interface AppContextValue {
   isLoadingRatings: boolean;
   isLoadingHousehold: boolean;
 
+  // Loading state setters
+  setLoadingRatingsComplete: () => void;
+
   // UI state
   consumptionSuggestions: ConsumptionSuggestion[];
   expirationAlerts: ExpirationAlert[];
@@ -110,6 +113,7 @@ const defaultAppContextValue: AppContextValue = {
   isLoadingSavedRecipes: false,
   isLoadingRatings: false,
   isLoadingHousehold: false,
+  setLoadingRatingsComplete: () => {},
   consumptionSuggestions: [],
   expirationAlerts: [],
   recipeSuggestions: [],

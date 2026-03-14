@@ -11,13 +11,10 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper function to check if user is admin
+    // Helper function to check if user is admin (admins collection)
     function isAdmin() {
-      return request.auth != null && (
-        request.auth.uid == "admin-user-id-1" ||
-        request.auth.uid == "admin-user-id-2"
-        // Add actual admin UIDs here
-      );
+      return request.auth != null
+        && get(/databases/$(database)/documents/admins/$(request.auth.uid)).exists();
     }
 
     // A user can create their own user document and read/write to all of their own data (documents and subcollections)
@@ -85,10 +82,16 @@ service cloud.firestore {
       allow update, delete: if request.auth != null && request.auth.uid == resource.data.userId;
     }
 
-    // Feedback collection: allow authenticated users to create feedback
+    // Feedback collection: allow authenticated users to create feedback but with limits
     match /feedback/{docId} {
-      allow create: if request.auth != null;
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasAny(['message'])
+        && request.resource.data.message is string
+        && request.resource.data.message.size() > 0
+        && request.resource.data.message.size() <= 2000
+        && ( !('userId' in request.resource.data) || request.resource.data.userId == request.auth.uid );
       allow read: if false; // Only allow creation, no reading for privacy
+      allow update, delete: if isAdmin();
     }
 
     // Notifications collection: users can only access their own notifications
@@ -203,20 +206,24 @@ service cloud.firestore {
       allow delete: if request.auth != null && request.auth.uid == resource.data.userId;
     }
 
-    // Recipe community stats: allow authenticated users to read and allow updates from authenticated users
-    // Writes originate from the client in this app; ensure basic validation for stat fields
+    // Recipe community stats: clients should NOT be allowed to arbitrarily update aggregated stats.
+    // Only admin processes (or server-side scripts using the Admin SDK) should write these documents.
     match /recipeCommunityStats/{docId} {
       allow read: if request.auth != null;
-      allow create, update: if request.auth != null
-        && request.resource.data.keys().hasAny(['totalRatings', 'averageRating', 'wouldMakeAgainPercentage', 'topFeedback'])
-        && (request.resource.data.totalRatings is number || request.resource.data.totalRatings == null)
-        && (request.resource.data.averageRating is number || request.resource.data.averageRating == null)
-        && (request.resource.data.wouldMakeAgainPercentage is number || request.resource.data.wouldMakeAgainPercentage == null);
+      allow create, update: if isAdmin();
     }
 
-    // Image cache collection: allow authenticated users to cache pantry item images
+    // Image cache collection: limited client writes. Clients may create a small cache entry
+    // but fields are validated. Server/admin processes may manage larger cache operations.
     match /image_cache/{docId} {
-      allow read, write: if request.auth != null; // Authenticated users can cache images
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasAny(['itemId', 'url', 'uploader'])
+        && request.resource.data.itemId is string
+        && request.resource.data.url is string
+        && request.resource.data.uploader == request.auth.uid
+        && request.resource.data.url.size() < 2000;
+      allow update, delete: if isAdmin();
     }
 
     // Price data cache: allow authenticated users to read/write the single global cache document.

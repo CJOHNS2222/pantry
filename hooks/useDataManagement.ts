@@ -1112,6 +1112,34 @@ export function useDataManagement(
   const expirationAlerts = useMemo(() => generateExpirationAlerts(inventory), [inventory]);
   const recipeSuggestions = useMemo(() => generateRecipeSuggestions(inventory), [inventory]);
 
+  const refreshAllData = useCallback(async () => {
+    if (!user?.id) return;
+
+    try {
+      // Force refresh all caches by clearing and reloading
+      setIsLoadingInventory(true);
+      setIsLoadingShoppingList(true);
+      setIsLoadingMealPlan(true);
+      setIsLoadingSavedRecipes(true);
+
+      // Clear cache flags to force reload
+      setRemoteInventoryUpdate(true);
+      setRemoteShoppingListUpdate(true);
+      setRemoteMealPlanUpdate(true);
+      setRemoteSavedRecipesUpdate(true);
+
+      // The listeners will automatically reload the data
+      addToast?.('Data refreshed!', 'success');
+    } catch (err) {
+      log.error('Failed to refresh data:', err, 'DataManagement');
+      addToast?.('Failed to refresh data. Please try again.', 'error');
+    }
+  }, [user?.id, addToast]);
+
+  const setLoadingRatingsComplete = useCallback(() => {
+    setIsLoadingRatings(false);
+  }, []);
+
   return {
     inventory,
     setInventory,
@@ -1163,6 +1191,8 @@ export function useDataManagement(
     updateShoppingListItems,
     removeShoppingListItem,
     removeShoppingListItems,
+    refreshAllData,
+    setLoadingRatingsComplete,
     isLoadingInventory,
     isLoadingShoppingList,
     isLoadingMealPlan,

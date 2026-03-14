@@ -1,6 +1,6 @@
 // services/pantryService.ts
 import { PantryItem, User } from '../types';
-import { analyzePantryImage } from './geminiService';
+import { analyzePantryImage, analyzeReceiptImage } from './geminiService';
 import { getItemImage, inferCategoryFromItemName, inferStorageLocationFromItemName, getAutoExpirationDate, parseItemText, fetchExternalItemImage, combineQuantities } from '../utils/appUtils';
 import { getQuantityAmount, getQuantityUnit } from '../utils/quantityUtils';
 import { validatePantryItem } from '../utils/validationUtils';
@@ -33,6 +33,35 @@ export class PantryService {
     }));
 
     // Track pantry scan results
+    AnalyticsService.trackPantryScan(items.length, items.length);
+
+    return processedItems as PantryItem[];
+  }
+
+  /**
+   * Analyzes a receipt image and returns processed pantry items
+   */
+  static async analyzeReceiptImage(
+    base64Data: string,
+    mimeType: string,
+    user?: Partial<User>
+  ): Promise<PantryItem[]> {
+    // Check if user has opted in to AI features
+    if (!canUseGemini(user?.id)) {
+      throw new Error('Please enable AI features in Settings to use receipt scanning.');
+    }
+
+    const items = await analyzeReceiptImage(base64Data, mimeType, user as any);
+    if (items.length === 0) {
+      throw new Error('No items detected in the receipt.');
+    }
+
+    // Process items and fetch external images for placeholders
+    const processedItems = await Promise.all(items.map(async (item) => {
+      return this.processDetectedItem(item);
+    }));
+
+    // Track receipt scan results
     AnalyticsService.trackPantryScan(items.length, items.length);
 
     return processedItems as PantryItem[];

@@ -3,26 +3,20 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 import { AppProvider } from '../contexts/AppContext'
 
-// Mock useDataManagement so we can assert addItem calls
-const mockAddItem = vi.fn()
-vi.mock('../hooks/useDataManagement', () => ({
-  useDataManagement: () => ({ addItem: mockAddItem })
-}))
-
-// Minimal mocks for services that might be imported by the component
-vi.mock('../services/leftoverImageService', () => ({ uploadLeftoverImage: vi.fn() }))
-vi.mock('../services/databaseMonitoringService', () => ({ doc: vi.fn(), getDoc: vi.fn(), updateDoc: vi.fn() }))
+// Mock the actual LeftoverService used by the component and the image uploader
+const mockCreate = vi.fn()
+vi.mock('../services/leftoverService', () => ({ LeftoverService: { create: mockCreate } }))
+vi.mock('../services/leftoverImageService', () => ({ uploadLeftoverImage: vi.fn().mockResolvedValue('https://example.com/photo.jpg') }))
 
 import LeftoverQuickCapture from '../components/LeftoverQuickCapture'
 
 describe('LeftoverQuickCapture', () => {
   beforeEach(() => {
-    mockAddItem.mockReset()
+    mockCreate.mockReset()
   })
 
-  it('sends cooked_rice flag when checkbox is checked and calls simpleAddOrMarkLeftover', async () => {
-    mockAddItem.mockResolvedValue({ id: 'leftover-1' })
-
+  it('sends cooked_rice flag when checkbox is checked and calls LeftoverService.create', async () => {
+    mockCreate.mockResolvedValue({ id: 'leftover-1' })
     const appValue = {
       // only include the minimal fields used by the component
       user: { id: 'user-1', profile: { leftoverPersona: 'normal' } },
@@ -60,7 +54,7 @@ describe('LeftoverQuickCapture', () => {
 
     render(
       <AppProvider value={appValue as any}>
-        <LeftoverQuickCapture householdId="h1" createdBy="user-1" />
+        <LeftoverQuickCapture createdBy="user-1" />
       </AppProvider>
     )
 
@@ -69,18 +63,18 @@ describe('LeftoverQuickCapture', () => {
     fireEvent.click(checkbox)
     expect(checkbox.checked).toBe(true)
 
-    const saveButton = screen.getByText('Save')
+    const saveButton = screen.getByText('Save Leftover')
     fireEvent.click(saveButton)
 
     await waitFor(() => {
-      expect(mockAddItem).toHaveBeenCalled()
+      expect(mockCreate).toHaveBeenCalled()
     })
 
-    // inspect the payload passed to addItem
-    const payload = mockAddItem.mock.calls[0][0]
+    // inspect the payload passed to LeftoverService.create
+    const payload = mockCreate.mock.calls[0][0]
     expect(payload).toBeTruthy()
-    // derived fields
-    expect(payload.category).toBe('Leftovers')
-    expect(payload.image === undefined || typeof payload.image === 'string').toBeTruthy()
+    expect(payload.cooked_rice).toBe(true)
+    expect(payload.createdBy).toBe('user-1')
+    expect(typeof payload.householdId === 'string').toBeTruthy()
   })
 })

@@ -34,6 +34,9 @@ android/app/google-services.json
 
 # Android release keystore
 pantry-release.keystore
+key
+keyid
+keyid.pub
 
 # Sentry Config File
 sentry.properties

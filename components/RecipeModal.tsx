@@ -59,7 +59,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
   , editable = false
 }) => {
   const [showLeftoverCapture, setShowLeftoverCapture] = useState(false);
-  const [servings, setServings] = useState(4); // Default to 4 servings
+  const [servings, setServings] = useState(household?.members?.length || 4); // Default to household size
   const [isSaving, setIsSaving] = useState(false); // Prevent double-clicks
   const originalServings = 4; // Assume recipes are for 4 servings
   const ratingRef = useRef<HTMLDivElement>(null);
@@ -570,6 +570,35 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
                   Got it
                 </button>
               </div>
+            </div>
+          )}
+
+          {/* Servings Control */}
+          {!editable && (
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-sm font-bold text-[var(--accent-color)] uppercase">Servings</h4>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setServings(Math.max(1, servings - 1))}
+                    className="w-8 h-8 rounded-full bg-theme-secondary/20 hover:bg-theme-secondary/30 flex items-center justify-center text-theme-primary font-bold"
+                    aria-label="Decrease servings"
+                  >
+                    <Minus className="w-4 h-4" />
+                  </button>
+                  <span className="text-lg font-semibold text-theme-primary min-w-[2rem] text-center">{servings}</span>
+                  <button
+                    onClick={() => setServings(servings + 1)}
+                    className="w-8 h-8 rounded-full bg-theme-secondary/20 hover:bg-theme-secondary/30 flex items-center justify-center text-theme-primary font-bold"
+                    aria-label="Increase servings"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+              <p className="text-xs text-theme-secondary opacity-70">
+                Adjust servings to scale ingredients proportionally (recipes assume 4 servings)
+              </p>
             </div>
           )}
 

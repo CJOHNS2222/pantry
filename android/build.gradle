@@ -7,8 +7,8 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        // Update AGP to 8.10.0 to support compileSdk 36
-        classpath 'com.android.tools.build:gradle:8.10.0'
+        // Downgrade AGP to 8.7.3 to maintain compatibility with older plugins while still supporting modern SDKs
+        classpath 'com.android.tools.build:gradle:8.7.3'
 
         // NOTE: Do not place your application dependencies here; they belong
         // in the individual module build.gradle files

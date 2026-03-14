@@ -11,10 +11,10 @@ import { InventoryCacheService } from '../services/inventoryCacheService'
 import { PantryItem } from '../types'
 
 interface LeftoversHotZoneProps {
-  householdId: string
-}
+  householdId: string;
+  onNavigateToRecipes?: (query: string) => void;}
 
-export default function LeftoversHotZone({ householdId }: LeftoversHotZoneProps) {
+export default function LeftoversHotZone({ householdId, onNavigateToRecipes }: LeftoversHotZoneProps) {
   const [leftovers, setLeftovers] = useState<PantryItem[]>([])
   const { addToast } = useAppActions()
   const { user } = useApp()
@@ -87,9 +87,28 @@ export default function LeftoversHotZone({ householdId }: LeftoversHotZoneProps)
     }
   }
 
+  const handleTransformLeftover = async (leftover: PantryItem) => {
+    try {
+      // Navigate to recipes with a prompt about this leftover
+      // This would need to be passed up to the parent component
+      // For now, just show a placeholder
+      addToast('Leftover transformation coming soon!', 'info');
+    } catch (error) {
+      addToast('Failed to get transformation ideas', 'error');
+    }
+  };
+
   return (
     <section className="px-3 py-2" aria-label="Leftovers Hot Zone">
-      <h4 className="text-sm font-semibold text-theme-primary mb-3">🥡 Leftovers</h4>
+      <div className="flex items-center justify-between mb-3">
+        <h4 className="text-sm font-semibold text-theme-primary">🥡 Leftovers</h4>
+        <button
+          onClick={() => onNavigateToRecipes?.('leftover transformation ideas')}
+          className="text-xs px-2 py-1 bg-[var(--accent-color)] text-white rounded hover:bg-[var(--accent-color)]/80 transition-colors"
+        >
+          Transform Ideas
+        </button>
+      </div>
       <div className="flex gap-3 overflow-x-auto pb-2">
         {leftovers.map(leftover => {
           const bestBefore = leftover.expirationDate ? new Date(leftover.expirationDate) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)

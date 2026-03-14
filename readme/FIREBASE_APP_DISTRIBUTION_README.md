@@ -1,3 +1,9 @@
+If you need to update the website in the future, just run firebase deploy --only hosting and it will deploy to the website site. If you want to deploy the app, you can temporarily change the "site" field back to the original site name.
+
+
+
+
+
 # Firebase App Distribution Setup
 
 This document explains how to use Firebase App Distribution to distribute your Smart Pantry app to testers.

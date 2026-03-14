@@ -26,6 +26,7 @@ export interface NotificationItem {
   createdAt: Timestamp;
   expiresAt?: Timestamp;
   snoozedUntil?: Timestamp;
+  dedupeKey?: string;
 }
 
 export interface NotificationSettings {
@@ -128,6 +129,7 @@ export class NotificationService {
       actionType: 'view_item',
       actionData,
       priority: priority,
+      dedupeKey: 'expiration_danger_zone',
       expiresAt: Timestamp.fromDate(new Date(Date.now() + 3 * 24 * 60 * 60 * 1000))
     })
   }
@@ -174,7 +176,7 @@ export class NotificationService {
       return existingStack.id;
     }
 
-    // Create new stack notification
+      // Create new stack notification
     const { title, message } = generateNotificationStackMessage(items);
 
     return this.createNotification(userId, {
@@ -188,6 +190,7 @@ export class NotificationService {
         items: items.map(i => ({ itemId: i.itemId, itemName: i.itemName, daysUntilExpiry: i.daysUntilExpiry, riskLevel: i.riskLevel }))
       },
       priority: urgentItems.length > 0 ? 'urgent' : highRiskItems.length > 0 ? 'high' : 'medium',
+      dedupeKey: 'expiration_stack',
       expiresAt: Timestamp.fromDate(new Date(Date.now() + 3 * 24 * 60 * 60 * 1000))
     });
   }
@@ -210,6 +213,7 @@ export class NotificationService {
       actionType,
       actionData: { itemId, itemName, wasteNotification: true },
       priority: 'low',
+      dedupeKey: `waste_${itemId}`,
       expiresAt: Timestamp.fromDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000))
     });
   }
@@ -311,6 +315,7 @@ export class NotificationService {
       actionType,
       actionData,
       priority: finalPriority,
+      dedupeKey: `expiration_${itemId}`,
       expiresAt: Timestamp.fromDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)) // Expire in 7 days
     });
   }

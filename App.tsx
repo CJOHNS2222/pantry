@@ -5,7 +5,6 @@ import DatabaseMonitoringService from './services/databaseMonitoringService';
 import { Login } from './components/Login';
 import { HouseholdManager } from './components/Household';
 import { HouseholdInviteModal } from './components/HouseholdInviteModal';
-import { Tutorial } from './components/Tutorial';
 import { ModernOnboardingFlow } from './components/ModernOnboardingFlow';
 import ErrorBoundary from './components/ErrorBoundary';
 import { AppHeader } from './components/layout/AppHeader';
@@ -91,7 +90,6 @@ const App: React.FC = () => {
 
   // UI States
   const [showHousehold, setShowHousehold] = useState(false);
-  const [showTutorial, setShowTutorial] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showNotificationsModal, setShowNotificationsModal] = useState(false);
   const [showHouseholdInviteModal, setShowHouseholdInviteModal] = useState(false);
@@ -183,7 +181,7 @@ const App: React.FC = () => {
       });
     }
     
-    setShoppingList(prev => [...prev, ...newItems]);
+    setShoppingList((prev: ShoppingItem[]) => [...prev, ...newItems]);
     
     await ShoppingListCacheService.addItemsToCache(newItems, householdId, userId);
     
@@ -261,6 +259,8 @@ const App: React.FC = () => {
     isLoadingHousehold,
     showRiskQuestionnaire,
     handleRiskQuestionnaireComplete,
+    refreshAllData,
+    setLoadingRatingsComplete,
   } = useDataManagement(user, addToast, addToShoppingList, updateSyncStatus, {
     logItemAdded,
     logItemRemoved,
@@ -583,30 +583,6 @@ const App: React.FC = () => {
       has_seen_tutorial: finalUser.hasSeenTutorial
     });
 
-    // Determine whether to show the tutorial on first login.
-    // Use Firestore flag first; support a localStorage fallback for offline/new-device scenarios.
-    try {
-      const seenFlag = !!finalUser.hasSeenTutorial;
-      const localSeen = localStorage.getItem('tutorialSeen:v2') === 'true';
-      const onboardingCompleted = localStorage.getItem('onboarding-completed') === 'true';
-      const rolloutEnabled = typeof featureFlags?.isEnabled === 'function'
-        ? featureFlags.isEnabled('newTutorial', finalUser.id)
-        : false;
-
-      if (!seenFlag && onboardingCompleted) {
-        // If the new tutorial rollout is enabled, respect localStorage fallback.
-        if (rolloutEnabled) {
-          if (!localSeen) setShowTutorial(true);
-        } else {
-          // Fallback to legacy behavior (show by default if user hasn't seen it)
-          setShowTutorial(true);
-        }
-      }
-    } catch (err) {
-      // On any error, fall back to legacy behavior to avoid blocking users.
-      if (!finalUser.hasSeenTutorial && localStorage.getItem('onboarding-completed') === 'true') setShowTutorial(true);
-    }
-
     // Show onboarding if not completed
     if (localStorage.getItem('onboarding-completed') !== 'true') {
       setShowOnboarding(true);
@@ -642,11 +618,6 @@ const App: React.FC = () => {
     const handleBackButton = (event: BackButtonListenerEvent) => {
       if (showNotificationsModal) {
         setShowNotificationsModal(false);
-        return;
-      }
-
-      if (showTutorial) {
-        setShowTutorial(false);
         return;
       }
 
@@ -706,7 +677,7 @@ const App: React.FC = () => {
         backButtonListenerRef.current = null;
       }
     };
-  }, [showNotificationsModal, showTutorial, showHousehold, showHouseholdInviteModal, showExpiredItemsModal, showOnboarding, activeTab, lastBackPress, addToast]);
+  }, [showNotificationsModal, showHousehold, showHouseholdInviteModal, showExpiredItemsModal, showOnboarding, activeTab, lastBackPress, addToast]);
 
   const [previousTab, setPreviousTab] = useState<Tab>(Tab.PANTRY);
   useEffect(() => {
@@ -821,44 +792,6 @@ const App: React.FC = () => {
               }
             }}
             onSkip={() => setShowOnboarding(false)}
-          />
-        )}
-
-        {showTutorial && (
-          <Tutorial
-            onClose={async () => {
-              setShowTutorial(false);
-              try {
-                // Always set a local fallback so users on this device don't repeatedly see the tutorial
-                localStorage.setItem('tutorialSeen:v2', 'true');
-              } catch (e) {
-                // ignore localStorage errors
-              }
-
-              if (user) {
-                try {
-                  await DatabaseMonitoringService.updateDoc(DatabaseMonitoringService.doc('users', user.id), { hasSeenTutorial: true });
-                  setUser({ ...user, hasSeenTutorial: true });
-                } catch (err) {
-                  // If Firestore update fails, we've at least persisted locally
-                  console.warn('Failed to persist tutorial seen flag to Firestore', err);
-                }
-              }
-            }}
-            onSwitchTab={setActiveTab}
-            onOpenHousehold={() => setShowHousehold(true)}
-            isHouseholdOpen={showHousehold}
-            onCloseHousehold={() => setShowHousehold(false)}
-            onToggleTheme={() => setSettings((prev: any) => ({
-              ...prev,
-              theme: {
-                ...prev.theme,
-                mode: prev.theme.mode === 'dark' ? 'light' : 'dark'
-              }
-            }))}
-            onOpenRecipeSearch={() => { setActiveTab(Tab.MEALS); }}
-            onOpenAnalytics={() => setActiveTab(Tab.SETTINGS)}
-            currentTab={activeTab}
           />
         )}
 
@@ -1003,6 +936,7 @@ const App: React.FC = () => {
             isLoadingSavedRecipes,
             isLoadingHousehold,
             isLoadingRatings,
+            setLoadingRatingsComplete,
             consumptionSuggestions,
             expirationAlerts,
             recipeSuggestions,
@@ -1138,14 +1072,14 @@ const App: React.FC = () => {
               setInitialSearchQuery,
               setPersistedRecipeResult,
               onLogout: handleLogout,
-              onShowTutorial: () => setShowTutorial(true),
               onShowHousehold: () => setShowHousehold(true),
               checkRecipeSaveLimit,
               checkMealPlanLimit,
-              addShoppingListItem
+              addShoppingListItem,
+              refreshAllData
             }}
           >
-            {household?.id && <LeftoversHotZone householdId={household.id} />}
+            {household?.id && <LeftoversHotZone householdId={household.id} onNavigateToRecipes={(query) => { setActiveTab(Tab.RECIPES); setInitialSearchQuery(query); }} />}
             <MainContent />
           </AppActionsProvider>
         </AppProvider>

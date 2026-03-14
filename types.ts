@@ -61,6 +61,12 @@ export interface PantryItem {
   freezerZone?: string; // Freezer zone hint (e.g., top, middle, bottom, door, drawer)
   freezerLabelPhotoUrl?: string; // Optional photo URL of freezer label/container
   freezerPortionCount?: number; // Optional portion count for frozen leftovers/items
+  // Opened tracking for items with different shelf lives once opened
+  isOpened?: boolean; // Whether the item has been opened
+  openedAt?: string; // ISO date when item was opened
+  openedExpiry?: string; // ISO date for opened-specific expiry
+  // Staples: items that auto-reappear on shopping list when depleted
+  isStaple?: boolean;
 }
 
 export interface Batch {
@@ -111,6 +117,12 @@ export interface ShoppingItem {
     lastUpdated: Date;
     unit: string;
   }; // Full price data for reference
+  priceOptions?: {
+    amount: number;
+    unit: string;
+    price: number;
+    store?: string;
+  }[]; // Multiple price options for comparison
 }
 
 export interface GroundingChunk {
@@ -399,6 +411,10 @@ export interface Settings {
   };
   shopping?: {
     includeStaples?: boolean;
+    autoReaddStaples?: boolean;
+    storeLayout?: string[]; // Custom order of store aisles
+    showNutrition?: boolean;
+    showPriceData?: boolean;
   };
 }
 

@@ -16,29 +16,17 @@ export const PORTION_PRESETS = {
   extendedFamily: { householdSize: 8, baseServingSize: 4, scalingFactor: 2.0 }
 };
 
-// Calculate portion scaling factor based on household size
+// Calculate portion scaling factor based on target servings
 export const calculatePortionScaling = (
   household: Household | null,
   targetServings: number = 4
 ): PortionConfig => {
   const householdSize = household?.members?.length || 1;
 
-  // Find the best preset match
-  let bestPreset = PORTION_PRESETS.smallFamily; // Default to 4 people
-  let minDifference = Math.abs(householdSize - PORTION_PRESETS.smallFamily.householdSize);
-
-  for (const [key, preset] of Object.entries(PORTION_PRESETS)) {
-    const difference = Math.abs(householdSize - preset.householdSize);
-    if (difference < minDifference) {
-      minDifference = difference;
-      bestPreset = preset;
-    }
-  }
-
   return {
     householdSize,
-    baseServingSize: targetServings,
-    scalingFactor: bestPreset.scalingFactor
+    baseServingSize: 4, // Recipes are assumed to be for 4 servings
+    scalingFactor: targetServings / 4
   };
 };
 

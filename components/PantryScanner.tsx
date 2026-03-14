@@ -1,13 +1,28 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Camera as CapacitorCamera, CameraResultType, CameraSource } from '@capacitor/camera';
-import { Camera, Upload, Loader2, Plus, Trash2, CheckCircle2, ShoppingBasket, X, Barcode, ChevronDown, ChevronRight, ChevronUp, Image, ChefHat, TrendingUp, Search, Filter, Settings2, Clock, Tag, FilePlus } from 'lucide-react';
+import { Camera, Upload, Loader2, Plus, Trash2, CheckCircle2, ShoppingBasket, X, Barcode, ChevronDown, ChevronRight, ChevronUp, Image, ChefHat, TrendingUp, Search, Filter, Settings2, Clock, Tag, FilePlus, Receipt } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { FixedSizeList as List } from 'react-window';
-import { analyzePantryImage } from '../services/geminiService';
+import { analyzePantryImage, analyzeReceiptImage } from '../services/geminiService';
 import StorageLocationIndicator from './StorageLocationIndicator';
-import { PantryItem, LoadingState, ConsumptionSuggestion, ExpirationAlert, CustomCategory, RecipeSuggestion, PantryFilter, User } from '../types';
+import { PantryItem, LoadingState, ConsumptionSuggestion, ExpirationAlert, CustomCategory, RecipeSuggestion, PantryFilter, User, ShoppingItem } from '../types';
 import { Tab } from '../types/app';
 import AnalyticsService from '../services/analyticsService';
+
+// Temporary interface for receipt scan results that may include price data
+interface ReceiptScanResult {
+  id: string;
+  item: string;
+  category: string;
+  quantity_estimate: string;
+  estimatedPrice?: number;
+  priceOptions?: {
+    amount: number;
+    unit: string;
+    price: number;
+  }[];
+  image?: string;
+}
 import FreezerService from '../services/freezerService';
 import { BrowserMultiFormatReader } from '@zxing/library';
 import VisualQuantitySelector from './VisualQuantitySelector';
@@ -16,10 +31,10 @@ import PriceTrends from './PriceTrends';
 import ItemDetailModal from './ItemDetailModal';
 import { ProgressiveImage } from './ProgressiveImage';
 import { PantryItemSkeleton } from './SkeletonLoader';
-import { searchPantryItems, getEnhancedAutocompleteSuggestions, filterPantryItems, savePantryFilter, loadPantryFilter, defaultPantryFilter, saveSearchToHistory, getRecentSearchSuggestions, AutocompleteSuggestion } from '../utils/searchUtils';
-import { getMealPrepSuggestions, RecipeIngredientMatch } from '../utils/searchUtils';
+import { generateIntelligentRecipeQuery, searchPantryItems, getEnhancedAutocompleteSuggestions, filterPantryItems, savePantryFilter, loadPantryFilter, defaultPantryFilter, saveSearchToHistory, getRecentSearchSuggestions, AutocompleteSuggestion, getMealPrepSuggestions, RecipeIngredientMatch } from '../utils/searchUtils';
 import { debounce } from '../utils/debounceUtils';
 import { formatItemQuantity, getExpirationColor, getAllCategories, getItemImage } from '../utils/appUtils';
+import { getQuantityAmount, getQuantityUnit } from '../utils/quantityUtils';
 import { PantryService } from '../services/pantryService';
 import { useApp } from '../contexts/AppContext';
 import { useAppActions } from '../contexts/AppActionsContext';
@@ -38,6 +53,7 @@ interface PantryScannerProps {
   inventory: PantryItem[];
   isLoadingInventory?: boolean;
   addToShoppingList: (items: string[]) => void;
+  addShoppingListItem?: (item: Omit<ShoppingItem, 'id'>) => void;
   onDeleteItem: (index: number) => Promise<void>;
   onAddItem: (item: PantryItem) => Promise<void>;
   onAddItems: (items: PantryItem[]) => Promise<void>;
@@ -55,6 +71,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   inventory,
   isLoadingInventory = false,
   addToShoppingList,
+  addShoppingListItem,
   onDeleteItem,
   onAddItem,
   onAddItems,
@@ -116,6 +133,29 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
     }
   };
 
+  const handleWhatCanICookTonight = async () => {
+    try {
+      setLoadingState(LoadingState.LOADING);
+      
+      const query = generateIntelligentRecipeQuery(inventory, user?.profile?.dietaryRestrictions);
+      
+      if (!query) {
+        appActions.addToast('No pantry items found. Add some items first!', 'info');
+        return;
+      }
+      
+      setInitialSearchQuery?.(query);
+      setActiveTab?.(Tab.RECIPES);
+      
+      appActions.addToast('Found some meal ideas!', 'success');
+    } catch (error) {
+      console.error('Failed to get meal suggestions:', error);
+      appActions.addToast('Failed to get meal suggestions. Try again.', 'error');
+    } finally {
+      setLoadingState(LoadingState.IDLE);
+    }
+  };
+
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [rawBase64, setRawBase64] = useState<string | null>(null);
   const [mimeType, setMimeType] = useState<string>("");
@@ -138,8 +178,9 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   const [storageSectionOrder, setStorageSectionOrder] = useState<string[]>(['pantry', 'fridge', 'freezer', 'spices', 'other']);
   const [showPriceTrends, setShowPriceTrends] = useState<string | null>(null);
   const [selectedItemIndex, setSelectedItemIndex] = useState<number | null>(null);
-  const [scanResults, setScanResults] = useState<PantryItem[] | null>(null);
+  const [scanResults, setScanResults] = useState<ReceiptScanResult[] | null>(null);
   const [showScanReviewModal, setShowScanReviewModal] = useState(false);
+  const [receiptDestination, setReceiptDestination] = useState<'pantry' | 'shopping'>('pantry');
   const [bulkQuantityEditItems, setBulkQuantityEditItems] = useState<PantryItem[]>([]);
   const [showBulkQuantityEdit, setShowBulkQuantityEdit] = useState(false);
   
@@ -199,7 +240,16 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
     appActions.addToast('Consumed 1 unit', 'success', 5000, 'Undo', async () => {
       await onUpdateItem(item.originalIndex, previous);
     });
-  }, [inventory, onUpdateItem, appActions]);
+
+    // Check if this is a staple and quantity reached 0, auto-readd to shopping list
+    const newQuantity = getQuantityAmount(updatedItem.quantity ?? updatedItem.quantity_estimate);
+    if (original.isStaple && newQuantity <= 0) {
+      // TODO: Check settings for autoReaddStaples
+      // For now, assume enabled
+      addToShoppingList([original.item]);
+      appActions.addToast(`${original.item} auto-added to shopping list (staple)`, 'info');
+    }
+  }, [inventory, onUpdateItem, appActions, addToShoppingList]);
 
   const applyQuickAddToShopping = useCallback((item: any) => {
     addToShoppingList([item.item]);
@@ -470,6 +520,34 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
     }
   }, []);
 
+  // Receipt scanning with camera
+  const handleScanReceipt = useCallback(async () => {
+    try {
+      // Track feature adoption
+      AnalyticsService.trackFeatureFirstUse('pantry_scanner_receipt', { method: 'receipt' });
+      
+      const photo = await CapacitorCamera.getPhoto({
+        resultType: CameraResultType.DataUrl,
+        source: CameraSource.Camera,
+        quality: 90, // Higher quality for text recognition
+      });
+      
+      if (photo.dataUrl) {
+        setLoadingState(LoadingState.LOADING);
+        setImagePreview(photo.dataUrl);
+        const base64Data = photo.dataUrl.split(',')[1];
+        setRawBase64(base64Data);
+        setMimeType(photo.format ? `image/${photo.format}` : 'image/jpeg');
+        
+        // Process receipt
+        await processReceiptImage(base64Data, photo.format ? `image/${photo.format}` : 'image/jpeg');
+      }
+    } catch (err) {
+      console.error('Camera error:', err);
+      setLoadingState(LoadingState.IDLE);
+    }
+  }, []);
+
   const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -512,6 +590,28 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
       setLoadingState(LoadingState.ERROR);
     }
   }, [rawBase64, mimeType, user]);
+
+  const processReceiptImage = useCallback(async (base64Data: string, mimeType: string) => {
+    try {
+      const processedItems = await PantryService.analyzeReceiptImage(base64Data, mimeType, user ?? undefined);
+
+      // Instead of immediately saving, open a review modal so user can edit/confirm items
+      setScanResults(processedItems);
+      setShowScanReviewModal(true);
+      setLoadingState(LoadingState.SUCCESS);
+
+      // Auto-close the modal after showing success message
+      setTimeout(() => {
+        setImagePreview(null);
+        setRawBase64(null);
+        setLoadingState(LoadingState.IDLE);
+      }, 3000);
+    } catch (err) {
+      console.error('Receipt analysis failed:', err);
+      alert(err instanceof Error ? err.message : 'Failed to analyze receipt. Please try again.');
+      setLoadingState(LoadingState.ERROR);
+    }
+  }, [user]);
 
   const removeItem = useCallback(async (index: number) => {
     await onDeleteItem(index);
@@ -693,27 +793,111 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
     }
   });
 
-  // Group inventory by category
+  // Group inventory by category (combine like items within categories)
   const groupedItems = sortedInventory.reduce((acc, item) => {
     // Show a dedicated "Leftovers" category for leftover items so it's
     // visible in the category view only when leftovers exist.
     const category = item.is_leftover ? 'Leftovers' : (item.category || 'Uncategorized');
     if (!acc[category]) {
-      acc[category] = [];
+      acc[category] = {};
     }
-    acc[category].push(item);
-    return acc;
-  }, {} as Record<string, (PantryItem & { originalIndex: number })[]>);
 
-  // Group inventory by storage location
+    // Group by item name and expiration date within the category
+    const itemKey = `${item.item}_${item.expirationDate || 'no-expiry'}`;
+    if (!acc[category][itemKey]) {
+      acc[category][itemKey] = {
+        ...item,
+        combinedItems: [item],
+        totalQuantity: getQuantityAmount(item.quantity ?? item.quantity_estimate),
+        originalIndices: [item.originalIndex],
+        originalIndex: item.originalIndex // Keep for backward compatibility
+      };
+    } else {
+      // Combine quantities
+      const currentAmount = getQuantityAmount(acc[category][itemKey].quantity ?? acc[category][itemKey].quantity_estimate);
+      const newAmount = getQuantityAmount(item.quantity ?? item.quantity_estimate);
+      const combinedAmount = currentAmount + newAmount;
+
+      // Update the combined item
+      acc[category][itemKey].combinedItems.push(item);
+      acc[category][itemKey].totalQuantity = combinedAmount;
+      acc[category][itemKey].originalIndices.push(item.originalIndex);
+
+      // Update quantity field - prefer structured quantity if available
+      if (typeof acc[category][itemKey].quantity === 'object' && acc[category][itemKey].quantity !== null) {
+        acc[category][itemKey].quantity = {
+          ...acc[category][itemKey].quantity,
+          amount: combinedAmount
+        };
+      } else if (typeof item.quantity === 'object' && item.quantity !== null) {
+        acc[category][itemKey].quantity = {
+          ...item.quantity,
+          amount: combinedAmount
+        };
+      } else {
+        acc[category][itemKey].quantity = combinedAmount;
+      }
+    }
+    return acc;
+  }, {} as Record<string, Record<string, PantryItem & { combinedItems: PantryItem[]; totalQuantity: number; originalIndices: number[]; originalIndex: number }>>);
+
+  // Convert grouped items to arrays for display
+  const categoryItemsArrays = Object.keys(groupedItems).reduce((acc, category) => {
+    acc[category] = Object.values(groupedItems[category]);
+    return acc;
+  }, {} as Record<string, (PantryItem & { combinedItems: PantryItem[]; totalQuantity: number; originalIndices: number[]; originalIndex: number })[]>);
+
+  // Group inventory by storage location (combine like items within locations)
   const groupedByStorage = sortedInventory.reduce((acc, item) => {
     const location = item.storageLocation || 'pantry'; // Default to pantry if not set
     if (!acc[location]) {
-      acc[location] = [];
+      acc[location] = {};
     }
-    acc[location].push(item);
+
+    // Group by item name and expiration date within the storage location
+    const itemKey = `${item.item}_${item.expirationDate || 'no-expiry'}`;
+    if (!acc[location][itemKey]) {
+      acc[location][itemKey] = {
+        ...item,
+        combinedItems: [item],
+        totalQuantity: getQuantityAmount(item.quantity ?? item.quantity_estimate),
+        originalIndices: [item.originalIndex],
+        originalIndex: item.originalIndex // Keep for backward compatibility
+      };
+    } else {
+      // Combine quantities
+      const currentAmount = getQuantityAmount(acc[location][itemKey].quantity ?? acc[location][itemKey].quantity_estimate);
+      const newAmount = getQuantityAmount(item.quantity ?? item.quantity_estimate);
+      const combinedAmount = currentAmount + newAmount;
+
+      // Update the combined item
+      acc[location][itemKey].combinedItems.push(item);
+      acc[location][itemKey].totalQuantity = combinedAmount;
+      acc[location][itemKey].originalIndices.push(item.originalIndex);
+
+      // Update quantity field - prefer structured quantity if available
+      if (typeof acc[location][itemKey].quantity === 'object' && acc[location][itemKey].quantity !== null) {
+        acc[location][itemKey].quantity = {
+          ...acc[location][itemKey].quantity,
+          amount: combinedAmount
+        };
+      } else if (typeof item.quantity === 'object' && item.quantity !== null) {
+        acc[location][itemKey].quantity = {
+          ...item.quantity,
+          amount: combinedAmount
+        };
+      } else {
+        acc[location][itemKey].quantity = combinedAmount;
+      }
+    }
     return acc;
-  }, {} as Record<string, (PantryItem & { originalIndex: number })[]>);
+  }, {} as Record<string, Record<string, PantryItem & { combinedItems: PantryItem[]; totalQuantity: number; originalIndices: number[]; originalIndex: number }>>);
+
+  // Convert grouped storage items to arrays for display
+  const storageItemsArrays = Object.keys(groupedByStorage).reduce((acc, location) => {
+    acc[location] = Object.values(groupedByStorage[location]);
+    return acc;
+  }, {} as Record<string, (PantryItem & { combinedItems: PantryItem[]; totalQuantity: number; originalIndices: number[]; originalIndex: number })[]>);
 
   const storageLocations = ['pantry', 'fridge', 'freezer', 'spices', 'other'] as const;
   const storageLabels = {
@@ -744,7 +928,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
 
   // Prepare view content
   const categoryViewContent = sortedCategories.map(category => {
-    const items = groupedItems[category];
+    const items = categoryItemsArrays[category] || [];
     return (
       <div key={category} className="bg-theme-secondary rounded-lg border border-theme overflow-hidden">
         <div
@@ -793,7 +977,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   });
 
   const storageViewContent = storageSectionOrder.map(location => {
-    const items = groupedByStorage[location] || [];
+    const items = storageItemsArrays[location] || [];
     const locationLabel = (storageLabels as any)[location] || location;
 
     return (
@@ -838,7 +1022,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
 
   // Virtualized category item renderer
   const renderCategoryItem = ({ index, style, category }: { index: number; style: React.CSSProperties; category: string }) => {
-    const items = groupedItems[category];
+    const items = categoryItemsArrays[category] || [];
     const item = items[index];
     if (!item) return null;
     const expirationHeatClass = (d?: number) => {
@@ -848,11 +1032,16 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
       return '';
     };
     const daysRemaining = item.expirationDate ? Math.ceil((new Date(item.expirationDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : undefined;
+
+    // Use the first original index for combined items
+    const primaryIndex = item.originalIndices ? item.originalIndices[0] : item.originalIndex;
+
     return (
-      <div style={style} key={item.originalIndex} className={`flex items-center justify-between px-2 py-1 border-b border-theme last:border-b-0 transition-all cursor-pointer ${
+      <div style={style} key={primaryIndex} className={`flex items-center justify-between px-2 py-1 border-b border-theme last:border-b-0 transition-all cursor-pointer ${
         expirationHeatClass(daysRemaining)
       } ${
-        bulkMode && selectedItems.has(item.originalIndex)
+        bulkMode && item.originalIndices ? item.originalIndices.some((idx: number) => selectedItems.has(idx)) :
+        bulkMode && selectedItems.has(primaryIndex)
           ? 'bg-[var(--accent-color)]/10 border-[var(--accent-color)]/30'
           : 'hover:bg-theme-primary/50'
       }`}
@@ -862,14 +1051,27 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
           gestureActionTriggeredRef.current = false;
           return;
         }
-        if (!bulkMode) setSelectedItemIndex(item.originalIndex)
+        if (!bulkMode) setSelectedItemIndex(primaryIndex)
       }}
       >
         {bulkMode && (
           <input
             type="checkbox"
-            checked={selectedItems.has(item.originalIndex)}
-            onChange={() => toggleItemSelection(item.originalIndex)}
+            checked={item.originalIndices ? item.originalIndices.some((idx: number) => selectedItems.has(idx)) : selectedItems.has(primaryIndex)}
+            onChange={() => {
+              if (item.originalIndices) {
+                // For combined items, toggle all indices
+                const allSelected = item.originalIndices.every((idx: number) => selectedItems.has(idx));
+                if (allSelected) {
+                  item.originalIndices.forEach((idx: number) => selectedItems.delete(idx));
+                } else {
+                  item.originalIndices.forEach((idx: number) => selectedItems.add(idx));
+                }
+                setSelectedItems(new Set(selectedItems));
+              } else {
+                toggleItemSelection(primaryIndex);
+              }
+            }}
             className="mr-3 w-4 h-4 text-[var(--accent-color)] bg-theme-primary border-theme rounded focus:ring-[var(--accent-color)]"
           />
         )}
@@ -909,7 +1111,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  setFreezeTargetIndex(item.originalIndex);
+                  setFreezeTargetIndex(primaryIndex);
                 }}
                 className="px-2 py-1 rounded bg-theme-secondary hover:bg-theme-primary text-xs"
                 title="Move to freezer"
@@ -929,7 +1131,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                     const cookingToday = window.confirm('Are you cooking this today?\nOK = Yes (shorter window), Cancel = No (default defrost window)');
                     const prev = { storageLocation: item.storageLocation, is_frozen: item.is_frozen, expirationDate: item.expirationDate } as any;
                     const result = await FreezerService.moveToFridgeFromFreezer(household.id, item.id, { cookingToday });
-                    await onUpdateItem(item.originalIndex, { storageLocation: 'fridge', is_frozen: false, expirationDate: result.newExpiry });
+                    await onUpdateItem(primaryIndex, { storageLocation: 'fridge', is_frozen: false, expirationDate: result.newExpiry });
                     appActions.addToast(
                       cookingToday ? 'Defrosted for today' : 'Defrosted to fridge',
                       'success',
@@ -937,7 +1139,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                       'Undo',
                       async () => {
                         try {
-                          await onUpdateItem(item.originalIndex, { storageLocation: prev.storageLocation, is_frozen: prev.is_frozen, expirationDate: prev.expirationDate });
+                          await onUpdateItem(primaryIndex, { storageLocation: prev.storageLocation, is_frozen: prev.is_frozen, expirationDate: prev.expirationDate });
                         } catch {
                           // ignore
                         }
@@ -962,7 +1164,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
 
   // Virtualized storage item renderer
   const renderStorageItem = ({ index, style, location }: { index: number; style: React.CSSProperties; location: string }) => {
-    const items = groupedByStorage[location] || [];
+    const items = storageItemsArrays[location] || [];
     const item = items[index];
     if (!item) return null;
     const daysRemaining = item.expirationDate ? Math.ceil((new Date(item.expirationDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : undefined;
@@ -978,9 +1180,13 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
       return '';
     }
 
+    // Use the first original index for combined items
+    const primaryIndex = item.originalIndices ? item.originalIndices[0] : item.originalIndex;
+
     return (
-      <div style={style} key={item.originalIndex} className={`flex items-center justify-between px-2 py-1 border-b border-theme last:border-b-0 transition-all cursor-pointer ${expirationBorderClass(daysRemaining)} ${expirationHeatClass(daysRemaining)} ${
-        bulkMode && selectedItems.has(item.originalIndex)
+      <div style={style} key={primaryIndex} className={`flex items-center justify-between px-2 py-1 border-b border-theme last:border-b-0 transition-all cursor-pointer ${expirationBorderClass(daysRemaining)} ${expirationHeatClass(daysRemaining)} ${
+        bulkMode && item.originalIndices ? item.originalIndices.some((idx: number) => selectedItems.has(idx)) :
+        bulkMode && selectedItems.has(primaryIndex)
           ? 'bg-[var(--accent-color)]/10 border-[var(--accent-color)]/30'
           : 'hover:bg-theme-primary/50'
       }`}
@@ -990,14 +1196,27 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
           gestureActionTriggeredRef.current = false;
           return;
         }
-        if (!bulkMode) setSelectedItemIndex(item.originalIndex)
+        if (!bulkMode) setSelectedItemIndex(primaryIndex)
       }}
       >
         {bulkMode && (
           <input
             type="checkbox"
-            checked={selectedItems.has(item.originalIndex)}
-            onChange={() => toggleItemSelection(item.originalIndex)}
+            checked={item.originalIndices ? item.originalIndices.some((idx: number) => selectedItems.has(idx)) : selectedItems.has(primaryIndex)}
+            onChange={() => {
+              if (item.originalIndices) {
+                // For combined items, toggle all indices
+                const allSelected = item.originalIndices.every((idx: number) => selectedItems.has(idx));
+                if (allSelected) {
+                  item.originalIndices.forEach((idx: number) => selectedItems.delete(idx));
+                } else {
+                  item.originalIndices.forEach((idx: number) => selectedItems.add(idx));
+                }
+                setSelectedItems(new Set(selectedItems));
+              } else {
+                toggleItemSelection(primaryIndex);
+              }
+            }}
             className="mr-3 w-4 h-4 text-[var(--accent-color)] bg-theme-primary border-theme rounded focus:ring-[var(--accent-color)]"
           />
         )}
@@ -1054,11 +1273,15 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
       if (d <= 3) return 'bg-orange-50/30 border-l-4 border-l-orange-200';
       return '';
     }
+    // Use the first original index for combined items
+    const primaryIndex = item.originalIndices ? item.originalIndices[0] : item.originalIndex;
+
     return (
       <div
-        key={item.originalIndex}
+        key={primaryIndex}
         className={`flex items-center justify-between px-2 py-1 border-b border-theme last:border-b-0 transition-all cursor-pointer ${expirationBorderClass(daysRemaining)} ${expirationHeatClass(daysRemaining)} ${
-          bulkMode && selectedItems.has(item.originalIndex)
+          bulkMode && item.originalIndices ? item.originalIndices.some((idx: number) => selectedItems.has(idx)) :
+          bulkMode && selectedItems.has(primaryIndex)
             ? 'bg-[var(--accent-color)]/10 border-[var(--accent-color)]/30'
             : 'hover:bg-theme-primary/50'
         }`}
@@ -1068,14 +1291,27 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
             gestureActionTriggeredRef.current = false;
             return;
           }
-          if (!bulkMode) setSelectedItemIndex(item.originalIndex)
+          if (!bulkMode) setSelectedItemIndex(primaryIndex)
         }}
       >
         {bulkMode && (
           <input
             type="checkbox"
-            checked={selectedItems.has(item.originalIndex)}
-            onChange={() => toggleItemSelection(item.originalIndex)}
+            checked={item.originalIndices ? item.originalIndices.some((idx: number) => selectedItems.has(idx)) : selectedItems.has(primaryIndex)}
+            onChange={() => {
+              if (item.originalIndices) {
+                // For combined items, toggle all indices
+                const allSelected = item.originalIndices.every((idx: number) => selectedItems.has(idx));
+                if (allSelected) {
+                  item.originalIndices.forEach((idx: number) => selectedItems.delete(idx));
+                } else {
+                  item.originalIndices.forEach((idx: number) => selectedItems.add(idx));
+                }
+                setSelectedItems(new Set(selectedItems));
+              } else {
+                toggleItemSelection(primaryIndex);
+              }
+            }}
             className="mr-3 w-4 h-4 text-[var(--accent-color)] bg-theme-primary border-theme rounded focus:ring-[var(--accent-color)]"
           />
         )}
@@ -1214,6 +1450,23 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
           <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-theme-primary pointer-events-none" />
           <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-theme-primary pointer-events-none" />
         </div>
+      </div>
+
+      {/* What Can I Cook Tonight Button */}
+      <div className="text-center">
+        <button
+          onClick={handleWhatCanICookTonight}
+          disabled={loadingState === LoadingState.LOADING}
+          className="inline-flex items-center gap-2 px-6 py-3 bg-[var(--accent-color)] text-white font-semibold rounded-lg shadow-lg hover:bg-[var(--accent-color)]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {loadingState === LoadingState.LOADING ? (
+            <Loader2 className="w-5 h-5 animate-spin" />
+          ) : (
+            <ChefHat className="w-5 h-5" />
+          )}
+          What Can I Cook Tonight?
+        </button>
+        <p className="text-xs text-theme-secondary opacity-60 mt-2">Get meal ideas from your pantry items</p>
       </div>
 
       {lastImportedBatch && (
@@ -1733,6 +1986,17 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                   </button>
                   
                   <button
+                    onClick={handleScanReceipt}
+                    disabled={loadingState === LoadingState.LOADING}
+                    className="flex-1 py-2 px-3 rounded-lg border border-theme text-theme-secondary hover:bg-theme-primary transition-colors flex items-center justify-center gap-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    aria-label="Scan receipt to add grocery items"
+                    aria-disabled={loadingState === LoadingState.LOADING}
+                  >
+                    <Receipt className="w-4 h-4" aria-hidden="true" />
+                    Receipt
+                  </button>
+                  
+                  <button
                     onClick={() => setShowImportModal(true)}
                     className="flex-1 py-2 px-3 rounded-lg border border-theme text-theme-secondary hover:bg-theme-primary transition-colors flex items-center justify-center gap-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:ring-offset-2"
                     aria-label="Import items or recipes"
@@ -1845,6 +2109,39 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                     </button>
                   </div>
 
+                  {/* Destination Selector */}
+                  <div className="mb-4 p-3 bg-theme-secondary rounded-lg border border-theme">
+                    <label className="block text-sm font-medium text-theme-secondary mb-2">Add items to:</label>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setReceiptDestination('pantry')}
+                        className={`px-3 py-2 rounded text-sm font-medium transition-colors ${
+                          receiptDestination === 'pantry'
+                            ? 'bg-[var(--accent-color)] text-white'
+                            : 'bg-theme-primary border border-theme text-theme-secondary hover:bg-theme-secondary'
+                        }`}
+                      >
+                        🏠 Pantry
+                      </button>
+                      <button
+                        onClick={() => setReceiptDestination('shopping')}
+                        className={`px-3 py-2 rounded text-sm font-medium transition-colors ${
+                          receiptDestination === 'shopping'
+                            ? 'bg-[var(--accent-color)] text-white'
+                            : 'bg-theme-primary border border-theme text-theme-secondary hover:bg-theme-secondary'
+                        }`}
+                      >
+                        🛒 Shopping List
+                      </button>
+                    </div>
+                    <p className="text-xs text-theme-secondary opacity-70 mt-2">
+                      {receiptDestination === 'pantry'
+                        ? 'Items will be added to your pantry inventory'
+                        : 'Items will be added to your shopping list with price comparison options'
+                      }
+                    </p>
+                  </div>
+
                   <div className="space-y-3">
                     {scanResults.map((sItem, idx) => (
                       <div key={sItem.id} className="bg-theme-secondary p-3 rounded-lg border border-theme">
@@ -1888,16 +2185,47 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
 
                   <div className="flex gap-2 mt-4">
                     <button onClick={async () => {
-                      // Confirm: add scanResults to inventory
-                      if (scanResults) {
-                        await onAddItems(scanResults);
+                      if (!scanResults) return;
+
+                      if (receiptDestination === 'pantry') {
+                        // Add to pantry (existing behavior)
+                        await onAddItems(scanResults as PantryItem[]);
+                      } else {
+                        // Add to shopping list with price options
+                        if (!addShoppingListItem) {
+                          alert('Shopping list integration not available from this view.');
+                          return;
+                        }
+
+                        // Convert PantryItems to ShoppingItems with price options
+                        for (const item of scanResults) {
+                          const shoppingItem: Omit<ShoppingItem, 'id'> = {
+                            item: item.item,
+                            category: item.category,
+                            checked: false,
+                            quantity: item.quantity_estimate,
+                            source: 'receipt_scan',
+                            addedAt: new Date(),
+                            estimatedPrice: item.estimatedPrice,
+                            priceOptions: item.priceOptions || (item.estimatedPrice ? [{
+                              amount: 1,
+                              unit: 'count',
+                              price: item.estimatedPrice
+                            }] : undefined)
+                          };
+
+                          await addShoppingListItem(shoppingItem);
+                        }
                       }
+
                       setShowScanReviewModal(false);
                       setScanResults(null);
                       setImagePreview(null);
                       setRawBase64(null);
                       setLoadingState(LoadingState.IDLE);
-                    }} className="px-4 py-2 bg-[var(--accent-color)] text-white rounded" aria-label="Add all scanned items to pantry">Add All</button>
+                    }} className="px-4 py-2 bg-[var(--accent-color)] text-white rounded" aria-label={`Add all scanned items to ${receiptDestination === 'pantry' ? 'pantry' : 'shopping list'}`}>
+                      Add All to {receiptDestination === 'pantry' ? 'Pantry' : 'Shopping List'}
+                    </button>
                     <button onClick={() => { setShowScanReviewModal(false); setScanResults(null); }} className="px-4 py-2 bg-theme-primary border border-theme rounded" aria-label="Cancel and discard scan results">Cancel</button>
                   </div>
                 </div>
@@ -1992,7 +2320,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
         {viewMode === 'category' && (
           <div className="grid grid-cols-4 gap-4">
             {sortedCategories.map(category => {
-              const items = groupedItems[category];
+              const items = categoryItemsArrays[category] || [];
               const representativeImage = items[0]?.image || getItemImage('', category);
               return (
                 <div
@@ -2025,7 +2353,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
           <div className="flex justify-center mb-4">
             <div className="flex gap-3">
               {storageOrder.map(location => {
-                const items = groupedByStorage[location] || [];
+                const items = storageItemsArrays[location] || [];
                 const locationLabel = (storageLabels as Record<string, string>)[location] || location;
                 return (
                   <div

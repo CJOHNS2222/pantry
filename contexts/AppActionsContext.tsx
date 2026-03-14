@@ -43,12 +43,12 @@ interface AppActionsContextValue {
 
   // Auth operations
   onLogout: () => void;
-  onShowTutorial: () => void;
   onShowHousehold?: () => void;
 
   // Usage limit checking
   checkRecipeSaveLimit: () => Promise<boolean>;
   checkMealPlanLimit: () => Promise<boolean>;
+  refreshAllData: () => Promise<void>;
 }
 
 const AppActionsContext = createContext<AppActionsContextValue | undefined>(undefined);
@@ -86,10 +86,10 @@ const defaultAppActionsContextValue: AppActionsContextValue = {
   setInitialSearchQuery: noop as any,
   setPersistedRecipeResult: noop as any,
   onLogout: noop as any,
-  onShowTutorial: noop as any,
   onShowHousehold: noop as any,
   checkRecipeSaveLimit: async () => false,
   checkMealPlanLimit: async () => false,
+  refreshAllData: async () => {},
 };
 
 export const AppActionsProvider: React.FC<AppActionsProviderProps> = ({ children, value }) => {

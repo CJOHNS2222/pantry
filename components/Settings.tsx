@@ -3,6 +3,7 @@ import { Timestamp } from 'firebase/firestore';
 import DatabaseMonitoringService from '../services/databaseMonitoringService';
 import { SubscriptionManager } from './SubscriptionManager';
 import { CategoryManager } from './CategoryManager';
+import { StoreLayoutEditor } from './StoreLayoutEditor';
 import { log } from '../services/logService';
 import AnalyticsService from '../services/analyticsService';
 import { LanguageSelector } from '../src/components/LanguageSelector';
@@ -29,6 +30,19 @@ import { RecipesCacheService } from '../services/recipesCacheService';
 import { ShoppingListCacheService } from '../services/shoppingListCacheService';
 import { setDoc } from 'firebase/firestore';
 
+const defaultStoreLayout = [
+  'Produce',
+  'Dairy',
+  'Meat & Seafood',
+  'Bakery',
+  'Frozen',
+  'Pantry Staples',
+  'Snacks',
+  'Beverages',
+  'Household',
+  'Other'
+];
+
 const defaultSettings = {
   notifications: {
     enabled: true,
@@ -48,6 +62,10 @@ const defaultSettings = {
   },
   shopping: {
     includeStaples: false,
+    autoReaddStaples: true,
+    storeLayout: defaultStoreLayout,
+    showNutrition: false,
+    showPriceData: false,
   },
 };
 
@@ -61,7 +79,6 @@ interface SettingsProps {
   onUpdateCustomCategory?: (categoryId: string, updates: Partial<Pick<CustomCategory, 'name' | 'icon' | 'color'>>) => void;
   onDeleteCustomCategory?: (categoryId: string) => void;
   mealPlan?: DayPlan[];
-  onShowTutorial?: () => void;
   household?: Household | null;
   onShowHousehold?: () => void;
   addToast?: (message: string, type: 'success' | 'error' | 'info' | 'warning', duration?: number) => void;
@@ -77,7 +94,6 @@ export const Settings: React.FC<SettingsProps> = ({
   onUpdateCustomCategory,
   onDeleteCustomCategory,
   mealPlan,
-  onShowTutorial,
   household,
   onShowHousehold,
   addToast
@@ -101,7 +117,7 @@ export const Settings: React.FC<SettingsProps> = ({
     NotificationService.getDefaultSettings()
   );
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['Profile', 'Household', 'Notifications']));
-  const [activeSettingsTab, setActiveSettingsTab] = useState<'account' | 'preferences' | 'more'>('account');
+  const [activeSettingsTab, setActiveSettingsTab] = useState<'account' | 'preferences' | 'organization' | 'more'>('account');
 
   // Member preferences state
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
@@ -360,6 +376,24 @@ export const Settings: React.FC<SettingsProps> = ({
     }
   };
 
+  const saveProfileData = async (data: typeof userProfile, silent = false) => {
+    if (!user || !data) return;
+    setSavingProfile(true);
+    try {
+      const userRef = DatabaseMonitoringService.doc('users', user.id);
+      await DatabaseMonitoringService.updateDoc(userRef, { profile: data });
+      setProfileChanged(false);
+      if (!silent) alert('Profile updated successfully!');
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      const stack = error instanceof Error ? error.stack : undefined;
+      log.error('Failed saving profile', { message: msg, stack }, 'Settings');
+      if (!silent) alert('Failed to update profile. Please try again.');
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
   const createHousehold = async () => {
     if (!householdName.trim() || isCreatingHousehold || !user) return;
 
@@ -493,8 +527,8 @@ export const Settings: React.FC<SettingsProps> = ({
       {/* Settings Tab Pills */}
       <div className="sticky top-0 z-10 bg-theme-primary border-b border-theme px-4 py-3">
         <div className="flex gap-1 bg-theme-secondary rounded-xl p-1">
-          {(['account', 'preferences', 'more'] as const).map((tab) => {
-            const labels: Record<string, string> = { account: 'Account', preferences: 'Preferences', more: 'More' };
+          {(['account', 'preferences', 'organization', 'more'] as const).map((tab) => {
+            const labels: Record<string, string> = { account: 'Account', preferences: 'Preferences', organization: 'Organization', more: 'More' };
             return (
               <button
                 key={tab}
@@ -535,68 +569,6 @@ export const Settings: React.FC<SettingsProps> = ({
 
           {expandedSections.has('Profile') && (
             <div className="border-t border-theme p-4">
-          {/* Measurement System Preference */}
-          <div className="mb-4">
-            <label className="block text-sm font-medium mb-2 text-theme-primary">Measurement System</label>
-            <div className="flex bg-theme-secondary rounded-lg p-1 border border-theme h-10">
-              <button
-                type="button"
-                onClick={() => handleProfileChange('measurementSystem', 'Standard')}
-                className={`flex-1 text-sm font-bold rounded transition-all ${userProfile?.measurementSystem === 'Standard' || (!userProfile?.measurementSystem && 'Standard' === 'Standard') ? 'bg-[var(--accent-color)] text-white shadow-sm' : 'text-theme-secondary opacity-50'}`}
-              >
-                Standard (Imperial)
-              </button>
-              <button
-                type="button"
-                onClick={() => handleProfileChange('measurementSystem', 'Metric')}
-                className={`flex-1 text-sm font-bold rounded transition-all ${userProfile?.measurementSystem === 'Metric' ? 'bg-[var(--accent-color)] text-white shadow-sm' : 'text-theme-secondary opacity-50'}`}
-              >
-                Metric
-              </button>
-            </div>
-          </div>
-
-          {/* AI Opt-in and Shopping Preferences - Side by side */}
-          <div className="mb-4">
-            <div className="flex items-center justify-between gap-4">
-              {/* AI Opt-in */}
-              <div className="flex-1 min-w-0">
-                <label htmlFor="geminiOptIn" className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    id="geminiOptIn"
-                    name="geminiOptIn"
-                    type="checkbox"
-                    checked={geminiOptedIn}
-                    onChange={e => handleGeminiOptIn(e.target.checked)}
-                    className="flex-shrink-0"
-                  />
-                  <span className="text-sm text-theme-primary break-words">Enable AI Features</span>
-                </label>
-              </div>
-
-              {/* Shopping Preferences */}
-              <div className="flex-1 min-w-0">
-                <label htmlFor="includeStaples" className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    id="includeStaples"
-                    name="includeStaples"
-                    type="checkbox"
-                    checked={settings.shopping?.includeStaples || false}
-                    onChange={e => setSettings(prev => ({
-                      ...prev,
-                      shopping: {
-                        ...prev.shopping,
-                        includeStaples: e.target.checked
-                      }
-                    }))}
-                    className="flex-shrink-0"
-                  />
-                  <span className="text-sm text-theme-primary break-words">Include Staples in Shopping Lists</span>
-                </label>
-              </div>
-            </div>
-          </div>
-
           {/* Avatar Section */}
           <div className="mb-4">
             <div className="flex items-center gap-4 mb-3">
@@ -875,41 +847,6 @@ export const Settings: React.FC<SettingsProps> = ({
               </div>
             </div>
 
-            {/* Dietary Restrictions - full width but more compact */}
-            <div>
-              <label htmlFor="dietaryRestrictions" className="block text-xs text-theme-secondary mb-1">Dietary Restrictions</label>
-              <input
-                id="dietaryRestrictions"
-                name="dietaryRestrictions"
-                type="text"
-                value={userProfile?.dietaryRestrictions?.join(', ') || ''}
-                onChange={(e) => handleProfileChange('dietaryRestrictions', e.target.value ? e.target.value.split(',').map(s => s.trim()) : undefined)}
-                placeholder="vegetarian, gluten-free"
-                className="w-full p-1 text-xs border rounded text-black bg-white"
-              />
-            </div>
-
-            {/* Allergies - full width but more compact */}
-            <div>
-              <label htmlFor="allergies" className="block text-xs text-theme-secondary mb-1">Allergies</label>
-              <input
-                id="allergies"
-                name="allergies"
-                type="text"
-                value={userProfile?.allergies?.join(', ') || ''}
-                onChange={(e) => handleProfileChange('allergies', e.target.value ? e.target.value.split(',').map(s => s.trim()) : undefined)}
-                placeholder="nuts, shellfish, dairy"
-                className="w-full p-1 text-xs border rounded text-black bg-white"
-              />
-            </div>
-
-            {/* Leftover Persona Questionnaire */}
-            <LeftoverPersonaQuestionnaire
-              user={user}
-              userProfile={userProfile}
-              onChange={(persona) => handleProfileChange('leftoverPersona', persona)}
-            />
-
             {profileChanged && (
               <button
                 onClick={saveProfile}
@@ -1074,43 +1011,257 @@ export const Settings: React.FC<SettingsProps> = ({
 
       {activeSettingsTab === 'preferences' && <>
 
-      {/* Categories Section */}
-      {user && (
-        <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden">
-          <div
-            onClick={() => toggleSection('Categories')}
-            className="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-theme-primary transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              {expandedSections.has('Categories') ? (
-                <ChevronDown className="w-5 h-5 text-theme-primary" />
-              ) : (
-                <ChevronRight className="w-5 h-5 text-theme-primary" />
-              )}
-              <h3 className="font-semibold text-theme-primary">Categories</h3>
-            </div>
+      {/* App Preferences Section */}
+      <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden">
+        <div
+          onClick={() => toggleSection('AppPreferences')}
+          className="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-theme-primary transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            {expandedSections.has('AppPreferences') ? (
+              <ChevronDown className="w-5 h-5 text-theme-primary" />
+            ) : (
+              <ChevronRight className="w-5 h-5 text-theme-primary" />
+            )}
+            <h3 className="font-semibold text-theme-primary">App Preferences</h3>
           </div>
+        </div>
 
-          {expandedSections.has('Categories') && (
-            <div className="border-t border-theme p-4">
-              <div className="space-y-3">
-                <p className="text-sm text-theme-secondary">
-                  Create custom categories to better organize your pantry items.
-                </p>
+        {expandedSections.has('AppPreferences') && (
+          <div className="border-t border-theme px-4 divide-y divide-theme">
+
+            {/* Enable Notifications */}
+            <div className="flex items-center justify-between py-3">
+              <div className="flex-1 pr-4">
+                <p className="text-sm font-medium text-theme-primary">Enable Notifications</p>
+                <p className="text-xs text-theme-secondary mt-0.5">Receive alerts for expiring items, meal plans, and shopping reminders</p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                <input
+                  type="checkbox"
+                  checked={settings.notifications.enabled}
+                  onChange={e => setSettings(prev => ({
+                    ...prev,
+                    notifications: { ...prev.notifications, enabled: e.target.checked }
+                  }))}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-400 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[var(--accent-color)]"></div>
+              </label>
+            </div>
+
+            {/* Measurement System */}
+            <div className="flex items-center justify-between py-3">
+              <div className="flex-1 pr-4">
+                <p className="text-sm font-medium text-theme-primary">Measurement System</p>
+                <p className="text-xs text-theme-secondary mt-0.5">Choose between imperial and metric units throughout the app</p>
+              </div>
+              <div className="flex bg-theme-primary rounded-lg p-0.5 border border-theme flex-shrink-0">
                 <button
-                  onClick={() => setShowCategoryManager(true)}
-                  className="bg-[var(--accent-color)] text-white px-4 py-2 rounded font-medium text-sm hover:bg-opacity-90 transition-colors"
+                  type="button"
+                  onClick={() => handleProfileChange('measurementSystem', 'Standard')}
+                  className={`px-3 py-1 text-xs font-medium rounded transition-all ${
+                    userProfile?.measurementSystem !== 'Metric'
+                      ? 'bg-[var(--accent-color)] text-white shadow-sm'
+                      : 'text-theme-secondary'
+                  }`}
                 >
-                  Manage Categories
+                  Imperial
                 </button>
-                <div className="text-xs text-theme-secondary">
-                  {customCategories.length} custom categor{customCategories.length === 1 ? 'y' : 'ies'}
-                </div>
+                <button
+                  type="button"
+                  onClick={() => handleProfileChange('measurementSystem', 'Metric')}
+                  className={`px-3 py-1 text-xs font-medium rounded transition-all ${
+                    userProfile?.measurementSystem === 'Metric'
+                      ? 'bg-[var(--accent-color)] text-white shadow-sm'
+                      : 'text-theme-secondary'
+                  }`}
+                >
+                  Metric
+                </button>
               </div>
             </div>
-          )}
+
+            {/* Enable AI Features */}
+            <div className="flex items-center justify-between py-3">
+              <div className="flex-1 pr-4">
+                <p className="text-sm font-medium text-theme-primary">Enable AI Features</p>
+                <p className="text-xs text-theme-secondary mt-0.5">Use AI for recipe suggestions, smart shopping tips, and meal planning assistance</p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                <input
+                  type="checkbox"
+                  checked={geminiOptedIn}
+                  onChange={e => handleGeminiOptIn(e.target.checked)}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-400 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[var(--accent-color)]"></div>
+              </label>
+            </div>
+
+            {/* Include Staples in Shopping List */}
+            <div className="flex items-center justify-between py-3">
+              <div className="flex-1 pr-4">
+                <p className="text-sm font-medium text-theme-primary">Include Staples in Shopping List</p>
+                <p className="text-xs text-theme-secondary mt-0.5">Automatically suggest common pantry staples when building a shopping list</p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                <input
+                  type="checkbox"
+                  checked={settings.shopping?.includeStaples || false}
+                  onChange={e => setSettings(prev => ({
+                    ...prev,
+                    shopping: { ...prev.shopping, includeStaples: e.target.checked }
+                  }))}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-400 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[var(--accent-color)]"></div>
+              </label>
+            </div>
+
+            {/* Auto-restock Staples */}
+            <div className="flex items-center justify-between py-3">
+              <div className="flex-1 pr-4">
+                <p className="text-sm font-medium text-theme-primary">Auto-restock Staples When Depleted</p>
+                <p className="text-xs text-theme-secondary mt-0.5">Automatically add staple items back to your shopping list when they run low or run out</p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                <input
+                  type="checkbox"
+                  checked={settings.shopping?.autoReaddStaples ?? true}
+                  onChange={e => setSettings(prev => ({
+                    ...prev,
+                    shopping: { ...prev.shopping, autoReaddStaples: e.target.checked }
+                  }))}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-400 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[var(--accent-color)]"></div>
+              </label>
+            </div>
+
+            {/* Show Nutrition Information */}
+            <div className="flex items-center justify-between py-3">
+              <div className="flex-1 pr-4">
+                <p className="text-sm font-medium text-theme-primary">Show Nutrition Information</p>
+                <p className="text-xs text-theme-secondary mt-0.5">Display calories, protein, and macros on recipes and pantry items</p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                <input
+                  type="checkbox"
+                  checked={settings.shopping?.showNutrition ?? true}
+                  onChange={e => setSettings(prev => ({
+                    ...prev,
+                    shopping: { ...prev.shopping, showNutrition: e.target.checked }
+                  }))}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-400 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[var(--accent-color)]"></div>
+              </label>
+            </div>
+
+            {/* Show Price Data */}
+            <div className="flex items-center justify-between py-3">
+              <div className="flex-1 pr-4">
+                <p className="text-sm font-medium text-theme-primary">Show Price Data</p>
+                <p className="text-xs text-theme-secondary mt-0.5">Display estimated grocery prices on shopping list items and pantry ingredients</p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                <input
+                  type="checkbox"
+                  checked={settings.shopping?.showPriceData ?? false}
+                  onChange={e => setSettings(prev => ({
+                    ...prev,
+                    shopping: { ...prev.shopping, showPriceData: e.target.checked }
+                  }))}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-400 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[var(--accent-color)]"></div>
+              </label>
+            </div>
+
+          </div>
+        )}
+      </div>
+
+      {/* Food Safety Section */}
+      <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden">
+        <div
+          onClick={() => toggleSection('FoodSafety')}
+          className="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-theme-primary transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            {expandedSections.has('FoodSafety') ? (
+              <ChevronDown className="w-5 h-5 text-theme-primary" />
+            ) : (
+              <ChevronRight className="w-5 h-5 text-theme-primary" />
+            )}
+            <h3 className="font-semibold text-theme-primary">Food Safety</h3>
+          </div>
         </div>
-      )}
+
+        {expandedSections.has('FoodSafety') && (
+          <div className="border-t border-theme p-4 space-y-5">
+
+            {/* Dietary Restrictions */}
+            <div>
+              <label htmlFor="dietaryRestrictions" className="block text-sm font-medium text-theme-primary mb-1">Dietary Restrictions</label>
+              <p className="text-xs text-theme-secondary mb-2">e.g. vegetarian, vegan, gluten-free, keto</p>
+              <input
+                id="dietaryRestrictions"
+                name="dietaryRestrictions"
+                type="text"
+                value={userProfile?.dietaryRestrictions?.join(', ') || ''}
+                onChange={(e) => handleProfileChange('dietaryRestrictions', e.target.value ? e.target.value.split(',').map(s => s.trim()) : undefined)}
+                onBlur={(e) => {
+                  const newRestrictions = e.target.value ? e.target.value.split(',').map(s => s.trim()) : undefined;
+                  saveProfileData({ ...userProfile, dietaryRestrictions: newRestrictions }, true);
+                }}
+                placeholder="vegetarian, gluten-free"
+                className="w-full px-3 py-2 text-sm border border-theme rounded-lg bg-white text-black focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]"
+              />
+            </div>
+
+            {/* Allergies */}
+            <div>
+              <label className="block text-sm font-medium text-theme-primary mb-1">Allergies</label>
+              <p className="text-xs text-theme-secondary mb-3">Select all that apply — these will be flagged in recipes and shopping suggestions</p>
+              <div className="grid grid-cols-2 gap-3">
+                {['Peanuts', 'Tree Nuts', 'Dairy', 'Eggs', 'Soy', 'Wheat', 'Fish', 'Shellfish', 'Sesame', 'Mustard'].map((allergy) => (
+                  <label key={allergy} className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={userProfile?.allergies?.includes(allergy) || false}
+                      onChange={(e) => {
+                        const current = userProfile?.allergies || [];
+                        const newAllergies = e.target.checked
+                          ? [...current, allergy]
+                          : current.filter(a => a !== allergy);
+                        const newProfile = { ...userProfile, allergies: newAllergies };
+                        setUserProfile(newProfile);
+                        saveProfileData(newProfile, true);
+                      }}
+                      className="rounded border-theme text-theme-primary focus:border-theme-primary"
+                    />
+                    <span className="text-theme-primary">{allergy}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Leftover Persona */}
+            <LeftoverPersonaQuestionnaire
+              user={user}
+              userProfile={userProfile}
+              onChange={(persona) => {
+                const newProfile = { ...userProfile, leftoverPersona: persona };
+                setUserProfile(newProfile);
+                saveProfileData(newProfile, true);
+              }}
+            />
+
+          </div>
+        )}
+      </div>
 
       {/* Theme Settings Section */}
       <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden">
@@ -1238,6 +1389,82 @@ export const Settings: React.FC<SettingsProps> = ({
           </div>
         )}
       </div>
+
+      </>}
+
+      {activeSettingsTab === 'organization' && <>
+
+      {/* Categories Section */}
+      {user && (
+        <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden">
+          <div
+            onClick={() => toggleSection('Categories')}
+            className="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-theme-primary transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              {expandedSections.has('Categories') ? (
+                <ChevronDown className="w-5 h-5 text-theme-primary" />
+              ) : (
+                <ChevronRight className="w-5 h-5 text-theme-primary" />
+              )}
+              <h3 className="font-semibold text-theme-primary">Categories</h3>
+            </div>
+          </div>
+
+          {expandedSections.has('Categories') && (
+            <div className="border-t border-theme p-4">
+              <div className="space-y-3">
+                <p className="text-sm text-theme-secondary">
+                  Create custom categories to better organize your pantry items.
+                </p>
+                <button
+                  onClick={() => setShowCategoryManager(true)}
+                  className="bg-[var(--accent-color)] text-white px-4 py-2 rounded font-medium text-sm hover:bg-opacity-90 transition-colors"
+                >
+                  Manage Categories
+                </button>
+                <div className="text-xs text-theme-secondary">
+                  {customCategories.length} custom categor{customCategories.length === 1 ? 'y' : 'ies'}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Store Layout Section */}
+      {user && (
+        <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden">
+          <div
+            onClick={() => toggleSection('Store Layout')}
+            className="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-theme-primary transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              {expandedSections.has('Store Layout') ? (
+                <ChevronDown className="w-5 h-5 text-theme-primary" />
+              ) : (
+                <ChevronRight className="w-5 h-5 text-theme-primary" />
+              )}
+              <h3 className="font-semibold text-theme-primary">Store Layout</h3>
+            </div>
+          </div>
+
+          {expandedSections.has('Store Layout') && (
+            <div className="border-t border-theme p-4">
+              <StoreLayoutEditor
+                storeLayout={settings.shopping?.storeLayout || defaultStoreLayout}
+                onStoreLayoutChange={(newLayout: string[]) => setSettings(prev => ({
+                  ...prev,
+                  shopping: {
+                    ...prev.shopping,
+                    storeLayout: newLayout
+                  }
+                }))}
+              />
+            </div>
+          )}
+        </div>
+      )}
 
       </>}
 
@@ -1440,14 +1667,8 @@ export const Settings: React.FC<SettingsProps> = ({
           <div className="border-t border-theme p-4">
         <div className="space-y-3">
           <p className="text-sm text-theme-secondary">
-            Need help getting started or want to see the app features again?
+            Need help? Contact our support team for assistance.
           </p>
-          <button
-            onClick={onShowTutorial}
-            className="bg-[var(--accent-color)] text-white px-4 py-2 rounded font-medium text-sm hover:bg-opacity-90 transition-colors"
-          >
-            Watch Tutorial
-          </button>
         </div>
           </div>
         )}

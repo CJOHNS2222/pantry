@@ -46,8 +46,12 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   const [localExpirationDate, setLocalExpirationDate] = useState<string>(item.expirationDate || '');
   const [localExpirationType, setLocalExpirationType] = useState<'use-by' | 'best-by'>(item.expirationType || 'best-by');
   const [localNotes, setLocalNotes] = useState<string>(item.notes || '');
+  const [localIsStaple, setLocalIsStaple] = useState<boolean>(item.isStaple || false);
+  const [localIsOpened, setLocalIsOpened] = useState<boolean>(item.isOpened || false);
   // Image upload state
-  const { household, user } = useApp();
+  const { household, user, settings } = useApp();
+  const showNutrition = settings?.shopping?.showNutrition ?? false;
+  const showPriceData = settings?.shopping?.showPriceData ?? false;
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -61,10 +65,16 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
     setLocalExpirationDate(item.expirationDate || '');
     setLocalExpirationType(item.expirationType || 'best-by');
     setLocalNotes(item.notes || '');
+    setLocalIsStaple(item.isStaple || false);
+    setLocalIsOpened(item.isOpened || false);
   }, [item]);
 
-  // Fetch nutrition facts on component mount
+  // Fetch nutrition facts on component mount (only when showNutrition is enabled)
   useEffect(() => {
+    if (!showNutrition) {
+      setLoadingNutrition(false);
+      return;
+    }
     const fetchNutrition = async () => {
       setLoadingNutrition(true);
       try {
@@ -78,7 +88,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
       }
     };
     fetchNutrition();
-  }, [item.item, item.category]);
+  }, [item.item, item.category, showNutrition]);
 
   // Keyboard navigation support
   useKeyboardNavigation({
@@ -174,6 +184,32 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
     // Notes
     if (localNotes !== (item.notes || '')) {
       updates.notes = localNotes || undefined;
+    }
+
+    // Staple
+    if (localIsStaple !== (item.isStaple || false)) {
+      updates.isStaple = localIsStaple;
+    }
+
+    // Opened tracking
+    if (localIsOpened !== (item.isOpened || false)) {
+      updates.isOpened = localIsOpened;
+      if (localIsOpened && !item.openedAt) {
+        // Item is being marked as opened for the first time
+        updates.openedAt = new Date().toISOString();
+        // Calculate opened expiry based on category (simplified logic)
+        const category = localCategory || item.category;
+        if (category === 'Canned Goods' || category === 'Condiments & Sauces') {
+          // These typically last 6-12 months after opening
+          const openedExpiry = new Date();
+          openedExpiry.setMonth(openedExpiry.getMonth() + 6);
+          updates.openedExpiry = openedExpiry.toISOString().split('T')[0];
+        }
+      } else if (!localIsOpened) {
+        // Item is being unmarked as opened
+        updates.openedAt = undefined;
+        updates.openedExpiry = undefined;
+      }
     }
 
     if (Object.keys(updates).length > 0) {
@@ -376,6 +412,41 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
               </div>
             </div>
 
+            {/* Staple Checkbox */}
+            <div className="bg-theme-secondary p-2 rounded-lg border border-theme">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={localIsStaple}
+                  onChange={(e) => setLocalIsStaple(e.target.checked)}
+                  className="flex-shrink-0"
+                />
+                <span className="text-sm text-theme-primary">Mark as staple (auto-readds to shopping list when depleted)</span>
+              </label>
+            </div>
+
+            {/* Opened Tracking Checkbox - Only show for certain categories */}
+            {['Canned Goods', 'Condiments & Sauces', 'Spices & Herbs', 'Baking Supplies', 'Snacks', 'Beverages'].includes(localCategory) && (
+              <div className="bg-theme-secondary p-2 rounded-lg border border-theme">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={localIsOpened}
+                    onChange={(e) => setLocalIsOpened(e.target.checked)}
+                    className="flex-shrink-0"
+                  />
+                  <span className="text-sm text-theme-primary">
+                    Mark as opened {localIsOpened && item.openedAt && `(opened ${new Date(item.openedAt).toLocaleDateString()})`}
+                  </span>
+                </label>
+                {localIsOpened && item.openedExpiry && (
+                  <p className="text-xs text-theme-secondary mt-1">
+                    Opened expiry: {new Date(item.openedExpiry).toLocaleDateString()}
+                  </p>
+                )}
+              </div>
+            )}
+
             {/* User Notes Section */}
             <div className="bg-theme-secondary p-2 rounded-lg border border-theme">
               <label className="block text-xs font-medium text-theme-primary mb-1 uppercase opacity-70">
@@ -391,14 +462,14 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
             </div>
 
             {/* Nutrition Facts Section */}
-            {loadingNutrition ? (
+            {showNutrition && loadingNutrition ? (
               <div className="bg-theme-secondary p-3 rounded-lg border border-theme">
                 <div className="flex items-center gap-2 text-sm text-theme-primary">
                   <Zap className="w-4 h-4 opacity-50 animate-pulse" />
                   <span className="opacity-70">Loading nutrition info...</span>
                 </div>
               </div>
-            ) : nutrition ? (
+            ) : showNutrition && nutrition ? (
               <div className="bg-gradient-to-br from-theme-secondary to-theme-secondary/80 p-3 rounded-lg border border-theme">
                 <div className="flex items-center gap-2 mb-3">
                   <Zap className="w-4 h-4 text-[var(--accent-color)]" />
@@ -486,13 +557,15 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                 <ShoppingBasket className="w-4 h-4" />
                 Buy More
               </button>
-              <button
-                onClick={() => setShowPriceTrends(true)}
-                className="flex items-center justify-center gap-2 px-4 py-2 bg-[var(--bg-theme-secondary)] text-[var(--text-theme-primary)] border border-[var(--border-theme)] rounded-lg hover:bg-[var(--bg-theme-primary)] transition-colors"
-              >
-                <TrendingUp className="w-4 h-4" />
-                Price Trends
-              </button>
+              {showPriceData && (
+                <button
+                  onClick={() => setShowPriceTrends(true)}
+                  className="flex items-center justify-center gap-2 px-4 py-2 bg-[var(--bg-theme-secondary)] text-[var(--text-theme-primary)] border border-[var(--border-theme)] rounded-lg hover:bg-[var(--bg-theme-primary)] transition-colors"
+                >
+                  <TrendingUp className="w-4 h-4" />
+                  Price Trends
+                </button>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-2">
               <button

@@ -28,7 +28,7 @@ interface RecipeStats {
 
 export const Community: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecipe, user }) => {
   const app = useApp();
-  const { isLoadingRatings } = app;
+  const { isLoadingRatings, setLoadingRatingsComplete } = app;
   const [localLoading, setLocalLoading] = useState(false);
   const [ratingsState, setRatingsState] = useState<RecipeRating[]>([]);
   // Load community-rated cache once when the tab/component mounts (don't refresh on focus)
@@ -62,7 +62,11 @@ export const Community: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecipe,
       } catch (e) {
         console.error('Community: failed to load cached community recipes', e);
       } finally {
-        if (mounted) setLocalLoading(false);
+        if (mounted) {
+          setLocalLoading(false);
+          // Mark global ratings loading as complete
+          setLoadingRatingsComplete();
+        }
       }
     };
     load();

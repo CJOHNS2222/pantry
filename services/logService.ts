@@ -17,7 +17,10 @@ class Logger {
   private static instance: Logger;
   private logs: LogEntry[] = [];
   private maxLogs = 1000;
-  private currentLevel: LogLevel = LogLevel.INFO;
+  // Default level: verbose in dev, conservative in prod
+  private currentLevel: LogLevel = (typeof (import.meta as any).env !== 'undefined' && (import.meta as any).env.DEV)
+    ? LogLevel.DEBUG
+    : LogLevel.WARN;
 
   private constructor() {}
 

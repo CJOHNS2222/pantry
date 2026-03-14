@@ -11,9 +11,9 @@
     "SafeArea": {}
   },
   "android": {
-    "icon": "public/icons/smartpantryicon.png"
+    "icon": "public/icons/icon.PNG"
   },
   "ios": {
-    "icon": "public/icons/smartpantryicon.png"
+    "icon": "public/icons/icon.PNG"
   }
 }

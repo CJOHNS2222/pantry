@@ -65,6 +65,7 @@ interface ShoppingListProps {
     currentActivity?: string;
   }>;
   onHouseholdMessage?: (message: string) => void;
+  settings?: any; // Settings object
 }
 
 export const ShoppingList: React.FC<ShoppingListProps> = ({
@@ -78,7 +79,8 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   pantryItems = [],
   recentPurchases = [],
   householdMembers = [],
-  onHouseholdMessage
+  onHouseholdMessage,
+  settings
 }) => {
   const [newItem, setNewItem] = React.useState('');
   const [canShowAdBanner, setCanShowAdBanner] = React.useState<boolean>(false);
@@ -232,6 +234,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
 
   // Hooks for offline functionality
   const { isOnline } = useOfflineStatus();
+  const { user: authUser } = useAuth();
   const addToQueue = (op: any) => offlineQueue.enqueue(op);
   const processQueue = () => offlineQueue.processQueue();
 
@@ -647,19 +650,28 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
 
       {/* Household Sharing */}
       {householdMembers.length > 0 && (
-        <HouseholdShoppingShare
-          householdMembers={householdMembers}
-          recentActivity={householdActivity}
-          currentUserId="current-user" // TODO: Get from auth
-          onSendMessage={onHouseholdMessage}
-        />
+          <HouseholdShoppingShare
+            householdMembers={householdMembers}
+            recentActivity={householdActivity}
+            currentUserId={authUser?.id || user?.id || ''}
+            onSendMessage={onHouseholdMessage}
+          />
       )}
 
       {/* Quick Add Component */}
       <QuickAdd
         onAddItem={handleQuickAdd}
-        onScanBarcode={async () => null} // TODO: Implement barcode scanning
-        onVoiceInput={async () => null} // TODO: Implement voice input
+        onScanBarcode={async () => {
+          // Desktop-friendly fallback: prompt for item name to simulate a scan
+          const scanned = prompt('Simulate barcode scan: enter item name');
+          if (!scanned) return null;
+          return { name: scanned, category: inferCategoryFromItemName(scanned), quantity: '1' };
+        }}
+        onVoiceInput={async () => {
+          // Simple fallback for voice input: prompt for text
+          const spoken = prompt('Simulate voice input: say item name');
+          return spoken || null;
+        }}
         isOnline={isOnline}
         recentItems={recentItems}
         suggestedItems={suggestedItems}
@@ -905,6 +917,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
             onQuantityChange={handleQuantityChange}
             isSelected={(id) => items.some(it => it.id === id && it.checked)}
             onLongPress={undefined}
+            storeLayout={settings?.shopping?.storeLayout}
           />
         ) : (
           // Regular list view with enhanced items
@@ -918,6 +931,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
               isOffline={!isOnline}
               isSelected={item.checked}
               onLongPress={undefined}
+              showPriceData={settings?.shopping?.showPriceData ?? false}
             />
           ))
         )}

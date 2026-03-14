@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Check, Undo2, Package, ShoppingCart, Trash2 } from 'lucide-react';
+import { Check, Undo2, Package, ShoppingCart, Trash2, Calculator } from 'lucide-react';
 import { ShoppingItem } from '../types';
+import { comparePriceOptions, formatPricePerUnit, getPriceComparisonSummary } from '../utils/priceCalculator';
 
 interface ShoppingListItemProps {
   item: ShoppingItem;
@@ -11,6 +12,7 @@ interface ShoppingListItemProps {
   isSelected?: boolean;
   isOffline?: boolean;
   lastSynced?: Date;
+  showPriceData?: boolean;
 }
 
 export const EnhancedShoppingListItem: React.FC<ShoppingListItemProps> = ({
@@ -21,7 +23,8 @@ export const EnhancedShoppingListItem: React.FC<ShoppingListItemProps> = ({
   onLongPress,
   isSelected = false,
   isOffline = false,
-  lastSynced
+  lastSynced,
+  showPriceData = false,
 }) => {
   const [swipeOffset, setSwipeOffset] = useState(0);
   const [isSwiping, setIsSwiping] = useState(false);
@@ -32,6 +35,16 @@ export const EnhancedShoppingListItem: React.FC<ShoppingListItemProps> = ({
   const SWIPE_THRESHOLD = 80;
   const MAX_SWIPE = 120;
   const LONG_PRESS_DELAY = 500;
+
+  const [showPriceComparison, setShowPriceComparison] = useState(false);
+
+  const priceComparisons = item.priceOptions && item.priceOptions.length > 1
+    ? comparePriceOptions(item.priceOptions)
+    : [];
+
+  const priceComparisonSummary = item.priceOptions && item.priceOptions.length > 1
+    ? getPriceComparisonSummary(item.priceOptions)
+    : '';
 
   const handleTouchStart = (e: React.TouchEvent) => {
     setStartX(e.touches[0].clientX);
@@ -176,10 +189,24 @@ export const EnhancedShoppingListItem: React.FC<ShoppingListItemProps> = ({
               placeholder="qty"
             />
           )}
-          {item.estimatedPrice && item.estimatedPrice > 0 && (
+          {showPriceData && item.estimatedPrice && item.estimatedPrice > 0 && (
             <div className="text-xs font-medium text-green-600 opacity-70 bg-green-50 px-2 py-1 rounded border border-green-200">
               ~${item.estimatedPrice.toFixed(2)}
             </div>
+          )}
+
+          {/* Price Comparison */}
+          {showPriceData && item.priceOptions && item.priceOptions.length > 1 && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowPriceComparison(!showPriceComparison);
+              }}
+              className="p-2 text-theme-secondary opacity-60 hover:opacity-100 hover:text-[var(--accent-color)] transition-opacity"
+              title="Compare prices"
+            >
+              <Calculator className="w-4 h-4" />
+            </button>
           )}
 
           {/* Remove Button */}
@@ -194,6 +221,48 @@ export const EnhancedShoppingListItem: React.FC<ShoppingListItemProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Price Comparison Details */}
+      {showPriceData && showPriceComparison && item.priceOptions && item.priceOptions.length > 1 && (
+        <div className="mt-2 p-3 bg-theme-secondary/50 border border-theme rounded-lg">
+          <div className="text-xs font-medium text-theme-primary mb-2">
+            Price Comparison {priceComparisonSummary && `• ${priceComparisonSummary}`}
+          </div>
+          <div className="space-y-2">
+            {item.priceOptions.map((option, index) => {
+              const comparison = priceComparisons[index];
+              return (
+                <div
+                  key={index}
+                  className={`flex items-center justify-between p-2 rounded border ${
+                    comparison?.isBestValue
+                      ? 'bg-green-50 border-green-200 text-green-800'
+                      : 'bg-theme border-theme'
+                  }`}
+                >
+                  <div className="flex-1">
+                    <div className="text-sm font-medium">
+                      {option.amount}{option.unit} for ${option.price.toFixed(2)}
+                      {option.store && <span className="text-xs opacity-70 ml-1">at {option.store}</span>}
+                    </div>
+                    <div className="text-xs opacity-70">
+                      {formatPricePerUnit(comparison?.pricePerUnit || 0, comparison?.unit || option.unit)}
+                      {comparison?.isBestValue && (
+                        <span className="ml-2 text-green-600 font-medium">✨ Best value</span>
+                      )}
+                    </div>
+                  </div>
+                  {comparison?.savings && comparison.savings > 0 && (
+                    <div className="text-xs text-red-600 font-medium">
+                      Save ${comparison.savings.toFixed(2)}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

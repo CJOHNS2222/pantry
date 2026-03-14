@@ -7,8 +7,12 @@ import { I18nProvider } from './src/components/I18nProvider';
 import { AppProvider } from './contexts/AppContext';
 import { AppActionsProvider } from './contexts/AppActionsContext';
 
-// Initialize Sentry for error reporting
-// initSentry(); // DISABLED for testing
+// Initialize Sentry for error reporting only when a real DSN is configured
+// and running in production. This avoids noisy reports during local testing.
+const sentryDsn = import.meta.env.VITE_SENTRY_DSN;
+if (import.meta.env.PROD && sentryDsn && sentryDsn !== 'https://your-sentry-dsn-here@sentry.io/project-id') {
+  initSentry();
+}
 
 // Add global error handlers for debugging
 window.addEventListener('error', (event) => {

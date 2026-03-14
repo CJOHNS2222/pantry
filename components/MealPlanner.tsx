@@ -20,6 +20,45 @@ import { getMealPrepSuggestions, RecipeIngredientMatch } from '../utils/searchUt
 import { getUserMeasurementSystem } from '../utils/measurementUtils';
 // import CalendarService from '../services/calendarService'; // Temporarily disabled
 
+// Utility function to generate attractive recipe placeholder images
+const generateRecipePlaceholderImage = (title: string): string => {
+  // Create a simple hash from the title for consistent colors
+  let hash = 0;
+  for (let i = 0; i < title.length; i++) {
+    hash = ((hash << 5) - hash) + title.charCodeAt(i);
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  
+  // Generate colors based on hash
+  const hue = Math.abs(hash) % 360;
+  const saturation = 65 + (Math.abs(hash) % 20); // 65-85%
+  const lightness = 45 + (Math.abs(hash) % 15); // 45-60%
+  
+  // Create SVG with recipe icon
+  const svg = `
+    <svg width="120" height="120" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" style="stop-color:hsl(${hue}, ${saturation}%, ${lightness}%);stop-opacity:1" />
+          <stop offset="100%" style="stop-color:hsl(${(hue + 30) % 360}, ${saturation}%, ${lightness + 10}%);stop-opacity:1" />
+        </linearGradient>
+      </defs>
+      <rect width="120" height="120" fill="url(#bg)" rx="8"/>
+      <g transform="translate(30, 30)">
+        <!-- Recipe icon -->
+        <circle cx="30" cy="25" r="8" fill="white" opacity="0.9"/>
+        <rect x="22" y="35" width="16" height="8" fill="white" opacity="0.9" rx="2"/>
+        <rect x="18" y="45" width="24" height="3" fill="white" opacity="0.7" rx="1"/>
+        <rect x="18" y="50" width="20" height="3" fill="white" opacity="0.7" rx="1"/>
+        <rect x="18" y="55" width="16" height="3" fill="white" opacity="0.7" rx="1"/>
+      </g>
+    </svg>
+  `;
+  
+  // Convert to data URL
+  return `data:image/svg+xml;base64,${btoa(svg)}`;
+};
+
 interface MealPlannerProps {
   mealPlan: DayPlan[];
   updateMealPlan: (newPlan: DayPlan[]) => void;
@@ -271,22 +310,22 @@ const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
                           target.style.display = 'none';
                           const parent = target.parentElement;
                           if (parent) {
+                            const placeholderSrc = generateRecipePlaceholderImage(recipe.title);
                             parent.innerHTML = `
                               <div class="w-full h-full flex items-center justify-center bg-theme-primary/10">
-                                <svg class="w-6 h-6 text-theme-secondary opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
-                                </svg>
+                                <img src="${placeholderSrc}" alt="${recipe.title}" class="w-full h-full object-cover" />
                               </div>
                             `;
                           }
                         }}
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-theme-primary/10">
-                        <svg className="w-6 h-6 text-theme-secondary opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
-                        </svg>
-                      </div>
+                      <img
+                        src={generateRecipePlaceholderImage(recipe.title)}
+                        alt={recipe.title}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                      />
                     )}
                   </div>
 
@@ -341,22 +380,22 @@ const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
                           target.style.display = 'none';
                           const parent = target.parentElement;
                           if (parent) {
+                            const placeholderSrc = generateRecipePlaceholderImage(recipe.title);
                             parent.innerHTML = `
                               <div class="w-full h-full flex items-center justify-center bg-theme-primary/10">
-                                <svg class="w-6 h-6 text-theme-secondary opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
-                                </svg>
+                                <img src="${placeholderSrc}" alt="${recipe.title}" class="w-full h-full object-cover" />
                               </div>
                             `;
                           }
                         }}
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-theme-primary/10">
-                        <svg className="w-6 h-6 text-theme-secondary opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
-                        </svg>
-                      </div>
+                      <img
+                        src={generateRecipePlaceholderImage(recipe.title)}
+                        alt={recipe.title}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                      />
                     )}
                   </div>
 
@@ -411,22 +450,22 @@ const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
                           target.style.display = 'none';
                           const parent = target.parentElement;
                           if (parent) {
+                            const placeholderSrc = generateRecipePlaceholderImage(recipe.title);
                             parent.innerHTML = `
                               <div class="w-full h-full flex items-center justify-center bg-theme-primary/10">
-                                <svg class="w-6 h-6 text-theme-secondary opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
-                                </svg>
+                                <img src="${placeholderSrc}" alt="${recipe.title}" class="w-full h-full object-cover" />
                               </div>
                             `;
                           }
                         }}
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-theme-primary/10">
-                        <svg className="w-6 h-6 text-theme-secondary opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
-                        </svg>
-                      </div>
+                      <img
+                        src={generateRecipePlaceholderImage(recipe.title)}
+                        alt={recipe.title}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                      />
                     )}
                   </div>
 
@@ -488,22 +527,22 @@ const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
                           target.style.display = 'none';
                           const parent = target.parentElement;
                           if (parent) {
+                            const placeholderSrc = generateRecipePlaceholderImage(recipe.title);
                             parent.innerHTML = `
                               <div class="w-full h-full flex items-center justify-center bg-theme-primary/10">
-                                <svg class="w-6 h-6 text-theme-secondary opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
-                                </svg>
+                                <img src="${placeholderSrc}" alt="${recipe.title}" class="w-full h-full object-cover" />
                               </div>
                             `;
                           }
                         }}
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-theme-primary/10">
-                        <svg className="w-6 h-6 text-theme-secondary opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
-                        </svg>
-                      </div>
+                      <img
+                        src={generateRecipePlaceholderImage(recipe.title)}
+                        alt={recipe.title}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                      />
                     )}
                   </div>
 
@@ -1003,14 +1042,30 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
     const dd = String(d.getDate()).padStart(2, '0');
     const todayLocal = `${yyyy}-${mm}-${dd}`;
 
-    const idx = mealPlan.findIndex(day => day.date === todayLocal);
+    // Filter out invalid or corrupted dates (more than 1 year in past/future)
+    const validMealPlan = mealPlan.filter(day => {
+      if (!day.date || typeof day.date !== 'string') return false;
+      try {
+        const dayDate = new Date(day.date);
+        const diffTime = Math.abs(dayDate.getTime() - d.getTime());
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        return diffDays <= 365; // Within 1 year
+      } catch {
+        return false;
+      }
+    });
+
+    const idx = validMealPlan.findIndex(day => day.date === todayLocal);
     if (idx >= 0) {
-      const rotated = [...mealPlan.slice(idx), ...mealPlan.slice(0, idx)];
-      const mapping = rotated.map((_, i) => (i + idx) % mealPlan.length);
+      const rotated = [...validMealPlan.slice(idx), ...validMealPlan.slice(0, idx)];
+      const mapping = rotated.map((_, i) => {
+        const originalIdx = (i + idx) % validMealPlan.length;
+        return validMealPlan[originalIdx] ? mealPlan.indexOf(validMealPlan[originalIdx]) : -1;
+      });
       return { displayPlan: rotated, displayToOriginal: mapping };
     }
 
-    // Build a 7-day view starting today, prefer any existing day entries
+    // Build a 7-day view starting today
     const view: DayPlan[] = [];
     const mapping: number[] = [];
     for (let i = 0; i < 7; i++) {
@@ -1020,15 +1075,9 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
       const m = String(dt.getMonth() + 1).padStart(2, '0');
       const da = String(dt.getDate()).padStart(2, '0');
       const iso = `${y}-${m}-${da}`;
-      const found = mealPlan.find(day => day.date === iso);
-      if (found) {
-        view.push(found);
-        mapping.push(mealPlan.indexOf(found));
-      } else {
-        const dayName = dt.toLocaleDateString(undefined, { weekday: 'short' });
-        view.push({ date: iso, dayName, breakfast: [], lunch: [], dinner: [] } as DayPlan);
-        mapping.push(-1);
-      }
+      const dayName = dt.toLocaleDateString(undefined, { weekday: 'short' });
+      view.push({ date: iso, dayName, breakfast: [], lunch: [], dinner: [] } as DayPlan);
+      mapping.push(-1); // No original mapping for fallback days
     }
 
     return { displayPlan: view, displayToOriginal: mapping };
@@ -1141,13 +1190,20 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
   // Initialize current day to today when displayPlan is available
   useEffect(() => {
     if (displayPlan.length > 0) {
-      const today = new Date().toISOString().slice(0, 10);
+      const d = new Date();
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      const today = `${yyyy}-${mm}-${dd}`;
       const todayIndex = displayPlan.findIndex(day => day.date === today);
       if (todayIndex >= 0 && todayIndex !== currentDayIndex) {
         setCurrentDayIndex(todayIndex);
+      } else if (displayPlan.length > 0 && currentDayIndex >= displayPlan.length) {
+        // Reset to 0 if currentDayIndex is out of bounds
+        setCurrentDayIndex(0);
       }
     }
-  }, [displayPlan]);
+  }, [displayPlan, currentDayIndex]);
 
   useEffect(() => {
     setMissingItemsCount(missingIngredients.length);
@@ -1233,13 +1289,15 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
         </button>
 
         <div className={`flex gap-4 ${isEstimatorOpen ? 'flex-col' : ''}`}>
-          <div className={isEstimatorOpen ? 'w-full' : 'flex-1'}>
-            <GroceryCostEstimator 
-              mealPlan={mealPlan} 
-              inventory={inventory} 
-              onEstimatorToggle={setIsEstimatorOpen}
-            />
-          </div>
+          {(settings?.shopping?.showPriceData ?? false) && (
+            <div className={isEstimatorOpen ? 'w-full' : 'flex-1'}>
+              <GroceryCostEstimator 
+                mealPlan={mealPlan} 
+                inventory={inventory} 
+                onEstimatorToggle={setIsEstimatorOpen}
+              />
+            </div>
+          )}
           {!isEstimatorOpen && (
             <div className="flex-1">
               <button
@@ -1512,11 +1570,11 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
                             !isCurrentMonth
                               ? 'text-theme-secondary opacity-30'
                               : isSelected
-                              ? 'bg-[var(--accent-color)] text-white font-bold ring-2 ring-[var(--accent-color)]/50'
+                              ? 'bg-green-600 text-white font-bold ring-2 ring-green-600/50'
                               : isToday
                               ? 'bg-[var(--accent-color)]/20 text-[var(--accent-color)] border border-[var(--accent-color)]/30'
                               : hasMeals
-                              ? 'bg-theme-primary/50 text-theme-primary hover:bg-theme-primary/70 border border-theme-primary/30'
+                              ? 'bg-theme-primary/50 text-white hover:bg-theme-primary/70 border border-theme-primary/30'
                               : 'text-theme-secondary opacity-50 hover:bg-theme-primary/20'
                           }`}
                           title={`${currentDate.toLocaleDateString()}${hasMeals ? ' - Has meals scheduled' : ' - No meals'}`}
@@ -1531,8 +1589,8 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
                               {currentDate.getDate()}
                             </span>
                           )}
-                          {isSelected && (
-                            <div className="absolute -top-1 -right-1 w-2 h-2 bg-white rounded-full border border-[var(--accent-color)]"></div>
+                          {hasMeals && (
+                            <div className="absolute -top-1 -right-1 w-2 h-2 bg-white rounded-full border border-theme-primary"></div>
                           )}
                         </button>
                       );
@@ -1564,11 +1622,11 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
                       onClick={() => setCurrentDayIndex(index)}
                       className={`w-full py-1 text-xs rounded-lg transition-all relative ${
                         isCurrentDay
-                          ? 'bg-[var(--accent-color)] text-white font-bold ring-2 ring-[var(--accent-color)]/50'
+                          ? 'bg-green-600 text-white font-bold ring-2 ring-green-600/50'
                           : isTodayDate
                           ? 'bg-[var(--accent-color)]/20 text-[var(--accent-color)] border border-[var(--accent-color)]/30'
                           : hasMeals
-                          ? 'bg-theme-primary/50 text-theme-primary hover:bg-theme-primary/70 border border-theme-primary/30'
+                          ? 'bg-theme-primary/50 text-white hover:bg-theme-primary/70 border border-theme-primary/30'
                           : 'text-theme-secondary opacity-50 hover:bg-theme-primary/20'
                       }`}
                       title={`${day.dayName} ${day.date}${hasMeals ? ' - Has meals scheduled' : ' - No meals'}`}
@@ -1581,8 +1639,8 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
                       ) : (
                         new Date(day.date).getDate()
                       )}
-                      {isCurrentDay && (
-                        <div className="absolute -top-1 -right-1 w-2 h-2 bg-white rounded-full border border-[var(--accent-color)]"></div>
+                      {hasMeals && (
+                        <div className="absolute -top-1 -right-1 w-2 h-2 bg-white rounded-full border border-theme-primary"></div>
                       )}
                     </button>
                   </div>

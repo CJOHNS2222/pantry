@@ -180,6 +180,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
   // Handle Google redirect result (for mobile and fallback)
   useEffect(() => {
     console.log('Login component mounted, checking for redirect result...');
+    const auth = getAuth();
     const checkRedirect = async () => {
       try {
         console.log('Checking redirect result...');
@@ -214,7 +215,6 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
     checkRedirect();
 
     // Also listen for auth state changes in case the redirect happens while component is mounted
-    const auth = getAuth();
     let unsubscribe = () => {};
     if (auth && typeof (auth as any).onAuthStateChanged === 'function') {
       unsubscribe = auth.onAuthStateChanged((user) => {

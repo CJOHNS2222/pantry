@@ -117,15 +117,7 @@ export const resetUsageLimitsNow = onRequest(
     memory: '1GiB',
   },
   async (req, res) => {
-    // Temporarily allow anyone to trigger this for testing
-    // TODO: Add proper authentication
-
-    try {
-      await performUsageReset();
-      res.status(200).send('Usage limits reset completed successfully');
-    } catch (err: any) {
-      logger.error('Error in manual reset:', err);
-      res.status(500).send('Error resetting usage limits');
-    }
+    // Manual trigger disabled for safety. Use scheduled `resetWeeklyUsageLimits`.
+    res.status(403).send('Manual reset disabled. Use scheduled resetWeeklyUsageLimits.');
   }
 );

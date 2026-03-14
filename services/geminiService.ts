@@ -278,6 +278,164 @@ If an item doesn't fit these categories, use "Uncategorized".`,
 };
 
 /**
+ * Analyzes a receipt image to extract grocery items and their details.
+ */
+export const analyzeReceiptImage = async (base64Image: string, mimeType: string, user?: User): Promise<PantryItem[]> => {
+  // Gate Gemini usage: ensure global enabled + user opt-in + usage cap
+  if (!featureFlags.isGeminiGloballyEnabled()) {
+    throw new Error('Gemini integration is disabled by configuration.');
+  }
+
+  if (!user?.id) {
+    throw new Error('User authentication required for Gemini usage.');
+  }
+
+  // Note: we expect the caller to set user opt-in before invoking this in UI flows.
+  if (!featureFlags.userOptedInToGemini(user.id)) {
+    throw new Error('Gemini usage not permitted: opt-in required.');
+  }
+
+  // Check Firebase usage limits
+  if (!(await UsageService.canUseGemini(user))) {
+    throw new Error('Gemini usage not permitted: weekly limit reached.');
+  }
+
+  // Create cache key based on image hash (simple hash for demo)
+  const imageHash = btoa(base64Image).slice(0, 16);
+  const requestId = `receipt_analysis_${user.id}_${imageHash}`;
+
+  return geminiBatcher.enqueue(requestId, async () => {
+    const perfTrace = performance ? trace(performance, 'analyze_receipt_image') : null;
+    perfTrace?.start();
+
+    try {
+      const modelId = "gemini-2.0-flash-lite";
+
+      const schema: Schema = {
+        type: Type.ARRAY,
+        description: "A comprehensive list of grocery items extracted from the receipt.",
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            item: {
+              type: Type.STRING,
+              description: "The specific name of the grocery item.",
+            },
+            category: {
+              type: Type.STRING,
+              description: "The broad category.",
+            },
+            quantity_estimate: {
+              type: Type.STRING,
+              description: "Estimated quantity based on receipt information.",
+            },
+            estimatedPrice: {
+              type: Type.NUMBER,
+              description: "Price per item if available.",
+            },
+            priceOptions: {
+              type: Type.ARRAY,
+              description: "Multiple price options if the receipt shows different sizes/prices for the same item.",
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  amount: {
+                    type: Type.NUMBER,
+                    description: "The quantity amount (e.g., 32 for 32oz).",
+                  },
+                  unit: {
+                    type: Type.STRING,
+                    description: "The unit of measurement (e.g., 'oz', 'lbs', 'cups').",
+                  },
+                  price: {
+                    type: Type.NUMBER,
+                    description: "The price for this quantity.",
+                  },
+                },
+                required: ["amount", "unit", "price"],
+              },
+            },
+          },
+          required: ["item", "category", "quantity_estimate"],
+        },
+      };
+
+      const response = await ai.models.generateContent({
+        model: modelId,
+        contents: {
+          parts: [
+            {
+              inlineData: {
+                data: base64Image,
+                mimeType: mimeType,
+              },
+            },
+            {
+              text: `Analyze this grocery receipt image and extract all the purchased items. For each item, provide:
+
+1. The exact item name as it appears on the receipt
+2. An appropriate category
+3. A reasonable quantity estimate (use common units like "1 count", "2 lbs", "1 gallon", etc.)
+4. The price if clearly visible
+
+IMPORTANT: If you see multiple sizes or quantities of the same item with different prices (like "16oz for $2.79" and "32oz for $4.99"), include them as separate priceOptions entries for the same item. This helps with price comparison.
+
+For categorization, use these standard categories:
+- Fruits & Vegetables (fresh produce, fruits, vegetables)
+- Dairy & Eggs (milk, cheese, yogurt, eggs, butter)
+- Meat & Poultry (beef, chicken, pork, turkey, bacon, sausage)
+- Seafood (fish, shrimp, crab, canned tuna)
+- Grains & Bread (rice, pasta, bread, cereals, flour, oats)
+- Canned Goods (canned vegetables, soups, beans, tomatoes)
+- Condiments & Sauces (ketchup, mustard, mayo, oils, vinegars, dressings)
+- Snacks (chips, cookies, nuts, crackers, candy)
+- Beverages (soda, juice, coffee, tea, water, alcohol)
+- Frozen Foods (frozen vegetables, meals, ice cream, pizza)
+- Baking Supplies (sugar, baking powder, vanilla, chocolate chips)
+- Spices & Herbs (salt, pepper, garlic, herbs, spices)
+- Breakfast Foods (cereal, oatmeal, pancake mix, syrup)
+- Household (cleaning supplies, paper products, etc.)
+
+Only include actual grocery items, not taxes, totals, or store information.`,
+            },
+          ],
+        },
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: schema,
+        },
+      });
+
+      const jsonText = response.text;
+      if (!jsonText) throw new Error("No data returned from Gemini.");
+
+      const cleanJson = jsonText.replace(/^```json\s*/, "").replace(/\s*```$/, "");
+      const items = JSON.parse(cleanJson) as PantryItem[];
+
+      // Add custom metrics (if performance available)
+      if (perfTrace) {
+        perfTrace.putMetric('image_size_kb', Math.round(base64Image.length / 1024));
+        perfTrace.putMetric('items_detected', Number(items.length));
+      }
+
+      // Record usage in Firebase
+      try {
+        await UsageService.recordGeminiUsage(user);
+      } catch (e) {
+        console.warn('Failed to record Gemini usage:', e);
+      }
+
+      return items;
+    } catch (err: any) {
+      console.error("Error analyzing receipt image:", err);
+      throw err;
+    } finally {
+      perfTrace?.stop();
+    }
+  }, 2); // Higher priority for image analysis
+};
+
+/**
  * Searches for recipes using Google Search Grounding with enhanced filters and structured JSON output.
  */
 export const searchRecipes = async (params: RecipeSearchParams, user?: User): Promise<RecipeSearchResult> => {

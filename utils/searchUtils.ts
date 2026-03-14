@@ -531,3 +531,98 @@ export const getMealPrepSuggestions = (
     })
     .slice(0, 10); // Limit to top 10 suggestions
 };
+
+/**
+ * Generate an intelligent recipe search query based on pantry items and dietary preferences
+ */
+export function generateIntelligentRecipeQuery(
+  inventory: PantryItem[],
+  userDietaryRestrictions?: string[]
+): string {
+  // Check dietary restrictions
+  const hasMeatRestrictions = userDietaryRestrictions?.some(
+    restriction => restriction === 'vegan' || restriction === 'vegetarian'
+  ) || false;
+
+  // Define meat products to look for
+  const meatProducts = ['chicken', 'beef', 'pork', 'fish', 'turkey', 'lamb', 'sausage', 'bacon', 'salmon', 'tuna'];
+
+  let itemsToUse: string[] = [];
+
+  if (!hasMeatRestrictions) {
+    // Look for meat products first (prioritize soonest expiring meat)
+    const availableMeat = inventory
+      .filter(item =>
+        !item.is_leftover &&
+        meatProducts.some(meat => item.item.toLowerCase().includes(meat.toLowerCase()))
+      )
+      .sort((a, b) => {
+        // Sort by expiration date first, then by meat type priority
+        if (a.expirationDate && b.expirationDate) {
+          return new Date(a.expirationDate).getTime() - new Date(b.expirationDate).getTime();
+        }
+        if (a.expirationDate && !b.expirationDate) return -1;
+        if (!a.expirationDate && b.expirationDate) return 1;
+        return 0;
+      });
+
+    if (availableMeat.length > 0) {
+      // Include 1-2 meat items
+      const meatItems = availableMeat.slice(0, 2).map(item => item.item);
+      itemsToUse.push(...meatItems);
+
+      // Add complementary non-meat items (soonest expiring first)
+      const complementaryItems = inventory
+        .filter(item =>
+          item.expirationDate &&
+          !item.is_leftover &&
+          !meatProducts.some(meat => item.item.toLowerCase().includes(meat.toLowerCase())) &&
+          !itemsToUse.includes(item.item)
+        )
+        .sort((a, b) => new Date(a.expirationDate!).getTime() - new Date(b.expirationDate!).getTime())
+        .slice(0, 3)
+        .map(item => item.item);
+
+      itemsToUse.push(...complementaryItems);
+    }
+  }
+
+  // Fallback: if no meat-focused selection or has dietary restrictions, use soonest expiring items
+  if (itemsToUse.length === 0) {
+    itemsToUse = inventory
+      .filter(item => item.expirationDate && !item.is_leftover)
+      .sort((a, b) => new Date(a.expirationDate!).getTime() - new Date(b.expirationDate!).getTime())
+      .slice(0, 5)
+      .map(item => item.item);
+  }
+
+  // Final fallback: if no expiring items, use any pantry items
+  if (itemsToUse.length === 0) {
+    itemsToUse = inventory
+      .filter(item => !item.is_leftover)
+      .slice(0, 5)
+      .map(item => item.item);
+  }
+
+  if (itemsToUse.length === 0) {
+    return '';
+  }
+
+  // Create a more intelligent search query
+  let query = `recipes using ${itemsToUse.join(', ')}`;
+
+  // Add dietary context if restrictions exist
+  if (hasMeatRestrictions) {
+    const restrictions = userDietaryRestrictions || [];
+    if (restrictions.includes('vegan')) {
+      query += ' (vegan recipes only)';
+    } else if (restrictions.includes('vegetarian')) {
+      query += ' (vegetarian recipes only)';
+    }
+  } else if (itemsToUse.some(item => meatProducts.some(meat => item.toLowerCase().includes(meat.toLowerCase())))) {
+    // If we have meat, suggest meat-based recipes
+    query += ' (focus on meat-based recipes)';
+  }
+
+  return query;
+}

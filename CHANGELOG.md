@@ -5,6 +5,56 @@ All notable changes to Stock & Spoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.1] - 2026-03-13
+
+### Added
+- PullToRefreshWrapper component for consistent refresh behavior across app tabs
+- StoreLayoutEditor component for managing store layouts
+- priceCalculator utility for price calculations
+- purge-git-history script for repository maintenance
+
+### Changed
+- Comprehensive performance improvements across multiple components
+- Enhanced notification system with deduplication
+- Settings reorganization with Food Safety preferences moved to top
+- Updated authentication and app URL handling
+- Improved meal planning and shopping list features
+- Enhanced database analytics and caching services
+
+### Fixed
+- Removed DatabaseAnalytics component causing blank screen issues
+- Fixed auth API errors by removing problematic configurations
+- Improved Firebase redirects and app verification
+- Resolved HTTP load errors in Android builds
+- Updated app icon references for consistency
+
+### Removed
+- Tutorial component and service (deprecated)
+- Unused key files for security
+
+## [1.4.0] - 2026-03-13
+
+### Added
+- **Pull-to-Refresh Functionality**: Implemented pull-to-refresh across all app tabs using react-pull-to-refresh library
+  - Added `PullToRefreshWrapper` component for consistent refresh behavior
+  - Integrated `refreshAllData` function in data management hook for efficient data reloading
+  - Maintains scroll position and provides smooth user experience across Pantry, Shopping List, Meal Planner, and Community tabs
+
+- **Meal Planner Calendar Enhancements**: Improved visual indicators for better user experience
+  - Days with meals now display white dots/text for clear identification
+  - Selected day shows green background for improved navigation feedback
+  - Enhanced calendar styling for better visual hierarchy and usability
+
+- **Recipe Image Placeholders**: Added attractive SVG-based placeholder images for recipe search results
+  - Implemented `generateRecipePlaceholderImage` function that creates consistent, colorful placeholders
+  - Color generation based on recipe titles for visual variety and consistency
+  - Fallback handling for all recipe sources (saved, cached, and Gemini-generated recipes)
+  - Improved visual consistency in meal plan search results
+
+### Changed
+- **Recipe Search Modal**: Updated to display placeholder images instead of empty spaces for recipes without images
+- **Meal Planner Component**: Enhanced with improved calendar styling and image handling logic
+
 ## [1.3.9] - 2026-03-09
 
 ### Performance
