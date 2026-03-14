@@ -185,7 +185,15 @@ export const analyzePantryImage = async (base64Image: string, mimeType: string, 
     perfTrace?.start();
 
     try {
-      const modelId = "gemini-2.0-flash-lite";
+      // Check API key first
+      if (!import.meta.env.VITE_GEMINI_API_KEY) {
+        throw new Error('Gemini API key not configured. Please check your environment variables.');
+      }
+
+      console.log('🔍 Starting pantry image analysis with model:', "gemini-2.5-pro");
+      console.log('📊 Image size:', Math.round(base64Image.length / 1024), 'KB');
+
+      const modelId = "gemini-2.5-pro";
 
       const schema: Schema = {
         type: Type.ARRAY,
@@ -210,7 +218,12 @@ export const analyzePantryImage = async (base64Image: string, mimeType: string, 
         },
       };
 
-      const response = await ai.models.generateContent({
+      // Add timeout to prevent hanging requests
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Image analysis timeout. Please try again.')), 45000); // 45 second timeout for image analysis
+      });
+
+      const responsePromise = ai.models.generateContent({
         model: modelId,
         contents: {
           parts: [
@@ -248,11 +261,31 @@ If an item doesn't fit these categories, use "Uncategorized".`,
         },
       });
 
+      const response = await Promise.race([responsePromise, timeoutPromise]) as any;
+      console.log('✅ Pantry image analysis API call completed');
+
       const jsonText = response.text;
-      if (!jsonText) throw new Error("No data returned from Gemini.");
+      console.log('📄 Pantry response text length:', jsonText?.length || 0);
+      
+      if (!jsonText) {
+        console.error('❌ No text in pantry Gemini response');
+        throw new Error("No data returned from Gemini.");
+      }
+
+      console.log('🔧 Pantry raw response text:', jsonText.substring(0, 200) + '...');
 
       const cleanJson = jsonText.replace(/^```json\s*/, "").replace(/\s*```$/, "");
-      const items = JSON.parse(cleanJson) as PantryItem[];
+      console.log('🧹 Pantry cleaned JSON length:', cleanJson.length);
+      
+      let items;
+      try {
+        items = JSON.parse(cleanJson) as PantryItem[];
+        console.log('✅ Pantry successfully parsed', items.length, 'items');
+      } catch (parseError) {
+        console.error('❌ Pantry JSON parse error:', parseError);
+        console.error('❌ Pantry failed to parse:', cleanJson.substring(0, 500));
+        throw new Error(`Failed to parse Gemini response: ${parseError}`);
+      }
 
       // Add custom metrics (if performance available)
       if (perfTrace) {
@@ -309,7 +342,10 @@ export const analyzeReceiptImage = async (base64Image: string, mimeType: string,
     perfTrace?.start();
 
     try {
-      const modelId = "gemini-2.0-flash-lite";
+      console.log('🔍 Starting receipt image analysis with model:', "gemini-2.5-pro");
+      console.log('📊 Image size:', Math.round(base64Image.length / 1024), 'KB');
+
+      const modelId = "gemini-2.5-pro";
 
       const schema: Schema = {
         type: Type.ARRAY,
@@ -360,7 +396,12 @@ export const analyzeReceiptImage = async (base64Image: string, mimeType: string,
         },
       };
 
-      const response = await ai.models.generateContent({
+      // Add timeout to prevent hanging requests
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Receipt analysis timeout. Please try again.')), 45000); // 45 second timeout for image analysis
+      });
+
+      const responsePromise = ai.models.generateContent({
         model: modelId,
         contents: {
           parts: [
@@ -405,6 +446,8 @@ Only include actual grocery items, not taxes, totals, or store information.`,
           responseSchema: schema,
         },
       });
+
+      const response = await Promise.race([responsePromise, timeoutPromise]) as any;
 
       const jsonText = response.text;
       if (!jsonText) throw new Error("No data returned from Gemini.");
@@ -494,7 +537,7 @@ const performSearch = async (params: RecipeSearchParams, user: User | undefined,
     if (!(await UsageService.canUseGemini(user))) {
       throw new Error('Gemini usage not permitted: weekly limit reached.');
     }
-    const modelId = "gemini-2.0-flash-lite";
+    const modelId = "gemini-2.5-pro";
   
   // Check if API key is available
   if (!import.meta.env.VITE_GEMINI_API_KEY) {

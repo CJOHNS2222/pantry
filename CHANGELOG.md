@@ -5,6 +5,15 @@ All notable changes to Stock & Spoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.2] - 2026-03-14
+
+### Fixed
+- **Gemini API Integration**: Updated all model references from incorrect names to `gemini-2.5-pro` for proper AI image analysis
+- **Image Service Improvements**: Added timeout handling and Unsplash API fallback for pantry item images to resolve CORS issues
+- **Modal UI Layout**: Fixed footer overlap in pantry scanner component with proper flex layout structure
+- **Database Analytics Button**: Resized oversized button to 20×20px for consistent UI sizing
+- **Meal Plan Calendar**: Fixed date selection logic to properly show today as default instead of being stuck on previous dates
+
 ## [1.4.1] - 2026-03-13
 
 ### Added

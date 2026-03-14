@@ -179,12 +179,14 @@ const DatabaseAnalytics: React.FC = () => {
           top: `${position.y}px`,
           cursor: isDragging ? 'grabbing' : 'grab',
           userSelect: 'none',
-          zIndex: 9999 // Make sure it's on top
+          zIndex: 9999, // Make sure it's on top
+          width: '20px',
+          height: '20px'
         }}
-        className="bg-red-600 text-white px-8 py-4 rounded-lg shadow-2xl hover:bg-red-700 transition-colors border-4 border-yellow-400 animate-pulse text-lg font-bold"
+        className="bg-red-600 text-white rounded shadow-lg hover:bg-red-700 transition-colors border-2 border-yellow-400 animate-pulse text-xs font-bold flex items-center justify-center p-0"
         title="Click to open Database Analytics"
       >
-        📊 DB Analytics ({metrics ? `${DatabaseMonitoringService.getMetrics().reads} reads` : '...'})
+        📊
       </button>
     );
   }

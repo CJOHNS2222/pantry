@@ -16,6 +16,7 @@ import { useApp } from '../contexts/AppContext';
 import { searchRecipes } from '../utils/searchUtils';
 import { debounce } from '../utils/debounceUtils';
 import { CompactRecipeCardSkeleton, MealPlanSkeleton } from './SkeletonLoader';
+import { ProgressiveImage } from './ProgressiveImage';
 import { getMealPrepSuggestions, RecipeIngredientMatch } from '../utils/searchUtils';
 import { getUserMeasurementSystem } from '../utils/measurementUtils';
 // import CalendarService from '../services/calendarService'; // Temporarily disabled
@@ -300,32 +301,9 @@ const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
                   {/* Recipe Image */}
                   <div className="aspect-square bg-theme-primary/20 relative overflow-hidden">
                     {recipe.image ? (
-                      <img
-                        src={recipe.image}
-                        alt={recipe.title}
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          target.style.display = 'none';
-                          const parent = target.parentElement;
-                          if (parent) {
-                            const placeholderSrc = generateRecipePlaceholderImage(recipe.title);
-                            parent.innerHTML = `
-                              <div class="w-full h-full flex items-center justify-center bg-theme-primary/10">
-                                <img src="${placeholderSrc}" alt="${recipe.title}" class="w-full h-full object-cover" />
-                              </div>
-                            `;
-                          }
-                        }}
-                      />
+                      <ProgressiveImage src={recipe.image} alt={recipe.title} className="w-full h-full" lazy />
                     ) : (
-                      <img
-                        src={generateRecipePlaceholderImage(recipe.title)}
-                        alt={recipe.title}
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                      />
+                      <div className="w-full h-full flex items-center justify-center bg-theme-primary/10" />
                     )}
                   </div>
 
@@ -370,32 +348,9 @@ const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
                   {/* Recipe Image */}
                   <div className="aspect-square bg-theme-primary/20 relative overflow-hidden">
                     {recipe.image ? (
-                      <img
-                        src={recipe.image}
-                        alt={recipe.title}
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          target.style.display = 'none';
-                          const parent = target.parentElement;
-                          if (parent) {
-                            const placeholderSrc = generateRecipePlaceholderImage(recipe.title);
-                            parent.innerHTML = `
-                              <div class="w-full h-full flex items-center justify-center bg-theme-primary/10">
-                                <img src="${placeholderSrc}" alt="${recipe.title}" class="w-full h-full object-cover" />
-                              </div>
-                            `;
-                          }
-                        }}
-                      />
+                      <ProgressiveImage src={recipe.image} alt={recipe.title} className="w-full h-full" lazy />
                     ) : (
-                      <img
-                        src={generateRecipePlaceholderImage(recipe.title)}
-                        alt={recipe.title}
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                      />
+                      <div className="w-full h-full flex items-center justify-center bg-theme-primary/10" />
                     )}
                   </div>
 
@@ -440,32 +395,9 @@ const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
                   {/* Recipe Image */}
                   <div className="aspect-square bg-theme-primary/20 relative overflow-hidden">
                     {recipe.image ? (
-                      <img
-                        src={recipe.image}
-                        alt={recipe.title}
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          target.style.display = 'none';
-                          const parent = target.parentElement;
-                          if (parent) {
-                            const placeholderSrc = generateRecipePlaceholderImage(recipe.title);
-                            parent.innerHTML = `
-                              <div class="w-full h-full flex items-center justify-center bg-theme-primary/10">
-                                <img src="${placeholderSrc}" alt="${recipe.title}" class="w-full h-full object-cover" />
-                              </div>
-                            `;
-                          }
-                        }}
-                      />
+                      <ProgressiveImage src={recipe.image} alt={recipe.title} className="w-full h-full" lazy />
                     ) : (
-                      <img
-                        src={generateRecipePlaceholderImage(recipe.title)}
-                        alt={recipe.title}
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                      />
+                      <div className="w-full h-full flex items-center justify-center bg-theme-primary/10" />
                     )}
                   </div>
 
@@ -517,32 +449,9 @@ const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
                   {/* Recipe Image */}
                   <div className="aspect-square bg-theme-primary/20 relative overflow-hidden">
                     {recipe.image ? (
-                      <img
-                        src={recipe.image}
-                        alt={recipe.title}
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          target.style.display = 'none';
-                          const parent = target.parentElement;
-                          if (parent) {
-                            const placeholderSrc = generateRecipePlaceholderImage(recipe.title);
-                            parent.innerHTML = `
-                              <div class="w-full h-full flex items-center justify-center bg-theme-primary/10">
-                                <img src="${placeholderSrc}" alt="${recipe.title}" class="w-full h-full object-cover" />
-                              </div>
-                            `;
-                          }
-                        }}
-                      />
+                      <ProgressiveImage src={recipe.image} alt={recipe.title} className="w-full h-full" lazy />
                     ) : (
-                      <img
-                        src={generateRecipePlaceholderImage(recipe.title)}
-                        alt={recipe.title}
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                      />
+                      <div className="w-full h-full flex items-center justify-center bg-theme-primary/10" />
                     )}
                   </div>
 
@@ -1079,7 +988,6 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
       view.push({ date: iso, dayName, breakfast: [], lunch: [], dinner: [] } as DayPlan);
       mapping.push(-1); // No original mapping for fallback days
     }
-
     return { displayPlan: view, displayToOriginal: mapping };
   }, [mealPlan]);
 
@@ -1221,15 +1129,24 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
       const mm = String(d.getMonth() + 1).padStart(2, '0');
       const dd = String(d.getDate()).padStart(2, '0');
       const today = `${yyyy}-${mm}-${dd}`;
-      const todayIndex = displayPlan.findIndex(day => day.date === today);
-      if (todayIndex >= 0 && todayIndex !== currentDayIndex) {
-        setCurrentDayIndex(todayIndex);
-      } else if (displayPlan.length > 0 && currentDayIndex >= displayPlan.length) {
-        // Reset to 0 if currentDayIndex is out of bounds
-        setCurrentDayIndex(0);
+      
+      // Always ensure we're showing today by default
+      if (!isCalendarExpanded) {
+        // In compact week view, today should be at index 0
+        if (currentDayIndex !== 0) {
+          setCurrentDayIndex(0);
+        }
+      } else {
+        // In expanded month view, find today's position
+        const todayIndex = displayPlan.findIndex(day => day.date === today);
+        if (todayIndex >= 0 && todayIndex !== currentDayIndex) {
+          setCurrentDayIndex(todayIndex);
+        } else if (currentDayIndex >= displayPlan.length) {
+          setCurrentDayIndex(0);
+        }
       }
     }
-  }, [displayPlan, currentDayIndex]);
+  }, [displayPlan, isCalendarExpanded]); // Removed currentDayIndex from deps to prevent loops
 
   useEffect(() => {
     setMissingItemsCount(missingIngredients.length);
@@ -1266,10 +1183,10 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
         )}
       </div>
 
-      {/* Help Button - positioned absolutely on the right */}
+      {/* Help Button - positioned absolutely below the header */}
       <button
         onClick={() => setShowHelpTooltip(!showHelpTooltip)}
-        className="absolute top-4 right-4 p-2 rounded-full hover:bg-theme-secondary/10 transition-colors z-10"
+        className="absolute top-12 right-4 p-2 rounded-full hover:bg-theme-secondary/10 transition-colors z-10"
         title="Help"
       >
         <HelpCircle className="w-5 h-5 text-theme-secondary opacity-60 hover:opacity-100" />
@@ -1278,7 +1195,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
       {/* Meal Prep Planner Button */}
       <button
         onClick={() => setShowMealPrepPlanner(true)}
-        className="absolute top-4 right-16 p-2 rounded-full hover:bg-theme-secondary/10 transition-colors z-10"
+        className="absolute top-12 right-16 p-2 rounded-full hover:bg-theme-secondary/10 transition-colors z-10"
         title="Smart Meal Prep Planner"
       >
         <CalendarClock className="w-5 h-5 text-theme-secondary opacity-60 hover:opacity-100" />
@@ -1287,7 +1204,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
       {/* Calendar Export Button */}
       <button
         onClick={handleCalendarExport}
-        className="absolute top-4 right-28 p-2 rounded-full hover:bg-theme-secondary/10 transition-colors z-10"
+        className="absolute top-12 right-28 p-2 rounded-full hover:bg-theme-secondary/10 transition-colors z-10"
         title="Export to Calendar"
       >
         📅
@@ -1530,7 +1447,21 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
                     {currentCalendarMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
                   </h5>
                   <button
-                    onClick={() => setCurrentCalendarMonth(new Date())}
+                    onClick={() => {
+                      setCurrentCalendarMonth(new Date());
+                      // Also reset to today's index in displayPlan
+                      const today = new Date();
+                      const yyyy = today.getFullYear();
+                      const mm = String(today.getMonth() + 1).padStart(2, '0');
+                      const dd = String(today.getDate()).padStart(2, '0');
+                      const todayStr = `${yyyy}-${mm}-${dd}`;
+                      const todayIndex = displayPlan.findIndex(day => day.date === todayStr);
+                      if (todayIndex >= 0) {
+                        setCurrentDayIndex(todayIndex);
+                      } else {
+                        setCurrentDayIndex(0); // Fallback to first day
+                      }
+                    }}
                     className="text-xs px-2 py-1 rounded bg-theme-primary/20 hover:bg-theme-primary/30 text-theme-secondary"
                     title="Go to today"
                   >

@@ -2101,13 +2101,17 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
             {/* Scan Review Modal (appears after analyze) */}
             {showScanReviewModal && scanResults && (
               <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center p-2 pt-24 pb-24">
-                <div className="bg-theme-primary rounded-lg max-w-sm sm:max-w-2xl w-full max-h-[calc(100vh-160px)] overflow-y-auto border border-theme p-3 sm:p-4 pb-24">
-                  <div className="flex items-center justify-between mb-4">
+                <div className="bg-theme-primary rounded-lg max-w-sm sm:max-w-2xl w-full max-h-[calc(100vh-160px)] flex flex-col border border-theme">
+                  {/* Header - Fixed */}
+                  <div className="flex items-center justify-between p-4 pb-3 border-b border-theme flex-shrink-0 rounded-t-lg">
                     <h3 className="text-sm sm:text-lg font-bold text-theme-secondary">Review Scanned Items ({scanResults.length})</h3>
                     <button onClick={() => { setShowScanReviewModal(false); setScanResults(null); }} className="p-2 rounded hover:bg-theme-secondary">
                       <X className="w-5 h-5 text-theme-secondary" />
                     </button>
                   </div>
+
+                  {/* Scrollable Content */}
+                  <div className="flex-1 overflow-y-auto p-4">
 
                   {/* Destination Selector */}
                   <div className="mb-4 p-3 bg-theme-secondary rounded-lg border border-theme">
@@ -2183,7 +2187,10 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                     ))}
                   </div>
 
-                  <div className="flex gap-2 mt-4">
+                  </div>
+
+                  {/* Action Buttons - Fixed at bottom */}
+                  <div className="flex gap-2 p-4 border-t border-theme bg-theme-primary rounded-b-lg flex-shrink-0">
                     <button onClick={async () => {
                       if (!scanResults) return;
 
@@ -2223,7 +2230,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                       setImagePreview(null);
                       setRawBase64(null);
                       setLoadingState(LoadingState.IDLE);
-                    }} className="px-4 py-2 bg-[var(--accent-color)] text-white rounded" aria-label={`Add all scanned items to ${receiptDestination === 'pantry' ? 'pantry' : 'shopping list'}`}>
+                    }} className="flex-1 px-4 py-2 bg-[var(--accent-color)] text-white rounded" aria-label={`Add all scanned items to ${receiptDestination === 'pantry' ? 'pantry' : 'shopping list'}`}>
                       Add All to {receiptDestination === 'pantry' ? 'Pantry' : 'Shopping List'}
                     </button>
                     <button onClick={() => { setShowScanReviewModal(false); setScanResults(null); }} className="px-4 py-2 bg-theme-primary border border-theme rounded" aria-label="Cancel and discard scan results">Cancel</button>
