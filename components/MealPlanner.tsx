@@ -1083,6 +1083,32 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
     return { displayPlan: view, displayToOriginal: mapping };
   }, [mealPlan]);
 
+  // Ensure all displayPlan days exist in mealPlan
+  useEffect(() => {
+    if (displayPlan.length > 0) {
+      let needsUpdate = false;
+      const newPlan = [...mealPlan];
+      
+      for (const day of displayPlan) {
+        const existingIndex = newPlan.findIndex(d => d.date === day.date);
+        if (existingIndex === -1) {
+          newPlan.push({
+            date: day.date,
+            dayName: day.dayName,
+            breakfast: [],
+            lunch: [],
+            dinner: []
+          });
+          needsUpdate = true;
+        }
+      }
+      
+      if (needsUpdate) {
+        updateMealPlan(newPlan);
+      }
+    }
+  }, [displayPlan, mealPlan, updateMealPlan]);
+
   // Memoized missing ingredients computation
   const missingIngredients = useMemo(() => {
     const missingWithRecipes = displayPlan.flatMap(day => 
@@ -1554,7 +1580,8 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
                       
                       // Find if this date has meals scheduled
                       const dayIndex = displayPlan.findIndex(day => day.date === dateStr);
-                      const hasMeals = dayIndex >= 0 && hasMealsScheduled(displayToOriginal[dayIndex] ?? dayIndex);
+                      const mealPlanIndex = mealPlan.findIndex(d => d.date === dateStr);
+                      const hasMeals = mealPlanIndex >= 0 && hasMealsScheduled(mealPlanIndex);
                       const isSelected = dayIndex === currentDayIndex;
                       
                       days.push(
@@ -1607,9 +1634,8 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
             /* Compact Week View */
             <div className="grid grid-cols-7 gap-1 text-center">
               {displayPlan.slice(0, 7).map((day, index) => {
-                const originalIndex = displayToOriginal[index];
-                const effectiveIndex = originalIndex >= 0 ? originalIndex : ensureDayExists(day.date, day.dayName);
-                const hasMeals = hasMealsScheduled(effectiveIndex);
+                const mealPlanIndex = mealPlan.findIndex(d => d.date === day.date);
+                const hasMeals = mealPlanIndex >= 0 && hasMealsScheduled(mealPlanIndex);
                 const isCurrentDay = index === currentDayIndex;
                 const isTodayDate = isToday(day.date);
 
@@ -1690,9 +1716,8 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
               <div className="space-y-6">
                 {['Breakfast', 'Lunch', 'Dinner'].map((mealType) => {
                   const mealTypeKey = mealType.toLowerCase() as 'breakfast' | 'lunch' | 'dinner';
-                  const originalIndex = displayToOriginal[currentDayIndex];
-                  const effectiveIndex = originalIndex >= 0 ? originalIndex : ensureDayExists(displayPlan[currentDayIndex].date, displayPlan[currentDayIndex].dayName);
-                  const mealsForType = mealPlan[effectiveIndex][mealTypeKey] || [];
+                  const effectiveIndex = mealPlan.findIndex(d => d.date === displayPlan[currentDayIndex].date);
+                  const mealsForType = mealPlan[effectiveIndex]?.[mealTypeKey] || [];
 
                   return (
                     <div key={mealType} className="space-y-3">
@@ -1850,8 +1875,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
                 onAddRecipe={(recipe, dayIndex) => {
                   const newPlan = [...mealPlan];
                   // Map displayPlan index to mealPlan index
-                  const originalIndex = displayToOriginal[dayIndex];
-                  const effectiveIndex = originalIndex >= 0 ? originalIndex : ensureDayExists(displayPlan[dayIndex].date, displayPlan[dayIndex].dayName);
+                  const effectiveIndex = mealPlan.findIndex(d => d.date === displayPlan[dayIndex].date);
                   
                   if (!newPlan[effectiveIndex][searchMealType]) {
                     newPlan[effectiveIndex][searchMealType] = [];
@@ -1996,8 +2020,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
                 >
                   <option value="" disabled>Select a day...</option>
                   {displayPlan.map((day, displayIndex) => {
-                      const orig = displayToOriginal[displayIndex];
-                      const valueIndex = orig >= 0 ? orig : ensureDayExists(day.date, day.dayName);
+                      const valueIndex = mealPlan.findIndex(d => d.date === day.date);
                       return (
                         <option key={day.date} value={valueIndex}>
                           {day.dayName} - {day.date}

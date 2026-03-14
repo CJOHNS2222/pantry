@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.4.1] - 2026-03-13
 
 ### Added
-- PullToRefreshWrapper component for consistent refresh behavior across app tabs
+- PullToRefreshWrapper component for managing store layouts
 - StoreLayoutEditor component for managing store layouts
 - priceCalculator utility for price calculations
 - purge-git-history script for repository maintenance
@@ -22,15 +22,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Enhanced database analytics and caching services
 
 ### Fixed
-- Removed DatabaseAnalytics component causing blank screen issues
+- Meal planner day selection: Fixed issue where clicking different days wouldn't load correctly due to race condition in day creation
+- Removed race condition by ensuring all displayPlan days exist in mealPlan before rendering
 - Fixed auth API errors by removing problematic configurations
 - Improved Firebase redirects and app verification
 - Resolved HTTP load errors in Android builds
 - Updated app icon references for consistency
 
 ### Removed
-- Tutorial component and service (deprecated)
-- Unused key files for security
+- Pull-to-refresh functionality (causing scrolling issues and data loading problems)
+- react-pull-to-refresh dependency
 
 ## [1.4.0] - 2026-03-13
 

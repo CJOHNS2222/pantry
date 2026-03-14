@@ -50,7 +50,6 @@
     "react": "^19.2.1",
     "react-dom": "^19.2.1",
     "react-intl": "^8.1.1",
-    "react-pull-to-refresh": "^2.0.1",
     "react-router-dom": "^7.13.0",
     "react-swipeable": "^7.0.2",
     "react-window": "^1.8.8"

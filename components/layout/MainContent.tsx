@@ -18,7 +18,6 @@ import ComponentErrorBoundary from '../ComponentErrorBoundary';
 import { useApp } from '../../contexts/AppContext';
 import { useAppActions } from '../../contexts/AppActionsContext';
 import { parseIngredientForShoppingList, parseQuantity, subtractQuantities } from '../../utils/appUtils';
-import { PullToRefreshWrapper } from '../PullToRefreshWrapper';
 
 // Loading component for lazy-loaded components
 const LoadingSpinner: React.FC = () => (
@@ -129,15 +128,14 @@ export const MainContent: React.FC = () => {
       {/* Main pantry tab */}
       {activeTab === Tab.PANTRY && (
         <ComponentErrorBoundary componentName="PantryScanner">
-          <PullToRefreshWrapper onRefresh={refreshAllData}>
-            <Suspense fallback={<LoadingSpinner />}>
-              <PantryScanner
-                inventory={inventory}
-                isLoadingInventory={isLoadingInventory}
-                addToShoppingList={onAddToShoppingList}
-                addShoppingListItem={addShoppingListItem}
-                onDeleteItem={deleteItem}
-                onAddItem={addItem}
+          <Suspense fallback={<LoadingSpinner />}>
+            <PantryScanner
+              inventory={inventory}
+              isLoadingInventory={isLoadingInventory}
+              addToShoppingList={onAddToShoppingList}
+              addShoppingListItem={addShoppingListItem}
+              onDeleteItem={deleteItem}
+              onAddItem={addItem}
                 onAddItems={addItems}
                 onUpdateItem={updateItem}
                 consumptionSuggestions={consumptionSuggestions}
@@ -149,17 +147,15 @@ export const MainContent: React.FC = () => {
                 user={user as User}
               />
             </Suspense>
-          </PullToRefreshWrapper>
         </ComponentErrorBoundary>
       )}
 
       {activeTab === Tab.MEALS && (
         <ComponentErrorBoundary componentName="MealPlanner">
-          <PullToRefreshWrapper onRefresh={refreshAllData}>
-            <Suspense fallback={<LoadingSpinner />}>
-              <MealPlanner
-                mealPlan={mealPlan}
-                updateMealPlan={updateMealPlan}
+          <Suspense fallback={<LoadingSpinner />}>
+            <MealPlanner
+              mealPlan={mealPlan}
+              updateMealPlan={updateMealPlan}
                 inventory={inventory}
                 shoppingList={shoppingList}
                 addToShoppingList={onAddToShoppingList}
@@ -181,17 +177,15 @@ export const MainContent: React.FC = () => {
                 }}
               />
             </Suspense>
-          </PullToRefreshWrapper>
         </ComponentErrorBoundary>
       )}
       {activeTab === Tab.SHOPPING && (
         <ComponentErrorBoundary componentName="ShoppingList">
-          <PullToRefreshWrapper onRefresh={refreshAllData}>
-            <Suspense fallback={<LoadingSpinner />}>
-              <ShoppingList
-                items={shoppingList}
-                setItems={appState.setShoppingList}
-                onMoveToPantry={onMoveToPantry}
+          <Suspense fallback={<LoadingSpinner />}>
+            <ShoppingList
+              items={shoppingList}
+              setItems={appState.setShoppingList}
+              onMoveToPantry={onMoveToPantry}
                 addShoppingListItem={addShoppingListItem}
                 user={user || undefined}
                 household={appState.household}
@@ -199,70 +193,63 @@ export const MainContent: React.FC = () => {
                 settings={settings}
               />
             </Suspense>
-          </PullToRefreshWrapper>
         </ComponentErrorBoundary>
       )}
       {activeTab === Tab.RECIPES && (
         <ComponentErrorBoundary componentName="RecipeFinder">
-          <PullToRefreshWrapper onRefresh={refreshAllData}>
-            <Suspense fallback={<LoadingSpinner />}>
-              <RecipeFinder
-                onAddToPlan={onAddToPlan}
-                onSaveRecipe={onSaveRecipe}
-                onDeleteRecipe={onDeleteRecipe}
-                onMarkAsMade={handleMarkAsMade}
-                inventory={inventory}
-                ratings={ratings}
-                onRate={onRateRecipe}
-                savedRecipes={savedRecipes}
-                user={user || undefined}
-                setActiveTab={setActiveTab}
-                addToast={addToast}
-                persistedResult={persistedRecipeResult}
-                setPersistedResult={appActions.setPersistedRecipeResult}
-                initialSearchQuery={initialSearchQuery}
-                recipeSaveLimitExceeded={recipeSaveLimitExceeded}
-                mealPlanLimitExceeded={mealPlanLimitExceeded}
-                isLoadingSavedRecipes={isLoadingSavedRecipes}
-                household={household ?? undefined}
+          <Suspense fallback={<LoadingSpinner />}>
+            <RecipeFinder
+              onAddToPlan={onAddToPlan}
+              onSaveRecipe={onSaveRecipe}
+              onDeleteRecipe={onDeleteRecipe}
+              onMarkAsMade={handleMarkAsMade}
+              inventory={inventory}
+              ratings={ratings}
+              onRate={onRateRecipe}
+              savedRecipes={savedRecipes}
+              user={user || undefined}
+              setActiveTab={setActiveTab}
+              addToast={addToast}
+              persistedResult={persistedRecipeResult}
+              setPersistedResult={appActions.setPersistedRecipeResult}
+              initialSearchQuery={initialSearchQuery}
+              recipeSaveLimitExceeded={recipeSaveLimitExceeded}
+              mealPlanLimitExceeded={mealPlanLimitExceeded}
+              isLoadingSavedRecipes={isLoadingSavedRecipes}
+              household={household ?? undefined}
               />
             </Suspense>
-          </PullToRefreshWrapper>
         </ComponentErrorBoundary>
       )}
       {activeTab === Tab.COMMUNITY && (
         <ComponentErrorBoundary componentName="Community">
-          <PullToRefreshWrapper onRefresh={refreshAllData}>
-            <Suspense fallback={<LoadingSpinner />}>
-              <Community
-                onAddToPlan={onAddToPlan}
-                onSaveRecipe={onSaveRecipe}
-                user={user || undefined}
-              />
-            </Suspense>
-          </PullToRefreshWrapper>
+          <Suspense fallback={<LoadingSpinner />}>
+            <Community
+              onAddToPlan={onAddToPlan}
+              onSaveRecipe={onSaveRecipe}
+              user={user || undefined}
+            />
+          </Suspense>
         </ComponentErrorBoundary>
       )}
       {activeTab === Tab.SETTINGS && (
         <ComponentErrorBoundary componentName="Settings">
-          <PullToRefreshWrapper onRefresh={refreshAllData}>
-            <Suspense fallback={<LoadingSpinner />}>
-              <Settings 
-                settings={settings} 
-                setSettings={appActions.setSettings} 
-                user={user || undefined} 
-                onLogout={onLogout}
-                customCategories={customCategories}
-                onAddCustomCategory={onAddCustomCategory}
-                onUpdateCustomCategory={onUpdateCustomCategory}
-                onDeleteCustomCategory={onDeleteCustomCategory}
-                mealPlan={mealPlan}
-                household={household ?? undefined}
-                onShowHousehold={onShowHousehold}
-                addToast={addToast}
-              />
-            </Suspense>
-          </PullToRefreshWrapper>
+          <Suspense fallback={<LoadingSpinner />}>
+            <Settings 
+              settings={settings} 
+              setSettings={appActions.setSettings} 
+              user={user || undefined} 
+              onLogout={onLogout}
+              customCategories={customCategories}
+              onAddCustomCategory={onAddCustomCategory}
+              onUpdateCustomCategory={onUpdateCustomCategory}
+              onDeleteCustomCategory={onDeleteCustomCategory}
+              mealPlan={mealPlan}
+              household={household ?? undefined}
+              onShowHousehold={onShowHousehold}
+              addToast={addToast}
+            />
+          </Suspense>
         </ComponentErrorBoundary>
       )}
     </main>
