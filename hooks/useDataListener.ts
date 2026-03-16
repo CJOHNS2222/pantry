@@ -1,6 +1,7 @@
 // hooks/useDataListener.ts
 import { useEffect } from 'react';
 import DatabaseMonitoringService from '../services/databaseMonitoringService';
+import { log } from '../services/logService';
 
 /**
  * Generic hook for creating Firestore collection listeners
@@ -25,7 +26,7 @@ export function useDataListener<T>(
         onData(data);
       },
       (error) => {
-        console.error(`Listener failed for ${collectionPath}:`, error);
+        log.error(`Listener failed for ${collectionPath}:`, { error: (error as Error)?.message }, 'useDataListener');
         errorHandler?.(error);
       }
     );

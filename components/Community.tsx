@@ -4,6 +4,7 @@ import { Star, Clock, ChefHat, Plus, X } from 'lucide-react';
 import { RecipeRating, StructuredRecipe } from '../types';
 import RecipeModal from './RecipeModal';
 import { getCachedCommunityRatedRecipes } from '../services/recipeService';
+import { log } from '../services/logService';
 
 interface CommunityProps {
   onAddToPlan: (recipe: StructuredRecipe) => void;
@@ -60,7 +61,7 @@ export const Community: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecipe,
           }
         }
       } catch (e) {
-        console.error('Community: failed to load cached community recipes', e);
+        log.error('Failed to load cached community recipes', { error: e }, 'Community');
       } finally {
         if (mounted) {
           setLocalLoading(false);

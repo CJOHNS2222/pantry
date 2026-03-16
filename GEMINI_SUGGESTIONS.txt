@@ -5,6 +5,7 @@ Critical — Fix Before Any Production Release
 1. Private keys & keystores in git — key, keyid, keyid.pub, and 
 pantry-release.keystore are all tracked. Rotate everything, purge git history
  (git filter-repo), and add them to .gitignore properly.
+  ✅ FIXED: Used git-filter-repo to purge all sensitive files from git history
 
 2. Unauthenticated Cloud Function — resetUsageLimits.ts has an open HTTP endpoint
  that resets all user quotas with a // TODO: Add proper authentication comment. 

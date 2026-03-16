@@ -3,6 +3,7 @@ import { TrendingUp, ChefHat, Clock, Target, Lightbulb, Star } from 'lucide-reac
 import { useAuth } from '../hooks/useAuth';
 import { useDataManagement } from '../hooks/useDataManagement';
 import AnalyticsService from '../services/analyticsService';
+import { log } from '../services/logService';
 
 /**
  * Interface for smart recommendation data
@@ -208,32 +209,32 @@ const SmartRecommendations: React.FC = () => {
         if (rec.actionText.includes('View Recipe') || rec.actionText.includes('Browse Recipes')) {
           // This would need to be passed as a prop or accessed via context
           // For now, we'll just show a toast
-          console.log(`Navigate to recipes for: ${rec.title}`);
+          log.debug(`Navigate to recipes for: ${rec.title}`);
         } else if (rec.actionText.includes('Find Recipes')) {
-          console.log(`Find recipes using expiring items for: ${rec.title}`);
+          log.debug(`Find recipes using expiring items for: ${rec.title}`);
         }
         break;
       case 'feature':
         if (rec.actionText.includes('Create Meal Plan')) {
-          console.log('Navigate to meal planning');
+          log.debug('Navigate to meal planning');
         } else if (rec.actionText.includes('Upgrade Now')) {
-          console.log('Navigate to premium upgrade');
+          log.debug('Navigate to premium upgrade');
         } else if (rec.actionText.includes('Add First Item')) {
-          console.log('Navigate to add inventory item');
+          log.debug('Navigate to add inventory item');
         }
         break;
       case 'shopping':
         if (rec.actionText.includes('Create List')) {
-          console.log('Navigate to shopping list creation');
+          log.debug('Navigate to shopping list creation');
         }
         break;
       default:
-        console.log(`Action for ${rec.type}: ${rec.actionText}`);
+        log.debug(`Action for ${rec.type}: ${rec.actionText}`);
     }
 
     // For now, show a toast indicating the action
     // In a real implementation, this would navigate or perform the action
-    console.log(`Recommendation action: ${rec.actionText} for ${rec.title}`);
+    log.debug(`Recommendation action: ${rec.actionText} for ${rec.title}`);
   };
 
   if (recommendations.length === 0) {

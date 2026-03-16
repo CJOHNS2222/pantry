@@ -6,6 +6,7 @@ import { getAllCategories, getExpirationColor, cleanItemNameForShopping, formatI
 import { getQuantityAmount, getQuantityUnit } from '../utils/quantityUtils';
 import { getNutritionFactsWithFallback, NutritionFacts, formatNutrition } from '../services/nutritionService';
 import { useKeyboardNavigation } from '../hooks/useKeyboardNavigation';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 import QuantityUnitPicker from './QuantityUnitPicker';
 import { COMMON_UNITS, getSmartUnits } from './QuantityUnitPicker';
 import { useApp } from '../contexts/AppContext';
@@ -55,6 +56,9 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
+
+  // Focus trap for accessibility
+  const modalRef = useFocusTrap({ isActive: true });
 
   useEffect(() => {
     // Reset local state when item prop changes
@@ -222,7 +226,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   return (
     <>
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start sm:items-center justify-center z-[9999] p-4">
-        <div className="bg-theme-primary rounded-lg shadow-xl w-full max-w-md mx-auto max-h-[85vh] flex flex-col border border-theme">
+        <div ref={modalRef} className="bg-theme-primary rounded-lg shadow-xl w-full max-w-md mx-auto max-h-[85vh] flex flex-col border border-theme">
           {/* Header - Fixed */}
           <div className="flex items-center justify-between p-4 pb-3 border-b border-theme flex-shrink-0 rounded-t-lg">
             <h3 className="text-lg font-semibold text-theme-primary">{item.item}</h3>

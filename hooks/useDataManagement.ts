@@ -235,7 +235,7 @@ function createMealPlanListener(
           }
         }
       } else if (data) {
-        console.warn('Meal plan cache version mismatch, ignoring remote data.');
+        log.warn('Meal plan cache version mismatch, ignoring remote data.', {}, 'useDataManagement');
       }
     }
 
@@ -258,7 +258,7 @@ function createMealPlanListener(
     setIsLoadingMealPlan(false);
   }, err => {
     if (err.code !== 'permission-denied') {
-      console.error("Meal plan cache listener failed:", err);
+      log.error('Meal plan cache listener failed:', { code: err?.code, message: err?.message }, 'useDataManagement');
     }
     setIsLoadingMealPlan(false);
   });
@@ -402,18 +402,18 @@ export function useDataManagement(
   // Helper function to validate and sanitize meal plan data
   const validateMealPlan = (plan: DayPlan[]): DayPlan[] => {
     if (!Array.isArray(plan)) {
-      console.warn('Meal plan validation: plan is not an array', plan);
+      log.warn('Meal plan validation: plan is not an array', {}, 'useDataManagement');
       return [];
     }
     
     const validDays = plan
       .filter(day => {
         if (!day || typeof day !== 'object') {
-          console.warn('Meal plan validation: invalid day object', day);
+          log.warn('Meal plan validation: invalid day object', {}, 'useDataManagement');
           return false;
         }
         if (typeof day.date !== 'string' || !day.date.match(/^\d{4}-\d{2}-\d{2}$/)) {
-          console.warn('Meal plan validation: invalid date format', day.date);
+          log.warn('Meal plan validation: invalid date format', {}, 'useDataManagement');
           return false;
         }
         return true;
@@ -432,7 +432,7 @@ export function useDataManagement(
       .sort((a, b) => a.date.localeCompare(b.date));
     
     if (validDays.length !== plan.length) {
-      console.warn(`Meal plan validation: filtered out ${plan.length - validDays.length} invalid days`);
+      log.warn(`Meal plan validation: filtered out ${plan.length - validDays.length} invalid days`, {}, 'useDataManagement');
     }
     
     return validDays;
@@ -677,6 +677,8 @@ export function useDataManagement(
           if (typeof processedCount === 'number' && processedCount > 0) {
             addToast?.(`Synced ${processedCount} offline changes.`, 'success');
           }
+        }).catch(err => {
+          log.error('Failed to process offline queue', err, 'DataManagement');
         });
     }
   }, [isOnline]);
@@ -1117,6 +1119,8 @@ export function useDataManagement(
 
   const updateMealPlan = async (newPlan: DayPlan[]) => {
     if (!user?.id) return;
+    if (mealPlanSyncInProgress) return; // Prevent concurrent updates
+    mealPlanSyncInProgress = true;
     try {
       // Set the meal plan locally for immediate UI update
       setMealPlan(newPlan);
@@ -1126,6 +1130,8 @@ export function useDataManagement(
     } catch (err) {
       log.error('Error updating meal plan:', err, 'DataManagement');
       addToast?.(ERROR_MESSAGES.UPDATE_FAILED, 'error');
+    } finally {
+      mealPlanSyncInProgress = false;
     }
   };
 

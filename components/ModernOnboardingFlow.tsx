@@ -6,6 +6,7 @@ import { FeatureDiscoveryManager } from './FeatureDiscovery';
 import { ContextualTutorial } from './ContextualTutorial';
 import { RiskExplanationModal } from './RiskExplanationModal';
 import RiskAssessmentQuestionnaire from './RiskAssessmentQuestionnaire';
+import { log } from '../services/logService';
 
 interface ModernOnboardingFlowProps {
   user: any; // User object from auth context
@@ -130,7 +131,7 @@ export const ModernOnboardingFlow: React.FC<ModernOnboardingFlowProps> = ({
           userItems={collectedData.userItems}
           onRecipeSelect={(recipe) => {
             // Handle recipe selection - could navigate to recipe view
-            console.log('Selected recipe:', recipe);
+            log.debug('Selected recipe:', recipe);
             handleValueDemoComplete(collectedData.userItems);
           }}
           onSkip={() => handleValueDemoComplete([])}
@@ -247,7 +248,7 @@ export const useModernOnboarding = () => {
       try {
         setOnboardingData(JSON.parse(data));
       } catch (error) {
-        console.error('Failed to parse onboarding data:', error);
+        log.error('Failed to parse onboarding data:', error);
       }
     }
   }, []);

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Capacitor } from '@capacitor/core';
+import { log } from '../services/logService';
 
 // Use Google's sample/test ad unit for development/testing:
 // Banner test unit: ca-app-pub-3940256099942544/6300978111
@@ -38,7 +39,7 @@ export const AdMobBanner: React.FC = () => {
     }
 
     // AdMob functionality temporarily disabled
-    console.log('AdMob banner disabled for this build');
+    log.debug('AdMob banner disabled for this build');
 
     // When re-enabling AdMob, uncomment and update the following:
     /*
@@ -49,12 +50,12 @@ export const AdMobBanner: React.FC = () => {
       adSize: BannerAdSize.ADAPTIVE_BANNER,
       position: BannerAdPosition.BOTTOM_CENTER
     }).catch((error) => {
-      console.error('AdMob banner failed to show', error);
+      log.error('AdMob banner failed to show', error);
     });
 
     return () => {
       AdMob.hideBanner().catch((error) => {
-        console.warn('AdMob banner hide failed', error);
+        log.warn('AdMob banner hide failed', error);
       });
     };
     */

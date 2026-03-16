@@ -7,6 +7,7 @@ import { getFunctions } from "firebase/functions";
 import { getMessaging, onMessage, isSupported } from "firebase/messaging";
 import { Capacitor } from '@capacitor/core';
 import webFirebaseConfig from './VITE_firebaseConfig';
+import { log } from './services/logService';
 
 // Note: avoid static import of DatabaseMonitoringService here to prevent a
 // circular initialization (databaseMonitoringService imports `db` from
@@ -37,7 +38,11 @@ export const functions = getFunctions(app);
       mod.default.initializeMonitoring();
     }
   } catch (err: any) {
-    console.warn('DatabaseMonitoringService failed to initialize (deferred):', err?.message || err);
+    // Soft failure: warn in development only — monitoring services are non-critical on init
+    if (import.meta.env.DEV) {
+      // eslint-disable-next-line no-console
+      console.warn('DatabaseMonitoringService failed to initialize (deferred):', err?.message || err);
+    }
   }
 })();
 
@@ -49,7 +54,7 @@ if (typeof window !== 'undefined') {
       messaging = getMessaging(app);
     }
   }).catch(error => {
-    console.log('FCM not supported:', error);
+    log.debug('FCM not supported:', error);
   });
 }
 export { messaging };

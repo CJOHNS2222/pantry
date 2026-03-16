@@ -7,6 +7,7 @@ import { analytics } from '../firebaseConfig';
 import AnalyticsService from '../services/analyticsService';
 import { setUserContext, clearUserContext, trackAuthEvent } from '../services/sentryService';
 import { PriceDataCacheService } from '../services/priceDataCacheService';
+import { log } from '../services/logService';
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
@@ -39,9 +40,9 @@ export function useAuth() {
         try {
           await DatabaseMonitoringService.setDoc(userDocRef, {
             subscription: {
-              tier: 'premium',
+              tier: 'free',
               status: 'active',
-              current_period_end: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+              current_period_end: new Date(),
               cancel_at_period_end: false
             },
             createdAt: new Date(),
@@ -49,7 +50,7 @@ export function useAuth() {
             name: fbUser.displayName || (fbUser.email ? fbUser.email.split('@')[0] : 'User'),
           });
         } catch (err: any) {
-          console.error('Failed to create user document:', err);
+          log.error('Failed to create user document:', { error: err?.message }, 'useAuth');
         }
       }
 
@@ -74,7 +75,7 @@ export function useAuth() {
               return; // Listener will refire
             }
           } catch (err: any) {
-            console.error('Failed to check for existing household:', err);
+            log.error('Failed to check for existing household:', { error: err?.message }, 'useAuth');
           }
         }
 

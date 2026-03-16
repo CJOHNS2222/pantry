@@ -256,7 +256,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
         </div>
 
         <form onSubmit={handleEmailAuth} className="space-y-4">
-          {error && <div className="text-red-400 text-xs mb-2">{error}</div>}
+          {error && <div className="text-red-400 text-xs mb-2" aria-live="polite">{error}</div>}
           {success && <div className="text-green-400 text-xs mb-2">{success}</div>}
           {isSignup && (
             <div>

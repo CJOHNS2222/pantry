@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import DatabaseMonitoringService from '../services/databaseMonitoringService';
+import { log } from '../services/logService';
 
 interface DatabaseMetrics {
   reads: number;
@@ -32,7 +33,7 @@ const DatabaseAnalytics: React.FC = () => {
         const parsed = JSON.parse(savedPosition);
         setPosition(parsed);
       } catch (error) {
-        console.error('Failed to parse saved position:', error);
+        log.error('Failed to parse saved position:', error);
         setPosition({ x: 20, y: 20 });
       }
     } else {
@@ -44,7 +45,7 @@ const DatabaseAnalytics: React.FC = () => {
         const parsed = JSON.parse(savedModalPosition);
         setModalPosition(parsed);
       } catch (error) {
-        console.error('Failed to parse saved modal position:', error);
+        log.error('Failed to parse saved modal position:', error);
         setModalPosition({ x: 100, y: 100 });
       }
     } else {

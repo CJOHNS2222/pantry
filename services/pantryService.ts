@@ -7,6 +7,7 @@ import { validatePantryItem } from '../utils/validationUtils';
 import AnalyticsService from './analyticsService';
 import { canUseGemini } from './featureFlags';
 import { getFoodRiskLevel } from '../utils/foodRiskClassification';
+import { log } from './logService';
 
 export class PantryService {
   /**
@@ -163,9 +164,9 @@ export class PantryService {
           .then(ext => {
             if (ext) image = ext;
           })
-          .catch(e => console.log('Failed to fetch external image for', itemName, e));
+          .catch(e => log.debug('Failed to fetch external image for', itemName, e));
       } catch (err: any) {
-        console.log('Failed to fetch external image for', itemName, err);
+        log.debug('Failed to fetch external image for', itemName, err);
       }
     }
 

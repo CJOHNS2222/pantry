@@ -2,7 +2,8 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import './src/index.css';
-import { initSentry } from './services/sentryService';
+import { initSentry, captureError } from './services/sentryService';
+import { log } from './services/logService';
 import { I18nProvider } from './src/components/I18nProvider';
 import { AppProvider } from './contexts/AppContext';
 import { AppActionsProvider } from './contexts/AppActionsContext';
@@ -16,11 +17,13 @@ if (import.meta.env.PROD && sentryDsn && sentryDsn !== 'https://your-sentry-dsn-
 
 // Add global error handlers for debugging
 window.addEventListener('error', (event) => {
-  console.error('Global error caught:', event.error);
+  log.error('Global error caught:', { message: event.error?.message }, 'GlobalError');
+  captureError(event.error);
 });
 
 window.addEventListener('unhandledrejection', (event) => {
-  console.error('Unhandled promise rejection:', event.reason);
+  log.error('Unhandled promise rejection:', { reason: String(event.reason) }, 'GlobalError');
+  captureError(event.reason instanceof Error ? event.reason : new Error(String(event.reason)));
 });
 
 const rootElement = document.getElementById('root');

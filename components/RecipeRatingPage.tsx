@@ -4,6 +4,7 @@ import { RecipeCommunityInsights } from './RecipeCommunityInsights';
 import { RecipeRecommendations } from './RecipeRecommendations';
 import { StructuredRecipe } from '../types';
 import { useAuth } from '../hooks/useAuth';
+import { log } from '../services/logService';
 
 // Example recipe for demonstration
 const exampleRecipe: StructuredRecipe = {
@@ -40,7 +41,7 @@ export const RecipeRatingPage: React.FC = () => {
   };
 
   const handleRatingSubmitted = (rating: any) => {
-    console.log('Rating submitted:', rating);
+    log.debug('Rating submitted:', rating);
     // Handle rating submission (analytics, etc.)
   };
 

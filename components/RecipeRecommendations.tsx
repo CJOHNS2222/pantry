@@ -4,6 +4,7 @@ import { StructuredRecipe } from '../types';
 import { RecipeRecommendationService, RecipeRecommendation } from '../services/recipeRecommendationService';
 import { useAuth } from '../hooks/useAuth';
 import { useToasts } from '../hooks/useToasts';
+import { log } from '../services/logService';
 
 interface RecipeRecommendationsProps {
   pantryItems?: string[];
@@ -47,7 +48,7 @@ export const RecipeRecommendations: React.FC<RecipeRecommendationsProps> = ({
 
       setRecommendations(recs);
     } catch (err) {
-      console.error('Failed to load recommendations:', err);
+      log.error('Failed to load recommendations:', err);
       setError('Failed to load recommendations');
       addToast('Failed to load recipe recommendations', 'error');
     } finally {

@@ -150,7 +150,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
           }))
         })));
       } catch (error) {
-        console.warn('Failed to load previous shopping sessions:', error);
+        log.warn('Failed to load previous shopping sessions:', error);
       }
     }
   }, []);
@@ -187,7 +187,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
         priceData
       };
     } catch (error) {
-      console.warn(`Failed to estimate price for ${itemName}:`, error);
+      log.warn(`Failed to estimate price for ${itemName}:`, error);
       return { price: 0 };
     }
   };
@@ -220,7 +220,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     try {
       localStorage.setItem('shoppingListSessions', JSON.stringify(updatedSessions));
     } catch (error) {
-      console.warn('Failed to save shopping sessions to localStorage:', error);
+      log.warn('Failed to save shopping sessions to localStorage:', error);
     }
   }, [items, currentSessionId, previousSessions]);
 
@@ -392,7 +392,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     try {
       await ShoppingListCacheService.removeItem(id, householdId, userId);
     } catch (error) {
-      console.error('Failed to remove item from cache:', error);
+      log.error('Failed to remove item from cache:', error);
     }
   };
 
@@ -419,7 +419,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
       const checkedIds = new Set(checkedItems.map(i => i.id));
       setItems(prev => prev.filter(i => !checkedIds.has(i.id)));
     } catch (error) {
-      console.error('Failed to delete checked items from cache:', error);
+      log.error('Failed to delete checked items from cache:', error);
     }
   };
   const addItem = async (e: React.FormEvent) => {
@@ -636,7 +636,8 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     setTimeout(() => {
       navigator.clipboard.writeText(smsMessageText).then(() => {
         alert('Shopping list copied to clipboard (SMS app may not be available)');
-      }).catch(() => {
+      }).catch((error) => {
+        log.error('Failed to copy SMS message to clipboard', { error }, 'ShoppingList');
         alert('Unable to open SMS app. Shopping list has been copied to clipboard.');
       });
     }, 1000);
@@ -816,7 +817,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                       autoFocus
                     />
                     {validationErrors.item && (
-                      <p className="text-red-500 text-xs mt-1">{validationErrors.item}</p>
+                      <p className="text-red-500 text-xs mt-1" aria-live="polite">{validationErrors.item}</p>
                     )}
                   </div>
                   <QuantityUnitPicker
@@ -896,7 +897,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
               await ShoppingListCacheService.removeItemsFromCache(itemIds, householdId, userId);
               setItems(prev => prev.filter(item => !itemIds.includes(item.id)));
             } catch (error) {
-              console.error('Failed to delete selected items from cache:', error);
+              log.error('Failed to delete selected items from cache:', error);
             }
           }}
         />
@@ -949,7 +950,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                         Add Items
                     </button>
                     <button 
-                      onClick={() => console.log('Navigate to recipes')}
+                      onClick={() => log.debug('Navigate to recipes')}
                       className="px-4 py-2 border border-theme rounded-lg hover:bg-theme-secondary/50 transition-colors"
                     >
                       Browse Recipes

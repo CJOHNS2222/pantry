@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Camera, Bell, MapPin, Mic, Image, X, CheckCircle, AlertCircle } from 'lucide-react';
+import { log } from '../services/logService';
 
 interface PermissionRequestProps {
   permission: 'camera' | 'notifications' | 'location' | 'microphone' | 'photos';
@@ -75,7 +76,7 @@ export const PermissionRequest: React.FC<PermissionRequestProps> = ({
             stream.getTracks().forEach(track => track.stop()); // Stop immediately
             granted = true;
           } catch (error) {
-            console.log('Camera permission denied or not available');
+            log.warn('Camera permission denied or not available');
             granted = false;
           }
           break;
@@ -85,7 +86,7 @@ export const PermissionRequest: React.FC<PermissionRequestProps> = ({
             const result = await Notification.requestPermission();
             granted = result === 'granted';
           } else {
-            console.log('Notifications not supported');
+            log.warn('Notifications not supported');
             granted = false;
           }
           break;
@@ -101,7 +102,7 @@ export const PermissionRequest: React.FC<PermissionRequestProps> = ({
             });
             granted = true;
           } catch (error) {
-            console.log('Location permission denied or not available');
+            log.warn('Location permission denied or not available');
             granted = false;
           }
           break;
@@ -119,7 +120,7 @@ export const PermissionRequest: React.FC<PermissionRequestProps> = ({
       }
       setIsVisible(false);
     } catch (error) {
-      console.error('Permission request failed:', error);
+      log.error('Permission request failed', { error }, 'ContextualPermissions');
       onDeny();
       setIsVisible(false);
     } finally {

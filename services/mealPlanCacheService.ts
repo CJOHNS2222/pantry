@@ -11,7 +11,7 @@ const sanitizeObject = (obj: any): any => {
   }
 
   if (Array.isArray(obj)) {
-    return obj.map((item: any) => sanitizeObject(item)).filter((item: any) => item !== undefined);
+    return obj.map(item => sanitizeObject(item)).filter((item): item is any => item !== undefined);
   }
 
   const newObj: { [key: string]: any } = {};
@@ -121,31 +121,6 @@ const updateMeal = async (date: string, mealType: 'breakfast' | 'lunch' | 'dinne
   }
 };
 
-const setCache = async (mealPlan: DayPlan[], householdId?: string, userId?: string) => {
-  return updateCache(mealPlan, householdId, userId);
-};
-
-const getCachedMealPlan = async (householdId?: string, userId?: string): Promise<DayPlan[]> => {
-  try {
-    const cacheRef = getCacheRef(householdId, userId);
-    const docSnap = await DatabaseMonitoringService.getDoc(cacheRef);
-    if (!docSnap.exists()) return [];
-    const data = docSnap.data();
-    if (!data?.days) return [];
-    const days: DayPlan[] = Object.entries(data.days).map(([date, dayData]: [string, any]) => ({
-      date,
-      dayName: dayData.dayName || '',
-      breakfast: dayData.breakfast || [],
-      lunch: dayData.lunch || [],
-      dinner: dayData.dinner || [],
-    }));
-    return days;
-  } catch (err: any) {
-    console.error('Failed to get cached meal plan:', err);
-    return [];
-  }
-};
-
 const removeMeal = async (date: string, mealType: 'breakfast' | 'lunch' | 'dinner', mealId: string, householdId?: string, userId?: string) => {
   try {
     const cacheRef = getCacheRef(householdId, userId);
@@ -169,13 +144,39 @@ const removeMeal = async (date: string, mealType: 'breakfast' | 'lunch' | 'dinne
   }
 };
 
+const getCachedMealPlan = async (householdId?: string, userId?: string): Promise<DayPlan[]> => {
+  try {
+    const cacheRef = getCacheRef(householdId, userId);
+    const docSnap = await DatabaseMonitoringService.getDoc(cacheRef);
+
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      if (data && data.version === CACHE_VERSION && data.days) {
+        return Object.entries(data.days).map(([date, dayData]: [string, any]) => ({
+          date,
+          dayName: dayData.dayName,
+          breakfast: dayData.breakfast || [],
+          lunch: dayData.lunch || [],
+          dinner: dayData.dinner || [],
+        }));
+      }
+    }
+    return [];
+  } catch (err: any) {
+    console.error('Failed to get cached meal plan:', err);
+    return [];
+  }
+};
+
+const setCache = updateCache;
+
 
 export const MealPlanCacheService = {
   CACHE_VERSION,
   updateCache,
-  setCache,
-  getCachedMealPlan,
   addMeal,
   updateMeal,
   removeMeal,
+  getCachedMealPlan,
+  setCache,
 };

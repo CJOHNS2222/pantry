@@ -5,6 +5,7 @@ import { RecipeRatingService } from '../services/recipeRatingService';
 import { RecipePhotoService } from '../services/recipePhotoService';
 import { useAuth } from '../hooks/useAuth';
 import { useToasts } from '../hooks/useToasts';
+import { log } from '../services/logService';
 
 interface RecipeRatingUIProps {
   recipeTitle: string;
@@ -59,7 +60,7 @@ export const RecipeRatingUI: React.FC<RecipeRatingUIProps> = ({
         setIsSubmitted(true);
       }
     } catch (error) {
-      console.error('Failed to load existing rating:', error);
+      log.error('Failed to load existing rating:', error);
     } finally {
       setIsLoading(false);
     }
@@ -124,7 +125,7 @@ export const RecipeRatingUI: React.FC<RecipeRatingUIProps> = ({
       setPhotos(prev => [...prev, photo]);
       addToast('Photo uploaded successfully!', 'info');
     } catch (error) {
-      console.error('Photo upload failed:', error);
+      log.error('Photo upload failed:', error);
       addToast('Failed to upload photo. Please try again.', 'error');
     } finally {
       setIsLoading(false);

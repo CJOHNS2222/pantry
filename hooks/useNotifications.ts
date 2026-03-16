@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { Capacitor } from '@capacitor/core';
 import { DayPlan } from '../types';
+import { log } from '../services/logService';
 
 interface NotificationSettings {
   enabled: boolean;
@@ -28,7 +29,7 @@ export function useNotifications(settings: NotificationSettings, userEmail?: str
         const permission = await LocalNotifications.checkPermissions();
         setNotificationPermission(permission.display);
       } catch (err: any) {
-        console.error('Error checking notification permissions:', err);
+        log.error('Error checking notification permissions:', { error: err?.message }, 'useNotifications');
       }
     };
 
@@ -39,7 +40,7 @@ export function useNotifications(settings: NotificationSettings, userEmail?: str
         // Request permissions
         const permission = await LocalNotifications.requestPermissions();
         if (permission.display !== 'granted') {
-          console.log('Notification permissions not granted');
+          log.debug('Notification permissions not granted');
           return;
         }
 
@@ -50,7 +51,7 @@ export function useNotifications(settings: NotificationSettings, userEmail?: str
           await scheduleNotifications(settings, mealPlan);
         }
       } catch (err: any) {
-        console.error('Error setting up notifications:', err);
+        log.error('Error setting up notifications:', { error: err?.message }, 'useNotifications');
       }
     };
 
@@ -63,7 +64,7 @@ export function useNotifications(settings: NotificationSettings, userEmail?: str
       setNotificationPermission(permission.display);
       return permission.display;
     } catch (err: any) {
-      console.error('Error requesting notification permissions:', err);
+      log.error('Error requesting notification permissions:', { error: err?.message }, 'useNotifications');
       return 'denied';
     }
   };

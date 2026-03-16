@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Android Build Modernization**: Migrated Android build configuration to use version catalogs for better dependency management and maintainability
 - **Settings Performance**: Added debounced saving for profile changes to reduce unnecessary API calls and improve user experience
 - **Copilot Instructions**: Enhanced AI agent documentation with comprehensive project context, testing patterns, advanced features, and development guidelines
+- **Premium Upgrade Flow**: Updated PremiumFeature component to navigate to Settings tab instead of showing alert placeholders
 
 ### Fixed
 - **Household Admin Leave Button**: Fixed issue where household admins couldn't see the leave household button due to conditional logic that only showed it for non-admin users
@@ -20,6 +21,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Database Analytics Button**: Resized oversized button to 20×20px for consistent UI sizing
 - **Meal Plan Calendar**: Fixed date selection logic to properly show today as default instead of being stuck on previous dates
 - **App Code Cleanup**: Removed unused code and improved import organization in App.tsx
+- **Premium Tier Enforcement**: Fixed critical bug where new users and users without stored subscriptions defaulted to premium tier instead of free, ensuring proper revenue gating
+- **Production Readiness**: Added modal focus traps for accessibility, OS dark mode detection, camera permission error handling with user-friendly toasts, aria-live regions for validation errors, removed dead calendar export button
+- **Console Logging**: Replaced all console.* calls with proper logService/Sentry routing for production monitoring
+- **TypeScript Fixes**: Resolved type errors in MealPlanCacheService and useFocusTrap hook
 
 ## [1.4.1] - 2026-03-13
 

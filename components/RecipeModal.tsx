@@ -6,6 +6,7 @@ import { RecipeRatingUI } from './RecipeRating';
 import { ProgressiveImage } from './ProgressiveImage';
 import { generateBlurDataURL } from '../utils/appUtils';
 import { useKeyboardNavigation } from '../hooks/useKeyboardNavigation';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 import { scaleRecipeIngredients, calculatePortionScaling } from '../utils/portionUtils';
 
 interface RecipeModalProps {
@@ -75,6 +76,9 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [submitForInclusion, setSubmitForInclusion] = useState(false);
+  
+  // Focus trap for accessibility
+  const modalRef = useFocusTrap({ isActive: isOpen });
   
   // Cooking Timer State
   const [timerActive, setTimerActive] = useState(false);
@@ -313,7 +317,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
           </div>
         </div>
       )}
-      <div className="bg-theme-primary rounded-2xl shadow-2xl max-w-lg w-full relative flex flex-col max-h-[85vh] overflow-hidden" onClick={e => e.stopPropagation()}>
+      <div ref={modalRef} className="bg-theme-primary rounded-2xl shadow-2xl max-w-lg w-full relative flex flex-col max-h-[85vh] overflow-hidden" onClick={e => e.stopPropagation()}>
         {/* Fixed Header */}
         <div className="flex items-center justify-between p-4 pb-3 border-b border-theme flex-shrink-0 rounded-t-2xl">
           <h2 className="text-lg font-semibold text-theme-primary truncate pr-2">{recipe.title}</h2>

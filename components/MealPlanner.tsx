@@ -790,41 +790,6 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
     }
   };
 
-  const handleCalendarExport = async () => {
-    try {
-      const successCount = 0;
-      const totalEvents = 0;
-
-      // Temporarily disabled calendar integration due to plugin compatibility issues
-      /*
-      for (const day of mealPlan) {
-        if (day.meals.some(meal => meal.recipe)) {
-          const date = new Date(day.date);
-          const success = await CalendarService.createMealPlanEvent(day, date);
-          if (success) {
-            successCount++;
-          }
-          totalEvents++;
-        }
-      }
-      */
-
-      if (successCount > 0) {
-        alert(`Successfully added ${successCount} meal plan${successCount > 1 ? 's' : ''} to your calendar!`);
-        AnalyticsService.trackEvent('calendar_export_success', { events_added: successCount });
-      } else if (totalEvents === 0) {
-        alert('No meal plans with recipes found to export. Add some recipes to your meal plan first!');
-      } else {
-        alert('Calendar export failed. Please check calendar permissions and try again.');
-        AnalyticsService.trackEvent('calendar_export_failed', { reason: 'permissions_or_plugin' });
-      }
-    } catch (error) {
-      console.error('Calendar export error:', error);
-      alert('Failed to export to calendar. Please try again.');
-      AnalyticsService.trackEvent('calendar_export_error', { error: (error as any)?.message || String(error) });
-    }
-  };
-
   const removeMeal = (dayIndex: number, mealType: string, mealIndex: number) => {
       const newPlan = [...mealPlan];
       const mealTypeKey = mealType as 'breakfast' | 'lunch' | 'dinner';
@@ -1199,15 +1164,6 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
         title="Smart Meal Prep Planner"
       >
         <CalendarClock className="w-5 h-5 text-theme-secondary opacity-60 hover:opacity-100" />
-      </button>
-
-      {/* Calendar Export Button */}
-      <button
-        onClick={handleCalendarExport}
-        className="absolute top-12 right-28 p-2 rounded-full hover:bg-theme-secondary/10 transition-colors z-10"
-        title="Export to Calendar"
-      >
-        📅
       </button>
 
       <PremiumFeature

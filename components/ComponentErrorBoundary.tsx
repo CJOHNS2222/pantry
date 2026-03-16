@@ -1,6 +1,7 @@
 import React from 'react';
 import * as Sentry from '@sentry/react';
 import AnalyticsService from '../services/analyticsService';
+import { log } from '../services/logService';
 
 interface ComponentErrorBoundaryProps {
   children: React.ReactNode;
@@ -27,7 +28,7 @@ class ComponentErrorBoundary extends React.Component<ComponentErrorBoundaryProps
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error(`Error in ${this.props.componentName}:`, error, errorInfo);
+    log.error(`Error in ${this.props.componentName}`, { error, errorInfo }, 'ComponentErrorBoundary');
 
     // Report to Sentry with component context
     Sentry.withScope((scope) => {

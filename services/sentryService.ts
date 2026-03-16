@@ -295,6 +295,11 @@ export const clearUserContext = () => {
   Sentry.setTag('household_id', undefined);
 };
 
+// Capture an error exception
+export const captureError = (error: Error) => {
+  Sentry.captureException(error);
+};
+
 // Set app context
 export const setAppContext = (version: string, platform: 'web' | 'android' | 'ios', theme: 'light' | 'dark') => {
   Sentry.setTag('app_version', version);

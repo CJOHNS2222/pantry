@@ -446,10 +446,22 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
         setRawBase64(base64Data);
         setMimeType(photo.format ? `image/${photo.format}` : 'image/jpeg');
       }
-    } catch (err) {
-      // User cancelled or error
+    } catch (err: any) {
+      setLoadingState(LoadingState.IDLE);
+      // Handle camera permission errors
+      if (err?.message?.includes('permission') || err?.message?.includes('denied') || err?.message?.includes('Permission')) {
+        appActions.addToast(
+          'Camera permission is required. Please enable camera access in your device settings and try again.',
+          'error',
+          8000
+        );
+      } else if (!err?.message?.includes('cancelled') && !err?.message?.includes('dismissed')) {
+        // Only show error for non-user-cancellation errors
+        appActions.addToast('Failed to access camera. Please try again.', 'error');
+      }
+      // User cancelled - no toast needed
     }
-  }, []);
+  }, [appActions]);
 
   // Select photo from gallery
   const handleSelectFromGallery = useCallback(async () => {
@@ -465,10 +477,21 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
         setRawBase64(base64Data);
         setMimeType(photo.format ? `image/${photo.format}` : 'image/jpeg');
       }
-    } catch (err) {
-      // User cancelled or error
+    } catch (err: any) {
+      // Handle photo library permission errors
+      if (err?.message?.includes('permission') || err?.message?.includes('denied') || err?.message?.includes('Permission')) {
+        appActions.addToast(
+          'Photo library permission is required. Please enable photo access in your device settings and try again.',
+          'error',
+          8000
+        );
+      } else if (!err?.message?.includes('cancelled') && !err?.message?.includes('dismissed')) {
+        // Only show error for non-user-cancellation errors
+        appActions.addToast('Failed to access photo library. Please try again.', 'error');
+      }
+      // User cancelled - no toast needed
     }
-  }, []);
+  }, [appActions]);
 
   // Barcode scanning with camera
   const handleScanBarcode = useCallback(async () => {
@@ -514,11 +537,22 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
         };
         img.src = photo.dataUrl;
       }
-    } catch (err) {
-      console.error('Camera error:', err);
+    } catch (err: any) {
       setLoadingState(LoadingState.IDLE);
+      // Handle camera permission errors for barcode scanning
+      if (err?.message?.includes('permission') || err?.message?.includes('denied') || err?.message?.includes('Permission')) {
+        appActions.addToast(
+          'Camera permission is required for barcode scanning. Please enable camera access in your device settings and try again.',
+          'error',
+          8000
+        );
+      } else if (!err?.message?.includes('cancelled') && !err?.message?.includes('dismissed')) {
+        // Only show error for non-user-cancellation errors
+        appActions.addToast('Failed to access camera for barcode scanning. Please try again.', 'error');
+      }
+      // User cancelled - no toast needed
     }
-  }, []);
+  }, [appActions]);
 
   // Receipt scanning with camera
   const handleScanReceipt = useCallback(async () => {
@@ -542,11 +576,22 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
         // Process receipt
         await processReceiptImage(base64Data, photo.format ? `image/${photo.format}` : 'image/jpeg');
       }
-    } catch (err) {
-      console.error('Camera error:', err);
+    } catch (err: any) {
       setLoadingState(LoadingState.IDLE);
+      // Handle camera permission errors for receipt scanning
+      if (err?.message?.includes('permission') || err?.message?.includes('denied') || err?.message?.includes('Permission')) {
+        appActions.addToast(
+          'Camera permission is required for receipt scanning. Please enable camera access in your device settings and try again.',
+          'error',
+          8000
+        );
+      } else if (!err?.message?.includes('cancelled') && !err?.message?.includes('dismissed')) {
+        // Only show error for non-user-cancellation errors
+        appActions.addToast('Failed to access camera for receipt scanning. Please try again.', 'error');
+      }
+      // User cancelled - no toast needed
     }
-  }, []);
+  }, [appActions]);
 
   const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

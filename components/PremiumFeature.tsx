@@ -1,6 +1,8 @@
 import React from 'react';
 import { Lock, Crown } from 'lucide-react';
 import { useSubscription } from '../hooks/useSubscription';
+import { useApp } from '../contexts/AppContext';
+import { Tab } from '../types/app';
 import { User } from '../types';
 
 interface PremiumFeatureProps {
@@ -27,6 +29,7 @@ export const PremiumFeature: React.FC<PremiumFeatureProps> = ({
   onUpgrade
 }) => {
   const { isPremium, isActive, loading } = useSubscription(user);
+  const { setActiveTab } = useApp();
 
   if (loading) {
     return <div className="animate-pulse bg-gray-200 h-8 rounded"></div>;
@@ -68,7 +71,7 @@ export const PremiumFeature: React.FC<PremiumFeatureProps> = ({
                 ✨ Premium users save 2+ hours per week on meal planning
               </p>
             </div>
-            <button className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-4 py-2 rounded-lg font-medium hover:from-yellow-500 hover:to-orange-600 transition-all" onClick={onUpgrade || (() => alert('Upgrade functionality would navigate to subscription manager'))}>
+              <button className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-4 py-2 rounded-lg font-medium hover:from-yellow-500 hover:to-orange-600 transition-all" onClick={onUpgrade || (() => setActiveTab(Tab.SETTINGS))}>
               Upgrade Now - Starting at $4.99/mo
             </button>
           </div>
@@ -102,7 +105,7 @@ export const PremiumFeature: React.FC<PremiumFeatureProps> = ({
               🎯 Find recipes using ingredients you already have
             </p>
           </div>
-          <button className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-4 py-2 rounded-lg font-medium hover:from-yellow-500 hover:to-orange-600 transition-all" onClick={onUpgrade || (() => alert('Upgrade functionality would navigate to subscription manager'))}>
+          <button className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-4 py-2 rounded-lg font-medium hover:from-yellow-500 hover:to-orange-600 transition-all" onClick={onUpgrade || (() => setActiveTab(Tab.SETTINGS))}>
             Try Premium Free for 7 Days
           </button>
         </div>

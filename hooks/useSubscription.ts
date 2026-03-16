@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import DatabaseMonitoringService from '../services/databaseMonitoringService';
 import { User, Subscription } from '../types';
 import { UsageService } from '../services/usageService';
+import { log } from '../services/logService';
 
 export function useSubscription(user: User | null) {
   const [subscription, setSubscription] = useState<Subscription | null>(null);
@@ -18,11 +19,11 @@ export function useSubscription(user: User | null) {
       if (data?.subscription) {
         setSubscription(data.subscription);
       } else {
-        // Default to premium tier for development/testing
+        // Default to free tier for users without a stored subscription
         setSubscription({
-          tier: 'premium',
+          tier: 'free',
           status: 'active',
-          current_period_end: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year from now
+          current_period_end: new Date(),
           cancel_at_period_end: false
         });
       }
@@ -46,7 +47,7 @@ export function useSubscription(user: User | null) {
         await UsageService.updatePlanLimits(user, updates.tier);
       }
     } catch (err: any) {
-      console.error('Error updating subscription:', err);
+      log.error('Error updating subscription:', { error: err?.message }, 'useSubscription');
       throw err;
     }
   };

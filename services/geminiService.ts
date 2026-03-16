@@ -220,7 +220,7 @@ export const analyzePantryImage = async (base64Image: string, mimeType: string, 
 
       // Add timeout to prevent hanging requests
       const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Image analysis timeout. Please try again.')), 45000); // 45 second timeout for image analysis
+        setTimeout(() => reject(new Error('Image analysis timeout. Please try again.')), 30000); // 30 second timeout for image analysis
       });
 
       const responsePromise = ai.models.generateContent({
@@ -398,7 +398,7 @@ export const analyzeReceiptImage = async (base64Image: string, mimeType: string,
 
       // Add timeout to prevent hanging requests
       const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Receipt analysis timeout. Please try again.')), 45000); // 45 second timeout for image analysis
+        setTimeout(() => reject(new Error('Receipt analysis timeout. Please try again.')), 30000); // 30 second timeout for image analysis
       });
 
       const responsePromise = ai.models.generateContent({

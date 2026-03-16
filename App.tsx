@@ -28,8 +28,8 @@ import { getQuantityAmount } from './utils/quantityUtils';
 import { NotificationBanner } from './components/NotificationBanner';
 import { NotificationService, NotificationItem, NotificationSettings } from './services/notificationService';
 import { markNotificationRead, deleteNotification, snoozeNotificationInCache } from './services/notificationsService';
-import { pushNotificationService } from './services/pushNotificationService';
 import { log } from './services/logService';
+import { pushNotificationService } from './services/pushNotificationService';
 import { HouseholdActivityService } from './services/householdActivityService';
 import { App as CapacitorApp, BackButtonListenerEvent } from '@capacitor/app';
 import { AppProvider, useApp } from './contexts/AppContext';
@@ -132,7 +132,7 @@ const App: React.FC = () => {
   // Load price data once auth is ready and we have a user
   useEffect(() => {
     if (isAuthReady && user) {
-      console.log("Auth is ready and user is logged in, loading price data...");
+      log.debug("Auth is ready and user is logged in, loading price data...");
       PriceDataCacheService.loadPriceData();
     }
   }, [isAuthReady, user]);
@@ -527,7 +527,7 @@ const App: React.FC = () => {
       
       addToast(`${itemIds.length} expired item${itemIds.length !== 1 ? 's' : ''} removed`, 'success');
     } catch (error) {
-      console.error('Failed to remove expired items:', error);
+      log.error('Failed to remove expired items', { error }, 'App');
       addToast('Failed to remove expired items', 'error');
       throw error;
     }
@@ -652,10 +652,10 @@ const App: React.FC = () => {
 
     // Handle app URL open for Firebase auth redirects
     CapacitorApp.addListener('appUrlOpen', (event) => {
-      console.log('App opened with URL:', event.url);
+      log.debug('App opened with URL:', event.url);
       // Check if this is a Firebase auth redirect
       if (event.url && event.url.startsWith('com.smart.pantry://')) {
-        console.log('Firebase auth redirect detected, URL:', event.url);
+        log.debug('Firebase auth redirect detected, URL:', event.url);
         // The redirect result will be handled by the Login component
         // when it mounts and calls getRedirectResult
       }
@@ -683,21 +683,21 @@ const App: React.FC = () => {
   useEffect(() => {
     const checkHouseholdInvites = async () => {
       if (user && !user.householdId) {
-        console.log('Checking household invites for user:', user.id, user.email);
+        log.debug('Checking household invites for user', { userId: user.id });
         try {
           const unreadNotifications = await NotificationService.getUnreadNotifications(user.id, user.email);
-          console.log('Unread notifications:', unreadNotifications);
+          log.debug('Unread notifications count:', unreadNotifications.length);
           const invites = unreadNotifications.filter(n => n.type === 'household_invite' && n.actionType === 'join_household');
-          console.log('Household invites found:', invites);
+          log.debug('Household invites found:', invites.length);
           if (invites.length > 0) {
             setHouseholdInvites(invites);
             setShowHouseholdInviteModal(true);
           }
         } catch (error) {
-          console.error('Error checking household invites:', error);
+          log.error('Error checking household invites', { error }, 'App');
         }
       } else {
-        console.log('Skipping household invite check - user has householdId or no user:', user?.householdId);
+        log.debug('Skipping household invite check - user has householdId or no user');
       }
     };
 
@@ -780,7 +780,7 @@ const App: React.FC = () => {
                 // Mark onboarding as completed in localStorage
                 localStorage.setItem('onboarding-completed', 'true');
               } catch (error) {
-                console.error('Failed to mark onboarding complete:', error);
+                log.error('Failed to mark onboarding complete', { error }, 'App');
               }
             }}
             onSkip={() => setShowOnboarding(false)}

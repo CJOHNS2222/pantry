@@ -6,6 +6,7 @@ import { getQuantityAmount } from '../utils/quantityUtils';
 import AnalyticsService from '../services/analyticsService';
 import HapticService from '../services/hapticService';
 import FoodWasteAnalyticsService, { DisposalRecord } from '../services/foodWasteAnalyticsService';
+import { log } from '../services/logService';
 
 interface ExpiredItemsModalProps {
   isOpen: boolean;
@@ -122,7 +123,7 @@ const ExpiredItemsModal: React.FC<ExpiredItemsModalProps> = ({
       HapticService.success();
       onClose();
     } catch (error) {
-      console.error('Failed to remove expired items:', error);
+      log.error('Failed to remove expired items:', error);
       HapticService.error();
     } finally {
       setIsProcessing(false);

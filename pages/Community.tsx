@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 // Using plain HTML elements here to avoid optional Ionic dependency in non-native builds
 import { RecipeRating } from '../types';
 import { useDataManagement } from '../hooks/useDataManagement';
+import { log } from '../services/logService';
 
 const Community: React.FC = () => {
   const [ratings, setRatings] = useState<RecipeRating[]>([]);
@@ -17,7 +18,7 @@ const Community: React.FC = () => {
       setRatings(communityRatings);
     } catch (err: any) {
       setError('Could not load community ratings.');
-      console.error(err);
+      log.error('Failed to load community ratings:', { error: err?.message }, 'Community');
     }
     setIsLoading(false);
   }, [getCommunityRatings]);

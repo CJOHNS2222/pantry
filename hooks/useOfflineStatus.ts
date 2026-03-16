@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { offlineQueue } from '../services/offlineQueueService';
 import DatabaseMonitoringService from '../services/databaseMonitoringService';
+import { log } from '../services/logService';
 
 export interface SyncStatus {
   isOnline: boolean;
@@ -74,7 +75,7 @@ export const useOfflineStatus = () => {
           hasConflicts: conflicts.length > 0
         }));
       } catch (err: any) {
-        console.error('Failed to initialize offline queue:', err);
+        log.error('Failed to initialize offline queue:', { error: err?.message }, 'useOfflineStatus');
       }
     };
 
