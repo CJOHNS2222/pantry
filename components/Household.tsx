@@ -336,13 +336,6 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
               <Settings className="w-5 h-5" />
             </button>
 
-            <button
-              onClick={leaveHousehold}
-              className="text-red-200/50 hover:text-red-400 p-2 transition-colors"
-              title="Leave Household"
-            >
-              <AlertTriangle className="w-5 h-5" />
-            </button>
             <button onClick={onClose} className="text-red-200/50 hover:text-white">
               <X className="w-6 h-6" />
             </button>
@@ -435,19 +428,14 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
         </div>
 
         <div className="p-4 pb-2.5 bg-[#2A0A10] border-t border-red-900/50">
-          {(() => {
-            const currentUser = household?.members && Array.isArray(household.members) ? household.members.find(m => m.email === user.email) : null;
-            return currentUser?.role !== 'admin' && (
-              <div className="mb-3">
-                <button
-                  onClick={leaveHousehold}
-                  className="w-full bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg font-medium transition-colors"
-                >
-                  Leave Household
-                </button>
-              </div>
-            );
-          })()}
+          <div className="mb-3">
+            <button
+              onClick={leaveHousehold}
+              className="w-full bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg font-medium transition-colors"
+            >
+              Leave Household
+            </button>
+          </div>
           <p className="text-xs text-red-200/30 text-center">Changes are saved to your family group instantly.</p>
         </div>
       </div>
