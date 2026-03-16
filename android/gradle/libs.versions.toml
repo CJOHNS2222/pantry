@@ -1,6 +1,6 @@
 [versions]
 agp = "9.1.0"
-kotlin = "2.1.20"
+kotlin = "2.1.0"
 firebase-bom = "34.10.0"
 appcompat = "1.7.1"
 activity = "1.13.0"
