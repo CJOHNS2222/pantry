@@ -1,50 +1,44 @@
 [versions]
 agp = "9.1.0"
-appcompat = "1.7.1"
-com-google-firebase = "firebase-analytics"
-com-google-firebaseX2 = "firebase-crashlytics"
-com-google-firebaseX3 = "firebase-perf"
-com-google-firebaseX4 = "firebase-auth"
-com-google-firebaseX5 = "firebase-storage"
-com-google-firebaseX6 = "firebase-firestore"
-coordinatorlayout = "1.3.0"
-coreSplashscreen = "1.2.0"
-espresso-core = "3.7.0"
+kotlin = "2.1.20"
 firebase-bom = "34.10.0"
-google-firebase = "firebase-functions"
-google-firebase-appdistribution = "5.2.1"
-google-firebase-crashlytics = "3.0.6"
-google-firebase-firebase-perf = "2.0.2"
-google-gms-google-services = "4.4.4"
-gradle = "9.1.0"
-gradle-toolchains-foojay-resolver-convention = "1.0.0"
-junit = "1.3.0"
-junitVersion = "4.13.2"
-sentry-android-gradle = "6.1.0"
+appcompat = "1.7.1"
+activity = "1.13.0"
+core = "1.18.0"
+coordinatorlayout = "1.3.0"
+splashscreen = "1.2.0"
+webkit = "1.15.0"
+junit = "4.13.2"
+androidx-junit = "1.3.0"
+espresso = "3.7.0"
+sentry = "6.1.0"
 compileSdk = "36"
 
 [libraries]
+androidx-activity = { group = "androidx.activity", name = "activity", version.ref = "activity" }
 androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
+androidx-core = { group = "androidx.core", name = "core", version.ref = "core" }
+androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "core" }
+androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "splashscreen" }
 androidx-coordinatorlayout = { group = "androidx.coordinatorlayout", name = "coordinatorlayout", version.ref = "coordinatorlayout" }
-androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "coreSplashscreen" }
-androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espresso-core" }
-androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junit" }
+androidx-webkit = { group = "androidx.webkit", name = "webkit", version.ref = "webkit" }
 firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebase-bom" }
-gradle = { group = "com.android.tools.build", name = "gradle", version.ref = "gradle" }
-junit = { group = "junit", name = "junit", version.ref = "junitVersion" }
+firebase-analytics = { group = "com.google.firebase", name = "firebase-analytics" }
+firebase-auth = { group = "com.google.firebase", name = "firebase-auth" }
+firebase-crashlytics = { group = "com.google.firebase", name = "firebase-crashlytics" }
+firebase-firestore = { group = "com.google.firebase", name = "firebase-firestore" }
+firebase-functions = { group = "com.google.firebase", name = "firebase-functions" }
+firebase-perf = { group = "com.google.firebase", name = "firebase-perf" }
+firebase-storage = { group = "com.google.firebase", name = "firebase-storage" }
+junit = { group = "junit", name = "junit", version.ref = "junit" }
+androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidx-junit" }
+androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espresso" }
+material = { group = "com.google.android.material", name = "material", version = "1.13.0" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
-com-google-firebase = { id = "com.google.firebase", version.ref = "com-google-firebase" }
-com-google-firebaseX2 = { id = "com.google.firebase", version.ref = "com-google-firebaseX3" }
-com-google-firebaseX3 = { id = "com.google.firebase", version.ref = "com-google-firebaseX4" }
-com-google-firebaseX4 = { id = "com.google.firebase", version.ref = "com-google-firebaseX6" }
-com-google-firebaseX5 = { id = "com.google.firebase", version.ref = "google-firebase" }
-com-google-firebaseX6 = { id = "com.google.firebase", version.ref = "com-google-firebaseX5" }
-google-firebase = { id = "com.google.firebase", version.ref = "com-google-firebaseX2" }
-google-firebase-appdistribution = { id = "com.google.firebase.appdistribution", version.ref = "google-firebase-appdistribution" }
-google-firebase-crashlytics = { id = "com.google.firebase.crashlytics", version.ref = "google-firebase-crashlytics" }
-google-firebase-firebase-perf = { id = "com.google.firebase.firebase-perf", version.ref = "google-firebase-firebase-perf" }
-google-gms-google-services = { id = "com.google.gms.google-services", version.ref = "google-gms-google-services" }
-gradle-toolchains-foojay-resolver-convention = { id = "org.gradle.toolchains.foojay-resolver-convention", version.ref = "gradle-toolchains-foojay-resolver-convention" }
-sentry-android-gradle = { id = "io.sentry.android.gradle", version.ref = "sentry-android-gradle" }
+google-services = { id = "com.google.gms.google-services", version = "4.4.4" }
+firebase-appdistribution = { id = "com.google.firebase.appdistribution", version = "5.2.1" }
+firebase-crashlytics = { id = "com.google.firebase.crashlytics", version = "3.0.6" }
+firebase-perf = { id = "com.google.firebase.firebase-perf", version = "2.0.2" }
+sentry = { id = "io.sentry.android.gradle", version.ref = "sentry" }

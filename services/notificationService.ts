@@ -150,7 +150,7 @@ export class NotificationService {
     if (urgentItems.length <= 1 && highRiskItems.length <= 1) return '';
 
     // Check if stack notification already exists
-    const existingNotifications = await this.getUnreadNotifications(userId);
+    const existingNotifications = await NotificationService.getUnreadNotifications(userId);
     const existingStack = existingNotifications.find(n =>
       n.type === 'expiration' &&
       n.actionData?.isStack === true &&
@@ -230,7 +230,7 @@ export class NotificationService {
     itemCategory?: string
   ): Promise<string> {
     // Check if notification already exists for this item
-    const existingNotifications = await this.getUnreadNotifications(userId);
+    const existingNotifications = await NotificationService.getUnreadNotifications(userId);
     const existingNotification = existingNotifications.find(n =>
       n.type === 'expiration' &&
       n.actionData?.itemId === itemId &&

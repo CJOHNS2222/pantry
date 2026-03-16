@@ -43,6 +43,19 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
     setShowNotifications(prev => !prev);
   };
 
+  const handleNotificationBellDoubleClick = () => {
+    if (onNavigateToSettings) {
+      onNavigateToSettings();
+      // Navigate to account tab where pending notifications are located
+      setTimeout(() => {
+        const settingsTab = document.querySelector('[data-settings-tab="account"]') as HTMLElement;
+        if (settingsTab) {
+          settingsTab.click();
+        }
+      }, 100);
+    }
+  };
+
   const handleMarkAllRead = async () => {
     if (!user?.id) return;
     try {
@@ -66,9 +79,10 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
               <div className="relative">
                 <button
                   onClick={handleToggleNotifications}
+                  onDoubleClick={handleNotificationBellDoubleClick}
                   className="relative p-1 text-amber-500 hover:text-amber-400 transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 rounded"
                   aria-label={`${unreadNotificationsCount} unread notifications`}
-                  title="View pending notifications"
+                  title="Click to view notifications, double-click to view pending notifications"
                 >
                   <Bell className="w-4 h-4" />
                   {unreadNotificationsCount > 0 && (

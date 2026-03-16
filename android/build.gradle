@@ -7,69 +7,23 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        // Downgrade AGP to 8.7.3 to maintain compatibility with older plugins while still supporting modern SDKs
-        classpath 'com.android.tools.build:gradle:8.7.3'
+        // Use AGP 9.1.0 as specified in libs.versions.toml
+        classpath "com.android.tools.build:gradle:9.1.0"
 
         // NOTE: Do not place your application dependencies here; they belong
         // in the individual module build.gradle files
     }
 }
-plugins {
-     id 'com.google.gms.google-services' version '4.4.4' apply false
-     id 'com.google.firebase.appdistribution' version '5.2.0' apply false
-     id 'com.google.firebase.crashlytics' version '3.0.6' apply false
-     id 'com.google.firebase.firebase-perf' version '2.0.2' apply false
-}
 
+plugins {
+    alias(libs.plugins.android.application) apply false
+    alias(libs.plugins.google.services) apply false
+    alias(libs.plugins.firebase.appdistribution) apply false
+    alias(libs.plugins.firebase.crashlytics) apply false
+    alias(libs.plugins.firebase.perf) apply false
+}
 
 apply from: "variables.gradle"
-
-// Disable AAR metadata check for capacitor-cordova-android-plugins
-gradle.allprojects { project ->
-    project.afterEvaluate {
-        if (project.name == 'capacitor-cordova-android-plugins') {
-            project.tasks.findByName('checkDebugAarMetadata')?.enabled = false
-            project.tasks.findByName('checkReleaseAarMetadata')?.enabled = false
-        }
-    }
-}
-
-// Force disable the task at execution time
-gradle.taskGraph.whenReady { taskGraph ->
-    taskGraph.allTasks.findAll { task ->
-        task.name.contains('AarMetadata') && task.project.name == 'capacitor-cordova-android-plugins'
-    }.each { task ->
-        task.enabled = false
-    }
-}
-
-// Configure AAR metadata tasks to not fail on AndroidX issues
-gradle.allprojects { project ->
-    project.tasks.matching { task ->
-        task.name.contains('AarMetadata')
-    }.configureEach { task ->
-        if (task.hasProperty('ignoreAndroidX')) {
-            task.ignoreAndroidX = true
-        }
-        // Also try to set the property directly
-        project.ext.set('android.useAndroidX', true)
-    }
-}
-
-// New: robustly disable checkDebugAarMetadata/checkReleaseAarMetadata for all projects after evaluation
-gradle.projectsEvaluated {
-    allprojects.each { p ->
-        try {
-            p.tasks.matching { t -> t.name == 'checkDebugAarMetadata' || t.name == 'checkReleaseAarMetadata' }
-             .configureEach { t ->
-                 logger.lifecycle("[build.gradle] Disabling AAR metadata checks for project: ${p.name}")
-                 t.enabled = false
-             }
-        } catch(Exception e) {
-            // ignore if tasks don't exist yet
-        }
-    }
-}
 
 // Repository configuration for all projects has been moved to settings.gradle using dependencyResolutionManagement.
 
@@ -77,18 +31,13 @@ task clean(type: Delete) {
     delete rootProject.layout.buildDirectory.get().asFile
 }
 
-def ensureAarMetadataFile() {
-    def pluginDir = file("${rootDir}/capacitor-cordova-android-plugins")
-    def metaDir = new File(pluginDir, 'build/intermediates/aar_metadata/debug/writeDebugAarMetadata')
-    if (!metaDir.exists()) {
-        metaDir.mkdirs()
-    }
-    def metaFile = new File(metaDir, 'aar-metadata.properties')
-    if (!metaFile.exists()) {
-        metaFile.text = "group=local\nname=capacitor-cordova-android-plugins\nversion=1.0\nminCompileSdk=${project.hasProperty('compileSdkVersion') ? rootProject.ext.compileSdkVersion : 34}\n"
-        println "[build.gradle] Created ${metaFile}"
+// Resolve Duplicate class kotlin.* errors by forcing a single version
+allprojects {
+    configurations.all {
+        resolutionStrategy.eachDependency { DependencyResolveDetails details ->
+            if (details.requested.group == 'org.jetbrains.kotlin' && details.requested.name.startsWith('kotlin-stdlib')) {
+                details.useVersion '1.8.22'
+            }
+        }
     }
 }
-
-// Ensure the file exists early
-ensureAarMetadataFile()

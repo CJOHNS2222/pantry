@@ -590,15 +590,16 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
             </div>
           </div>
 
+          {/* Price Trends Modal */}
+          {showPriceTrends && (
+            <PriceTrends
+              ingredient={item.item}
+              onClose={() => setShowPriceTrends(false)}
+            />
+          )}
         </div>
-      </div>      </div>
-      {/* Price Trends Modal */}
-      {showPriceTrends && (
-        <PriceTrends
-          ingredient={item.item}
-          onClose={() => setShowPriceTrends(false)}
-        />
-      )}
+      </div>
+    </div>
     </>
   );
 };

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, Suspense } from 'react';
+import React, { useState, useEffect, useRef, useMemo, Suspense } from 'react';
 import { serverTimestamp } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import DatabaseMonitoringService from './services/databaseMonitoringService';
@@ -267,14 +267,6 @@ const App: React.FC = () => {
     logShoppingAdded,
     logRecipeSaved,
     logMealCompleted
-  }, {
-    disableInventoryListeners: activeTab === Tab.PANTRY_CACHE_TEST,
-    onShowAddToPlanDialog: (recipe: any) => {
-      setPendingRecipeForPlan(recipe);
-      setSelectedDayForPlan(0); // Default to first day
-      setSelectedMealForPlan('dinner'); // Default to dinner
-      setShowAddToPlanDialog(true);
-    }
   });
 
   // Confirm add to plan from dialog

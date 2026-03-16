@@ -26,6 +26,15 @@ import { RecipesCacheService, CachedRecipesData, RecipesCacheMetadata } from '..
 import { ShoppingListCacheService, CachedShoppingListData, ShoppingListCacheMetadata, ShoppingListCache } from '../services/shoppingListCacheService';
 import HapticService from '../services/hapticService';
 
+// Helper to normalize quantity from PantryItem
+const getQuantityValue = (item: PantryItem): number => {
+  if (typeof item.quantity === 'number') return item.quantity;
+  if (item.quantity && typeof item.quantity === 'object') return (item.quantity as any).amount || 0;
+  // Fallback to legacy estimate string
+  const est = parseFloat(item.quantity_estimate || '0');
+  return isNaN(est) ? 0 : est;
+};
+
 // Global flag to prevent multiple meal plan syncs
 let mealPlanSyncInProgress = false;
 
@@ -902,9 +911,22 @@ export function useDataManagement(
       updates
     });
 
-    setInventory(prev => prev.map((item, i) => i === index ? { ...item, ...updates, expiryAlertShown: shouldShowExpiryAlert({ ...item, ...updates }) } : item));
+    const updatedItem = { ...currentItem, ...updates, expiryAlertShown: shouldShowExpiryAlert({ ...currentItem, ...updates }) };
+
+    setInventory(prev => prev.map((item, i) => i === index ? updatedItem : item));
 
     await InventoryCacheService.updateItemInCache(currentItem.id, updates, user?.householdId, user?.id);
+
+    // Check if this is a staple item that needs to be re-added to shopping list
+    if (updatedItem.isStaple && addToShoppingList) {
+      const currentQuantity = getQuantityValue(updatedItem);
+      const previousQuantity = getQuantityValue(currentItem);
+
+      // If quantity dropped to zero or very low (and wasn't already zero), add to shopping list
+      if (currentQuantity <= 0 && previousQuantity > 0) {
+        addToShoppingList([updatedItem.item]);
+      }
+    }
   };
 
   const deleteItem = async (index: number) => {

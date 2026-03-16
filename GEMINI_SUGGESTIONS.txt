@@ -1,58 +1,216 @@
-Gemini Suggestions — Consolidated Modifications
-
-Purpose: capture the phone conversation ideas and convert them into a concise, actionable plan to finish final app polish.
-
-1) UI Tweaks
-- Make unit pickers consistent across UI: share `QuantityUnitPicker` options (include "1/2 gallon").
-- Ensure Import modal stacks above other modals (keep z-[99999]) and accepts .txt lists.
-- Match the batch/purchase editor units to the main unit selector; use same ordered list.
-- Add small helper/tooltips where behavior might be surprising (e.g., "purchases are saved when you close this dialog").
-- Increase modal accessibility: focus management, proper aria-labels for inputs/buttons.
-
-2) UX Flow Improvements
-- Inline batch (purchase) editor inside `ItemDetailModal` (open edit in-place, persist on modal close).
-- Replace confusing placeholders; make labels explicit (Add Purchase vs Add Batch).
-- Keep "Use Soon — Recipe Ideas" green box; remove top orange "Expiration Alerts" widget.
-- Allow plain-text `.txt` import: convert newline lists to CSV rows for import flow.
-
-3) Spoonacular / API & Vendor
-- Keep generated Spoonacular client optional: maintain shim in `typescript/dist` for tests.
-- Continue lazy dynamic import + REST fallback pattern for all Spoonacular calls.
-- Plan for vendor cleanup: remove committed generated artifacts from repo, ensure CI installs/generated client during build.
-- Reduce Spoonacular quota use: prefer local parsing, cached results, and minimal REST fallbacks.
-
-4) Data/Firestore fixes
-- Avoid using serverTimestamp() inside array elements (replace with ISO string `new Date().toISOString()` before array append).
-- Keep serverTimestamp() for top-level collection writes only where appropriate.
-
-5) Tests, CI, and Reliability
-- Ensure tests set `process.env.SPOONACULAR_API_KEY` or rely on shims; read API key at call-time.
-- Add/adjust unit tests for import flow, ItemDetailModal batch edits, and quantity/unit pickers.
-- Run full test suite and fix regressions; update CI to run `npm run type-check` and `npm test` before merging.
-
-6) Polishing & Release Tasks
-- Run accessibility audit and fix ARIA/label issues discovered.
-- Performance: lazy-load heavy components, memoize expensive computations (large lists), and verify bundle size after vendor removal.
-- Update README/release notes describing how to generate/install Spoonacular client in CI (avoid committing generated code).
-- Tag a release candidate and run E2E smoke tests (Playwright) before publishing.
-
-Prioritization (first pass)
-1. Tests & CI (type-check + tests) — prevent regressions.
-2. Spoonacular runtime safety + vendor cleanup plan — avoid committing generated clients while keeping CI stable.
-3. ItemDetailModal batch UX & unit picker sync (including "1/2 gallon").
-4. Import modal `.txt` support and z-index fix.
-5. Accessibility polish, performance, docs, E2E.
-
-Next Actions (recommended)
-- Confirm which Gemini suggestions to prioritize (UI / API / tests / release).
-- I can implement items 2–4 in small, reviewable PRs: each PR limited to 1 area (e.g., `ItemDetailModal` changes; `spoonacular` client adapter; `ImportModal` fixes).
-- Run full type-check and tests locally, then iterate on any failing tests.
-
-Commands to run locally
-
-npm run type-check
-npm test
-npm run lint
+maintenance
 
 
-If you want, I can now: 1) break this list into tracked TODOs/PRs, or 2) start implementing a specific high-priority item you pick.
+Critical — Fix Before Any Production Release
+1. Private keys & keystores in git — key, keyid, keyid.pub, and 
+pantry-release.keystore are all tracked. Rotate everything, purge git history
+ (git filter-repo), and add them to .gitignore properly.
+
+2. Unauthenticated Cloud Function — resetUsageLimits.ts has an open HTTP endpoint
+ that resets all user quotas with a // TODO: Add proper authentication comment. 
+ Any anonymous caller can hit it.
+
+3. Placeholder admin UIDs in Firestore rules — firestore.rules has
+ "admin-user-id-1" / "admin-user-id-2" literal strings as admin checks. Replace
+  with real UIDs or an admins collection.
+
+High Priority — Build & Config
+4. Sentry disabled — index.tsx has // initSentry(); // DISABLED for testing.
+ If something breaks in prod you have no error reporting. Fix the Sentry v7/v10
+  package mismatch first (@sentry/tracing v7 is incompatible with @sentry/react
+   v10 where tracing is built-in), then re-enable.
+
+5. GEMINI_API_KEY baked into bundle — vite.config.ts has define:
+ { 'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY) }.
+  This embeds the raw key in the built JS. Remove those two define entries — 
+  geminiService.ts already reads import.meta.env.VITE_GEMINI_API_KEY directly.
+
+6. No Firebase Hosting config — firebase.json has firestore/storage/functions but
+ no hosting block. Without SPA rewrite rules, any direct URL navigation returns a 
+ 404. Also missing cache-control headers for hashed assets.
+
+7. "private": false in package.json — Should be true to prevent accidental npm
+ publish.
+
+Medium — Incomplete Features
+XXXXX 8. SmartRecommendations is all stubs — SmartRecommendations.tsx — every action
+ handler calls console.log(...). Nothing actually works.
+
+XXXXX 9. recipeRecommendationService returns hardcoded mock data — Has a big // TODO:
+ Implement actual recipe search based on ingredients and returns 3 fake recipe
+  objects instead.
+
+10. ShoppingList.tsx hardcoded user — ShoppingList.tsx passes
+ currentUserId="current-user" — household attribution is broken for everyone.
+
+XXXX 11. Stripe billing is a non-functional stub — stripeService.ts is a single line
+ const stripePromise: any = null. Yet @stripe/react-stripe-js and 
+ @stripe/stripe-js are in prod dependencies. Either implement it or remove it
+  cleanly.
+
+12. Barcode scanning / voice input are no-ops — barcodeScanning feature flag is 
+at 100% rollout but the callback is async () => null.
+
+Medium — Security
+13. Storage rules allow unauthenticated reads of pantry photos — pantry_images/ 
+has allow read: if true. Personal food photos shouldn't be publicly accessible.
+
+14. Community recipe cache / recipeCommunityStats are client-writable — Any 
+logged-in user can overwrite community stats directly. These should go through
+ Cloud Functions only.
+
+15. image_cache collection has no field validation — Any auth'd user can write 
+arbitrary data to any document.
+
+16. feedback collection has no size/rate limits — No document size validation, 
+no rate limiting.
+
+Medium — Tests
+17. Root tests directory is never run — vitest.config.ts only includes
+ src/**/__tests__/** and components/**/__tests__/**. The 7 spec files in tests
+  (including pantryService.fefo.spec.ts, leftoverService.test.ts, 
+  smoke-all-components.test.tsx) are silently skipped.
+
+18. Smoke tests pass even when components crash — The smoke test catches errors 
+and console.warns them but still passes.
+
+19. Zero coverage for core services — pantryService, geminiService, 
+householdService, notificationService, recipeService, usageService have no tests
+ at all.
+
+Low — Polish
+20. console.log noise in prod — logService.ts has no production log-level gating.
+ App.tsx, Login.tsx, and especially databaseMonitoringService.ts (logs every 
+ single Firestore query) are very noisy.
+
+21. App name says "Smart Pantry" — capacitor.config.ts has appName: 'Smart Pantry' 
+— device home screens show the old name, not "Stock & Spoon."
+
+22. Android minifyEnabled false — build.gradle — release APK is not minified, 
+increasing size and exposing symbol names.
+
+23. firebase-admin and adb in prod dependencies — These belong in devDependencies
+ or package.json.
+
+The highest-impact items to tackle first are #1–3 (security), then #4–6 
+(build/monitoring), then #8–11 (incomplete features that are user-visible). The 
+test gaps (#17–19) should be addressed before any automated CI/CD pipeline is set
+ up.
+(build/monitoring), then #8–11 (incomplete features that are user-visible). The
+ test gaps (#17–19) should be addressed before any automated CI/CD pipeline is set up.
+
+
+
+Upgrades
+
+
+1. "What Can I Cook Tonight?" express mode
+A single large CTA button on the pantry or home tab — one tap, no form — that
+ queries Gemini with your 5 soonest-expiring items and returns 3 meals you can 
+ make right now. Different from the full recipe finder (no inputs required, 
+ speed-optimized). The Gemini + pantry infrastructure is all there; it's missing
+  the express entrypoint.
+
+2. Leftover transformation suggestions
+"You made roast chicken on Monday. Ideas: chicken fried rice, quesadillas, chicken
+ soup." Triggered from LeftoversHotZone — a dedicated "turn this into..." button 
+ per leftover that passes the specific leftover + pantry contents to Gemini. The 
+ leftover capture and Gemini service both exist; they just aren't connected this
+  way.
+
+XXXXX 3. "Expiry dash" view
+A filtered pantry view showing only items expiring within the next 7 days, sorted
+ by urgency, with a one-tap "Find recipes using all of these" that pre-fills the
+  recipe search. Reduces food waste directly. The expiry color coding and recipe
+   search exist — it's just a dedicated UI entry point and a pre-filled search.
+
+XXXXX 4. Weekly meal plan auto-generator
+"Plan my week" button in the Meal Planner that calls Gemini with: pantry contents, 
+household preferences/allergies, past 5-star recipes, what's expiring. Returns a 
+full 7-day plan with one tap. The MealPrepPlanner is already wired but this closes
+ the loop from data → full plan in one action.
+
+5. Allergen overlay on recipes and shopping list
+Cross-reference household member allergies (already stored in member profiles)
+ against recipe ingredients and shopping list items — show a visible warning badge.
+  Very safety-relevant and all the data already exists in Firestore; it just isn't 
+  cross-referenced at display time.
+
+Shopping UX
+6. Staples / auto-reorder list
+Let users mark items as "staples" (eggs, milk, bread) that automatically reappear 
+on the shopping list when quantity drops to 0 or after a set interval
+ (weekly/biweekly). A huge pain point for every household. Needs a stapleItems 
+ subcollection and a check when quantity drops.
+
+7. Receipt scanning
+Photo of a grocery receipt → Gemini extracts item names + prices → bulk-adds to
+ pantry with AI-estimated expiry dates per item type. The image analysis pipeline 
+ (Gemini + camera) already exists for adding individual items; this is the same 
+ flow but applied to a full receipt.
+
+8. Custom store layout / aisle order
+Let users define their store's aisle sequence (produce → dairy → bakery → meat →
+ frozen) so the shopping list auto-sorts into that walk path.
+  SmartShoppingListOrganizer already groups by category; this adds a user-defined
+   ordering layer on top.
+
+XXXXX 9. Price-per-unit calculator
+Inline in the shopping list: "32oz for $4.99 vs 16oz for $2.79 — which is better
+ value?" A quick unit price comparison when there are multiple sizes. Trivial
+  math but high utility, surfaced at the decision point.
+
+Meal & Cooking Experience
+10. Cooking mode
+Full-screen recipe view with large step-by-step text, swipe navigation between
+ steps, per-step timers (with haptic feedback), and screen-always-on. Hands-free
+  cooking. The RecipeModal has all the recipe data; cooking mode is a dedicated 
+  presentation layer of it. hapticService and safeAreaService already exist.
+
+11. Ingredient substitution assistant
+"Recipe calls for buttermilk. You have: milk + lemon juice → substitute with 1
+ cup milk + 1 tbsp lemon juice." Triggered from the recipe modal when you're 
+ missing an ingredient. (XXXXX Gemini-powered,XXXXXX) surfaces at the most useful moment.
+
+12. Family dinner vote
+Show household members 2–3 meal options via push notification ("Vote on tonight's 
+dinner!") and they tap to vote. The winner auto-fills tonight's dinner slot. Built
+ on the existing push notification + household sharing infrastructure. Social, 
+ fun, removes decision fatigue.
+
+Pantry Intelligence
+13. Opened vs unopened shelf life tracking
+Items like tahini, soy sauce, or mayo have very different shelf lives once opened.
+ A simple "mark as opened" action on a pantry item that sets a openedAt date and calculates a separate openedExpiry based on item category. Would dramatically improve the accuracy of expiry alerts.
+
+14. Pantry health score
+A single letter grade (A–F) or score (0–100) shown on the pantry tab: based on %
+ items with known expiry dates, % fresh vs expired, category diversity, and how
+  many items are approaching expiry. Gamifies good pantry hygiene and gives
+ users an at-a-glance status without drilling in.
+
+XXXXX 15. Seasonal ingredient prompts
+A dismissable banner in the recipe finder or shopping tab: "March: asparagus and 
+artichokes are in season — here are 3 recipes." Drives engagement and helps users
+ eat better. Could be a static seasonal calendar mapped to Gemini recipe prompts.
+
+Nutrition & Goals
+16. Weekly nutrition summary from meal plan
+The user profile stores height/weight/age/gender and diet goal — but there's no 
+feedback loop. After planning the week, show an estimated weekly nutrition summary
+ (calories, protein, carbs) pulled from Spoonacular nutrition data already in the
+  recipe models. Closes the gap between "I have goals" and "am I meeting them."
+
+Social & Engagement
+17. Share a meal plan or recipe via link
+Generate a read-only shareable URL for a meal plan or saved recipe — not requiring
+ the recipient to have the app or be in the household. "Here's what we're eating
+  this week" share for grandparents, friends, etc. Works as PWA deep link with
+   no sign-in required for view-only access.
+
+18. Food waste monthly report (shareable)
+"In February you saved an estimated $45 by using leftovers and caught 8 items 
+before they expired." A visual one-pager (shareable as image). The 
+foodWasteAnalyticsService and LeftoverAnalytics already track this data — it
+ just needs a designed report surface and a share-as-image export. Strong
+  retention and word-of-mouth driver.

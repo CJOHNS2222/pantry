@@ -713,7 +713,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
         </div>
       )}
         </div>
-        <div className="sticky bottom-0 z-20 w-full py-4 bg-theme-primary rounded-b-2xl p-4 pb-12">
+        <div className="sticky bottom-0 z-20 w-full bg-theme-primary rounded-b-2xl px-4 pt-2 pb-6">
           {/* Primary action buttons - Only show Save when editable */}
           {editable ? (
             <div className="space-y-3">
@@ -778,27 +778,31 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
         {/* Fixed Action Buttons */}
         <div className="flex-shrink-0 border-t border-theme bg-theme-primary p-4 rounded-b-2xl space-y-3">
           {/* Primary action buttons - Add to Plan, Rate, Mark as Made */}
-          {showMarkAsMade && onMarkAsMade && (
-            <button onClick={handleMarkAsMadeClick} className="w-full py-3 font-bold bg-[var(--accent-color)] text-white rounded-lg flex items-center justify-center gap-2">
-              <CheckCircle2 className="w-4 h-4" /> Mark as Made
-            </button>
-          )}
-          {showAddToPlan && onAddToPlan && (
-            <button
-              onClick={() => {
-                onAddToPlan(recipe);
-                onClose();
-              }}
-              disabled={mealPlanLimitExceeded}
-              className={`w-full py-3 font-bold rounded-lg flex items-center justify-center gap-2 ${
-                mealPlanLimitExceeded
-                  ? 'bg-gray-400 text-gray-600 cursor-not-allowed opacity-50'
-                  : 'bg-[var(--accent-color)] text-white'
-              }`}
-            >
-              <Plus className="w-4 h-4" /> {mealPlanLimitExceeded ? 'Limit Reached' : 'Add to Schedule'}
-            </button>
-          )}
+          {(showMarkAsMade && onMarkAsMade) || (showAddToPlan && onAddToPlan) ? (
+            <div className="grid grid-cols-2 gap-2">
+              {showMarkAsMade && onMarkAsMade && (
+                <button onClick={handleMarkAsMadeClick} className="py-3 font-bold bg-[var(--accent-color)] text-white rounded-lg flex items-center justify-center gap-2">
+                  <CheckCircle2 className="w-4 h-4" /> Mark as Made
+                </button>
+              )}
+              {showAddToPlan && onAddToPlan && (
+                <button
+                  onClick={() => {
+                    onAddToPlan(recipe);
+                    onClose();
+                  }}
+                  disabled={mealPlanLimitExceeded}
+                  className={`py-3 font-bold rounded-lg flex items-center justify-center gap-2 ${
+                    mealPlanLimitExceeded
+                      ? 'bg-gray-400 text-gray-600 cursor-not-allowed opacity-50'
+                      : 'bg-[var(--accent-color)] text-white'
+                  }`}
+                >
+                  <Plus className="w-4 h-4" /> {mealPlanLimitExceeded ? 'Limit Reached' : 'Add to Schedule'}
+                </button>
+              )}
+            </div>
+          ) : null}
 
           {/* Secondary action buttons - Save, Delete, Close */}
           <div className="flex items-center gap-2">

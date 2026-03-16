@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Timestamp } from 'firebase/firestore';
 import DatabaseMonitoringService from '../services/databaseMonitoringService';
 import { SubscriptionManager } from './SubscriptionManager';
@@ -116,7 +116,7 @@ export const Settings: React.FC<SettingsProps> = ({
   const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>(
     NotificationService.getDefaultSettings()
   );
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['Profile', 'Household', 'Notifications']));
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['Profile', 'Household']));
   const [activeSettingsTab, setActiveSettingsTab] = useState<'account' | 'preferences' | 'organization' | 'more'>('account');
 
   // Member preferences state
@@ -394,6 +394,19 @@ export const Settings: React.FC<SettingsProps> = ({
     }
   };
 
+  // Debounced save for profile changes
+  const [pendingProfileSave, setPendingProfileSave] = useState<NodeJS.Timeout | null>(null);
+  const debouncedSaveProfile = useCallback((data: typeof userProfile) => {
+    if (pendingProfileSave) {
+      clearTimeout(pendingProfileSave);
+    }
+    const timeout = setTimeout(() => {
+      saveProfileData(data, true);
+      setPendingProfileSave(null);
+    }, 1000); // Save after 1 second of no changes
+    setPendingProfileSave(timeout);
+  }, [user, saveProfileData]);
+
   const createHousehold = async () => {
     if (!householdName.trim() || isCreatingHousehold || !user) return;
 
@@ -532,6 +545,7 @@ export const Settings: React.FC<SettingsProps> = ({
             return (
               <button
                 key={tab}
+                data-settings-tab={tab}
                 onClick={() => setActiveSettingsTab(tab)}
                 className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
                   activeSettingsTab === tab
@@ -546,7 +560,7 @@ export const Settings: React.FC<SettingsProps> = ({
         </div>
       </div>
 
-      <div className="p-6 space-y-6">
+      <div className="pt-2 pb-6 px-6 space-y-6">
 
       {activeSettingsTab === 'account' && <>
 
@@ -866,6 +880,11 @@ export const Settings: React.FC<SettingsProps> = ({
           >
             Logout
           </button>
+
+          {/* Pending Notifications Section */}
+          <div className="mt-4 pt-4 border-t border-theme">
+            <PendingNotifications user={user} />
+          </div>
             </div>
           )}
         </div>
@@ -1214,7 +1233,7 @@ export const Settings: React.FC<SettingsProps> = ({
                 onChange={(e) => handleProfileChange('dietaryRestrictions', e.target.value ? e.target.value.split(',').map(s => s.trim()) : undefined)}
                 onBlur={(e) => {
                   const newRestrictions = e.target.value ? e.target.value.split(',').map(s => s.trim()) : undefined;
-                  saveProfileData({ ...userProfile, dietaryRestrictions: newRestrictions }, true);
+                  debouncedSaveProfile({ ...userProfile, dietaryRestrictions: newRestrictions });
                 }}
                 placeholder="vegetarian, gluten-free"
                 className="w-full px-3 py-2 text-sm border border-theme rounded-lg bg-white text-black focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]"
@@ -1238,7 +1257,7 @@ export const Settings: React.FC<SettingsProps> = ({
                           : current.filter(a => a !== allergy);
                         const newProfile = { ...userProfile, allergies: newAllergies };
                         setUserProfile(newProfile);
-                        saveProfileData(newProfile, true);
+                        debouncedSaveProfile(newProfile);
                       }}
                       className="rounded border-theme text-theme-primary focus:border-theme-primary"
                     />
@@ -1380,11 +1399,6 @@ export const Settings: React.FC<SettingsProps> = ({
                 currentSettings={notificationSettings}
                 onSettingsChange={setNotificationSettings}
               />
-            )}
-
-            {/* Pending Notifications Section */}
-            {user && (
-              <PendingNotifications user={user} />
             )}
           </div>
         )}

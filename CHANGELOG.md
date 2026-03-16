@@ -5,7 +5,12 @@ All notable changes to Stock & Spoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.4.2] - 2026-03-14
+## [1.4.2] - 2026-03-16
+
+### Changed
+- **Android Build Modernization**: Migrated Android build configuration to use version catalogs for better dependency management and maintainability
+- **Settings Performance**: Added debounced saving for profile changes to reduce unnecessary API calls and improve user experience
+- **Copilot Instructions**: Enhanced AI agent documentation with comprehensive project context, testing patterns, advanced features, and development guidelines
 
 ### Fixed
 - **Household Admin Leave Button**: Fixed issue where household admins couldn't see the leave household button due to conditional logic that only showed it for non-admin users
@@ -14,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Modal UI Layout**: Fixed footer overlap in pantry scanner component with proper flex layout structure
 - **Database Analytics Button**: Resized oversized button to 20×20px for consistent UI sizing
 - **Meal Plan Calendar**: Fixed date selection logic to properly show today as default instead of being stuck on previous dates
+- **App Code Cleanup**: Removed unused code and improved import organization in App.tsx
 
 ## [1.4.1] - 2026-03-13
 
