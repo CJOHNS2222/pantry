@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.4.2] - 2026-03-14
 
 ### Fixed
+- **Household Admin Leave Button**: Fixed issue where household admins couldn't see the leave household button due to conditional logic that only showed it for non-admin users
 - **Gemini API Integration**: Updated all model references from incorrect names to `gemini-2.5-pro` for proper AI image analysis
 - **Image Service Improvements**: Added timeout handling and Unsplash API fallback for pantry item images to resolve CORS issues
 - **Modal UI Layout**: Fixed footer overlap in pantry scanner component with proper flex layout structure
