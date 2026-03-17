@@ -5,6 +5,23 @@ All notable changes to Stock & Spoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.3] - 2026-03-16
+
+### Fixed
+- **Premium Tier Enforcement**: Fixed critical bug where new users and users without stored subscriptions defaulted to premium tier instead of free tier, ensuring proper revenue gating
+- **Premium Upgrade Navigation**: Upgrade buttons in PremiumFeature now navigate to the Settings/Subscription tab instead of showing a placeholder alert
+- **Version Check Display**: Verified version check in Settings correctly reads current version from Capacitor App plugin with web fallback
+- **Capacitor Plugins Update**: Updated all Capacitor plugins from v7 to v8 to resolve deprecated ProGuard configuration causing Gradle 9+ build failures
+- **Safe Area Plugin ProGuard Fix**: Applied patch to capacitor-plugin-safe-area to use modern ProGuard configuration for Gradle 9+ compatibility
+- **Safe Area Plugin Build Fix**: Built and added missing distribution files to capacitor-plugin-safe-area to resolve Vite import errors
+- **Safe Area Plugin Patch Application**: Applied patch-package to capacitor-plugin-safe-area and committed patch files for persistent ProGuard fixes
+
+### Changed
+- **Capacitor Core**: Updated from v7.6.0 to v8.0.1
+- **Capacitor Plugins**: Updated all plugins (app, browser, camera, device, haptics, local-notifications, push-notifications) to v8.0.1
+- **Capacitor Android**: Updated to v9.0.0 (dev) to resolve ProGuard deprecation issues with Gradle 9+
+- **Safe Area Plugin**: Updated to v4.0.3 from v6 branch with ProGuard compatibility patch and built distribution files
+
 ## [1.4.2] - 2026-03-16
 
 ### Changed

@@ -1,0 +1,415 @@
+diff --git a/node_modules/capacitor-plugin-safe-area/android/build.gradle b/node_modules/capacitor-plugin-safe-area/android/build.gradle
+index 98c6fb9..57bd8b4 100644
+--- a/node_modules/capacitor-plugin-safe-area/android/build.gradle
++++ b/node_modules/capacitor-plugin-safe-area/android/build.gradle
+@@ -30,7 +30,7 @@ android {
+     buildTypes {
+         release {
+             minifyEnabled false
+-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
++            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+         }
+     }
+     lintOptions {
+diff --git a/node_modules/capacitor-plugin-safe-area/android/build/.transforms/f0f051fbefed37ff5be8c8f55c41f025/results.bin b/node_modules/capacitor-plugin-safe-area/android/build/.transforms/f0f051fbefed37ff5be8c8f55c41f025/results.bin
+new file mode 100644
+index 0000000..0d259dd
+--- /dev/null
++++ b/node_modules/capacitor-plugin-safe-area/android/build/.transforms/f0f051fbefed37ff5be8c8f55c41f025/results.bin
+@@ -0,0 +1 @@
++o/classes
+diff --git a/node_modules/capacitor-plugin-safe-area/android/build/.transforms/f0f051fbefed37ff5be8c8f55c41f025/transformed/classes/classes_dex/classes.dex b/node_modules/capacitor-plugin-safe-area/android/build/.transforms/f0f051fbefed37ff5be8c8f55c41f025/transformed/classes/classes_dex/classes.dex
+new file mode 100644
+index 0000000..5e52524
+Binary files /dev/null and b/node_modules/capacitor-plugin-safe-area/android/build/.transforms/f0f051fbefed37ff5be8c8f55c41f025/transformed/classes/classes_dex/classes.dex differ
+diff --git a/node_modules/capacitor-plugin-safe-area/android/build/.transforms/f0f051fbefed37ff5be8c8f55c41f025/transformed/classes/classes_global-synthetics/global.globals b/node_modules/capacitor-plugin-safe-area/android/build/.transforms/f0f051fbefed37ff5be8c8f55c41f025/transformed/classes/classes_global-synthetics/global.globals
+new file mode 100644
+index 0000000..e87b511
+Binary files /dev/null and b/node_modules/capacitor-plugin-safe-area/android/build/.transforms/f0f051fbefed37ff5be8c8f55c41f025/transformed/classes/classes_global-synthetics/global.globals differ
+diff --git a/node_modules/capacitor-plugin-safe-area/android/build/intermediates/aapt_friendly_merged_manifests/debug/processDebugManifest/aapt/AndroidManifest.xml b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/aapt_friendly_merged_manifests/debug/processDebugManifest/aapt/AndroidManifest.xml
+new file mode 100644
+index 0000000..ce1d7f1
+--- /dev/null
++++ b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/aapt_friendly_merged_manifests/debug/processDebugManifest/aapt/AndroidManifest.xml
+@@ -0,0 +1,7 @@
++<?xml version="1.0" encoding="utf-8"?>
++<manifest xmlns:android="http://schemas.android.com/apk/res/android"
++    package="com.capacitor.safearea" >
++
++    <uses-sdk android:minSdkVersion="24" />
++
++</manifest>
+\ No newline at end of file
+diff --git a/node_modules/capacitor-plugin-safe-area/android/build/intermediates/aapt_friendly_merged_manifests/debug/processDebugManifest/aapt/output-metadata.json b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/aapt_friendly_merged_manifests/debug/processDebugManifest/aapt/output-metadata.json
+new file mode 100644
+index 0000000..536a414
+--- /dev/null
++++ b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/aapt_friendly_merged_manifests/debug/processDebugManifest/aapt/output-metadata.json
+@@ -0,0 +1,18 @@
++{
++  "version": 3,
++  "artifactType": {
++    "type": "AAPT_FRIENDLY_MERGED_MANIFESTS",
++    "kind": "Directory"
++  },
++  "applicationId": "com.capacitor.safearea",
++  "variantName": "debug",
++  "elements": [
++    {
++      "type": "SINGLE",
++      "filters": [],
++      "attributes": [],
++      "outputFile": "AndroidManifest.xml"
++    }
++  ],
++  "elementType": "File"
++}
+\ No newline at end of file
+diff --git a/node_modules/capacitor-plugin-safe-area/android/build/intermediates/aar_main_jar/debug/syncDebugLibJars/classes.jar b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/aar_main_jar/debug/syncDebugLibJars/classes.jar
+new file mode 100644
+index 0000000..982deea
+Binary files /dev/null and b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/aar_main_jar/debug/syncDebugLibJars/classes.jar differ
+diff --git a/node_modules/capacitor-plugin-safe-area/android/build/intermediates/aar_metadata/debug/writeDebugAarMetadata/aar-metadata.properties b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/aar_metadata/debug/writeDebugAarMetadata/aar-metadata.properties
+new file mode 100644
+index 0000000..ba000c0
+--- /dev/null
++++ b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/aar_metadata/debug/writeDebugAarMetadata/aar-metadata.properties
+@@ -0,0 +1,6 @@
++aarFormatVersion=1.0
++aarMetadataVersion=1.0
++minCompileSdk=36
++minCompileSdkExtension=0
++minAndroidGradlePluginVersion=1.0.0
++coreLibraryDesugaringEnabled=false
+diff --git a/node_modules/capacitor-plugin-safe-area/android/build/intermediates/android_res_source_set_path_map/debug/mapDebugSourceSetPaths/file-map.txt b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/android_res_source_set_path_map/debug/mapDebugSourceSetPaths/file-map.txt
+new file mode 100644
+index 0000000..b228352
+--- /dev/null
++++ b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/android_res_source_set_path_map/debug/mapDebugSourceSetPaths/file-map.txt
+@@ -0,0 +1,8 @@
++com.capacitor.safearea.capacitor-plugin-safe-area-pngs-0 C:\Users\cjohn\pantry\node_modules\capacitor-plugin-safe-area\android\build\generated\res\pngs\debug
++com.capacitor.safearea.capacitor-plugin-safe-area-updated_navigation_xml-1 C:\Users\cjohn\pantry\node_modules\capacitor-plugin-safe-area\android\build\generated\updated_navigation_xml\debug
++com.capacitor.safearea.capacitor-plugin-safe-area-mergeDebugResources-2 C:\Users\cjohn\pantry\node_modules\capacitor-plugin-safe-area\android\build\intermediates\incremental\debug\mergeDebugResources\merged.dir
++com.capacitor.safearea.capacitor-plugin-safe-area-mergeDebugResources-3 C:\Users\cjohn\pantry\node_modules\capacitor-plugin-safe-area\android\build\intermediates\incremental\debug\mergeDebugResources\stripped.dir
++com.capacitor.safearea.capacitor-plugin-safe-area-debug-4 C:\Users\cjohn\pantry\node_modules\capacitor-plugin-safe-area\android\build\intermediates\merged_res\debug\mergeDebugResources
++com.capacitor.safearea.capacitor-plugin-safe-area-debug-5 C:\Users\cjohn\pantry\node_modules\capacitor-plugin-safe-area\android\build\intermediates\packaged_res\debug\packageDebugResources
++com.capacitor.safearea.capacitor-plugin-safe-area-debug-6 C:\Users\cjohn\pantry\node_modules\capacitor-plugin-safe-area\android\src\debug\res
++com.capacitor.safearea.capacitor-plugin-safe-area-main-7 C:\Users\cjohn\pantry\node_modules\capacitor-plugin-safe-area\android\src\main\res
+diff --git a/node_modules/capacitor-plugin-safe-area/android/build/intermediates/annotation_processor_list/debug/javaPreCompileDebug/annotationProcessors.json b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/annotation_processor_list/debug/javaPreCompileDebug/annotationProcessors.json
+new file mode 100644
+index 0000000..9e26dfe
+--- /dev/null
++++ b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/annotation_processor_list/debug/javaPreCompileDebug/annotationProcessors.json
+@@ -0,0 +1 @@
++{}
+\ No newline at end of file
+diff --git a/node_modules/capacitor-plugin-safe-area/android/build/intermediates/annotations_typedef_file/debug/extractDebugAnnotations/typedefs.txt b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/annotations_typedef_file/debug/extractDebugAnnotations/typedefs.txt
+new file mode 100644
+index 0000000..e69de29
+diff --git a/node_modules/capacitor-plugin-safe-area/android/build/intermediates/compile_library_classes_jar/debug/bundleLibCompileToJarDebug/classes.jar b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/compile_library_classes_jar/debug/bundleLibCompileToJarDebug/classes.jar
+new file mode 100644
+index 0000000..6dfa097
+Binary files /dev/null and b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/compile_library_classes_jar/debug/bundleLibCompileToJarDebug/classes.jar differ
+diff --git a/node_modules/capacitor-plugin-safe-area/android/build/intermediates/compile_r_class_jar/debug/generateDebugRFile/R.jar b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/compile_r_class_jar/debug/generateDebugRFile/R.jar
+new file mode 100644
+index 0000000..344e197
+Binary files /dev/null and b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/compile_r_class_jar/debug/generateDebugRFile/R.jar differ
+diff --git a/node_modules/capacitor-plugin-safe-area/android/build/intermediates/compile_symbol_list/debug/generateDebugRFile/R.txt b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/compile_symbol_list/debug/generateDebugRFile/R.txt
+new file mode 100644
+index 0000000..e69de29
+diff --git a/node_modules/capacitor-plugin-safe-area/android/build/intermediates/incremental/debug-mergeJavaRes/merge-state b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/incremental/debug-mergeJavaRes/merge-state
+new file mode 100644
+index 0000000..1c983fc
+Binary files /dev/null and b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/incremental/debug-mergeJavaRes/merge-state differ
+diff --git a/node_modules/capacitor-plugin-safe-area/android/build/intermediates/incremental/debug/packageDebugResources/compile-file-map.properties b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/incremental/debug/packageDebugResources/compile-file-map.properties
+new file mode 100644
+index 0000000..123dd8e
+--- /dev/null
++++ b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/incremental/debug/packageDebugResources/compile-file-map.properties
+@@ -0,0 +1 @@
++#Tue Mar 17 01:03:53 CDT 2026
+diff --git a/node_modules/capacitor-plugin-safe-area/android/build/intermediates/incremental/debug/packageDebugResources/merger.xml b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/incremental/debug/packageDebugResources/merger.xml
+new file mode 100644
+index 0000000..ffe44e9
+--- /dev/null
++++ b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/incremental/debug/packageDebugResources/merger.xml
+@@ -0,0 +1,2 @@
++<?xml version="1.0" encoding="utf-8"?>
++<merger version="3"><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="main$Generated" generated="true" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="C:\Users\cjohn\pantry\node_modules\capacitor-plugin-safe-area\android\src\main\res"/></dataSet><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="main" generated-set="main$Generated" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~:!&lt;dir>navigation"><source path="C:\Users\cjohn\pantry\node_modules\capacitor-plugin-safe-area\android\src\main\res"/></dataSet><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="debug$Generated" generated="true" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="C:\Users\cjohn\pantry\node_modules\capacitor-plugin-safe-area\android\src\debug\res"/></dataSet><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="debug" generated-set="debug$Generated" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~:!&lt;dir>navigation"><source path="C:\Users\cjohn\pantry\node_modules\capacitor-plugin-safe-area\android\src\debug\res"/></dataSet><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="generated$Generated" generated="true" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"/><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="generated" generated-set="generated$Generated" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~:!&lt;dir>navigation"/><mergedItems/></merger>
+\ No newline at end of file
+diff --git a/node_modules/capacitor-plugin-safe-area/android/build/intermediates/incremental/mergeDebugAssets/merger.xml b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/incremental/mergeDebugAssets/merger.xml
+new file mode 100644
+index 0000000..7395b10
+--- /dev/null
++++ b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/incremental/mergeDebugAssets/merger.xml
+@@ -0,0 +1,2 @@
++<?xml version="1.0" encoding="utf-8"?>
++<merger version="3"><dataSet config="main" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="C:\Users\cjohn\pantry\node_modules\capacitor-plugin-safe-area\android\src\main\assets"/></dataSet><dataSet config="debug" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="C:\Users\cjohn\pantry\node_modules\capacitor-plugin-safe-area\android\src\debug\assets"/></dataSet></merger>
+\ No newline at end of file
+diff --git a/node_modules/capacitor-plugin-safe-area/android/build/intermediates/incremental/mergeDebugJniLibFolders/merger.xml b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/incremental/mergeDebugJniLibFolders/merger.xml
+new file mode 100644
+index 0000000..d229a0a
+--- /dev/null
++++ b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/incremental/mergeDebugJniLibFolders/merger.xml
+@@ -0,0 +1,2 @@
++<?xml version="1.0" encoding="utf-8"?>
++<merger version="3"><dataSet config="main" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="C:\Users\cjohn\pantry\node_modules\capacitor-plugin-safe-area\android\src\main\jniLibs"/></dataSet><dataSet config="debug" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="C:\Users\cjohn\pantry\node_modules\capacitor-plugin-safe-area\android\src\debug\jniLibs"/></dataSet></merger>
+\ No newline at end of file
+diff --git a/node_modules/capacitor-plugin-safe-area/android/build/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/capacitor/safearea/SafeArea.class b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/capacitor/safearea/SafeArea.class
+new file mode 100644
+index 0000000..52800f4
+Binary files /dev/null and b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/capacitor/safearea/SafeArea.class differ
+diff --git a/node_modules/capacitor-plugin-safe-area/android/build/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/capacitor/safearea/SafeAreaPlugin$1.class b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/capacitor/safearea/SafeAreaPlugin$1.class
+new file mode 100644
+index 0000000..dfa8a33
+Binary files /dev/null and b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/capacitor/safearea/SafeAreaPlugin$1.class differ
+diff --git a/node_modules/capacitor-plugin-safe-area/android/build/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/capacitor/safearea/SafeAreaPlugin.class b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/capacitor/safearea/SafeAreaPlugin.class
+new file mode 100644
+index 0000000..a2f491f
+Binary files /dev/null and b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/capacitor/safearea/SafeAreaPlugin.class differ
+diff --git a/node_modules/capacitor-plugin-safe-area/android/build/intermediates/local_only_symbol_list/debug/parseDebugLocalResources/R-def.txt b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/local_only_symbol_list/debug/parseDebugLocalResources/R-def.txt
+new file mode 100644
+index 0000000..78ac5b8
+--- /dev/null
++++ b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/local_only_symbol_list/debug/parseDebugLocalResources/R-def.txt
+@@ -0,0 +1,2 @@
++R_DEF: Internal format may change without notice
++local
+diff --git a/node_modules/capacitor-plugin-safe-area/android/build/intermediates/manifest_merge_blame_file/debug/processDebugManifest/manifest-merger-blame-debug-report.txt b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/manifest_merge_blame_file/debug/processDebugManifest/manifest-merger-blame-debug-report.txt
+new file mode 100644
+index 0000000..0cfebe2
+--- /dev/null
++++ b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/manifest_merge_blame_file/debug/processDebugManifest/manifest-merger-blame-debug-report.txt
+@@ -0,0 +1,9 @@
++1<?xml version="1.0" encoding="utf-8"?>
++2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
++3    package="com.capacitor.safearea" >
++4
++5    <uses-sdk android:minSdkVersion="24" />
++5-->INJECTED
++5-->INJECTED
++6
++7</manifest>
+diff --git a/node_modules/capacitor-plugin-safe-area/android/build/intermediates/merged_java_res/debug/mergeDebugJavaResource/feature-capacitor-plugin-safe-area.jar b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/merged_java_res/debug/mergeDebugJavaResource/feature-capacitor-plugin-safe-area.jar
+new file mode 100644
+index 0000000..15cb0ec
+Binary files /dev/null and b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/merged_java_res/debug/mergeDebugJavaResource/feature-capacitor-plugin-safe-area.jar differ
+diff --git a/node_modules/capacitor-plugin-safe-area/android/build/intermediates/merged_manifest/debug/processDebugManifest/AndroidManifest.xml b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/merged_manifest/debug/processDebugManifest/AndroidManifest.xml
+new file mode 100644
+index 0000000..ce1d7f1
+--- /dev/null
++++ b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/merged_manifest/debug/processDebugManifest/AndroidManifest.xml
+@@ -0,0 +1,7 @@
++<?xml version="1.0" encoding="utf-8"?>
++<manifest xmlns:android="http://schemas.android.com/apk/res/android"
++    package="com.capacitor.safearea" >
++
++    <uses-sdk android:minSdkVersion="24" />
++
++</manifest>
+\ No newline at end of file
+diff --git a/node_modules/capacitor-plugin-safe-area/android/build/intermediates/navigation_json/debug/extractDeepLinksDebug/navigation.json b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/navigation_json/debug/extractDeepLinksDebug/navigation.json
+new file mode 100644
+index 0000000..0637a08
+--- /dev/null
++++ b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/navigation_json/debug/extractDeepLinksDebug/navigation.json
+@@ -0,0 +1 @@
++[]
+\ No newline at end of file
+diff --git a/node_modules/capacitor-plugin-safe-area/android/build/intermediates/nested_resources_validation_report/debug/generateDebugResources/nestedResourcesValidationReport.txt b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/nested_resources_validation_report/debug/generateDebugResources/nestedResourcesValidationReport.txt
+new file mode 100644
+index 0000000..08f4ebe
+--- /dev/null
++++ b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/nested_resources_validation_report/debug/generateDebugResources/nestedResourcesValidationReport.txt
+@@ -0,0 +1 @@
++0 Warning/Error
+\ No newline at end of file
+diff --git a/node_modules/capacitor-plugin-safe-area/android/build/intermediates/runtime_library_classes_jar/debug/bundleLibRuntimeToJarDebug/classes.jar b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/runtime_library_classes_jar/debug/bundleLibRuntimeToJarDebug/classes.jar
+new file mode 100644
+index 0000000..d911170
+Binary files /dev/null and b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/runtime_library_classes_jar/debug/bundleLibRuntimeToJarDebug/classes.jar differ
+diff --git a/node_modules/capacitor-plugin-safe-area/android/build/intermediates/symbol_list_with_package_name/debug/generateDebugRFile/package-aware-r.txt b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/symbol_list_with_package_name/debug/generateDebugRFile/package-aware-r.txt
+new file mode 100644
+index 0000000..c942cd7
+--- /dev/null
++++ b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/symbol_list_with_package_name/debug/generateDebugRFile/package-aware-r.txt
+@@ -0,0 +1 @@
++com.capacitor.safearea
+diff --git a/node_modules/capacitor-plugin-safe-area/android/build/outputs/aar/capacitor-plugin-safe-area-debug.aar b/node_modules/capacitor-plugin-safe-area/android/build/outputs/aar/capacitor-plugin-safe-area-debug.aar
+new file mode 100644
+index 0000000..7560671
+Binary files /dev/null and b/node_modules/capacitor-plugin-safe-area/android/build/outputs/aar/capacitor-plugin-safe-area-debug.aar differ
+diff --git a/node_modules/capacitor-plugin-safe-area/android/build/outputs/logs/manifest-merger-debug-report.txt b/node_modules/capacitor-plugin-safe-area/android/build/outputs/logs/manifest-merger-debug-report.txt
+new file mode 100644
+index 0000000..46743b4
+--- /dev/null
++++ b/node_modules/capacitor-plugin-safe-area/android/build/outputs/logs/manifest-merger-debug-report.txt
+@@ -0,0 +1,16 @@
++-- Merging decision tree log ---
++manifest
++ADDED from C:\Users\cjohn\pantry\node_modules\capacitor-plugin-safe-area\android\src\main\AndroidManifest.xml:1:1-2:12
++INJECTED from C:\Users\cjohn\pantry\node_modules\capacitor-plugin-safe-area\android\src\main\AndroidManifest.xml:1:1-2:12
++	package
++		INJECTED from C:\Users\cjohn\pantry\node_modules\capacitor-plugin-safe-area\android\src\main\AndroidManifest.xml
++	xmlns:android
++		ADDED from C:\Users\cjohn\pantry\node_modules\capacitor-plugin-safe-area\android\src\main\AndroidManifest.xml:1:11-69
++uses-sdk
++INJECTED from C:\Users\cjohn\pantry\node_modules\capacitor-plugin-safe-area\android\src\main\AndroidManifest.xml reason: use-sdk injection requested
++INJECTED from C:\Users\cjohn\pantry\node_modules\capacitor-plugin-safe-area\android\src\main\AndroidManifest.xml
++INJECTED from C:\Users\cjohn\pantry\node_modules\capacitor-plugin-safe-area\android\src\main\AndroidManifest.xml
++	android:targetSdkVersion
++		INJECTED from C:\Users\cjohn\pantry\node_modules\capacitor-plugin-safe-area\android\src\main\AndroidManifest.xml
++	android:minSdkVersion
++		INJECTED from C:\Users\cjohn\pantry\node_modules\capacitor-plugin-safe-area\android\src\main\AndroidManifest.xml
+diff --git a/node_modules/capacitor-plugin-safe-area/android/build/tmp/compileDebugJavaWithJavac/previous-compilation-data.bin b/node_modules/capacitor-plugin-safe-area/android/build/tmp/compileDebugJavaWithJavac/previous-compilation-data.bin
+new file mode 100644
+index 0000000..94db4c6
+Binary files /dev/null and b/node_modules/capacitor-plugin-safe-area/android/build/tmp/compileDebugJavaWithJavac/previous-compilation-data.bin differ
+diff --git a/node_modules/capacitor-plugin-safe-area/dist/esm/definitions.d.ts b/node_modules/capacitor-plugin-safe-area/dist/esm/definitions.d.ts
+index b7eae2e..44c13eb 100644
+--- a/node_modules/capacitor-plugin-safe-area/dist/esm/definitions.d.ts
++++ b/node_modules/capacitor-plugin-safe-area/dist/esm/definitions.d.ts
+@@ -12,7 +12,7 @@ export interface SafeAreaPlugin {
+      * Set navigation bar immersive on Android , statusbar background is always set to transparent, not implemented on IOS
+      * @param options.statusBarStyle - statusbar style
+      */
+-    setImmersiveNavigationBar(options?: Pick<NavigationBarOptions, "statusBarStyle">): Promise<void>;
++    setImmersiveNavigationBar(options?: Pick<NavigationBarOptions, 'statusBarStyle'>): Promise<void>;
+     /**
+      * unset navigation bar immersive on Android , not implemented on IOS
+      * @param options.statusBarBg - statusbar background color, default is transparent
+diff --git a/node_modules/capacitor-plugin-safe-area/dist/esm/definitions.js.map b/node_modules/capacitor-plugin-safe-area/dist/esm/definitions.js.map
+index 6f2bb03..7c2543f 100644
+--- a/node_modules/capacitor-plugin-safe-area/dist/esm/definitions.js.map
++++ b/node_modules/capacitor-plugin-safe-area/dist/esm/definitions.js.map
+@@ -1 +1 @@
+-{"version":3,"file":"definitions.js","sourceRoot":"","sources":["../../src/definitions.ts"],"names":[],"mappings":"AAyDA,MAAM,CAAN,IAAY,cAGX;AAHD,WAAY,cAAc;IACxB,iCAAe,CAAA;IACf,+BAAa,CAAA;AACf,CAAC,EAHW,cAAc,KAAd,cAAc,QAGzB","sourcesContent":["import type { PluginListenerHandle } from '@capacitor/core';\n\nexport interface SafeAreaPlugin {\n  /**\n   *  Get mobile SafeArea info\n   */\n  getSafeAreaInsets(): Promise<SafeAreaInsets>;\n\n  /**\n   * Get mobile statusbar height\n   */\n  getStatusBarHeight(): Promise<StatusBarInfo>;\n\n  /**\n   * Set navigation bar immersive on Android , statusbar background is always set to transparent, not implemented on IOS\n   * @param options.statusBarStyle - statusbar style\n   */\n  setImmersiveNavigationBar(options?: Pick<NavigationBarOptions, \"statusBarStyle\">): Promise<void>;\n\n  /**\n   * unset navigation bar immersive on Android , not implemented on IOS\n   * @param options.statusBarBg - statusbar background color, default is transparent\n   * @param options.statusBarStyle - statusbar style\n   */\n  unsetImmersiveNavigationBar(options?: NavigationBarOptions): Promise<void>;\n  \n  /**\n   * Event listener when safe-area changed\n   * @param event\n   * @param listenerFunc\n   */\n  addListener(\n    event: 'safeAreaChanged',\n    listenerFunc: (data: SafeAreaInsets) => void,\n  ): Promise<PluginListenerHandle>;\n\n  /**\n   * Remove all native listeners for this plugin\n   */\n  removeAllListeners(): Promise<void>;\n}\n\ninterface SafeArea {\n  top: number;\n  right: number;\n  bottom: number;\n  left: number;\n}\n\nexport interface SafeAreaInsets {\n  insets: SafeArea;\n}\n\nexport interface StatusBarInfo {\n  statusBarHeight: number;\n}\n\nexport enum StatusbarStyle {\n  Light = 'light',\n  Dark = 'dark',\n}\nexport interface NavigationBarOptions {\n  /**\n   * statusbar background color, default is transparent\n   */\n  statusBarBg?: string;\n  /**\n   * statusbar style\n   */\n  statusBarStyle?: StatusbarStyle;\n}"]}
+\ No newline at end of file
++{"version":3,"file":"definitions.js","sourceRoot":"","sources":["../../src/definitions.ts"],"names":[],"mappings":"AAsDA,MAAM,CAAN,IAAY,cAGX;AAHD,WAAY,cAAc;IACxB,iCAAe,CAAA;IACf,+BAAa,CAAA;AACf,CAAC,EAHW,cAAc,KAAd,cAAc,QAGzB","sourcesContent":["import type { PluginListenerHandle } from '@capacitor/core';\r\n\r\nexport interface SafeAreaPlugin {\r\n  /**\r\n   *  Get mobile SafeArea info\r\n   */\r\n  getSafeAreaInsets(): Promise<SafeAreaInsets>;\r\n\r\n  /**\r\n   * Get mobile statusbar height\r\n   */\r\n  getStatusBarHeight(): Promise<StatusBarInfo>;\r\n\r\n  /**\r\n   * Set navigation bar immersive on Android , statusbar background is always set to transparent, not implemented on IOS\r\n   * @param options.statusBarStyle - statusbar style\r\n   */\r\n  setImmersiveNavigationBar(options?: Pick<NavigationBarOptions, 'statusBarStyle'>): Promise<void>;\r\n\r\n  /**\r\n   * unset navigation bar immersive on Android , not implemented on IOS\r\n   * @param options.statusBarBg - statusbar background color, default is transparent\r\n   * @param options.statusBarStyle - statusbar style\r\n   */\r\n  unsetImmersiveNavigationBar(options?: NavigationBarOptions): Promise<void>;\r\n\r\n  /**\r\n   * Event listener when safe-area changed\r\n   * @param event\r\n   * @param listenerFunc\r\n   */\r\n  addListener(event: 'safeAreaChanged', listenerFunc: (data: SafeAreaInsets) => void): Promise<PluginListenerHandle>;\r\n\r\n  /**\r\n   * Remove all native listeners for this plugin\r\n   */\r\n  removeAllListeners(): Promise<void>;\r\n}\r\n\r\ninterface SafeArea {\r\n  top: number;\r\n  right: number;\r\n  bottom: number;\r\n  left: number;\r\n}\r\n\r\nexport interface SafeAreaInsets {\r\n  insets: SafeArea;\r\n}\r\n\r\nexport interface StatusBarInfo {\r\n  statusBarHeight: number;\r\n}\r\n\r\nexport enum StatusbarStyle {\r\n  Light = 'light',\r\n  Dark = 'dark',\r\n}\r\nexport interface NavigationBarOptions {\r\n  /**\r\n   * statusbar background color, default is transparent\r\n   */\r\n  statusBarBg?: string;\r\n  /**\r\n   * statusbar style\r\n   */\r\n  statusBarStyle?: StatusbarStyle;\r\n}\r\n"]}
+\ No newline at end of file
+diff --git a/node_modules/capacitor-plugin-safe-area/dist/esm/index.js b/node_modules/capacitor-plugin-safe-area/dist/esm/index.js
+index 4ad01b3..aae7fc7 100644
+--- a/node_modules/capacitor-plugin-safe-area/dist/esm/index.js
++++ b/node_modules/capacitor-plugin-safe-area/dist/esm/index.js
+@@ -1,6 +1,6 @@
+ import { registerPlugin } from '@capacitor/core';
+ const SafeArea = registerPlugin('SafeArea', {
+-    web: () => import('./web').then(m => new m.SafeAreaWeb()),
++    web: () => import('./web').then((m) => new m.SafeAreaWeb()),
+ });
+ export * from './definitions';
+ export { SafeArea };
+diff --git a/node_modules/capacitor-plugin-safe-area/dist/esm/index.js.map b/node_modules/capacitor-plugin-safe-area/dist/esm/index.js.map
+index 8a00821..c1ee50b 100644
+--- a/node_modules/capacitor-plugin-safe-area/dist/esm/index.js.map
++++ b/node_modules/capacitor-plugin-safe-area/dist/esm/index.js.map
+@@ -1 +1 @@
+-{"version":3,"file":"index.js","sourceRoot":"","sources":["../../src/index.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,cAAc,EAAE,MAAM,iBAAiB,CAAC;AAIjD,MAAM,QAAQ,GAAG,cAAc,CAAiB,UAAU,EAAE;IAC1D,GAAG,EAAE,GAAG,EAAE,CAAC,MAAM,CAAC,OAAO,CAAC,CAAC,IAAI,CAAC,CAAC,CAAC,EAAE,CAAC,IAAI,CAAC,CAAC,WAAW,EAAE,CAAC;CAC1D,CAAC,CAAC;AAEH,cAAc,eAAe,CAAC;AAC9B,OAAO,EAAE,QAAQ,EAAE,CAAC","sourcesContent":["import { registerPlugin } from '@capacitor/core';\n\nimport type { SafeAreaPlugin } from './definitions';\n\nconst SafeArea = registerPlugin<SafeAreaPlugin>('SafeArea', {\n  web: () => import('./web').then(m => new m.SafeAreaWeb()),\n});\n\nexport * from './definitions';\nexport { SafeArea };\n"]}
+\ No newline at end of file
++{"version":3,"file":"index.js","sourceRoot":"","sources":["../../src/index.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,cAAc,EAAE,MAAM,iBAAiB,CAAC;AAIjD,MAAM,QAAQ,GAAG,cAAc,CAAiB,UAAU,EAAE;IAC1D,GAAG,EAAE,GAAG,EAAE,CAAC,MAAM,CAAC,OAAO,CAAC,CAAC,IAAI,CAAC,CAAC,CAAC,EAAE,EAAE,CAAC,IAAI,CAAC,CAAC,WAAW,EAAE,CAAC;CAC5D,CAAC,CAAC;AAEH,cAAc,eAAe,CAAC;AAC9B,OAAO,EAAE,QAAQ,EAAE,CAAC","sourcesContent":["import { registerPlugin } from '@capacitor/core';\r\n\r\nimport type { SafeAreaPlugin } from './definitions';\r\n\r\nconst SafeArea = registerPlugin<SafeAreaPlugin>('SafeArea', {\r\n  web: () => import('./web').then((m) => new m.SafeAreaWeb()),\r\n});\r\n\r\nexport * from './definitions';\r\nexport { SafeArea };\r\n"]}
+\ No newline at end of file
+diff --git a/node_modules/capacitor-plugin-safe-area/dist/esm/web.js b/node_modules/capacitor-plugin-safe-area/dist/esm/web.js
+index 1c18eba..eb5b959 100644
+--- a/node_modules/capacitor-plugin-safe-area/dist/esm/web.js
++++ b/node_modules/capacitor-plugin-safe-area/dist/esm/web.js
+@@ -7,13 +7,13 @@ export class SafeAreaWeb extends WebPlugin {
+                 left: 0,
+                 right: 0,
+                 bottom: 0,
+-            }
++            },
+         };
+     }
+     async getStatusBarHeight() {
+         // throw this.unimplemented('Method not supported on Web.');
+         return {
+-            statusBarHeight: 0
++            statusBarHeight: 0,
+         };
+     }
+     setImmersiveNavigationBar() {
+diff --git a/node_modules/capacitor-plugin-safe-area/dist/esm/web.js.map b/node_modules/capacitor-plugin-safe-area/dist/esm/web.js.map
+index a3f421c..95e493d 100644
+--- a/node_modules/capacitor-plugin-safe-area/dist/esm/web.js.map
++++ b/node_modules/capacitor-plugin-safe-area/dist/esm/web.js.map
+@@ -1 +1 @@
+-{"version":3,"file":"web.js","sourceRoot":"","sources":["../../src/web.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,SAAS,EAAE,MAAM,iBAAiB,CAAC;AAK5C,MAAM,OAAO,WAAY,SAAQ,SAAS;IACxC,KAAK,CAAC,iBAAiB;QACrB,OAAO;YACL,MAAM,EAAE;gBACN,GAAG,EAAE,CAAC;gBACN,IAAI,EAAE,CAAC;gBACP,KAAK,EAAE,CAAC;gBACR,MAAM,EAAE,CAAC;aACV;SACF,CAAC;IACJ,CAAC;IACD,KAAK,CAAC,kBAAkB;QACtB,4DAA4D;QAC5D,OAAO;YACL,eAAe,EAAE,CAAC;SACnB,CAAA;IACH,CAAC;IAED,yBAAyB;QACvB,MAAM,IAAI,CAAC,aAAa,CAAC,8BAA8B,CAAC,CAAC;IAC3D,CAAC;IAED,2BAA2B;QACzB,MAAM,IAAI,CAAC,aAAa,CAAC,8BAA8B,CAAC,CAAC;IAC3D,CAAC;CACF","sourcesContent":["import { WebPlugin } from '@capacitor/core';\n\nimport type { SafeAreaPlugin, SafeAreaInsets, StatusBarInfo } from './definitions';\n\n\nexport class SafeAreaWeb extends WebPlugin implements SafeAreaPlugin {\n  async getSafeAreaInsets(): Promise<SafeAreaInsets> {\n    return {\n      insets: {\n        top: 0,\n        left: 0,\n        right: 0,\n        bottom: 0,\n      }\n    };\n  }\n  async getStatusBarHeight(): Promise<StatusBarInfo> {\n    // throw this.unimplemented('Method not supported on Web.');\n    return {\n      statusBarHeight: 0\n    }\n  }\n\n  setImmersiveNavigationBar(): Promise<void> {\n    throw this.unimplemented('Method not supported on Web.');\n  }\n\n  unsetImmersiveNavigationBar(): Promise<void> {\n    throw this.unimplemented('Method not supported on Web.');\n  }\n}\n"]}
+\ No newline at end of file
++{"version":3,"file":"web.js","sourceRoot":"","sources":["../../src/web.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,SAAS,EAAE,MAAM,iBAAiB,CAAC;AAI5C,MAAM,OAAO,WAAY,SAAQ,SAAS;IACxC,KAAK,CAAC,iBAAiB;QACrB,OAAO;YACL,MAAM,EAAE;gBACN,GAAG,EAAE,CAAC;gBACN,IAAI,EAAE,CAAC;gBACP,KAAK,EAAE,CAAC;gBACR,MAAM,EAAE,CAAC;aACV;SACF,CAAC;IACJ,CAAC;IACD,KAAK,CAAC,kBAAkB;QACtB,4DAA4D;QAC5D,OAAO;YACL,eAAe,EAAE,CAAC;SACnB,CAAC;IACJ,CAAC;IAED,yBAAyB;QACvB,MAAM,IAAI,CAAC,aAAa,CAAC,8BAA8B,CAAC,CAAC;IAC3D,CAAC;IAED,2BAA2B;QACzB,MAAM,IAAI,CAAC,aAAa,CAAC,8BAA8B,CAAC,CAAC;IAC3D,CAAC;CACF","sourcesContent":["import { WebPlugin } from '@capacitor/core';\r\n\r\nimport type { SafeAreaPlugin, SafeAreaInsets, StatusBarInfo } from './definitions';\r\n\r\nexport class SafeAreaWeb extends WebPlugin implements SafeAreaPlugin {\r\n  async getSafeAreaInsets(): Promise<SafeAreaInsets> {\r\n    return {\r\n      insets: {\r\n        top: 0,\r\n        left: 0,\r\n        right: 0,\r\n        bottom: 0,\r\n      },\r\n    };\r\n  }\r\n  async getStatusBarHeight(): Promise<StatusBarInfo> {\r\n    // throw this.unimplemented('Method not supported on Web.');\r\n    return {\r\n      statusBarHeight: 0,\r\n    };\r\n  }\r\n\r\n  setImmersiveNavigationBar(): Promise<void> {\r\n    throw this.unimplemented('Method not supported on Web.');\r\n  }\r\n\r\n  unsetImmersiveNavigationBar(): Promise<void> {\r\n    throw this.unimplemented('Method not supported on Web.');\r\n  }\r\n}\r\n"]}
+\ No newline at end of file
+diff --git a/node_modules/capacitor-plugin-safe-area/dist/plugin.cjs.js b/node_modules/capacitor-plugin-safe-area/dist/plugin.cjs.js
+index 0330629..d0ced04 100644
+--- a/node_modules/capacitor-plugin-safe-area/dist/plugin.cjs.js
++++ b/node_modules/capacitor-plugin-safe-area/dist/plugin.cjs.js
+@@ -9,7 +9,7 @@ exports.StatusbarStyle = void 0;
+ })(exports.StatusbarStyle || (exports.StatusbarStyle = {}));
+ 
+ const SafeArea = core.registerPlugin('SafeArea', {
+-    web: () => Promise.resolve().then(function () { return web; }).then(m => new m.SafeAreaWeb()),
++    web: () => Promise.resolve().then(function () { return web; }).then((m) => new m.SafeAreaWeb()),
+ });
+ 
+ class SafeAreaWeb extends core.WebPlugin {
+@@ -20,13 +20,13 @@ class SafeAreaWeb extends core.WebPlugin {
+                 left: 0,
+                 right: 0,
+                 bottom: 0,
+-            }
++            },
+         };
+     }
+     async getStatusBarHeight() {
+         // throw this.unimplemented('Method not supported on Web.');
+         return {
+-            statusBarHeight: 0
++            statusBarHeight: 0,
+         };
+     }
+     setImmersiveNavigationBar() {
+diff --git a/node_modules/capacitor-plugin-safe-area/dist/plugin.cjs.js.map b/node_modules/capacitor-plugin-safe-area/dist/plugin.cjs.js.map
+index 8e0cffa..1eb47d1 100644
+--- a/node_modules/capacitor-plugin-safe-area/dist/plugin.cjs.js.map
++++ b/node_modules/capacitor-plugin-safe-area/dist/plugin.cjs.js.map
+@@ -1 +1 @@
+-{"version":3,"file":"plugin.cjs.js","sources":["esm/definitions.js","esm/index.js","esm/web.js"],"sourcesContent":["export var StatusbarStyle;\n(function (StatusbarStyle) {\n    StatusbarStyle[\"Light\"] = \"light\";\n    StatusbarStyle[\"Dark\"] = \"dark\";\n})(StatusbarStyle || (StatusbarStyle = {}));\n//# sourceMappingURL=definitions.js.map","import { registerPlugin } from '@capacitor/core';\nconst SafeArea = registerPlugin('SafeArea', {\n    web: () => import('./web').then(m => new m.SafeAreaWeb()),\n});\nexport * from './definitions';\nexport { SafeArea };\n//# sourceMappingURL=index.js.map","import { WebPlugin } from '@capacitor/core';\nexport class SafeAreaWeb extends WebPlugin {\n    async getSafeAreaInsets() {\n        return {\n            insets: {\n                top: 0,\n                left: 0,\n                right: 0,\n                bottom: 0,\n            }\n        };\n    }\n    async getStatusBarHeight() {\n        // throw this.unimplemented('Method not supported on Web.');\n        return {\n            statusBarHeight: 0\n        };\n    }\n    setImmersiveNavigationBar() {\n        throw this.unimplemented('Method not supported on Web.');\n    }\n    unsetImmersiveNavigationBar() {\n        throw this.unimplemented('Method not supported on Web.');\n    }\n}\n//# sourceMappingURL=web.js.map"],"names":["StatusbarStyle","registerPlugin","WebPlugin"],"mappings":";;;;AAAWA;AACX,CAAC,UAAU,cAAc,EAAE;AAC3B,IAAI,cAAc,CAAC,OAAO,CAAC,GAAG,OAAO;AACrC,IAAI,cAAc,CAAC,MAAM,CAAC,GAAG,MAAM;AACnC,CAAC,EAAEA,sBAAc,KAAKA,sBAAc,GAAG,EAAE,CAAC,CAAC;;ACHtC,MAAC,QAAQ,GAAGC,mBAAc,CAAC,UAAU,EAAE;AAC5C,IAAI,GAAG,EAAE,MAAM,mDAAe,CAAC,IAAI,CAAC,CAAC,IAAI,IAAI,CAAC,CAAC,WAAW,EAAE,CAAC;AAC7D,CAAC;;ACFM,MAAM,WAAW,SAASC,cAAS,CAAC;AAC3C,IAAI,MAAM,iBAAiB,GAAG;AAC9B,QAAQ,OAAO;AACf,YAAY,MAAM,EAAE;AACpB,gBAAgB,GAAG,EAAE,CAAC;AACtB,gBAAgB,IAAI,EAAE,CAAC;AACvB,gBAAgB,KAAK,EAAE,CAAC;AACxB,gBAAgB,MAAM,EAAE,CAAC;AACzB;AACA,SAAS;AACT;AACA,IAAI,MAAM,kBAAkB,GAAG;AAC/B;AACA,QAAQ,OAAO;AACf,YAAY,eAAe,EAAE;AAC7B,SAAS;AACT;AACA,IAAI,yBAAyB,GAAG;AAChC,QAAQ,MAAM,IAAI,CAAC,aAAa,CAAC,8BAA8B,CAAC;AAChE;AACA,IAAI,2BAA2B,GAAG;AAClC,QAAQ,MAAM,IAAI,CAAC,aAAa,CAAC,8BAA8B,CAAC;AAChE;AACA;;;;;;;;;"}
+\ No newline at end of file
++{"version":3,"file":"plugin.cjs.js","sources":["esm/definitions.js","esm/index.js","esm/web.js"],"sourcesContent":["export var StatusbarStyle;\n(function (StatusbarStyle) {\n    StatusbarStyle[\"Light\"] = \"light\";\n    StatusbarStyle[\"Dark\"] = \"dark\";\n})(StatusbarStyle || (StatusbarStyle = {}));\n//# sourceMappingURL=definitions.js.map","import { registerPlugin } from '@capacitor/core';\nconst SafeArea = registerPlugin('SafeArea', {\n    web: () => import('./web').then((m) => new m.SafeAreaWeb()),\n});\nexport * from './definitions';\nexport { SafeArea };\n//# sourceMappingURL=index.js.map","import { WebPlugin } from '@capacitor/core';\nexport class SafeAreaWeb extends WebPlugin {\n    async getSafeAreaInsets() {\n        return {\n            insets: {\n                top: 0,\n                left: 0,\n                right: 0,\n                bottom: 0,\n            },\n        };\n    }\n    async getStatusBarHeight() {\n        // throw this.unimplemented('Method not supported on Web.');\n        return {\n            statusBarHeight: 0,\n        };\n    }\n    setImmersiveNavigationBar() {\n        throw this.unimplemented('Method not supported on Web.');\n    }\n    unsetImmersiveNavigationBar() {\n        throw this.unimplemented('Method not supported on Web.');\n    }\n}\n//# sourceMappingURL=web.js.map"],"names":["StatusbarStyle","registerPlugin","WebPlugin"],"mappings":";;;;AAAWA;AACX,CAAC,UAAU,cAAc,EAAE;AAC3B,IAAI,cAAc,CAAC,OAAO,CAAC,GAAG,OAAO;AACrC,IAAI,cAAc,CAAC,MAAM,CAAC,GAAG,MAAM;AACnC,CAAC,EAAEA,sBAAc,KAAKA,sBAAc,GAAG,EAAE,CAAC,CAAC;;ACHtC,MAAC,QAAQ,GAAGC,mBAAc,CAAC,UAAU,EAAE;AAC5C,IAAI,GAAG,EAAE,MAAM,mDAAe,CAAC,IAAI,CAAC,CAAC,CAAC,KAAK,IAAI,CAAC,CAAC,WAAW,EAAE,CAAC;AAC/D,CAAC;;ACFM,MAAM,WAAW,SAASC,cAAS,CAAC;AAC3C,IAAI,MAAM,iBAAiB,GAAG;AAC9B,QAAQ,OAAO;AACf,YAAY,MAAM,EAAE;AACpB,gBAAgB,GAAG,EAAE,CAAC;AACtB,gBAAgB,IAAI,EAAE,CAAC;AACvB,gBAAgB,KAAK,EAAE,CAAC;AACxB,gBAAgB,MAAM,EAAE,CAAC;AACzB,aAAa;AACb,SAAS;AACT,IAAI;AACJ,IAAI,MAAM,kBAAkB,GAAG;AAC/B;AACA,QAAQ,OAAO;AACf,YAAY,eAAe,EAAE,CAAC;AAC9B,SAAS;AACT,IAAI;AACJ,IAAI,yBAAyB,GAAG;AAChC,QAAQ,MAAM,IAAI,CAAC,aAAa,CAAC,8BAA8B,CAAC;AAChE,IAAI;AACJ,IAAI,2BAA2B,GAAG;AAClC,QAAQ,MAAM,IAAI,CAAC,aAAa,CAAC,8BAA8B,CAAC;AAChE,IAAI;AACJ;;;;;;;;;"}
+\ No newline at end of file
+diff --git a/node_modules/capacitor-plugin-safe-area/dist/plugin.js b/node_modules/capacitor-plugin-safe-area/dist/plugin.js
+index 871e259..bd1aa3b 100644
+--- a/node_modules/capacitor-plugin-safe-area/dist/plugin.js
++++ b/node_modules/capacitor-plugin-safe-area/dist/plugin.js
+@@ -8,7 +8,7 @@ var capacitorSafeArea = (function (exports, core) {
+     })(exports.StatusbarStyle || (exports.StatusbarStyle = {}));
+ 
+     const SafeArea = core.registerPlugin('SafeArea', {
+-        web: () => Promise.resolve().then(function () { return web; }).then(m => new m.SafeAreaWeb()),
++        web: () => Promise.resolve().then(function () { return web; }).then((m) => new m.SafeAreaWeb()),
+     });
+ 
+     class SafeAreaWeb extends core.WebPlugin {
+@@ -19,13 +19,13 @@ var capacitorSafeArea = (function (exports, core) {
+                     left: 0,
+                     right: 0,
+                     bottom: 0,
+-                }
++                },
+             };
+         }
+         async getStatusBarHeight() {
+             // throw this.unimplemented('Method not supported on Web.');
+             return {
+-                statusBarHeight: 0
++                statusBarHeight: 0,
+             };
+         }
+         setImmersiveNavigationBar() {
+diff --git a/node_modules/capacitor-plugin-safe-area/dist/plugin.js.map b/node_modules/capacitor-plugin-safe-area/dist/plugin.js.map
+index 962d74b..32e0d9e 100644
+--- a/node_modules/capacitor-plugin-safe-area/dist/plugin.js.map
++++ b/node_modules/capacitor-plugin-safe-area/dist/plugin.js.map
+@@ -1 +1 @@
+-{"version":3,"file":"plugin.js","sources":["esm/definitions.js","esm/index.js","esm/web.js"],"sourcesContent":["export var StatusbarStyle;\n(function (StatusbarStyle) {\n    StatusbarStyle[\"Light\"] = \"light\";\n    StatusbarStyle[\"Dark\"] = \"dark\";\n})(StatusbarStyle || (StatusbarStyle = {}));\n//# sourceMappingURL=definitions.js.map","import { registerPlugin } from '@capacitor/core';\nconst SafeArea = registerPlugin('SafeArea', {\n    web: () => import('./web').then(m => new m.SafeAreaWeb()),\n});\nexport * from './definitions';\nexport { SafeArea };\n//# sourceMappingURL=index.js.map","import { WebPlugin } from '@capacitor/core';\nexport class SafeAreaWeb extends WebPlugin {\n    async getSafeAreaInsets() {\n        return {\n            insets: {\n                top: 0,\n                left: 0,\n                right: 0,\n                bottom: 0,\n            }\n        };\n    }\n    async getStatusBarHeight() {\n        // throw this.unimplemented('Method not supported on Web.');\n        return {\n            statusBarHeight: 0\n        };\n    }\n    setImmersiveNavigationBar() {\n        throw this.unimplemented('Method not supported on Web.');\n    }\n    unsetImmersiveNavigationBar() {\n        throw this.unimplemented('Method not supported on Web.');\n    }\n}\n//# sourceMappingURL=web.js.map"],"names":["StatusbarStyle","registerPlugin","WebPlugin"],"mappings":";;;AAAWA;IACX,CAAC,UAAU,cAAc,EAAE;IAC3B,IAAI,cAAc,CAAC,OAAO,CAAC,GAAG,OAAO;IACrC,IAAI,cAAc,CAAC,MAAM,CAAC,GAAG,MAAM;IACnC,CAAC,EAAEA,sBAAc,KAAKA,sBAAc,GAAG,EAAE,CAAC,CAAC;;ACHtC,UAAC,QAAQ,GAAGC,mBAAc,CAAC,UAAU,EAAE;IAC5C,IAAI,GAAG,EAAE,MAAM,mDAAe,CAAC,IAAI,CAAC,CAAC,IAAI,IAAI,CAAC,CAAC,WAAW,EAAE,CAAC;IAC7D,CAAC;;ICFM,MAAM,WAAW,SAASC,cAAS,CAAC;IAC3C,IAAI,MAAM,iBAAiB,GAAG;IAC9B,QAAQ,OAAO;IACf,YAAY,MAAM,EAAE;IACpB,gBAAgB,GAAG,EAAE,CAAC;IACtB,gBAAgB,IAAI,EAAE,CAAC;IACvB,gBAAgB,KAAK,EAAE,CAAC;IACxB,gBAAgB,MAAM,EAAE,CAAC;IACzB;IACA,SAAS;IACT;IACA,IAAI,MAAM,kBAAkB,GAAG;IAC/B;IACA,QAAQ,OAAO;IACf,YAAY,eAAe,EAAE;IAC7B,SAAS;IACT;IACA,IAAI,yBAAyB,GAAG;IAChC,QAAQ,MAAM,IAAI,CAAC,aAAa,CAAC,8BAA8B,CAAC;IAChE;IACA,IAAI,2BAA2B,GAAG;IAClC,QAAQ,MAAM,IAAI,CAAC,aAAa,CAAC,8BAA8B,CAAC;IAChE;IACA;;;;;;;;;;;;;;;"}
+\ No newline at end of file
++{"version":3,"file":"plugin.js","sources":["esm/definitions.js","esm/index.js","esm/web.js"],"sourcesContent":["export var StatusbarStyle;\n(function (StatusbarStyle) {\n    StatusbarStyle[\"Light\"] = \"light\";\n    StatusbarStyle[\"Dark\"] = \"dark\";\n})(StatusbarStyle || (StatusbarStyle = {}));\n//# sourceMappingURL=definitions.js.map","import { registerPlugin } from '@capacitor/core';\nconst SafeArea = registerPlugin('SafeArea', {\n    web: () => import('./web').then((m) => new m.SafeAreaWeb()),\n});\nexport * from './definitions';\nexport { SafeArea };\n//# sourceMappingURL=index.js.map","import { WebPlugin } from '@capacitor/core';\nexport class SafeAreaWeb extends WebPlugin {\n    async getSafeAreaInsets() {\n        return {\n            insets: {\n                top: 0,\n                left: 0,\n                right: 0,\n                bottom: 0,\n            },\n        };\n    }\n    async getStatusBarHeight() {\n        // throw this.unimplemented('Method not supported on Web.');\n        return {\n            statusBarHeight: 0,\n        };\n    }\n    setImmersiveNavigationBar() {\n        throw this.unimplemented('Method not supported on Web.');\n    }\n    unsetImmersiveNavigationBar() {\n        throw this.unimplemented('Method not supported on Web.');\n    }\n}\n//# sourceMappingURL=web.js.map"],"names":["StatusbarStyle","registerPlugin","WebPlugin"],"mappings":";;;AAAWA;IACX,CAAC,UAAU,cAAc,EAAE;IAC3B,IAAI,cAAc,CAAC,OAAO,CAAC,GAAG,OAAO;IACrC,IAAI,cAAc,CAAC,MAAM,CAAC,GAAG,MAAM;IACnC,CAAC,EAAEA,sBAAc,KAAKA,sBAAc,GAAG,EAAE,CAAC,CAAC;;ACHtC,UAAC,QAAQ,GAAGC,mBAAc,CAAC,UAAU,EAAE;IAC5C,IAAI,GAAG,EAAE,MAAM,mDAAe,CAAC,IAAI,CAAC,CAAC,CAAC,KAAK,IAAI,CAAC,CAAC,WAAW,EAAE,CAAC;IAC/D,CAAC;;ICFM,MAAM,WAAW,SAASC,cAAS,CAAC;IAC3C,IAAI,MAAM,iBAAiB,GAAG;IAC9B,QAAQ,OAAO;IACf,YAAY,MAAM,EAAE;IACpB,gBAAgB,GAAG,EAAE,CAAC;IACtB,gBAAgB,IAAI,EAAE,CAAC;IACvB,gBAAgB,KAAK,EAAE,CAAC;IACxB,gBAAgB,MAAM,EAAE,CAAC;IACzB,aAAa;IACb,SAAS;IACT,IAAI;IACJ,IAAI,MAAM,kBAAkB,GAAG;IAC/B;IACA,QAAQ,OAAO;IACf,YAAY,eAAe,EAAE,CAAC;IAC9B,SAAS;IACT,IAAI;IACJ,IAAI,yBAAyB,GAAG;IAChC,QAAQ,MAAM,IAAI,CAAC,aAAa,CAAC,8BAA8B,CAAC;IAChE,IAAI;IACJ,IAAI,2BAA2B,GAAG;IAClC,QAAQ,MAAM,IAAI,CAAC,aAAa,CAAC,8BAA8B,CAAC;IAChE,IAAI;IACJ;;;;;;;;;;;;;;;"}
+\ No newline at end of file
