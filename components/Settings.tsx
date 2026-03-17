@@ -8,6 +8,7 @@ import { log } from '../services/logService';
 import AnalyticsService from '../services/analyticsService';
 import { LanguageSelector } from '../src/components/LanguageSelector';
 import { useNotifications } from '../hooks/useNotifications';
+import { FAQPage } from './FAQPage';
 import { User, UserProfile, CustomCategory, Member } from '../types';
 import type { Settings as AppSettings } from '../types';
 
@@ -124,6 +125,9 @@ export const Settings: React.FC<SettingsProps> = ({
   const [memberPreferences, setMemberPreferences] = useState<Partial<MemberPreferences>>({});
   const [savingMemberPrefs, setSavingMemberPrefs] = useState(false);
   const [showMemberPreferencesModal, setShowMemberPreferencesModal] = useState(false);
+
+  // FAQ modal state
+  const [showFAQModal, setShowFAQModal] = useState(false);
 
   // Household creation state
   const [householdName, setHouseholdName] = useState('');
@@ -1681,8 +1685,14 @@ export const Settings: React.FC<SettingsProps> = ({
           <div className="border-t border-theme p-4">
         <div className="space-y-3">
           <p className="text-sm text-theme-secondary">
-            Need help? Contact our support team for assistance.
+            Need help? Check out our FAQ or contact our support team for assistance.
           </p>
+          <button
+            onClick={() => setShowFAQModal(true)}
+            className="bg-[var(--accent-color)] text-white px-4 py-2 rounded font-medium text-sm hover:bg-opacity-90 transition-colors"
+          >
+            View FAQ & Help
+          </button>
         </div>
           </div>
         )}
@@ -1942,6 +1952,30 @@ export const Settings: React.FC<SettingsProps> = ({
         </div>
       )}
     </div>
+
+    {/* FAQ Modal */}
+    {showFAQModal && (
+      <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
+        <div className="bg-theme-primary rounded-2xl shadow-2xl max-w-4xl w-full h-[90vh] max-h-[800px] flex flex-col">
+          <div className="flex-shrink-0 p-4 border-b border-theme bg-theme-secondary">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <SettingsIcon className="w-5 h-5 text-theme-primary flex-shrink-0" />
+                <h2 className="font-serif font-bold text-theme-primary text-lg truncate">Help & FAQ</h2>
+              </div>
+              <button onClick={() => setShowFAQModal(false)} className="text-theme-secondary hover:text-theme-primary flex-shrink-0 ml-2">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+          </div>
+
+          <div className="flex-1 p-6 overflow-y-auto min-h-0">
+            <FAQPage />
+          </div>
+        </div>
+      </div>
+    )}
+
     </>
   );
 };
