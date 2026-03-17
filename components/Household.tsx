@@ -8,6 +8,7 @@ import { serverTimestamp } from 'firebase/firestore';
 import { db, auth } from '../firebaseConfig';
 import DatabaseMonitoringService from '../services/databaseMonitoringService';
 import { removeMemberFromHousehold } from '../services/householdService';
+import { log } from '../services/logService';
 import { UsageService } from '../services/usageService';
 import { InventoryCacheService } from '../services/inventoryCacheService';
 import { MealPlanCacheService } from '../services/MealPlanCacheService';
@@ -33,13 +34,13 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
 
   const checkHouseholdMemberLimit = async () => {
     try {
-      console.log('checkHouseholdMemberLimit - Checking for user:', user.id, 'household:', household?.id);
+      log.debug('Checking household member limit', { userId: user.id, householdId: household?.id }, 'Household');
       const canAdd = await UsageService.canAddHouseholdMember(user.id);
-      console.log('checkHouseholdMemberLimit - Result:', canAdd);
+      log.debug('Household member limit check result', { canAdd }, 'Household');
       setHouseholdMemberLimitExceeded(!canAdd);
       return canAdd;
     } catch (error) {
-      console.error('Error checking household member limit:', error);
+      log.error('Error checking household member limit', error, 'Household');
       return false;
     }
   };
@@ -76,10 +77,10 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
       await auth.currentUser?.getIdToken(true);
 
       setInviteEmail('');
-      console.log("Invitation sent and member added as pending!");
+      log.info('Invitation sent and member added as pending', { email: inviteEmail, householdId: household.id }, 'Household');
 
     } catch (error: any) {
-      console.error("Error sending invitation:", error);
+      log.error('Error sending invitation', error, 'Household');
       
       let message = 'Failed to send invitation';
       if (error.code === 'functions/permission-denied') {
@@ -108,7 +109,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
       if (!household) return;
       await removeMemberFromHousehold(household.id, id, user.id);
     } catch (error: any) {
-      console.error('Error removing member:', error);
+      log.error('Error removing member', { error: error?.message, code: error?.code }, 'Household');
       
       let message = 'Failed to remove member';
       if (error.code === 'functions/permission-denied') {
@@ -161,7 +162,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
       
       addToast('You have left the household. Your data has been copied to your personal collections.', 'info');
     } catch (error: any) {
-      console.error('Error leaving household:', error);
+      log.error('Error leaving household', { error: error?.message, code: error?.code }, 'Household');
       
       let message = 'Failed to leave household';
       if (error.code === 'functions/permission-denied') {
@@ -185,7 +186,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
         memberIds: [user.id],
         members: [{
           id: user.id,
-          name: user.name,
+          name: user?.profile?.name || user.name,
           email: user.email,
           role: 'admin',
           status: 'active'
@@ -220,9 +221,9 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
       await RecipesCacheService.updateCache(savedRecipes, householdId, undefined);
       await RecipesCacheService.updateCache([], undefined, userId); // Clear user's cache
       
-      console.log('Household created and data migrated successfully');
+      log.info('Household created and data migrated successfully', { householdId, userId }, 'Household');
     } catch (error) {
-      console.error('Error creating household:', error);
+      log.error('Error creating household', error, 'Household');
       alert('Failed to create household. Please try again.');
     } finally {
       setIsCreating(false);

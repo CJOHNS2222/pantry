@@ -41,6 +41,8 @@ import { setAppContext, trackNavigation, trackShoppingListAction } from './servi
 import PerformanceMonitoringService from './services/performanceMonitoringService';
 import HapticService from './services/hapticService';
 import { ShoppingListCacheService } from './services/shoppingListCacheService';
+import { MealPlanCacheService } from './services/MealPlanCacheService';
+import { RecipesCacheService } from './services/recipesCacheService';
 import { groceryPriceService } from './services/groceryPriceService';
 import { PriceDataCacheService } from './services/priceDataCacheService'; // Import the service
 import ExpiredItemsModal from './components/ExpiredItemsModal';
@@ -445,6 +447,94 @@ const App: React.FC = () => {
     setNotifications([]);
   };
 
+  /**
+   * Merges a user's personal data (inventory, shopping list, meal plan, saved recipes)
+   * into the household they just joined, then clears the personal copies.
+   *
+   * A localStorage checkpoint is written before migration begins and cleared only on
+   * full success. If the app is closed mid-migration or a step fails, the checkpoint
+   * persists so the user can retry on next load (see the effect below).
+   */
+  const migrateUserDataToHousehold = async (householdId: string, userId: string): Promise<boolean> => {
+    const CHECKPOINT_KEY = `pending_migration_${userId}`;
+
+    // Write checkpoint so we can retry if the app crashes mid-migration
+    localStorage.setItem(CHECKPOINT_KEY, JSON.stringify({ householdId, timestamp: Date.now() }));
+
+    let allSucceeded = true;
+
+    try {
+      const [userInventory, userShoppingList, userMealPlan, userRecipes] = await Promise.all([
+        InventoryCacheService.getCachedInventory(undefined, userId),
+        ShoppingListCacheService.getCachedShoppingList(undefined, userId),
+        MealPlanCacheService.getCachedMealPlan(undefined, userId),
+        RecipesCacheService.getCachedRecipes(undefined, userId),
+      ]);
+
+      // Run each step sequentially so a failure in one doesn't cancel the others
+      // and the user cache is only cleared when that step is confirmed written
+
+      if (userInventory.length > 0) {
+        try {
+          await InventoryCacheService.addItemsToCache(userInventory, householdId, undefined);
+          await InventoryCacheService.updateCache([], undefined, userId);
+        } catch (e) {
+          allSucceeded = false;
+          log.error('Migration: inventory step failed', { userId, householdId, error: e }, 'App');
+        }
+      }
+
+      if (userShoppingList.length > 0) {
+        try {
+          await ShoppingListCacheService.addItemsToCache(userShoppingList, householdId, undefined);
+          await ShoppingListCacheService.setCache([], undefined, userId);
+        } catch (e) {
+          allSucceeded = false;
+          log.error('Migration: shopping list step failed', { userId, householdId, error: e }, 'App');
+        }
+      }
+
+      if (userMealPlan.length > 0) {
+        try {
+          const householdMealPlan = await MealPlanCacheService.getCachedMealPlan(householdId, undefined);
+          const householdDates = new Set(householdMealPlan.map(d => d.date));
+          const newDays = userMealPlan.filter(d => !householdDates.has(d.date));
+          await MealPlanCacheService.updateCache([...householdMealPlan, ...newDays], householdId, undefined);
+          await MealPlanCacheService.updateCache([], undefined, userId);
+        } catch (e) {
+          allSucceeded = false;
+          log.error('Migration: meal plan step failed', { userId, householdId, error: e }, 'App');
+        }
+      }
+
+      if (userRecipes.length > 0) {
+        try {
+          const householdRecipes = await RecipesCacheService.getCachedRecipes(householdId, undefined);
+          const existingIds = new Set(householdRecipes.map(r => r.id));
+          const newRecipes = userRecipes.filter(r => !existingIds.has(r.id));
+          const merged = newRecipes.length > 0 ? [...householdRecipes, ...newRecipes] : householdRecipes;
+          if (newRecipes.length > 0) await RecipesCacheService.updateCache(merged, householdId, undefined);
+          await RecipesCacheService.updateCache([], undefined, userId);
+        } catch (e) {
+          allSucceeded = false;
+          log.error('Migration: recipes step failed', { userId, householdId, error: e }, 'App');
+        }
+      }
+
+      if (allSucceeded) {
+        localStorage.removeItem(CHECKPOINT_KEY);
+        log.info('Personal data migrated to household on join', { householdId, userId }, 'App');
+      } else {
+        log.warn('Migration completed with some failures — checkpoint kept for retry', { householdId, userId }, 'App');
+      }
+    } catch (error) {
+      allSucceeded = false;
+      log.error('Failed to migrate personal data to household', { userId, householdId, error }, 'App');
+    }
+
+    return allSucceeded;
+  };
+
   const handleHouseholdInviteAccept = async (invite: NotificationItem) => {
     if (!user) return;
 
@@ -456,7 +546,8 @@ const App: React.FC = () => {
       const updatedHousehold = await joinHousehold(invite.actionData.householdId, user);
       
       if (updatedHousehold) {
-        setUser({ ...user, householdId: invite.actionData.householdId });
+        const joinedHouseholdId = invite.actionData.householdId;
+        setUser({ ...user, householdId: joinedHouseholdId });
         setHousehold(updatedHousehold);
         setHouseholdInvites(prev => prev.filter(i => i.id !== invite.id));
         
@@ -464,8 +555,16 @@ const App: React.FC = () => {
         if (householdInvites.length <= 1) {
           setShowHouseholdInviteModal(false);
         }
+
+        // Migrate personal inventory/lists/recipes into the household
+        const migrationOk = await migrateUserDataToHousehold(joinedHouseholdId, user.id);
         
-        addToast('Successfully joined household!', 'success');
+        addToast(
+          migrationOk
+            ? 'Successfully joined household! Your personal data has been merged in.'
+            : 'Joined household, but some data could not be migrated. You can retry from Settings.',
+          migrationOk ? 'success' : 'warning'
+        );
       } else {
         addToast('Failed to join household - invitation not found', 'error');
       }
@@ -692,6 +791,14 @@ const App: React.FC = () => {
           if (invites.length > 0) {
             setHouseholdInvites(invites);
             setShowHouseholdInviteModal(true);
+            // Surface a toast with action so the user can't miss it
+            addToast(
+              `You have ${invites.length === 1 ? 'a household invitation' : `${invites.length} household invitations`}!`,
+              'info',
+              0, // persistent until dismissed
+              'View',
+              () => setShowHouseholdInviteModal(true)
+            );
           }
         } catch (error) {
           log.error('Error checking household invites', { error }, 'App');
@@ -703,6 +810,39 @@ const App: React.FC = () => {
 
     checkHouseholdInvites();
   }, [user]);
+
+  // Retry any pending data migration that was interrupted (app crash / network failure)
+  useEffect(() => {
+    if (!user?.id || !user?.householdId) return;
+    const CHECKPOINT_KEY = `pending_migration_${user.id}`;
+    const raw = localStorage.getItem(CHECKPOINT_KEY);
+    if (!raw) return;
+
+    try {
+      const { householdId } = JSON.parse(raw) as { householdId: string; timestamp: number };
+      // Only retry if the checkpoint is for the household the user is currently in
+      if (householdId !== user.householdId) {
+        localStorage.removeItem(CHECKPOINT_KEY);
+        return;
+      }
+
+      addToast(
+        'A previous data migration was incomplete.',
+        'warning',
+        0, // persistent
+        'Retry now',
+        async () => {
+          const ok = await migrateUserDataToHousehold(householdId, user.id);
+          addToast(
+            ok ? 'Data migration completed successfully!' : 'Migration still has errors. Please check your connection and try again.',
+            ok ? 'success' : 'error'
+          );
+        }
+      );
+    } catch {
+      localStorage.removeItem(CHECKPOINT_KEY);
+    }
+  }, [user?.id, user?.householdId]);
 
   // Check for expired items when user logs in and has opted in
   useEffect(() => {
@@ -897,6 +1037,21 @@ const App: React.FC = () => {
           onSyncClick={syncNow}
           onNavigateToSettings={navigateToNotifications}
         />
+
+        {/* Persistent household invite banner — stays visible until acted on */}
+        {householdInvites.length > 0 && !showHouseholdInviteModal && (
+          <div
+            className="sticky top-[calc(var(--safe-area-top,0px)+56px)] z-10 mx-auto max-w-md px-3 pt-1"
+          >
+            <button
+              onClick={() => setShowHouseholdInviteModal(true)}
+              className="w-full flex items-center justify-between gap-2 bg-[var(--accent-color)] text-white px-4 py-2 rounded-lg shadow-md text-sm font-medium animate-pulse-subtle"
+            >
+              <span>🏠 You have {householdInvites.length === 1 ? 'a pending household invitation' : `${householdInvites.length} household invitations`}</span>
+              <span className="underline whitespace-nowrap">View →</span>
+            </button>
+          </div>
+        )}
         
         <AppProvider
           value={{

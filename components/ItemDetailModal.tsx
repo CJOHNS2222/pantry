@@ -10,7 +10,9 @@ import { useFocusTrap } from '../hooks/useFocusTrap';
 import QuantityUnitPicker from './QuantityUnitPicker';
 import { COMMON_UNITS, getSmartUnits } from './QuantityUnitPicker';
 import { useApp } from '../contexts/AppContext';
+import { useAppActions } from '../contexts/AppActionsContext';
 import { uploadItemImage } from '../services/imageService';
+import { log } from '../services/logService';
 
 interface ItemDetailModalProps {
   item: PantryItem;
@@ -51,6 +53,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   const [localIsOpened, setLocalIsOpened] = useState<boolean>(item.isOpened || false);
   // Image upload state
   const { household, user, settings } = useApp();
+  const { addToast } = useAppActions();
   const showNutrition = settings?.shopping?.showNutrition ?? false;
   const showPriceData = settings?.shopping?.showPriceData ?? false;
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -85,7 +88,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
         const nutritionData = await getNutritionFactsWithFallback(item.item, item.category || 'Manual');
         setNutrition(nutritionData);
       } catch (error) {
-        console.warn('Failed to fetch nutrition:', error);
+        log.warn('Failed to fetch nutrition', { item: item.item }, 'ItemDetailModal');
         setNutrition(null);
       } finally {
         setLoadingNutrition(false);
@@ -159,8 +162,8 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
       setSelectedFile(null);
       setPreviewUrl(null);
     } catch (err: any) {
-      console.error('Failed to upload image:', err);
-      alert('Failed to upload image.');
+      log.error('Failed to upload image', { item: item.item, error: err?.message }, 'ItemDetailModal');
+      addToast('Failed to upload image. Please try again.', 'error');
     } finally {
       setUploadingImage(false);
     }

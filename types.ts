@@ -266,6 +266,7 @@ export interface RecipeSearchParams {
   measurementSystem: 'Metric' | 'Standard';
   strictMode?: boolean; // Only use inventory
   userId?: string;
+  userProfile?: UserProfile; // For personalized recommendations
 }
 
 export interface User {
@@ -283,6 +284,7 @@ export interface User {
 }
 
 export interface UserProfile {
+  name?: string; // Display name override
   height?: number; // in inches (stored as total inches, displayed as ft/in)
   weight?: number; // in pounds
   age?: number;
@@ -300,6 +302,11 @@ export interface UserProfile {
   leftoverPersona?: 'strict' | 'normal' | 'relaxed';
   // Measurement system preference: 'Standard' (imperial) or 'Metric'
   measurementSystem?: 'Standard' | 'Metric';
+  // Food preferences
+  favoriteCuisines?: string[];
+  preferredProteins?: string[];
+  dislikedIngredients?: string[];
+  specialNeeds?: string;
 }
 
 export interface HouseholdMember {

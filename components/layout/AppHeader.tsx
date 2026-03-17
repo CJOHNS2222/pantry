@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Sun, Moon, Undo2, Bell } from 'lucide-react';
 import { User, Household } from '../../types';
+import { log } from '../../services/logService';
 import { UsageIndicator } from '../UsageIndicator';
 import { HouseholdStatusIndicator } from '../HouseholdStatusIndicator';
 import { SyncIndicator } from '../SyncIndicator';
@@ -34,6 +35,13 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   onSyncClick,
   onNavigateToSettings
 }) => {
+  const greeting = useMemo(() => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    return 'Good evening';
+  }, []);
+
   const [showNotifications, setShowNotifications] = useState(false);
   const throttleMs = 5000; // UI update throttle for notifications
   const { items } = useUserNotifications(user?.id, throttleMs);
@@ -61,7 +69,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
     try {
       await markAllNotificationsRead(user.id);
     } catch (err) {
-      console.error('Failed to mark notifications read:', err);
+      log.error('Failed to mark notifications read', err instanceof Error ? { message: err.message } : { err }, 'AppHeader');
     }
   };
   return (
@@ -73,7 +81,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         <div className="flex flex-col items-center min-w-0 flex-shrink">
           <div className="flex items-center gap-1 mb-1">
             <div className="text-sm font-medium text-theme-primary opacity-80 truncate" id="user-email">
-              {user.name || user.email.split('@')[0]}
+            {`${greeting}, ${(user.profile?.name || user.name || user.email.split('@')[0]).split(' ')[0]}!`}
             </div>
             {user?.id && (
               <div className="relative">

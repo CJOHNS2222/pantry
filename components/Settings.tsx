@@ -369,12 +369,12 @@ export const Settings: React.FC<SettingsProps> = ({
         profile: userProfile
       });
       setProfileChanged(false);
-      alert('Profile updated successfully!');
+      addToast?.('Profile updated successfully!', 'success');
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       const stack = error instanceof Error ? error.stack : undefined;
       log.error('Failed saving profile', { message: msg, stack }, 'Settings');
-      alert('Failed to update profile. Please try again.');
+      addToast?.('Failed to update profile. Please try again.', 'error');
     } finally {
       setSavingProfile(false);
     }
@@ -387,12 +387,12 @@ export const Settings: React.FC<SettingsProps> = ({
       const userRef = DatabaseMonitoringService.doc('users', user.id);
       await DatabaseMonitoringService.updateDoc(userRef, { profile: data });
       setProfileChanged(false);
-      if (!silent) alert('Profile updated successfully!');
+      if (!silent) addToast?.('Profile updated successfully!', 'success');
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       const stack = error instanceof Error ? error.stack : undefined;
       log.error('Failed saving profile', { message: msg, stack }, 'Settings');
-      if (!silent) alert('Failed to update profile. Please try again.');
+      if (!silent) addToast?.('Failed to update profile. Please try again.', 'error');
     } finally {
       setSavingProfile(false);
     }
@@ -458,7 +458,7 @@ export const Settings: React.FC<SettingsProps> = ({
       await RecipesCacheService.updateCache([], undefined, userId); // Clear user's cache
 
       setHouseholdName('');
-      alert('Household created successfully!');
+      addToast?.('Household created successfully!', 'success');
 
       // Refresh the page to show the new household
       window.location.reload();
@@ -467,7 +467,7 @@ export const Settings: React.FC<SettingsProps> = ({
       const msg = error instanceof Error ? error.message : String(error);
       const stack = error instanceof Error ? error.stack : undefined;
       log.error('Failed creating household', { message: msg, stack }, 'Settings');
-      alert('Failed to create household. Please try again.');
+      addToast?.('Failed to create household. Please try again.', 'error');
     } finally {
       setIsCreatingHousehold(false);
     }
@@ -484,12 +484,12 @@ export const Settings: React.FC<SettingsProps> = ({
         avatar: avatarPath
       });
       setShowAvatarSelection(false);
-      alert('Avatar updated successfully!');
+      addToast?.('Avatar updated successfully!', 'success');
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       const stack = error instanceof Error ? error.stack : undefined;
       log.error('Failed updating avatar', { message: msg, stack }, 'Settings');
-      alert('Failed to update avatar. Please try again.');
+      addToast?.('Failed to update avatar. Please try again.', 'error');
     } finally {
       setUpdatingAvatar(false);
     }
@@ -504,9 +504,9 @@ export const Settings: React.FC<SettingsProps> = ({
         await DatabaseMonitoringService.updateDoc(userRef, {
           avatar: null
         });
-        alert('Avatar removed successfully!');
+        addToast?.('Avatar removed successfully!', 'success');
       } catch (_error) {
-        alert('Failed to remove avatar');
+        addToast?.('Failed to remove avatar', 'error');
       } finally {
         setUpdatingAvatar(false);
       }
@@ -528,10 +528,10 @@ export const Settings: React.FC<SettingsProps> = ({
           avatar: user.avatar || null
         } : null
       });
-      alert('Thank you for your feedback!');
+      addToast?.('Thank you for your feedback!', 'success');
       setFeedback('');
     } catch (_err) {
-      alert('Failed to send feedback. Please try again later.');
+      addToast?.('Failed to send feedback. Please try again later.', 'error');
     }
     setSending(false);
   };
@@ -598,7 +598,7 @@ export const Settings: React.FC<SettingsProps> = ({
                 )}
               </div>
               <div className="flex-1">
-                <p className="font-medium text-theme-primary">{user.name}</p>
+                <p className="font-medium text-theme-primary">{userProfile?.name || user.name}</p>
                 <p className="text-sm text-theme-secondary">{user.email}</p>
               </div>
             </div>
@@ -648,73 +648,23 @@ export const Settings: React.FC<SettingsProps> = ({
                 </div>
               </div>
             )}
+
+            {/* Name Field */}
+            <div className="mb-4">
+              <label htmlFor="userName" className="block text-sm font-medium text-theme-primary mb-2">Display Name</label>
+              <input
+                id="userName"
+                name="userName"
+                type="text"
+                value={userProfile?.name || user.name || ''}
+                onChange={(e) => handleProfileChange('name', e.target.value)}
+                placeholder="Enter your display name"
+                className="w-full px-3 py-2 border border-theme rounded-lg bg-theme-primary text-theme-secondary placeholder-theme-secondary/50 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:border-transparent"
+              />
+              <p className="text-xs text-theme-secondary mt-1">This name will be used throughout the app to personalize your experience.</p>
+            </div>
           </div>
-              {/* Privacy & Legal Section */}
-              <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden">
-                <div
-                  onClick={() => toggleSection('Privacy & Legal')}
-                  className="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-theme-primary transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    {expandedSections.has('Privacy & Legal') ? (
-                      <ChevronDown className="w-5 h-5 text-theme-primary" />
-                    ) : (
-                      <ChevronRight className="w-5 h-5 text-theme-primary" />
-                    )}
-                    <h3 className="font-semibold text-theme-primary">Privacy & Legal</h3>
-                  </div>
-                </div>
-
-                {expandedSections.has('Privacy & Legal') && (
-                  <div className="border-t border-theme p-4">
-                    <p className="text-sm text-theme-secondary">
-                      We use the device camera to scan barcodes and take pantry item photos. Review our privacy policy for details about data collection and storage.
-                    </p>
-                    <div className="flex gap-2 mt-3">
-                      <button
-                        onClick={() => {
-                          const privacyUrl = (window as any).PRIVACY_POLICY_URL || 'https://smartpantrymobile.page.gd/privacy.html';
-                          window.open(privacyUrl, '_blank');
-                        }}
-                        className="bg-[var(--accent-color)] text-white px-4 py-2 rounded font-medium text-sm hover:bg-opacity-90 transition-colors"
-                      >
-                        View Privacy Policy
-                      </button>
-                      <button
-                        onClick={() => {
-                          const privacyUrl = (window as any).PRIVACY_POLICY_URL || 'https://smartpantrymobile.page.gd/privacy.html';
-                          if (navigator.clipboard) navigator.clipboard.writeText(privacyUrl);
-                          alert('Privacy policy URL copied to clipboard');
-                        }}
-                        className="bg-theme-primary text-theme-secondary px-3 py-2 rounded text-sm hover:bg-theme-secondary transition-colors"
-                      >
-                        Copy URL
-                      </button>
-                      <button
-                        onClick={() => {
-                          const delUrl = (window as any).DELETE_ACCOUNT_URL || 'https://smartpantrymobile.page.gd/delete-account.html';
-                          window.open(delUrl, '_blank');
-                        }}
-                        className="bg-red-500 text-white px-4 py-2 rounded font-medium text-sm hover:bg-red-600 transition-colors"
-                      >
-                        Request Account Deletion
-                      </button>
-                      <button
-                        onClick={() => {
-                          const delUrl = (window as any).DELETE_ACCOUNT_URL || 'https://smartpantrymobile.page.gd/delete-account.html';
-                          if (navigator.clipboard) navigator.clipboard.writeText(delUrl);
-                          alert('Account deletion URL copied to clipboard');
-                        }}
-                        className="bg-theme-primary text-theme-secondary px-3 py-2 rounded text-sm hover:bg-theme-secondary transition-colors"
-                      >
-                        Copy Deletion URL
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-          {/* User Profile Information */}
+            {/* User Profile Information */}
           <div className="space-y-4 mb-4">
             <h4 className="text-sm font-medium mb-3 text-theme-primary">Personal Information</h4>
             
@@ -1227,48 +1177,124 @@ export const Settings: React.FC<SettingsProps> = ({
 
             {/* Dietary Restrictions */}
             <div>
-              <label htmlFor="dietaryRestrictions" className="block text-sm font-medium text-theme-primary mb-1">Dietary Restrictions</label>
-              <p className="text-xs text-theme-secondary mb-2">e.g. vegetarian, vegan, gluten-free, keto</p>
-              <input
-                id="dietaryRestrictions"
-                name="dietaryRestrictions"
-                type="text"
-                value={userProfile?.dietaryRestrictions?.join(', ') || ''}
-                onChange={(e) => handleProfileChange('dietaryRestrictions', e.target.value ? e.target.value.split(',').map(s => s.trim()) : undefined)}
-                onBlur={(e) => {
-                  const newRestrictions = e.target.value ? e.target.value.split(',').map(s => s.trim()) : undefined;
-                  debouncedSaveProfile({ ...userProfile, dietaryRestrictions: newRestrictions });
-                }}
-                placeholder="vegetarian, gluten-free"
-                className="w-full px-3 py-2 text-sm border border-theme rounded-lg bg-white text-black focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]"
-              />
-            </div>
-
-            {/* Allergies */}
-            <div>
-              <label className="block text-sm font-medium text-theme-primary mb-1">Allergies</label>
-              <p className="text-xs text-theme-secondary mb-3">Select all that apply — these will be flagged in recipes and shopping suggestions</p>
+              <label className="block text-sm font-medium text-theme-primary mb-3 flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4" />
+                Dietary Restrictions
+              </label>
+              <p className="text-xs text-theme-secondary mb-3">Select all that apply — these will affect recipe recommendations and meal planning</p>
               <div className="grid grid-cols-2 gap-3">
-                {['Peanuts', 'Tree Nuts', 'Dairy', 'Eggs', 'Soy', 'Wheat', 'Fish', 'Shellfish', 'Sesame', 'Mustard'].map((allergy) => (
-                  <label key={allergy} className="flex items-center gap-2 text-sm cursor-pointer">
+                {['Vegetarian', 'Vegan', 'Gluten-Free', 'Dairy-Free', 'Keto', 'Paleo', 'Low-Carb', 'Halal', 'Kosher'].map((restriction) => (
+                  <label key={restriction} className="flex items-center gap-2 text-sm cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={userProfile?.allergies?.includes(allergy) || false}
+                      checked={userProfile?.dietaryRestrictions?.includes(restriction) || false}
                       onChange={(e) => {
-                        const current = userProfile?.allergies || [];
-                        const newAllergies = e.target.checked
-                          ? [...current, allergy]
-                          : current.filter(a => a !== allergy);
-                        const newProfile = { ...userProfile, allergies: newAllergies };
+                        const current = userProfile?.dietaryRestrictions || [];
+                        const newRestrictions = e.target.checked
+                          ? [...current, restriction]
+                          : current.filter(r => r !== restriction);
+                        const newProfile = { ...userProfile, dietaryRestrictions: newRestrictions };
                         setUserProfile(newProfile);
                         debouncedSaveProfile(newProfile);
                       }}
                       className="rounded border-theme text-theme-primary focus:border-theme-primary"
                     />
-                    <span className="text-theme-primary">{allergy}</span>
+                    <span className="text-theme-primary">{restriction}</span>
                   </label>
                 ))}
               </div>
+            </div>
+
+            {/* Favorite Cuisines */}
+            <div>
+              <label className="block text-sm font-medium text-theme-primary mb-3 flex items-center gap-2">
+                <Heart className="w-4 h-4" />
+                Favorite Cuisines
+              </label>
+              <p className="text-xs text-theme-secondary mb-3">Select cuisines you enjoy — these will influence recipe suggestions</p>
+              <div className="grid grid-cols-2 gap-3">
+                {['Italian', 'Mexican', 'Chinese', 'Japanese', 'Indian', 'Thai', 'French', 'Mediterranean', 'American', 'Korean'].map((cuisine) => (
+                  <label key={cuisine} className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={userProfile?.favoriteCuisines?.includes(cuisine) || false}
+                      onChange={(e) => {
+                        const current = userProfile?.favoriteCuisines || [];
+                        const newCuisines = e.target.checked
+                          ? [...current, cuisine]
+                          : current.filter(c => c !== cuisine);
+                        const newProfile = { ...userProfile, favoriteCuisines: newCuisines };
+                        setUserProfile(newProfile);
+                        debouncedSaveProfile(newProfile);
+                      }}
+                      className="rounded border-theme text-theme-primary focus:border-theme-primary"
+                    />
+                    <span className="text-theme-primary">{cuisine}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Preferred Proteins */}
+            <div>
+              <label className="block text-sm font-medium text-theme-primary mb-3">Preferred Proteins</label>
+              <p className="text-xs text-theme-secondary mb-3">Select proteins you prefer — these will be prioritized in meal suggestions</p>
+              <div className="grid grid-cols-2 gap-3">
+                {['Chicken', 'Beef', 'Pork', 'Fish', 'Tofu', 'Beans', 'Eggs', 'Turkey', 'Lamb', 'Shrimp'].map((protein) => (
+                  <label key={protein} className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={userProfile?.preferredProteins?.includes(protein) || false}
+                      onChange={(e) => {
+                        const current = userProfile?.preferredProteins || [];
+                        const newProteins = e.target.checked
+                          ? [...current, protein]
+                          : current.filter(p => p !== protein);
+                        const newProfile = { ...userProfile, preferredProteins: newProteins };
+                        setUserProfile(newProfile);
+                        debouncedSaveProfile(newProfile);
+                      }}
+                      className="rounded border-theme text-theme-primary focus:border-theme-primary"
+                    />
+                    <span className="text-theme-primary">{protein}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Disliked Ingredients */}
+            <div>
+              <label className="block text-sm font-medium text-theme-primary mb-3">Disliked Ingredients</label>
+              <p className="text-xs text-theme-secondary mb-2">Ingredients you don't like — these will be avoided in suggestions</p>
+              <input
+                type="text"
+                value={userProfile?.dislikedIngredients?.join(', ') || ''}
+                onChange={(e) => {
+                  const newIngredients = e.target.value ? e.target.value.split(',').map(s => s.trim()).filter(s => s.length > 0) : undefined;
+                  const newProfile = { ...userProfile, dislikedIngredients: newIngredients };
+                  setUserProfile(newProfile);
+                  debouncedSaveProfile(newProfile);
+                }}
+                placeholder="e.g., mushrooms, olives, cilantro"
+                className="w-full px-3 py-2 text-sm border border-theme rounded-lg bg-white text-black focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]"
+              />
+            </div>
+
+            {/* Special Dietary Needs */}
+            <div>
+              <label className="block text-sm font-medium text-theme-primary mb-3">Special Dietary Needs</label>
+              <p className="text-xs text-theme-secondary mb-2">Any additional dietary requirements or preferences</p>
+              <textarea
+                value={userProfile?.specialNeeds || ''}
+                onChange={(e) => {
+                  const newProfile = { ...userProfile, specialNeeds: e.target.value || undefined };
+                  setUserProfile(newProfile);
+                  debouncedSaveProfile(newProfile);
+                }}
+                placeholder="e.g., low sodium, diabetic friendly, etc."
+                className="w-full px-3 py-2 text-sm border border-theme rounded-lg bg-white text-black focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] resize-none"
+                rows={2}
+              />
             </div>
 
             {/* Leftover Persona */}
@@ -1484,6 +1510,31 @@ export const Settings: React.FC<SettingsProps> = ({
         </div>
       )}
 
+      {/* Leftover Analytics Section */}
+      {user && (
+        <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden">
+          <div
+            onClick={() => toggleSection('Leftover Analytics')}
+            className="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-theme-primary transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              {expandedSections.has('Leftover Analytics') ? (
+                <ChevronDown className="w-5 h-5 text-theme-primary" />
+              ) : (
+                <ChevronRight className="w-5 h-5 text-theme-primary" />
+              )}
+              <h3 className="font-semibold text-theme-primary">Leftover Analytics</h3>
+            </div>
+          </div>
+
+          {expandedSections.has('Leftover Analytics') && (
+            <div className="border-t border-theme p-4">
+              <LeftoverAnalytics householdId={household?.id} userId={user.id} />
+            </div>
+          )}
+        </div>
+      )}
+
       </>}
 
       {activeSettingsTab === 'more' && <>
@@ -1552,55 +1603,7 @@ export const Settings: React.FC<SettingsProps> = ({
         </div>
       )}
 
-      {/* Database Monitoring Section - Developer/Admin Only */}
-      {user && process.env.NODE_ENV === 'development' && (
-        <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden">
-          <div
-            onClick={() => toggleSection('Database Monitoring')}
-            className="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-theme-primary transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              {expandedSections.has('Database Monitoring') ? (
-                <ChevronDown className="w-5 h-5 text-theme-primary" />
-              ) : (
-                <ChevronRight className="w-5 h-5 text-theme-primary" />
-              )}
-              <h3 className="font-semibold text-theme-primary">Database Monitoring</h3>
-            </div>
-          </div>
 
-          {expandedSections.has('Database Monitoring') && (
-            <div className="border-t border-theme p-4">
-              <MonitoringDashboard user={user} />
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Leftover Analytics Section */}
-      {user && (
-        <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden">
-          <div
-            onClick={() => toggleSection('Leftover Analytics')}
-            className="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-theme-primary transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              {expandedSections.has('Leftover Analytics') ? (
-                <ChevronDown className="w-5 h-5 text-theme-primary" />
-              ) : (
-                <ChevronRight className="w-5 h-5 text-theme-primary" />
-              )}
-              <h3 className="font-semibold text-theme-primary">Leftover Analytics</h3>
-            </div>
-          </div>
-
-          {expandedSections.has('Leftover Analytics') && (
-            <div className="border-t border-theme p-4">
-              <LeftoverAnalytics householdId={household?.id} userId={user.id} />
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Bulk Image Update Section */}
       {user && (
@@ -1640,12 +1643,12 @@ export const Settings: React.FC<SettingsProps> = ({
                     log.info(`Updated ${completed}/${total} items`, { completed, total }, 'Settings');
                   });
 
-                  alert(`Image update complete!\n\n${result.updatedItems} items updated\n${result.failedItems} items failed\n\nCheck the console for details.`);
+                  addToast?.(`Updated ${result.updatedItems} items${result.failedItems > 0 ? ` (${result.failedItems} failed)` : ''}`, result.failedItems > 0 ? 'warning' : 'success');
                 } catch (error) {
                   const msg = error instanceof Error ? error.message : String(error);
                   const stack = error instanceof Error ? error.stack : undefined;
                   log.error('Failed bulk image update', { message: msg, stack }, 'Settings');
-                  alert('Failed to update images. Check the console for details.');
+                  addToast?.('Failed to update images. Please try again.', 'error');
                 } finally {
                   setUpdatingBulkImages(false);
                 }
@@ -1951,6 +1954,76 @@ export const Settings: React.FC<SettingsProps> = ({
           </div>
         </div>
       )}
+
+      {activeSettingsTab === 'more' && <>
+
+      {/* Privacy & Legal Section - MOVED FROM ACCOUNT TAB */}
+      <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden">
+        <div
+          onClick={() => toggleSection('Privacy & Legal')}
+          className="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-theme-primary transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            {expandedSections.has('Privacy & Legal') ? (
+              <ChevronDown className="w-5 h-5 text-theme-primary" />
+            ) : (
+              <ChevronRight className="w-5 h-5 text-theme-primary" />
+            )}
+            <h3 className="font-semibold text-theme-primary">Privacy & Legal</h3>
+          </div>
+        </div>
+
+        {expandedSections.has('Privacy & Legal') && (
+          <div className="border-t border-theme p-4">
+            <p className="text-sm text-theme-secondary">
+              We use the device camera to scan barcodes and take pantry item photos. Review our privacy policy for details about data collection and storage.
+            </p>
+            <div className="flex gap-2 mt-3">
+              <button
+                onClick={() => {
+                  const privacyUrl = (window as any).PRIVACY_POLICY_URL || 'https://smartpantrymobile.page.gd/privacy.html';
+                  window.open(privacyUrl, '_blank');
+                }}
+                className="bg-[var(--accent-color)] text-white px-4 py-2 rounded font-medium text-sm hover:bg-opacity-90 transition-colors"
+              >
+                View Privacy Policy
+              </button>
+              <button
+                onClick={() => {
+                  const privacyUrl = (window as any).PRIVACY_POLICY_URL || 'https://smartpantrymobile.page.gd/privacy.html';
+                  if (navigator.clipboard) navigator.clipboard.writeText(privacyUrl);
+                  addToast?.('Privacy policy URL copied to clipboard', 'success');
+                }}
+                className="bg-theme-primary text-theme-secondary px-3 py-2 rounded text-sm hover:bg-theme-secondary transition-colors"
+              >
+                Copy URL
+              </button>
+              <button
+                onClick={() => {
+                  const delUrl = (window as any).DELETE_ACCOUNT_URL || 'https://smartpantrymobile.page.gd/delete-account.html';
+                  window.open(delUrl, '_blank');
+                }}
+                className="bg-red-500 text-white px-4 py-2 rounded font-medium text-sm hover:bg-red-600 transition-colors"
+              >
+                Request Account Deletion
+              </button>
+              <button
+                onClick={() => {
+                  const delUrl = (window as any).DELETE_ACCOUNT_URL || 'https://smartpantrymobile.page.gd/delete-account.html';
+                  if (navigator.clipboard) navigator.clipboard.writeText(delUrl);
+                  addToast?.('Account deletion URL copied to clipboard', 'success');
+                }}
+                className="bg-theme-primary text-theme-secondary px-3 py-2 rounded text-sm hover:bg-theme-secondary transition-colors"
+              >
+                Copy Deletion URL
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      </>}
+
     </div>
 
     {/* FAQ Modal */}
@@ -1970,7 +2043,7 @@ export const Settings: React.FC<SettingsProps> = ({
           </div>
 
           <div className="flex-1 p-6 overflow-y-auto min-h-0">
-            <FAQPage />
+            <FAQPage onBack={() => setShowFAQModal(false)} />
           </div>
         </div>
       </div>

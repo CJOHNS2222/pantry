@@ -5,6 +5,32 @@ All notable changes to Stock & Spoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.4] - 2026-03-17
+
+### Added
+- **Personalized Greeting**: AppHeader now shows a time-based greeting ("Good morning/afternoon/evening, [Name]!") using the user's display name for a more personal experience
+- **Household Data Migration on Join**: When a user accepts a household invitation, all personal data (inventory, shopping list, meal plan, saved recipes) is automatically migrated and merged into the household — no data is lost on join
+- **Household Data Migration Retry**: Migration uses a localStorage checkpoint; if the app closes mid-migration or a step fails, a persistent "Retry now" toast appears on next load to resume
+- **Persistent Invite Notifications**: A sticky banner beneath the app header and a persistent toast with a "View" action button now appear whenever pending household invitations are detected on login
+- **User Profile Recipe Scoring**: RecipeFinder now filters and ranks recipes by personal profile — diet goals, favourite cuisines, preferred proteins, and disliked ingredients are all considered, with a score-based sort and toast highlight for top matches
+- **Profile-Aware Preference Utilities**: New `checkRecipeAgainstUserProfile` and `filterRecipesByUserProfile` helpers in `preferenceUtils.ts` for personalised recipe recommendation scoring
+- **Nutrition Utilities**: New `nutritionUtils.ts` with `getUserNutritionTargets` and `checkRecipeMacros` helpers; covered by unit tests in `src/test/utils/nutritionUtils.test.ts`
+- **UserProfile Type Extensions**: Added `favoriteCuisines`, `preferredProteins`, `dislikedIngredients`, `specialNeeds`, and `userProfile` fields to the `UserProfile` type
+
+### Changed
+- **Settings Reorganisation**: Removed Database Monitoring from the More tab; moved Leftover Analytics to the Organisation tab; Privacy & Legal confirmed in More tab; user name field present in profile
+- **HouseholdInviteModal Redesign**: Rebuilt as a theme-aware modal with accent-colour header, a checklist of what joining means, a prominent "Accept & Join" button, and a "Decide later" dismiss link — replaces the previous minimal dialog
+- **RecipeFinder Search UI**: Added inline search button that appears when query text is present; search input now uses theme-consistent styling
+- **MealPlanCacheService**: Extended to support household-scoped meal plan reads and writes needed by the data migration flow
+
+### Fixed
+- **Alert → Toast (Settings)**: All `alert()` calls in Settings.tsx (household creation, avatar update/remove, feedback submit, bulk image update, Privacy & Legal clipboard copy) replaced with non-blocking `addToast` notifications
+- **Alert → Toast (ItemDetailModal)**: Image upload failure `alert` replaced with `addToast`; related `console.warn/error` calls routed through `logService`
+- **Console Logging (Login)**: Replaced all `console.*` calls in `Login.tsx` with structured `logService` (`log.debug/warn/error/info`)
+- **Console Logging (Household)**: `console.error` calls in `leaveHousehold` and `removeMember` replaced with `log.error`
+- **Console Logging (HouseholdInviteModal)**: `console.error` replaced with `log.error`; removed unused `serverTimestamp`, `DatabaseMonitoringService`, and `markNotificationRead` imports
+- **Gemini Service**: Minor fixes to model reference and error handling
+
 ## [1.4.3] - 2026-03-16
 
 ### Fixed

@@ -1,10 +1,8 @@
 import React, { useState } from 'react';
-import { Users, Check, X, AlertCircle } from 'lucide-react';
+import { Users, Check, X, Bell } from 'lucide-react';
 import { NotificationItem } from '../services/notificationService';
 import { User } from '../types';
-import { serverTimestamp } from 'firebase/firestore';
-import DatabaseMonitoringService from '../services/databaseMonitoringService';
-import { markNotificationRead } from '../services/notificationsService';
+import { log } from '../services/logService';
 
 interface HouseholdInviteModalProps {
   invites: NotificationItem[];
@@ -29,7 +27,7 @@ export const HouseholdInviteModal: React.FC<HouseholdInviteModalProps> = ({
       await onAccept(invite);
       setProcessing(null);
     } catch (error) {
-      console.error('Error accepting household invite:', error);
+      log.error('Error accepting household invite', { inviteId: invite.id, error: error instanceof Error ? error.message : String(error) }, 'HouseholdInviteModal');
       setProcessing(null);
     }
   };
@@ -40,75 +38,103 @@ export const HouseholdInviteModal: React.FC<HouseholdInviteModalProps> = ({
       await onDecline(invite);
       setProcessing(null);
     } catch (error) {
-      console.error('Error declining household invite:', error);
+      log.error('Error declining household invite', { inviteId: invite.id, error: error instanceof Error ? error.message : String(error) }, 'HouseholdInviteModal');
       setProcessing(null);
     }
   };
 
   if (invites.length === 0) return null;
 
-  // For simplicity, show the first invite. In a real app, you might want to handle multiple invites
   const currentInvite = invites[0];
+  const isProcessing = processing === currentInvite.id;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
-        <div className="p-6">
-          <div className="flex items-center mb-4">
-            <div className="bg-blue-100 p-3 rounded-full mr-4">
-              <Users className="w-6 h-6 text-blue-600" />
-            </div>
-            <div>
-              <h2 className="text-xl font-semibold text-gray-900">Household Invitation</h2>
-              <p className="text-sm text-gray-600">You have been invited to join a household</p>
-            </div>
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+      <div className="bg-theme-secondary rounded-2xl shadow-2xl max-w-md w-full mx-4 border border-theme overflow-hidden">
+        {/* Header */}
+        <div className="bg-[var(--accent-color)] px-6 py-5 flex items-center gap-3">
+          <div className="bg-white/20 p-2.5 rounded-full">
+            <Users className="w-6 h-6 text-white" />
           </div>
+          <div>
+            <h2 className="text-xl font-bold text-white">Household Invitation</h2>
+            <p className="text-white/80 text-sm">You've been invited to join a household</p>
+          </div>
+          {invites.length > 1 && (
+            <span className="ml-auto bg-white/20 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+              {invites.length}
+            </span>
+          )}
+        </div>
 
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-            <div className="flex items-start">
-              <AlertCircle className="w-5 h-5 text-yellow-600 mt-0.5 mr-3 flex-shrink-0" />
+        <div className="p-6">
+          {/* Invite details */}
+          <div className="bg-[var(--accent-color)]/10 border border-[var(--accent-color)]/30 rounded-xl p-4 mb-5">
+            <div className="flex items-start gap-3">
+              <Bell className="w-5 h-5 text-[var(--accent-color)] mt-0.5 flex-shrink-0" />
               <div>
-                <p className="text-sm font-medium text-yellow-800 mb-1">
+                <p className="text-sm font-semibold text-theme-primary mb-1">
                   {currentInvite.title}
                 </p>
-                <p className="text-sm text-yellow-700">
+                <p className="text-sm text-theme-secondary">
                   {currentInvite.message}
                 </p>
               </div>
             </div>
           </div>
 
-          <p className="text-sm text-gray-600 mb-6">
-            Joining a household allows you to share pantry items, shopping lists, and meal plans with other members.
-            You can leave the household at any time from the settings.
-          </p>
+          {/* What joining means */}
+          <div className="space-y-2 mb-6">
+            <p className="text-xs font-semibold text-theme-secondary uppercase tracking-wide">What happens when you join</p>
+            {[
+              'Your pantry items will be merged into the shared household pantry',
+              'Your shopping list and meal plans will be combined with theirs',
+              'Your saved recipes will be added to the household collection',
+              'You can leave the household at any time from Settings',
+            ].map((line, i) => (
+              <div key={i} className="flex items-start gap-2 text-sm text-theme-secondary">
+                <Check className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                <span>{line}</span>
+              </div>
+            ))}
+          </div>
 
-          <div className="flex space-x-3">
+          {/* Actions */}
+          <div className="flex gap-3">
             <button
               onClick={() => handleDecline(currentInvite)}
-              disabled={processing === currentInvite.id}
-              className="flex-1 bg-gray-200 hover:bg-gray-300 disabled:bg-gray-100 text-gray-800 disabled:text-gray-400 font-medium py-2 px-4 rounded-lg transition-colors duration-200 flex items-center justify-center"
+              disabled={isProcessing}
+              className="flex-1 bg-theme-primary hover:bg-theme-secondary disabled:opacity-50 text-theme-secondary border border-theme font-medium py-3 px-4 rounded-xl transition-colors flex items-center justify-center gap-2"
             >
-              {processing === currentInvite.id ? (
-                <div className="w-5 h-5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin mr-2"></div>
+              {isProcessing ? (
+                <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
               ) : (
-                <X className="w-4 h-4 mr-2" />
+                <X className="w-4 h-4" />
               )}
               Decline
             </button>
             <button
               onClick={() => handleAccept(currentInvite)}
-              disabled={processing === currentInvite.id}
-              className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 flex items-center justify-center"
+              disabled={isProcessing}
+              className="flex-2 flex-grow bg-[var(--accent-color)] hover:bg-[var(--accent-color)]/90 disabled:opacity-50 text-white font-bold py-3 px-6 rounded-xl transition-colors flex items-center justify-center gap-2 shadow-md"
             >
-              {processing === currentInvite.id ? (
-                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+              {isProcessing ? (
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
               ) : (
-                <Check className="w-4 h-4 mr-2" />
+                <Check className="w-4 h-4" />
               )}
-              Accept
+              Accept &amp; Join
             </button>
           </div>
+
+          {/* Dismiss link (non-destructive — just hides modal, not the invite) */}
+          <button
+            onClick={onClose}
+            disabled={isProcessing}
+            className="mt-4 w-full text-center text-xs text-theme-secondary hover:text-theme-primary transition-colors py-1"
+          >
+            Decide later (reminder will stay visible)
+          </button>
         </div>
       </div>
     </div>

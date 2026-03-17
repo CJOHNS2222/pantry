@@ -4,6 +4,7 @@ import { getPerformance, trace } from "firebase/performance";
 import featureFlags from './featureFlags';
 import { UsageService } from './usageService';
 import { log } from './logService';
+import { getUserNutritionTargets, generatePersonalizedSearchPrompt } from '../utils/nutritionUtils';
 
 // Initialize Gemini Client
 const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
@@ -546,6 +547,9 @@ const performSearch = async (params: RecipeSearchParams, user: User | undefined,
   
   let prompt = "";
 
+  // Get user nutrition targets if profile is available
+  const macroTargets = params.userProfile ? getUserNutritionTargets(params.userProfile) : null;
+
   if (params.query) {
     // Mode 1: Specific Search - ultra-concise for cost efficiency
     prompt = `3 recipes for "${params.query}"`;
@@ -554,7 +558,7 @@ const performSearch = async (params: RecipeSearchParams, user: User | undefined,
     // Mode 2: Generate from Pantry - ultra-concise
     const limitedIngredients = params.ingredients.split(', ').slice(0, 25).join(', ');
     prompt = `3 recipes using: ${limitedIngredients}`;
-    
+
     if (params.strictMode) {
       prompt += `. Only these + basics (oil, salt, pepper, water)`;
     } else {
@@ -567,6 +571,11 @@ const performSearch = async (params: RecipeSearchParams, user: User | undefined,
   }
 
   prompt += `. Use ${params.measurementSystem} units`;
+
+  // Apply personalized prompt modifications based on user profile
+  if (params.userProfile) {
+    prompt = generatePersonalizedSearchPrompt(prompt, params.userProfile, macroTargets || undefined);
+  }
 
   // Ultra-concise JSON structure - be very explicit
   prompt += `. Respond ONLY with valid JSON in this exact format, no other text: {"recipes":[{"title":"string","description":"brief summary","ingredients":["concise ingredient with quantity"],"instructions":["3-5 key steps"],"cookTime":"string"}]}`;

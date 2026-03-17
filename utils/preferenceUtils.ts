@@ -1,4 +1,5 @@
-import { Member, StructuredRecipe, PantryItem, SavedRecipe } from '../types';
+import { Member, StructuredRecipe, PantryItem, SavedRecipe, UserProfile } from '../types';
+import { getUserNutritionTargets, checkRecipeMacros } from './nutritionUtils';
 
 /**
  * Utility functions for checking household member preferences against recipes and inventory
@@ -261,27 +262,107 @@ export function filterRecipesByHouseholdPreferences(
 }
 
 /**
- * Get preference-based recipe recommendations for a household
+ * Check if a recipe fits a user's individual profile preferences
  */
-export function getHouseholdRecipeRecommendations(
-  recipes: (StructuredRecipe | SavedRecipe)[],
-  householdMembers: Member[]
+export function checkRecipeAgainstUserProfile(
+  recipe: StructuredRecipe | SavedRecipe,
+  userProfile: UserProfile
 ): {
-  recommended: (StructuredRecipe | SavedRecipe)[];
-  needsAttention: Array<{
-    recipe: StructuredRecipe | SavedRecipe;
-    issues: string[];
-  }>;
+  isRecommended: boolean;
+  score: number; // 0-100, higher is better match
+  reasons: string[];
 } {
-  const { safeRecipes, riskyRecipes } = filterRecipesByHouseholdPreferences(recipes, householdMembers, false);
+  let score = 50; // Base score
+  const reasons: string[] = [];
 
-  const needsAttention = riskyRecipes.map(({ recipe, violations }) => ({
-    recipe,
-    issues: violations.flatMap(v => v.result.warnings)
-  }));
+  // Check diet goal alignment
+  if (userProfile.dietGoal && recipe.nutrition?.calories) {
+    const macroTargets = getUserNutritionTargets(userProfile);
+    if (macroTargets) {
+      const recipeNutrition = {
+        calories: recipe.nutrition.calories,
+        protein: recipe.nutrition.protein,
+        carbs: recipe.nutrition.carbs,
+        fat: recipe.nutrition.fat
+      };
+      const macroCheck = checkRecipeMacros(recipeNutrition, macroTargets, 0.3); // 30% tolerance
+      if (macroCheck.fits) {
+        score += 20;
+        reasons.push(`Fits your ${userProfile.dietGoal} nutrition goals`);
+      } else {
+        score -= 10;
+        reasons.push(`May not align with your ${userProfile.dietGoal} goals`);
+      }
+    }
+  }
+
+  // Check preferred cuisines
+  if (userProfile.favoriteCuisines?.length && recipe.description) {
+    const recipeCuisines = userProfile.favoriteCuisines.filter(cuisine =>
+      recipe.description?.toLowerCase().includes(cuisine.toLowerCase()) ||
+      recipe.title?.toLowerCase().includes(cuisine.toLowerCase())
+    );
+    if (recipeCuisines.length > 0) {
+      score += 15;
+      reasons.push(`Matches your preferred cuisine: ${recipeCuisines.join(', ')}`);
+    }
+  }
+
+  // Check preferred proteins
+  if (userProfile.preferredProteins?.length && Array.isArray(recipe.ingredients)) {
+    const recipeProteins = userProfile.preferredProteins.filter(protein =>
+      recipe.ingredients.some(ingredient =>
+        ingredient.toLowerCase().includes(protein.toLowerCase())
+      )
+    );
+    if (recipeProteins.length > 0) {
+      score += 10;
+      reasons.push(`Includes your preferred proteins: ${recipeProteins.join(', ')}`);
+    }
+  }
+
+  // Check disliked ingredients
+  if (userProfile.dislikedIngredients?.length && Array.isArray(recipe.ingredients)) {
+    const dislikedFound = userProfile.dislikedIngredients.filter(disliked =>
+      recipe.ingredients.some(ingredient =>
+        ingredient.toLowerCase().includes(disliked.toLowerCase())
+      )
+    );
+    if (dislikedFound.length > 0) {
+      score -= 25;
+      reasons.push(`Contains ingredients you dislike: ${dislikedFound.join(', ')}`);
+    }
+  }
+
+  // Ensure score stays within bounds
+  score = Math.max(0, Math.min(100, score));
 
   return {
-    recommended: safeRecipes,
-    needsAttention
+    isRecommended: score >= 60,
+    score,
+    reasons
   };
+}
+
+/**
+ * Filter and score recipes based on individual user profile
+ */
+export function filterRecipesByUserProfile(
+  recipes: (StructuredRecipe | SavedRecipe)[],
+  userProfile: UserProfile
+): Array<{
+  recipe: StructuredRecipe | SavedRecipe;
+  score: number;
+  reasons: string[];
+  isRecommended: boolean;
+}> {
+  return recipes.map(recipe => {
+    const profileCheck = checkRecipeAgainstUserProfile(recipe, userProfile);
+    return {
+      recipe,
+      score: profileCheck.score,
+      reasons: profileCheck.reasons,
+      isRecommended: profileCheck.isRecommended
+    };
+  }).sort((a, b) => b.score - a.score); // Sort by score descending
 }

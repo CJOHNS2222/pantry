@@ -7,6 +7,7 @@ import { signInWithEmailAndPassword, createUserWithEmailAndPassword, getAuth, Go
 import { logEvent } from 'firebase/analytics';
 import { analytics } from '../firebaseConfig';
 import { validateEmail, validatePassword, validateName } from '../src/utils/validation';
+import { log } from '../services/logService';
 
 
 
@@ -26,13 +27,13 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
   // Debug timer to track when crash occurs
   useEffect(() => {
-    console.log('Login component mounted at:', new Date().toISOString());
+    log.debug('Login component mounted', { timestamp: new Date().toISOString() }, 'Login');
     const interval = setInterval(() => {
-      console.log('Login component still alive at:', new Date().toISOString());
+      log.debug('Login component still alive', { timestamp: new Date().toISOString() }, 'Login');
     }, 1000);
 
     return () => {
-      console.log('Login component unmounting at:', new Date().toISOString());
+      log.debug('Login component unmounting', { timestamp: new Date().toISOString() }, 'Login');
       clearInterval(interval);
     };
   }, []);
@@ -160,7 +161,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
             hasSeenTutorial: false
           });
         } catch (popupError: any) {
-          console.log('Popup failed, trying redirect:', popupError);
+          log.warn('Google popup failed, trying redirect', { error: popupError.message, code: popupError.code }, 'Login');
           // If popup is blocked or fails, use redirect as fallback
           if (popupError.code === 'auth/popup-blocked' ||
               popupError.code === 'auth/popup-closed-by-user' ||
@@ -172,23 +173,23 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
         }
       }
     } catch (error: any) {
-      console.error('Google login error:', error);
+      log.error('Google login error', error, 'Login');
       setError(<FormattedMessage id="auth.error.googleLoginFailed" values={{ message: error.message }} />);
     }
   };
 
   // Handle Google redirect result (for mobile and fallback)
   useEffect(() => {
-    console.log('Login component mounted, checking for redirect result...');
+    log.debug('Login component mounted, checking for redirect result', {}, 'Login');
     const auth = getAuth();
     const checkRedirect = async () => {
       try {
-        console.log('Checking redirect result...');
+        log.debug('Checking redirect result', {}, 'Login');
         const result = await getRedirectResult(auth);
-        console.log('Redirect result:', result);
+        log.debug('Redirect result received', { hasUser: !!result?.user }, 'Login');
         if (result && result.user) {
           const user = result.user;
-          console.log('User from redirect:', user);
+          log.info('User authenticated via redirect', { uid: user.uid, provider: 'google' }, 'Login');
           if (analytics) {
             logEvent(analytics, 'login', { email: user.email, provider: 'google' });
           }
@@ -200,10 +201,10 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
             hasSeenTutorial: false
           });
         } else {
-          console.log('No redirect result found');
+          log.debug('No redirect result found', {}, 'Login');
         }
       } catch (error: any) {
-        console.log('Redirect result error:', error);
+        log.warn('Redirect result error', { error: error.message, code: error.code }, 'Login');
         // Only show error if it's not a "no redirect result" scenario
         if (error.code !== 'auth/null-user' && error.code !== 'auth/user-cancelled') {
           setError(<FormattedMessage id="auth.error.googleLoginFailed" values={{ message: error.message }} />);

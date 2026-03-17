@@ -19,7 +19,7 @@ import { UsageService } from '../services/usageService';
 import { searchPantryItems, getEnhancedAutocompleteSuggestions, filterPantryItems, savePantryFilter, loadPantryFilter, defaultPantryFilter, saveSearchToHistory, getRecentSearchSuggestions, AutocompleteSuggestion } from '../utils/searchUtils';
 import { useKeyboardNavigation } from '../hooks/useKeyboardNavigation';
 import { debounce } from '../utils/debounceUtils';
-import { filterRecipesByHouseholdPreferences } from '../utils/preferenceUtils';
+import { filterRecipesByHouseholdPreferences, filterRecipesByUserProfile } from '../utils/preferenceUtils';
 import { getUserMeasurementSystem } from '../utils/measurementUtils';
 
 interface RecipeFinderProps {
@@ -1085,7 +1085,8 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                     dietaryRestrictions,
                     maxPrepTime: parseInt(maxPrepTime),
                     servings: parseInt(servings),
-                    userId: user?.id
+                    userId: user?.id,
+                    userProfile: user?.profile
                 }, user);
                 setIsResultFromCache(false);
             }
@@ -1118,6 +1119,26 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
 
                 // Use safe recipes, but include risky ones with warnings
                 filteredRecipes = [...safeRecipes, ...riskyRecipes.map(r => r.recipe)];
+            }
+
+            // Apply individual user profile filtering and scoring
+            if (user?.profile) {
+                const profileFiltered = filterRecipesByUserProfile(filteredRecipes, user.profile);
+
+                // Sort by profile score (recommended recipes first)
+                filteredRecipes = profileFiltered
+                    .sort((a, b) => b.score - a.score)
+                    .map(item => item.recipe);
+
+                // Show toast for highly recommended recipes
+                const highlyRecommended = profileFiltered.filter(item => item.isRecommended && item.score >= 80);
+                if (highlyRecommended.length > 0 && addToast) {
+                    addToast(
+                        `${highlyRecommended.length} recipes perfectly match your profile! Check the top recommendations.`,
+                        'success',
+                        4000
+                    );
+                }
             }
 
             setResult({ ...data, recipes: filteredRecipes });
@@ -1565,8 +1586,21 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                         onFocus={() => setShowRecipeAutocomplete(specificQuery.length === 0 && recentRecipeSearches.length > 0)}
                         onBlur={() => setTimeout(() => setShowRecipeAutocomplete(false), 200)}
                         placeholder="Search e.g. Pasta..."
-                        className="w-full bg-theme-primary border border-theme rounded-xl px-4 py-3 pr-12 text-theme-primary focus:border-[var(--accent-color)] outline-none"
+                        className="w-full bg-theme-primary border border-theme rounded-xl px-4 py-3 pr-20 text-theme-primary focus:border-[var(--accent-color)] outline-none"
                         />
+                        {/* Search Button */}
+                        {specificQuery.trim().length > 0 && (
+                            <button
+                                type="button"
+                                onClick={handleSpecificSearch}
+                                disabled={loadingState === LoadingState.LOADING}
+                                className="absolute right-10 top-1/2 -translate-y-1/2 p-1 rounded-lg text-theme-secondary hover:text-[var(--accent-color)] hover:bg-theme-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                title="Search recipes"
+                                data-tutorial="search-button"
+                            >
+                                <Search className="w-4 h-4" />
+                            </button>
+                        )}
                         {voiceSearchSupported && (
                             <button
                                 type="button"
