@@ -27,6 +27,7 @@ interface RecipeModalProps {
   isFromMealPlan?: boolean;
   recipeSaveLimitExceeded?: boolean;
   mealPlanLimitExceeded?: boolean;
+  recipeSavedCount?: number;
   household?: Household | null;
   user?: {
     id: string;
@@ -55,6 +56,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
   isFromMealPlan = false,
   recipeSaveLimitExceeded = false,
   mealPlanLimitExceeded = false,
+  recipeSavedCount,
   household = null,
   user
   , editable = false
@@ -734,6 +736,13 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
                 </label>
               </div>
               
+              {recipeSavedCount !== undefined && (
+                <p className="text-xs text-theme-secondary text-center mb-1">
+                  {recipeSaveLimitExceeded
+                    ? 'Recipe limit reached — upgrade to save more'
+                    : `${recipeSavedCount} saved`}
+                </p>
+              )}
               <button
                 onClick={async () => {
                   if (isSaving) return;
@@ -824,6 +833,14 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
               </button>
             )}
             {showSaveButton && onSaveRecipe && (
+              <div className="flex-1 flex flex-col gap-1">
+                {recipeSavedCount !== undefined && (
+                  <p className="text-xs text-theme-secondary text-center">
+                    {recipeSaveLimitExceeded
+                      ? 'Limit reached — upgrade to save more'
+                      : `${recipeSavedCount} saved`}
+                  </p>
+                )}
               <button
                 onClick={async () => { 
                   if (isSaving) return; // Prevent double-clicks
@@ -856,6 +873,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
                 }}
                 disabled={recipeSaveLimitExceeded || isSaving}
                 className={`flex-1 py-3 font-bold border rounded-lg flex items-center justify-center gap-2 ${
+                  /* non-editable save button — limit hint shown inline in button label */
                   recipeSaveLimitExceeded || isSaving
                     ? 'border-gray-400 text-gray-400 cursor-not-allowed opacity-50'
                     : 'border-[var(--accent-color)] hover:bg-[var(--accent-color)] hover:text-white'
@@ -863,6 +881,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
               >
                 <Heart className="w-4 h-4" /> {isSaving ? 'Saving...' : recipeSaveLimitExceeded ? 'Limit Reached' : 'Save Recipe'}
               </button>
+              </div>
             )}
           </div>
         </div>

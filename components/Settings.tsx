@@ -28,6 +28,9 @@ import { serverTimestamp } from 'firebase/firestore';
 import { InventoryCacheService } from '../services/inventoryCacheService';
 import { MealPlanCacheService } from '../services/MealPlanCacheService';
 import { RecipesCacheService } from '../services/recipesCacheService';
+import { useSubscription } from '../hooks/useSubscription';
+import { UsageService } from '../services/usageService';
+import type { UsageLimits } from '../services/usageService';
 import { ShoppingListCacheService } from '../services/shoppingListCacheService';
 import { setDoc } from 'firebase/firestore';
 
@@ -101,6 +104,13 @@ export const Settings: React.FC<SettingsProps> = ({
 }) => {
   const [feedback, setFeedback] = useState('');
   const [sending, setSending] = useState(false);
+  const { isPremium, isFamily } = useSubscription(user || null);
+  const [usageLimits, setUsageLimits] = useState<UsageLimits | null>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    UsageService.getUsageLimits(user).then(limits => setUsageLimits(limits)).catch(() => {});
+  }, [user?.id]);
   const [savingProfile, setSavingProfile] = useState(false);
   const [updatingAvatar, setUpdatingAvatar] = useState(false);
   const [pendingNotifications, setPendingNotifications] = useState(settings?.notifications || defaultSettings.notifications);
@@ -570,7 +580,7 @@ export const Settings: React.FC<SettingsProps> = ({
 
       {/* Profile Section */}
       {user && onLogout && (
-        <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden">
+        <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden" data-section="profile">
           <div
             onClick={() => toggleSection('Profile')}
             className="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-theme-primary transition-colors"
@@ -834,11 +844,184 @@ export const Settings: React.FC<SettingsProps> = ({
           >
             Logout
           </button>
+            </div>
+          )}
+        </div>
+      )}
 
-          {/* Pending Notifications Section */}
-          <div className="mt-4 pt-4 border-t border-theme">
-            <PendingNotifications user={user} />
+      {/* Pending Notifications Section */}
+      {user && (
+        <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden" data-section="pending-notifications">
+          <div
+            onClick={() => toggleSection('PendingNotifications')}
+            className="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-theme-primary transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              {expandedSections.has('PendingNotifications') ? (
+                <ChevronDown className="w-5 h-5 text-theme-primary" />
+              ) : (
+                <ChevronRight className="w-5 h-5 text-theme-primary" />
+              )}
+              <h3 className="font-semibold text-theme-primary">Pending Notifications</h3>
+            </div>
           </div>
+          {expandedSections.has('PendingNotifications') && (
+            <div className="border-t border-theme p-4">
+              <PendingNotifications user={user} />
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Usage & Limits Section */}
+      {user && (
+        <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden" data-section="usage-limits">
+          <div
+            onClick={() => toggleSection('UsageLimits')}
+            className="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-theme-primary transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              {expandedSections.has('UsageLimits') ? (
+                <ChevronDown className="w-5 h-5 text-theme-primary" />
+              ) : (
+                <ChevronRight className="w-5 h-5 text-theme-primary" />
+              )}
+              <h3 className="font-semibold text-theme-primary">Usage & Limits</h3>
+            </div>
+            {!isPremium && !isFamily && (
+              <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">Free Plan</span>
+            )}
+          </div>
+          {expandedSections.has('UsageLimits') && (
+            <div className="border-t border-theme p-4 space-y-4">
+              {usageLimits ? (
+                <>
+                  <div className="space-y-3">
+                    {/* AI Scans */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm text-theme-secondary">AI Scans (weekly)</span>
+                        <span className={`text-sm font-semibold ${
+                          usageLimits.gemini.weekly !== -1 && usageLimits.gemini.used >= usageLimits.gemini.weekly
+                            ? 'text-red-500' : 'text-theme-primary'
+                        }`}>
+                          {usageLimits.gemini.used} / {usageLimits.gemini.weekly === -1 ? '∞' : usageLimits.gemini.weekly}
+                        </span>
+                      </div>
+                      {usageLimits.gemini.weekly !== -1 && (
+                        <div className="w-full bg-theme-primary/20 rounded-full h-1.5">
+                          <div
+                            className={`h-1.5 rounded-full ${
+                              usageLimits.gemini.used >= usageLimits.gemini.weekly ? 'bg-red-500' : 'bg-[var(--accent-color)]'
+                            }`}
+                            style={{ width: `${Math.min(100, (usageLimits.gemini.used / usageLimits.gemini.weekly) * 100)}%` }}
+                          />
+                        </div>
+                      )}
+                      {usageLimits.gemini.weekly !== -1 && usageLimits.gemini.used >= usageLimits.gemini.weekly && (
+                        <p className="text-xs text-red-500 mt-1">⚠️ Weekly limit reached — upgrade to continue scanning</p>
+                      )}
+                    </div>
+
+                    {/* Saved Recipes */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm text-theme-secondary">Saved Recipes</span>
+                        <span className={`text-sm font-semibold ${
+                          usageLimits.recipes.max !== -1 && usageLimits.recipes.used >= usageLimits.recipes.max
+                            ? 'text-red-500' : 'text-theme-primary'
+                        }`}>
+                          {usageLimits.recipes.used} / {usageLimits.recipes.max === -1 ? '∞' : usageLimits.recipes.max}
+                        </span>
+                      </div>
+                      {usageLimits.recipes.max !== -1 && (
+                        <div className="w-full bg-theme-primary/20 rounded-full h-1.5">
+                          <div
+                            className={`h-1.5 rounded-full ${
+                              usageLimits.recipes.used >= usageLimits.recipes.max ? 'bg-red-500' : 'bg-[var(--accent-color)]'
+                            }`}
+                            style={{ width: `${Math.min(100, (usageLimits.recipes.used / usageLimits.recipes.max) * 100)}%` }}
+                          />
+                        </div>
+                      )}
+                      {usageLimits.recipes.max !== -1 && usageLimits.recipes.used >= usageLimits.recipes.max && (
+                        <p className="text-xs text-red-500 mt-1">⚠️ Recipe limit reached — upgrade to save more</p>
+                      )}
+                    </div>
+
+                    {/* Meal Plan Additions */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm text-theme-secondary">Meal Plan Additions (weekly)</span>
+                        <span className={`text-sm font-semibold ${
+                          usageLimits.mealPlanning.weeklyRecipes !== -1 && usageLimits.mealPlanning.weeklyUsed >= usageLimits.mealPlanning.weeklyRecipes
+                            ? 'text-red-500' : 'text-theme-primary'
+                        }`}>
+                          {usageLimits.mealPlanning.weeklyUsed} / {usageLimits.mealPlanning.weeklyRecipes === -1 ? '∞' : usageLimits.mealPlanning.weeklyRecipes}
+                        </span>
+                      </div>
+                      {usageLimits.mealPlanning.weeklyRecipes !== -1 && (
+                        <div className="w-full bg-theme-primary/20 rounded-full h-1.5">
+                          <div
+                            className={`h-1.5 rounded-full ${
+                              usageLimits.mealPlanning.weeklyUsed >= usageLimits.mealPlanning.weeklyRecipes ? 'bg-red-500' : 'bg-[var(--accent-color)]'
+                            }`}
+                            style={{ width: `${Math.min(100, (usageLimits.mealPlanning.weeklyUsed / usageLimits.mealPlanning.weeklyRecipes) * 100)}%` }}
+                          />
+                        </div>
+                      )}
+                      {usageLimits.mealPlanning.weeklyRecipes !== -1 && usageLimits.mealPlanning.weeklyUsed >= usageLimits.mealPlanning.weeklyRecipes && (
+                        <p className="text-xs text-red-500 mt-1">⚠️ Weekly meal plan limit reached — upgrade to add more</p>
+                      )}
+                    </div>
+
+                    {/* Custom Categories */}
+                    {!isPremium && !isFamily && (
+                      <div className="flex items-center justify-between py-1">
+                        <span className="text-sm text-theme-secondary">Custom Categories</span>
+                        <span className="text-sm font-semibold text-theme-primary">
+                          Free: 1 category max
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Grocery Estimator */}
+                    {!isPremium && !isFamily && (
+                      <div className="flex items-center justify-between py-1">
+                        <span className="text-sm text-theme-secondary">Grocery Cost Estimator</span>
+                        <span className="text-sm font-semibold text-theme-primary">
+                          Free: 5 ingredients shown
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Meal Plan View */}
+                    {!isPremium && !isFamily && (
+                      <div className="flex items-center justify-between py-1">
+                        <span className="text-sm text-theme-secondary">Meal Plan View</span>
+                        <span className="text-sm font-semibold text-theme-primary">
+                          Free: current week only
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {!isPremium && !isFamily && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm">
+                      <p className="text-amber-800 font-medium mb-1">🔓 Unlock more with Premium or Family</p>
+                      <ul className="text-amber-700 text-xs space-y-0.5">
+                        <li>• Unlimited AI scans, recipe saves &amp; meal plan entries</li>
+                        <li>• Unlimited custom categories</li>
+                        <li>• Full grocery cost estimates</li>
+                        <li>• Monthly meal plan view</li>
+                      </ul>
+                      <p className="text-amber-600 text-xs mt-2">Upgrade via Settings → More → Subscription</p>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <p className="text-sm text-theme-secondary opacity-60">Loading usage data…</p>
+              )}
             </div>
           )}
         </div>
@@ -1737,6 +1920,7 @@ export const Settings: React.FC<SettingsProps> = ({
           onDeleteCategory={onDeleteCustomCategory || (() => {})}
           isOpen={showCategoryManager}
           onClose={() => setShowCategoryManager(false)}
+          maxCategories={isPremium || isFamily ? undefined : 1}
         />
       )}
 

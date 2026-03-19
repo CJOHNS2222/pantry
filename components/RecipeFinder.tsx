@@ -1910,6 +1910,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
           showAddToPlan={true}
           recipeSaveLimitExceeded={recipeSaveLimitExceeded}
           mealPlanLimitExceeded={mealPlanLimitExceeded}
+          recipeSavedCount={savedRecipes.length}
           user={user}
         />
       )}

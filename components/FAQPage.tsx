@@ -11,6 +11,29 @@ interface FAQItem {
 }
 
 const FAQ_DATA: FAQItem[] = [
+  // Plans & Limits
+  {
+    id: 'plans-1',
+    category: 'Plans & Limits',
+    question: 'What are the limits on the Free plan?',
+    answer: 'The Free plan includes the following limits:\n\n• **Saved Recipes**: Up to 10 recipes saved\n• **AI Scans**: 5 per week (pantry scans, receipt scanning, AI kitchen assistant)\n• **Meal Plan Entries**: 3 per week\n• **Meal Plan View**: Current week only (no monthly calendar)\n• **Custom Categories**: 1 custom pantry category\n• **Grocery Cost Estimator**: First 5 ingredients shown\n\nWhen you reach a limit, you\'ll see an upgrade prompt. Upgrade to Premium or Family via Settings → More → Subscription.',
+    keywords: ['free plan', 'limits', 'upgrade', 'cap', 'restrict', 'categories', 'meal plan', 'recipes', 'ai scans']
+  },
+  {
+    id: 'plans-2',
+    category: 'Plans & Limits',
+    question: 'What does Premium unlock?',
+    answer: 'Premium unlocks:\n\n• **Up to 20 saved recipes**\n• **Unlimited meal plan entries**\n• **15 AI scans per week**\n• **Unlimited custom pantry categories**\n• **Full grocery cost estimator** (all ingredients)\n• **Monthly calendar view** in Meal Planner\n• **Up to 3 household members**\n\nUpgrade via Settings → More → Subscription on an Android device through Google Play Billing.',
+    keywords: ['premium', 'upgrade', 'unlock', 'features', 'subscription', 'paid']
+  },
+  {
+    id: 'plans-3',
+    category: 'Plans & Limits',
+    question: 'How do I upgrade my plan?',
+    answer: 'To upgrade:\n\n1. Go to **Settings** (gear icon)\n2. Tap the **More** tab\n3. Open **Subscription**\n4. Tap **View Plans** and choose Premium or Family\n5. Complete the purchase through **Google Play Billing**\n\nYour subscription status syncs automatically. On iOS or web, use an Android device with Play Store access to complete the upgrade.\n\nYou can also view your current usage at any time under **Settings → Account → Usage & Limits**.',
+    keywords: ['upgrade', 'premium', 'family', 'subscribe', 'google play', 'billing', 'purchase']
+  },
+
   // Getting Started
   {
     id: 'getting-started-1',

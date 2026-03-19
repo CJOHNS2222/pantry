@@ -16,8 +16,8 @@ android {
         applicationId "com.smart.pantry"
         minSdk 24
         targetSdk 36
-        versionCode 18
-        versionName "1.4.3"
+        versionCode 19
+        versionName "1.4.5"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         
         buildFeatures {
@@ -30,10 +30,10 @@ android {
     }
     signingConfigs {
         release {
-            def keystoreFile = project.hasProperty('RELEASE_STORE_FILE') ? file(RELEASE_STORE_FILE) : file('pantry-release.keystore')
-            def storePasswordVal = project.hasProperty('RELEASE_STORE_PASSWORD') ? RELEASE_STORE_PASSWORD : ''
-            def keyAliasVal = project.hasProperty('RELEASE_KEY_ALIAS') ? RELEASE_KEY_ALIAS : 'pantry-key'
-            def keyPasswordVal = project.hasProperty('RELEASE_KEY_PASSWORD') ? RELEASE_KEY_PASSWORD : ''
+            def keystoreFile = file('pantry-release-new.keystore')
+            def storePasswordVal = 'pantry123'
+            def keyAliasVal = 'pantry-key'
+            def keyPasswordVal = 'pantry123'
 
             storeFile keystoreFile
             storePassword storePasswordVal

@@ -13,6 +13,7 @@ import { getSavedRecipes, getCachedPopularRecipes, getCachedRecipesCache } from 
 import { parseIngredientForShoppingList } from '../utils/appUtils';
 import AnalyticsService from '../services/analyticsService';
 import { useApp } from '../contexts/AppContext';
+import { useSubscription } from '../hooks/useSubscription';
 import { searchRecipes } from '../utils/searchUtils';
 import { debounce } from '../utils/debounceUtils';
 import { CompactRecipeCardSkeleton, MealPlanSkeleton } from './SkeletonLoader';
@@ -506,6 +507,7 @@ const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
 
 export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPlan, inventory, shoppingList, addToShoppingList, onAddToPlan, onSaveRecipe, onMarkAsMade, onRate, user, setActiveTab, recipeSaveLimitExceeded = false, mealPlanLimitExceeded = false, isLoadingMealPlan = false, isLoadingSavedRecipes = false, savedRecipes: propSavedRecipes = [], settings, onOpenRecipeSearch }) => {
   const { household } = useApp();
+  const { isPremium, isFamily } = useSubscription(user);
     // List of staple items to ignore (unless user wants them included)
     const STAPLES = ['salt', 'pepper', 'oil', 'water', 'flour', 'sugar', 'butter', 'vinegar', 'baking powder', 'baking soda', 'spices', 'seasoning', 'soy sauce', 'cornstarch', 'yeast'];
     const includeStaples = settings?.shopping?.includeStaples || false;
@@ -984,15 +986,23 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
 
   // Memoized missing ingredients computation
   const missingIngredients = useMemo(() => {
-    const missingWithRecipes = displayPlan.flatMap(day => 
-      [...(day.breakfast || []), ...(day.lunch || []), ...(day.dinner || [])].flatMap(meal => 
-        meal.recipe.ingredients.map(ingredient => ({
-          ingredient,
-          recipeName: meal.recipe.title,
-          recipeId: meal.recipe.id
-        }))
-      )
-    );
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    const todayLocal = `${yyyy}-${mm}-${dd}`;
+
+    const missingWithRecipes = displayPlan
+      .filter(day => day.date >= todayLocal)
+      .flatMap(day => 
+        [...(day.breakfast || []), ...(day.lunch || []), ...(day.dinner || [])].flatMap(meal => 
+          meal.recipe.ingredients.map(ingredient => ({
+            ingredient,
+            recipeName: meal.recipe.title,
+            recipeId: meal.recipe.id
+          }))
+        )
+      );
     
     // Filter out staple items and duplicates (unless user wants staples included)
     const missing = missingWithRecipes.filter(item => {
@@ -1194,6 +1204,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
                 mealPlan={mealPlan} 
                 inventory={inventory} 
                 onEstimatorToggle={setIsEstimatorOpen}
+                freeItemLimit={isPremium || isFamily ? undefined : 5}
               />
             </div>
           )}
@@ -1359,6 +1370,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
               >
                 This Week
               </button>
+              {isPremium || isFamily ? (
               <button
                 onClick={() => setIsCalendarExpanded(true)}
                 className={`px-3 py-1 text-xs font-medium rounded-lg transition-colors ${
@@ -1369,6 +1381,11 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
               >
                 This Month
               </button>
+              ) : (
+              <span className="px-3 py-1 text-xs font-medium rounded-lg text-theme-secondary opacity-40 cursor-default" title="Upgrade for monthly view">
+                This Month 🔒
+              </span>
+              )}
             </div>
             <div className="flex items-center gap-2 text-xs">
               <span className="flex items-center gap-1">
@@ -1588,9 +1605,10 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
 
               <button
                 onClick={() => setCurrentDayIndex(Math.min(displayPlan.length - 1, currentDayIndex + 1))}
-                disabled={currentDayIndex === displayPlan.length - 1}
+                disabled={currentDayIndex === displayPlan.length - 1 || (!isPremium && !isFamily && currentDayIndex >= 6)}
                 className="p-2 rounded-lg hover:bg-theme-primary/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 aria-label="Next day"
+                title={(!isPremium && !isFamily && currentDayIndex >= 6) ? 'Upgrade to plan beyond the current week' : undefined}
               >
                 <svg className="w-6 h-6 text-theme-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />

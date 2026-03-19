@@ -8,6 +8,7 @@ interface GroceryCostEstimatorProps {
   mealPlan: DayPlan[];
   inventory: PantryItem[];
   onEstimatorToggle?: (isOpen: boolean) => void;
+  freeItemLimit?: number;
 }
 
 interface IngredientCost {
@@ -18,7 +19,7 @@ interface IngredientCost {
   source: 'estimated' | 'known';
 }
 
-export const GroceryCostEstimator: React.FC<GroceryCostEstimatorProps> = ({ mealPlan, inventory, onEstimatorToggle }) => {
+export const GroceryCostEstimator: React.FC<GroceryCostEstimatorProps> = ({ mealPlan, inventory, onEstimatorToggle, freeItemLimit }) => {
   const [showEstimator, setShowEstimator] = useState(false);
   const [customPrices, setCustomPrices] = useState<Record<string, number>>({});
   const [priceData, setPriceData] = useState<Record<string, PriceData>>({});
@@ -334,7 +335,9 @@ export const GroceryCostEstimator: React.FC<GroceryCostEstimatorProps> = ({ meal
     return costItems;
   }, [mealPlan, inventory, customPrices, includeAllIngredients]);
 
-  const totalCost = costBreakdown.reduce((sum, item) => sum + item.estimatedCost, 0);
+  const visibleBreakdown = freeItemLimit !== undefined ? costBreakdown.slice(0, freeItemLimit) : costBreakdown;
+  const lockedCount = freeItemLimit !== undefined ? Math.max(0, costBreakdown.length - freeItemLimit) : 0;
+  const totalCost = visibleBreakdown.reduce((sum, item) => sum + item.estimatedCost, 0);
 
   if (!showEstimator) {
     return (
@@ -381,6 +384,7 @@ export const GroceryCostEstimator: React.FC<GroceryCostEstimatorProps> = ({ meal
           </div>
           <div className="text-sm text-theme-secondary">
             Estimated cost for {includeAllIngredients ? 'all' : 'missing'} ingredients
+            {lockedCount > 0 && <span className="ml-1 text-amber-600">(first {freeItemLimit} shown — upgrade for full estimate)</span>}
           </div>
         </div>
 
@@ -400,7 +404,7 @@ export const GroceryCostEstimator: React.FC<GroceryCostEstimatorProps> = ({ meal
             <p className="text-sm text-theme-secondary/70">All ingredients are in your pantry! 🎉</p>
           ) : (
             <div className="space-y-2 max-h-60 overflow-y-auto">
-              {costBreakdown.map((item, index) => {
+              {visibleBreakdown.map((item, index) => {
                 const ingredientKey = getIngredientKey(item.ingredient).toLowerCase();
                 const realTimeData = priceData[ingredientKey];
                 const hasRealTimeData = !!realTimeData;
@@ -509,6 +513,14 @@ export const GroceryCostEstimator: React.FC<GroceryCostEstimatorProps> = ({ meal
                   </div>
                 );
               })}
+              {lockedCount > 0 && (
+                <div className="py-3 px-3 bg-amber-50 rounded-lg border border-amber-200 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-amber-700 text-sm font-medium">🔒 +{lockedCount} more ingredient{lockedCount !== 1 ? 's' : ''} hidden</span>
+                  </div>
+                  <span className="text-xs text-amber-600">Upgrade to see all</span>
+                </div>
+              )}
             </div>
           )}
         </div>

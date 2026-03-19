@@ -5,6 +5,25 @@ All notable changes to Stock & Spoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.6] - 2026-03-19
+
+### Added
+- **Free Plan Feature Gates**: Limited free users to 1 custom pantry category, 5-item grocery cost estimate, and current-week-only meal plan view (no monthly calendar)
+- **Upgrade Messaging**: Upgrade banners and warnings appear in CategoryManager, GroceryCostEstimator, MealPlanner, and Settings when free plan caps are reached
+- **Usage & Limits Accordion**: New collapsible section in Settings → Account showing progress bars for AI scans, saved recipes, and meal plan entries, plus static rows for category/estimator/calendar limits with red warnings at cap
+- **Subscription Plan Descriptions Updated**: Free, Premium, and Family plan feature lists in SubscriptionManager now accurately reflect all feature gates
+- **FAQ — Plans & Limits**: New "Plans & Limits" FAQ category at the top of the help page with entries covering free plan limits, Premium features, and how to upgrade
+
+### Changed
+- **AppHeader Greeting**: Split greeting into two lines ("Good morning," / name) so the username always appears on its own line, preventing off-centre layout
+- **AppHeader Status Labels**: Moved SyncIndicator from the left avatar row to the right side; OnlineIndicator now stacks below Sync so both status labels are grouped together
+- **Meal Planner Missing Ingredients**: Past-dated meals (before today) are now excluded from the missing ingredients and grocery cost estimator calculations
+
+## [1.4.5] - 2026-03-17
+
+### Changed
+- Release build preparation and version updates
+
 ## [1.4.4] - 2026-03-17
 
 ### Added

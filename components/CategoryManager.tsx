@@ -10,6 +10,7 @@ interface CategoryManagerProps {
   onDeleteCategory: (categoryId: string) => void;
   isOpen: boolean;
   onClose: () => void;
+  maxCategories?: number;
 }
 
 const commonEmojis = [
@@ -32,7 +33,8 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({
   onUpdateCategory,
   onDeleteCategory,
   isOpen,
-  onClose
+  onClose,
+  maxCategories
 }) => {
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -91,7 +93,19 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({
 
         {/* Content */}
         <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
-          {/* Add/Edit Form */}
+          {/* Upgrade banner when at limit */}
+          {maxCategories !== undefined && customCategories.length >= maxCategories && (
+            <div className="mb-4 p-3 bg-amber-50 border border-amber-300 rounded-lg flex items-start gap-3">
+              <span className="text-amber-500 text-lg flex-shrink-0">🔒</span>
+              <div>
+                <p className="text-sm font-semibold text-amber-800">Free plan limit reached</p>
+                <p className="text-xs text-amber-700 mt-0.5">
+                  You've used your 1 free custom category. Upgrade to <strong>Premium</strong> or <strong>Family</strong> for unlimited categories — starting at $4.99/mo.
+                </p>
+                <p className="text-xs text-amber-600 mt-1">Go to Settings → More → Subscription to upgrade.</p>
+              </div>
+            </div>
+          )}
           {(isAdding || editingId) && (
             <div className="mb-6 p-4 bg-theme-secondary rounded-lg">
               <h3 className="text-lg font-semibold text-theme-primary mb-4">
@@ -200,6 +214,12 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold text-theme-primary">Your Categories</h3>
               {!isAdding && !editingId && (
+                maxCategories !== undefined && customCategories.length >= maxCategories ? (
+                  <div className="flex flex-col items-end gap-1">
+                    <span className="text-xs text-amber-600 font-medium">Free plan: 1 category limit</span>
+                    <span className="text-xs text-theme-secondary opacity-60">Upgrade for unlimited</span>
+                  </div>
+                ) : (
                 <button
                   onClick={() => setIsAdding(true)}
                   className="flex items-center gap-2 px-4 py-2 bg-[var(--accent-color)] text-white rounded-lg hover:bg-opacity-90 transition-colors"
@@ -207,6 +227,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({
                   <Plus className="w-4 h-4" />
                   Add Category
                 </button>
+                )
               )}
             </div>
 

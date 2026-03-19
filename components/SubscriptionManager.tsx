@@ -60,15 +60,17 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }
       description: 'Perfect for getting started',
       features: [
         'Up to 10 saved recipes',
-        '3 recipes per week meal planning',
-        '5 recipe searches per week',
-        '1 household member',
+        '3 meal plan entries per week',
+        '5 AI scans per week',
+        '1 custom pantry category',
+        'Grocery cost estimator (first 5 items)',
+        'Current week meal plan view',
         'Community access'
       ],
       limitations: [
-        'Limited recipe storage',
-        'Limited searches',
-        'Basic meal planning only'
+        'No monthly calendar view',
+        'Limited grocery cost details',
+        'Limited custom categories'
       ],
       popular: false
     },
@@ -80,12 +82,14 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }
       description: 'Everything you need for meal planning',
       features: [
         'Up to 20 saved recipes',
-        '7 days meal planning (unlimited entries)',
-        '15 recipe searches per week',
+        'Unlimited meal plan entries',
+        '15 AI scans per week',
+        'Unlimited custom categories',
+        'Full grocery cost estimator',
+        '7-day + monthly calendar view',
         'Up to 3 household members',
         'Priority support',
-        'Offline access',
-        'Nutrition tracking'
+        'Offline access'
       ],
       limitations: [],
       popular: true
@@ -99,7 +103,11 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }
       features: [
         'Unlimited saved recipes',
         '2 weeks meal planning (unlimited entries)',
+        'Unlimited AI scans',
         'Unlimited recipe searches',
+        'Unlimited custom categories',
+        'Full grocery cost estimator',
+        'Monthly calendar view',
         'Up to 5 household members (you + 4 family)',
         'Shared shopping lists',
         'Family meal planning',

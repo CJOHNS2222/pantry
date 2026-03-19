@@ -878,10 +878,23 @@ const App: React.FC = () => {
   const navigateToNotifications = () => {
     setActiveTab(Tab.SETTINGS);
     setTimeout(() => {
-      const notificationsSection = document.querySelector('[data-section="notifications"]');
-      if (notificationsSection) {
-        notificationsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
+      // Switch to the Account tab (Pending Notifications is its own box there)
+      const accountTab = document.querySelector('[data-settings-tab="account"]') as HTMLElement;
+      if (accountTab) accountTab.click();
+
+      setTimeout(() => {
+        // Expand the Pending Notifications accordion if collapsed
+        const pendingSection = document.querySelector('[data-section="pending-notifications"]') as HTMLElement;
+        if (pendingSection) {
+          const header = pendingSection.querySelector('.cursor-pointer') as HTMLElement;
+          const isExpanded = pendingSection.querySelector('.border-t.border-theme.p-4') !== null;
+          if (!isExpanded && header) header.click();
+
+          setTimeout(() => {
+            pendingSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }, 150);
+        }
+      }, 100);
     }, 100);
   };
 

@@ -89,7 +89,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   const appActions = useAppActions();
 
   // Destructure needed values
-  const { household, savedRecipes } = appState;
+  const { household, savedRecipes, recipeSaveLimitExceeded } = appState;
   const { onSaveRecipe, onRateRecipe, checkRecipeSaveLimit, checkMealPlanLimit } = appActions;
 
   const [canShowAdBanner, setCanShowAdBanner] = React.useState<boolean>(false);
@@ -2736,6 +2736,8 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
           onClose={() => setShowRecipeModal(false)}
           onAddToPlan={appActions.onAddToPlan}
           onSaveRecipe={onSaveRecipe}
+          recipeSaveLimitExceeded={recipeSaveLimitExceeded}
+          recipeSavedCount={savedRecipes.length}
           onRate={onRateRecipe}
           showSaveButton={true}
           showAddToPlan={modalContext === 'search'}

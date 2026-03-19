@@ -54,13 +54,6 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   const handleNotificationBellDoubleClick = () => {
     if (onNavigateToSettings) {
       onNavigateToSettings();
-      // Navigate to account tab where pending notifications are located
-      setTimeout(() => {
-        const settingsTab = document.querySelector('[data-settings-tab="account"]') as HTMLElement;
-        if (settingsTab) {
-          settingsTab.click();
-        }
-      }, 100);
     }
   };
 
@@ -78,48 +71,12 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
       role="banner"
     >
       <div className="flex justify-between items-center">
-        <div className="flex flex-col items-center min-w-0 flex-shrink">
-          <div className="flex items-center gap-1 mb-1">
-            <div className="text-sm font-medium text-theme-primary opacity-80 truncate" id="user-email">
-            {`${greeting}, ${(user.profile?.name || user.name || user.email.split('@')[0]).split(' ')[0]}!`}
+        <div className="flex flex-col items-start min-w-0 flex-shrink">
+          <div className="w-full mb-1">
+            <div className="text-[11px] font-medium text-theme-primary opacity-80 text-center" id="user-email">
+              <span className="block">{greeting},</span>
+              <span className="block">{(user.profile?.name || user.name || user.email.split('@')[0]).split(' ')[0]}!</span>
             </div>
-            {user?.id && (
-              <div className="relative">
-                <button
-                  onClick={handleToggleNotifications}
-                  onDoubleClick={handleNotificationBellDoubleClick}
-                  className="relative p-1 text-amber-500 hover:text-amber-400 transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 rounded"
-                  aria-label={`${unreadNotificationsCount} unread notifications`}
-                  title="Click to view notifications, double-click to view pending notifications"
-                >
-                  <Bell className="w-4 h-4" />
-                  {unreadNotificationsCount > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-medium text-[10px]">
-                      {unreadNotificationsCount > 99 ? '99+' : unreadNotificationsCount}
-                    </span>
-                  )}
-                </button>
-
-                {showNotifications && (
-                  <div className="absolute right-0 mt-2 w-80 max-h-96 overflow-auto bg-theme-primary border border-theme rounded shadow-lg z-50 p-2">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="text-sm font-semibold">Notifications</div>
-                      <button onClick={handleMarkAllRead} className="text-xs text-theme-secondary hover:underline">Mark all read</button>
-                    </div>
-                    <div className="space-y-2">
-                      {(items || []).slice().reverse().slice(0, 50).map((n: any) => (
-                        <div key={n.id} className={`p-2 rounded ${n.read ? 'bg-theme-secondary' : 'bg-theme-primary/20'}`}>
-                          <div className="text-sm font-medium">{n.title}</div>
-                          {n.body && <div className="text-xs text-theme-secondary">{n.body}</div>}
-                          <div className="text-xs text-theme-secondary mt-1">{n.createdAt?.toString ? n.createdAt.toString() : ''}</div>
-                        </div>
-                      ))}
-                      {(items || []).length === 0 && <div className="text-xs text-theme-secondary">No notifications</div>}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
           </div>
           <div className="flex items-center gap-1">
             <button
@@ -145,11 +102,43 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                 </div>
               )}
             </button>
-            <SyncIndicator
-              syncStatus={syncStatus}
-              compact={true}
-              onSyncClick={onSyncClick}
-            />
+            {user?.id && (
+              <div className="relative">
+                <button
+                  onClick={handleToggleNotifications}
+                  onDoubleClick={handleNotificationBellDoubleClick}
+                  className="relative p-1 text-amber-500 hover:text-amber-400 transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 rounded"
+                  aria-label={`${unreadNotificationsCount} unread notifications`}
+                  title="Click to view notifications, double-click to view pending notifications"
+                >
+                  <Bell className="w-4 h-4" />
+                  {unreadNotificationsCount > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-medium text-[10px]">
+                      {unreadNotificationsCount > 99 ? '99+' : unreadNotificationsCount}
+                    </span>
+                  )}
+                </button>
+
+                {showNotifications && (
+                  <div className="absolute left-0 mt-2 w-72 max-h-96 overflow-auto bg-theme-primary border border-theme rounded shadow-lg z-50 p-2">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-sm font-semibold">Notifications</div>
+                      <button onClick={handleMarkAllRead} className="text-xs text-theme-secondary hover:underline">Mark all read</button>
+                    </div>
+                    <div className="space-y-2">
+                      {(items || []).slice().reverse().slice(0, 50).map((n: any) => (
+                        <div key={n.id} className={`p-2 rounded ${n.read ? 'bg-theme-secondary' : 'bg-theme-primary/20'}`}>
+                          <div className="text-sm font-medium">{n.title}</div>
+                          {n.body && <div className="text-xs text-theme-secondary">{n.body}</div>}
+                          <div className="text-xs text-theme-secondary mt-1">{n.createdAt?.toString ? n.createdAt.toString() : ''}</div>
+                        </div>
+                      ))}
+                      {(items || []).length === 0 && <div className="text-xs text-theme-secondary">No notifications</div>}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
         <div className="flex flex-col items-center flex-1 min-w-0">
@@ -160,13 +149,6 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           >
             Stock & Spoon
           </h1>
-          <span 
-            className="text-[10px] uppercase tracking-widest text-theme-secondary opacity-60"
-            aria-describedby="app-title"
-          >
-            AI Kitchen Assistant
-          </span>
-          <UsageIndicator user={user} compact={true} onUpgrade={() => {}} />
           {household && household.members.length > 1 && (
             <div className="mt-1">
               <HouseholdStatusIndicator
@@ -206,7 +188,14 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
               {settings.theme.mode === 'dark' ? <Sun className="w-5 h-5" aria-hidden="true" /> : <Moon className="w-5 h-5" aria-hidden="true" />}
             </button>
           </div>
-          <OnlineIndicator isOnline={syncStatus.isOnline} />
+          <div className="flex flex-col items-center gap-0.5">
+            <SyncIndicator
+              syncStatus={syncStatus}
+              compact={true}
+              onSyncClick={onSyncClick}
+            />
+            <OnlineIndicator isOnline={syncStatus.isOnline} />
+          </div>
         </div>
       </div>
     </header>
