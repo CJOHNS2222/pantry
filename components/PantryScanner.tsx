@@ -1928,17 +1928,19 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
       {/* Add Items Modal */}
       {isAddModalOpen && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center p-4">
-          <div className="bg-theme-primary rounded-t-3xl max-w-md w-full max-h-[80vh] overflow-y-auto shadow-xl animate-slide-up">
-            <div className="p-6 pb-[75px]">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-bold text-theme-secondary">Add Items</h3>
-                <button
-                  onClick={closeModal}
-                  className="p-2 hover:bg-theme-secondary rounded-full transition-colors"
-                >
-                  <X className="w-5 h-5 text-theme-secondary" />
-                </button>
-              </div>
+          <div className="bg-theme-primary rounded-t-3xl max-w-md w-full modal-safe-h flex flex-col shadow-xl animate-slide-up">
+            {/* Fixed Header */}
+            <div className="flex items-center justify-between p-6 pb-3 flex-shrink-0">
+              <h3 className="text-xl font-bold text-theme-secondary">Add Items</h3>
+              <button
+                onClick={closeModal}
+                className="p-2 hover:bg-theme-secondary rounded-full transition-colors"
+              >
+                <X className="w-5 h-5 text-theme-secondary" />
+              </button>
+            </div>
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto px-6 pb-6">
 
               {/* Camera/File Upload Section */}
               <div className="bg-theme-secondary p-4 rounded-2xl border border-theme shadow-lg mb-6">
@@ -2568,8 +2570,8 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
 
       {/* Bulk Quantity Edit Modal */}
       {showBulkQuantityEdit && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4">
-          <div className="bg-theme-primary rounded-lg shadow-xl w-full max-w-md mx-auto max-h-[80vh] overflow-y-auto border border-theme pb-20 pt-20">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] px-4 pt-[var(--app-header-h)] pb-[var(--app-nav-h)]">
+          <div className="bg-theme-primary rounded-lg shadow-xl w-full max-w-md mx-auto max-h-full overflow-y-auto border border-theme">
             <div className="p-6 pb-2.5">
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-xl font-bold text-theme-secondary">Edit Quantities</h3>

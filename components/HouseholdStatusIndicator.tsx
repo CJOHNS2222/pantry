@@ -11,28 +11,37 @@ export const HouseholdStatusIndicator: React.FC<HouseholdStatusIndicatorProps> =
   household,
   currentUserId
 }) => {
-  // Filter out current user and get active members
+  // Helper to read live activity data for a member from the memberActivity map
+  const getActivity = (memberId: string) => household.memberActivity?.[memberId] ?? {};
+
+  // Filter out current user and get other active members
   const otherMembers = household.members.filter(m => m.id !== currentUserId && m.status === 'active');
 
   if (otherMembers.length === 0) {
-    return null; // No other active members
+    return null;
   }
 
-  // Get members who are currently online
-  const onlineMembers = otherMembers.filter(m => m.isOnline);
+  // Members whose isOnline flag is true in memberActivity
+  const onlineMembers = otherMembers.filter(m => getActivity(m.id).isOnline === true);
 
-  // Get members who were recently active (within last 30 minutes)
+  // Members with a lastSeen within the last 30 minutes
   const recentlyActiveMembers = otherMembers.filter(m => {
-    if (!m.lastSeen) return false;
-    const lastSeen = new Date(m.lastSeen);
+    const rawLastSeen = getActivity(m.id).lastSeen;
+    if (!rawLastSeen) return false;
+    const lastSeen = typeof rawLastSeen === 'object' && rawLastSeen?.toDate
+      ? rawLastSeen.toDate()
+      : new Date(rawLastSeen as string);
     const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
     return lastSeen > thirtyMinutesAgo;
   });
 
-  const getTimeAgo = (timestamp: string) => {
-    const now = new Date();
-    const time = new Date(timestamp);
-    const diffMs = now.getTime() - time.getTime();
+  const getTimeAgo = (rawTime: any) => {
+    if (!rawTime) return '';
+    const time = typeof rawTime === 'object' && rawTime?.toDate
+      ? rawTime.toDate()
+      : new Date(rawTime as string);
+    if (isNaN(time.getTime())) return '';
+    const diffMs = Date.now() - time.getTime();
     const diffMins = Math.floor(diffMs / (1000 * 60));
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
@@ -65,14 +74,14 @@ export const HouseholdStatusIndicator: React.FC<HouseholdStatusIndicatorProps> =
           <span className="text-xs text-red-200/50">•</span>
         )}
 
-        {recentlyActiveMembers.filter(m => !m.isOnline).length > 0 && (
+        {recentlyActiveMembers.filter(m => !getActivity(m.id).isOnline).length > 0 && (
           <div className="flex items-center gap-1">
             <Clock className="w-3 h-3 text-amber-500/60" />
             <span className="text-xs text-amber-500/60">
               {(() => {
-                const offlineRecent = recentlyActiveMembers.filter(m => !m.isOnline);
+                const offlineRecent = recentlyActiveMembers.filter(m => !getActivity(m.id).isOnline);
                 if (offlineRecent.length === 1) {
-                  return `${offlineRecent[0].name} was active ${getTimeAgo(offlineRecent[0].lastSeen!)}`;
+                  return `${offlineRecent[0].name} was active ${getTimeAgo(getActivity(offlineRecent[0].id).lastSeen)}`;
                 }
                 return `${offlineRecent.length} recently active`;
               })()}
@@ -90,18 +99,18 @@ export const HouseholdStatusIndicator: React.FC<HouseholdStatusIndicatorProps> =
         )}
       </div>
 
-      {/* Current activity indicators */}
-      {onlineMembers.some(m => m.currentActivity) && (
+      {/* Current activity indicators for online members */}
+      {onlineMembers.some(m => getActivity(m.id).currentActivity) && (
         <div className="flex items-center gap-1 ml-2">
           <Eye className="w-3 h-3 text-amber-500/60" />
           <div className="flex gap-1">
             {onlineMembers
-              .filter(m => m.currentActivity)
-              .slice(0, 2) // Show max 2 activities
-              .map((member, index) => (
+              .filter(m => getActivity(m.id).currentActivity)
+              .slice(0, 2)
+              .map((member, index, arr) => (
                 <span key={member.id} className="text-xs text-amber-500/80">
-                  {member.name}: {member.currentActivity}
-                  {index < onlineMembers.filter(m => m.currentActivity).length - 1 && ','}
+                  {member.name}: {getActivity(member.id).currentActivity}
+                  {index < arr.length - 1 && ','}
                 </span>
               ))
             }

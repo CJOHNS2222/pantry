@@ -239,6 +239,12 @@ export class NotificationService {
 
     // Determine risk level for this item
     const itemRiskLevel = getFoodRiskLevel(itemName, itemCategory);
+
+    // Hardy Fridge items (risk level 2) generate low-value "Checking In" notifications — skip them
+    if (itemRiskLevel === 2) {
+      return '';
+    }
+
     const { priority: basePriority } = getNotificationTone(itemRiskLevel);
 
     // Adjust priority based on user risk level and time sensitivity

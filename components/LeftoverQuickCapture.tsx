@@ -75,8 +75,8 @@ export default function LeftoverQuickCapture({
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4">
-      <div className="bg-theme-primary rounded-lg shadow-xl w-full max-w-md mx-auto max-h-[80vh] flex flex-col border border-theme">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] px-4 pt-[var(--app-header-h)] pb-[var(--app-nav-h)]">
+      <div className="bg-theme-primary rounded-lg shadow-xl w-full max-w-md mx-auto max-h-full flex flex-col border border-theme">
         {/* Header */}
         <div className="flex items-center justify-between pt-4 px-3 pb-3 border-b border-theme flex-shrink-0">
           <h3 className="text-lg font-semibold text-theme-primary">Save Leftover</h3>

@@ -11,6 +11,7 @@ import QuantityUnitPicker from './QuantityUnitPicker';
 import { COMMON_UNITS, getSmartUnits } from './QuantityUnitPicker';
 import { useApp } from '../contexts/AppContext';
 import { useAppActions } from '../contexts/AppActionsContext';
+import { useIntl } from 'react-intl';
 import { uploadItemImage } from '../services/imageService';
 import { log } from '../services/logService';
 
@@ -52,6 +53,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   const [localIsStaple, setLocalIsStaple] = useState<boolean>(item.isStaple || false);
   const [localIsOpened, setLocalIsOpened] = useState<boolean>(item.isOpened || false);
   // Image upload state
+  const intl = useIntl();
   const { household, user, settings } = useApp();
   const { addToast } = useAppActions();
   const showNutrition = settings?.shopping?.showNutrition ?? false;
@@ -228,19 +230,19 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
 
   return (
     <>
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start sm:items-center justify-center z-[9999] p-4">
-        <div ref={modalRef} className="bg-theme-primary rounded-lg shadow-xl w-full max-w-md mx-auto max-h-[85vh] flex flex-col border border-theme">
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start sm:items-center justify-center z-[9999] px-4 pt-[var(--app-header-h)] pb-[var(--app-nav-h)]">
+        <div ref={modalRef} className="bg-theme-primary rounded-lg shadow-xl w-full max-w-md mx-auto max-h-full flex flex-col border border-theme">
           {/* Header - Fixed */}
           <div className="flex items-center justify-between p-4 pb-3 border-b border-theme flex-shrink-0 rounded-t-lg">
             <h3 className="text-lg font-semibold text-theme-primary">{item.item}</h3>
             <div className="flex items-center gap-2">
               <div className="text-sm text-theme-secondary">
-                Added on {item.dateAdded ? new Date(item.dateAdded).toLocaleDateString() : 'Unknown'}
+                {intl.formatMessage({ id: 'common.addedOn' }, { date: item.dateAdded ? new Date(item.dateAdded).toLocaleDateString() : intl.formatMessage({ id: 'common.unknown' }) })}
               </div>
               <button
                 onClick={onClose}
                 className="p-1 hover:bg-theme-secondary rounded-full transition-colors"
-                aria-label="Close modal"
+                aria-label={intl.formatMessage({ id: 'common.closeModal' })}
               >
                 <X className="w-5 h-5 text-theme-secondary" />
               </button>
@@ -253,7 +255,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
             <div className="pb-2 flex items-center gap-4">
               {/* Change picture button - left side */}
               <label className="cursor-pointer px-2 py-1 bg-theme-secondary text-theme-primary rounded text-xs hover:bg-theme-primary hover:text-theme-secondary border border-theme flex-shrink-0">
-                Change
+                {intl.formatMessage({ id: 'common.change' })}
                 <input
                   type="file"
                   accept="image/*"
@@ -281,7 +283,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                 disabled={!selectedFile || uploadingImage}
                 className="px-2 py-1 bg-[var(--accent-color)] text-white rounded text-xs flex-shrink-0 disabled:opacity-50"
               >
-                {uploadingImage ? 'Uploading…' : 'Upload'}
+                {uploadingImage ? intl.formatMessage({ id: 'common.uploading' }) : intl.formatMessage({ id: 'common.upload' })}
               </button>
             </div>
 
@@ -306,7 +308,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
             {(item as any).originalQuantity && (
               <div className="bg-theme-secondary p-2 rounded-lg border border-theme">
                 <label className="block text-xs font-medium text-theme-primary mb-1 uppercase opacity-70">
-                  Recipe Qty
+                  {intl.formatMessage({ id: 'pantry.recipeQty' })}
                 </label>
                 <div className="text-sm text-theme-primary">
                   {(item as any).originalQuantity}
@@ -317,7 +319,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
             {/* Expiration Date */}
             <div className="bg-theme-secondary p-2 rounded-lg border border-theme">
               <label className="block text-xs font-medium text-theme-primary mb-1 uppercase opacity-70">
-                Expiration
+                {intl.formatMessage({ id: 'pantry.expiration' })}
               </label>
               {isEditingExpiration ? (
                 <div className="space-y-2">
@@ -333,8 +335,8 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                       onChange={(e) => setEditExpirationType(e.target.value as 'use-by' | 'best-by')}
                       className="px-2 py-1 text-sm border border-theme rounded-md bg-white text-black focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]"
                     >
-                      <option value="best-by">Best By</option>
-                      <option value="use-by">Use By</option>
+                      <option value="best-by">{intl.formatMessage({ id: 'pantry.bestBy' })}</option>
+                      <option value="use-by">{intl.formatMessage({ id: 'pantry.useBy' })}</option>
                     </select>
                   </div>
                   <div className="flex gap-2 justify-end">
@@ -342,13 +344,13 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                       onClick={handleSaveExpiration}
                       className="px-3 py-1 text-sm bg-[var(--accent-color)] text-white rounded-lg hover:bg-[var(--accent-color)]/80 transition-colors"
                     >
-                      Save
+                      {intl.formatMessage({ id: 'common.save' })}
                     </button>
                     <button
                       onClick={handleCancelExpirationEdit}
                       className="px-3 py-1 text-sm bg-theme-primary text-theme-primary border border-theme rounded-lg hover:bg-theme-secondary transition-colors"
                     >
-                      Cancel
+                      {intl.formatMessage({ id: 'common.cancel' })}
                     </button>
                   </div>
                 </div>
@@ -370,7 +372,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                       </span>
                     </div>
                   ) : (
-                    <span className="text-sm text-theme-secondary opacity-70">No expiration set</span>
+                    <span className="text-sm text-theme-secondary opacity-70">{intl.formatMessage({ id: 'pantry.noExpirationSet' })}</span>
                   )}
                   <button
                     onClick={() => setIsEditingExpiration(true)}
@@ -393,11 +395,11 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                   onChange={(e) => handleStorageChange(e.target.value as PantryItem['storageLocation'])}
                   className="w-full px-2 py-1.5 text-sm border border-theme rounded-md bg-theme-primary text-theme-primary focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]"
                 >
-                  <option value="pantry">Pantry</option>
-                  <option value="fridge">Fridge</option>
-                  <option value="freezer">Freezer</option>
-                  <option value="spices">Spices</option>
-                  <option value="other">Other</option>
+                  <option value="pantry">{intl.formatMessage({ id: 'pantry.storageLocations.pantry' })}</option>
+                  <option value="fridge">{intl.formatMessage({ id: 'pantry.storageLocations.fridge' })}</option>
+                  <option value="freezer">{intl.formatMessage({ id: 'pantry.storageLocations.freezer' })}</option>
+                  <option value="spices">{intl.formatMessage({ id: 'pantry.storageLocations.spices' })}</option>
+                  <option value="other">{intl.formatMessage({ id: 'pantry.storageLocations.other' })}</option>
                 </select>
               </div>
 
@@ -480,7 +482,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
               <div className="bg-gradient-to-br from-theme-secondary to-theme-secondary/80 p-3 rounded-lg border border-theme">
                 <div className="flex items-center gap-2 mb-3">
                   <Zap className="w-4 h-4 text-[var(--accent-color)]" />
-                  <h4 className="font-semibold text-theme-primary text-sm">Nutrition Facts</h4>
+                  <h4 className="font-semibold text-theme-primary text-sm">{intl.formatMessage({ id: 'pantry.nutritionFacts' })}</h4>
                   <span className="text-xs text-theme-primary/70 ml-auto">{nutrition.servingSize}</span>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
@@ -532,7 +534,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
               <div className="bg-theme-secondary p-3 rounded-lg border border-theme">
                 <div className="flex items-center gap-2 mb-3">
                   <History className="w-4 h-4 text-[var(--accent-color)]" />
-                  <h4 className="font-semibold text-theme-primary text-sm">Consumption History</h4>
+                  <h4 className="font-semibold text-theme-primary text-sm">{intl.formatMessage({ id: 'pantry.consumptionHistory' })}</h4>
                 </div>
                 <div className="space-y-2">
                   {item.consumptionHistory.slice(-5).reverse().map((date, index) => (
@@ -562,7 +564,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                 className="flex items-center justify-center gap-2 px-4 py-2 bg-[var(--accent-color)] text-[var(--text-theme-primary)] rounded-lg hover:bg-[var(--accent-color)]/80 transition-colors"
               >
                 <ShoppingBasket className="w-4 h-4" />
-                Buy More
+                {intl.formatMessage({ id: 'pantry.buyMore' })}
               </button>
               {showPriceData && (
                 <button
@@ -570,7 +572,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                   className="flex items-center justify-center gap-2 px-4 py-2 bg-[var(--bg-theme-secondary)] text-[var(--text-theme-primary)] border border-[var(--border-theme)] rounded-lg hover:bg-[var(--bg-theme-primary)] transition-colors"
                 >
                   <TrendingUp className="w-4 h-4" />
-                  Price Trends
+                  {intl.formatMessage({ id: 'pantry.priceTrends' })}
                 </button>
               )}
             </div>
@@ -585,14 +587,14 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                 className="flex items-center justify-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
               >
                 <Trash2 className="w-4 h-4" />
-                Delete Item
+                {intl.formatMessage({ id: 'pantry.deleteItem' })}
               </button>
               <button
-                onClick={onClose}
+                onClick={handleCloseAndPersist}
                 className="flex items-center justify-center gap-2 px-4 py-2 bg-[var(--bg-theme-secondary)] text-[var(--text-theme-primary)] border border-[var(--border-theme)] rounded-lg hover:bg-[var(--bg-theme-primary)] transition-colors"
               >
                 <X className="w-4 h-4" />
-                Close
+                {intl.formatMessage({ id: 'common.close' })}
               </button>
             </div>
           </div>

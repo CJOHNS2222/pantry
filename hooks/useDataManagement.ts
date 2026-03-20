@@ -47,8 +47,10 @@ function createShoppingListListener(
   setIsLoadingShoppingList: (loading: boolean) => void,
   prevShoppingListRef: React.MutableRefObject<ShoppingItem[]>
 ) {
-  if (inHousehold && household?.id) {
-    const householdId = household.id;
+  // Use user.householdId as fallback — household state may not be loaded yet when this runs
+  const resolvedHouseholdId = inHousehold ? (household?.id || user.householdId) : undefined;
+  if (inHousehold && resolvedHouseholdId) {
+    const householdId = resolvedHouseholdId;
     ShoppingListCacheService.getCachedShoppingList(householdId).then(cachedItems => {
       if (cachedItems.length > 0) {
         setShoppingList(cachedItems);
@@ -132,7 +134,8 @@ function createSavedRecipesListener(
   setIsLoadingSavedRecipes: (loading: boolean) => void,
   prevSavedRecipesRef: React.MutableRefObject<SavedRecipe[]>
 ) {
-  const householdId = inHousehold && household?.id ? household.id : undefined;
+  // Use user.householdId as fallback — household state may not be loaded yet when this runs
+  const householdId = inHousehold ? (household?.id || user.householdId) : undefined;
   const userId = inHousehold ? undefined : user.id;
 
   RecipesCacheService.getCachedRecipes(householdId, userId).then(cachedRecipes => {
@@ -185,8 +188,10 @@ function createMealPlanListener(
   setIsLoadingMealPlan: (loading: boolean) => void,
   prevMealPlanRef: React.MutableRefObject<DayPlan[]>
 ) {
-  const cachePath = inHousehold && household?.id
-    ? `households/${household.id}/cache/mealPlan`
+  // Use user.householdId as fallback — household state may not be loaded yet when this runs
+  const effectiveHouseholdId = inHousehold ? (household?.id || user.householdId) : undefined;
+  const cachePath = effectiveHouseholdId
+    ? `households/${effectiveHouseholdId}/cache/mealPlan`
     : `users/${user.id}/cache/mealPlan`;
 
   return DatabaseMonitoringService.onSnapshot(DatabaseMonitoringService.doc(cachePath), snap => {

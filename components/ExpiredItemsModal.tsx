@@ -7,6 +7,7 @@ import AnalyticsService from '../services/analyticsService';
 import HapticService from '../services/hapticService';
 import FoodWasteAnalyticsService, { DisposalRecord } from '../services/foodWasteAnalyticsService';
 import { log } from '../services/logService';
+import { useIntl } from 'react-intl';
 
 interface ExpiredItemsModalProps {
   isOpen: boolean;
@@ -32,6 +33,7 @@ const ExpiredItemsModal: React.FC<ExpiredItemsModalProps> = ({
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [disposalReason, setDisposalReason] = useState<DisposalReason>('thrown_away');
   const [isProcessing, setIsProcessing] = useState(false);
+  const intl = useIntl();
   const [expiredItems, setExpiredItems] = useState<PantryItem[]>([]);
 
   useEffect(() => {
@@ -140,8 +142,8 @@ const ExpiredItemsModal: React.FC<ExpiredItemsModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-theme-primary rounded-2xl border border-theme max-w-2xl w-full max-h-[90vh] overflow-hidden shadow-2xl">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center px-4 pt-[var(--app-header-h)] pb-[var(--app-nav-h)]">
+      <div className="bg-theme-primary rounded-2xl border border-theme max-w-2xl w-full max-h-full overflow-hidden shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-theme">
           <div className="flex items-center gap-3">
@@ -149,7 +151,7 @@ const ExpiredItemsModal: React.FC<ExpiredItemsModalProps> = ({
               <AlertTriangle className="w-5 h-5 text-red-500" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-theme-primary">Expired Items</h2>
+              <h2 className="text-xl font-bold text-theme-primary">{intl.formatMessage({ id: 'pantry.expired.title' })}</h2>
               <p className="text-sm text-theme-secondary opacity-70">
                 {expiredItems.length} item{expiredItems.length !== 1 ? 's' : ''} need{expiredItems.length === 1 ? 's' : ''} attention
               </p>
@@ -248,7 +250,7 @@ const ExpiredItemsModal: React.FC<ExpiredItemsModalProps> = ({
                         onChange={(e) => setDisposalReason(e.target.value as DisposalReason)}
                         className="w-4 h-4 text-[var(--accent-color)]"
                       />
-                      <span className="text-sm text-theme-primary">Threw it out</span>
+                      <span className="text-sm text-theme-primary">{intl.formatMessage({ id: 'pantry.expired.threwItOut' })}</span>
                     </label>
                     <label className="flex items-center gap-2">
                       <input
@@ -259,7 +261,7 @@ const ExpiredItemsModal: React.FC<ExpiredItemsModalProps> = ({
                         onChange={(e) => setDisposalReason(e.target.value as DisposalReason)}
                         className="w-4 h-4 text-[var(--accent-color)]"
                       />
-                      <span className="text-sm text-theme-primary">Cooked with it</span>
+                      <span className="text-sm text-theme-primary">{intl.formatMessage({ id: 'pantry.expired.cookedWithIt' })}</span>
                     </label>
                     <label className="flex items-center gap-2">
                       <input
@@ -270,7 +272,7 @@ const ExpiredItemsModal: React.FC<ExpiredItemsModalProps> = ({
                         onChange={(e) => setDisposalReason(e.target.value as DisposalReason)}
                         className="w-4 h-4 text-[var(--accent-color)]"
                       />
-                      <span className="text-sm text-theme-primary">Just want to remove it</span>
+                      <span className="text-sm text-theme-primary">{intl.formatMessage({ id: 'pantry.expired.justRemoveIt' })}</span>
                     </label>
                   </div>
                 </div>

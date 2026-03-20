@@ -47,6 +47,7 @@ import { groceryPriceService } from './services/groceryPriceService';
 import { PriceDataCacheService } from './services/priceDataCacheService'; // Import the service
 import ExpiredItemsModal from './components/ExpiredItemsModal';
 import { InventoryCacheService } from './services/inventoryCacheService';
+import { useIntl } from 'react-intl';
 
 // Lazy load monitoring components
 const DatabaseAnalytics = React.lazy(() => import('./components/DatabaseAnalytics').then(module => ({ default: module.default })));
@@ -61,6 +62,7 @@ const LoadingSpinner: React.FC = () => (
 type Theme = 'dark' | 'light';
 
 const App: React.FC = () => {
+  const intl = useIntl();
   const [activeTab, setActiveTab] = useState<Tab>(Tab.PANTRY); // Default to pantry
   const prevActiveTabRef = useRef<Tab>(activeTab);
   const [persistedRecipeResult, setPersistedRecipeResult] = useState<RecipeSearchResult | null>(null);
@@ -980,12 +982,12 @@ const App: React.FC = () => {
         {showAddToPlanDialog && pendingRecipeForPlan && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-theme-primary p-6 rounded-lg shadow-lg max-w-md w-full mx-4">
-              <h3 className="text-lg font-semibold mb-4 text-theme-text">Add to Meal Plan</h3>
+              <h3 className="text-lg font-semibold mb-4 text-theme-text">{intl.formatMessage({ id: 'mealPlanner.addToMealPlan' })}</h3>
               <p className="mb-4 text-theme-text-secondary">Select a day and meal for "{pendingRecipeForPlan.title}"</p>
               
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium mb-2 text-theme-text">Day</label>
+                  <label className="block text-sm font-medium mb-2 text-theme-text">{intl.formatMessage({ id: 'mealPlanner.day' })}</label>
                   <select 
                     className="w-full p-2 border border-theme-border rounded bg-white text-black"
                     onChange={(e) => setSelectedDayForPlan(parseInt(e.target.value))}
@@ -1000,15 +1002,15 @@ const App: React.FC = () => {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium mb-2 text-theme-text">Meal</label>
+                  <label className="block text-sm font-medium mb-2 text-theme-text">{intl.formatMessage({ id: 'mealPlanner.meal' })}</label>
                   <select 
                     className="w-full p-2 border border-theme-border rounded bg-white text-black"
                     onChange={(e) => setSelectedMealForPlan(e.target.value as 'breakfast' | 'lunch' | 'dinner')}
                     value={selectedMealForPlan ?? 'dinner'}
                   >
-                    <option value="breakfast">Breakfast</option>
-                    <option value="lunch">Lunch</option>
-                    <option value="dinner">Dinner</option>
+                    <option value="breakfast">{intl.formatMessage({ id: 'mealPlanner.breakfast' })}</option>
+                    <option value="lunch">{intl.formatMessage({ id: 'mealPlanner.lunch' })}</option>
+                    <option value="dinner">{intl.formatMessage({ id: 'mealPlanner.dinner' })}</option>
                   </select>
                 </div>
               </div>
@@ -1021,7 +1023,7 @@ const App: React.FC = () => {
                   }}
                   className="flex-1 px-4 py-2 border border-theme-border rounded text-theme-text hover:bg-theme-hover"
                 >
-                  Cancel
+                  {intl.formatMessage({ id: 'common.cancel' })}
                 </button>
                 <button
                   onClick={() => {

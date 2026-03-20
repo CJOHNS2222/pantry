@@ -1,0 +1,63 @@
+version: 2
+
+updates:
+  # Main app (React + Vite + Capacitor)
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "America/New_York"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+    groups:
+      npm-dev-minor-patch:
+        dependency-type: "development"
+        update-types: ["minor", "patch"]
+      npm-prod-minor-patch:
+        dependency-type: "production"
+        update-types: ["minor", "patch"]
+
+  # Firebase Cloud Functions
+  - package-ecosystem: "npm"
+    directory: "/functions"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "America/New_York"
+    labels:
+      - "dependencies"
+      - "functions"
+    groups:
+      functions-minor-patch:
+        update-types: ["minor", "patch"]
+
+  # Website
+  - package-ecosystem: "npm"
+    directory: "/website"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "America/New_York"
+    labels:
+      - "dependencies"
+      - "website"
+    groups:
+      website-minor-patch:
+        update-types: ["minor", "patch"]
+
+  # Android (Capacitor Gradle wrapper)
+  - package-ecosystem: "gradle"
+    directory: "/android"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "America/New_York"
+    labels:
+      - "dependencies"
+      - "android"

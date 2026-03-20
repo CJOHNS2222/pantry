@@ -21,6 +21,7 @@ import { useKeyboardNavigation } from '../hooks/useKeyboardNavigation';
 import { debounce } from '../utils/debounceUtils';
 import { filterRecipesByHouseholdPreferences, filterRecipesByUserProfile } from '../utils/preferenceUtils';
 import { getUserMeasurementSystem } from '../utils/measurementUtils';
+import { useIntl } from 'react-intl';
 
 interface RecipeFinderProps {
     onAddToPlan: (recipe: StructuredRecipe) => void;
@@ -47,6 +48,7 @@ interface RecipeFinderProps {
 }
 
 export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveRecipe, onDeleteRecipe, onMarkAsMade, inventory, ratings = [], onRate, savedRecipes, user, setActiveTab, persistedResult, setPersistedResult, initialSearchQuery, addToast, recipeSaveLimitExceeded = false, mealPlanLimitExceeded = false, isLoadingSavedRecipes = false, household }) => {
+    const intl = useIntl();
     // List of staple items to ignore
     const STAPLES = ['salt', 'pepper', 'oil', 'water', 'flour', 'sugar', 'butter', 'vinegar', 'baking powder', 'baking soda', 'spices', 'seasoning', 'soy sauce', 'cornstarch', 'yeast'];
     
@@ -1322,7 +1324,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                                 />
                             ) : (
                                 <div className="w-full h-full bg-theme-primary/10 flex items-center justify-center">
-                                    <div className="text-theme-secondary/50 text-xs">No Image</div>
+                                    <div className="text-theme-secondary/50 text-xs">{intl.formatMessage({ id: 'recipes.noImage' })}</div>
                                 </div>
                             )}
                         </div>
@@ -1500,7 +1502,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                 ) : savedRecipes.length === 0 ? (
                     <div className="text-center py-12 opacity-30">
                         <Bookmark className="w-12 h-12 mx-auto mb-2" />
-                        <p>No saved recipes yet.</p>
+                        <p>{intl.formatMessage({ id: 'recipes.noSaved' })}</p>
                     </div>
                 ) : (
                     <>
@@ -1852,8 +1854,8 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
             {loadingState === LoadingState.SUCCESS && result && (!result.recipes || result.recipes.length === 0) && (
                 <div className="animate-fade-in-up mt-8 text-center py-12 opacity-60">
                     <Search className="w-12 h-12 mx-auto mb-4 text-theme-secondary/50" />
-                    <h3 className="text-lg font-semibold text-theme-primary mb-2">No recipes found</h3>
-                    <p className="text-theme-secondary opacity-70 mb-4">Try adjusting your search terms or ingredients</p>
+                    <h3 className="text-lg font-semibold text-theme-primary mb-2">{intl.formatMessage({ id: 'recipes.noResults' })}</h3>
+                    <p className="text-theme-secondary opacity-70 mb-4">{intl.formatMessage({ id: 'recipes.tryAdjusting' })}</p>
                     <div className="flex flex-wrap justify-center gap-2 text-sm">
                         <span className="text-theme-secondary/60">Suggestions:</span>
                         <button 
@@ -1879,7 +1881,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
             )}
 
             <div className="mt-12">
-                <h2 className="text-xl font-bold text-theme-primary mb-6">Popular Recipes</h2>
+                <h2 className="text-xl font-bold text-theme-primary mb-6">{intl.formatMessage({ id: 'recipes.popular' })}</h2>
                 <PopularRecipes openRecipeModal={openRecipeModal} onAddToPlan={onAddToPlan} user={user} household={household} />
             </div>
 

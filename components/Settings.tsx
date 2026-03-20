@@ -5,6 +5,7 @@ import { SubscriptionManager } from './SubscriptionManager';
 import { CategoryManager } from './CategoryManager';
 import { StoreLayoutEditor } from './StoreLayoutEditor';
 import { log } from '../services/logService';
+import { useIntl } from 'react-intl';
 import AnalyticsService from '../services/analyticsService';
 import { LanguageSelector } from '../src/components/LanguageSelector';
 import { useNotifications } from '../hooks/useNotifications';
@@ -102,6 +103,7 @@ export const Settings: React.FC<SettingsProps> = ({
   onShowHousehold,
   addToast
 }) => {
+  const intl = useIntl();
   const [feedback, setFeedback] = useState('');
   const [sending, setSending] = useState(false);
   const { isPremium, isFamily } = useSubscription(user || null);
@@ -555,13 +557,13 @@ export const Settings: React.FC<SettingsProps> = ({
       <div className="sticky top-0 z-10 bg-theme-primary border-b border-theme px-4 py-3">
         <div className="flex gap-1 bg-theme-secondary rounded-xl p-1">
           {(['account', 'preferences', 'organization', 'more'] as const).map((tab) => {
-            const labels: Record<string, string> = { account: 'Account', preferences: 'Preferences', organization: 'Organization', more: 'More' };
+            const labels: Record<string, string> = { account: 'Account', preferences: 'Prefs', organization: 'Organize', more: 'More' };
             return (
               <button
                 key={tab}
                 data-settings-tab={tab}
                 onClick={() => setActiveSettingsTab(tab)}
-                className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
+                className={`flex-1 py-2 px-1 rounded-lg text-sm font-medium text-center transition-colors ${
                   activeSettingsTab === tab
                     ? 'bg-[var(--accent-color)] text-white shadow-sm'
                     : 'text-theme-secondary hover:text-theme-primary'
@@ -591,7 +593,7 @@ export const Settings: React.FC<SettingsProps> = ({
               ) : (
                 <ChevronRight className="w-5 h-5 text-theme-primary" />
               )}
-              <h3 className="font-semibold text-theme-primary">Profile</h3>
+              <h3 className="font-semibold text-theme-primary">{intl.formatMessage({ id: 'settings.profile' })}</h3>
             </div>
           </div>
 
@@ -634,7 +636,7 @@ export const Settings: React.FC<SettingsProps> = ({
 
             {showAvatarSelection && (
               <div className="mb-4">
-                <h4 className="text-sm font-medium mb-2 text-theme-primary">Choose an avatar:</h4>
+                <h4 className="text-sm font-medium mb-2 text-theme-primary">{intl.formatMessage({ id: 'settings.chooseAvatar' })}</h4>
                 <div className="grid grid-cols-5 gap-2 max-h-48 overflow-y-auto">
                   {avatarOptions.map((avatarPath) => (
                     <button
@@ -661,7 +663,7 @@ export const Settings: React.FC<SettingsProps> = ({
 
             {/* Name Field */}
             <div className="mb-4">
-              <label htmlFor="userName" className="block text-sm font-medium text-theme-primary mb-2">Display Name</label>
+              <label htmlFor="userName" className="block text-sm font-medium text-theme-primary mb-2">{intl.formatMessage({ id: 'settings.displayName' })}</label>
               <input
                 id="userName"
                 name="userName"
@@ -676,12 +678,12 @@ export const Settings: React.FC<SettingsProps> = ({
           </div>
             {/* User Profile Information */}
           <div className="space-y-4 mb-4">
-            <h4 className="text-sm font-medium mb-3 text-theme-primary">Personal Information</h4>
+            <h4 className="text-sm font-medium mb-3 text-theme-primary">{intl.formatMessage({ id: 'settings.personalInfo' })}</h4>
             
             {/* Height and Weight - keep in 2 columns */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs text-theme-secondary mb-1">Height</label>
+                <label className="block text-xs text-theme-secondary mb-1">{intl.formatMessage({ id: 'settings.height' })}</label>
                 <div className="flex gap-1">
                   <div className="flex-1">
                     <input
@@ -724,7 +726,7 @@ export const Settings: React.FC<SettingsProps> = ({
                 </div>
               </div>
               <div>
-                <label htmlFor="weight" className="block text-xs text-theme-secondary mb-1">Weight (lbs)</label>
+                <label htmlFor="weight" className="block text-xs text-theme-secondary mb-1">{intl.formatMessage({ id: 'settings.weight' })}</label>
                 <input
                   id="weight"
                   name="weight"
@@ -754,7 +756,7 @@ export const Settings: React.FC<SettingsProps> = ({
                 />
               </div>
               <div>
-                <label htmlFor="gender" className="block text-xs text-theme-secondary mb-1">Gender</label>
+                <label htmlFor="gender" className="block text-xs text-theme-secondary mb-1">{intl.formatMessage({ id: 'settings.gender' })}</label>
                 <select
                   id="gender"
                   name="gender"
@@ -762,15 +764,15 @@ export const Settings: React.FC<SettingsProps> = ({
                   onChange={(e) => handleProfileChange('gender', e.target.value || undefined)}
                   className="w-full p-1 text-xs border rounded text-black bg-white"
                 >
-                  <option value="">Select gender</option>
-                  <option value="male">Male</option>
-                  <option value="female">Female</option>
-                  <option value="other">Other</option>
-                  <option value="prefer-not-to-say">Prefer not to say</option>
+                  <option value="">{intl.formatMessage({ id: 'settings.selectGender' })}</option>
+                  <option value="male">{intl.formatMessage({ id: 'settings.genders.male' })}</option>
+                  <option value="female">{intl.formatMessage({ id: 'settings.genders.female' })}</option>
+                  <option value="other">{intl.formatMessage({ id: 'settings.genders.other' })}</option>
+                  <option value="prefer-not-to-say">{intl.formatMessage({ id: 'settings.genders.preferNotToSay' })}</option>
                 </select>
               </div>
               <div>
-                <label htmlFor="householdSize" className="block text-xs text-theme-secondary mb-1">Household</label>
+                <label htmlFor="householdSize" className="block text-xs text-theme-secondary mb-1">{intl.formatMessage({ id: 'settings.household' })}</label>
                 <input
                   id="householdSize"
                   name="householdSize"
@@ -790,7 +792,7 @@ export const Settings: React.FC<SettingsProps> = ({
             {/* Diet Goal and Activity Level - combine into 2 columns */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label htmlFor="dietGoal" className="block text-xs text-theme-secondary mb-1">Diet Goal</label>
+                <label htmlFor="dietGoal" className="block text-xs text-theme-secondary mb-1">{intl.formatMessage({ id: 'settings.dietGoal' })}</label>
                 <select
                   id="dietGoal"
                   name="dietGoal"
@@ -798,16 +800,16 @@ export const Settings: React.FC<SettingsProps> = ({
                   onChange={(e) => handleProfileChange('dietGoal', e.target.value || undefined)}
                   className="w-full p-2 border rounded text-sm text-black bg-white"
                 >
-                  <option value="">Select diet goal</option>
-                  <option value="lose-weight">Lose Weight</option>
-                  <option value="maintain-weight">Maintain Weight</option>
-                  <option value="gain-weight">Gain Weight</option>
-                  <option value="build-muscle">Build Muscle</option>
-                  <option value="improve-health">Improve Health</option>
+                  <option value="">{intl.formatMessage({ id: 'settings.selectDietGoal' })}</option>
+                  <option value="lose-weight">{intl.formatMessage({ id: 'settings.dietGoals.loseWeight' })}</option>
+                  <option value="maintain-weight">{intl.formatMessage({ id: 'settings.dietGoals.maintainWeight' })}</option>
+                  <option value="gain-weight">{intl.formatMessage({ id: 'settings.dietGoals.gainWeight' })}</option>
+                  <option value="build-muscle">{intl.formatMessage({ id: 'settings.dietGoals.buildMuscle' })}</option>
+                  <option value="improve-health">{intl.formatMessage({ id: 'settings.dietGoals.improveHealth' })}</option>
                 </select>
               </div>
               <div>
-                <label htmlFor="activityLevel" className="block text-xs text-theme-secondary mb-1">Activity Level</label>
+                <label htmlFor="activityLevel" className="block text-xs text-theme-secondary mb-1">{intl.formatMessage({ id: 'settings.activityLevel' })}</label>
                 <select
                   id="activityLevel"
                   name="activityLevel"
@@ -815,12 +817,12 @@ export const Settings: React.FC<SettingsProps> = ({
                   onChange={(e) => handleProfileChange('activityLevel', e.target.value || undefined)}
                   className="w-full p-2 border rounded text-sm text-black bg-white"
                 >
-                  <option value="">Select activity level</option>
-                  <option value="sedentary">Sedentary</option>
-                  <option value="lightly-active">Lightly Active</option>
-                  <option value="moderately-active">Moderately Active</option>
-                  <option value="very-active">Very Active</option>
-                  <option value="extremely-active">Extremely Active</option>
+                  <option value="">{intl.formatMessage({ id: 'settings.selectActivityLevel' })}</option>
+                  <option value="sedentary">{intl.formatMessage({ id: 'settings.activityLevels.sedentary' })}</option>
+                  <option value="lightly-active">{intl.formatMessage({ id: 'settings.activityLevels.lightlyActive' })}</option>
+                  <option value="moderately-active">{intl.formatMessage({ id: 'settings.activityLevels.moderatelyActive' })}</option>
+                  <option value="very-active">{intl.formatMessage({ id: 'settings.activityLevels.veryActive' })}</option>
+                  <option value="extremely-active">{intl.formatMessage({ id: 'settings.activityLevels.extremelyActive' })}</option>
                 </select>
               </div>
             </div>
@@ -832,7 +834,7 @@ export const Settings: React.FC<SettingsProps> = ({
                 className="w-full bg-green-500 text-white px-4 py-2 rounded text-sm font-medium hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {savingProfile && <Loader2 className="w-4 h-4 animate-spin" />}
-                {savingProfile ? 'Saving...' : 'Save Profile'}
+                {savingProfile ? 'Saving...' : intl.formatMessage({ id: 'settings.saveProfile' })}
               </button>
             )}
           </div>
@@ -862,7 +864,7 @@ export const Settings: React.FC<SettingsProps> = ({
               ) : (
                 <ChevronRight className="w-5 h-5 text-theme-primary" />
               )}
-              <h3 className="font-semibold text-theme-primary">Pending Notifications</h3>
+              <h3 className="font-semibold text-theme-primary">{intl.formatMessage({ id: 'settings.pendingNotifications' })}</h3>
             </div>
           </div>
           {expandedSections.has('PendingNotifications') && (
@@ -886,7 +888,7 @@ export const Settings: React.FC<SettingsProps> = ({
               ) : (
                 <ChevronRight className="w-5 h-5 text-theme-primary" />
               )}
-              <h3 className="font-semibold text-theme-primary">Usage & Limits</h3>
+              <h3 className="font-semibold text-theme-primary">{intl.formatMessage({ id: 'settings.usageLimits' })}</h3>
             </div>
             {!isPremium && !isFamily && (
               <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">Free Plan</span>
@@ -1040,7 +1042,7 @@ export const Settings: React.FC<SettingsProps> = ({
               ) : (
                 <ChevronRight className="w-5 h-5 text-theme-primary" />
               )}
-              <h3 className="font-semibold text-theme-primary">Household</h3>
+              <h3 className="font-semibold text-theme-primary">{intl.formatMessage({ id: 'settings.household' })}</h3>
             </div>
           </div>
 
@@ -1059,7 +1061,7 @@ export const Settings: React.FC<SettingsProps> = ({
                       onClick={() => onShowHousehold?.()}
                       className="px-3 py-2 bg-[var(--accent-color)] text-white rounded-lg hover:bg-[var(--accent-color)]/80 transition-colors text-sm font-medium"
                     >
-                      Manage Household
+                      {intl.formatMessage({ id: 'settings.manageHousehold' })}
                     </button>
                   </div>
 
@@ -1095,13 +1097,15 @@ export const Settings: React.FC<SettingsProps> = ({
                               </div>
                             </div>
                             <div className="flex items-center gap-2">
+                              {(currentUserIsAdmin || isCurrentUser) && (
                               <button
                                 onClick={() => openMemberPreferences(member)}
                                 className="flex items-center gap-2 px-3 py-1 bg-theme-primary hover:bg-theme-secondary text-theme-secondary hover:text-theme-primary rounded-lg text-sm transition-colors"
                               >
                                 <Edit2 className="w-4 h-4" />
-                                {currentUserIsAdmin ? 'Edit' : 'Preferences'}
+                                {currentUserIsAdmin && !isCurrentUser ? 'Edit' : 'My Prefs'}
                               </button>
+                              )}
                               {currentUserIsAdmin && !isCurrentUser && (
                                 <button
                                   onClick={() => removeMemberFromHousehold(member)}
@@ -1179,7 +1183,7 @@ export const Settings: React.FC<SettingsProps> = ({
             ) : (
               <ChevronRight className="w-5 h-5 text-theme-primary" />
             )}
-            <h3 className="font-semibold text-theme-primary">App Preferences</h3>
+            <h3 className="font-semibold text-theme-primary">{intl.formatMessage({ id: 'settings.appPreferences' })}</h3>
           </div>
         </div>
 
@@ -1189,7 +1193,7 @@ export const Settings: React.FC<SettingsProps> = ({
             {/* Enable Notifications */}
             <div className="flex items-center justify-between py-3">
               <div className="flex-1 pr-4">
-                <p className="text-sm font-medium text-theme-primary">Enable Notifications</p>
+                <p className="text-sm font-medium text-theme-primary">{intl.formatMessage({ id: 'settings.enableNotifications' })}</p>
                 <p className="text-xs text-theme-secondary mt-0.5">Receive alerts for expiring items, meal plans, and shopping reminders</p>
               </div>
               <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
@@ -1209,7 +1213,7 @@ export const Settings: React.FC<SettingsProps> = ({
             {/* Measurement System */}
             <div className="flex items-center justify-between py-3">
               <div className="flex-1 pr-4">
-                <p className="text-sm font-medium text-theme-primary">Measurement System</p>
+                <p className="text-sm font-medium text-theme-primary">{intl.formatMessage({ id: 'settings.measurementSystem' })}</p>
                 <p className="text-xs text-theme-secondary mt-0.5">Choose between imperial and metric units throughout the app</p>
               </div>
               <div className="flex bg-theme-primary rounded-lg p-0.5 border border-theme flex-shrink-0">
@@ -1241,7 +1245,7 @@ export const Settings: React.FC<SettingsProps> = ({
             {/* Enable AI Features */}
             <div className="flex items-center justify-between py-3">
               <div className="flex-1 pr-4">
-                <p className="text-sm font-medium text-theme-primary">Enable AI Features</p>
+                <p className="text-sm font-medium text-theme-primary">{intl.formatMessage({ id: 'settings.enableAiFeatures' })}</p>
                 <p className="text-xs text-theme-secondary mt-0.5">Use AI for recipe suggestions, smart shopping tips, and meal planning assistance</p>
               </div>
               <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
@@ -1258,7 +1262,7 @@ export const Settings: React.FC<SettingsProps> = ({
             {/* Include Staples in Shopping List */}
             <div className="flex items-center justify-between py-3">
               <div className="flex-1 pr-4">
-                <p className="text-sm font-medium text-theme-primary">Include Staples in Shopping List</p>
+                <p className="text-sm font-medium text-theme-primary">{intl.formatMessage({ id: 'settings.includeStaples' })}</p>
                 <p className="text-xs text-theme-secondary mt-0.5">Automatically suggest common pantry staples when building a shopping list</p>
               </div>
               <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
@@ -1278,7 +1282,7 @@ export const Settings: React.FC<SettingsProps> = ({
             {/* Auto-restock Staples */}
             <div className="flex items-center justify-between py-3">
               <div className="flex-1 pr-4">
-                <p className="text-sm font-medium text-theme-primary">Auto-restock Staples When Depleted</p>
+                <p className="text-sm font-medium text-theme-primary">{intl.formatMessage({ id: 'settings.autoRestockStaples' })}</p>
                 <p className="text-xs text-theme-secondary mt-0.5">Automatically add staple items back to your shopping list when they run low or run out</p>
               </div>
               <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
@@ -1298,7 +1302,7 @@ export const Settings: React.FC<SettingsProps> = ({
             {/* Show Nutrition Information */}
             <div className="flex items-center justify-between py-3">
               <div className="flex-1 pr-4">
-                <p className="text-sm font-medium text-theme-primary">Show Nutrition Information</p>
+                <p className="text-sm font-medium text-theme-primary">{intl.formatMessage({ id: 'settings.showNutrition' })}</p>
                 <p className="text-xs text-theme-secondary mt-0.5">Display calories, protein, and macros on recipes and pantry items</p>
               </div>
               <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
@@ -1318,7 +1322,7 @@ export const Settings: React.FC<SettingsProps> = ({
             {/* Show Price Data */}
             <div className="flex items-center justify-between py-3">
               <div className="flex-1 pr-4">
-                <p className="text-sm font-medium text-theme-primary">Show Price Data</p>
+                <p className="text-sm font-medium text-theme-primary">{intl.formatMessage({ id: 'settings.showPriceData' })}</p>
                 <p className="text-xs text-theme-secondary mt-0.5">Display estimated grocery prices on shopping list items and pantry ingredients</p>
               </div>
               <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
@@ -1351,7 +1355,7 @@ export const Settings: React.FC<SettingsProps> = ({
             ) : (
               <ChevronRight className="w-5 h-5 text-theme-primary" />
             )}
-            <h3 className="font-semibold text-theme-primary">Food Safety</h3>
+            <h3 className="font-semibold text-theme-primary">{intl.formatMessage({ id: 'settings.foodSafety' })}</h3>
           </div>
         </div>
 
@@ -1507,7 +1511,7 @@ export const Settings: React.FC<SettingsProps> = ({
             ) : (
               <ChevronRight className="w-5 h-5 text-theme-primary" />
             )}
-            <h3 className="font-semibold text-theme-primary">Theme Settings</h3>
+            <h3 className="font-semibold text-theme-primary">{intl.formatMessage({ id: 'settings.themeSettings' })}</h3>
           </div>
         </div>
 
@@ -1533,7 +1537,7 @@ export const Settings: React.FC<SettingsProps> = ({
           </div>
           <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-sm text-theme-primary">Theme</span>
+            <span className="text-sm text-theme-primary">{intl.formatMessage({ id: 'settings.theme' })}</span>
             <select
               id="themeMode"
               name="themeMode"
@@ -1541,10 +1545,10 @@ export const Settings: React.FC<SettingsProps> = ({
               onChange={(e) => handleChange('theme', { mode: e.target.value })}
               className="border rounded px-2 py-1 text-black bg-white text-sm"
             >
-              <option value="dark">Dark</option>
-              <option value="light">Light</option>
+              <option value="dark">{intl.formatMessage({ id: 'settings.themes.dark' })}</option>
+              <option value="light">{intl.formatMessage({ id: 'settings.themes.light' })}</option>
             </select>
-            <span className="text-sm text-theme-primary ml-4">Accent</span>
+            <span className="text-sm text-theme-primary ml-4">{intl.formatMessage({ id: 'settings.accent' })}</span>
             <input
               id="accentColor"
               name="accentColor"
@@ -1556,7 +1560,7 @@ export const Settings: React.FC<SettingsProps> = ({
           </div>
 
           <div className="flex items-center justify-between">
-            <span className="text-sm text-theme-primary">Background</span>
+            <span className="text-sm text-theme-primary">{intl.formatMessage({ id: 'settings.background' })}</span>
             <input
               id="backgroundColor"
               name="backgroundColor"
@@ -1565,7 +1569,7 @@ export const Settings: React.FC<SettingsProps> = ({
               onChange={(e) => handleChange('theme', { backgroundColor: e.target.value })}
               className="border rounded w-8 h-8"
             />
-            <span className="text-sm text-theme-primary ml-4">Text</span>
+            <span className="text-sm text-theme-primary ml-4">{intl.formatMessage({ id: 'settings.textColor' })}</span>
             <input
               id="textColor"
               name="textColor"
@@ -1580,7 +1584,7 @@ export const Settings: React.FC<SettingsProps> = ({
         {/* Language Selector */}
         <div className="mt-4 pt-3 border-t border-theme">
           <div className="flex items-center justify-between">
-            <span className="text-sm text-theme-primary">Language</span>
+            <span className="text-sm text-theme-primary">{intl.formatMessage({ id: 'settings.language' })}</span>
             <LanguageSelector />
           </div>
         </div>
@@ -1600,7 +1604,7 @@ export const Settings: React.FC<SettingsProps> = ({
             ) : (
               <ChevronRight className="w-5 h-5 text-theme-primary" />
             )}
-            <h3 className="font-semibold text-theme-primary">Notifications</h3>
+            <h3 className="font-semibold text-theme-primary">{intl.formatMessage({ id: 'settings.notifications' })}</h3>
           </div>
         </div>
 
@@ -1634,7 +1638,7 @@ export const Settings: React.FC<SettingsProps> = ({
               ) : (
                 <ChevronRight className="w-5 h-5 text-theme-primary" />
               )}
-              <h3 className="font-semibold text-theme-primary">Categories</h3>
+              <h3 className="font-semibold text-theme-primary">{intl.formatMessage({ id: 'settings.categories' })}</h3>
             </div>
           </div>
 
@@ -1672,7 +1676,7 @@ export const Settings: React.FC<SettingsProps> = ({
               ) : (
                 <ChevronRight className="w-5 h-5 text-theme-primary" />
               )}
-              <h3 className="font-semibold text-theme-primary">Store Layout</h3>
+              <h3 className="font-semibold text-theme-primary">{intl.formatMessage({ id: 'settings.storeLayout' })}</h3>
             </div>
           </div>
 
@@ -1706,7 +1710,7 @@ export const Settings: React.FC<SettingsProps> = ({
               ) : (
                 <ChevronRight className="w-5 h-5 text-theme-primary" />
               )}
-              <h3 className="font-semibold text-theme-primary">Leftover Analytics</h3>
+              <h3 className="font-semibold text-theme-primary">{intl.formatMessage({ id: 'settings.leftoverAnalytics' })}</h3>
             </div>
           </div>
 
@@ -1734,7 +1738,7 @@ export const Settings: React.FC<SettingsProps> = ({
             ) : (
               <ChevronRight className="w-5 h-5 text-theme-primary" />
             )}
-            <h3 className="font-semibold text-theme-primary">Feedback</h3>
+            <h3 className="font-semibold text-theme-primary">{intl.formatMessage({ id: 'settings.feedback' })}</h3>
           </div>
         </div>
 
@@ -1774,7 +1778,7 @@ export const Settings: React.FC<SettingsProps> = ({
               ) : (
                 <ChevronRight className="w-5 h-5 text-theme-primary" />
               )}
-              <h3 className="font-semibold text-theme-primary">Subscription</h3>
+              <h3 className="font-semibold text-theme-primary">{intl.formatMessage({ id: 'settings.subscription' })}</h3>
             </div>
           </div>
 
@@ -1801,7 +1805,7 @@ export const Settings: React.FC<SettingsProps> = ({
               ) : (
                 <ChevronRight className="w-5 h-5 text-theme-primary" />
               )}
-              <h3 className="font-semibold text-theme-primary">Pantry Images</h3>
+              <h3 className="font-semibold text-theme-primary">{intl.formatMessage({ id: 'settings.pantryImages' })}</h3>
             </div>
           </div>
 
@@ -1863,7 +1867,7 @@ export const Settings: React.FC<SettingsProps> = ({
             ) : (
               <ChevronRight className="w-5 h-5 text-theme-primary" />
             )}
-            <h3 className="font-semibold text-theme-primary">Help & Support</h3>
+            <h3 className="font-semibold text-theme-primary">{intl.formatMessage({ id: 'settings.help' })}</h3>
           </div>
         </div>
 
@@ -1896,7 +1900,7 @@ export const Settings: React.FC<SettingsProps> = ({
             ) : (
               <ChevronRight className="w-5 h-5 text-theme-primary" />
             )}
-            <h3 className="font-semibold text-theme-primary">App Updates</h3>
+            <h3 className="font-semibold text-theme-primary">{intl.formatMessage({ id: 'settings.appUpdates' })}</h3>
           </div>
         </div>
 
@@ -2153,7 +2157,7 @@ export const Settings: React.FC<SettingsProps> = ({
             ) : (
               <ChevronRight className="w-5 h-5 text-theme-primary" />
             )}
-            <h3 className="font-semibold text-theme-primary">Privacy & Legal</h3>
+            <h3 className="font-semibold text-theme-primary">{intl.formatMessage({ id: 'settings.privacy' })}</h3>
           </div>
         </div>
 
@@ -2162,13 +2166,13 @@ export const Settings: React.FC<SettingsProps> = ({
             <p className="text-sm text-theme-secondary">
               We use the device camera to scan barcodes and take pantry item photos. Review our privacy policy for details about data collection and storage.
             </p>
-            <div className="flex gap-2 mt-3">
+            <div className="flex flex-wrap gap-2 mt-3">
               <button
                 onClick={() => {
                   const privacyUrl = (window as any).PRIVACY_POLICY_URL || 'https://smartpantrymobile.page.gd/privacy.html';
                   window.open(privacyUrl, '_blank');
                 }}
-                className="bg-[var(--accent-color)] text-white px-4 py-2 rounded font-medium text-sm hover:bg-opacity-90 transition-colors"
+                className="bg-[var(--accent-color)] text-white px-3 py-1 rounded-lg font-medium text-sm hover:bg-opacity-90 transition-colors"
               >
                 View Privacy Policy
               </button>
@@ -2178,7 +2182,7 @@ export const Settings: React.FC<SettingsProps> = ({
                   if (navigator.clipboard) navigator.clipboard.writeText(privacyUrl);
                   addToast?.('Privacy policy URL copied to clipboard', 'success');
                 }}
-                className="bg-theme-primary text-theme-secondary px-3 py-2 rounded text-sm hover:bg-theme-secondary transition-colors"
+                className="bg-theme-primary text-theme-secondary px-3 py-1 rounded-lg text-sm hover:bg-theme-secondary transition-colors"
               >
                 Copy URL
               </button>
@@ -2187,9 +2191,9 @@ export const Settings: React.FC<SettingsProps> = ({
                   const delUrl = (window as any).DELETE_ACCOUNT_URL || 'https://smartpantrymobile.page.gd/delete-account.html';
                   window.open(delUrl, '_blank');
                 }}
-                className="bg-red-500 text-white px-4 py-2 rounded font-medium text-sm hover:bg-red-600 transition-colors"
+                className="bg-red-500 text-white px-3 py-1 rounded-lg font-medium text-sm hover:bg-red-600 transition-colors"
               >
-                Request Account Deletion
+                Delete Account
               </button>
               <button
                 onClick={() => {
@@ -2197,9 +2201,9 @@ export const Settings: React.FC<SettingsProps> = ({
                   if (navigator.clipboard) navigator.clipboard.writeText(delUrl);
                   addToast?.('Account deletion URL copied to clipboard', 'success');
                 }}
-                className="bg-theme-primary text-theme-secondary px-3 py-2 rounded text-sm hover:bg-theme-secondary transition-colors"
+                className="bg-theme-primary text-theme-secondary px-3 py-1 rounded-lg text-sm hover:bg-theme-secondary transition-colors"
               >
-                Copy Deletion URL
+                Copy Link
               </button>
             </div>
           </div>

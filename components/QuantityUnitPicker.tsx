@@ -146,6 +146,7 @@ const QuantityUnitPicker: React.FC<QuantityUnitPickerProps> = ({
       <div className="flex items-center gap-1">
         {showControls && (
           <button
+            type="button"
             onClick={handleDecrement}
             disabled={quantity <= 0}
             className="w-8 h-8 rounded-full bg-theme-primary border border-theme flex items-center justify-center text-theme-primary hover:bg-theme-secondary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
@@ -167,6 +168,7 @@ const QuantityUnitPicker: React.FC<QuantityUnitPickerProps> = ({
 
         {showControls && (
           <button
+            type="button"
             onClick={handleIncrement}
             disabled={quantity >= maxQuantity}
             className="w-8 h-8 rounded-full bg-theme-primary border border-theme flex items-center justify-center text-theme-primary hover:bg-theme-secondary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"

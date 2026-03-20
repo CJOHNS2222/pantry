@@ -12,6 +12,7 @@ import { getSavedRecipes, getCachedPopularRecipes, getCachedRecipesCache } from 
 // Firestore access is instrumented via DatabaseMonitoringService when needed
 import { parseIngredientForShoppingList } from '../utils/appUtils';
 import AnalyticsService from '../services/analyticsService';
+import { useIntl } from 'react-intl';
 import { useApp } from '../contexts/AppContext';
 import { useSubscription } from '../hooks/useSubscription';
 import { searchRecipes } from '../utils/searchUtils';
@@ -101,6 +102,7 @@ const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
   user,
   savedRecipes: propSavedRecipes
 }) => {
+  const intl = useIntl();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<StructuredRecipe[]>([]);
   const [searchResultsSource, setSearchResultsSource] = useState<'saved' | 'gemini' | null>(null);
@@ -273,7 +275,7 @@ const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
       <div className="max-h-96 overflow-y-auto">
         {isSearching && (
           <div>
-            <h4 className="text-sm font-semibold text-theme-secondary mb-2">Search Results</h4>
+            <h4 className="text-sm font-semibold text-theme-secondary mb-2">{intl.formatMessage({ id: 'mealPlanner.searchResults' })}</h4>
             <div className="grid grid-cols-3 gap-2">
               {Array.from({ length: 6 }).map((_, index) => (
                 <CompactRecipeCardSkeleton key={`search-skeleton-${index}`} />
@@ -332,7 +334,7 @@ const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
 
         {filteredSavedRecipes.length > 0 && recipesLoaded && (
           <div>
-            <h4 className="text-sm font-semibold text-theme-secondary mb-2">Saved Recipes</h4>
+            <h4 className="text-sm font-semibold text-theme-secondary mb-2">{intl.formatMessage({ id: 'mealPlanner.savedRecipes' })}</h4>
             <div className="grid grid-cols-3 gap-2">
               {filteredSavedRecipes.map((recipe) => (
                 <div
@@ -379,7 +381,7 @@ const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
 
         {filteredCachedRecipes.length > 0 && cachedRecipesLoaded && (
           <div>
-            <h4 className="text-sm font-semibold text-theme-secondary mb-2">Popular Recipes</h4>
+            <h4 className="text-sm font-semibold text-theme-secondary mb-2">{intl.formatMessage({ id: 'mealPlanner.popularRecipes' })}</h4>
             <div className="grid grid-cols-3 gap-2">
               {filteredCachedRecipes.map((recipe) => (
                 <div
@@ -426,14 +428,14 @@ const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
 
         {!isSearching && searchQuery && searchResults.length === 0 && filteredSavedRecipes.length === 0 && filteredCachedRecipes.length === 0 && (
           <div className="text-center py-8 text-theme-primary opacity-50">
-            No recipes found. Try a different search term.
+            {intl.formatMessage({ id: 'recipes.noResults' })}
           </div>
         )}
 
         {/* Cached Recipes Section - Show when no search query */}
         {!searchQuery && cachedRecipesLoaded && cachedRecipes.length > 0 && (
           <div>
-            <h4 className="text-sm font-semibold text-theme-secondary mb-2">Popular Recipes</h4>
+            <h4 className="text-sm font-semibold text-theme-secondary mb-2">{intl.formatMessage({ id: 'mealPlanner.popularRecipes' })}</h4>
             <div className="grid grid-cols-3 gap-2">
               {cachedRecipes.slice(0, 12).map((recipe) => (
                 <div
@@ -480,7 +482,7 @@ const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
 
         {!searchQuery && !cachedRecipesLoaded && (
           <div>
-            <h4 className="text-sm font-semibold text-theme-secondary mb-2">Popular Recipes</h4>
+            <h4 className="text-sm font-semibold text-theme-secondary mb-2">{intl.formatMessage({ id: 'mealPlanner.popularRecipes' })}</h4>
             <div className="grid grid-cols-3 gap-2">
               {Array.from({ length: 6 }).map((_, index) => (
                 <CompactRecipeCardSkeleton key={`cached-skeleton-${index}`} />
@@ -506,6 +508,7 @@ const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
 };
 
 export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPlan, inventory, shoppingList, addToShoppingList, onAddToPlan, onSaveRecipe, onMarkAsMade, onRate, user, setActiveTab, recipeSaveLimitExceeded = false, mealPlanLimitExceeded = false, isLoadingMealPlan = false, isLoadingSavedRecipes = false, savedRecipes: propSavedRecipes = [], settings, onOpenRecipeSearch }) => {
+  const intl = useIntl();
   const { household } = useApp();
   const { isPremium, isFamily } = useSubscription(user);
     // List of staple items to ignore (unless user wants them included)
@@ -1141,7 +1144,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
     <div className="space-y-6 pb-24 animate-fade-in">
       <div className="text-center mb-1 relative">
         <div className="flex items-center justify-center gap-2">
-          <h2 className="text-3xl font-serif font-bold text-theme-secondary">Meal Schedule</h2>
+          <h2 className="text-3xl font-serif font-bold text-theme-secondary">{intl.formatMessage({ id: 'mealPlanner.mealSchedule' })}</h2>
         </div>
         
         {/* Help Tooltip */}
@@ -1390,7 +1393,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
             <div className="flex items-center gap-2 text-xs">
               <span className="flex items-center gap-1">
                 <span className="w-2 h-2 bg-theme-primary/50 rounded"></span>
-                <span className="text-theme-secondary opacity-70">Has meals</span>
+                <span className="text-theme-secondary opacity-70">{intl.formatMessage({ id: 'mealPlanner.hasMeals' })}</span>
               </span>
               <span className="text-theme-secondary opacity-40">•</span>
               <span className="flex items-center gap-1">
@@ -1627,7 +1630,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
                   return (
                     <div key={mealType} className="space-y-3">
                       <h3 className="text-lg font-semibold text-theme-primary flex items-center gap-2">
-                        {mealType}
+                        {intl.formatMessage({ id: `mealPlanner.${mealTypeKey}` })}
                         <span className="text-sm opacity-60">({mealsForType.length})</span>
                       </h3>
 
@@ -1641,7 +1644,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
                           className="w-full border-2 border-dashed border-theme/50 rounded-lg p-6 text-center hover:border-[var(--accent-color)] hover:bg-[var(--accent-color)]/5 transition-all"
                         >
                           <Plus className="w-8 h-8 mx-auto mb-2 text-theme-secondary opacity-50" />
-                          <span className="text-theme-secondary opacity-70">Add Recipe</span>
+                          <span className="text-theme-secondary opacity-70">{intl.formatMessage({ id: 'mealPlanner.addRecipe' })}</span>
                         </button>
                       ) : (
                         <div className="space-y-3">

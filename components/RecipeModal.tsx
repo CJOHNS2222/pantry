@@ -719,7 +719,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
         </div>
       )}
         </div>
-        <div className="sticky bottom-0 z-20 w-full bg-theme-primary rounded-b-2xl px-4 pt-2 pb-6">
+        <div className="sticky bottom-0 z-20 w-full bg-theme-primary rounded-b-2xl px-4 pt-2 pb-2">
           {/* Primary action buttons - Only show Save when editable */}
           {editable ? (
             <div className="space-y-3">
@@ -772,7 +772,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
                   }
                 }}
                 disabled={recipeSaveLimitExceeded || isSaving}
-                className={`w-full py-3 font-bold border rounded-lg flex items-center justify-center gap-2 ${
+                className={`w-full py-2 font-bold border rounded-lg flex items-center justify-center gap-2 ${
                   recipeSaveLimitExceeded || isSaving
                     ? 'border-gray-400 text-gray-400 cursor-not-allowed opacity-50'
                     : 'border-[var(--accent-color)] hover:bg-[var(--accent-color)] hover:text-white'
@@ -789,12 +789,12 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
         </div>
 
         {/* Fixed Action Buttons */}
-        <div className="flex-shrink-0 border-t border-theme bg-theme-primary p-4 rounded-b-2xl space-y-3">
+        <div className="flex-shrink-0 border-t border-theme bg-theme-primary px-4 pt-2 pb-3 rounded-b-2xl space-y-2">
           {/* Primary action buttons - Add to Plan, Rate, Mark as Made */}
           {(showMarkAsMade && onMarkAsMade) || (showAddToPlan && onAddToPlan) ? (
             <div className="grid grid-cols-2 gap-2">
               {showMarkAsMade && onMarkAsMade && (
-                <button onClick={handleMarkAsMadeClick} className="py-3 font-bold bg-[var(--accent-color)] text-white rounded-lg flex items-center justify-center gap-2">
+                <button onClick={handleMarkAsMadeClick} className="py-2 font-bold bg-[var(--accent-color)] text-white rounded-lg flex items-center justify-center gap-2">
                   <CheckCircle2 className="w-4 h-4" /> Mark as Made
                 </button>
               )}
@@ -805,7 +805,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
                     onClose();
                   }}
                   disabled={mealPlanLimitExceeded}
-                  className={`py-3 font-bold rounded-lg flex items-center justify-center gap-2 ${
+                  className={`py-2 font-bold rounded-lg flex items-center justify-center gap-2 ${
                     mealPlanLimitExceeded
                       ? 'bg-gray-400 text-gray-600 cursor-not-allowed opacity-50'
                       : 'bg-[var(--accent-color)] text-white'
@@ -819,16 +819,16 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
 
           {/* Secondary action buttons - Save, Delete, Close */}
           <div className="flex items-center gap-2">
-            <button className="flex-1 py-3 font-bold border border-[var(--accent-color)] rounded-lg flex items-center justify-center gap-2" onClick={onClose}>CLOSE</button>
+            <button className="flex-1 py-2 font-bold border border-[var(--accent-color)] rounded-lg flex items-center justify-center gap-2" onClick={onClose}>CLOSE</button>
             {isFromMealPlan && (
               <div className="flex-1">
-                <button onClick={() => setShowLeftoverCapture(true)} className="w-full py-3 font-bold bg-yellow-500 text-black rounded-lg flex items-center justify-center gap-2">
+                <button onClick={() => setShowLeftoverCapture(true)} className="w-full py-2 font-bold bg-yellow-500 text-black rounded-lg flex items-center justify-center gap-2">
                   <RotateCcw className="w-4 h-4" /> Save Leftovers
                 </button>
               </div>
             )}
             {showDeleteButton && onDeleteRecipe && (
-              <button onClick={() => { onDeleteRecipe(recipe as SavedRecipe); onClose(); }} className="flex-1 py-3 font-bold bg-red-500 text-white rounded-lg flex items-center justify-center gap-2">
+              <button onClick={() => { onDeleteRecipe(recipe as SavedRecipe); onClose(); }} className="flex-1 py-2 font-bold bg-red-500 text-white rounded-lg flex items-center justify-center gap-2">
                 <Trash2 className="w-4 h-4" /> Delete
               </button>
             )}
@@ -872,7 +872,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
                   }
                 }}
                 disabled={recipeSaveLimitExceeded || isSaving}
-                className={`flex-1 py-3 font-bold border rounded-lg flex items-center justify-center gap-2 ${
+                className={`flex-1 py-2 font-bold border rounded-lg flex items-center justify-center gap-2 ${
                   /* non-editable save button — limit hint shown inline in button label */
                   recipeSaveLimitExceeded || isSaving
                     ? 'border-gray-400 text-gray-400 cursor-not-allowed opacity-50'
@@ -918,7 +918,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
                   e.stopPropagation();
                   setShowRatingModal(false);
                 }}
-                className="py-3 px-6 font-bold border border-theme rounded-lg hover:bg-theme-secondary transition-colors"
+                className="py-2 px-6 font-bold border border-theme rounded-lg hover:bg-theme-secondary transition-colors"
               >
                 Skip for Now
               </button>

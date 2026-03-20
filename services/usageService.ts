@@ -68,8 +68,8 @@ class UsageService {
   private static readonly PLAN_LIMITS: PlanLimits = {
     free: {
       searches: { weekly: 5 },
-      recipes: { max: 10 },
-      mealPlanning: { weeklyRecipes: 3, twoWeekPlanning: false },
+      recipes: { max: 2 },
+      mealPlanning: { weeklyRecipes: 1, twoWeekPlanning: false },
       gemini: { weekly: 5 }
     },
     premium: {

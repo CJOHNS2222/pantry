@@ -77,8 +77,8 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-theme-primary rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-4 pt-[var(--app-header-h)] pb-[var(--app-nav-h)]">
+      <div className="bg-theme-primary rounded-lg shadow-xl max-w-2xl w-full max-h-full overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-theme">
           <h2 className="text-xl font-bold text-theme-primary">Manage Categories</h2>

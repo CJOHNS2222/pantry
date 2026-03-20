@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Sun, Moon, Undo2, Bell } from 'lucide-react';
 import { User, Household } from '../../types';
 import { log } from '../../services/logService';
@@ -8,7 +8,7 @@ import { SyncIndicator } from '../SyncIndicator';
 import { OnlineIndicator } from '../OnlineIndicator';
 import { SyncStatus } from '../../hooks/useOfflineStatus';
 import useUserNotifications from '../../hooks/useUserNotifications';
-import notificationsService, { markAllNotificationsRead } from '../../services/notificationsService';
+import notificationsService, { markAllNotificationsRead, markNotificationRead } from '../../services/notificationsService';
 
 interface AppHeaderProps {
   user: User;
@@ -43,9 +43,20 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   }, []);
 
   const [showNotifications, setShowNotifications] = useState(false);
+  const [expandedNotifId, setExpandedNotifId] = useState<string | null>(null);
+  const notifTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const throttleMs = 5000; // UI update throttle for notifications
   const { items } = useUserNotifications(user?.id, throttleMs);
   const unreadNotificationsCount = (items || []).filter(i => !i.read).length;
+
+  useEffect(() => {
+    if (showNotifications) {
+      notifTimerRef.current = setTimeout(() => setShowNotifications(false), 6000);
+    }
+    return () => {
+      if (notifTimerRef.current) clearTimeout(notifTimerRef.current);
+    };
+  }, [showNotifications]);
 
   const handleToggleNotifications = () => {
     setShowNotifications(prev => !prev);
@@ -64,6 +75,51 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
     } catch (err) {
       log.error('Failed to mark notifications read', err instanceof Error ? { message: err.message } : { err }, 'AppHeader');
     }
+  };
+
+  const handleMarkOneRead = async (notifId: string) => {
+    if (!user?.id) return;
+    try {
+      await markNotificationRead(user.id, notifId);
+    } catch (err) {
+      log.error('Failed to mark notification read', err instanceof Error ? { message: err.message } : { err }, 'AppHeader');
+    }
+  };
+
+  const handleToggleExpand = (notifId: string) => {
+    setExpandedNotifId(prev => prev === notifId ? null : notifId);
+    // Reset auto-close timer when user interacts with a notification
+    if (notifTimerRef.current) clearTimeout(notifTimerRef.current);
+    notifTimerRef.current = setTimeout(() => setShowNotifications(false), 10000);
+  };
+
+  const getNotifTimeAgo = (ts: any): string => {
+    if (!ts) return '';
+    const time = typeof ts === 'object' && ts?.toDate ? ts.toDate() : new Date(ts);
+    if (isNaN(time.getTime())) return '';
+    const diffMs = Date.now() - time.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    if (diffMins < 1) return 'just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours}h ago`;
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return time.toLocaleDateString();
+  };
+
+  const priorityBadge = (priority?: string) => {
+    if (!priority || priority === 'low') return null;
+    const styles: Record<string, string> = {
+      urgent: 'bg-red-500/20 text-red-400',
+      high: 'bg-orange-500/20 text-orange-400',
+      medium: 'bg-yellow-500/20 text-yellow-400',
+    };
+    return (
+      <span className={`text-[10px] px-1 rounded font-medium ${styles[priority] ?? ''}`}>
+        {priority}
+      </span>
+    );
   };
   return (
     <header 
@@ -120,20 +176,68 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                 </button>
 
                 {showNotifications && (
-                  <div className="absolute left-0 mt-2 w-72 max-h-96 overflow-auto bg-theme-primary border border-theme rounded shadow-lg z-50 p-2">
+                  <div className="absolute left-0 mt-2 w-80 max-h-96 overflow-auto bg-theme-primary border border-theme rounded shadow-lg z-50 p-2">
                     <div className="flex items-center justify-between mb-2">
                       <div className="text-sm font-semibold">Notifications</div>
                       <button onClick={handleMarkAllRead} className="text-xs text-theme-secondary hover:underline">Mark all read</button>
                     </div>
-                    <div className="space-y-2">
-                      {(items || []).slice().reverse().slice(0, 50).map((n: any) => (
-                        <div key={n.id} className={`p-2 rounded ${n.read ? 'bg-theme-secondary' : 'bg-theme-primary/20'}`}>
-                          <div className="text-sm font-medium">{n.title}</div>
-                          {n.body && <div className="text-xs text-theme-secondary">{n.body}</div>}
-                          <div className="text-xs text-theme-secondary mt-1">{n.createdAt?.toString ? n.createdAt.toString() : ''}</div>
-                        </div>
-                      ))}
-                      {(items || []).length === 0 && <div className="text-xs text-theme-secondary">No notifications</div>}
+                    <div className="space-y-1.5">
+                      {(items || []).slice().reverse().slice(0, 50).map((n: any) => {
+                        const isExpanded = expandedNotifId === n.id;
+                        const bodyText = n.message || n.body;
+                        return (
+                          <div
+                            key={n.id}
+                            className={`p-2 rounded cursor-pointer transition-colors ${
+                              n.read
+                                ? 'bg-theme-secondary/40 hover:bg-theme-secondary/70'
+                                : 'bg-amber-500/10 border-l-2 border-amber-500/60 hover:bg-amber-500/20'
+                            }`}
+                            onClick={() => handleToggleExpand(n.id)}
+                          >
+                            {/* Title row */}
+                            <div className="flex items-start justify-between gap-1">
+                              <div className="text-sm font-medium flex-1 leading-tight">{n.title}</div>
+                              <div className="flex items-center gap-1 flex-shrink-0 mt-0.5">
+                                {priorityBadge(n.priority)}
+                                {!n.read && (
+                                  <button
+                                    type="button"
+                                    onClick={e => { e.stopPropagation(); handleMarkOneRead(n.id); }}
+                                    className="text-[10px] text-theme-secondary hover:text-green-400 transition-colors"
+                                    title="Mark as read"
+                                  >✓</button>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Body — collapsed = 1 line, expanded = full */}
+                            {bodyText && (
+                              <div className={`text-xs text-theme-secondary mt-0.5 leading-snug ${isExpanded ? '' : 'line-clamp-1'}`}>
+                                {bodyText}
+                              </div>
+                            )}
+
+                            {/* Expanded details */}
+                            {isExpanded && (
+                              <div className="mt-1.5 space-y-1 border-t border-theme/40 pt-1.5">
+                                {n.type && (
+                                  <div className="text-[10px] text-theme-secondary capitalize">{n.type.replace(/_/g, ' ')}</div>
+                                )}
+                                {n.actionLabel && (
+                                  <div className="text-xs text-amber-500 font-medium">{n.actionLabel}</div>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Timestamp */}
+                            <div className="text-[10px] text-theme-secondary mt-1 opacity-70">
+                              {getNotifTimeAgo(n.createdAt)}
+                            </div>
+                          </div>
+                        );
+                      })}
+                      {(items || []).length === 0 && <div className="text-xs text-theme-secondary py-2 text-center">No notifications</div>}
                     </div>
                   </div>
                 )}

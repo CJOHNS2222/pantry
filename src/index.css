@@ -1,3 +1,14 @@
+/* App layout heights – keep in sync with AppHeader paddingTop and AppNavigation height */
+:root {
+  --app-header-h: 120px;
+  --app-nav-h: calc(5rem + max(0.5rem, var(--safe-area-inset-bottom, 0px)));
+}
+
+/* Safe modal max-height: fits between the fixed header and fixed nav bar */
+.modal-safe-h {
+  max-height: calc(100dvh - var(--app-header-h) - var(--app-nav-h) - 1.5rem);
+}
+
 /* Theme utility classes */
 .bg-theme-primary { background-color: var(--bg-primary); }
 .bg-theme-secondary { background-color: var(--bg-secondary); }

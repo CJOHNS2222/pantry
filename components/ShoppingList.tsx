@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import { useIntl } from 'react-intl';
 import { ShoppingBasket, Check, Trash2, Archive, Plus, X, Share2, Copy, Download, MessageSquare, Calendar } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { ShoppingItem, User, Household } from '../types';
@@ -82,6 +83,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   onHouseholdMessage,
   settings
 }) => {
+  const intl = useIntl();
   const [newItem, setNewItem] = React.useState('');
   const [canShowAdBanner, setCanShowAdBanner] = React.useState<boolean>(false);
 
@@ -276,7 +278,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     // Check if item already exists
     const exists = items.some(item => item.item.toLowerCase() === itemName.toLowerCase());
     if (exists) {
-      alert(`${itemName} is already in your shopping list!`);
+      alert(intl.formatMessage({ id: 'shoppingList.alreadyInList' }, { name: itemName }));
       return;
     }
 
@@ -478,7 +480,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   const handleQuickAdd = async (quickAddItem: { name: string; category?: string; quantity?: string; unit?: string }) => {
     const exists = items.some(item => item.item.toLowerCase() === quickAddItem.name.toLowerCase());
     if (exists) {
-      alert(`${quickAddItem.name} is already in your shopping list!`);
+      alert(intl.formatMessage({ id: 'shoppingList.alreadyInList' }, { name: quickAddItem.name }));
       return;
     }
 
@@ -590,7 +592,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
 
   const handleCopyToClipboard = () => {
     navigator.clipboard.writeText(uncheckedItemsText).then(() => {
-      alert('Shopping list copied to clipboard!');
+      alert(intl.formatMessage({ id: 'shoppingList.copiedToClipboard' }));
     }).catch(err => {
       log.error('Failed to copy shopping list', { error: err }, 'ShoppingList');
       alert('Failed to copy to clipboard');
@@ -601,7 +603,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     if (navigator.share) {
       try {
         await navigator.share({
-          title: 'Shopping List',
+          title: intl.formatMessage({ id: 'shoppingList.shareTitle' }),
           text: uncheckedItemsText
         });
       } catch (err) {
@@ -635,10 +637,10 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     // Fallback: copy to clipboard if SMS app doesn't open
     setTimeout(() => {
       navigator.clipboard.writeText(smsMessageText).then(() => {
-        alert('Shopping list copied to clipboard (SMS app may not be available)');
+        alert(intl.formatMessage({ id: 'shoppingList.smsFallback' }));
       }).catch((error) => {
         log.error('Failed to copy SMS message to clipboard', { error }, 'ShoppingList');
-        alert('Unable to open SMS app. Shopping list has been copied to clipboard.');
+        alert(intl.formatMessage({ id: 'shoppingList.smsUnavailable' }));
       });
     }, 1000);
   };
@@ -646,7 +648,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   return (
     <div className="space-y-6 pb-24 max-w-2xl mx-auto animate-fade-in relative">
       <div className="text-center mb-6">
-        <h2 className="text-3xl font-serif font-bold text-theme-secondary">Shopping List</h2>
+        <h2 className="text-3xl font-serif font-bold text-theme-secondary">{intl.formatMessage({ id: 'shoppingList.title' })}</h2>
       </div>
 
       {/* Household Sharing */}
@@ -719,7 +721,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
             <h3 className="text-lg font-bold mb-3">Add purchase for "{purchaseTargetItem.item}"</h3>
             <div className="space-y-3">
               <div>
-                <label className="text-sm text-theme-secondary">Quantity purchased</label>
+                <label className="text-sm text-theme-secondary">{intl.formatMessage({ id: 'shoppingList.quantityPurchased' })}</label>
                 <div className="mt-2">
                   <VisualQuantitySelector
                     value={purchaseQty}
@@ -734,7 +736,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                 </div>
               </div>
               <div>
-                <label className="text-sm text-theme-secondary">Unit</label>
+                <label className="text-sm text-theme-secondary">{intl.formatMessage({ id: 'shoppingList.unit' })}</label>
                 <select value={purchaseUnit} onChange={(e) => setPurchaseUnit(e.target.value)} className="w-full mt-1 p-2 rounded border text-black">
                   <option value="count">count</option>
                   <option value="lb">lb</option>
@@ -791,10 +793,10 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
       {/* Add Items Modal */}
       {isAddModalOpen && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center p-4">
-          <div className="bg-theme-primary rounded-t-3xl max-w-md w-full max-h-[80vh] overflow-y-auto shadow-xl animate-slide-up">
+          <div className="bg-theme-primary rounded-t-3xl max-w-md w-full modal-safe-h overflow-y-auto shadow-xl animate-slide-up">
             <div className="p-6 pb-2.5">
               <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-bold text-theme-secondary">Add to Shopping List</h3>
+                <h3 className="text-xl font-bold text-theme-secondary">{intl.formatMessage({ id: 'shoppingList.addToList' })}</h3>
                 <button
                   onClick={closeModal}
                   className="p-2 hover:bg-theme-secondary rounded-full transition-colors"
@@ -939,8 +941,8 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
         {items.length === 0 && !isLoadingShoppingList && (
              <div className="text-center py-12 opacity-60 flex flex-col items-center">
                 <ShoppingBasket className="w-12 h-12 mb-4 text-theme-secondary/50" />
-                <h3 className="text-lg font-semibold text-theme-primary mb-2">Shopping list is empty</h3>
-                <p className="text-theme-secondary opacity-70 mb-4">Add items manually or get suggestions from recipes</p>
+                <h3 className="text-lg font-semibold text-theme-primary mb-2">{intl.formatMessage({ id: 'shoppingList.empty' })}</h3>
+                <p className="text-theme-secondary opacity-70 mb-4">{intl.formatMessage({ id: 'shoppingList.addItems' })}</p>
                 <div className="flex flex-col sm:flex-row gap-3 justify-center">
                     <button 
                         onClick={() => setIsAddModalOpen(true)}

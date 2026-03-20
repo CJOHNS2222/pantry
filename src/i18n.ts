@@ -9,12 +9,24 @@ export const DEFAULT_LOCALE = 'en';
 // Available locales
 export const LOCALES = {
   en: 'English',
+  es: 'Español',
+  fr: 'Français',
+  de: 'Deutsch',
+  ru: 'Русский',
+  zh: '中文',
+  ja: '日本語',
 } as const;
 
 export type Locale = keyof typeof LOCALES;
 
 // Import locale messages
 import enMessages from './locales/en.json';
+import esMessages from './locales/es.json';
+import frMessages from './locales/fr.json';
+import deMessages from './locales/de.json';
+import ruMessages from './locales/ru.json';
+import zhMessages from './locales/zh.json';
+import jaMessages from './locales/ja.json';
 
 // Function to flatten nested messages
 const flattenMessages = (nestedMessages: any, prefix = ''): Record<string, string> => {
@@ -34,6 +46,12 @@ const flattenMessages = (nestedMessages: any, prefix = ''): Record<string, strin
 
 const messages: Record<Locale, any> = {
   en: flattenMessages(enMessages),
+  es: flattenMessages(esMessages),
+  fr: flattenMessages(frMessages),
+  de: flattenMessages(deMessages),
+  ru: flattenMessages(ruMessages),
+  zh: flattenMessages(zhMessages),
+  ja: flattenMessages(jaMessages),
 };
 
 // Create intl instance

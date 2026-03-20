@@ -5,10 +5,20 @@ export interface NotificationItem {
   id: string;
   title: string;
   body?: string;
+  /** Rich body text written by notificationService.ts */
+  message?: string;
   data?: Record<string, any>;
   createdAt?: any;
   read?: boolean;
-  dedupeKey?: string; // When set, replaces any existing notification with the same key
+  dedupeKey?: string;
+  // Rich fields present when created via notificationService.ts
+  type?: string;
+  priority?: 'low' | 'medium' | 'high' | 'urgent';
+  actionLabel?: string;
+  actionType?: string;
+  actionData?: any;
+  snoozedUntil?: any;
+  expiresAt?: any;
 }
 
 const DEFAULT_MAX_NOTIFICATIONS = 200;

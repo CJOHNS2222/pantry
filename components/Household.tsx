@@ -14,6 +14,7 @@ import { InventoryCacheService } from '../services/inventoryCacheService';
 import { MealPlanCacheService } from '../services/MealPlanCacheService';
 import { RecipesCacheService } from '../services/recipesCacheService';
 import { ShoppingListCacheService } from '../services/shoppingListCacheService';
+import { useIntl } from 'react-intl';
 
 interface HouseholdManagerProps {
   user: User;
@@ -26,6 +27,7 @@ interface HouseholdManagerProps {
 
 export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, household, setHousehold, onClose, setActiveTab, addToast }) => {
   
+  const intl = useIntl();
   const [inviteEmail, setInviteEmail] = useState('');
   const [isInviting, setIsInviting] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
@@ -237,7 +239,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
           <div className="p-4 border-b border-red-900/50 flex justify-between items-center bg-[#2A0A10]">
             <div className="flex items-center gap-2">
               <Users className="w-5 h-5 text-amber-500" />
-              <h2 className="font-serif font-bold text-amber-50 text-lg">Create Household</h2>
+              <h2 className="font-serif font-bold text-amber-50 text-lg">{intl.formatMessage({ id: 'household.create' })}</h2>
             </div>
             <button onClick={onClose} className="text-red-200/50 hover:text-white">
               <X className="w-6 h-6" />
@@ -247,7 +249,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
           <div className="p-6 pb-2.5">
             <div className="text-center">
               <Users className="w-16 h-16 text-amber-500/50 mx-auto mb-4" />
-              <h3 className="text-lg font-bold text-white mb-2">Create Your Household</h3>
+              <h3 className="text-lg font-bold text-white mb-2">{intl.formatMessage({ id: 'household.createYours' })}</h3>
               <p className="text-red-200/70 mb-6">
                 Create a household to start sharing your pantry with family members.
               </p>
@@ -273,7 +275,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
                 ) : (
                   <Plus className="w-5 h-5 mr-2" />
                 )}
-                {isCreating ? 'Creating...' : 'Create Household'}
+                {isCreating ? 'Creating...' : intl.formatMessage({ id: 'household.create' })}
               </button>
             </div>
           </div>
@@ -289,7 +291,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
           <div className="p-4 border-b border-red-900/50 flex justify-between items-center bg-[#2A0A10]">
             <div className="flex items-center gap-2">
               <Users className="w-5 h-5 text-amber-500" />
-              <h2 className="font-serif font-bold text-amber-50 text-lg">Loading Household</h2>
+              <h2 className="font-serif font-bold text-amber-50 text-lg">{intl.formatMessage({ id: 'household.loading' })}</h2>
             </div>
             <button onClick={onClose} className="text-red-200/50 hover:text-white">
               <X className="w-6 h-6" />
@@ -299,7 +301,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
           <div className="p-6 pb-2.5">
             <div className="text-center">
               <div className="w-16 h-16 border-4 border-amber-500/30 border-t-amber-500 rounded-full animate-spin mx-auto mb-4"></div>
-              <h3 className="text-lg font-bold text-white mb-2">Setting up your household...</h3>
+              <h3 className="text-lg font-bold text-white mb-2">{intl.formatMessage({ id: 'household.settingUp' })}</h3>
               <p className="text-red-200/70">
                 Please wait while we load your household data.
               </p>
@@ -311,8 +313,8 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
   }
 
   const mainUI = (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
-      <div className="bg-[#3F1016] border border-amber-500/30 w-full max-w-md rounded-2xl shadow-2xl relative overflow-hidden flex flex-col max-h-[85vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm px-4 pt-[var(--app-header-h)] pb-[var(--app-nav-h)] animate-fade-in">
+      <div className="bg-[#3F1016] border border-amber-500/30 w-full max-w-md rounded-2xl shadow-2xl relative overflow-hidden flex flex-col max-h-full">
         
         <div className="p-4 border-b border-red-900/50 flex justify-between items-center bg-[#2A0A10]">
           <div className="flex items-center gap-2">
@@ -353,7 +355,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
             onUpgrade={() => setActiveTab(Tab.SETTINGS)}
           >
             <div className="bg-[#2A0A10]/50 p-4 rounded-xl border border-red-900/30 mb-6">
-                  <h3 className="text-sm font-bold text-amber-500 uppercase mb-3">Invite Family Member</h3>
+                  <h3 className="text-sm font-bold text-amber-500 uppercase mb-3">{intl.formatMessage({ id: 'household.inviteMember' })}</h3>
                   <form onSubmit={handleInvite} className="flex gap-2">
                     <div className="relative flex-1">
                       <Mail className="absolute left-3 top-3 w-4 h-4 text-red-900/50" />
@@ -380,7 +382,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
                 </div>
               </PremiumFeature>
 
-          <h3 className="text-sm font-bold text-amber-500 uppercase mb-3 px-1">Group Members</h3>
+          <h3 className="text-sm font-bold text-amber-500 uppercase mb-3 px-1">{intl.formatMessage({ id: 'household.groupMembers' })}</h3>
           <div className="space-y-2">
             {household?.members && Array.isArray(household.members) && household.members.map((member) => {
               const currentUser = household?.members && Array.isArray(household.members) ? household.members.find(m => m.email === user.email) : null;
@@ -451,7 +453,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
           <div className="p-4 border-b border-red-900/50 flex justify-between items-center bg-[#2A0A10]">
             <div className="flex items-center gap-2">
               <Users className="w-5 h-5 text-amber-500" />
-              <h2 className="font-serif font-bold text-amber-50 text-lg">Create Household</h2>
+              <h2 className="font-serif font-bold text-amber-50 text-lg">{intl.formatMessage({ id: 'household.create' })}</h2>
             </div>
             <button onClick={onClose} className="text-red-200/50 hover:text-white">
               <X className="w-6 h-6" />
@@ -461,7 +463,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
           <div className="p-6 pb-2.5">
             <div className="text-center">
               <Users className="w-16 h-16 text-amber-500/50 mx-auto mb-4" />
-              <h3 className="text-lg font-bold text-white mb-2">Create Your Household</h3>
+              <h3 className="text-lg font-bold text-white mb-2">{intl.formatMessage({ id: 'household.createYours' })}</h3>
               <p className="text-red-200/70 mb-6">
                 Create a household to start sharing your pantry with family members.
               </p>
@@ -487,7 +489,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
                     Creating...
                   </>
                 ) : (
-                  "Create Household"
+                  intl.formatMessage({ id: 'household.create' })
                 )}
               </button>
             </div>
@@ -521,7 +523,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
               onUpgrade={() => setActiveTab(Tab.SETTINGS)}
               >
                 <div className="bg-[#2A0A10]/50 p-4 rounded-xl border border-red-900/30 mb-6">
-                  <h3 className="text-sm font-bold text-amber-500 uppercase mb-3">Invite Family Member</h3>
+                  <h3 className="text-sm font-bold text-amber-500 uppercase mb-3">{intl.formatMessage({ id: 'household.inviteMember' })}</h3>
                   <form onSubmit={handleInvite} className="flex gap-2">
                     <div className="relative flex-1">
                       <Mail className="absolute left-3 top-3 w-4 h-4 text-red-900/50" />
@@ -548,7 +550,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
                 </div>
               </PremiumFeature>
 
-          <h3 className="text-sm font-bold text-amber-500 uppercase mb-3 px-1">Group Members</h3>
+          <h3 className="text-sm font-bold text-amber-500 uppercase mb-3 px-1">{intl.formatMessage({ id: 'household.groupMembers' })}</h3>
           <div className="space-y-2">
             {household.members && Array.isArray(household.members) && household.members.map((member) => {
               const currentUser = household.members && Array.isArray(household.members) ? household.members.find(m => m.email === user.email) : null;

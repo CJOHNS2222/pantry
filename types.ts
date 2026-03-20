@@ -375,6 +375,8 @@ export interface Household {
   name: string;
   members: Member[];
   memberIds: string[]; // For querying households by user ID
+  /** Live presence map written by householdActivityService — keyed by userId */
+  memberActivity?: Record<string, { isOnline?: boolean; lastSeen?: any; currentActivity?: string }>;
 }
 
 export interface Member {

@@ -19,7 +19,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **AppHeader Status Labels**: Moved SyncIndicator from the left avatar row to the right side; OnlineIndicator now stacks below Sync so both status labels are grouped together
 - **Meal Planner Missing Ingredients**: Past-dated meals (before today) are now excluded from the missing ingredients and grocery cost estimator calculations
 
-## [1.4.7] - 2026-03-19
+## [1.4.7] - 2026-03-20
+
+### Added
+- **Full Internationalization (i18n)**: All UI text across 9 components now translatable via `react-intl` — `App.tsx`, `ShoppingList`, `ItemDetailModal`, `MealPlanner`, `RecipeFinder`, `Settings`, `Household`, `ExpiredItemsModal`, and supporting views
+- **7-Language Locale Support**: Complete translation files added for English, Spanish, French, German, Russian, Chinese (Simplified), and Japanese (`src/locales/`)
+- **Dependabot Configuration**: `.github/dependabot.yml` set up with weekly dependency updates for npm (root, `/functions`, `/website`) and Gradle (`/android`), with minor/patch updates grouped to reduce PR noise
+- **Secret Scanning**: `.github/secret_scanning.yml` added to configure path exclusions for test fixtures, example files, and third-party vendored clients; push protection guidance documented
 
 ### Fixed
 - Minor packaging and build metadata updates for release (version bump)
