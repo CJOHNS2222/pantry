@@ -19,6 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **AppHeader Status Labels**: Moved SyncIndicator from the left avatar row to the right side; OnlineIndicator now stacks below Sync so both status labels are grouped together
 - **Meal Planner Missing Ingredients**: Past-dated meals (before today) are now excluded from the missing ingredients and grocery cost estimator calculations
 
+## [1.4.8] - 2026-03-20
+
+### Changed
+- Release build preparation and version updates (versionCode 22)
+
 ## [1.4.7] - 2026-03-20
 
 ### Added
