@@ -26,7 +26,7 @@ interface ReceiptScanResult {
 import FreezerService from '../services/freezerService';
 import { BrowserMultiFormatReader } from '@zxing/library';
 import VisualQuantitySelector from './VisualQuantitySelector';
-import QuantityUnitPicker from './QuantityUnitPicker';
+import QuantityUnitPicker, { getSmartUnits } from './QuantityUnitPicker';
 import PriceTrends from './PriceTrends';
 import ItemDetailModal from './ItemDetailModal';
 import { ProgressiveImage } from './ProgressiveImage';
@@ -201,6 +201,15 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   const [modalRecipe, setModalRecipe] = useState<any>(null);
   const [modalContext, setModalContext] = useState<'search' | 'scheduled'>('search');
   const [freezeTargetIndex, setFreezeTargetIndex] = useState<number | null>(null);
+
+  // Auto-set smart unit when item name changes in the quick-add form
+  useEffect(() => {
+    if (newItemText.trim().length > 1) {
+      setNewUnit(getSmartUnits(newItemText)[0]);
+    } else {
+      setNewUnit('count');
+    }
+  }, [newItemText]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const gestureStartRef = useRef<{ x: number; y: number } | null>(null);

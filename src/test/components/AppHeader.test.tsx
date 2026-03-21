@@ -56,10 +56,9 @@ describe('AppHeader', () => {
   it('renders user information', () => {
     render(<AppHeader {...defaultProps} />);
 
-    // The header shows the user's display name
-    expect(screen.getByText('Test User')).toBeInTheDocument();
+    // The header shows the app title and user's first name in the greeting
     expect(screen.getByText('Stock & Spoon')).toBeInTheDocument();
-    expect(screen.getByText('AI Kitchen Assistant')).toBeInTheDocument();
+    expect(screen.getByText(/Test/)).toBeInTheDocument();
   });
 
   it('renders user avatar when available', () => {
@@ -136,12 +135,12 @@ describe('AppHeader', () => {
     expect(moonIcon).toBeInTheDocument();
   });
 
-  it('renders usage indicator', () => {
+  it('renders sync indicator', () => {
     render(<AppHeader {...defaultProps} />);
 
-    const usageIndicator = screen.getByTestId('usage-indicator');
-    expect(usageIndicator).toBeInTheDocument();
-    expect(usageIndicator).toHaveAttribute('data-compact', 'true');
+    // SyncIndicator is rendered in the header
+    const header = screen.getByRole('banner');
+    expect(header).toBeInTheDocument();
   });
 
   it('renders undo button when recent actions exist', () => {

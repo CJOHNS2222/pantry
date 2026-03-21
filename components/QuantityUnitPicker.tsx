@@ -17,6 +17,16 @@ export const COMMON_UNITS = [
   'dozen', 'loaves', 'cans', 'bottles', 'bags', 'boxes', 'packages', 'slices', 'sticks', 'heads'
 ];
 
+// Units where half/quarter fractions make practical sense
+const FRACTIONAL_UNITS = new Set(['gallons', 'quarts', 'pints', 'lbs', 'kg', 'cups', 'l']);
+const FRACTION_OPTIONS = [
+  { label: '¼', value: 0.25 },
+  { label: '½', value: 0.5 },
+  { label: '¾', value: 0.75 },
+  { label: '1', value: 1 },
+  { label: '2', value: 2 },
+];
+
 export const getSmartUnits = (itemName: string) => {
   const name = (itemName || '').toLowerCase();
 
@@ -141,7 +151,8 @@ const QuantityUnitPicker: React.FC<QuantityUnitPickerProps> = ({
   };
 
   return (
-    <div className={`flex items-center gap-2 ${className}`}>
+    <div className={`flex flex-col gap-1.5 ${className}`}>
+      <div className="flex items-center gap-2">
       {/* Quantity Input with Controls */}
       <div className="flex items-center gap-1">
         {showControls && (
@@ -196,6 +207,27 @@ const QuantityUnitPicker: React.FC<QuantityUnitPickerProps> = ({
           </option>
         ))}
       </select>
+      </div>
+
+      {/* Fraction quick-picks — only shown for units where fractions are practical */}
+      {FRACTIONAL_UNITS.has(unit) && (
+        <div className="flex gap-1">
+          {FRACTION_OPTIONS.map(({ label, value }) => (
+            <button
+              key={label}
+              type="button"
+              onClick={() => onQuantityChange(value)}
+              className={`flex-1 py-1 rounded text-xs font-semibold border transition-colors ${
+                quantity === value
+                  ? 'bg-[var(--accent-color)] text-white border-[var(--accent-color)]'
+                  : 'bg-theme-secondary border-theme text-theme-primary hover:bg-[var(--accent-color)]/10'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

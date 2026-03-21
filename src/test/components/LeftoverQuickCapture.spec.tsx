@@ -30,23 +30,21 @@ vi.mock('../../../services/databaseMonitoringService', () => ({
 }))
 
 import LeftoverQuickCapture from '../../../components/LeftoverQuickCapture'
+import { LeftoverService } from '../../../services/leftoverService'
+
+const mockedLeftoverService = vi.mocked(LeftoverService)
 
 describe('LeftoverQuickCapture', () => {
   beforeEach(() => {
-    // reset the mocked implementation on the mocked module
-    const mocked = (require('../../../services/leftoverService') as any).LeftoverService;
-    if (mocked && mocked.create && mocked.create.mockReset) mocked.create.mockReset();
+    vi.mocked(mockedLeftoverService.create).mockReset()
   })
 
   it('sends cooked_rice flag when checkbox is checked and calls LeftoverService.create', async () => {
-    // set the mock result on the mocked module
-    const mocked = (require('../../../services/leftoverService') as any).LeftoverService;
-    if (mocked && mocked.create && mocked.create.mockResolvedValue) {
-      mocked.create.mockResolvedValue({ id: 'leftover-1', createdAt: '2023-01-01T00:00:00Z', computedBestBefore: '2023-01-02T00:00:00Z' });
-    }
+    vi.mocked(mockedLeftoverService.create).mockResolvedValue({ id: 'leftover-1', createdAt: '2023-01-01T00:00:00Z', computedBestBefore: '2023-01-02T00:00:00Z' } as any)
 
     const appValue = {
       user: { id: 'user-1', profile: { leftoverPersona: 'normal' } },
+      household: { id: 'h1', members: [] },
       activeTab: 0,
       setActiveTab: () => {},
       inventory: [],
@@ -81,7 +79,7 @@ describe('LeftoverQuickCapture', () => {
 
     render(
       <AppProvider value={appValue as any}>
-        <LeftoverQuickCapture householdId="h1" createdBy="user-1" />
+        <LeftoverQuickCapture createdBy="user-1" />
       </AppProvider>
     )
 
@@ -94,11 +92,10 @@ describe('LeftoverQuickCapture', () => {
     fireEvent.click(saveButton)
 
     await waitFor(() => {
-      const mocked2 = (require('../../../services/leftoverService') as any).LeftoverService;
-      expect(mocked2.create).toHaveBeenCalled()
+      expect(vi.mocked(mockedLeftoverService.create)).toHaveBeenCalled()
     })
 
-    const payload = (require('../../../services/leftoverService') as any).LeftoverService.create.mock.calls[0][0]
+    const payload = vi.mocked(mockedLeftoverService.create).mock.calls[0][0]
     expect(payload).toBeTruthy()
     expect(payload.householdId).toBe('h1')
     expect(payload.createdBy).toBe('user-1')

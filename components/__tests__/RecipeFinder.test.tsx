@@ -6,6 +6,12 @@ import { RecipeSearchResult, StructuredRecipe, SavedRecipe, PantryItem, RecipeRa
 import { Tab } from '../../types/app';
 
 // Mock services and utilities
+vi.mock('react-intl', () => ({
+  useIntl: () => ({
+    formatMessage: ({ defaultMessage, id }: { defaultMessage?: string; id: string }) => defaultMessage || id,
+  }),
+}));
+
 vi.mock('../../services/geminiService', () => ({
   searchRecipes: vi.fn(),
 }));

@@ -4,7 +4,7 @@ import { vi, describe, it, expect, beforeEach } from 'vitest'
 import { AppProvider } from '../contexts/AppContext'
 
 // Mock the actual LeftoverService used by the component and the image uploader
-const mockCreate = vi.fn()
+const mockCreate = vi.hoisted(() => vi.fn())
 vi.mock('../services/leftoverService', () => ({ LeftoverService: { create: mockCreate } }))
 vi.mock('../services/leftoverImageService', () => ({ uploadLeftoverImage: vi.fn().mockResolvedValue('https://example.com/photo.jpg') }))
 
@@ -63,7 +63,7 @@ describe('LeftoverQuickCapture', () => {
     fireEvent.click(checkbox)
     expect(checkbox.checked).toBe(true)
 
-    const saveButton = screen.getByText('Save Leftover')
+    const saveButton = screen.getByRole('button', { name: /Save Leftover/i })
     fireEvent.click(saveButton)
 
     await waitFor(() => {

@@ -271,6 +271,13 @@ const App: React.FC = () => {
     logShoppingAdded,
     logRecipeSaved,
     logMealCompleted
+  }, {
+    onShowAddToPlanDialog: (recipe) => {
+      setPendingRecipeForPlan(recipe);
+      setSelectedDayForPlan(0);
+      setSelectedMealForPlan('dinner');
+      setShowAddToPlanDialog(true);
+    }
   });
 
   // Confirm add to plan from dialog
