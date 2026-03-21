@@ -274,7 +274,12 @@ const App: React.FC = () => {
   }, {
     onShowAddToPlanDialog: (recipe) => {
       setPendingRecipeForPlan(recipe);
-      setSelectedDayForPlan(0);
+      // Default to tomorrow's date if it exists in the plan, otherwise first day
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const tomorrowStr = tomorrow.toISOString().slice(0, 10);
+      const tomorrowIndex = mealPlan?.findIndex(day => day.date?.slice(0, 10) === tomorrowStr) ?? -1;
+      setSelectedDayForPlan(tomorrowIndex >= 0 ? tomorrowIndex : 0);
       setSelectedMealForPlan('dinner');
       setShowAddToPlanDialog(true);
     }

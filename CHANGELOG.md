@@ -19,6 +19,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **AppHeader Status Labels**: Moved SyncIndicator from the left avatar row to the right side; OnlineIndicator now stacks below Sync so both status labels are grouped together
 - **Meal Planner Missing Ingredients**: Past-dated meals (before today) are now excluded from the missing ingredients and grocery cost estimator calculations
 
+## [1.4.9] - 2026-03-20
+
+### Added
+- **Free Tier Invite Limit**: Free users are now capped at 1 household invite; `usageService.ts` enforces limit and `SubscriptionManager` surfaces upgrade prompt when cap is reached
+- **Firestore Composite Index**: Added index for `cache` collection queries to support notification and cache data access patterns
+
+### Changed
+- **Quantity Fill Level Icons**: Replaced flat rectangle fill-bar with distinct colored unicode circle icons (◔ ¼ amber, ◑ ½ orange, ◕ ¾ green, ● full dark-green) with glow on selection in `ItemDetailModal`
+- **Add to Schedule Default Date**: Schedule modal now pre-selects tomorrow's date when opening instead of always defaulting to Monday/index 0
+- **Meal Plan Default Day**: `onShowAddToPlanDialog` callback finds tomorrow in the meal plan array by ISO date and falls back to index 0 only if tomorrow is not in the plan
+
+### Fixed
+- **Redundant Firestore Queries**: `getUnreadNotifications` was called once per expiring item in the notification loop — now fetched once before the loop and passed as a cache parameter to `createExpirationAlert`
+- **"Checking In" Notification Spam**: Suppressed low-value notifications for risk levels 1 (Staples) and 2 (Hardy Fridge) entirely; suppressed level 3 (Produce) alerts when item has more than 3 days remaining
+- **Stale "Online" Member Badge**: Household members shown as online only if `isOnline === true` AND `lastSeen` is within the last 5 minutes — prevents stale presence from persisting after app close without logout
+- **Household Header Too Many Lines**: Status indicator capped at 2 lines (first online member's name + "+N others online") instead of 3; `recentlyActiveMembers` excludes anyone already counted as online
+- **Expired Notification Pruning**: `notificationsService.ts` now prunes expired notifications from the queue during sync
+- **LeftoversHotZone Doc Snapshot**: Rewritten to use Firestore doc snapshot listener for live updates instead of stale data
+- **ItemDetailModal TDZ Crash**: Fixed temporal dead zone reference error on modal open
+
 ## [1.4.8] - 2026-03-20
 
 ### Changed

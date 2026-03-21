@@ -217,10 +217,10 @@ const QuantityUnitPicker: React.FC<QuantityUnitPickerProps> = ({
               key={label}
               type="button"
               onClick={() => onQuantityChange(value)}
-              className={`flex-1 py-1 rounded text-xs font-semibold border transition-colors ${
+              className={`flex-1 py-1.5 rounded-lg text-xs font-bold border transition-all duration-150 ${
                 quantity === value
-                  ? 'bg-[var(--accent-color)] text-white border-[var(--accent-color)]'
-                  : 'bg-theme-secondary border-theme text-theme-primary hover:bg-[var(--accent-color)]/10'
+                  ? 'bg-[var(--accent-color)] text-white border-[var(--accent-color)] shadow-md shadow-[var(--accent-color)]/30 scale-105'
+                  : 'bg-amber-500/15 border-amber-400/40 text-amber-500 hover:bg-amber-500/25 hover:border-amber-400/70 hover:scale-105'
               }`}
             >
               {label}

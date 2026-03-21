@@ -65,6 +65,7 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }
         '1 custom pantry category',
         'Grocery cost estimator (first 5 items)',
         'Current week meal plan view',
+        'Invite 1 household member',
         'Community access'
       ],
       limitations: [

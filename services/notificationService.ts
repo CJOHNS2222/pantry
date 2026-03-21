@@ -227,10 +227,11 @@ export class NotificationService {
     daysUntilExpiry: number,
     itemId: string,
     userRiskLevel?: number,
-    itemCategory?: string
+    itemCategory?: string,
+    cachedNotifications?: NotificationItem[]
   ): Promise<string> {
     // Check if notification already exists for this item
-    const existingNotifications = await NotificationService.getUnreadNotifications(userId);
+    const existingNotifications = cachedNotifications ?? await NotificationService.getUnreadNotifications(userId);
     const existingNotification = existingNotifications.find(n =>
       n.type === 'expiration' &&
       n.actionData?.itemId === itemId &&
@@ -240,8 +241,15 @@ export class NotificationService {
     // Determine risk level for this item
     const itemRiskLevel = getFoodRiskLevel(itemName, itemCategory);
 
-    // Hardy Fridge items (risk level 2) generate low-value "Checking In" notifications — skip them
-    if (itemRiskLevel === 2) {
+    // Skip low-value notifications:
+    // - Staples (1): don't meaningfully expire, "Inventory Check" is noise
+    // - Hardy Fridge (2): "Checking In" adds no value if everything is fine
+    if (itemRiskLevel <= 2) {
+      return '';
+    }
+
+    // Produce (3) only warrants a notification when truly imminent — skip generic "Expires Soon" spam
+    if (itemRiskLevel === 3 && daysUntilExpiry > 3) {
       return '';
     }
 

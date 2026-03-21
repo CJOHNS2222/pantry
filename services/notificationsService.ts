@@ -43,18 +43,32 @@ export async function appendNotificationToUser(uid: string, notification: Notifi
         : new Date().toISOString();
       const newItem = { ...notification, createdAt: createdAtValue };
 
+      // Prune already-expired notifications before adding the new one
+      const now = new Date();
+      const pruned = existing.filter(n => {
+        if (!n.expiresAt) return true;
+        try {
+          const expiry = typeof n.expiresAt === 'string'
+            ? new Date(n.expiresAt)
+            : (n.expiresAt as any)?.toDate?.() ?? new Date(n.expiresAt as any);
+          return expiry > now;
+        } catch {
+          return true;
+        }
+      });
+
       let next: NotificationItem[];
       if (newItem.dedupeKey) {
         // Replace any existing notification with the same dedupeKey, preserving array position order
-        const idx = existing.findIndex(n => n.dedupeKey === newItem.dedupeKey);
+        const idx = pruned.findIndex(n => n.dedupeKey === newItem.dedupeKey);
         if (idx !== -1) {
-          next = [...existing];
+          next = [...pruned];
           next[idx] = { ...newItem, createdAt: createdAtValue };
         } else {
-          next = [...existing, newItem];
+          next = [...pruned, newItem];
         }
       } else {
-        next = [...existing, newItem];
+        next = [...pruned, newItem];
       }
 
       // Trim oldest if over cap

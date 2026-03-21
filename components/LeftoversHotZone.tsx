@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { collection, query, orderBy, onSnapshot, where } from 'firebase/firestore'
+import { doc, onSnapshot } from 'firebase/firestore'
 import { db } from '../firebaseConfig'
 import { LeftoverService } from '../services/leftoverService'
 import FreezerService from '../services/freezerService'
@@ -20,25 +20,41 @@ export default function LeftoversHotZone({ householdId, onNavigateToRecipes }: L
   const { user } = useApp()
 
   useEffect(() => {
-    if (!householdId) return
+    if (!householdId || !user?.id) return
 
-    const cacheRef = collection(db, 'users', user.id, 'cache')
-    const q = query(cacheRef, where('is_leftover', '==', true), orderBy('leftoverMeta.createdAt', 'desc'))
-    const unsub = onSnapshot(q, snap => {
-      const docs: PantryItem[] = []
-      snap.forEach(d => {
-        const data = d.data() as PantryItem
-        if (data.is_leftover) {
-          docs.push(data)
+    // The inventory cache is stored as a single document (not individual docs per item),
+    // so we subscribe to the inventory cache doc and filter in memory.
+    const cachePath = householdId !== user.id
+      ? `households/${householdId}/cache/inventory`
+      : `users/${user.id}/cache/inventory`;
+    const cacheDocRef = doc(db, cachePath)
+    const unsub = onSnapshot(cacheDocRef, snap => {
+      if (!snap.exists()) {
+        setLeftovers([])
+        return
+      }
+      const data = snap.data() as Record<string, any>
+      const items: PantryItem[] = []
+      for (const [itemId, itemArray] of Object.entries(data)) {
+        if (Array.isArray(itemArray)) {
+          try {
+            const item = InventoryCacheService.arrayToPantryItem(itemId, itemArray)
+            if (item.is_leftover) items.push(item)
+          } catch { /* skip malformed entries */ }
         }
+      }
+      items.sort((a, b) => {
+        const aDate = a.leftoverMeta?.createdAt ?? ''
+        const bDate = b.leftoverMeta?.createdAt ?? ''
+        return bDate.localeCompare(aDate)
       })
-      setLeftovers(docs)
+      setLeftovers(items)
     })
 
     return () => {
       unsub()
     }
-  }, [householdId, user.id])
+  }, [householdId, user?.id])
 
   if (!leftovers.length) return null
 

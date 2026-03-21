@@ -1,6 +1,6 @@
 import React from 'react';
 import { Household, Member } from '../types';
-import { Users, Eye, Clock } from 'lucide-react';
+import { Users, Clock } from 'lucide-react';
 
 interface HouseholdStatusIndicatorProps {
   household: Household;
@@ -21,10 +21,24 @@ export const HouseholdStatusIndicator: React.FC<HouseholdStatusIndicatorProps> =
     return null;
   }
 
-  // Members whose isOnline flag is true in memberActivity
-  const onlineMembers = otherMembers.filter(m => getActivity(m.id).isOnline === true);
+  // Members whose isOnline flag is true AND have been seen within the last 5 minutes.
+  // If someone closes the app without logging out, isOnline stays true but lastSeen
+  // stops updating — so we require both signals to avoid stale "online" indicators.
+  const ONLINE_WINDOW_MS = 5 * 60 * 1000;
+  const isConsideredOnline = (memberId: string) => {
+    const activity = getActivity(memberId);
+    if (!activity.isOnline) return false;
+    const rawLastSeen = activity.lastSeen;
+    if (!rawLastSeen) return false;
+    const lastSeen = typeof rawLastSeen === 'object' && rawLastSeen?.toDate
+      ? rawLastSeen.toDate()
+      : new Date(rawLastSeen as string);
+    return lastSeen > new Date(Date.now() - ONLINE_WINDOW_MS);
+  };
 
-  // Members with a lastSeen within the last 30 minutes
+  const onlineMembers = otherMembers.filter(m => isConsideredOnline(m.id));
+
+  // Members with a lastSeen within the last 30 minutes (but not counted as actively online)
   const recentlyActiveMembers = otherMembers.filter(m => {
     const rawLastSeen = getActivity(m.id).lastSeen;
     if (!rawLastSeen) return false;
@@ -32,7 +46,7 @@ export const HouseholdStatusIndicator: React.FC<HouseholdStatusIndicatorProps> =
       ? rawLastSeen.toDate()
       : new Date(rawLastSeen as string);
     const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
-    return lastSeen > thirtyMinutesAgo;
+    return lastSeen > thirtyMinutesAgo && !isConsideredOnline(m.id);
   });
 
   const getTimeAgo = (rawTime: any) => {
@@ -53,70 +67,48 @@ export const HouseholdStatusIndicator: React.FC<HouseholdStatusIndicatorProps> =
     return time.toLocaleDateString();
   };
 
+  // Build at most 2 display lines.
+  // Line 1: first online/recently-active member by name
+  // Line 2: "+N other" summary if there are more, or a single recently-active member
+  const offlineRecent = recentlyActiveMembers;
+  const lines: { color: string; dot?: 'green' | 'amber'; text: string }[] = [];
+
+  if (onlineMembers.length >= 1) {
+    lines.push({ color: 'text-green-400', dot: 'green', text: `${onlineMembers[0].name} is online` });
+    const remaining = onlineMembers.length - 1;
+    if (remaining > 0) {
+      lines.push({ color: 'text-green-400/70', text: `+${remaining} other${remaining > 1 ? 's' : ''} online` });
+    } else if (offlineRecent.length > 0) {
+      lines.push({ color: 'text-amber-500/60', dot: 'amber', text: `${offlineRecent[0].name} was active ${getTimeAgo(getActivity(offlineRecent[0].id).lastSeen)}` });
+    }
+  } else if (offlineRecent.length >= 1) {
+    lines.push({ color: 'text-amber-500/60', dot: 'amber', text: `${offlineRecent[0].name} was active ${getTimeAgo(getActivity(offlineRecent[0].id).lastSeen)}` });
+    const remaining = offlineRecent.length - 1;
+    if (remaining > 0) {
+      lines.push({ color: 'text-amber-500/40', text: `+${remaining} other${remaining > 1 ? 's' : ''} recently active` });
+    }
+  } else if (otherMembers.length > 0) {
+    lines.push({
+      color: 'text-red-200/40',
+      text: otherMembers.length === 1
+        ? `${otherMembers[0].name} hasn't been active recently`
+        : `${otherMembers.length} members inactive`
+    });
+  }
+
   return (
-    <div className="flex items-center gap-2 px-3 py-2 bg-[#2A0A10]/80 border border-amber-500/20 rounded-lg backdrop-blur-sm">
-      <Users className="w-4 h-4 text-amber-500" />
-
-      <div className="flex items-center gap-3">
-        {onlineMembers.length > 0 && (
-          <div className="flex items-center gap-1">
-            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-            <span className="text-xs text-green-400">
-              {onlineMembers.length === 1
-                ? `${onlineMembers[0].name} is online`
-                : `${onlineMembers.length} online`
-              }
-            </span>
+    <div className="flex items-start gap-2 px-3 py-1.5 bg-[#2A0A10]/80 border border-amber-500/20 rounded-lg backdrop-blur-sm">
+      <Users className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+      <div className="flex flex-col gap-0.5">
+        {lines.slice(0, 2).map((line, i) => (
+          <div key={i} className="flex items-center gap-1">
+            {line.dot === 'green' && <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse flex-shrink-0" />}
+            {line.dot === 'amber' && <Clock className="w-3 h-3 text-amber-500/60 flex-shrink-0" />}
+            {!line.dot && <div className="w-2 h-2 flex-shrink-0" />}
+            <span className={`text-xs ${line.color} leading-tight`}>{line.text}</span>
           </div>
-        )}
-
-        {onlineMembers.length > 0 && recentlyActiveMembers.length > onlineMembers.length && (
-          <span className="text-xs text-red-200/50">•</span>
-        )}
-
-        {recentlyActiveMembers.filter(m => !getActivity(m.id).isOnline).length > 0 && (
-          <div className="flex items-center gap-1">
-            <Clock className="w-3 h-3 text-amber-500/60" />
-            <span className="text-xs text-amber-500/60">
-              {(() => {
-                const offlineRecent = recentlyActiveMembers.filter(m => !getActivity(m.id).isOnline);
-                if (offlineRecent.length === 1) {
-                  return `${offlineRecent[0].name} was active ${getTimeAgo(getActivity(offlineRecent[0].id).lastSeen)}`;
-                }
-                return `${offlineRecent.length} recently active`;
-              })()}
-            </span>
-          </div>
-        )}
-
-        {onlineMembers.length === 0 && recentlyActiveMembers.length === 0 && otherMembers.length > 0 && (
-          <span className="text-xs text-red-200/40">
-            {otherMembers.length === 1
-              ? `${otherMembers[0].name} hasn't been active recently`
-              : `${otherMembers.length} members inactive`
-            }
-          </span>
-        )}
+        ))}
       </div>
-
-      {/* Current activity indicators for online members */}
-      {onlineMembers.some(m => getActivity(m.id).currentActivity) && (
-        <div className="flex items-center gap-1 ml-2">
-          <Eye className="w-3 h-3 text-amber-500/60" />
-          <div className="flex gap-1">
-            {onlineMembers
-              .filter(m => getActivity(m.id).currentActivity)
-              .slice(0, 2)
-              .map((member, index, arr) => (
-                <span key={member.id} className="text-xs text-amber-500/80">
-                  {member.name}: {getActivity(member.id).currentActivity}
-                  {index < arr.length - 1 && ','}
-                </span>
-              ))
-            }
-          </div>
-        </div>
-      )}
     </div>
   );
 };

@@ -626,12 +626,14 @@ export function useDataManagement(
               // Create a single aggregated Danger Zone notification
               await NotificationService.createDangerZoneAlert(user.id, dangerCandidates as any);
             } else {
+              // Fetch once and reuse for all items to avoid redundant Firestore queries
+              const cachedNotifications = await NotificationService.getUnreadNotifications(user.id);
               // Fallback to individual notifications for up to 3 items
               for (const item of itemsExpiringSoon.slice(0, 3)) {
                 const daysUntilExpiry = Math.ceil((new Date(item.expirationDate!).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
                 // pass user risk level to tailor priority
                 // eslint-disable-next-line no-await-in-loop
-                await NotificationService.createExpirationAlert(user.id, item.item, daysUntilExpiry, item.id, user?.profile?.riskLevel, item.category);
+                await NotificationService.createExpirationAlert(user.id, item.item, daysUntilExpiry, item.id, user?.profile?.riskLevel, item.category, cachedNotifications);
               }
             }
           }

@@ -52,6 +52,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   const [localNotes, setLocalNotes] = useState<string>(item.notes || '');
   const [localIsStaple, setLocalIsStaple] = useState<boolean>(item.isStaple || false);
   const [localIsOpened, setLocalIsOpened] = useState<boolean>(item.isOpened || false);
+  const [localVisualLevel, setLocalVisualLevel] = useState<PantryItem['visualLevel']>(item.visualLevel);
   // Image upload state
   const intl = useIntl();
   const { household, user, settings } = useApp();
@@ -76,6 +77,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
     setLocalNotes(item.notes || '');
     setLocalIsStaple(item.isStaple || false);
     setLocalIsOpened(item.isOpened || false);
+    setLocalVisualLevel(item.visualLevel);
   }, [item]);
 
   // Fetch nutrition facts on component mount (only when showNutrition is enabled)
@@ -98,12 +100,6 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
     };
     fetchNutrition();
   }, [item.item, item.category, showNutrition]);
-
-  // Keyboard navigation support
-  useKeyboardNavigation({
-    onEscape: onClose,
-    enabled: true
-  });
 
   // Local-only change while modal is open; will persist on close
   const handleQuantityChange = (newQuantity: number) => {
@@ -200,6 +196,11 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
       updates.isStaple = localIsStaple;
     }
 
+    // Visual fill level
+    if (localVisualLevel !== item.visualLevel) {
+      updates.visualLevel = localVisualLevel;
+    }
+
     // Opened tracking
     if (localIsOpened !== (item.isOpened || false)) {
       updates.isOpened = localIsOpened;
@@ -228,6 +229,12 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
     onClose();
   };
 
+  // Keyboard navigation support — defined here because handleCloseAndPersist must be initialized first
+  useKeyboardNavigation({
+    onEscape: handleCloseAndPersist,
+    enabled: true
+  });
+
   return (
     <>
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start sm:items-center justify-center z-[9999] px-4 pt-[var(--app-header-h)] pb-[var(--app-nav-h)]">
@@ -240,7 +247,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                 {intl.formatMessage({ id: 'common.addedOn' }, { date: item.dateAdded ? new Date(item.dateAdded).toLocaleDateString() : intl.formatMessage({ id: 'common.unknown' }) })}
               </div>
               <button
-                onClick={onClose}
+                onClick={handleCloseAndPersist}
                 className="p-1 hover:bg-theme-secondary rounded-full transition-colors"
                 aria-label={intl.formatMessage({ id: 'common.closeModal' })}
               >
@@ -255,7 +262,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
             <div className="pb-2 flex items-center gap-4">
               {/* Change picture button - left side */}
               <label className="cursor-pointer px-2 py-1 bg-theme-secondary text-theme-primary rounded text-xs hover:bg-theme-primary hover:text-theme-secondary border border-theme flex-shrink-0">
-                {intl.formatMessage({ id: 'common.change' })}
+                Change Photo
                 <input
                   type="file"
                   accept="image/*"
@@ -283,7 +290,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                 disabled={!selectedFile || uploadingImage}
                 className="px-2 py-1 bg-[var(--accent-color)] text-white rounded text-xs flex-shrink-0 disabled:opacity-50"
               >
-                {uploadingImage ? intl.formatMessage({ id: 'common.uploading' }) : intl.formatMessage({ id: 'common.upload' })}
+                {uploadingImage ? 'Uploading...' : 'Save Photo'}
               </button>
             </div>
 
@@ -302,6 +309,44 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                 itemName={item.item}
                 showControls={true}
               />
+              {/* Visual fill level selector */}
+              <div className="mt-2">
+                <div className="text-xs font-medium text-theme-primary opacity-70 uppercase mb-1">Fill Level</div>
+                <div className="flex gap-1.5">
+                  {([
+                    { value: 'quarter',      label: '¼',  icon: '◔', color: '#f59e0b' },
+                    { value: 'half',         label: '½',  icon: '◑', color: '#f97316' },
+                    { value: 'threeQuarter', label: '¾',  icon: '◕', color: '#22c55e' },
+                    { value: 'full',         label: 'Full', icon: '●', color: '#16a34a' },
+                  ] as { value: NonNullable<PantryItem['visualLevel']>; label: string; icon: string; color: string }[]).map(({ value, label, icon, color }) => {
+                    const selected = localVisualLevel === value;
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setLocalVisualLevel(selected ? undefined : value)}
+                        className={`flex-1 flex flex-col items-center gap-0.5 px-1 py-1.5 rounded-lg border transition-all duration-150 ${
+                          selected
+                            ? 'border-[var(--accent-color)] bg-[var(--accent-color)]/10 scale-105'
+                            : 'border-theme bg-theme-primary hover:bg-theme-secondary hover:scale-105'
+                        }`}
+                        aria-pressed={selected}
+                        title={`${label} full`}
+                      >
+                        <span
+                          className="text-xl leading-none transition-all"
+                          style={{ color: selected ? color : 'rgb(156 163 175)', filter: selected ? `drop-shadow(0 0 4px ${color}80)` : undefined }}
+                        >
+                          {icon}
+                        </span>
+                        <span className={`text-[10px] font-medium leading-none ${
+                          selected ? 'text-[var(--accent-color)]' : 'text-theme-secondary'
+                        }`}>{label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
 
             {/* Original Quantity (from recipe/shopping list) */}
@@ -375,7 +420,11 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                     <span className="text-sm text-theme-secondary opacity-70">{intl.formatMessage({ id: 'pantry.noExpirationSet' })}</span>
                   )}
                   <button
-                    onClick={() => setIsEditingExpiration(true)}
+                    onClick={() => {
+                      setEditExpirationDate((localExpirationDate || '').split('T')[0]);
+                      setEditExpirationType(localExpirationType);
+                      setIsEditingExpiration(true);
+                    }}
                     className="text-[var(--accent-color)] hover:text-[var(--accent-color)]/80"
                   >
                     <Edit3 className="w-4 h-4" />
