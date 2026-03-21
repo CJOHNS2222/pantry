@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
-  Camera,
   Plus,
   SkipForward,
   Sparkles,
@@ -13,7 +12,6 @@ import {
   X,
   Zap,
   Heart,
-  Star
 } from 'lucide-react';
 import { Tab } from '../types/app';
 
@@ -32,7 +30,7 @@ interface ModernOnboardingProps {
   onOpenHousehold?: () => void;
 }
 
-type OnboardingStep = 'welcome' | 'quick-setup' | 'permissions' | 'value-demo' | 'complete';
+type OnboardingStep = 'welcome' | 'quick-setup' | 'value-demo' | 'complete';
 
 interface QuickSetupOption {
   id: string;
@@ -54,8 +52,8 @@ export const ModernOnboarding: React.FC<ModernOnboardingProps> = ({
 }) => {
   const [currentStep, setCurrentStep] = useState<OnboardingStep>('welcome');
   const [selectedSetupOption, setSelectedSetupOption] = useState<string | null>(null);
-  const [permissionsGranted, setPermissionsGranted] = useState<Set<string>>(new Set());
   const [isAnimating, setIsAnimating] = useState(false);
+  const onCompleteCalledRef = useRef(false);
 
   const quickSetupOptions: QuickSetupOption[] = [
     {
@@ -100,19 +98,25 @@ export const ModernOnboarding: React.FC<ModernOnboardingProps> = ({
       // Execute the action and move to next step
       setTimeout(() => {
         option.action();
-        handleStepTransition('permissions');
+        handleStepTransition('value-demo');
       }, 500);
     }
   };
 
   const handleSkip = () => {
     handleStepTransition('complete');
-    setTimeout(() => onComplete({ completed: false, selectedSetup: null, permissions: [] }), 1000);
   };
 
-  const handlePermissionGrant = (permission: string) => {
-    setPermissionsGranted(prev => new Set([...prev, permission]));
-  };
+  // Auto-advance from the complete step — covers all paths (normal flow + skip)
+  useEffect(() => {
+    if (currentStep === 'complete' && !onCompleteCalledRef.current) {
+      onCompleteCalledRef.current = true;
+      const timer = setTimeout(() => {
+        onComplete({ completed: true, selectedSetup: selectedSetupOption, permissions: [] });
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [currentStep, selectedSetupOption, onComplete]);
 
   const renderWelcomeStep = () => (
     <div className={`transition-all duration-500 ${isAnimating ? 'opacity-0 transform translate-x-4' : 'opacity-100 transform translate-x-0'}`}>
@@ -260,86 +264,6 @@ export const ModernOnboarding: React.FC<ModernOnboardingProps> = ({
     </div>
   );
 
-  const renderPermissionsStep = () => (
-    <div className={`transition-all duration-500 ${isAnimating ? 'opacity-0 transform translate-x-4' : 'opacity-100 transform translate-x-0'}`}>
-      <div className="text-center mb-8">
-        <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl mb-4">
-          <Camera className="w-8 h-8 text-white" />
-        </div>
-        <h2 className="text-2xl font-bold text-theme-primary mb-3">
-          Quick Permissions
-        </h2>
-        <p className="text-theme-secondary">
-          These help make the app work better for you
-        </p>
-      </div>
-
-      <div className="space-y-4 mb-8">
-        <div className="p-4 rounded-xl border border-theme bg-theme/5">
-          <div className="flex items-start gap-4">
-            <div className="flex-shrink-0 w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
-              <Camera className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-            </div>
-            <div className="flex-1">
-              <h3 className="font-medium text-theme-primary mb-1">
-                Camera Access
-              </h3>
-              <p className="text-sm text-theme-secondary mb-3">
-                Scan pantry items quickly and upload recipe photos
-              </p>
-              <button
-                onClick={() => handlePermissionGrant('camera')}
-                disabled={permissionsGranted.has('camera')}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                  permissionsGranted.has('camera')
-                    ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                    : 'bg-[var(--accent-color)] text-white hover:bg-[var(--accent-color)]/90'
-                }`}
-              >
-                {permissionsGranted.has('camera') ? 'Granted ✓' : 'Allow Camera'}
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div className="p-4 rounded-xl border border-theme bg-theme/5">
-          <div className="flex items-start gap-4">
-            <div className="flex-shrink-0 w-10 h-10 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center">
-              <Star className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-            </div>
-            <div className="flex-1">
-              <h3 className="font-medium text-theme-primary mb-1">
-                Notifications (Optional)
-              </h3>
-              <p className="text-sm text-theme-secondary mb-3">
-                Get reminders for meal prep and expiring ingredients
-              </p>
-              <button
-                onClick={() => handlePermissionGrant('notifications')}
-                disabled={permissionsGranted.has('notifications')}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                  permissionsGranted.has('notifications')
-                    ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                    : 'bg-theme text-theme-primary hover:bg-theme/80'
-                }`}
-              >
-                {permissionsGranted.has('notifications') ? 'Granted ✓' : 'Maybe Later'}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <button
-        onClick={() => handleStepTransition('value-demo')}
-        className="w-full bg-gradient-to-r from-[var(--accent-color)] to-[var(--accent-color)]/90 hover:from-[var(--accent-color)]/90 hover:to-[var(--accent-color)]/80 text-white py-4 px-6 rounded-xl font-semibold transition-all duration-200 transform hover:scale-[1.02] shadow-lg hover:shadow-xl flex items-center justify-center gap-3"
-      >
-        Continue
-        <ArrowRight className="w-5 h-5" />
-      </button>
-    </div>
-  );
-
   const renderValueDemoStep = () => (
     <div className={`transition-all duration-500 ${isAnimating ? 'opacity-0 transform translate-x-4' : 'opacity-100 transform translate-x-0'}`}>
       <div className="text-center mb-8">
@@ -438,7 +362,6 @@ export const ModernOnboarding: React.FC<ModernOnboardingProps> = ({
         <div className="p-8">
           {currentStep === 'welcome' && renderWelcomeStep()}
           {currentStep === 'quick-setup' && renderQuickSetupStep()}
-          {currentStep === 'permissions' && renderPermissionsStep()}
           {currentStep === 'value-demo' && renderValueDemoStep()}
           {currentStep === 'complete' && renderCompleteStep()}
         </div>
@@ -446,11 +369,11 @@ export const ModernOnboarding: React.FC<ModernOnboardingProps> = ({
         {/* Progress indicator */}
         <div className="px-8 pb-6">
           <div className="flex justify-center gap-2">
-            {(['welcome', 'quick-setup', 'permissions', 'value-demo', 'complete'] as OnboardingStep[]).map((step, index) => (
+            {(['welcome', 'quick-setup', 'value-demo', 'complete'] as OnboardingStep[]).map((step, index) => (
               <div
                 key={step}
                 className={`w-2 h-2 rounded-full transition-all duration-300 ${
-                  index <= (['welcome', 'quick-setup', 'permissions', 'value-demo', 'complete'] as OnboardingStep[]).indexOf(currentStep)
+                  index <= (['welcome', 'quick-setup', 'value-demo', 'complete'] as OnboardingStep[]).indexOf(currentStep)
                     ? 'bg-[var(--accent-color)]'
                     : 'bg-theme/30'
                 }`}
