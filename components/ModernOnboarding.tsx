@@ -12,6 +12,7 @@ import {
   X,
   Zap,
   Heart,
+  Camera,
 } from 'lucide-react';
 import { Tab } from '../types/app';
 
@@ -116,6 +117,7 @@ export const ModernOnboarding: React.FC<ModernOnboardingProps> = ({
       }, 1500);
       return () => clearTimeout(timer);
     }
+    return undefined;
   }, [currentStep, selectedSetupOption, onComplete]);
 
   const renderWelcomeStep = () => (
