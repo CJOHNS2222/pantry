@@ -38,8 +38,8 @@ class VersionService {
       this.platform = deviceInfo.platform;
     } catch (err: any) {
       log.warn('Failed to get app info', { error: err }, 'VersionService');
-      // Fallback for web
-      this.currentVersion = '1.0.0';
+      // Fallback for web — injected at build time from package.json
+      this.currentVersion = (typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.4.9');
       this.platform = 'web';
     }
   }
@@ -163,10 +163,10 @@ class VersionService {
     try {
       const versionDocRef = DatabaseMonitoringService.doc('app_versions/' + platform);
       const initialVersionData: AppVersion = {
-        version: '1.0.0',
-        buildNumber: '1',
+        version: '1.4.9',
+        buildNumber: '23',
         platform: platform as 'ios' | 'android' | 'web',
-        releaseNotes: 'Initial release with pantry management features',
+        releaseNotes: 'Notification improvements, fill level icons, schedule defaults, and bug fixes.',
         forceUpdate: false,
         downloadUrl: platform === 'android'
           ? 'https://play.google.com/store/apps/details?id=com.smart.pantry'

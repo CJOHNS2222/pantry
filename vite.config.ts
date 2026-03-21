@@ -41,6 +41,7 @@ export default defineConfig(({ mode }) => {
       ],
       define: {
         'process.env.npm_package_version': JSON.stringify(process.env.npm_package_version || '1.0.0'),
+        __APP_VERSION__: JSON.stringify(process.env.npm_package_version || '1.0.0'),
       },
       // Avoid embedding raw GEMINI API keys into the built bundle.
       // The app should use `import.meta.env.VITE_GEMINI_API_KEY` at runtime instead.

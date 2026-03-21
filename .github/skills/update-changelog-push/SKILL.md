@@ -1,37 +1,40 @@
 ---
 name: update-changelog-push
-description: '**WORKFLOW SKILL** — Update CHANGELOG.md with recent changes and push all commits to GitHub. USE FOR: releasing changes, updating version history, pushing commits after updates. DO NOT USE FOR: initial repository setup, merge conflicts, complex git rebasing.'
+description: '**WORKFLOW SKILL** — Update CHANGELOG.md with recent changes and push all commits to GitHub. USE FOR: committing and pushing already-built changes without a version bump. For a full release (type-check + version bump + build + publish + push), use the release-build skill instead.'
 ---
 
 # Update Changelog and Push Changes
 
-This skill automates the process of updating the changelog and pushing changes to GitHub after making updates to the pantry app.
+> **Tip:** For a full end-to-end release (type-check, version bump, build, Capacitor sync, Firestore publish, and push), use `/release-build` instead — it covers everything this skill does plus more.
+
+This skill handles the final commit-and-push step when changes are already built and ready.
 
 ## Workflow Steps
 
-1. **Review Recent Changes**: Check git status and recent commits to understand what has changed.
+1. **Review Recent Changes**: Run `git status` and `git log --oneline -10` to understand what has changed.
 
-2. **Update CHANGELOG.md**: Add entries for recent changes, following the format:
+2. **Update CHANGELOG.md**: Add entries for recent changes at the top, following the format:
    - Version header: `## [version] - YYYY-MM-DD`
    - Sections: `### Added`, `### Changed`, `### Fixed`
    - Entries: `- Description of change`
+   - Extract the current version from `package.json` if not provided.
 
-3. **Stage Changes**: Add all modified files including CHANGELOG.md to git staging area.
+3. **Stage Changes**: Run `git add -A` to stage all modified files including CHANGELOG.md.
 
-4. **Commit Changes**: Create a commit with message "Update changelog and release changes".
+4. **Commit Changes**: Create a commit with a descriptive message, e.g. `chore: update changelog and release vX.Y.Z`.
 
-5. **Push to GitHub**: Push the commits to the remote repository.
+5. **Push to GitHub**: Run `git push` to push to the remote branch.
 
 ## Parameters
 
-- `version`: The version number for the changelog entry (optional, can be extracted from package.json)
-- `changes`: List of changes to add (optional, can be inferred from commits)
+- `version`: The version number for the changelog entry (optional — extracted from `package.json` if omitted)
+- `changes`: List of changes to add (optional — inferred from recent commits if omitted)
 
 ## Usage Examples
 
-- "Update changelog for version 1.4.1 and push all changes"
-- "Add changelog entry for notification fixes and commit with message 'Fix notification deduplication'"
+- "Update changelog and push all uncommitted changes"
+- "Add changelog entry for notification fixes and push"
 
-## Assets
+## See Also
 
-None required - uses standard git and file editing tools.
+- `/release-build` — Full pipeline: type-check → version bump → changelog → build → cap sync → Firestore publish → commit → push

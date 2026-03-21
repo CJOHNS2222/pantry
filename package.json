@@ -1,7 +1,7 @@
 {
   "name": "stockandspoon",
   "private": true,
-  "version": "1.4.9",
+  "version": "1.4.10",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -23,7 +23,8 @@
     "test-spoonacular": "node scripts/test-spoonacular.js",
     "rebuild-community-cache": "node scripts/rebuild-community-cache.js",
     "migrate-firebase": "node migrate-firebase.js",
-    "test-firebase": "node test-firebase.js"
+    "test-firebase": "node test-firebase.js",
+    "version:publish": "node scripts/publish-version.cjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.0.0",

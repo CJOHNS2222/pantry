@@ -5,6 +5,24 @@ All notable changes to Stock & Spoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.10] - 2026-03-21
+
+### Added
+- **Hot-Patch Version System**: New `scripts/publish-version.cjs` script writes the current version to Firestore `app_versions/{android,ios,web}` — running `npm run version:publish` after any release immediately notifies all users of the update
+- **In-App Update Prompt on Foreground**: `GlobalUpdatePrompt` now re-checks for updates every time the app returns to foreground using Capacitor `App.addListener('appStateChange')`, so users see the update prompt even if they had the app open before the release
+- **Play Store Link in Version Check UI**: Settings → Check for Updates now always shows a direct link to the Google Play Store listing after any version check
+
+### Changed
+- **Update Dismiss Window**: Reduced the "remind me later" dismissal window from 7 days to 1 day — users are re-prompted daily instead of weekly for pending updates
+- **Force Update Guard**: `GlobalUpdatePrompt` skips dismiss logic entirely when `forceUpdate: true` is set in Firestore, so critical updates cannot be deferred
+- **Build-Time Version Injection**: `vite.config.ts` now injects `__APP_VERSION__` at build time from `package.json`; web version check fallback reads this value instead of a hardcoded string
+- **Release Skill**: Combined `release-build` and `update-changelog-push` workflows into a single `/release-build` command that type-checks, bumps versions, builds, syncs, publishes to Firestore, commits, and pushes
+
+### Fixed
+- **Version Service Web Fallback**: Settings version check was reporting `1.4.8` as "up to date" — now correctly reads build-time `__APP_VERSION__` constant
+- **Update Prompt Never Shown**: `GlobalUpdatePrompt` was never triggering because Firestore `app_versions` documents were empty; `publish-version.cjs` seeds all three platform documents automatically
+- **Wrong Firebase Project in Publish Script**: `publish-version.cjs` was targeting the wrong project ID; now auto-detects service account key from `scripts/` and uses correct project `ornate-compass-478504-e1`
+
 ## [1.4.9] - 2026-03-20
 
 ### Added

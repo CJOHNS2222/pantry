@@ -1,6 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { App as CapacitorApp } from '@capacitor/app';
 import { versionService, VersionCheckResult } from '../services/versionService';
-import { Download, AlertTriangle, X } from 'lucide-react';
+import { Download, AlertTriangle } from 'lucide-react';
+import { log } from '../services/logService';
+
+const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=com.smart.pantry';
+const ONE_DAY = 24 * 60 * 60 * 1000;
 
 interface GlobalUpdatePromptProps {
   onDismiss?: () => void;
@@ -10,43 +15,53 @@ export const GlobalUpdatePrompt: React.FC<GlobalUpdatePromptProps> = ({ onDismis
   const [versionCheck, setVersionCheck] = useState<VersionCheckResult | null>(null);
   const [showPrompt, setShowPrompt] = useState(false);
 
-  useEffect(() => {
-    checkForUpdates();
-  }, []);
-
-  const checkForUpdates = async () => {
+  const checkForUpdates = useCallback(async () => {
     try {
-      // Only check on mobile platforms
-      const platform = await versionService.getPlatform();
-      if (platform === 'web') return;
-
       const result = await versionService.checkForUpdates();
 
       if (result.needsUpdate) {
-        // Check if user has dismissed this version recently
+        if (result.forceUpdate) {
+          // Force update — always show, no dismiss
+          setVersionCheck(result);
+          setShowPrompt(true);
+          return;
+        }
+        // Regular update — show once per day per version
         const dismissedKey = `global_update_dismissed_${result.latestVersion}`;
         const dismissedTime = localStorage.getItem(dismissedKey);
         const now = Date.now();
-        const sevenDays = 7 * 24 * 60 * 60 * 1000; // 7 days
-
-        if (!dismissedTime || (now - parseInt(dismissedTime)) > sevenDays) {
+        if (!dismissedTime || now - parseInt(dismissedTime) > ONE_DAY) {
           setVersionCheck(result);
           setShowPrompt(true);
         }
       }
     } catch (error) {
-      console.error('Failed to check for global updates:', error);
+      log.error('Failed to check for global updates', { error }, 'GlobalUpdatePrompt');
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    checkForUpdates();
+
+    // Re-check every time the app comes back to the foreground
+    let removeListener: (() => void) | undefined;
+    CapacitorApp.addListener('appStateChange', ({ isActive }) => {
+      if (isActive) checkForUpdates();
+    }).then((handle) => {
+      removeListener = () => handle.remove();
+    });
+
+    return () => { removeListener?.(); };
+  }, [checkForUpdates]);
 
   const handleUpdate = () => {
-    if (!versionCheck?.downloadUrl) return;
-    window.open(versionCheck.downloadUrl, '_blank');
+    const url = versionCheck?.downloadUrl || PLAY_STORE_URL;
+    window.open(url, '_blank');
   };
 
   const dismissPrompt = () => {
+    if (versionCheck?.forceUpdate) return; // can't dismiss force updates
     setShowPrompt(false);
-    // Store dismissal time to prevent re-showing for 7 days
     if (versionCheck) {
       const dismissedKey = `global_update_dismissed_${versionCheck.latestVersion}`;
       localStorage.setItem(dismissedKey, Date.now().toString());

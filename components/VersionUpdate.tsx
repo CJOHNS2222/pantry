@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { versionService, VersionCheckResult } from '../services/versionService';
-import { RefreshCw, Download, AlertTriangle, CheckCircle, X } from 'lucide-react';
+import { RefreshCw, Download, AlertTriangle, CheckCircle, ExternalLink } from 'lucide-react';
 import { log } from '../services/logService';
+
+const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=com.smart.pantry';
 
 interface VersionUpdateProps {
   onUpdateAvailable?: (result: VersionCheckResult) => void;
@@ -137,6 +139,19 @@ export const VersionUpdate: React.FC<VersionUpdateProps> = ({ onUpdateAvailable,
           </div>
         )}
       </div>
+
+      {/* Play Store link — always visible after a check */}
+      {versionCheck && (
+        <a
+          href={PLAY_STORE_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 hover:underline"
+        >
+          <ExternalLink className="w-4 h-4" />
+          View on Google Play Store
+        </a>
+      )}
 
       {/* Update Available Prompt */}
       {showUpdatePrompt && versionCheck && (
