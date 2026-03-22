@@ -5,6 +5,19 @@ All notable changes to Stock & Spoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.3] - 2026-03-22
+
+### Changed
+- Switched Gemini AI model to `gemini-2.5-flash` for faster, more accurate pantry analysis
+- Updated all npm packages: firebase 12.11.0, firebase-admin 13.7.0, @google/genai 1.46.0, @sentry/react 10.45.0, tailwindcss 4.2.2, vitest 4.1.0, typescript 5.9.3, lucide-react 0.577.0, @capacitor/core 8.2.0, vite-plugin-pwa 1.2.0
+
+### Fixed
+- Notification write race condition: concurrent expiry/leftover checks caused `failed-precondition` (HTTP 400) errors; writes are now serialized per-user with exponential-backoff retry
+- Removed Tailwind CDN `<script>` tag from index.html (was triggering production warning; Tailwind is already bundled via PostCSS)
+- Barcode scanner now performs Spoonacular UPC product lookup to populate item name instead of showing raw barcode number
+- Add Item and Scan Review modals standardized to match `ItemDetailModal` pattern (centered, fixed header/footer)
+- Scan buttons reorganized into two rows to prevent overflow on narrow screens
+
 ## [1.5.2] - 2026-03-22
 
 ### Fixed

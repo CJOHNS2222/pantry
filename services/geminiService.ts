@@ -191,10 +191,10 @@ export const analyzePantryImage = async (base64Image: string, mimeType: string, 
         throw new Error('Gemini API key not configured. Please check your environment variables.');
       }
 
-      console.log('🔍 Starting pantry image analysis with model:', "gemini-2.5-pro");
+      console.log('🔍 Starting pantry image analysis with model:', "gemini-2.5-flash");
       console.log('📊 Image size:', Math.round(base64Image.length / 1024), 'KB');
 
-      const modelId = "gemini-2.5-pro";
+      const modelId = "gemini-2.5-flash";
 
       const schema: Schema = {
         type: Type.ARRAY,
@@ -343,10 +343,10 @@ export const analyzeReceiptImage = async (base64Image: string, mimeType: string,
     perfTrace?.start();
 
     try {
-      console.log('🔍 Starting receipt image analysis with model:', "gemini-2.5-pro");
+      console.log('🔍 Starting receipt image analysis with model:', "gemini-2.5-flash");
       console.log('📊 Image size:', Math.round(base64Image.length / 1024), 'KB');
 
-      const modelId = "gemini-2.5-pro";
+      const modelId = "gemini-2.5-flash";
 
       const schema: Schema = {
         type: Type.ARRAY,
@@ -538,7 +538,7 @@ const performSearch = async (params: RecipeSearchParams, user: User | undefined,
     if (!(await UsageService.canUseGemini(user))) {
       throw new Error('Gemini usage not permitted: weekly limit reached.');
     }
-    const modelId = "gemini-2.5-pro";
+    const modelId = "gemini-2.5-flash";
   
   // Check if API key is available
   if (!import.meta.env.VITE_GEMINI_API_KEY) {

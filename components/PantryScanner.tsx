@@ -25,6 +25,7 @@ interface ReceiptScanResult {
 }
 import FreezerService from '../services/freezerService';
 import { BrowserMultiFormatReader } from '@zxing/library';
+import SpoonacularFoodClient from '../services/spoonacularFoodClient';
 import VisualQuantitySelector from './VisualQuantitySelector';
 import QuantityUnitPicker, { getSmartUnits } from './QuantityUnitPicker';
 import PriceTrends from './PriceTrends';
@@ -526,20 +527,41 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
             const result = await codeReader.decodeFromImage(img);
             
             if (result) {
-              // Try to identify the product from barcode
-              // For now, we'll use a simple approach - could integrate with barcode lookup APIs
               const barcode = result.getText();
-              setNewItemText(`Scanned Item (${barcode})`);
-              setIsAddModalOpen(true);
-              
-              // Track barcode scan
               AnalyticsService.trackPantryScan(1, 1);
+
+              // Look up the product name via Spoonacular UPC search
+              try {
+                const product = await SpoonacularFoodClient.searchGroceryProductByUPC(barcode);
+                if (product && (product as any).title) {
+                  const p = product as any;
+                  setNewItemText(p.title);
+                  // Use the first breadcrumb as a category hint if available
+                  if (p.breadcrumbs?.length) {
+                    const hint = (p.breadcrumbs[p.breadcrumbs.length - 1] as string);
+                    // capitalise first letter
+                    setNewItemText(p.title);
+                    // store breadcrumb in unit field temporarily isn't clean — just pre-fill name
+                    // Category inference will run in createManualItem from the product title
+                    void hint; // acknowledged, category inferred from title downstream
+                  }
+                  appActions.addToast(`Found: ${p.title}`, 'success', 3000);
+                } else {
+                  // Product not found in database — let user edit the raw barcode text
+                  setNewItemText(`Scanned Item (${barcode})`);
+                  appActions.addToast('Product not found in database. Please edit the name.', 'warning', 4000);
+                }
+              } catch {
+                setNewItemText(`Scanned Item (${barcode})`);
+              }
+
+              setIsAddModalOpen(true);
             } else {
-              alert('No barcode detected. Try taking a clearer photo or use manual entry.');
+              appActions.addToast('No barcode detected. Try taking a clearer photo or use manual entry.', 'error');
             }
           } catch (error) {
             console.error('Barcode detection error:', error);
-            alert('Barcode detection failed. Try taking a clearer photo or use manual entry.');
+            appActions.addToast('Barcode detection failed. Try taking a clearer photo or use manual entry.', 'error');
           } finally {
             setLoadingState(LoadingState.IDLE);
           }
@@ -1937,11 +1959,11 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
 
       {/* Add Items Modal */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center p-4">
-          <div className="bg-theme-primary rounded-t-3xl max-w-md w-full modal-safe-h flex flex-col shadow-xl animate-slide-up">
-            {/* Fixed Header */}
-            <div className="flex items-center justify-between p-6 pb-3 flex-shrink-0">
-              <h3 className="text-xl font-bold text-theme-secondary">Add Items</h3>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start sm:items-center justify-center z-[9999] px-4 pt-[var(--app-header-h)] pb-[var(--app-nav-h)]">
+          <div className="bg-theme-primary rounded-lg shadow-xl w-full max-w-md mx-auto max-h-full flex flex-col border border-theme">
+            {/* Header - Fixed */}
+            <div className="flex items-center justify-between p-4 pb-3 border-b border-theme flex-shrink-0 rounded-t-lg">
+              <h3 className="text-lg font-semibold text-theme-primary">Add Items</h3>
               <button
                 onClick={closeModal}
                 data-testid="pantry-add-modal-close"
@@ -1951,7 +1973,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
               </button>
             </div>
             {/* Scrollable Content */}
-            <div className="flex-1 overflow-y-auto px-6 pb-6">
+            <div className="flex-1 overflow-y-auto p-4">
 
               {/* Camera/File Upload Section */}
               <div className="bg-theme-secondary p-4 rounded-2xl border border-theme shadow-lg mb-6">
@@ -2001,7 +2023,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                   />
                 </div>
 
-                {/* Action Buttons */}
+                {/* Action Buttons — Row 1: image capture */}
                 <div className="flex gap-2 mt-4">
                   <button
                     onClick={async () => {
@@ -2046,7 +2068,10 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                     <Barcode className="w-4 h-4" aria-hidden="true" />
                     Barcode
                   </button>
-                  
+                </div>
+
+                {/* Action Buttons — Row 2: receipt & import */}
+                <div className="flex gap-2 mt-2">
                   <button
                     onClick={handleScanReceipt}
                     data-testid="pantry-receipt-button"
@@ -2056,17 +2081,17 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                     aria-disabled={loadingState === LoadingState.LOADING}
                   >
                     <Receipt className="w-4 h-4" aria-hidden="true" />
-                    Receipt
+                    Scan Receipt
                   </button>
                   
                   <button
                     onClick={() => setShowImportModal(true)}
                     data-testid="pantry-import-button"
                     className="flex-1 py-2 px-3 rounded-lg border border-theme text-theme-secondary hover:bg-theme-primary transition-colors flex items-center justify-center gap-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:ring-offset-2"
-                    aria-label="Import items or recipes"
+                    aria-label="Import items from CSV or recipe from URL"
                   >
                     <FilePlus className="w-4 h-4" aria-hidden="true" />
-                    Import
+                    Import CSV
                   </button>
                 </div>
 
@@ -2075,7 +2100,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                     onClick={handleAnalyze}
                     data-testid="pantry-process-image-button"
                     disabled={loadingState === LoadingState.LOADING}
-                    className="w-full mt-4 py-3 rounded-lg font-bold text-sm uppercase tracking-wider flex items-center justify-center gap-2 bg-[var(--accent-color)] text-white shadow-lg hover:bg-[var(--accent-color)]/90 transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full mt-4 flex items-center justify-center gap-2 px-4 py-2 bg-[var(--accent-color)] text-white rounded-lg hover:bg-[var(--accent-color)]/80 transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     aria-label="Process image with AI to identify pantry items"
                     aria-disabled={loadingState === LoadingState.LOADING}
                   >
@@ -2128,7 +2153,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
               {/* Manual Add Section */}
               <div className="bg-theme-secondary p-4 rounded-2xl border border-theme shadow-lg">
                 <h4 className="text-lg font-semibold text-theme-secondary mb-4">Quick Add</h4>
-                <form onSubmit={handleManualAdd} className="space-y-4" role="form" aria-label="Add item manually">
+                <form id="manual-add-form" onSubmit={handleManualAdd} className="space-y-4" role="form" aria-label="Add item manually">
                   <div className="space-y-3">
                     <input 
                       type="text"
@@ -2151,22 +2176,27 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                       maxQuantity={999}
                     />
                   </div>
-                  <button 
-                    type="submit" 
-                    className="w-full py-3 rounded-lg font-bold text-sm uppercase tracking-wider flex items-center justify-center gap-2 bg-[var(--accent-color)] text-white shadow-lg hover:bg-[var(--accent-color)]/90 transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:ring-offset-2"
-                    aria-label="Add item to pantry"
-                  >
-                    <Plus className="w-4 h-4" aria-hidden="true" />
-                    Add Item
-                  </button>
                 </form>
               </div>
             </div>
 
+            {/* Action Buttons - Fixed at bottom */}
+            <div className="flex-shrink-0 border-t border-theme bg-theme-primary p-4 rounded-b-lg">
+              <button
+                type="submit"
+                form="manual-add-form"
+                className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-[var(--accent-color)] text-white rounded-lg hover:bg-[var(--accent-color)]/80 transition-colors"
+                aria-label="Add item to pantry"
+              >
+                <Plus className="w-4 h-4" aria-hidden="true" />
+                Add Item to Pantry
+              </button>
+            </div>
+
             {/* Scan Review Modal (appears after analyze) */}
             {showScanReviewModal && scanResults && (
-              <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center p-2 pt-24 pb-24">
-                <div className="bg-theme-primary rounded-lg max-w-sm sm:max-w-2xl w-full max-h-[calc(100vh-160px)] flex flex-col border border-theme">
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start sm:items-center justify-center z-[9999] px-4 pt-[var(--app-header-h)] pb-[var(--app-nav-h)]">
+                <div className="bg-theme-primary rounded-lg shadow-xl w-full max-w-sm sm:max-w-2xl mx-auto max-h-full flex flex-col border border-theme">
                   {/* Header - Fixed */}
                   <div className="flex items-center justify-between p-4 pb-3 border-b border-theme flex-shrink-0 rounded-t-lg">
                     <h3 className="text-sm sm:text-lg font-bold text-theme-secondary">Review Scanned Items ({scanResults.length})</h3>
@@ -2255,7 +2285,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                   </div>
 
                   {/* Action Buttons - Fixed at bottom */}
-                  <div className="flex gap-2 p-4 border-t border-theme bg-theme-primary rounded-b-lg flex-shrink-0">
+                  <div className="flex-shrink-0 border-t border-theme bg-theme-primary p-4 rounded-b-lg flex gap-2">
                     <button onClick={async () => {
                       if (!scanResults) return;
 
@@ -2295,10 +2325,10 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                       setImagePreview(null);
                       setRawBase64(null);
                       setLoadingState(LoadingState.IDLE);
-                    }} className="flex-1 px-4 py-2 bg-[var(--accent-color)] text-white rounded" aria-label={`Add all scanned items to ${receiptDestination === 'pantry' ? 'pantry' : 'shopping list'}`}>
+                    }} className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-[var(--accent-color)] text-white rounded-lg hover:bg-[var(--accent-color)]/80 transition-colors" aria-label={`Add all scanned items to ${receiptDestination === 'pantry' ? 'pantry' : 'shopping list'}`}>
                       Add All to {receiptDestination === 'pantry' ? 'Pantry' : 'Shopping List'}
                     </button>
-                    <button onClick={() => { setShowScanReviewModal(false); setScanResults(null); }} className="px-4 py-2 bg-theme-primary border border-theme rounded" aria-label="Cancel and discard scan results">Cancel</button>
+                    <button onClick={() => { setShowScanReviewModal(false); setScanResults(null); }} className="flex items-center justify-center gap-2 px-4 py-2 bg-theme-secondary text-theme-primary border border-theme rounded-lg hover:bg-theme-primary transition-colors" aria-label="Cancel and discard scan results">Cancel</button>
                   </div>
                 </div>
               </div>

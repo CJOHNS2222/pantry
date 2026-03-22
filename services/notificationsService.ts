@@ -28,10 +28,34 @@ function getNotificationsDocRef(uid: string): DocumentReference {
 }
 
 /**
+ * Per-user in-memory write queue so concurrent callers for the same uid are
+ * serialized rather than fighting each other (which produces failed-precondition
+ * from Firestore's optimistic concurrency check).
+ */
+const _writeQueues = new Map<string, Promise<void>>();
+
+function serializeWrite(uid: string, fn: () => Promise<void>): Promise<void> {
+  const prev = _writeQueues.get(uid) ?? Promise.resolve();
+  const next = prev.then(fn).catch(() => {/* errors handled inside fn */});
+  _writeQueues.set(uid, next);
+  // Clean up the map entry once the chain is idle
+  next.finally(() => {
+    if (_writeQueues.get(uid) === next) _writeQueues.delete(uid);
+  });
+  return next;
+}
+
+/**
  * Append a notification to the user's notifications cache document.
  * Uses a transaction to avoid races and caps the array length.
+ * Calls are serialized per-uid and retried on failed-precondition (optimistic
+ * concurrency conflicts that Firebase does not auto-retry).
  */
 export async function appendNotificationToUser(uid: string, notification: NotificationItem, maxItems = DEFAULT_MAX_NOTIFICATIONS) {
+  return serializeWrite(uid, () => _appendWithRetry(uid, notification, maxItems));
+}
+
+async function _appendWithRetry(uid: string, notification: NotificationItem, maxItems: number, attempt = 0): Promise<void> {
   const ref = getNotificationsDocRef(uid);
   try {
     await runTransaction(db, async (tx) => {
@@ -76,6 +100,16 @@ export async function appendNotificationToUser(uid: string, notification: Notifi
       tx.set(ref as any, { items: trimmed }, { merge: true });
     });
   } catch (err: any) {
+    // Firebase SDK only auto-retries transactions on ABORTED, not FAILED_PRECONDITION.
+    // FAILED_PRECONDITION (HTTP 400) happens when our optimistic-concurrency precondition
+    // fails due to a concurrent write. Retry with exponential backoff + jitter.
+    const isConflict = err?.code === 'failed-precondition' || err?.code === 'aborted';
+    const MAX_RETRIES = 4;
+    if (isConflict && attempt < MAX_RETRIES) {
+      const delay = Math.min(100 * 2 ** attempt + Math.random() * 50, 2000);
+      await new Promise(r => setTimeout(r, delay));
+      return _appendWithRetry(uid, notification, maxItems, attempt + 1);
+    }
     // Provide contextual debug info to help troubleshoot permission errors
     console.error('appendNotificationToUser failed', {
       error: err?.message || err,
