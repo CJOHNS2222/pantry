@@ -86,6 +86,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({
             onClick={onClose}
             className="p-2 hover:bg-theme-secondary rounded-lg transition-colors"
             aria-label="Close category manager"
+            data-testid="category-close"
           >
             <X className="w-5 h-5 text-theme-secondary" />
           </button>
@@ -124,6 +125,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({
                     onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                     placeholder="Enter category name"
                     className="w-full px-3 py-2 bg-theme-primary border border-theme rounded-lg text-theme-primary placeholder-theme-secondary focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]"
+                    data-testid="category-name-input"
                   />
                 </div>
 
@@ -140,16 +142,18 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({
                       onChange={(e) => setFormData(prev => ({ ...prev, icon: e.target.value }))}
                       placeholder="Or type emoji"
                       className="flex-1 px-3 py-2 bg-theme-primary border border-theme rounded-lg text-theme-primary placeholder-theme-secondary focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]"
+                      data-testid="category-icon-input"
                     />
                   </div>
                   <div className="grid grid-cols-12 gap-1">
-                    {commonEmojis.map(emoji => (
+                    {commonEmojis.map((emoji, idx) => (
                       <button
-                        key={emoji}
+                        key={emoji + idx}
                         onClick={() => setFormData(prev => ({ ...prev, icon: emoji }))}
                         className={`p-2 rounded hover:bg-theme-primary transition-colors ${
                           formData.icon === emoji ? 'bg-[var(--accent-color)] text-white' : ''
                         }`}
+                        data-testid={`category-emoji-${idx}`}
                       >
                         {emoji}
                       </button>
@@ -172,10 +176,11 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({
                       value={formData.color}
                       onChange={(e) => setFormData(prev => ({ ...prev, color: e.target.value }))}
                       className="w-8 h-8 rounded border border-theme cursor-pointer"
+                      data-testid="category-color-input"
                     />
                   </div>
                   <div className="flex gap-2">
-                    {colorOptions.map(color => (
+                    {colorOptions.map((color, idx) => (
                       <button
                         key={color}
                         onClick={() => setFormData(prev => ({ ...prev, color }))}
@@ -183,6 +188,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({
                           formData.color === color ? 'border-theme-primary' : 'border-theme'
                         }`}
                         style={{ backgroundColor: color }}
+                        data-testid={`category-color-${idx}`}
                       />
                     ))}
                   </div>
@@ -194,6 +200,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({
                     onClick={handleSubmit}
                     disabled={!formData.name.trim()}
                     className="flex items-center gap-2 px-4 py-2 bg-[var(--accent-color)] text-white rounded-lg hover:bg-opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    data-testid="category-submit"
                   >
                     <Check className="w-4 h-4" />
                     {editingId ? 'Update' : 'Add'} Category
@@ -201,6 +208,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({
                   <button
                     onClick={resetForm}
                     className="px-4 py-2 border border-theme rounded-lg text-theme-secondary hover:bg-theme-secondary transition-colors"
+                    data-testid="category-cancel"
                   >
                     Cancel
                   </button>
@@ -223,6 +231,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({
                 <button
                   onClick={() => setIsAdding(true)}
                   className="flex items-center gap-2 px-4 py-2 bg-[var(--accent-color)] text-white rounded-lg hover:bg-opacity-90 transition-colors"
+                  data-testid="category-add-button"
                 >
                   <Plus className="w-4 h-4" />
                   Add Category
@@ -271,6 +280,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({
                         className="p-2 text-theme-secondary hover:text-theme-primary hover:bg-theme-primary rounded-lg transition-colors"
                         title="Edit category"
                         aria-label={`Edit category: ${category.name}`}
+                        data-testid={`category-edit-${category.id}`}
                       >
                         <Edit2 className="w-4 h-4" />
                       </button>
@@ -279,6 +289,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({
                         className="p-2 text-theme-secondary hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                         title="Delete category"
                         aria-label={`Delete category: ${category.name}`}
+                        data-testid={`category-delete-${category.id}`}
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>

@@ -91,23 +91,23 @@ const ImportModal: React.FC<ImportModalProps> = ({ open, onClose, defaultTab = '
       <div className="w-full max-w-2xl bg-theme-primary rounded shadow-lg border border-theme">
         <div className="flex items-center justify-between p-3 border-b border-theme">
           <h3 className="text-lg font-semibold">Import</h3>
-          <button onClick={onClose} className="text-theme-secondary"><X className="w-5 h-5"/></button>
+            <button onClick={onClose} className="text-theme-secondary" data-testid="import-close"><X className="w-5 h-5"/></button>
         </div>
         <div className="p-4 space-y-4">
           <div className="flex gap-2">
-            <button onClick={() => setTab('pantry')} className={`px-3 py-1 rounded ${tab==='pantry'?'bg-[var(--accent-color)] text-white':'bg-theme-secondary'}`}>Pantry CSV</button>
-            <button onClick={() => setTab('recipes')} className={`px-3 py-1 rounded ${tab==='recipes'?'bg-[var(--accent-color)] text-white':'bg-theme-secondary'}`}>Recipe URL</button>
+              <button onClick={() => setTab('pantry')} className={`px-3 py-1 rounded ${tab==='pantry'?'bg-[var(--accent-color)] text-white':'bg-theme-secondary'}`} data-testid="import-tab-pantry">Pantry CSV</button>
+              <button onClick={() => setTab('recipes')} className={`px-3 py-1 rounded ${tab==='recipes'?'bg-[var(--accent-color)] text-white':'bg-theme-secondary'}`} data-testid="import-tab-recipes">Recipe URL</button>
           </div>
 
           {tab === 'pantry' ? (
             <div className="space-y-2">
               <div className="text-sm text-theme-primary">Upload a CSV or plain-text list. CSV columns like <code>item,name,amount,quantity,storageLocation,expirationDate,category</code>. Preview shows parsed rows count.</div>
-              <input type="file" accept=".csv,.txt,text/csv,text/plain" onChange={(e) => handleFile(e.target.files?.[0])} />
-              <textarea value={csvText} onChange={(e) => { setCsvText(e.target.value); const items = parseCsvToPantryItems(e.target.value); setPreviewCount(items.length); }} rows={8} className="w-full p-2 rounded border text-black" />
+                <input type="file" accept=".csv,.txt,text/csv,text/plain" onChange={(e) => handleFile(e.target.files?.[0])} data-testid="import-file-input" />
+                <textarea value={csvText} onChange={(e) => { setCsvText(e.target.value); const items = parseCsvToPantryItems(e.target.value); setPreviewCount(items.length); }} rows={8} className="w-full p-2 rounded border text-black" data-testid="import-csv-textarea" />
               <div className="flex items-center justify-between">
                 <div className="text-sm opacity-70">Parsed rows: {previewCount}</div>
                 <div>
-                  <button onClick={handleImportPantry} disabled={loading || previewCount===0} className="px-3 py-1 bg-[var(--accent-color)] text-white rounded">Import Pantry</button>
+                    <button onClick={handleImportPantry} disabled={loading || previewCount===0} className="px-3 py-1 bg-[var(--accent-color)] text-white rounded" data-testid="import-pantry">Import Pantry</button>
                 </div>
               </div>
             </div>
@@ -115,11 +115,11 @@ const ImportModal: React.FC<ImportModalProps> = ({ open, onClose, defaultTab = '
             <div className="space-y-2">
               <div className="text-sm text-theme-primary">Paste a recipe URL to import its title, ingredients and instructions where possible. This uses a lightweight scraper; results vary by site.</div>
               <div className="flex gap-2">
-                <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://example.com/recipe" className="flex-1 p-2 rounded border text-black" />
-                <button onClick={async () => { setLoading(true); const r = await fetchRecipeFromUrl(url); setLoading(false); if (r) alert(`Preview: ${r.title}\nIngredients: ${r.ingredients.length}`); else alert('No preview available'); }} className="px-3 py-1 bg-theme-secondary rounded">Preview</button>
+                  <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://example.com/recipe" className="flex-1 p-2 rounded border text-black" data-testid="import-recipe-url" />
+                  <button onClick={async () => { setLoading(true); const r = await fetchRecipeFromUrl(url); setLoading(false); if (r) alert(`Preview: ${r.title}\nIngredients: ${r.ingredients.length}`); else alert('No preview available'); }} className="px-3 py-1 bg-theme-secondary rounded" data-testid="import-preview">Preview</button>
               </div>
               <div className="flex justify-end">
-                <button onClick={handleImportRecipe} disabled={loading || !url} className="px-3 py-1 bg-[var(--accent-color)] text-white rounded">Import Recipe</button>
+                  <button onClick={handleImportRecipe} disabled={loading || !url} className="px-3 py-1 bg-[var(--accent-color)] text-white rounded" data-testid="import-recipe">Import Recipe</button>
               </div>
             </div>
           )}

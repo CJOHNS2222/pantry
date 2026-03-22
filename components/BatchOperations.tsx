@@ -43,6 +43,7 @@ export const BatchOperations: React.FC<BatchOperationsProps> = ({
           onClick={handleSelectAll}
           className="px-3 py-1 rounded-lg text-sm font-medium bg-theme-secondary text-theme-primary hover:bg-theme-primary border border-theme transition-colors"
           aria-label={checkedCount === items.length ? 'Deselect all items' : 'Select all items'}
+          data-testid="batch-select-all"
         >
           {checkedCount === items.length ? 'Deselect All' : 'Select All'}
         </button>
@@ -52,6 +53,7 @@ export const BatchOperations: React.FC<BatchOperationsProps> = ({
             onClick={handleDeleteSelected}
             className="px-3 py-1 rounded-lg text-sm font-medium bg-red-500 text-white hover:bg-red-600 transition-colors"
             aria-label={`Delete ${checkedCount} selected items`}
+            data-testid="batch-delete-selected"
           >
             Delete Selected ({checkedCount})
           </button>

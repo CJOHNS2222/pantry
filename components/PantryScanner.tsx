@@ -1926,6 +1926,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
       {/* Floating Action Button */}
       <button
         onClick={() => setIsAddModalOpen(true)}
+        data-testid="pantry-add-button"
         className="fixed bottom-28 right-6 z-50 bg-[var(--accent-color)] text-white p-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:ring-offset-2"
         style={{ bottom: 'calc(7rem + 15px)' }}
         aria-label="Add items to pantry"
@@ -1943,6 +1944,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
               <h3 className="text-xl font-bold text-theme-secondary">Add Items</h3>
               <button
                 onClick={closeModal}
+                data-testid="pantry-add-modal-close"
                 className="p-2 hover:bg-theme-secondary rounded-full transition-colors"
               >
                 <X className="w-5 h-5 text-theme-secondary" />
@@ -1991,6 +1993,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                   <input 
                     type="file" 
                     ref={fileInputRef}
+                    data-testid="pantry-file-input"
                     onChange={handleFileChange}
                     accept="image/*"
                     capture="environment"
@@ -2008,6 +2011,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                         fileInputRef.current?.click();
                       }
                     }}
+                    data-testid="pantry-photo-button"
                     className="flex-1 py-2 px-3 rounded-lg border border-theme text-theme-secondary hover:bg-theme-primary transition-colors flex items-center justify-center gap-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:ring-offset-2"
                     aria-label="Take photo with camera to scan pantry items"
                   >
@@ -2023,6 +2027,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                         fileInputRef.current?.click();
                       }
                     }}
+                    data-testid="pantry-gallery-button"
                     className="flex-1 py-2 px-3 rounded-lg border border-theme text-theme-secondary hover:bg-theme-primary transition-colors flex items-center justify-center gap-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:ring-offset-2"
                     aria-label="Select photo from gallery to scan pantry items"
                   >
@@ -2032,6 +2037,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                   
                   <button
                     onClick={handleScanBarcode}
+                    data-testid="pantry-barcode-button"
                     disabled={loadingState === LoadingState.LOADING}
                     className="flex-1 py-2 px-3 rounded-lg border border-theme text-theme-secondary hover:bg-theme-primary transition-colors flex items-center justify-center gap-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     aria-label="Scan barcode to identify product"
@@ -2043,6 +2049,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                   
                   <button
                     onClick={handleScanReceipt}
+                    data-testid="pantry-receipt-button"
                     disabled={loadingState === LoadingState.LOADING}
                     className="flex-1 py-2 px-3 rounded-lg border border-theme text-theme-secondary hover:bg-theme-primary transition-colors flex items-center justify-center gap-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     aria-label="Scan receipt to add grocery items"
@@ -2054,6 +2061,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                   
                   <button
                     onClick={() => setShowImportModal(true)}
+                    data-testid="pantry-import-button"
                     className="flex-1 py-2 px-3 rounded-lg border border-theme text-theme-secondary hover:bg-theme-primary transition-colors flex items-center justify-center gap-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:ring-offset-2"
                     aria-label="Import items or recipes"
                   >
@@ -2065,6 +2073,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                 {imagePreview && loadingState !== LoadingState.SUCCESS && (
                   <button
                     onClick={handleAnalyze}
+                    data-testid="pantry-process-image-button"
                     disabled={loadingState === LoadingState.LOADING}
                     className="w-full mt-4 py-3 rounded-lg font-bold text-sm uppercase tracking-wider flex items-center justify-center gap-2 bg-[var(--accent-color)] text-white shadow-lg hover:bg-[var(--accent-color)]/90 transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     aria-label="Process image with AI to identify pantry items"

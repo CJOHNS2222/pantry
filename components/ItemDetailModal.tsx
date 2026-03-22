@@ -250,6 +250,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                 onClick={handleCloseAndPersist}
                 className="p-1 hover:bg-theme-secondary rounded-full transition-colors"
                 aria-label={intl.formatMessage({ id: 'common.closeModal' })}
+                data-testid="item-close"
               >
                 <X className="w-5 h-5 text-theme-secondary" />
               </button>
@@ -261,13 +262,14 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
             {/* Item Image + upload */}
             <div className="pb-2 flex items-center gap-4">
               {/* Change picture button - left side */}
-              <label className="cursor-pointer px-2 py-1 bg-theme-secondary text-theme-primary rounded text-xs hover:bg-theme-primary hover:text-theme-secondary border border-theme flex-shrink-0">
+              <label className="cursor-pointer px-2 py-1 bg-theme-secondary text-theme-primary rounded text-xs hover:bg-theme-primary hover:text-theme-secondary border border-theme flex-shrink-0" data-testid="item-change-photo">
                 Change Photo
                 <input
                   type="file"
                   accept="image/*"
                   onChange={(e) => handleFileInput(e.target.files?.[0])}
                   className="hidden"
+                  data-testid="item-file-input"
                 />
               </label>
 
@@ -289,6 +291,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                 onClick={handleUploadImage}
                 disabled={!selectedFile || uploadingImage}
                 className="px-2 py-1 bg-[var(--accent-color)] text-white rounded text-xs flex-shrink-0 disabled:opacity-50"
+                data-testid="item-upload-photo"
               >
                 {uploadingImage ? 'Uploading...' : 'Save Photo'}
               </button>
@@ -330,6 +333,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                             ? 'border-[var(--accent-color)] bg-[var(--accent-color)]/10 scale-105'
                             : 'border-theme bg-theme-primary hover:bg-theme-secondary hover:scale-105'
                         }`}
+                        data-testid={`item-visual-${value}`}
                         aria-pressed={selected}
                         title={`${label} full`}
                       >
@@ -388,12 +392,14 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                     <button
                       onClick={handleSaveExpiration}
                       className="px-3 py-1 text-sm bg-[var(--accent-color)] text-white rounded-lg hover:bg-[var(--accent-color)]/80 transition-colors"
+                      data-testid="item-save-expiration"
                     >
                       {intl.formatMessage({ id: 'common.save' })}
                     </button>
                     <button
                       onClick={handleCancelExpirationEdit}
                       className="px-3 py-1 text-sm bg-theme-primary text-theme-primary border border-theme rounded-lg hover:bg-theme-secondary transition-colors"
+                      data-testid="item-cancel-expiration"
                     >
                       {intl.formatMessage({ id: 'common.cancel' })}
                     </button>
@@ -443,6 +449,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                   value={item.storageLocation || 'pantry'}
                   onChange={(e) => handleStorageChange(e.target.value as PantryItem['storageLocation'])}
                   className="w-full px-2 py-1.5 text-sm border border-theme rounded-md bg-theme-primary text-theme-primary focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]"
+                  data-testid="item-storage-select"
                 >
                   <option value="pantry">{intl.formatMessage({ id: 'pantry.storageLocations.pantry' })}</option>
                   <option value="fridge">{intl.formatMessage({ id: 'pantry.storageLocations.fridge' })}</option>
@@ -460,6 +467,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                   value={item.category || 'Manual'}
                   onChange={(e) => handleCategoryChange(e.target.value)}
                   className="w-full px-2 py-1.5 text-sm border border-theme rounded-md bg-theme-primary text-theme-primary focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]"
+                  data-testid="item-category-select"
                 >
                   {getAllCategories(customCategories).map(category => (
                     <option key={category} value={category}>
@@ -478,6 +486,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                   checked={localIsStaple}
                   onChange={(e) => setLocalIsStaple(e.target.checked)}
                   className="flex-shrink-0"
+                  data-testid="item-staple-checkbox"
                 />
                 <span className="text-sm text-theme-primary">Mark as staple (auto-readds to shopping list when depleted)</span>
               </label>
@@ -492,6 +501,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                     checked={localIsOpened}
                     onChange={(e) => setLocalIsOpened(e.target.checked)}
                     className="flex-shrink-0"
+                    data-testid="item-opened-checkbox"
                   />
                   <span className="text-sm text-theme-primary">
                     Mark as opened {localIsOpened && item.openedAt && `(opened ${new Date(item.openedAt).toLocaleDateString()})`}
@@ -516,6 +526,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                 placeholder="Add any notes about this item..."
                 className="w-full px-2 py-1.5 text-sm border border-theme rounded-md bg-theme-primary text-theme-primary focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] resize-none"
                 rows={3}
+                data-testid="item-notes"
               />
             </div>
 
@@ -611,6 +622,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
               <button
                 onClick={() => onAddToShoppingList([cleanItemNameForShopping(item.item)])}
                 className="flex items-center justify-center gap-2 px-4 py-2 bg-[var(--accent-color)] text-[var(--text-theme-primary)] rounded-lg hover:bg-[var(--accent-color)]/80 transition-colors"
+                data-testid="item-add-to-shopping"
               >
                 <ShoppingBasket className="w-4 h-4" />
                 {intl.formatMessage({ id: 'pantry.buyMore' })}
@@ -619,6 +631,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                 <button
                   onClick={() => setShowPriceTrends(true)}
                   className="flex items-center justify-center gap-2 px-4 py-2 bg-[var(--bg-theme-secondary)] text-[var(--text-theme-primary)] border border-[var(--border-theme)] rounded-lg hover:bg-[var(--bg-theme-primary)] transition-colors"
+                  data-testid="item-price-trends"
                 >
                   <TrendingUp className="w-4 h-4" />
                   {intl.formatMessage({ id: 'pantry.priceTrends' })}
@@ -634,6 +647,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                   }
                 }}
                 className="flex items-center justify-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                data-testid="item-delete"
               >
                 <Trash2 className="w-4 h-4" />
                 {intl.formatMessage({ id: 'pantry.deleteItem' })}
@@ -641,6 +655,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
               <button
                 onClick={handleCloseAndPersist}
                 className="flex items-center justify-center gap-2 px-4 py-2 bg-[var(--bg-theme-secondary)] text-[var(--text-theme-primary)] border border-[var(--border-theme)] rounded-lg hover:bg-[var(--bg-theme-primary)] transition-colors"
+                data-testid="item-close-bottom"
               >
                 <X className="w-4 h-4" />
                 {intl.formatMessage({ id: 'common.close' })}

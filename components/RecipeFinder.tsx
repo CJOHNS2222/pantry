@@ -1377,6 +1377,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                         <div className="flex gap-2">
                             <button 
                                 onClick={(e) => { e.stopPropagation(); onAddToPlan(recipe); }}
+                                data-testid={`recipefinder-add-${recipe.id || recipe.title.replace(/\s+/g,'-')}`}
                                 disabled={mealPlanLimitExceeded}
                                 className={`flex-1 border font-bold py-2 rounded-xl transition-all flex items-center justify-center gap-2 ${
                                     mealPlanLimitExceeded 
@@ -1511,12 +1512,13 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                         </div>
                         <div className="flex justify-end mt-6">
                             <div className="flex gap-2">
-                                <button
-                                className="px-4 py-2 bg-theme-secondary text-theme-primary rounded-lg font-bold shadow hover:bg-theme-secondary/90 transition-colors"
-                                onClick={() => setShowImportModal(true)}
-                                >
-                                  Import
-                                </button>
+                                                                <button
+                                                                data-testid="recipefinder-import-button"
+                                                                className="px-4 py-2 bg-theme-secondary text-theme-primary rounded-lg font-bold shadow hover:bg-theme-secondary/90 transition-colors"
+                                                                onClick={() => setShowImportModal(true)}
+                                                                >
+                                                                    Import
+                                                                </button>
                                 <button
                                 className="px-4 py-2 bg-[var(--accent-color)] text-white rounded-lg font-bold shadow hover:bg-[var(--accent-color)]/90 transition-colors"
                                 onClick={() => {
@@ -1583,6 +1585,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                         <input
                         id="specificQuery"
                         name="specificQuery"
+                        data-testid="recipefinder-search-input"
                         value={specificQuery}
                         onChange={(e) => setSpecificQuery(e.target.value)}
                         onFocus={() => setShowRecipeAutocomplete(specificQuery.length === 0 && recentRecipeSearches.length > 0)}
@@ -1595,6 +1598,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                             <button
                                 type="button"
                                 onClick={handleSpecificSearch}
+                                data-testid="recipefinder-search-button"
                                 disabled={loadingState === LoadingState.LOADING}
                                 className="absolute right-10 top-1/2 -translate-y-1/2 p-1 rounded-lg text-theme-secondary hover:text-[var(--accent-color)] hover:bg-theme-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                 title="Search recipes"
@@ -1607,6 +1611,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                             <button
                                 type="button"
                                 onClick={startVoiceSearch}
+                                data-testid="recipefinder-voice-button"
                                 disabled={loadingState === LoadingState.LOADING}
                                 className={`absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-lg transition-colors ${
                                     isListening

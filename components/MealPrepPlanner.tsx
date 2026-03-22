@@ -126,6 +126,7 @@ export const MealPrepPlanner: React.FC<MealPrepPlannerProps> = ({
           </div>
           <button
             onClick={onClose}
+            data-testid="mealprep-close"
             className="text-theme-secondary hover:text-theme-primary text-xl"
           >
             ✕
@@ -141,6 +142,7 @@ export const MealPrepPlanner: React.FC<MealPrepPlannerProps> = ({
             {[3, 5, 7].map(days => (
               <button
                 key={days}
+                data-testid={`mealprep-duration-${days}`}
                 onClick={() => setPlanDuration(days as 3 | 5 | 7)}
                 className={`px-4 py-2 rounded-lg text-sm font-medium ${
                   planDuration === days
@@ -193,6 +195,7 @@ export const MealPrepPlanner: React.FC<MealPrepPlannerProps> = ({
                     </div>
                     <button
                       onClick={() => addPlanToMealPlan(plan)}
+                      data-testid={`mealprep-add-${index}`}
                       className="bg-[var(--accent-color)] text-white px-3 py-1 rounded text-sm hover:bg-opacity-90"
                     >
                       Add to Plan
@@ -222,6 +225,7 @@ export const MealPrepPlanner: React.FC<MealPrepPlannerProps> = ({
               {savedRecipes.map(recipe => (
                 <button
                   key={recipe.id}
+                  data-testid={`mealprep-select-${recipe.id}`}
                   onClick={() => toggleRecipeSelection(recipe)}
                   className={`px-3 py-2 rounded-lg text-sm border transition-colors ${
                     selectedRecipes.find(r => r.id === recipe.id)
@@ -250,6 +254,7 @@ export const MealPrepPlanner: React.FC<MealPrepPlannerProps> = ({
                 </div>
                 <button
                   onClick={() => addPlanToMealPlan(createCustomPlan()!)}
+                  data-testid="mealprep-add-to-plan"
                   className="bg-[var(--accent-color)] text-white px-4 py-2 rounded text-sm hover:bg-opacity-90"
                 >
                   Add to Meal Plan

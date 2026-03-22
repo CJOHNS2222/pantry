@@ -192,7 +192,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] px-4 pt-[var(--app-header-h)] pb-[var(--app-nav-h)]" onClick={handleBackdropClick}>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] px-4 pt-[var(--app-header-h)] pb-[var(--app-nav-h)]" onClick={handleBackdropClick} data-testid="quickadd-backdrop">
       <div className="bg-theme-primary rounded-lg shadow-xl w-full max-w-md mx-auto max-h-full flex flex-col overflow-hidden border border-theme">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-theme">
@@ -214,6 +214,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
               <input
                 ref={inputRef}
                 type="text"
+                data-testid="quickadd-input"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyPress}
@@ -226,6 +227,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
                 <button
                   onClick={() => setInput('')}
                   className="absolute right-2 top-1/2 -translate-y-1/2 text-theme-secondary hover:text-theme-primary"
+                  data-testid="quickadd-clear"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -236,6 +238,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
               onClick={() => handleSubmit()}
               disabled={!input.trim()}
               className="px-4 py-3 bg-[var(--accent-color)] text-white rounded-lg hover:bg-[var(--accent-color)]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              data-testid="quickadd-submit"
             >
               <Plus className="w-5 h-5" />
             </button>
@@ -249,6 +252,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
                   key={suggestion}
                   onClick={() => handleSuggestionClick(suggestion)}
                   className="w-full text-left px-3 py-2 hover:bg-theme-secondary transition-colors first:rounded-t-lg last:rounded-b-lg"
+                  data-testid={`quickadd-suggestion-${index}`}
                 >
                   <div className="flex items-center gap-2">
                     <Search className="w-3 h-3 text-theme-secondary" />
@@ -265,6 +269,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
           <button
             onClick={onClose}
             className="px-3 py-2 bg-theme-secondary text-theme-primary hover:bg-theme-primary border border-theme rounded-lg transition-colors"
+            data-testid="quickadd-cancel"
           >
             Cancel
           </button>
@@ -277,6 +282,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
                 ? 'bg-red-500 text-white animate-pulse'
                 : 'bg-theme-secondary text-theme-primary hover:bg-theme-primary border border-theme'
             } disabled:opacity-50 disabled:cursor-not-allowed`}
+            data-testid="quickadd-voice"
           >
             {isListening ? (
               <>
@@ -295,6 +301,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
             onClick={handleScanBarcode}
             disabled={!isOnline || isScanning || !onScanBarcode}
             className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-theme-secondary text-theme-primary hover:bg-theme-primary border border-theme rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            data-testid="quickadd-scan"
           >
             {isScanning ? (
               <>
