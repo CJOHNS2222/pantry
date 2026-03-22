@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.5.0] - 2026-03-21
 
+## [1.5.1] - 2026-03-22
+
+### Added
+- **Testability / Instrumentation**: Added stable `data-testid` attributes across many interactive components (examples: PantryScanner, MealPlanner, RecipeFinder, MealPrepPlanner, LeftoverQuickCapture, ProgressiveFeature, PriceTrends, Household, CategoryManager, BatchOperations) to improve Firebase Test Lab and automated UI test reliability.
+- **Version bump**: Bumped app version to `1.5.1` (Android `versionCode` 26).
+
+### Changed
+- Minor testability and instrumentation improvements only; no user-facing behavior changes.
+
+
 ### Fixed
 - **Android Launcher Icon**: Regenerated all mipmap density variants (ldpi → xxxhdpi) with the correct Stock & Spoon logo, replacing the placeholder gray square icon
 - **Splash Screens**: Added splash screen assets for all screen densities, orientations, and night mode variants
