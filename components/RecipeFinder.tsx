@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Search, Loader2, Sparkles, ExternalLink, Globe, Plus, Clock, List, ChefHat, Star, Heart, Bookmark, Zap, Mic } from 'lucide-react';
 import { searchRecipes } from '../services/geminiService';
 import { getSavedRecipes, getCachedPopularRecipes, saveRecipeToFirestore, saveRecipeToUserCache, uploadRecipeImageFile, submitRecipeForReview } from '../services/recipeService';
@@ -931,23 +931,30 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
     await performSearch(params);
   };
 
-  // Debounced search for specific query input
-  const debouncedSpecificSearch = useMemo(
-    () => debounce(async () => {
-      if (specificQuery.trim() && specificQuery.trim().length >= 2) {
-        const params = { query: specificQuery, ingredients: '' };
-        await performSearch(params);
+  // Stable refs so the debounce is never recreated on every keystroke
+  // (the old useMemo([specificQuery]) pattern fired one Gemini call per character typed)
+  const specificQueryRef = useRef(specificQuery);
+  specificQueryRef.current = specificQuery;
+  const performSearchRef = useRef<(params: any) => Promise<void>>(async () => {});
+  // performSearchRef.current is set after performSearch is defined below
+
+  // Debounced search - created once, never recreated
+  const debouncedSpecificSearch = useRef(
+    debounce(async () => {
+      const q = specificQueryRef.current;
+      if (q.trim() && q.trim().length >= 2) {
+        const params = { query: q, ingredients: '' };
+        await performSearchRef.current(params);
       }
-    }, 800), // 800ms delay for recipe search
-    [specificQuery]
-  );
+    }, 800) // 800ms delay for recipe search
+  ).current;
 
   // Effect to trigger debounced search when query changes
   useEffect(() => {
     if (specificQuery.trim() && specificQuery.trim().length >= 2) {
       debouncedSpecificSearch();
     }
-  }, [specificQuery, debouncedSpecificSearch]);
+  }, [specificQuery]);
 
   // Save recipe search to history when user performs a meaningful search
   useEffect(() => {
@@ -1201,6 +1208,9 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
             setLoadingState(LoadingState.ERROR);
         }
     };
+
+  // Wire up the stable ref now that performSearch is defined
+  performSearchRef.current = performSearch;
 
   const getRatingInfo = (title: string) => {
       const related = ratings.filter(r => !!r?.recipeTitle && r.recipeTitle.toLowerCase() === title.toLowerCase());

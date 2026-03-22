@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { CalendarClock, Plus, Move, AlertCircle, ShoppingBasket, Trash2, HelpCircle, Search } from 'lucide-react';
 import { DayPlan, MealPlanItem, PantryItem, StructuredRecipe, User, SavedRecipe, ShoppingItem } from '../types';
 import RecipeModal from './RecipeModal';
@@ -213,22 +213,24 @@ const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
     }
   };
 
-  // Debounced search function for input changes
-  const debouncedSearch = useMemo(
-    () => debounce(() => {
-      if (searchQuery.trim() && searchQuery.trim().length >= 2) {
-        handleSearch();
-      }
-    }, 800), // 800ms delay
-    [searchQuery]
-  );
+  // Stable ref so the debounce always calls the latest handleSearch without being recreated
+  // on every keystroke (the old useMemo([searchQuery]) pattern fired one Gemini call per character)
+  const handleSearchRef = useRef<() => Promise<void>>(async () => {});
+  handleSearchRef.current = handleSearch;
+
+  // Debounced search - created once, never recreated
+  const debouncedSearch = useRef(
+    debounce(() => {
+      void handleSearchRef.current();
+    }, 800) // 800ms delay
+  ).current;
 
   // Effect to trigger debounced search when query changes
   useEffect(() => {
     if (searchQuery.trim() && searchQuery.trim().length >= 2) {
       debouncedSearch();
     }
-  }, [searchQuery, debouncedSearch]);
+  }, [searchQuery]);
 
   const filteredSavedRecipes = useMemo(() => 
     searchRecipes(savedRecipes, searchQuery)

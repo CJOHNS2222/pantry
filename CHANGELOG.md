@@ -5,6 +5,11 @@ All notable changes to Stock & Spoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.2] - 2026-03-22
+
+### Fixed
+- **Billing spike / Gemini API flood**: Fixed a critical bug in `RecipeFinder` and `MealPlanner` where `debounce()` was wrapped in `useMemo([query])`, causing a brand-new debounce instance to be created on every keystroke. This meant every character typed fired a separate Gemini API call instead of one call after the user stopped typing. Replaced with a stable `useRef`-based debounce so only one call is made per completed search.
+
 ## [1.5.0] - 2026-03-21
 
 ## [1.5.1] - 2026-03-22
