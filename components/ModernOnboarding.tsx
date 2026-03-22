@@ -165,6 +165,7 @@ export const ModernOnboarding: React.FC<ModernOnboardingProps> = ({
         <button
           onClick={() => handleStepTransition('quick-setup')}
           className="w-full bg-gradient-to-r from-[var(--accent-color)] to-[var(--accent-color)]/90 hover:from-[var(--accent-color)]/90 hover:to-[var(--accent-color)]/80 text-white py-4 px-6 rounded-xl font-semibold text-lg transition-all duration-200 transform hover:scale-[1.02] shadow-lg hover:shadow-xl flex items-center justify-center gap-3"
+          data-testid="onboard-get-started"
         >
           <Sparkles className="w-5 h-5" />
           Get Started
@@ -174,6 +175,7 @@ export const ModernOnboarding: React.FC<ModernOnboardingProps> = ({
         <button
           onClick={handleSkip}
           className="w-full bg-theme/10 hover:bg-theme/20 text-theme-secondary py-3 px-6 rounded-xl font-medium transition-all duration-200 flex items-center justify-center gap-2"
+          data-testid="onboard-skip"
         >
           <SkipForward className="w-4 h-4" />
           Skip for now
@@ -206,6 +208,7 @@ export const ModernOnboarding: React.FC<ModernOnboardingProps> = ({
                 ? 'border-theme hover:border-[var(--accent-color)]/50 hover:bg-theme/5 hover:shadow-md'
                 : 'border-theme/50 opacity-50'
             }`}
+            data-testid={`onboard-option-${option.id}`}
           >
             {option.popular && (
               <div className="absolute top-3 right-3 bg-gradient-to-r from-yellow-400 to-orange-500 text-white text-xs px-2 py-1 rounded-full font-medium">
@@ -259,6 +262,7 @@ export const ModernOnboarding: React.FC<ModernOnboardingProps> = ({
         <button
           onClick={handleSkip}
           className="text-theme-secondary hover:text-theme-primary transition-colors text-sm"
+          data-testid="onboard-skip-setup"
         >
           Skip setup for now →
         </button>
@@ -316,6 +320,7 @@ export const ModernOnboarding: React.FC<ModernOnboardingProps> = ({
       <button
         onClick={() => handleStepTransition('complete')}
         className="w-full bg-gradient-to-r from-[var(--accent-color)] to-[var(--accent-color)]/90 hover:from-[var(--accent-color)]/90 hover:to-[var(--accent-color)]/80 text-white py-4 px-6 rounded-xl font-semibold text-lg transition-all duration-200 transform hover:scale-[1.02] shadow-lg hover:shadow-xl flex items-center justify-center gap-3"
+        data-testid="onboard-start-cooking"
       >
         <Sparkles className="w-5 h-5" />
         Start Cooking!
@@ -356,6 +361,7 @@ export const ModernOnboarding: React.FC<ModernOnboardingProps> = ({
         <button
           onClick={handleSkip}
           className="absolute top-4 right-4 z-10 w-8 h-8 flex items-center justify-center rounded-full bg-theme/10 hover:bg-theme/20 text-theme-secondary/60 hover:text-theme-secondary transition-colors"
+          data-testid="onboard-close"
         >
           <X className="w-4 h-4" />
         </button>

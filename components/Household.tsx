@@ -262,6 +262,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
                   placeholder="Enter household name"
                   className="w-full bg-[#2A0A10] border border-red-900/50 rounded-lg px-4 py-3 text-white placeholder-red-200/50 focus:border-amber-500 outline-none"
                   disabled={isCreating}
+                  data-testid="household-name-input"
                 />
               </div>
               
@@ -269,6 +270,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
                 onClick={createHousehold}
                 disabled={!householdName.trim() || isCreating}
                 className="bg-amber-600 hover:bg-amber-500 disabled:bg-gray-500 disabled:cursor-not-allowed text-white px-6 py-3 rounded-lg font-medium transition-colors w-full flex items-center justify-center"
+                data-testid="household-create-button"
               >
                 {isCreating ? (
                   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
@@ -366,12 +368,14 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
                         placeholder="Enter email address"
                         className="w-full bg-[#2A0A10] border border-red-900/50 rounded-lg pl-9 pr-4 py-2 text-sm text-white placeholder-red-200/50 focus:border-amber-500 outline-none"
                         disabled={isInviting}
+                        data-testid="household-invite-input"
                       />
                     </div>
                     <button 
                       type="submit"
                       className="bg-amber-600 hover:bg-amber-500 text-white px-3 py-2 rounded-lg transition-colors disabled:bg-gray-500 disabled:cursor-not-allowed flex items-center justify-center w-12"
                       disabled={isInviting || householdMemberLimitExceeded}
+                      data-testid="household-invite-submit"
                     >
                       {isInviting ? <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div> : <Plus className="w-5 h-5" />}
                     </button>

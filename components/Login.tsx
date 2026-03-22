@@ -266,7 +266,8 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
               </label>
               <input
                 id="name"
-                name="name"
+                  name="name"
+                  data-testid="login-name"
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -283,7 +284,8 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
             </label>
             <input
               id="email"
-              name="email"
+                name="email"
+                data-testid="login-email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -299,7 +301,8 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
             </label>
             <input
               id="password"
-              name="password"
+                name="password"
+                data-testid="login-password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -313,6 +316,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
                  type="button"
                  onClick={handleForgotPassword}
                  className="w-full mt-2 text-amber-400 underline text-xs text-left hover:text-amber-500"
+                 data-testid="login-forgot-password"
                >
                  <FormattedMessage id="auth.forgotPassword" />
                </button>
@@ -325,7 +329,8 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
               </label>
               <input
                 id="confirmPassword"
-                name="confirmPassword"
+                  name="confirmPassword"
+                  data-testid="login-confirm-password"
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
@@ -339,6 +344,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
           <button
             type="submit"
             className="w-full bg-gradient-to-r from-amber-500 to-amber-700 text-white font-bold py-3.5 rounded-xl hover:shadow-lg hover:shadow-amber-900/20 transition-all transform active:scale-95 mt-2"
+            data-testid="login-submit"
           >
             <FormattedMessage id={isSignup ? "auth.signUp" : "auth.signIn"} />
           </button>
@@ -346,6 +352,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
             type="button"
             onClick={() => setIsSignup(!isSignup)}
             className="w-full mt-2 text-amber-500 underline text-sm"
+            data-testid="login-toggle-signup"
           >
             <FormattedMessage id={isSignup ? "auth.alreadyHaveAccount" : "auth.dontHaveAccount"} />
           </button>
@@ -363,6 +370,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
             type="button"
             onClick={handleGoogleLogin}
             className="flex items-center justify-center gap-2 bg-white text-gray-800 font-medium py-3 rounded-xl hover:bg-gray-50 transition-colors"
+            data-testid="login-google"
           >
             <Chrome className="w-5 h-5 text-red-500" />
             Google

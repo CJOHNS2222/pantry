@@ -157,6 +157,7 @@ export const FirstTimeFlow: React.FC<FirstTimeFlowProps> = ({
             <button
               onClick={handleNext}
               className="flex-1 bg-[var(--accent-color)] hover:opacity-90 text-white py-3 px-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2"
+              data-testid="ftf-continue"
             >
               {currentStep === steps.length - 1 ? 'Get Cooking!' : 'Continue'}
               <ArrowRight className="w-4 h-4" />
