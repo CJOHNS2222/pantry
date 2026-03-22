@@ -241,7 +241,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
               <Users className="w-5 h-5 text-amber-500" />
               <h2 className="font-serif font-bold text-amber-50 text-lg">{intl.formatMessage({ id: 'household.create' })}</h2>
             </div>
-            <button onClick={onClose} className="text-red-200/50 hover:text-white">
+            <button onClick={onClose} className="text-red-200/50 hover:text-white" data-testid="household-close">
               <X className="w-6 h-6" />
             </button>
           </div>
@@ -295,7 +295,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
               <Users className="w-5 h-5 text-amber-500" />
               <h2 className="font-serif font-bold text-amber-50 text-lg">{intl.formatMessage({ id: 'household.loading' })}</h2>
             </div>
-            <button onClick={onClose} className="text-red-200/50 hover:text-white">
+            <button onClick={onClose} className="text-red-200/50 hover:text-white" data-testid="household-close">
               <X className="w-6 h-6" />
             </button>
           </div>
@@ -337,11 +337,12 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
               }}
               className="text-red-200/50 hover:text-amber-500 p-2 transition-colors"
               title="Household Settings"
+              data-testid="household-settings-button"
             >
               <Settings className="w-5 h-5" />
             </button>
 
-            <button onClick={onClose} className="text-red-200/50 hover:text-white">
+            <button onClick={onClose} className="text-red-200/50 hover:text-white" data-testid="household-close">
               <X className="w-6 h-6" />
             </button>
           </div>
@@ -422,6 +423,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
                         onClick={() => removeMember(member.id)}
                         className="text-red-900/50 hover:text-red-400 p-2"
                         title="Remove member"
+                        data-testid={`household-remove-${member.id}`}
                       >
                         <X className="w-4 h-4" />
                       </button>
@@ -439,6 +441,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
             <button
               onClick={leaveHousehold}
               className="w-full bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg font-medium transition-colors"
+              data-testid="household-leave-button"
             >
               Leave Household
             </button>
@@ -459,7 +462,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
               <Users className="w-5 h-5 text-amber-500" />
               <h2 className="font-serif font-bold text-amber-50 text-lg">{intl.formatMessage({ id: 'household.create' })}</h2>
             </div>
-            <button onClick={onClose} className="text-red-200/50 hover:text-white">
+            <button onClick={onClose} className="text-red-200/50 hover:text-white" data-testid="household-close">
               <X className="w-6 h-6" />
             </button>
           </div>
@@ -512,7 +515,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
             <Users className="w-5 h-5 text-amber-500" />
             <h2 className="font-serif font-bold text-amber-50 text-lg">{household.name}</h2>
           </div>
-          <button onClick={onClose} className="text-red-200/50 hover:text-white">
+          <button onClick={onClose} className="text-red-200/50 hover:text-white" data-testid="household-close">
             <X className="w-6 h-6" />
           </button>
         </div>
@@ -590,6 +593,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
                         onClick={() => removeMember(member.id)}
                         className="text-red-900/50 hover:text-red-400 p-2"
                         title="Remove member"
+                        data-testid={`household-remove-${member.id}`}
                       >
                         <X className="w-4 h-4" />
                       </button>
@@ -610,6 +614,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
                 <button
                   onClick={leaveHousehold}
                   className="w-full bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg font-medium transition-colors"
+                  data-testid="household-leave-button"
                 >
                   Leave Household
                 </button>

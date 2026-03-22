@@ -81,6 +81,7 @@ export const ProgressiveFeature: React.FC<ProgressiveFeatureProps> = ({
           <button
             onClick={toggleExpanded}
             className="text-yellow-600 hover:text-yellow-800 transition-colors"
+            data-testid="progressivefeature-toggle"
           >
             {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </button>
@@ -88,6 +89,7 @@ export const ProgressiveFeature: React.FC<ProgressiveFeatureProps> = ({
             <button
               onClick={handleDismiss}
               className="text-yellow-600 hover:text-yellow-800 transition-colors"
+              data-testid="progressivefeature-dismiss"
             >
               <X className="w-4 h-4" />
             </button>

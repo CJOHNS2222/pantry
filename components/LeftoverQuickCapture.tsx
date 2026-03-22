@@ -84,6 +84,7 @@ export default function LeftoverQuickCapture({
             onClick={onClose}
             className="p-1 hover:bg-theme-secondary rounded transition-colors"
             aria-label="Close"
+            data-testid="leftoverquickcapture-close"
           >
             <X className="w-5 h-5 text-theme-primary" />
           </button>
@@ -119,6 +120,7 @@ export default function LeftoverQuickCapture({
                     }
                   }}
                   className="hidden"
+                  data-testid="leftoverquickcapture-file-input"
                 />
               </label>
             </div>
@@ -186,6 +188,7 @@ export default function LeftoverQuickCapture({
                 onClick={onClose}
                 className="flex items-center justify-center gap-2 px-4 py-2 bg-theme-secondary text-theme-primary border border-theme rounded-lg hover:bg-theme-primary transition-colors"
                 disabled={loading}
+                data-testid="leftoverquickcapture-cancel"
               >
                 Cancel
               </button>
@@ -193,6 +196,7 @@ export default function LeftoverQuickCapture({
                 onClick={handleSave}
                 className="flex items-center justify-center gap-2 px-4 py-2 bg-[var(--accent-color)] text-white rounded-lg hover:bg-[var(--accent-color)]/80 transition-colors"
                 disabled={loading}
+                data-testid="leftoverquickcapture-save"
               >
                 {loading ? 'Saving…' : 'Save Leftover'}
               </button>
