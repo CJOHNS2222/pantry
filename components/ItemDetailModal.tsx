@@ -238,7 +238,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   return (
     <>
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start sm:items-center justify-center z-[9999] px-4 pt-[var(--app-header-h)] pb-[var(--app-nav-h)]">
-        <div ref={modalRef} className="bg-theme-primary rounded-lg shadow-xl w-full max-w-md mx-auto max-h-full flex flex-col border border-theme">
+        <div ref={modalRef} role="dialog" aria-modal="true" aria-label={item.item} className="bg-theme-primary rounded-lg shadow-xl w-full max-w-md mx-auto max-h-full flex flex-col border border-theme">
           {/* Header - Fixed */}
           <div className="flex items-center justify-between p-4 pb-3 border-b border-theme flex-shrink-0 rounded-t-lg">
             <h3 className="text-lg font-semibold text-theme-primary">{item.item}</h3>

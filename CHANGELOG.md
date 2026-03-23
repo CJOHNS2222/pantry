@@ -5,6 +5,13 @@ All notable changes to Stock & Spoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.4] - 2026-03-23
+
+### Fixed
+- **Notification action buttons**: Action labels in the notification dropdown (e.g. "View Items", "Add to Shopping List") were non-interactive `<div>` elements — replaced with functional `<button>` elements that invoke the correct handler for each `actionType` (`add_to_shopping`, `view_recipe`, `view_item`, `join_household`)
+- **Notification swipe-to-dismiss**: Added horizontal swipe gesture support on notification dropdown items with direction lock (won't interfere with vertical scroll), red "Dismiss" reveal layer, 80 px threshold, and snap-back animation on release
+- **MealPlanner timezone bug**: "This Week" compact view showed wrong day labels and date numbers due to `getUTCDay()` / `new Date("YYYY-MM-DD")` UTC-midnight parsing returning the previous calendar day in US timezones. Fixed by always appending `'T12:00:00'` for local noon parsing and always recomputing `dayName` from the date string instead of trusting a potentially corrupt stored value
+
 ## [1.5.4] - 2026-03-22
 
 ### Fixed

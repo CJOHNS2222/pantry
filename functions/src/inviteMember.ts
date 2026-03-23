@@ -28,32 +28,15 @@ async function inviteMemberCore(inviterUid: string, email: string, householdId: 
     throw new HttpsError("not-found", "The household data is corrupted.");
   }
 
-  // Add a small delay to see if it's a race condition
-  await new Promise(resolve => setTimeout(resolve, 1000));
-
-  console.log('Full household data:', JSON.stringify(householdData, null, 2));
-  console.log('Household data members type:', typeof householdData.members);
-  console.log('Household data members:', householdData.members);
-  console.log('Household data memberIds type:', typeof householdData.memberIds);
-  console.log('Household data memberIds:', householdData.memberIds);
-  console.log('Inviter UID:', inviterUid);
-
   // Check both members array and memberIds array for backward compatibility
   const members = Array.isArray(householdData.members) ? householdData.members : [];
   const memberIds = Array.isArray(householdData.memberIds) ? householdData.memberIds : [];
-
-  console.log('Members array after check:', members);
-  console.log('Member IDs array:', memberIds);
 
   // Check if inviter is in either members or memberIds
   const isMemberByMembers = members.some((member: { id: string; }) => member.id === inviterUid);
   const isMemberByIds = memberIds.includes(inviterUid);
 
-  console.log('Is member by members array:', isMemberByMembers);
-  console.log('Is member by memberIds array:', isMemberByIds);
-
   if (!isMemberByMembers && !isMemberByIds) {
-    console.log('User not found in members or memberIds');
     throw new HttpsError("permission-denied", "You are not a member of this household.");
   }
 

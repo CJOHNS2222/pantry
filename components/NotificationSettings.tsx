@@ -44,11 +44,59 @@ export const NotificationSettingsComponent: React.FC<NotificationSettingsProps> 
     });
   };
 
+  const PRESETS: Record<string, NotificationSettings> = {
+    Relaxed: {
+      enabled: true,
+      quietHours: { enabled: true, start: '21:00', end: '09:00' },
+      types: {
+        expiration: 'week_before',
+        recipe_suggestion: false,
+        household_activity: false,
+        shopping_reminder: false,
+        system: true,
+        allergy_alert: true,
+        household_invite: true,
+        expired_items_check: false
+      }
+    },
+    Normal: NotificationService.getDefaultSettings(),
+    Strict: {
+      enabled: true,
+      quietHours: { enabled: false, start: '22:00', end: '08:00' },
+      types: {
+        expiration: 'urgent',
+        recipe_suggestion: true,
+        household_activity: true,
+        shopping_reminder: true,
+        system: true,
+        allergy_alert: true,
+        household_invite: true,
+        expired_items_check: true
+      }
+    }
+  };
+
   return (
     <div className="bg-[#2A0A10]/50 p-6 rounded-xl border border-red-900/30">
       <div className="flex items-center gap-2 mb-6">
         <Bell className="w-5 h-5 text-amber-500" />
         <h3 className="text-lg font-bold text-white">Notifications</h3>
+      </div>
+
+      {/* Presets */}
+      <div className="mb-6">
+        <p className="text-xs text-red-200/60 mb-2">Quick presets</p>
+        <div className="flex gap-2">
+          {(Object.keys(PRESETS) as Array<keyof typeof PRESETS>).map((preset) => (
+            <button
+              key={preset}
+              onClick={() => { setSettings(PRESETS[preset]); onSettingsChange(PRESETS[preset]); }}
+              className="flex-1 px-3 py-1.5 rounded-lg text-sm font-semibold bg-[#1A0508]/70 border border-red-900/30 text-red-200/80 hover:border-amber-500/60 hover:text-amber-400 transition-colors"
+            >
+              {preset}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Master toggle */}

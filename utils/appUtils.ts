@@ -97,7 +97,46 @@ export function parseIngredientForShoppingList(ingredientText: string): { quanti
   perfTrace.start();
 
   try {
-    const text = ingredientText.trim();
+    // ── Pre-processing ──────────────────────────────────────────────────────
+    // 1) Normalise Unicode vulgar fractions so the rest of the parser only
+    //    ever sees ASCII digit sequences.
+    let text = ingredientText.trim()
+      .replace(/½/g, '1/2')
+      .replace(/¼/g, '1/4')
+      .replace(/¾/g, '3/4')
+      .replace(/⅓/g, '1/3')
+      .replace(/⅔/g, '2/3')
+      .replace(/⅛/g, '1/8')
+      .replace(/⅜/g, '3/8')
+      .replace(/⅝/g, '5/8')
+      .replace(/⅞/g, '7/8');
+
+    // 2) Handle mixed fractions written as two separate tokens, e.g. "1 1/2 tsp"
+    //    Collapse them into a single token like "1.5 tsp" so the regex below
+    //    matches on the first word.
+    text = text.replace(/^(\d+)\s+(\d+\/\d+)(\s|$)/, (_, whole, frac, rest) => {
+      const [num, den] = frac.split('/').map(Number);
+      const value = parseInt(whole) + num / den;
+      return value + (rest || ' ');
+    });
+
+    // 3) Strip "to taste" variants — keep just the ingredient name.
+    //    Covers: "to taste pepper", "salt, to taste", "pepper to taste"
+    let toTasteQty = '';
+    if (/^to\s+taste\b/i.test(text)) {
+      toTasteQty = 'to taste';
+      text = text.replace(/^to\s+taste\s*/i, '').trim();
+    } else if (/\bto\s+taste\s*$/i.test(text)) {
+      toTasteQty = 'to taste';
+      text = text.replace(/,?\s*\bto\s+taste\s*$/i, '').trim();
+    }
+
+    if (toTasteQty) {
+      // Capitalise and return immediately — no quantity splitting needed.
+      const itemName = text.replace(/\b\w/g, l => l.toUpperCase());
+      return { quantity: toTasteQty, itemName: itemName || 'Item' };
+    }
+    // ────────────────────────────────────────────────────────────────────────
 
     // Add custom metrics
     perfTrace.putMetric('input_length', text.length);
@@ -167,8 +206,8 @@ export function parseIngredientForShoppingList(ingredientText: string): { quanti
           itemName = words.slice(1).join(' ');
         }
         perfTrace.putAttribute('parsing_method', 'word_analysis');
-      } else if (firstPart.toLowerCase() === 'a' && words.length > 1) {
-        // Handle "a slice of", "a pinch of", "a dash of", etc.
+      } else if ((firstPart.toLowerCase() === 'a' || firstPart.toLowerCase() === 'an') && words.length > 1) {
+        // Handle "a slice of", "a pinch of", "a dash of", "an egg", etc.
         const secondPart = words[1]!.toLowerCase();
         const commonQuantities = ['slice', 'pinch', 'dash', 'handful', 'scoop', 'clove', 'bunch', 'sprig', 'head', 'stalk', 'piece', 'loaf', 'stick', 'block'];
         
@@ -179,7 +218,10 @@ export function parseIngredientForShoppingList(ingredientText: string): { quanti
           itemName = itemName.replace(/^of\s+/i, '');
           perfTrace.putAttribute('parsing_method', 'article_quantity');
         } else {
-          perfTrace.putAttribute('parsing_method', 'no_quantity');
+          // Bare article ("a garlic clove", "an egg") — strip the article, default qty=1
+          quantity = '1';
+          itemName = words.slice(1).join(' ');
+          perfTrace.putAttribute('parsing_method', 'article_noun');
         }
       } else {
         perfTrace.putAttribute('parsing_method', 'no_quantity');
@@ -188,6 +230,10 @@ export function parseIngredientForShoppingList(ingredientText: string): { quanti
 
     // Clean the item name by removing common descriptors, but keep preparation methods for shopping list display
     itemName = itemName
+      // Strip parenthetical size/method notes (e.g. "(14.5 oz)", "(optional)", "(or water)")
+      .replace(/\s*\([^)]*\)/g, '')
+      // Strip trailing comma + anything after (e.g. "garlic, minced" → "garlic", "oil, divided" → "oil")
+      .replace(/,.*$/, '')
       // Remove common size descriptors
       .replace(/\b(large|medium|small|big|tiny|huge|giant)\s+/gi, '')
       // Remove "of" preposition

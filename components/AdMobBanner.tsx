@@ -9,19 +9,7 @@ const PROD_AD_UNIT = 'ca-app-pub-5084706792909644/2077776375';
 const TEST_AD_UNIT = 'ca-app-pub-3940256099942544/6300978111';
 
 const useTestAds = (): boolean => {
-  // Vite environment flag: set VITE_ADMOB_USE_TEST=true to force test ads
-  try {
-    // import.meta might not be available in some tooling; guard access
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
-    const mode = typeof import.meta !== 'undefined' ? import.meta.env.MODE : process.env.NODE_ENV;
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
-    const force = typeof import.meta !== 'undefined' ? import.meta.env.VITE_ADMOB_USE_TEST : process.env.VITE_ADMOB_USE_TEST;
-    return mode !== 'production' || String(force) === 'true';
-  } catch (e) {
-    return process.env.NODE_ENV !== 'production' || process.env.VITE_ADMOB_USE_TEST === 'true';
-  }
+  return import.meta.env.MODE !== 'production' || import.meta.env.VITE_ADMOB_USE_TEST === 'true';
 };
 // Temporarily disable AdMob for testing releases.
 // To re-enable: set `ADMOB_ENABLED = true` and ensure `admob_app_id` in Android strings.xml is your production App ID.

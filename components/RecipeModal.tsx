@@ -1,7 +1,8 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Plus, Heart, Trash2, Minus, Users, CheckCircle2, Play, Pause, RotateCcw, AlertCircle, X } from 'lucide-react';
+import { Plus, Heart, Trash2, Minus, Users, CheckCircle2, Play, Pause, RotateCcw, AlertCircle, X, UtensilsCrossed } from 'lucide-react';
 import { StructuredRecipe, RecipeRating, SavedRecipe, PantryItem, Household } from '../types';
 import LeftoverQuickCapture from './LeftoverQuickCapture';
+import { CookingMode } from './CookingMode';
 import { RecipeRatingUI } from './RecipeRating';
 import { ProgressiveImage } from './ProgressiveImage';
 import { generateBlurDataURL } from '../utils/appUtils';
@@ -62,6 +63,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
   , editable = false
 }) => {
   const [showLeftoverCapture, setShowLeftoverCapture] = useState(false);
+  const [showCookingMode, setShowCookingMode] = useState(false);
   const [servings, setServings] = useState(household?.members?.length || 4); // Default to household size
   const [isSaving, setIsSaving] = useState(false); // Prevent double-clicks
   const originalServings = 4; // Assume recipes are for 4 servings
@@ -302,6 +304,11 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
 
   if (!isOpen || !recipe) return null;
 
+  // Cooking mode fullscreen overlay — rendered above the modal
+  if (showCookingMode) {
+    return <CookingMode recipe={recipe} onExit={() => setShowCookingMode(false)} />;
+  }
+
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-start sm:items-center justify-center p-4" onClick={onClose}>
       {/* Top-level leftover quick-capture overlay so it renders above other modals */}
@@ -319,7 +326,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
           </div>
         </div>
       )}
-      <div ref={modalRef} className="bg-theme-primary rounded-2xl shadow-2xl max-w-lg w-full relative flex flex-col max-h-[85vh] overflow-hidden" onClick={e => e.stopPropagation()}>
+      <div ref={modalRef} role="dialog" aria-modal="true" aria-label={recipe.title} className="bg-theme-primary rounded-2xl shadow-2xl max-w-lg w-full relative flex flex-col max-h-[85vh] overflow-hidden" onClick={e => e.stopPropagation()}>
         {/* Fixed Header */}
         <div className="flex items-center justify-between p-4 pb-3 border-b border-theme flex-shrink-0 rounded-t-2xl">
           <h2 className="text-lg font-semibold text-theme-primary truncate pr-2">{recipe.title}</h2>
@@ -816,6 +823,16 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
               )}
             </div>
           ) : null}
+
+          {/* Cooking Mode button */}
+          {!editable && Array.isArray(recipe.instructions) && recipe.instructions.some(s => s.trim()) && (
+            <button
+              onClick={() => setShowCookingMode(true)}
+              className="w-full py-2.5 font-bold bg-[var(--accent-color)] text-white rounded-lg flex items-center justify-center gap-2 mb-1"
+            >
+              <UtensilsCrossed className="w-4 h-4" /> Start Cooking
+            </button>
+          )}
 
           {/* Secondary action buttons - Save, Delete, Close */}
           <div className="flex items-center gap-2">

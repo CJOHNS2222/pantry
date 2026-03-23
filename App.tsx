@@ -421,6 +421,8 @@ const App: React.FC = () => {
         case 'view_item':
           if (notification.actionData?.tab === 'shopping') {
             setActiveTab(Tab.SHOPPING);
+          } else {
+            setActiveTab(Tab.PANTRY);
           }
           break;
         case 'join_household':
@@ -688,8 +690,8 @@ const App: React.FC = () => {
       has_seen_tutorial: finalUser.hasSeenTutorial
     });
 
-    // Show onboarding if not completed
-    if (localStorage.getItem('onboarding-completed') !== 'true') {
+    // Show onboarding if not completed (check both Firestore flag and localStorage for cross-device support)
+    if (!finalUser.hasSeenTutorial && localStorage.getItem('onboarding-completed') !== 'true') {
       setShowOnboarding(true);
     }
   };
@@ -944,8 +946,13 @@ const App: React.FC = () => {
             onComplete={async () => {
               setShowOnboarding(false);
               try {
-                // Mark onboarding as completed in localStorage
+                // Mark onboarding as completed in localStorage and Firestore
                 localStorage.setItem('onboarding-completed', 'true');
+                if (user?.id) {
+                  const userRef = DatabaseMonitoringService.doc('users', user.id);
+                  await DatabaseMonitoringService.updateDoc(userRef, { hasSeenTutorial: true });
+                  setUser(prev => prev ? { ...prev, hasSeenTutorial: true } : prev);
+                }
               } catch (error) {
                 log.error('Failed to mark onboarding complete', { error }, 'App');
               }
@@ -1063,6 +1070,7 @@ const App: React.FC = () => {
           syncStatus={syncStatus}
           onSyncClick={syncNow}
           onNavigateToSettings={navigateToNotifications}
+          onNotificationAction={n => handleNotificationAction(n as Parameters<typeof handleNotificationAction>[0])}
         />
 
         {/* Persistent household invite banner — stays visible until acted on */}

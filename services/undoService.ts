@@ -2,12 +2,12 @@ import { PantryItem } from '../types';
 
 type ActionType = 'delete_item' | 'bulk_edit' | 'update_item';
 
-interface Action {
+export interface UndoAction {
   id: string;
   type: ActionType;
   timestamp: number;
   userId: string; // Add user ID to scope actions per user
-  data: any; // Previous state or details
+  data: unknown; // Previous state or details
 }
 
 const DB_NAME = 'SmartPantryUndo';
@@ -37,10 +37,10 @@ class UndoService {
     });
   }
 
-  async recordAction(action: Omit<Action, 'id' | 'timestamp' | 'userId'>, userId: string): Promise<void> {
+  async recordAction(action: Omit<UndoAction, 'id' | 'timestamp' | 'userId'>, userId: string): Promise<void> {
     if (!this.db) await this.init();
 
-    const fullAction: Action = {
+    const fullAction: UndoAction = {
       ...action,
       id: `${action.type}_${userId}_${Date.now()}`,
       timestamp: Date.now(),
@@ -61,7 +61,7 @@ class UndoService {
     });
   }
 
-  async getRecentActions(userId: string, limit: number = MAX_ACTIONS): Promise<Action[]> {
+  async getRecentActions(userId: string, limit: number = MAX_ACTIONS): Promise<UndoAction[]> {
     if (!this.db) await this.init();
 
     return new Promise((resolve, reject) => {
@@ -70,7 +70,7 @@ class UndoService {
       const index = store.index('timestamp');
       const request = index.openCursor(null, 'prev'); // Most recent first
 
-      const actions: Action[] = [];
+      const actions: UndoAction[] = [];
       request.onsuccess = (event) => {
         const cursor = (event.target as IDBRequest).result;
         if (cursor && actions.length < limit) {
@@ -133,7 +133,7 @@ class UndoService {
     }
   }
 
-  async undoAction(action: Action): Promise<{ type: 'restore_item' | 'revert_edit'; data: any } | null> {
+  async undoAction(action: UndoAction): Promise<{ type: 'restore_item' | 'revert_edit'; data: unknown } | null> {
     // Return the undo operation details
     if (action.type === 'delete_item') {
       return { type: 'restore_item', data: action.data };

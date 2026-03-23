@@ -199,16 +199,15 @@ function createMealPlanListener(
     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     const today = new Date();
     
-    // Generate a full year of meal plan data (6 months past + 6 months future)
-    // This allows users to view history and plan far ahead
-    const monthsBack = 6;
-    const monthsForward = 6;
-    const totalDays = (monthsBack + monthsForward) * 31; // Rough estimate
+    // Generate a rolling 4-month window (60 days back + 60 days forward).
+    // Saves generating ~240 unused empty objects on every snapshot vs. the old 6-month window.
+    // Firestore data outside this window is still merged in below.
+    const daysBack = 60;
+    const daysForward = 60;
     
     const basePlan = new Map<string, DayPlan>();
     
-    // Generate dates from 6 months ago to 6 months in the future
-    for (let i = -monthsBack * 30; i < monthsForward * 30; i++) {
+    for (let i = -daysBack; i < daysForward; i++) {
       const d = new Date(today);
       d.setDate(today.getDate() + i);
       const iso = d.toISOString().slice(0, 10);
@@ -232,7 +231,7 @@ function createMealPlanListener(
             const dayData = firestoreDays[date];
             basePlan.set(date, {
               date,
-              dayName: dayData.dayName || days[new Date(`${date}T00:00:00`).getUTCDay()],
+              dayName: days[new Date(date + 'T12:00:00').getDay()],
               breakfast: Array.isArray(dayData.breakfast) ? dayData.breakfast : [],
               lunch: Array.isArray(dayData.lunch) ? dayData.lunch : [],
               dinner: Array.isArray(dayData.dinner) ? dayData.dinner : []

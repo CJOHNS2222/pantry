@@ -8,19 +8,22 @@ import { SyncIndicator } from '../SyncIndicator';
 import { OnlineIndicator } from '../OnlineIndicator';
 import { SyncStatus } from '../../hooks/useOfflineStatus';
 import useUserNotifications from '../../hooks/useUserNotifications';
-import notificationsService, { markAllNotificationsRead, markNotificationRead } from '../../services/notificationsService';
+import notificationsService, { markAllNotificationsRead, markNotificationRead, NotificationItem } from '../../services/notificationsService';
+import { AppSettings } from '../../hooks/useSettings';
+import { UndoAction } from '../../services/undoService';
 
 interface AppHeaderProps {
   user: User;
   household: Household | null;
-  settings: any;
-  setSettings: React.Dispatch<React.SetStateAction<any>>;
+  settings: AppSettings;
+  setSettings: React.Dispatch<React.SetStateAction<AppSettings>>;
   onShowHousehold: () => void;
-  recentActions?: any[];
-  onUndo?: (action: any) => void;
+  recentActions?: UndoAction[];
+  onUndo?: (action: UndoAction) => void;
   syncStatus: SyncStatus;
   onSyncClick?: () => void;
   onNavigateToSettings?: () => void;
+  onNotificationAction?: (notification: NotificationItem) => void;
 }
 
 export const AppHeader: React.FC<AppHeaderProps> = ({
@@ -33,7 +36,8 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   onUndo,
   syncStatus,
   onSyncClick,
-  onNavigateToSettings
+  onNavigateToSettings,
+  onNotificationAction
 }) => {
   const greeting = useMemo(() => {
     const hour = new Date().getHours();
@@ -44,6 +48,11 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 
   const [showNotifications, setShowNotifications] = useState(false);
   const [expandedNotifId, setExpandedNotifId] = useState<string | null>(null);
+  const [swipingId, setSwipingId] = useState<string | null>(null);
+  const [swipeX, setSwipeX] = useState(0);
+  const touchStartX = useRef(0);
+  const touchStartY = useRef(0);
+  const swipeLocked = useRef<'h' | 'v' | null>(null);
   const notifTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const throttleMs = 5000; // UI update throttle for notifications
   const { items } = useUserNotifications(user?.id, throttleMs);
@@ -86,6 +95,52 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
     }
   };
 
+  const SWIPE_DISMISS_THRESHOLD = 80;
+
+  const handleSwipeTouchStart = (e: React.TouchEvent, notifId: string) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+    swipeLocked.current = null;
+    setSwipingId(notifId);
+    setSwipeX(0);
+  };
+
+  const handleSwipeTouchMove = (e: React.TouchEvent, notifId: string) => {
+    if (swipingId !== notifId) return;
+    const dx = e.touches[0].clientX - touchStartX.current;
+    const dy = e.touches[0].clientY - touchStartY.current;
+    if (!swipeLocked.current) {
+      if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 6) {
+        swipeLocked.current = 'h';
+      } else if (Math.abs(dy) > 6) {
+        swipeLocked.current = 'v';
+        setSwipingId(null);
+        setSwipeX(0);
+        return;
+      }
+    }
+    if (swipeLocked.current === 'h' && dx < 0) {
+      e.preventDefault();
+      setSwipeX(dx);
+    }
+  };
+
+  const handleSwipeTouchEnd = async (notifId: string) => {
+    if (swipeX < -SWIPE_DISMISS_THRESHOLD) {
+      await handleMarkOneRead(notifId);
+    }
+    setSwipingId(null);
+    setSwipeX(0);
+    swipeLocked.current = null;
+  };
+
+  const handleNotifActionClick = (e: React.MouseEvent, n: NotificationItem) => {
+    e.stopPropagation();
+    setShowNotifications(false);
+    setExpandedNotifId(null);
+    onNotificationAction?.(n);
+  };
+
   const handleToggleExpand = (notifId: string) => {
     setExpandedNotifId(prev => prev === notifId ? null : notifId);
     // Reset auto-close timer when user interacts with a notification
@@ -93,9 +148,10 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
     notifTimerRef.current = setTimeout(() => setShowNotifications(false), 10000);
   };
 
-  const getNotifTimeAgo = (ts: any): string => {
+  const getNotifTimeAgo = (ts: unknown): string => {
     if (!ts) return '';
-    const time = typeof ts === 'object' && ts?.toDate ? ts.toDate() : new Date(ts);
+    const firestoreTs = ts as { toDate?: () => Date };
+    const time = firestoreTs.toDate ? firestoreTs.toDate() : new Date(ts as string | number | Date);
     if (isNaN(time.getTime())) return '';
     const diffMs = Date.now() - time.getTime();
     const diffMins = Math.floor(diffMs / 60000);
@@ -182,18 +238,38 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                       <button onClick={handleMarkAllRead} className="text-xs text-theme-secondary hover:underline">Mark all read</button>
                     </div>
                     <div className="space-y-1.5">
-                      {(items || []).slice().reverse().slice(0, 50).map((n: any) => {
+                      {(items || []).slice().reverse().slice(0, 50).map((n: NotificationItem) => {
                         const isExpanded = expandedNotifId === n.id;
                         const bodyText = n.message || n.body;
+                        const isSwiping = swipingId === n.id;
+                        const currentSwipeX = isSwiping ? swipeX : 0;
+                        const isPastThreshold = currentSwipeX < -SWIPE_DISMISS_THRESHOLD;
                         return (
                           <div
                             key={n.id}
-                            className={`p-2 rounded cursor-pointer transition-colors ${
+                            className="relative overflow-hidden rounded"
+                            onTouchStart={e => handleSwipeTouchStart(e, n.id)}
+                            onTouchMove={e => handleSwipeTouchMove(e, n.id)}
+                            onTouchEnd={() => handleSwipeTouchEnd(n.id)}
+                          >
+                            {/* Swipe-reveal dismiss background */}
+                            <div
+                              className={`absolute inset-0 flex items-center justify-end px-3 rounded transition-colors ${isPastThreshold ? 'bg-red-500' : 'bg-red-500/70'}`}
+                              aria-hidden="true"
+                            >
+                              <span className="text-white text-xs font-semibold">Dismiss</span>
+                            </div>
+                          <div
+                            className={`p-2 rounded cursor-pointer transition-colors relative ${
                               n.read
                                 ? 'bg-theme-secondary/40 hover:bg-theme-secondary/70'
                                 : 'bg-amber-500/10 border-l-2 border-amber-500/60 hover:bg-amber-500/20'
                             }`}
-                            onClick={() => handleToggleExpand(n.id)}
+                            style={{
+                              transform: `translateX(${currentSwipeX}px)`,
+                              transition: isSwiping ? 'none' : 'transform 0.2s ease',
+                            }}
+                            onClick={() => !isSwiping && handleToggleExpand(n.id)}
                           >
                             {/* Title row */}
                             <div className="flex items-start justify-between gap-1">
@@ -224,7 +300,16 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                                 {n.type && (
                                   <div className="text-[10px] text-theme-secondary capitalize">{n.type.replace(/_/g, ' ')}</div>
                                 )}
-                                {n.actionLabel && (
+                                {n.actionLabel && n.actionType && (
+                                  <button
+                                    type="button"
+                                    onClick={e => handleNotifActionClick(e, n)}
+                                    className="text-xs text-amber-500 font-medium hover:text-amber-300 underline underline-offset-2 transition-colors text-left"
+                                  >
+                                    {n.actionLabel}
+                                  </button>
+                                )}
+                                {n.actionLabel && !n.actionType && (
                                   <div className="text-xs text-amber-500 font-medium">{n.actionLabel}</div>
                                 )}
                               </div>
@@ -234,6 +319,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                             <div className="text-[10px] text-theme-secondary mt-1 opacity-70">
                               {getNotifTimeAgo(n.createdAt)}
                             </div>
+                          </div>
                           </div>
                         );
                       })}
@@ -279,7 +365,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             )}
             <button
               data-tutorial="theme-toggle"
-              onClick={() => setSettings((prev: any) => ({
+              onClick={() => setSettings((prev: AppSettings) => ({
                 ...prev,
                 theme: {
                   ...prev.theme,

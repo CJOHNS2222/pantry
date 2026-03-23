@@ -387,7 +387,16 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
                 </div>
               </PremiumFeature>
 
-          <h3 className="text-sm font-bold text-amber-500 uppercase mb-3 px-1">{intl.formatMessage({ id: 'household.groupMembers' })}</h3>
+          <div className="flex items-center justify-between mb-3 px-1">
+            <h3 className="text-sm font-bold text-amber-500 uppercase">{intl.formatMessage({ id: 'household.groupMembers' })}</h3>
+            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+              (household?.members?.length ?? 0) >= 3
+                ? 'bg-amber-500/20 text-amber-400'
+                : 'bg-red-900/30 text-red-200/60'
+            }`}>
+              {household?.members?.length ?? 0} / 3 members
+            </span>
+          </div>
           <div className="space-y-2">
             {household?.members && Array.isArray(household.members) && household.members.map((member) => {
               const currentUser = household?.members && Array.isArray(household.members) ? household.members.find(m => m.email === user.email) : null;
@@ -557,7 +566,16 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
                 </div>
               </PremiumFeature>
 
-          <h3 className="text-sm font-bold text-amber-500 uppercase mb-3 px-1">{intl.formatMessage({ id: 'household.groupMembers' })}</h3>
+          <div className="flex items-center justify-between mb-3 px-1">
+            <h3 className="text-sm font-bold text-amber-500 uppercase">{intl.formatMessage({ id: 'household.groupMembers' })}</h3>
+            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+              (household.members?.length ?? 0) >= 3
+                ? 'bg-amber-500/20 text-amber-400'
+                : 'bg-red-900/30 text-red-200/60'
+            }`}>
+              {household.members?.length ?? 0} / 3 members
+            </span>
+          </div>
           <div className="space-y-2">
             {household.members && Array.isArray(household.members) && household.members.map((member) => {
               const currentUser = household.members && Array.isArray(household.members) ? household.members.find(m => m.email === user.email) : null;

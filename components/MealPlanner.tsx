@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { CalendarClock, Plus, Move, AlertCircle, ShoppingBasket, Trash2, HelpCircle, Search } from 'lucide-react';
+import { CalendarClock, Plus, Move, AlertCircle, ShoppingBasket, Trash2, HelpCircle, Search, Copy, UtensilsCrossed } from 'lucide-react';
 import { DayPlan, MealPlanItem, PantryItem, StructuredRecipe, User, SavedRecipe, ShoppingItem } from '../types';
 import RecipeModal from './RecipeModal';
 import LeftoverQuickCapture from './LeftoverQuickCapture';
@@ -995,6 +995,39 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
     }
   }, [displayPlan, mealPlan, updateMealPlan]);
 
+  const handleClearWeek = useCallback(() => {
+    const weekStart = Math.floor(currentDayIndex / 7) * 7;
+    const weekDates = new Set(
+      displayPlan.slice(weekStart, weekStart + 7).map(d => d.date)
+    );
+    const cleared = mealPlan.map(day =>
+      weekDates.has(day.date)
+        ? { ...day, breakfast: [], lunch: [], dinner: [] }
+        : day
+    );
+    updateMealPlan(cleared);
+  }, [currentDayIndex, displayPlan, mealPlan, updateMealPlan]);
+
+  const handleCopyWeek = useCallback(() => {
+    const weekStart = Math.floor(currentDayIndex / 7) * 7;
+    const sourceDays = displayPlan.slice(weekStart, weekStart + 7);
+    const updated = mealPlan.map(day => {
+      const srcDay = sourceDays.find(s => {
+        const srcDate = new Date(s.date);
+        srcDate.setDate(srcDate.getDate() + 7);
+        return srcDate.toISOString().slice(0, 10) === day.date;
+      });
+      if (!srcDay) return day;
+      return {
+        ...day,
+        breakfast: [...srcDay.breakfast],
+        lunch: [...srcDay.lunch],
+        dinner: [...srcDay.dinner],
+      };
+    });
+    updateMealPlan(updated);
+  }, [currentDayIndex, displayPlan, mealPlan, updateMealPlan]);
+
   // Memoized missing ingredients computation
   const missingIngredients = useMemo(() => {
     const now = new Date();
@@ -1557,7 +1590,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
                 return (
                   <div key={day.date} className="flex flex-col items-center">
                     <div className="text-xs text-theme-secondary opacity-60 mb-1">
-                      {day.dayName.slice(0, 3)}
+                      {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date(day.date + 'T12:00:00').getDay()]}
                     </div>
                     <button
                       onClick={() => setCurrentDayIndex(index)}
@@ -1570,15 +1603,15 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
                           ? 'bg-theme-primary/50 text-white hover:bg-theme-primary/70 border border-theme-primary/30'
                           : 'text-theme-secondary opacity-50 hover:bg-theme-primary/20'
                       }`}
-                      title={`${day.dayName} ${day.date}${hasMeals ? ' - Has meals scheduled' : ' - No meals'}`}
+                      title={`${['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][new Date(day.date + 'T12:00:00').getDay()]} ${day.date}${hasMeals ? ' - Has meals scheduled' : ' - No meals'}`}
                     >
                       {hasMeals ? (
                         <div className="flex flex-col items-center leading-tight">
                           <span className="font-bold">✓</span>
-                          <span className="text-[10px]">{new Date(day.date).getDate()}</span>
+                          <span className="text-[10px]">{new Date(day.date + 'T12:00:00').getDate()}</span>
                         </div>
                       ) : (
-                        new Date(day.date).getDate()
+                        new Date(day.date + 'T12:00:00').getDate()
                       )}
                       {hasMeals && (
                         <div className="absolute -top-1 -right-1 w-2 h-2 bg-white rounded-full border border-theme-primary"></div>
@@ -1592,6 +1625,38 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
         </div>
 
             {/* Navigation Header */}
+            <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between gap-2">
+              <button
+                onClick={() => { setShowLeftoverCapture(true); }}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-theme-secondary border border-theme text-theme-secondary hover:bg-yellow-500/10 hover:text-yellow-400 hover:border-yellow-400/30 transition-colors"
+                aria-label="Log a leftover"
+                title="Quickly log a leftover from today"
+              >
+                <UtensilsCrossed className="w-3.5 h-3.5" />
+                Log leftover
+              </button>
+              <div className="flex items-center gap-2">
+              <button
+                onClick={handleClearWeek}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-theme-secondary border border-theme text-theme-secondary hover:bg-red-500/10 hover:text-red-400 hover:border-red-400/30 transition-colors"
+                aria-label="Clear week meals"
+                title="Clear all meals for this week"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Clear week
+              </button>
+              <button
+                onClick={handleCopyWeek}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-theme-secondary border border-theme text-theme-secondary hover:bg-[var(--accent-color)]/10 hover:text-[var(--accent-color)] hover:border-[var(--accent-color)]/30 transition-colors"
+                aria-label="Copy week meals to next week"
+                title="Copy this week's meals to next week"
+              >
+                <Copy className="w-3.5 h-3.5" />
+                Copy to next week
+              </button>
+              </div>
+            </div>
             <div className="flex items-center justify-between bg-theme-secondary rounded-xl p-4 border border-theme">
               <button
                 onClick={() => setCurrentDayIndex(Math.max(0, currentDayIndex - 1))}
@@ -1625,6 +1690,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
                 </svg>
               </button>
+            </div>
             </div>
 
             {/* Current Day Meals */}

@@ -13,7 +13,12 @@ interface NotificationSettings {
   };
 }
 
-export function useNotifications(settings: NotificationSettings, userEmail?: string, mealPlan?: DayPlan[]): any {
+interface UseNotificationsResult {
+  notificationPermission: string;
+  requestNotificationPermission: () => Promise<string>;
+}
+
+export function useNotifications(settings: NotificationSettings, userEmail?: string, mealPlan?: DayPlan[]): UseNotificationsResult | Record<string, never> {
   // Capacitor PermissionState can vary between platforms; keep this a wide string
   // so we can assign whatever the plugin returns without narrowing errors.
   const [notificationPermission, setNotificationPermission] = useState<string>('default');
@@ -28,8 +33,8 @@ export function useNotifications(settings: NotificationSettings, userEmail?: str
       try {
         const permission = await LocalNotifications.checkPermissions();
         setNotificationPermission(permission.display);
-      } catch (err: any) {
-        log.error('Error checking notification permissions:', { error: err?.message }, 'useNotifications');
+      } catch (err: unknown) {
+        log.error('Error checking notification permissions:', { error: err instanceof Error ? err.message : String(err) }, 'useNotifications');
       }
     };
 
@@ -50,8 +55,8 @@ export function useNotifications(settings: NotificationSettings, userEmail?: str
         if (settings.enabled && userEmail) {
           await scheduleNotifications(settings, mealPlan);
         }
-      } catch (err: any) {
-        log.error('Error setting up notifications:', { error: err?.message }, 'useNotifications');
+      } catch (err: unknown) {
+        log.error('Error setting up notifications:', { error: err instanceof Error ? err.message : String(err) }, 'useNotifications');
       }
     };
 
@@ -63,8 +68,8 @@ export function useNotifications(settings: NotificationSettings, userEmail?: str
       const permission = await LocalNotifications.requestPermissions();
       setNotificationPermission(permission.display);
       return permission.display;
-    } catch (err: any) {
-      log.error('Error requesting notification permissions:', { error: err?.message }, 'useNotifications');
+    } catch (err: unknown) {
+      log.error('Error requesting notification permissions:', { error: err instanceof Error ? err.message : String(err) }, 'useNotifications');
       return 'denied';
     }
   };

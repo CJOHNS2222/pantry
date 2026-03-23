@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { useIntl } from 'react-intl';
-import { ShoppingBasket, Check, Trash2, Archive, Plus, X, Share2, Copy, Download, MessageSquare, Calendar } from 'lucide-react';
+import { ShoppingBasket, Check, Trash2, Archive, Plus, X, Share2, Copy, Download, MessageSquare, Calendar, Undo2 } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { ShoppingItem, User, Household } from '../types';
 import { inferCategoryFromItemName, getItemImage, isHouseholdMember } from '../utils/appUtils';
@@ -108,7 +108,10 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   // New state for enhanced features
   const [viewMode, setViewMode] = useState<'list' | 'organized'>('list');
   const [showAnalytics, setShowAnalytics] = useState(false);
-  const [undoHistory, setUndoHistory] = useState<Array<{item: ShoppingItem, timestamp: Date}>>([]);
+  const [undoHistory, setUndoHistory] = useState<Array<{item: ShoppingItem, timestamp: Date}>>([])
+  // Pending deletes for undo-on-swipe: map of id -> { item, timerId }
+  const pendingDeletes = React.useRef<Map<string, { item: ShoppingItem; timerId: ReturnType<typeof setTimeout> }>>(new Map());
+  const [pendingDeleteCount, setPendingDeleteCount] = useState(0);;
   const [purchaseModalOpen, setPurchaseModalOpen] = useState(false);
   const [purchaseTargetItem, setPurchaseTargetItem] = useState<ShoppingItem | null>(null);
   const [purchaseQty, setPurchaseQty] = useState<number>(1);
@@ -383,19 +386,42 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     setItems(prev => prev.map(i => ({ ...i, checked: false })));
   };
 
-  const remove = async (id: string) => {
+  const remove = (id: string) => {
+    const targetItem = items.find(i => i.id === id);
+    if (!targetItem) return;
+
+    // Optimistically remove from UI immediately
     setItems(prev => prev.filter(i => i.id !== id));
-    
-    // Update cache
-    const inHousehold = household?.id && user ? isHouseholdMember(household, user) : false;
-    const householdId = inHousehold ? household?.id : undefined;
-    const userId = inHousehold ? undefined : user?.id;
-    
-    try {
-      await ShoppingListCacheService.removeItem(id, householdId, userId);
-    } catch (error) {
-      log.error('Failed to remove item from cache:', error);
-    }
+
+    // Delay the actual cache removal so the user can undo within 5 seconds
+    const timerId = setTimeout(async () => {
+      pendingDeletes.current.delete(id);
+      setPendingDeleteCount(pendingDeletes.current.size);
+
+      const inHousehold = household?.id && user ? isHouseholdMember(household, user) : false;
+      const householdId = inHousehold ? household?.id : undefined;
+      const userId = inHousehold ? undefined : user?.id;
+      try {
+        await ShoppingListCacheService.removeItem(id, householdId, userId);
+      } catch (error) {
+        log.error('Failed to remove item from cache:', error);
+      }
+    }, 5000);
+
+    pendingDeletes.current.set(id, { item: targetItem, timerId });
+    setPendingDeleteCount(pendingDeletes.current.size);
+  };
+
+  const undoDelete = () => {
+    // Restore the most recently deleted item
+    const entries = Array.from(pendingDeletes.current.entries());
+    if (entries.length === 0) return;
+    // Pick the one whose timer was started last (highest timerId value is unreliable; just take last entry)
+    const [id, { item: restoredItem, timerId }] = entries[entries.length - 1];
+    clearTimeout(timerId);
+    pendingDeletes.current.delete(id);
+    setPendingDeleteCount(pendingDeletes.current.size);
+    setItems(prev => [...prev, restoredItem]);
   };
 
   // Multi-selection functions
@@ -842,6 +868,19 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
               </form>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Undo delete banner — shown for 5 seconds after any swipe-to-delete */}
+      {pendingDeleteCount > 0 && (
+        <div className="flex items-center justify-between bg-gray-800 text-white rounded-lg px-3 py-2 text-sm shadow-lg animate-fade-in">
+          <span>Item deleted</span>
+          <button
+            onClick={undoDelete}
+            className="flex items-center gap-1 ml-4 px-2 py-1 bg-white text-gray-800 rounded text-xs font-bold hover:bg-gray-100 transition-colors"
+          >
+            <Undo2 className="w-3 h-3" /> Undo
+          </button>
         </div>
       )}
 

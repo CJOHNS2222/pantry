@@ -5,7 +5,7 @@ import { Download, AlertTriangle } from 'lucide-react';
 import { log } from '../services/logService';
 
 const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=com.smart.pantry';
-const ONE_DAY = 24 * 60 * 60 * 1000;
+const DISMISS_COOLDOWN = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 interface GlobalUpdatePromptProps {
   onDismiss?: () => void;
@@ -30,7 +30,7 @@ export const GlobalUpdatePrompt: React.FC<GlobalUpdatePromptProps> = ({ onDismis
         const dismissedKey = `global_update_dismissed_${result.latestVersion}`;
         const dismissedTime = localStorage.getItem(dismissedKey);
         const now = Date.now();
-        if (!dismissedTime || now - parseInt(dismissedTime) > ONE_DAY) {
+        if (!dismissedTime || now - parseInt(dismissedTime) > DISMISS_COOLDOWN) {
           setVersionCheck(result);
           setShowPrompt(true);
         }

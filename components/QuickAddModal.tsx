@@ -91,10 +91,15 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
       const filtered = recentItems.filter(item =>
         item.toLowerCase().includes(input.toLowerCase())
       ).slice(0, 5);
-      setSuggestions(filtered);
+      setSuggestions(prev => {
+        if (prev.length === filtered.length && prev.every((v, i) => v === filtered[i])) return prev;
+        return filtered;
+      });
       setShowSuggestions(filtered.length > 0);
     } else {
-      setSuggestions([]);
+      // Use functional updater to keep the same reference when already empty,
+      // preventing an infinite loop when recentItems defaults to a new [] each render.
+      setSuggestions(prev => prev.length === 0 ? prev : []);
       setShowSuggestions(false);
     }
   }, [input, recentItems]);
@@ -193,7 +198,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] px-4 pt-[var(--app-header-h)] pb-[var(--app-nav-h)]" onClick={handleBackdropClick} data-testid="quickadd-backdrop">
-      <div className="bg-theme-primary rounded-lg shadow-xl w-full max-w-md mx-auto max-h-full flex flex-col overflow-hidden border border-theme">
+      <div className="bg-theme-primary rounded-lg shadow-xl w-full max-w-md mx-auto max-h-full flex flex-col overflow-hidden border border-theme" role="dialog" aria-modal="true" aria-label="Add Item">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-theme">
           <h3 className="text-lg font-semibold text-theme-primary">Add Item</h3>

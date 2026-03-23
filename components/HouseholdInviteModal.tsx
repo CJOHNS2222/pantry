@@ -50,7 +50,7 @@ export const HouseholdInviteModal: React.FC<HouseholdInviteModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
-      <div className="bg-theme-secondary rounded-2xl shadow-2xl max-w-md w-full mx-4 border border-theme overflow-hidden">
+      <div role="dialog" aria-modal="true" aria-label="Household Invitation" className="bg-theme-secondary rounded-2xl shadow-2xl max-w-md w-full mx-4 border border-theme overflow-hidden">
         {/* Header */}
         <div className="bg-[var(--accent-color)] px-6 py-5 flex items-center gap-3">
           <div className="bg-white/20 p-2.5 rounded-full">

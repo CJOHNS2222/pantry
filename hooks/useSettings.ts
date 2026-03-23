@@ -1,5 +1,15 @@
 import { useState, useEffect } from 'react';
 
+export interface AppSettings {
+  notifications: {
+    enabled: boolean;
+    time: string;
+    types: { shoppingList: boolean; mealPlan: boolean };
+  };
+  theme: { mode: 'dark' | 'light'; accentColor: string };
+  shopping: { includeStaples: boolean };
+}
+
 export function useSettings() {
   const [settings, setSettings] = useState(() => {
     const saved = localStorage.getItem('settings');

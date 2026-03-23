@@ -285,11 +285,11 @@ class UsageService {
     const householdDoc = await DatabaseMonitoringService.getDoc(householdRef);
     const currentMemberCount = householdDoc.exists() ? householdDoc.data().members?.length || 0 : 0;
 
-    // For free users: max 2 members (themselves + 1 invited member)
+    // For free users: max 1 member (themselves only, no invites)
     // For premium: max 3 members
     // For family: max 5 members (user + 4 family members)
     const maxMembers = user.subscription?.tier === 'family' ? 5 :
-                      user.subscription?.tier === 'premium' ? 3 : 2;
+                      user.subscription?.tier === 'premium' ? 3 : 1;
 
     const canAdd = currentMemberCount < maxMembers;
     log.debug('canAddHouseholdMember - Result', {

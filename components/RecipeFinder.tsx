@@ -108,7 +108,24 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
             needMore: suggestions.filter(item => !item.feasibility.canMake).slice(0, 8)
         };
     }, [savedRecipes, inventory]);
-    
+
+    const [savedSort, setSavedSort] = useState<'recent' | 'top-rated'>('recent');
+
+    const sortedSavedRecipes = useMemo(() => {
+        if (savedSort === 'recent') {
+            return [...savedRecipes].sort((a, b) =>
+                (b.dateSaved ?? '').localeCompare(a.dateSaved ?? '')
+            );
+        }
+        // top-rated: match by title against ratings array, average per recipe
+        const avgRating = (recipe: SavedRecipe) => {
+            const recipeRatings = ratings.filter(r => r.recipeTitle === recipe.title);
+            if (!recipeRatings.length) return 0;
+            return recipeRatings.reduce((sum, r) => sum + r.rating, 0) / recipeRatings.length;
+        };
+        return [...savedRecipes].sort((a, b) => avgRating(b) - avgRating(a));
+    }, [savedRecipes, savedSort, ratings]);
+
     // Extract search logic to custom hook
     const [activeView, setActiveView] = useState<'search' | 'saved'>('search');
     const [selectedCategory, setSelectedCategory] = useState<string>('All');
@@ -1517,8 +1534,32 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                     </div>
                 ) : (
                     <>
+                        <div className="flex items-center justify-between mb-3">
+                            <div className="flex gap-1">
+                                <button
+                                    onClick={() => setSavedSort('recent')}
+                                    className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${
+                                        savedSort === 'recent'
+                                            ? 'bg-[var(--accent-color)] text-white'
+                                            : 'bg-theme-secondary text-theme-secondary opacity-60 hover:opacity-90'
+                                    }`}
+                                >
+                                    Recent
+                                </button>
+                                <button
+                                    onClick={() => setSavedSort('top-rated')}
+                                    className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${
+                                        savedSort === 'top-rated'
+                                            ? 'bg-[var(--accent-color)] text-white'
+                                            : 'bg-theme-secondary text-theme-secondary opacity-60 hover:opacity-90'
+                                    }`}
+                                >
+                                    Top Rated
+                                </button>
+                            </div>
+                        </div>
                         <div className="grid grid-cols-3 gap-4">
-                            {savedRecipes.map(r => renderRecipeCard(r, true, true))}
+                            {sortedSavedRecipes.map(r => renderRecipeCard(r, true, true))}
                         </div>
                         <div className="flex justify-end mt-6">
                             <div className="flex gap-2">

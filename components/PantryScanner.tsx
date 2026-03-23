@@ -1700,7 +1700,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
       )}
 
       {/* Search and Filter Bar */}
-      <div className="bg-theme-secondary p-4 rounded-2xl border border-theme shadow-lg mb-6">
+      <div className="bg-theme-secondary p-4 rounded-2xl border border-theme shadow-lg mb-6 sticky top-0 z-10">
         <div className="flex gap-3 items-center">
           {/* Search Input */}
           <div className="flex-1 relative">
