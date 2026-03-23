@@ -5,6 +5,11 @@ All notable changes to Stock & Spoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.4] - 2026-03-22
+
+### Fixed
+- Added `@import "tailwindcss"` to `src/index.css` so Tailwind utility classes are compiled into the bundle; the app was previously relying entirely on the CDN for all utility styles, causing broken layout after CDN removal
+
 ## [1.5.3] - 2026-03-22
 
 ### Changed

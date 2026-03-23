@@ -1,3 +1,5 @@
+@import "tailwindcss";
+
 /* App layout heights – keep in sync with AppHeader paddingTop and AppNavigation height */
 :root {
   --app-header-h: 120px;
