@@ -7,10 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.5.4] - 2026-03-23
 
+### Added
+- **CookingMode component**: New step-by-step cooking mode view for guided recipe execution
+- **NotificationSettings**: Expanded notification preference controls
+
 ### Fixed
 - **Notification action buttons**: Action labels in the notification dropdown (e.g. "View Items", "Add to Shopping List") were non-interactive `<div>` elements — replaced with functional `<button>` elements that invoke the correct handler for each `actionType` (`add_to_shopping`, `view_recipe`, `view_item`, `join_household`)
 - **Notification swipe-to-dismiss**: Added horizontal swipe gesture support on notification dropdown items with direction lock (won't interfere with vertical scroll), red "Dismiss" reveal layer, 80 px threshold, and snap-back animation on release
 - **MealPlanner timezone bug**: "This Week" compact view showed wrong day labels and date numbers due to `getUTCDay()` / `new Date("YYYY-MM-DD")` UTC-midnight parsing returning the previous calendar day in US timezones. Fixed by always appending `'T12:00:00'` for local noon parsing and always recomputing `dayName` from the date string instead of trusting a potentially corrupt stored value
+- **`parseIngredientForShoppingList`**: Fixed several ingredient parsing edge cases — Unicode vulgar fractions (½, ¼, ¾, etc.) now normalised to ASCII before parsing; mixed fractions ("1 1/2 cups") collapsed to decimal; "to taste" variants handled (prefix, suffix, after comma); bare article "an" now treated same as "a"; bare article nouns ("an egg", "a garlic clove") correctly strip the article and default quantity to 1; parenthetical notes ("(optional)", "(14.5 oz)") stripped from item name
+- **Smoke test suite**: Split into two workers (A–Q / R–Z) to prevent OOM under Vitest; replaced full `AppProvider` wrapper with minimal `MemoryRouter` wrapper to avoid Firebase service accumulation; added `afterEach` cleanup + fake timers; skip list for native-only components (`AdMobBanner`, `PantryScanner`, `QuickAdd`) that hang in jsdom
+- **ARIA / accessibility**: Fixed missing ARIA labels, roles, and keyboard-navigation attributes across multiple components
+- **TypeScript**: Removed `@ts-ignore` suppressions, resolved type errors in validation utilities and hooks
 
 ## [1.5.4] - 2026-03-22
 
