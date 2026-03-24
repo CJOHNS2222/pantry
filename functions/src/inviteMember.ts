@@ -115,21 +115,44 @@ async function inviteMemberCore(inviterUid: string, email: string, householdId: 
     }
   }
 
-  // Send notification to invited user via top-level notifications collection
+  // Send notification to invited user.
+  // Registered users (have a UID) → write to their per-user cache so the bell badge picks it up.
+  // Unregistered users (email-only) → fall back to the top-level collection as a best-effort.
+  const notificationId = db.collection('_').doc().id; // generate a random ID
+  const notificationPayload: Record<string, any> = {
+    id: notificationId,
+    userId: memberIdToStore,
+    type: 'household_invite',
+    title: 'Household Invitation',
+    message: `${inviterName} has invited you to join the "${householdName}" household on Smart Pantry!`,
+    priority: 'medium',
+    actionType: 'join_household',
+    actionLabel: 'Accept',
+    actionData: { householdId },
+    read: false,
+  };
+
+  const inviteeHasUid = memberIdToStore && memberIdToStore !== email;
   try {
-    const notificationsRef = db.collection('notifications');
-    await notificationsRef.add({
-      userId: memberIdToStore,
-      type: 'household_invite',
-      title: 'Household Invitation',
-      message: `${inviterName} has invited you to join the "${householdName}" household on Smart Pantry!`,
-      priority: 'medium',
-      actionType: 'join_household',
-      actionLabel: 'Accept',
-      actionData: { householdId },
-      read: false,
-      createdAt: FieldValue.serverTimestamp()
-    });
+    if (inviteeHasUid) {
+      // Write into the per-user notifications cache array (same path the client uses)
+      notificationPayload.createdAt = new Date().toISOString();
+      const cacheRef = db.collection('users').doc(memberIdToStore).collection('cache').doc('notifications');
+      await db.runTransaction(async (tx) => {
+        const snap = await tx.get(cacheRef);
+        const existing: any[] = snap.exists ? ((snap.data()?.items as any[]) ?? []) : [];
+        const updated = [...existing, notificationPayload].slice(-200); // cap at 200 items
+        if (snap.exists) {
+          tx.update(cacheRef, { items: updated });
+        } else {
+          tx.set(cacheRef, { items: updated });
+        }
+      });
+    } else {
+      // Invitee not yet registered — fall back to top-level collection
+      notificationPayload.createdAt = FieldValue.serverTimestamp();
+      await db.collection('notifications').add(notificationPayload);
+    }
   } catch (err) {
     console.error('Failed to create household invite notification:', err);
     throw new HttpsError("internal", "Failed to send invitation notification.");

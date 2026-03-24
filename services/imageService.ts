@@ -29,8 +29,8 @@ export async function fetchGroceryItemImage(itemName: string): Promise<string | 
       .replace(/\b(fresh|dried|canned|chopped|sliced|diced|minced|crushed|ground|cubed|grated|finely)\s+/g, '') // Remove prep descriptors
       .trim();
 
-    // Search Open Food Facts API with timeout
-    const searchUrl = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(cleanName)}&json=1&fields=product_name,image_url&page_size=10`;
+    // Search Open Food Facts API with timeout (v2 endpoint supports CORS)
+    const searchUrl = `https://world.openfoodfacts.org/api/v2/search?search_terms=${encodeURIComponent(cleanName)}&fields=product_name,image_url&page_size=10`;
     
     // Create a timeout promise
     const timeoutPromise = new Promise((_, reject) => {

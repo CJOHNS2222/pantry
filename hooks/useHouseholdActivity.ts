@@ -32,8 +32,7 @@ export function useHouseholdActivity(user: User | null, household: Household | n
     };
 
     const currentActivity = activityMap[currentTab] || 'using app';
-    // Temporarily disabled to test if this causes excessive reads
-    // debouncedUpdateActivity(user.id, household.id, currentActivity);
+    debouncedUpdateActivity(user.id, household.id, currentActivity);
   }, [currentTab, user?.id, household?.id, debouncedUpdateActivity]);
 
   // Mark user as offline when component unmounts or page visibility changes
@@ -55,8 +54,7 @@ export function useHouseholdActivity(user: User | null, household: Household | n
           [Tab.ANALYTICS]: 'viewing analytics'
         };
         const currentActivity = activityMap[currentTab] || 'using app';
-        // Temporarily disabled
-        // debouncedUpdateActivity(user.id, household.id, currentActivity);
+        debouncedUpdateActivity(user.id, household.id, currentActivity);
       }
     };
 

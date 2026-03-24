@@ -13,6 +13,7 @@ const Settings = React.lazy(() => import('../Settings').then(module => ({ defaul
 // Keep Login and Tutorial as regular imports since they're shown immediately
 import { Login } from '../Login';
 import { HouseholdActivityFeed } from '../HouseholdActivityFeed';
+import SmartRecommendations from '../SmartRecommendations';
 import { UsageIndicator } from '../UsageIndicator';
 import ComponentErrorBoundary from '../ComponentErrorBoundary';
 import { useApp } from '../../contexts/AppContext';
@@ -196,7 +197,13 @@ export const MainContent: React.FC = () => {
         </ComponentErrorBoundary>
       )}
       {activeTab === Tab.RECIPES && (
-        <ComponentErrorBoundary componentName="RecipeFinder">
+        <>
+          <SmartRecommendations
+            inventory={inventory}
+            savedRecipes={savedRecipes}
+            user={user}
+          />
+          <ComponentErrorBoundary componentName="RecipeFinder">
           <Suspense fallback={<LoadingSpinner />}>
             <RecipeFinder
               onAddToPlan={onAddToPlan}
@@ -219,10 +226,21 @@ export const MainContent: React.FC = () => {
               household={household ?? undefined}
               />
             </Suspense>
-        </ComponentErrorBoundary>
+          </ComponentErrorBoundary>
+        </>
       )}
       {activeTab === Tab.COMMUNITY && (
-        <ComponentErrorBoundary componentName="Community">
+        <>
+          {household && (
+            <ComponentErrorBoundary componentName="HouseholdActivityFeed">
+              <HouseholdActivityFeed
+                activities={recentActivities}
+                isLoading={isLoadingActivities}
+                maxItems={10}
+              />
+            </ComponentErrorBoundary>
+          )}
+          <ComponentErrorBoundary componentName="Community">
           <Suspense fallback={<LoadingSpinner />}>
             <Community
               onAddToPlan={onAddToPlan}
@@ -230,7 +248,8 @@ export const MainContent: React.FC = () => {
               user={user || undefined}
             />
           </Suspense>
-        </ComponentErrorBoundary>
+          </ComponentErrorBoundary>
+        </>
       )}
       {activeTab === Tab.SETTINGS && (
         <ComponentErrorBoundary componentName="Settings">

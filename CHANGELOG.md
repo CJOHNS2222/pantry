@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.5.4] - 2026-03-23
 
 ### Added
+- **SmartRecommendations in Recipe Finder tab**: `SmartRecommendations` component now renders above the RecipeFinder on the Recipes tab; reads only the already-cached `inventory` and `savedRecipes` arrays (no extra Firestore reads), matching pantry items against saved recipe ingredients for "Cook with What You Have" suggestions, expiry alerts, and time-based dinner prompts
+- **Household Activity Feed**: Re-enabled `HouseholdActivityFeed` in the Community tab; shows recent household member actions (adds, removals, recipes, meals) with live Firestore subscription; member "currently viewing" activity tracking re-enabled via debounced writes
+
+### Removed
+- **Email invite Cloud Function** (`sendHouseholdInvitation`): Deleted `functions/src/sendHouseholdInvitation.ts`, `functions/src/helpers/sendEmail.ts`, and `services/emailService.ts`; in-app bell notification (written directly to user cache) is the only invite signal
+- **Stripe payment code**: Deleted `functions/src/stripe.ts`, `components/StripeCheckout.tsx`, and `services/stripeService.ts`; Stripe integration was fully dormant (null stub + commented-out CF export)
+
+### Added
 - **CookingMode component**: New step-by-step cooking mode view for guided recipe execution
 - **NotificationSettings**: Expanded notification preference controls
 

@@ -27,7 +27,7 @@ import { isHouseholdMember, inferCategoryFromItemName, inferStorageLocationFromI
 import { getQuantityAmount } from './utils/quantityUtils';
 import { NotificationBanner } from './components/NotificationBanner';
 import { NotificationService, NotificationItem, NotificationSettings } from './services/notificationService';
-import { markNotificationRead, deleteNotification, snoozeNotificationInCache } from './services/notificationsService';
+import { markNotificationRead, deleteNotification, snoozeNotificationInCache, updateNotificationInCache } from './services/notificationsService';
 import { log } from './services/logService';
 import { pushNotificationService } from './services/pushNotificationService';
 import { HouseholdActivityService } from './services/householdActivityService';
@@ -46,6 +46,7 @@ import { RecipesCacheService } from './services/recipesCacheService';
 import { groceryPriceService } from './services/groceryPriceService';
 import { PriceDataCacheService } from './services/priceDataCacheService'; // Import the service
 import ExpiredItemsModal from './components/ExpiredItemsModal';
+import ItemDetailModal from './components/ItemDetailModal';
 import { InventoryCacheService } from './services/inventoryCacheService';
 import { useIntl } from 'react-intl';
 
@@ -98,6 +99,7 @@ const App: React.FC = () => {
   const [showNotificationsModal, setShowNotificationsModal] = useState(false);
   const [showHouseholdInviteModal, setShowHouseholdInviteModal] = useState(false);
   const [showExpiredItemsModal, setShowExpiredItemsModal] = useState(false);
+  const [notificationViewItem, setNotificationViewItem] = useState<{ item: PantryItem; index: number } | null>(null);
   const [showAddToPlanDialog, setShowAddToPlanDialog] = useState(false);
   const [pendingRecipeForPlan, setPendingRecipeForPlan] = useState<StructuredRecipe | null>(null);
   const [selectedDayForPlan, setSelectedDayForPlan] = useState<number | null>(null);
@@ -402,7 +404,12 @@ const App: React.FC = () => {
     
     try {
       if (user?.id) {
-        await markNotificationRead(user.id, notification.id);
+        try {
+          await markNotificationRead(user.id, notification.id);
+        } catch {
+          // Notification lives in per-user cache only (no top-level collection doc) — fall back
+          await updateNotificationInCache(user.id, notification.id, { read: true });
+        }
       } else {
         await NotificationService.markAsRead(notification.id);
       }
@@ -418,13 +425,23 @@ const App: React.FC = () => {
             setActiveTab(Tab.RECIPES);
           }
           break;
-        case 'view_item':
-          if (notification.actionData?.tab === 'shopping') {
+        case 'view_item': {
+          // Try to open ItemDetailModal for the specific item; fall back to navigating to the tab
+          const itemId = notification.actionData?.items?.[0]?.itemId
+            ?? notification.actionData?.itemId;
+          const found = itemId
+            ? inventory.findIndex(i => i.id === itemId)
+            : -1;
+          if (found !== -1) {
+            setActiveTab(Tab.PANTRY);
+            setNotificationViewItem({ item: inventory[found], index: found });
+          } else if (notification.actionData?.tab === 'shopping') {
             setActiveTab(Tab.SHOPPING);
           } else {
             setActiveTab(Tab.PANTRY);
           }
           break;
+        }
         case 'join_household':
           if (notification.actionData?.householdId && user) {
             try {
@@ -983,6 +1000,18 @@ const App: React.FC = () => {
             onClose={() => setShowHouseholdInviteModal(false)}
             onAccept={handleHouseholdInviteAccept}
             onDecline={handleHouseholdInviteDecline}
+          />
+        )}
+
+        {notificationViewItem && (
+          <ItemDetailModal
+            item={notificationViewItem.item}
+            originalIndex={notificationViewItem.index}
+            onClose={() => setNotificationViewItem(null)}
+            onUpdateItem={updateItem}
+            onDeleteItem={deleteItem}
+            onAddToShoppingList={addToShoppingList}
+            customCategories={customCategories}
           />
         )}
 

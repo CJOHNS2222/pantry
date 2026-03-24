@@ -1,9 +1,8 @@
 import React, { useMemo } from 'react';
-import { TrendingUp, ChefHat, Clock, Target, Lightbulb, Star } from 'lucide-react';
-import { useAuth } from '../hooks/useAuth';
-import { useDataManagement } from '../hooks/useDataManagement';
+import { ChefHat, Clock, Lightbulb, Star } from 'lucide-react';
 import AnalyticsService from '../services/analyticsService';
 import { log } from '../services/logService';
+import { PantryItem, SavedRecipe, User } from '../types';
 
 /**
  * Interface for smart recommendation data
@@ -30,33 +29,26 @@ interface SmartRecommendation {
  * - Usage pattern analysis and personalized insights
  * - Impact-based prioritization (high/medium/low)
  */
-const SmartRecommendations: React.FC = () => {
-  const { user } = useAuth();
-  const { inventory: userInventory, shoppingList: userShoppingList, mealPlan: userMealPlan, savedRecipes: userSavedRecipes } = useDataManagement(user, () => {}, () => {}, () => {});
+interface SmartRecommendationsProps {
+  inventory: PantryItem[];
+  savedRecipes: SavedRecipe[];
+  user?: User | null;
+}
 
-  /**
-   * Generate personalized recommendations based on user data and behavior patterns
-   * Analyzes inventory, meal plans, saved recipes, and usage patterns to provide
-   * actionable suggestions for improving the user experience.
-   */
+const SmartRecommendations: React.FC<SmartRecommendationsProps> = ({ inventory, savedRecipes, user }) => {
   const recommendations = useMemo((): SmartRecommendation[] => {
     const recs: SmartRecommendation[] = [];
 
-    // Analyze user behavior patterns
-    const hasInventory = userInventory && userInventory.length > 0;
-    const hasShoppingList = userShoppingList && userShoppingList.length > 0;
-    const hasMealPlan = userMealPlan && userMealPlan.length > 0;
-    const hasSavedRecipes = userSavedRecipes && userSavedRecipes.length > 0;
+    const hasInventory = inventory.length > 0;
+    const hasSavedRecipes = savedRecipes.length > 0;
 
-    // Recipe-based recommendations
+    // Recipe-based recommendations — match pantry items against saved recipe ingredients
     if (hasInventory && hasSavedRecipes) {
-      const inventoryItems = userInventory.map((item: any) => item.name.toLowerCase());
-      const savedRecipeTitles = userSavedRecipes.map((recipe: any) => recipe.title.toLowerCase());
+      const inventoryItems = inventory.map((item) => item.item.toLowerCase());
 
-      // Check for recipes that match current inventory
-      const matchingRecipes = userSavedRecipes.filter((recipe: any) =>
-        recipe.ingredients?.some((ingredient: any) =>
-          inventoryItems.some((item: any) =>
+      const matchingRecipes = savedRecipes.filter((recipe) =>
+        recipe.ingredients?.some((ingredient) =>
+          inventoryItems.some((item) =>
             ingredient.toLowerCase().includes(item) || item.includes(ingredient.toLowerCase())
           )
         )
@@ -76,33 +68,6 @@ const SmartRecommendations: React.FC = () => {
       }
     }
 
-    // Feature adoption recommendations
-    if (!hasMealPlan && hasSavedRecipes) {
-      recs.push({
-        id: 'try-meal-planning',
-        type: 'feature',
-        title: 'Start Meal Planning',
-        description: 'With your saved recipes, you could plan meals for the week and save time on grocery shopping.',
-        impact: 'medium',
-        icon: <Target className="w-5 h-5" />,
-        actionText: 'Create Meal Plan',
-        category: 'Feature Discovery'
-      });
-    }
-
-    if (!hasShoppingList && hasInventory) {
-      recs.push({
-        id: 'create-shopping-list',
-        type: 'shopping',
-        title: 'Track What You Need',
-        description: 'Create a shopping list to stay organized and never run out of essentials again.',
-        impact: 'medium',
-        icon: <TrendingUp className="w-5 h-5" />,
-        actionText: 'Create List',
-        category: 'Organization'
-      });
-    }
-
     // Time-based recommendations
     const now = new Date();
     const hour = now.getHours();
@@ -120,9 +85,9 @@ const SmartRecommendations: React.FC = () => {
       });
     }
 
-    // Inventory optimization
+    // Expiring inventory alert
     if (hasInventory) {
-      const expiringSoon = userInventory.filter((item: any) => {
+      const expiringSoon = inventory.filter((item) => {
         if (!item.expirationDate) return false;
         const expiry = new Date(item.expirationDate);
         const daysUntilExpiry = Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
@@ -143,7 +108,7 @@ const SmartRecommendations: React.FC = () => {
       }
     }
 
-    // Premium feature suggestions (if not premium)
+    // Premium upgrade suggestion
     if (user?.subscription?.tier !== 'premium') {
       recs.push({
         id: 'upgrade-premium',
@@ -157,13 +122,13 @@ const SmartRecommendations: React.FC = () => {
       });
     }
 
-    // Learning recommendations
-    if (!hasInventory && !hasShoppingList && !hasMealPlan) {
+    // Getting started nudge
+    if (!hasInventory && !hasSavedRecipes) {
       recs.push({
         id: 'getting-started',
         type: 'feature',
         title: 'Getting Started Guide',
-        description: 'New to Smart Pantry? Start by adding some items to your inventory to unlock personalized recommendations.',
+        description: 'Start by adding some items to your inventory to unlock personalized recommendations.',
         impact: 'high',
         icon: <Lightbulb className="w-5 h-5" />,
         actionText: 'Add First Item',
@@ -171,7 +136,6 @@ const SmartRecommendations: React.FC = () => {
       });
     }
 
-    // Sort by impact (high first) and limit to top 5
     return recs
       .sort((a, b) => {
         const impactOrder = { high: 3, medium: 2, low: 1 };
@@ -179,7 +143,7 @@ const SmartRecommendations: React.FC = () => {
       })
       .slice(0, 5);
 
-  }, [userInventory, userShoppingList, userMealPlan, userSavedRecipes, user]);
+  }, [inventory, savedRecipes, user]);
 
   const getImpactColor = (impact: string) => {
     switch (impact) {
