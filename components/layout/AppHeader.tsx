@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Sun, Moon, Undo2, Bell, Activity } from 'lucide-react';
+import { Sun, Moon, Undo2, Bell } from 'lucide-react';
 import { User, Household, HouseholdActivity } from '../../types';
 import { log } from '../../services/logService';
 import { UsageIndicator } from '../UsageIndicator';
@@ -243,38 +243,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                   )}
                 </button>
 
-                {/* Household activity feed button — only shown when in a multi-member household */}
-                {household && household.members.length > 1 && (
-                  <div className="relative">
-                    <button
-                      onClick={handleToggleActivityFeed}
-                      className="relative p-1 text-theme-secondary hover:text-theme-primary transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:ring-offset-2 rounded"
-                      aria-label="View household activity feed"
-                      title="Household activity"
-                    >
-                      <Activity className="w-4 h-4" />
-                    </button>
-
-                    {showActivityFeed && (
-                      <div className="absolute left-0 mt-2 w-80 max-h-96 overflow-auto bg-theme-primary border border-theme rounded shadow-lg z-50 p-2">
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="text-sm font-semibold">Household Activity</div>
-                          <button
-                            onClick={() => setShowActivityFeed(false)}
-                            className="text-xs text-theme-secondary hover:text-theme-primary transition-colors px-1"
-                            aria-label="Close activity feed"
-                          >✕</button>
-                        </div>
-                        <HouseholdActivityFeed
-                          activities={recentActivities}
-                          isLoading={isLoadingActivities}
-                          maxItems={15}
-                        />
-                      </div>
-                    )}
-                  </div>
-                )}
-
+                {/* Notification bell */}
                 {showNotifications && (
                   <div className="absolute left-0 mt-2 w-80 max-h-96 overflow-auto bg-theme-primary border border-theme rounded shadow-lg z-50 p-2">
                     <div className="flex items-center justify-between mb-2">
@@ -384,11 +353,36 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             Stock & Spoon
           </h1>
           {household && household.members.length > 1 && (
-            <div className="mt-1">
-              <HouseholdStatusIndicator
-                household={household}
-                currentUserId={user.id}
-              />
+            <div className="relative mt-1">
+              <button
+                onClick={handleToggleActivityFeed}
+                className="focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:ring-offset-2 rounded"
+                aria-label="View household activity feed"
+                title="Tap to view household activity"
+              >
+                <HouseholdStatusIndicator
+                  household={household}
+                  currentUserId={user.id}
+                />
+              </button>
+
+              {showActivityFeed && (
+                <div className="absolute left-1/2 -translate-x-1/2 mt-2 w-80 max-h-96 overflow-auto bg-theme-primary border border-theme rounded shadow-lg z-50 p-2">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="text-sm font-semibold">Household Activity</div>
+                    <button
+                      onClick={() => setShowActivityFeed(false)}
+                      className="text-xs text-theme-secondary hover:text-theme-primary transition-colors px-1"
+                      aria-label="Close activity feed"
+                    >✕</button>
+                  </div>
+                  <HouseholdActivityFeed
+                    activities={recentActivities}
+                    isLoading={isLoadingActivities}
+                    maxItems={15}
+                  />
+                </div>
+              )}
             </div>
           )}
         </div>
