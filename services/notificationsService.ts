@@ -171,15 +171,21 @@ export async function getNotificationsOnce(uid: string): Promise<NotificationIte
 }
 
 export async function markNotificationRead(uid: string, notificationId: string) {
-  // Update the notification in the top-level notifications collection
-  const notificationRef = doc(db, 'notifications', notificationId);
-  await updateDoc(notificationRef, { read: true });
+  // Update the notification in the per-user cache
+  await updateNotificationInCache(uid, notificationId, { read: true });
 }
 
 export async function deleteNotification(uid: string, notificationId: string) {
-  // Delete the notification from the top-level notifications collection
-  const notificationRef = doc(db, 'notifications', notificationId);
-  await deleteDoc(notificationRef);
+  // Delete the notification from the per-user cache
+  const ref = getNotificationsDocRef(uid);
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref as any);
+    if (!snap.exists()) return;
+    const data = snap.data() as any;
+    const items = Array.isArray(data.items) ? data.items as NotificationItem[] : [];
+    const filtered = items.filter(i => i.id !== notificationId);
+    tx.set(ref as any, { items: filtered }, { merge: true });
+  });
 }
 
 /**

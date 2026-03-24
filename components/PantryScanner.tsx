@@ -8,6 +8,7 @@ import StorageLocationIndicator from './StorageLocationIndicator';
 import { PantryItem, LoadingState, ConsumptionSuggestion, ExpirationAlert, CustomCategory, RecipeSuggestion, PantryFilter, User, ShoppingItem } from '../types';
 import { Tab } from '../types/app';
 import AnalyticsService from '../services/analyticsService';
+import { GeminiLoadingOverlay, IMAGE_ANALYSIS_STAGES } from './GeminiLoadingOverlay';
 
 // Temporary interface for receipt scan results that may include price data
 interface ReceiptScanResult {
@@ -1991,15 +1992,12 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                   {imagePreview ? (
                     <div className="relative rounded-xl overflow-hidden aspect-[4/3] ring-2 ring-[var(--accent-color)]">
                       <img src={imagePreview} alt="Preview" className="w-full h-full object-cover opacity-80" />
-                      {loadingState === LoadingState.LOADING && (
-                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                          <div className="bg-white/90 backdrop-blur-sm rounded-lg p-4 flex flex-col items-center gap-2">
-                            <Loader2 className="animate-spin w-6 h-6 text-[var(--accent-color)]" />
-                            <p className="text-sm font-medium text-theme-secondary">AI is analyzing your image...</p>
-                            <p className="text-xs text-theme-secondary/70">This may take a few seconds</p>
-                          </div>
-                        </div>
-                      )}
+                      <GeminiLoadingOverlay
+                        isActive={loadingState === LoadingState.LOADING}
+                        totalSeconds={30}
+                        stages={IMAGE_ANALYSIS_STAGES}
+                        variant="overlay"
+                      />
                     </div>
                   ) : (
                     <div className="border-2 border-dashed border-theme rounded-xl bg-theme-primary hover:bg-[var(--accent-color)]/5 transition-all aspect-[4/3] flex flex-col items-center justify-center gap-3">

@@ -6,6 +6,7 @@ import DatabaseMonitoringService from '../services/databaseMonitoringService';
 import { RecipeSearchResult, LoadingState, RecipeRating, StructuredRecipe, PantryItem, SavedRecipe, User, Household } from '../types';
 import { Tab } from '../types/app';
 import { RecipeCardSkeleton } from './SkeletonLoader';
+import { GeminiLoadingOverlay, RECIPE_SEARCH_STAGES } from './GeminiLoadingOverlay';
 import PopularRecipes from './PopularRecipes';
 import { PremiumFeature } from './PremiumFeature';
 import { RecipeRatingUI } from './RecipeRating';
@@ -1842,10 +1843,18 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
             </div>
 
             {loadingState === LoadingState.LOADING && (
-                <div className="animate-fade-in-up space-y-8 mt-8">
-                    <RecipeCardSkeleton />
-                    <RecipeCardSkeleton />
-                    <RecipeCardSkeleton />
+                <div className="animate-fade-in-up mt-8">
+                    <GeminiLoadingOverlay
+                        isActive
+                        totalSeconds={35}
+                        stages={RECIPE_SEARCH_STAGES}
+                        variant="inline"
+                    />
+                    <div className="space-y-8">
+                        <RecipeCardSkeleton />
+                        <RecipeCardSkeleton />
+                        <RecipeCardSkeleton />
+                    </div>
                 </div>
             )}
 
@@ -1938,7 +1947,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
 
             <div className="mt-12">
                 <h2 className="text-xl font-bold text-theme-primary mb-6">{intl.formatMessage({ id: 'recipes.popular' })}</h2>
-                <PopularRecipes openRecipeModal={openRecipeModal} onAddToPlan={onAddToPlan} user={user} household={household} />
+                <PopularRecipes openRecipeModal={openRecipeModal} onAddToPlan={onAddToPlan} user={user} household={household} recipes={firebaseRecipes} />
             </div>
 
         </>

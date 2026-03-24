@@ -1,23 +1,36 @@
 import React, { useState, useEffect } from 'react';
 import { Crown, Check, X } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
 import { useSubscription } from '../hooks/useSubscription';
 import { User } from '../types';
 import { UsageService, UsageLimits } from '../services/usageService';
 import { log } from '../services/logService';
 import AnalyticsService from '../services/analyticsService';
+import {
+  initializePurchaseStore,
+  purchaseProduct,
+  restorePurchases,
+  getProductPrice,
+  PRODUCT_IDS,
+  ProductId,
+} from '../services/purchaseService';
 
 interface SubscriptionManagerProps {
   user: User | null;
 }
 
-interface SubscriptionManagerProps {
-  user: User | null;
-}
+const PLAN_PRODUCT_MAP: Record<string, ProductId> = {
+  premium: PRODUCT_IDS.PREMIUM_MONTHLY,
+  family: PRODUCT_IDS.FAMILY_MONTHLY,
+};
 
 export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }) => {
   const { subscription, isPremium, isFamily, isActive } = useSubscription(user);
   const [showPlans, setShowPlans] = useState(false);
   const [usageLimits, setUsageLimits] = useState<UsageLimits | null>(null);
+  const [purchaseLoading, setPurchaseLoading] = useState<string | null>(null);
+  const [purchaseError, setPurchaseError] = useState<string | null>(null);
+  const [livePrices, setLivePrices] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const fetchUsageLimits = async () => {
@@ -32,7 +45,21 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }
     };
 
     fetchUsageLimits();
-    
+
+    // Initialize IAP store on Android and fetch live prices
+    if (user?.id && Capacitor.isNativePlatform()) {
+      initializePurchaseStore(user.id)
+        .then(() => {
+          setLivePrices({
+            [PRODUCT_IDS.PREMIUM_MONTHLY]: getProductPrice(PRODUCT_IDS.PREMIUM_MONTHLY) ?? '',
+            [PRODUCT_IDS.FAMILY_MONTHLY]: getProductPrice(PRODUCT_IDS.FAMILY_MONTHLY) ?? '',
+          });
+        })
+        .catch((err: any) =>
+          log.error('IAP store init error', { error: err?.message }, 'SubscriptionManager')
+        );
+    }
+
     // Track subscription funnel - viewing pricing
     AnalyticsService.trackSubscriptionFunnel('view_pricing', {
       current_tier: subscription?.tier || 'free',
@@ -40,15 +67,36 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }
     });
   }, [user, subscription?.tier, isActive]);
 
-  const handleUpgrade = (plan: any) => {
-    // Track subscription funnel
+  const handleUpgrade = async (plan: any) => {
+    if (plan.id === 'free') return;
+    const productId = PLAN_PRODUCT_MAP[plan.id];
+    if (!productId) return;
+
     AnalyticsService.trackSubscriptionFunnel('upgrade_intent', {
       plan_name: plan.name,
       plan_price: plan.price,
-      current_tier: subscription?.tier || 'free'
+      current_tier: subscription?.tier || 'free',
     });
-    
-    alert(`Premium subscriptions are handled through Google Play Billing. Upgrade on Android devices via the Play Store for ${plan.name}.`);
+
+    setPurchaseError(null);
+    setPurchaseLoading(productId);
+    try {
+      AnalyticsService.trackSubscriptionFunnel('payment_attempt', { plan_name: plan.name });
+      const result = await purchaseProduct(productId);
+      if (result.success) {
+        AnalyticsService.trackSubscriptionFunnel('payment_success', { plan_name: plan.name });
+        // Subscription update is written to Firestore by verifyPurchase CF;
+        // useSubscription will pick it up automatically via the live listener.
+      } else {
+        setPurchaseError(result.error ?? 'Purchase failed. Please try again.');
+        AnalyticsService.trackSubscriptionFunnel('payment_failed', {
+          plan_name: plan.name,
+          error: result.error,
+        });
+      }
+    } finally {
+      setPurchaseLoading(null);
+    }
   };
 
   const plans = [
@@ -201,7 +249,7 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }
           onClick={() => setShowPlans(!showPlans)}
           className="w-full bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg font-medium transition-colors"
         >
-          {isPremium ? 'Manage Subscription' : 'View Plans (Coming Soon)'}
+          {isPremium ? 'Manage Subscription' : 'View Plans'}
         </button>
       </div>
 
@@ -280,15 +328,23 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }
                       ? 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 cursor-not-allowed'
                       : plan.id === 'free'
                       ? 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
-                      : 'bg-blue-500 hover:bg-blue-600 text-white'
+                      : 'bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-60'
                   }`}
-                  disabled={subscription?.tier === plan.id}
+                  disabled={
+                    subscription?.tier === plan.id ||
+                    purchaseLoading !== null ||
+                    (plan.id !== 'free' && !Capacitor.isNativePlatform())
+                  }
                 >
                   {subscription?.tier === plan.id
                     ? 'Current Plan'
                     : plan.id === 'free'
                     ? 'Downgrade'
-                    : 'Coming Soon'}
+                    : purchaseLoading === PLAN_PRODUCT_MAP[plan.id]
+                    ? 'Processing…'
+                    : livePrices[PLAN_PRODUCT_MAP[plan.id]]
+                    ? `Subscribe — ${livePrices[PLAN_PRODUCT_MAP[plan.id]]}/mo`
+                    : 'Subscribe'}
                 </button>
               </div>
             ))}
@@ -313,15 +369,30 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }
         </div>
       )}
 
-      <div className="mt-6 bg-yellow-50 dark:bg-yellow-900/20 rounded-xl border border-yellow-200 dark:border-yellow-800 p-6 space-y-2">
-        <h3 className="text-lg font-semibold text-yellow-700 dark:text-yellow-200">Upgrade via Google Play Billing</h3>
-        <p className="text-sm text-yellow-800 dark:text-yellow-100">
-          Premium tiers are unlocked through the Google Play Store billing flow. Please upgrade inside the app on an Android device or visit the Play Store listing to activate your plan. Once Play completes the purchase, the subscription status syncs automatically.
-        </p>
-        <p className="text-xs text-yellow-600 dark:text-yellow-200">
-          On iOS or web the upgrade prompt is currently unavailable; use an Android device with Play Store access.
-        </p>
+      {purchaseError && (
+        <div className="bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800 p-4">
+          <p className="text-sm text-red-700 dark:text-red-300">{purchaseError}</p>
+        </div>
+      )}
+
+      <div className="flex gap-3">
+        <button
+          onClick={async () => {
+            setPurchaseError(null);
+            await restorePurchases();
+          }}
+          disabled={!Capacitor.isNativePlatform()}
+          className="flex-1 text-sm text-blue-500 hover:text-blue-600 disabled:text-gray-400 font-medium py-2 border border-blue-200 dark:border-blue-700 disabled:border-gray-200 rounded-lg transition-colors"
+        >
+          Restore Purchases
+        </button>
       </div>
+
+      {!Capacitor.isNativePlatform() && (
+        <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
+          In-app purchases are available on the Android app.
+        </p>
+      )}
     </div>
   );
 };

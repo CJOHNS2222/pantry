@@ -8,14 +8,24 @@ interface Props {
   onAddToPlan?: (r: any) => void;
   user?: User | null;
   household?: Household | null;
+  recipes?: SavedRecipe[]; // Optional prop to avoid duplicate loading
 }
 
-export const PopularRecipes: React.FC<Props> = ({ openRecipeModal, onAddToPlan, user }) => {
-  const [recipes, setRecipes] = useState<SavedRecipe[]>([]);
-  const [loading, setLoading] = useState(false);
+export const PopularRecipes: React.FC<Props> = ({ openRecipeModal, onAddToPlan, user, recipes: propRecipes }) => {
+  const [recipes, setRecipes] = useState<SavedRecipe[]>(propRecipes || []);
+  const [loading, setLoading] = useState(!propRecipes); // Only load if recipes not provided
   const [visible, setVisible] = useState(25);
 
   useEffect(() => {
+    // If recipes are provided as props, use them
+    if (propRecipes) {
+      setRecipes(propRecipes);
+      setLoading(false);
+      setVisible(25);
+      return;
+    }
+
+    // Otherwise, load them
     const load = async () => {
       if (!user) return;
       setLoading(true);
@@ -30,7 +40,7 @@ export const PopularRecipes: React.FC<Props> = ({ openRecipeModal, onAddToPlan, 
       }
     };
     load();
-  }, [user]);
+  }, [user, propRecipes]);
 
   if (loading) return (
     <div className="text-center py-12 opacity-50">

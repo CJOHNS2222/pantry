@@ -206,8 +206,9 @@ const App: React.FC = () => {
     logItemRemoved,
     logShoppingAdded,
     logRecipeSaved,
-    logMealCompleted
-  } = useHouseholdActivity(user, null, activeTab); // Pass null for household initially
+    logMealCompleted,
+    updateActivityStatus
+  } = useHouseholdActivity(user, null); // Household will be set later
 
   const {
     inventory,
@@ -272,7 +273,8 @@ const App: React.FC = () => {
     logItemRemoved,
     logShoppingAdded,
     logRecipeSaved,
-    logMealCompleted
+    logMealCompleted,
+    updateActivityStatus
   }, {
     onShowAddToPlanDialog: (recipe) => {
       setPendingRecipeForPlan(recipe);

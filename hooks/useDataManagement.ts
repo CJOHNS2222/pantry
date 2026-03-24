@@ -279,6 +279,7 @@ export function useDataManagement(
     logShoppingAdded?: (item: string) => void;
     logRecipeSaved?: (recipe: string) => void;
     logMealCompleted?: (meal: string) => void;
+    updateActivityStatus?: (activity: string) => void;
   },
   options?: {
     disableInventoryListeners?: boolean;
@@ -944,6 +945,9 @@ export function useDataManagement(
     if (loggingOptions?.logItemRemoved) {
       loggingOptions.logItemRemoved(itemToDelete.item, itemToDelete.id);
     }
+    if (loggingOptions?.updateActivityStatus) {
+      loggingOptions.updateActivityStatus('managing inventory');
+    }
 
     await recordUndo('delete_item', itemToDelete);
 
@@ -960,6 +964,9 @@ export function useDataManagement(
     if (loggingOptions?.logItemAdded) {
       loggingOptions.logItemAdded(item.item, item.id);
     }
+    if (loggingOptions?.updateActivityStatus) {
+      loggingOptions.updateActivityStatus('managing inventory');
+    }
 
     await InventoryCacheService.addItemToCache(itemWithAlert, user?.householdId, user?.id);
     HapticService.itemAdded();
@@ -973,12 +980,18 @@ export function useDataManagement(
     if (!user?.id) return;
     const fullItem: ShoppingItem = { ...item, id: `shop-${Date.now()}`, addedAt: new Date() };
     await ShoppingListCacheService.addItemToCache(fullItem, user?.householdId, user?.id);
+    if (loggingOptions?.updateActivityStatus) {
+      loggingOptions.updateActivityStatus('managing shopping list');
+    }
   };
 
   const addShoppingListItems = async (items: Omit<ShoppingItem, 'id' | 'addedAt'>[]) => {
     if (!user?.id || !items.length) return;
     const itemsWithIds = items.map(item => ({ ...item, id: `shop-${Date.now()}-${Math.random()}`, addedAt: new Date() }));
     await ShoppingListCacheService.addItemsToCache(itemsWithIds, user?.householdId, user?.id);
+    if (loggingOptions?.updateActivityStatus) {
+      loggingOptions.updateActivityStatus('managing shopping list');
+    }
   };
 
   const updateShoppingListItem = async (itemId: string, updates: Partial<ShoppingItem>) => {
@@ -1094,6 +1107,9 @@ export function useDataManagement(
     if (!user?.id) return;
     try {
       await MealPlanCacheService.addMeal(date, mealType, meal, user?.householdId, user?.id);
+      if (loggingOptions?.updateActivityStatus) {
+        loggingOptions.updateActivityStatus('planning meals');
+      }
       addToast?.(`Added ${meal.recipe.title} to your meal plan!`, 'success');
     } catch (err) {
       log.error('Error adding meal to plan:', err, 'DataManagement');
@@ -1105,6 +1121,9 @@ export function useDataManagement(
     if (!user?.id) return;
     try {
       await MealPlanCacheService.updateMeal(date, mealType, meal, user?.householdId, user?.id);
+      if (loggingOptions?.updateActivityStatus) {
+        loggingOptions.updateActivityStatus('planning meals');
+      }
       addToast?.(`Updated ${meal.recipe.title} on your meal plan!`, 'success');
     } catch (err) {
       log.error('Error updating meal on plan:', err, 'DataManagement');
@@ -1116,6 +1135,9 @@ export function useDataManagement(
     if (!user?.id) return;
     try {
       await MealPlanCacheService.removeMeal(date, mealType, mealId, user?.householdId, user?.id);
+      if (loggingOptions?.updateActivityStatus) {
+        loggingOptions.updateActivityStatus('planning meals');
+      }
       addToast?.('Removed meal from your plan!', 'success');
     } catch (err) {
       log.error('Error removing meal from plan:', err, 'DataManagement');

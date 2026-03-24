@@ -1,7 +1,7 @@
 {
   "name": "stockandspoon",
   "private": true,
-  "version": "1.5.5",
+  "version": "1.5.6",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -45,6 +45,7 @@
     "@zxing/library": "^0.21.3",
     "adb": "^0.2.0",
     "capacitor-plugin-safe-area": "^4.0.3",
+    "cordova-plugin-purchase": "^13.13.1",
     "firebase": "^12.6.0",
     "firebase-admin": "^13.7.0",
     "fuse.js": "^7.1.0",

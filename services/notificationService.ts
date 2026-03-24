@@ -49,7 +49,6 @@ export interface NotificationSettings {
 }
 
 export class NotificationService {
-  private static readonly COLLECTION = 'notifications';
 
   /**
    * Create a contextual notification
@@ -73,31 +72,14 @@ export class NotificationService {
     try {
       await appendNotificationToUser(userId, item as any);
     } catch (err: any) {
-      // Add richer debug output to help diagnose permission issues
+      // Log the error but don't fallback to inefficient root collection
       console.error('Failed to append notification to user cache:', {
         error: err?.message || err,
         authUid: auth?.currentUser?.uid,
         targetUid: userId,
         payload: item
       });
-      // fallback to writing to collection if cache fails
-      try {
-        const docRef = await DatabaseMonitoringService.addDoc(DatabaseMonitoringService.collection(this.COLLECTION), {
-          userId,
-          read: false,
-          createdAt: serverTimestamp(),
-          ...notification
-        });
-        return docRef.id;
-      } catch (fallbackErr: any) {
-        console.error('Failed to write notification to top-level collection (fallback):', {
-          error: fallbackErr?.message || fallbackErr,
-          authUid: auth?.currentUser?.uid,
-          targetUid: userId,
-          payload: notification
-        });
-        throw fallbackErr;
-      }
+      throw err; // Re-throw to prevent silent failures
     }
 
     // Send push notification for urgent notifications only (expired items)
@@ -487,27 +469,35 @@ export class NotificationService {
    */
   static async getUnreadNotifications(userId: string, userEmail?: string): Promise<NotificationItem[]> {
     try {
-      // Query the top-level notifications collection for unread notifications for this user from the last 30 days
+      // Read from per-user cache document instead of querying root collection
+      const cacheRef = DatabaseMonitoringService.doc('users', userId, 'cache', 'notifications');
+      const cacheSnap = await DatabaseMonitoringService.getDoc(cacheRef);
+
+      if (!cacheSnap.exists()) {
+        return [];
+      }
+
+      const data = cacheSnap.data() as any;
+      const allNotifications = Array.isArray(data.items) ? data.items : [];
+
+      // Filter for unread notifications from the last 30 days
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-      const notificationsQuery = DatabaseMonitoringService.query(
-        DatabaseMonitoringService.collection('notifications'),
-        DatabaseMonitoringService.where('userId', '==', userId),
-        DatabaseMonitoringService.where('read', '==', false),
-        DatabaseMonitoringService.where('createdAt', '>=', Timestamp.fromDate(thirtyDaysAgo))
-      );
+      const unreadNotifications = allNotifications.filter((n: NotificationItem) => {
+        if (n.read) return false;
 
-      const querySnapshot = await DatabaseMonitoringService.getDocs(notificationsQuery);
-      const unreadNotifications = querySnapshot.docs.map((doc: any) => ({
-        id: doc.id,
-        ...doc.data()
-      })) as NotificationItem[];
+        // Check if notification is within 30 days
+        const createdAt = n.createdAt ? new Date(n.createdAt) : null;
+        if (!createdAt || createdAt < thirtyDaysAgo) return false;
 
-      // Sort by createdAt desc
-      const sorted = unreadNotifications.slice().sort((a: any, b: any) => {
-        const aTime = a.createdAt && a.createdAt.toMillis ? a.createdAt.toMillis() : (a.createdAt ? new Date(a.createdAt).getTime() : 0);
-        const bTime = b.createdAt && b.createdAt.toMillis ? b.createdAt.toMillis() : (b.createdAt ? new Date(b.createdAt).getTime() : 0);
+        return true;
+      });
+
+      // Sort by createdAt desc and limit to 20
+      const sorted = unreadNotifications.slice().sort((a: NotificationItem, b: NotificationItem) => {
+        const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
         return bTime - aTime;
       }).slice(0, 20);
 
@@ -522,31 +512,22 @@ export class NotificationService {
   /**
    * Mark notification as read
    */
-  static async markAsRead(notificationId: string): Promise<void> {
-    // Try to mark read in per-user cache; fall back to collection update if needed
+  static async markAsRead(userId: string, notificationId: string): Promise<void> {
     try {
-      // We don't know the uid here; the callers usually have it. As a fallback,
-      // update by scanning user's cache is not feasible without uid. Keep collection fallback here.
-      await DatabaseMonitoringService.updateDoc(DatabaseMonitoringService.doc(this.COLLECTION + '/' + notificationId), {
-        read: true
-      });
+      await updateNotificationInCache(userId, notificationId, { read: true });
     } catch (err) {
-      console.error('Failed to mark notification read in collection fallback:', err);
+      console.error('Failed to mark notification read in cache:', err);
     }
   }
 
   /**
    * Snooze notification
    */
-  static async snoozeNotification(notificationId: string, minutes: number): Promise<void> {
-    // Snooze in cache is per-user; here we fallback to collection update as we don't have uid
-    const snoozedUntil = new Date(Date.now() + minutes * 60 * 1000);
+  static async snoozeNotification(userId: string, notificationId: string, minutes: number): Promise<void> {
     try {
-      await DatabaseMonitoringService.updateDoc(DatabaseMonitoringService.doc(this.COLLECTION + '/' + notificationId), {
-        snoozedUntil: Timestamp.fromDate(snoozedUntil)
-      });
+      await snoozeNotificationInCache(userId, notificationId, minutes);
     } catch (err) {
-      console.error('Failed to snooze notification in collection fallback:', err);
+      console.error('Failed to snooze notification in cache:', err);
     }
   }
 
@@ -630,19 +611,31 @@ export class NotificationService {
    * Clean up old notifications (older than 30 days)
    */
   static async cleanupOldNotifications(userId: string): Promise<void> {
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const q = DatabaseMonitoringService.query(
-      DatabaseMonitoringService.collection(this.COLLECTION),
-      DatabaseMonitoringService.where('userId', '==', userId),
-      DatabaseMonitoringService.where('createdAt', '<', Timestamp.fromDate(thirtyDaysAgo))
-    );
+    try {
+      const cacheRef = DatabaseMonitoringService.doc('users', userId, 'cache', 'notifications');
+      const cacheSnap = await DatabaseMonitoringService.getDoc(cacheRef);
 
-    const snapshot = await DatabaseMonitoringService.getDocs(q);
-    const batch = [];
-    for (const doc of snapshot.docs) {
-      batch.push(DatabaseMonitoringService.deleteDoc(DatabaseMonitoringService.doc(this.COLLECTION + '/' + doc.id)));
+      if (!cacheSnap.exists()) {
+        return;
+      }
+
+      const data = cacheSnap.data() as any;
+      const allNotifications = Array.isArray(data.items) ? data.items : [];
+
+      // Filter out notifications older than 30 days
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      const recentNotifications = allNotifications.filter((n: NotificationItem) => {
+        const createdAt = n.createdAt ? new Date(n.createdAt) : null;
+        return createdAt && createdAt >= thirtyDaysAgo;
+      });
+
+      // Update the cache with only recent notifications
+      if (recentNotifications.length !== allNotifications.length) {
+        await DatabaseMonitoringService.setDoc(cacheRef, { items: recentNotifications }, { merge: true });
+      }
+    } catch (err: any) {
+      console.error('Error cleaning up old notifications:', err);
     }
-    await Promise.all(batch);
   }
 
   /**
@@ -650,19 +643,29 @@ export class NotificationService {
    * This prevents duplicate notifications from accumulating
    */
   static async deleteExistingDailyNotifications(userId: string): Promise<void> {
-    const q = DatabaseMonitoringService.query(
-      DatabaseMonitoringService.collection(this.COLLECTION),
-      DatabaseMonitoringService.where('userId', '==', userId),
-      DatabaseMonitoringService.where('type', '==', 'system'),
-      DatabaseMonitoringService.where('title', '==', 'Daily Pantry Check')
-    );
+    try {
+      const cacheRef = DatabaseMonitoringService.doc('users', userId, 'cache', 'notifications');
+      const cacheSnap = await DatabaseMonitoringService.getDoc(cacheRef);
 
-    const snapshot = await DatabaseMonitoringService.getDocs(q);
-    const batch = [];
-    for (const doc of snapshot.docs) {
-      batch.push(DatabaseMonitoringService.deleteDoc(DatabaseMonitoringService.doc(this.COLLECTION + '/' + doc.id)));
+      if (!cacheSnap.exists()) {
+        return;
+      }
+
+      const data = cacheSnap.data() as any;
+      const allNotifications = Array.isArray(data.items) ? data.items : [];
+
+      // Filter out daily pantry check notifications
+      const filteredNotifications = allNotifications.filter((n: NotificationItem) => {
+        return !(n.type === 'system' && n.title === 'Daily Pantry Check');
+      });
+
+      // Update the cache if any notifications were removed
+      if (filteredNotifications.length !== allNotifications.length) {
+        await DatabaseMonitoringService.setDoc(cacheRef, { items: filteredNotifications }, { merge: true });
+      }
+    } catch (err: any) {
+      console.error('Error deleting existing daily notifications:', err);
     }
-    await Promise.all(batch);
   }
 
   /**

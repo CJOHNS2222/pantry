@@ -17,7 +17,7 @@ dependencies {
     implementation project(':capacitor-local-notifications')
     implementation project(':capacitor-push-notifications')
     implementation project(':capacitor-plugin-safe-area')
-
+    implementation "com.android.billingclient:billing:8.3.0"
 }
 
 
