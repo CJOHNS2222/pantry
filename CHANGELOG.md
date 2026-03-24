@@ -5,6 +5,22 @@ All notable changes to Stock & Spoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.5] - 2026-03-23
+
+### Added
+- **Activity Feed in header**: Household activity feed is now accessible via the household members status indicator in the app header (centre section). Tapping the indicator opens a dropdown showing recent member actions — no longer buried in the Community tab. Only visible to multi-member households.
+- **SmartRecommendations in Recipe Finder tab**: `SmartRecommendations` component renders above the RecipeFinder on the Recipes tab; reads only the already-cached `inventory` and `savedRecipes` arrays (zero extra Firestore reads), matching pantry items against saved recipe ingredients for "Cook with What You Have" suggestions, expiry alerts, and time-based dinner prompts.
+- **Household activity tracking re-enabled**: Debounced `debouncedUpdateActivity` writes (tab-change + page-visibility) re-enabled in `useHouseholdActivity`.
+
+### Removed
+- **Email invite Cloud Function** (`sendHouseholdInvitation`): Deleted `functions/src/sendHouseholdInvitation.ts`, `functions/src/helpers/sendEmail.ts`, and `services/emailService.ts`; in-app bell notification (written directly to user cache) is the only invite signal.
+- **Stripe payment code**: Deleted `functions/src/stripe.ts`, `components/StripeCheckout.tsx`, and `services/stripeService.ts`; Stripe integration was fully dormant (null stub + commented-out CF export).
+
+### Fixed
+- **Notification action buttons**: Action labels in the notification dropdown (e.g. "View Items", "Add to Shopping List") were non-interactive `<div>` elements — replaced with functional `<button>` elements that invoke the correct handler for each `actionType`.
+- **Notification swipe-to-dismiss**: Added horizontal swipe gesture support on notification dropdown items with direction lock, red "Dismiss" reveal layer, 80 px threshold, and snap-back animation on release.
+- **MealPlanner timezone bug**: "This Week" compact view showed wrong day labels/dates due to UTC-midnight parsing. Fixed by appending `'T12:00:00'` for local noon parsing and recomputing `dayName` from the date string.
+
 ## [1.5.4] - 2026-03-23
 
 ### Added
