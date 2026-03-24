@@ -1100,6 +1100,8 @@ const App: React.FC = () => {
           onSyncClick={syncNow}
           onNavigateToSettings={navigateToNotifications}
           onNotificationAction={n => handleNotificationAction(n as Parameters<typeof handleNotificationAction>[0])}
+          recentActivities={recentActivities}
+          isLoadingActivities={isLoadingActivities}
         />
 
         {/* Persistent household invite banner — stays visible until acted on */}

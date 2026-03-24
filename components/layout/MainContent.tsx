@@ -12,7 +12,6 @@ const Settings = React.lazy(() => import('../Settings').then(module => ({ defaul
 
 // Keep Login and Tutorial as regular imports since they're shown immediately
 import { Login } from '../Login';
-import { HouseholdActivityFeed } from '../HouseholdActivityFeed';
 import SmartRecommendations from '../SmartRecommendations';
 import { UsageIndicator } from '../UsageIndicator';
 import ComponentErrorBoundary from '../ComponentErrorBoundary';
@@ -230,17 +229,7 @@ export const MainContent: React.FC = () => {
         </>
       )}
       {activeTab === Tab.COMMUNITY && (
-        <>
-          {household && (
-            <ComponentErrorBoundary componentName="HouseholdActivityFeed">
-              <HouseholdActivityFeed
-                activities={recentActivities}
-                isLoading={isLoadingActivities}
-                maxItems={10}
-              />
-            </ComponentErrorBoundary>
-          )}
-          <ComponentErrorBoundary componentName="Community">
+        <ComponentErrorBoundary componentName="Community">
           <Suspense fallback={<LoadingSpinner />}>
             <Community
               onAddToPlan={onAddToPlan}
@@ -248,8 +237,7 @@ export const MainContent: React.FC = () => {
               user={user || undefined}
             />
           </Suspense>
-          </ComponentErrorBoundary>
-        </>
+        </ComponentErrorBoundary>
       )}
       {activeTab === Tab.SETTINGS && (
         <ComponentErrorBoundary componentName="Settings">
