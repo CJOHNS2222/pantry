@@ -227,18 +227,25 @@ export const filterPantryItems = (items: PantryItem[], filter: PantryFilter): Pa
   if (filter.expirationStatus !== 'all') {
     const now = new Date();
     const soon = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // 7 days from now
+    const soonFrozen = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days for frozen items
 
     filtered = filtered.filter(item => {
-      if (!item.expirationDate) return filter.expirationStatus === 'fresh';
+      const isFrozen = item.is_frozen || item.storageLocation === 'freezer';
+      const effectiveExpiry = isFrozen
+        ? (item.freezerExpiry || item.expirationDate)
+        : item.expirationDate;
+      const threshold = isFrozen ? soonFrozen : soon;
 
-      const expDate = new Date(item.expirationDate);
+      if (!effectiveExpiry) return filter.expirationStatus === 'fresh';
+
+      const expDate = new Date(effectiveExpiry);
       switch (filter.expirationStatus) {
         case 'expired':
           return expDate < now;
         case 'expiring-soon':
-          return expDate >= now && expDate <= soon;
+          return expDate >= now && expDate <= threshold;
         case 'fresh':
-          return expDate > soon;
+          return expDate > threshold;
         default:
           return true;
       }

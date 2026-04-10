@@ -86,8 +86,27 @@ const FAQ_DATA: FAQItem[] = [
     answer: 'Immortal items are things that don\'t expire:\n\n• **Pantry Staples**: Salt, sugar, rice, pasta, canned goods\n• **Non-perishables**: Dried beans, spices, baking soda\n• **Household Items**: Cleaning supplies, paper products\n\nMark items as immortal to prevent false expiration alerts. These items will never show up in expiration warnings but can still be included in shopping lists when quantities get low.',
     keywords: ['immortal', 'non-perishable', 'staples', 'expiration', 'never expires']
   },
-
-  // Shopping Lists
+  {
+    id: 'pantry-5',
+    category: 'Pantry Management',
+    question: 'What is the difference between Best By, Use By, and Sell By dates?',
+    answer: 'These three labels mean different things — and only two of them belong in Stock & Spoon:\n\n• **Best By / Best If Used By** — a quality date set by the manufacturer. The food is safe to eat after this date but may lose flavour, texture, or aroma. Most pantry staples (cereal, crackers, canned goods, frozen vegetables) carry this label. Choose "Best By" in the app for these items.\n\n• **Use By** — the last date the manufacturer recommends for peak quality and, for many perishables, safety. Dairy, fresh meat, deli items, and prepared foods often carry this label. The app treats Use By dates with higher urgency (shorter alert window). Choose "Use By" for these items.\n\n• **Sell By** — an inventory and restocking date for the store, not a safety date for you. Milk purchased on the sell-by date is typically fine for 5–7 more days if properly refrigerated. You do not need to enter sell-by dates — find the best-by or use-by date on the package instead.\n\nWhen in doubt, choose "Best By." Stock & Spoon uses this as the safer default for most items.',
+    keywords: ['best by', 'use by', 'sell by', 'expiration', 'date label', 'safety', 'quality', 'food date', 'printed date']
+  },
+  {
+    id: 'pantry-6',
+    category: 'Pantry Management',
+    question: 'How does the app handle items I put in the freezer?',
+    answer: 'When you change an item\'s storage location to Freezer (tap the item, change Storage Location, then save), Stock & Spoon automatically extends its expiry to the USDA-recommended freezer shelf life:\n\n• Ground beef / hamburger — 4 months\n• Chicken, turkey, duck — 9 months\n• Beef steaks / roasts, lamb, veal — 9 months\n• Pork, ham, sausage, bacon — 6 months\n• Lean fish (cod, tilapia, halibut) — 6 months\n• Salmon and other fatty fish — 3 months\n• Shrimp and shellfish — 4 months\n• Deli / cured meats — 2 months\n• Bread and baked goods — 3 months\n• Everything else — 4 months\n\nFrozen items only show expiry alerts within 30 days of the expected use-by date, and the language is gentler: "best used within N days (frozen)" rather than urgent red warnings.\n\nYou can always tap the item and override the date manually — the app trusts your judgment.',
+    keywords: ['freezer', 'frozen', 'shelf life', 'usda', 'chicken', 'beef', 'ground meat', 'auto expiry', 'freeze date', 'storage location']
+  },
+  {
+    id: 'pantry-7',
+    category: 'Pantry Management',
+    question: 'Why don\'t dry goods and canned items get automatic expiry dates?',
+    answer: 'Pasta, rice, flour, canned goods, cereals, crackers, spices, and similar shelf-stable items typically last 1–4 years and pose very little food-safety risk before that. Auto-assigning expiry dates to these would create a constant stream of low-value alerts, making it harder to notice the ones that actually matter — fresh meat, dairy, and produce.\n\nIf a package has a printed best-by date you care about, you can set it manually. Tap the item, tap the Expiration field, and choose a date.\n\nItems that genuinely never expire (salt, sugar, honey) can be flagged as "Shelf Stable" from the item detail screen. That permanently silences all expiry alerts for that item.',
+    keywords: ['dry goods', 'canned', 'pasta', 'rice', 'no expiry', 'shelf stable', 'immortal', 'auto date', 'cereal', 'flour', 'pantry staple']
+  },
   {
     id: 'shopping-1',
     category: 'Shopping Lists',

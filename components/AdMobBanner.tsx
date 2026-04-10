@@ -11,9 +11,8 @@ const TEST_AD_UNIT = 'ca-app-pub-3940256099942544/6300978111';
 const useTestAds = (): boolean => {
   return import.meta.env.MODE !== 'production' || import.meta.env.VITE_ADMOB_USE_TEST === 'true';
 };
-// Temporarily disable AdMob for testing releases.
-// To re-enable: set `ADMOB_ENABLED = true` and ensure `admob_app_id` in Android strings.xml is your production App ID.
-const ADMOB_ENABLED = false;
+// To re-enable: set `VITE_ADMOB_ENABLED=true` in .env.local and ensure `admob_app_id` in Android strings.xml is your production App ID.
+const ADMOB_ENABLED = import.meta.env.VITE_ADMOB_ENABLED === 'true';
 
 export const AdMobBanner: React.FC = () => {
   React.useEffect(() => {

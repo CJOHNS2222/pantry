@@ -4,7 +4,7 @@
       { "type": "start_activity", "intent": { "action": "android.intent.action.MAIN", "package": "com.smart.pantry" } },
       { "type": "wait", "milliseconds": 1200 },
 
-      { "type": "enter_text", "resource_name": "com.smart.pantry:id/login_email", "text": "cjohns222duck.com" },
+      { "type": "enter_text", "resource_name": "com.smart.pantry:id/login_email", "text": "cjohns22@duck.com" },
       { "type": "enter_text", "resource_name": "com.smart.pantry:id/login_password", "text": "63789632a" },
       { "type": "click", "resource_name": "com.smart.pantry:id/login_submit" },
       { "type": "wait", "milliseconds": 3000 },

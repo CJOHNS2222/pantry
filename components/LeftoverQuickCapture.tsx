@@ -1,5 +1,6 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { X } from 'lucide-react'
+import { useModalOpen } from '../utils/useModalOpen'
 import { useApp } from '../contexts/AppContext'
 import { uploadLeftoverImage } from '../services/leftoverImageService'
 import { LeftoverService, LeftoverCreateData } from '../services/leftoverService'
@@ -25,6 +26,7 @@ export default function LeftoverQuickCapture({
   onSaved,
   onClose
 }: LeftoverQuickCaptureProps) {
+  useModalOpen()
   const { user, household } = useApp()
   const dm = useDataManagement(user)
   const [photoUrl, setPhotoUrl] = useState<string | undefined>(recipeImageUrl)
@@ -75,8 +77,8 @@ export default function LeftoverQuickCapture({
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] px-4 pt-[var(--app-header-h)] pb-[var(--app-nav-h)]">
-      <div className="bg-theme-primary rounded-lg shadow-xl w-full max-w-md mx-auto max-h-full flex flex-col border border-theme">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] px-4 pt-[var(--safe-area-inset-top,0px)] pb-[var(--safe-area-inset-bottom,0px)]">
+      <div className="bg-theme-primary rounded-lg shadow-xl w-full max-w-md mx-auto h-full flex flex-col border border-theme">
         {/* Header */}
         <div className="flex items-center justify-between pt-4 px-3 pb-3 border-b border-theme flex-shrink-0">
           <h3 className="text-lg font-semibold text-theme-primary">Save Leftover</h3>

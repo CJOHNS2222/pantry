@@ -97,7 +97,7 @@ export class PantryService {
       id: crypto.randomUUID(),
       image,
       storageLocation: inferStorageLocationFromItemName(description),
-      expirationDate: getAutoExpirationDate(description, category),
+      expirationDate: getAutoExpirationDate(description, category, inferStorageLocationFromItemName(description)),
       expirationType: 'best-by', // Default to best-by for auto-detected items
       dateAdded: now,
       lastRestocked: now,
@@ -178,7 +178,7 @@ export class PantryService {
       batchId: crypto.randomUUID(),
       quantity,
       unit,
-      expires: getAutoExpirationDate(itemName, category),
+      expires: getAutoExpirationDate(itemName, category, inferStorageLocationFromItemName(itemName)),
       purchaseDate: now,
       note: ''
     };
@@ -192,7 +192,7 @@ export class PantryService {
       batches: [initialBatch],
       image,
       storageLocation: inferStorageLocationFromItemName(itemName),
-      expirationDate: getAutoExpirationDate(itemName, category),
+      expirationDate: getAutoExpirationDate(itemName, category, inferStorageLocationFromItemName(itemName)),
       expirationType: 'best-by', // Default to best-by for manual additions
       dateAdded: now,
       lastRestocked: now,

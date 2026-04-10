@@ -34,6 +34,8 @@ interface GeminiLoadingOverlayProps {
    * `inline`  – block-level banner inside the page flow (used in RecipeFinder).
    */
   variant?: 'overlay' | 'inline';
+  /** Called once when the countdown reaches zero. Use to abort the in-flight request. */
+  onTimeout?: () => void;
 }
 
 export const GeminiLoadingOverlay: React.FC<GeminiLoadingOverlayProps> = ({
@@ -41,11 +43,13 @@ export const GeminiLoadingOverlay: React.FC<GeminiLoadingOverlayProps> = ({
   totalSeconds,
   stages,
   variant = 'overlay',
+  onTimeout,
 }) => {
   const { remaining, progressPct, stageLabel } = useGeminiProgress(
     isActive,
     totalSeconds,
     stages,
+    onTimeout,
   );
 
   if (!isActive) return null;

@@ -121,40 +121,20 @@ class GroceryPriceService {
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-      const collectionRef = (DatabaseMonitoringService as any)?.collection && typeof (DatabaseMonitoringService as any).collection === 'function'
-        ? (DatabaseMonitoringService as any).collection(this.COLLECTION_NAME)
-        : firestoreCollection(db, this.COLLECTION_NAME);
-
-      const whereFn = (DatabaseMonitoringService as any)?.where && typeof (DatabaseMonitoringService as any).where === 'function'
-        ? (DatabaseMonitoringService as any).where
-        : firestoreWhere;
-
-      const orderByFn = (DatabaseMonitoringService as any)?.orderBy && typeof (DatabaseMonitoringService as any).orderBy === 'function'
-        ? (DatabaseMonitoringService as any).orderBy
-        : firestoreOrderBy;
-
-      const limitFn = (DatabaseMonitoringService as any)?.limit && typeof (DatabaseMonitoringService as any).limit === 'function'
-        ? (DatabaseMonitoringService as any).limit
-        : firestoreLimit;
-
-      const queryFn = (DatabaseMonitoringService as any)?.query && typeof (DatabaseMonitoringService as any).query === 'function'
-        ? (DatabaseMonitoringService as any).query
-        : firestoreQuery;
-
-      const q = queryFn(
-        collectionRef,
-        whereFn('ingredient', '==', ingredientKey),
-        whereFn('lastUpdated', '>=', thirtyDaysAgo),
-        orderByFn('lastUpdated', 'desc'),
-        limitFn(50)
+      const q = DatabaseMonitoringService.query(
+        DatabaseMonitoringService.collection(this.COLLECTION_NAME),
+        DatabaseMonitoringService.where('ingredient', '==', ingredientKey),
+        DatabaseMonitoringService.where('lastUpdated', '>=', thirtyDaysAgo),
+        DatabaseMonitoringService.orderBy('lastUpdated', 'desc'),
+        DatabaseMonitoringService.limit(50)
       );
 
-      const querySnapshot = await ((DatabaseMonitoringService as any)?.getDocs ? (DatabaseMonitoringService as any).getDocs(q) : (async (qr:any) => await (await import('firebase/firestore')).getDocs(qr))(q));
+      const querySnapshot = await DatabaseMonitoringService.getDocs(q);
 
       const prices: number[] = [];
 
-      querySnapshot.forEach((doc: any) => {
-        const data = doc.data() as GroceryPrice;
+      querySnapshot.forEach((doc: { data(): GroceryPrice }) => {
+        const data = doc.data();
         prices.push(data.price);
       });
 
@@ -188,7 +168,7 @@ class GroceryPriceService {
           }
           return openPriceData;
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.warn('Open Prices API fallback failed:', err);
       }
 
@@ -217,7 +197,7 @@ class GroceryPriceService {
       // If nothing found, return null and let component handle it
       console.warn(`No price data found for ${ingredient} from any source`);
       return null;
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error fetching ingredient price:', err);
       // Try to at least return default price on error
       const ingredientKey = this.normalizeIngredientName(ingredient);
@@ -275,7 +255,7 @@ class GroceryPriceService {
 
       // Also store in price history
       await this.storePriceHistory(priceData);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error submitting price update:', err);
       throw err;
     }
@@ -290,28 +270,18 @@ class GroceryPriceService {
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - days);
 
-      let querySnapshot: any;
+      let querySnapshot: Awaited<ReturnType<typeof DatabaseMonitoringService.getDocs>>;
 
-      const hasQueryApi = DatabaseMonitoringService &&
-        typeof (DatabaseMonitoringService as any).query === 'function' &&
-        typeof (DatabaseMonitoringService as any).collection === 'function' &&
-        typeof (DatabaseMonitoringService as any).where === 'function' &&
-        typeof (DatabaseMonitoringService as any).orderBy === 'function';
-
-      if (hasQueryApi) {
-        const q = (DatabaseMonitoringService as any).query(
-          (DatabaseMonitoringService as any).collection(this.PRICE_HISTORY_COLLECTION),
-          (DatabaseMonitoringService as any).where('ingredient', '==', ingredientKey),
-          (DatabaseMonitoringService as any).where('lastUpdated', '>=', startDate),
-          (DatabaseMonitoringService as any).orderBy('lastUpdated', 'desc')
+      try {
+        const q = DatabaseMonitoringService.query(
+          DatabaseMonitoringService.collection(this.PRICE_HISTORY_COLLECTION),
+          DatabaseMonitoringService.where('ingredient', '==', ingredientKey),
+          DatabaseMonitoringService.where('lastUpdated', '>=', startDate),
+          DatabaseMonitoringService.orderBy('lastUpdated', 'desc')
         );
-
-        querySnapshot = await (DatabaseMonitoringService as any).getDocs(q);
-      } else if ((DatabaseMonitoringService as any).getDocs) {
-        // The test mocks often only stub getDocs; call it directly and let the mock control the result
-        querySnapshot = await (DatabaseMonitoringService as any).getDocs(undefined);
-      } else {
-        // Fallback to Firestore directly when monitoring wrapper unavailable
+        querySnapshot = await DatabaseMonitoringService.getDocs(q);
+      } catch {
+        // Fallback to Firestore directly if monitoring wrapper unavailable
         const collectionRef = firestoreCollection(db, this.PRICE_HISTORY_COLLECTION);
         const q = firestoreQuery(
           collectionRef,
@@ -324,9 +294,8 @@ class GroceryPriceService {
 
       const userTrends: GroceryPrice[] = [];
 
-      querySnapshot.forEach((doc: any) => {
-        const data = doc.data() as GroceryPrice;
-        userTrends.push(data);
+      querySnapshot.forEach((doc: { data(): GroceryPrice }) => {
+        userTrends.push(doc.data());
       });
 
       // If we have enough user data, return it
@@ -360,7 +329,7 @@ class GroceryPriceService {
 
       // No user data available and we don't call API for completely empty user data
       return [];
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error fetching price trends:', err);
 
       // Fallback to Open Prices API only
@@ -421,7 +390,7 @@ class GroceryPriceService {
         priceChangePercent,
         priceHistory
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error analyzing price trends:', err);
 
       // Return default price on error
@@ -467,7 +436,7 @@ class GroceryPriceService {
       const newVotes = vote === 'up' ? currentVotes + 1 : Math.max(0, currentVotes - 1);
 
       await DatabaseMonitoringService.updateDoc(priceRef, { votes: newVotes });
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error voting on price:', err);
       throw err;
     }
@@ -481,7 +450,7 @@ class GroceryPriceService {
         ...priceData,
         recordedAt: new Date()
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error storing price history:', err);
     }
   }
@@ -498,8 +467,8 @@ class GroceryPriceService {
 
       const ingredients = new Set<string>();
 
-      querySnapshot.forEach((doc: any) => {
-        const data = doc.data() as GroceryPrice;
+      querySnapshot.forEach((doc: { data(): GroceryPrice }) => {
+        const data = doc.data();
         ingredients.add(data.ingredient);
       });
 
@@ -509,7 +478,7 @@ class GroceryPriceService {
       });
 
       return Array.from(ingredients).sort();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error fetching available ingredients:', err);
       return Object.keys(this.defaultPrices);
     }
@@ -547,7 +516,7 @@ class GroceryPriceService {
 
       const data: OpenPricesResponse = await response.json();
       return data.items || [];
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.warn('Failed to fetch historical prices from Open Prices API:', err);
       return [];
     }
@@ -578,13 +547,13 @@ class GroceryPriceService {
           currency: price.currency,
           lastUpdated: new Date(price.date),
           source: 'api' as const,
-          userId: undefined as any,
+          userId: undefined,
           votes: undefined
         }))
         .sort((a, b) => b.lastUpdated.getTime() - a.lastUpdated.getTime()); // Most recent first
 
       return trends;
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error fetching price trends from Open Prices API:', err);
       return [];
     }
@@ -622,7 +591,7 @@ class GroceryPriceService {
         currency: 'USD',
         lastUpdated: new Date(),
         source: 'api',
-        userId: undefined as any,
+        userId: undefined,
         votes: usdPrices.length // Use sample size as "votes"
       };
 
@@ -632,7 +601,7 @@ class GroceryPriceService {
       });
 
       console.log(`Stored Open Prices snapshot for ${ingredient}: $${averagePrice.toFixed(2)}`);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.warn('Failed to store Open Prices snapshot:', err);
     }
   }
@@ -689,7 +658,7 @@ class GroceryPriceService {
       }
 
       console.log('Price trend update completed');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error updating price trends from API:', err);
     }
   }
@@ -719,7 +688,7 @@ class GroceryPriceService {
       });
 
       return response.ok;
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.warn('Failed to submit price to Open Prices:', err);
       return false;
     }
@@ -756,7 +725,7 @@ class GroceryPriceService {
 
       const data: OpenPricesResponse = await response.json();
       return data.items || [];
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.warn(`Failed to fetch current prices from Open Prices API for ${ingredient}:`, err);
       return [];
     }
@@ -764,28 +733,12 @@ class GroceryPriceService {
 
   async saveGroceryPrice(priceData: GroceryPrice): Promise<void> {
     try {
-      let priceRef: any;
-      const hasSetDoc = (DatabaseMonitoringService as any) && typeof (DatabaseMonitoringService as any).setDoc === 'function';
-
-      if (hasSetDoc) {
-        // Prefer calling the monitoring wrapper's setDoc when it exists (tests mock this)
-        priceRef = (DatabaseMonitoringService as any).doc && typeof (DatabaseMonitoringService as any).doc === 'function'
-          ? (DatabaseMonitoringService as any).doc(this.COLLECTION_NAME, priceData.id)
-          : { __mockRef: `${this.COLLECTION_NAME}/${priceData.id}` };
-
-        await (DatabaseMonitoringService as any).setDoc(priceRef, {
-          ...priceData,
-          lastUpdated: new Date()
-        });
-      } else {
-        const { doc: docFn, setDoc: setDocFn } = await import('firebase/firestore');
-        priceRef = docFn(db, `${this.COLLECTION_NAME}/${priceData.id}`);
-        await setDocFn(priceRef, {
-          ...priceData,
-          lastUpdated: new Date()
-        });
-      }
-    } catch (err: any) {
+      const priceRef = DatabaseMonitoringService.doc(this.COLLECTION_NAME, priceData.id);
+      await DatabaseMonitoringService.setDoc(priceRef, {
+        ...priceData,
+        lastUpdated: new Date()
+      });
+    } catch (err: unknown) {
       console.error('Error saving grocery price:', err);
       throw err;
     }

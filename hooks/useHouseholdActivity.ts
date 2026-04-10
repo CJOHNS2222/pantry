@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
 import { User, Household, HouseholdActivity } from '../types';
-import { Tab } from '../types/app';
 import { HouseholdActivityService } from '../services/householdActivityService';
 import { debounce } from '../utils/debounceUtils';
 

@@ -50,8 +50,10 @@ export default defineConfig(({ mode }) => {
           '@': path.resolve(__dirname, '.'),
         }
       },
+      // Strip console.* and debugger statements in production builds
+      esbuild: mode === 'production' ? { drop: ['console', 'debugger'] } : {},
       build: {
-        sourcemap: true,
+        sourcemap: mode !== 'production',
         rollupOptions: {
           output: {
             manualChunks: {

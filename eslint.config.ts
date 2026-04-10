@@ -19,7 +19,7 @@ export default defineConfig([
     },
     rules: {
       "@typescript-eslint/no-unused-vars": "warn", // Reduce noise, warn instead of error
-      "@typescript-eslint/no-explicit-any": "off", // Disable noisy any type warnings
+      "@typescript-eslint/no-explicit-any": "error",
       "react/no-unescaped-entities": "off", // Disable quote escaping warnings
       "@typescript-eslint/no-require-imports": "off", // Allow require in scripts
       "no-undef": "off", // Allow globals like process in scripts

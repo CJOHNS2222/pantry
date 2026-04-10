@@ -197,7 +197,9 @@ const App: React.FC = () => {
     PerformanceMonitoringService.measure('shopping_list_add', 'shopping_list_add_start', 'shopping_list_add_end');
   };
 
-  // Household activity tracking
+  // Household activity tracking — activityHousehold is synced from useDataManagement below
+  // so the subscription only starts after the real household is loaded.
+  const [activityHousehold, setActivityHousehold] = useState<Household | null>(null);
   const {
     recentActivities,
     isLoadingActivities,
@@ -208,7 +210,7 @@ const App: React.FC = () => {
     logRecipeSaved,
     logMealCompleted,
     updateActivityStatus
-  } = useHouseholdActivity(user, null); // Household will be set later
+  } = useHouseholdActivity(user, activityHousehold);
 
   const {
     inventory,
@@ -288,6 +290,12 @@ const App: React.FC = () => {
       setShowAddToPlanDialog(true);
     }
   });
+
+  // Sync household into activityHousehold so the activity subscription activates
+  // once the household is loaded (avoids circular dependency at hook call site).
+  useEffect(() => {
+    setActivityHousehold(household ?? null);
+  }, [household]);
 
   // Confirm add to plan from dialog
   const confirmAddToPlan = (dayIndex: number, mealType: 'breakfast' | 'lunch' | 'dinner') => {
@@ -396,7 +404,7 @@ const App: React.FC = () => {
     if (user?.id) {
       await markNotificationRead(user.id, notificationId);
     } else {
-      await NotificationService.markAsRead(notificationId);
+      await NotificationService.markAsRead('', notificationId);
     }
     setNotifications([]);
   };
@@ -413,19 +421,23 @@ const App: React.FC = () => {
           await updateNotificationInCache(user.id, notification.id, { read: true });
         }
       } else {
-        await NotificationService.markAsRead(notification.id);
+        await NotificationService.markAsRead('', notification.id);
       }
 
       switch (notification.actionType) {
         case 'add_to_shopping':
           if (notification.actionData?.itemName) {
             addToShoppingList([notification.actionData.itemName]);
+            addToast(`Added "${notification.actionData.itemName}" to shopping list`, 'success');
+          } else if (notification.actionData?.items?.[0]?.itemName) {
+            const names = notification.actionData.items.map((i: {itemName: string}) => i.itemName) as string[];
+            addToShoppingList(names);
+            addToast(`Added ${names.length} item${names.length > 1 ? 's' : ''} to shopping list`, 'success');
           }
           break;
         case 'view_recipe':
-          if (notification.actionData?.recipeId) {
-            setActiveTab(Tab.RECIPES);
-          }
+          setActiveTab(Tab.RECIPES);
+          addToast('Viewing your saved recipes', 'info');
           break;
         case 'view_item': {
           // Try to open ItemDetailModal for the specific item; fall back to navigating to the tab
@@ -441,6 +453,7 @@ const App: React.FC = () => {
             setActiveTab(Tab.SHOPPING);
           } else {
             setActiveTab(Tab.PANTRY);
+            addToast('Item no longer found in pantry', 'info');
           }
           break;
         }
@@ -477,7 +490,7 @@ const App: React.FC = () => {
     if (user?.id) {
       await snoozeNotificationInCache(user.id, notificationId, minutes);
     } else {
-      await NotificationService.snoozeNotification(notificationId, minutes);
+      await NotificationService.snoozeNotification('', notificationId, minutes);
     }
     setNotifications([]);
   };
@@ -976,6 +989,7 @@ const App: React.FC = () => {
                 log.error('Failed to mark onboarding complete', { error }, 'App');
               }
             }}
+            onOpenHousehold={() => { setShowOnboarding(false); setShowHousehold(true); }}
             onSkip={() => setShowOnboarding(false)}
           />
         )}

@@ -28,6 +28,7 @@ import { useDataManagement } from '../hooks/useDataManagement';
 import { useAuth } from '../hooks/useAuth';
 import { offlineQueue } from '../services/offlineQueueService';
 import { offlineDataCache } from '../services/offlineDataCache';
+import { useAppActions } from '../contexts/AppActionsContext';
 import { groceryPriceService } from '../services/groceryPriceService';
 import { priceCacheService } from '../services/priceCacheService';
 
@@ -86,6 +87,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   const intl = useIntl();
   const [newItem, setNewItem] = React.useState('');
   const [canShowAdBanner, setCanShowAdBanner] = React.useState<boolean>(false);
+  const { addToast } = useAppActions();
 
   useEffect(() => {
     let mounted = true;
@@ -281,7 +283,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     // Check if item already exists
     const exists = items.some(item => item.item.toLowerCase() === itemName.toLowerCase());
     if (exists) {
-      alert(intl.formatMessage({ id: 'shoppingList.alreadyInList' }, { name: itemName }));
+      addToast(intl.formatMessage({ id: 'shoppingList.alreadyInList' }, { name: itemName }), 'info');
       return;
     }
 
@@ -506,7 +508,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   const handleQuickAdd = async (quickAddItem: { name: string; category?: string; quantity?: string; unit?: string }) => {
     const exists = items.some(item => item.item.toLowerCase() === quickAddItem.name.toLowerCase());
     if (exists) {
-      alert(intl.formatMessage({ id: 'shoppingList.alreadyInList' }, { name: quickAddItem.name }));
+      addToast(intl.formatMessage({ id: 'shoppingList.alreadyInList' }, { name: quickAddItem.name }), 'info');
       return;
     }
 
@@ -591,37 +593,34 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
       return item;
     });
 
-    if (confirm(`Move ${itemsToMove.length} items to pantry?`)) {
-      onMoveToPantry(updatedItems);
+    onMoveToPantry(updatedItems);
+    addToast(`${itemsToMove.length} item${itemsToMove.length > 1 ? 's' : ''} moved to pantry ✓`, 'success');
 
-      // Clear undo history for the moved items
-      setUndoHistory(prev => prev.filter(action =>
-        !itemsToMove.some(item => item.id === action.item.id)
-      ));
+    // Clear undo history for the moved items
+    setUndoHistory(prev => prev.filter(action =>
+      !itemsToMove.some(item => item.id === action.item.id)
+    ));
 
-      // Remove moved items from list
-      const movedIds = new Set(itemsToMove.map(i => i.id));
-      setItems(prev => prev.filter(i => !movedIds.has(i.id)));
+    // Remove moved items from list
+    const movedIds = new Set(itemsToMove.map(i => i.id));
+    setItems(prev => prev.filter(i => !movedIds.has(i.id)));
 
-      // nothing else to clear; we operate on checked items only
-
-      // Offline queue for sync
-      if (!isOnline) {
-        addToQueue({
-          type: 'batch',
-          collection: 'shoppingList',
-          data: { action: 'checkout', items: updatedItems }
-        });
-      }
+    // Offline queue for sync
+    if (!isOnline) {
+      addToQueue({
+        type: 'batch',
+        collection: 'shoppingList',
+        data: { action: 'checkout', items: updatedItems }
+      });
     }
   };
 
   const handleCopyToClipboard = () => {
     navigator.clipboard.writeText(uncheckedItemsText).then(() => {
-      alert(intl.formatMessage({ id: 'shoppingList.copiedToClipboard' }));
+      addToast(intl.formatMessage({ id: 'shoppingList.copiedToClipboard' }), 'success');
     }).catch(err => {
       log.error('Failed to copy shopping list', { error: err }, 'ShoppingList');
-      alert('Failed to copy to clipboard');
+      addToast('Failed to copy to clipboard', 'error');
     });
   };
 
@@ -663,10 +662,10 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     // Fallback: copy to clipboard if SMS app doesn't open
     setTimeout(() => {
       navigator.clipboard.writeText(smsMessageText).then(() => {
-        alert(intl.formatMessage({ id: 'shoppingList.smsFallback' }));
+        addToast(intl.formatMessage({ id: 'shoppingList.smsFallback' }), 'info');
       }).catch((error) => {
         log.error('Failed to copy SMS message to clipboard', { error }, 'ShoppingList');
-        alert(intl.formatMessage({ id: 'shoppingList.smsUnavailable' }));
+        addToast(intl.formatMessage({ id: 'shoppingList.smsUnavailable' }), 'error');
       });
     }, 1000);
   };
@@ -818,7 +817,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
 
       {/* Add Items Modal */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center p-4">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-theme-primary rounded-t-3xl max-w-md w-full modal-safe-h overflow-y-auto shadow-xl animate-slide-up">
             <div className="p-6 pb-2.5">
               <div className="flex items-center justify-between mb-6">
@@ -1079,6 +1078,23 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
 
       {canShowAdBanner && <AdMobBanner />}
 
+      {/* Undo banner for swipe-to-delete */}
+      {pendingDeleteCount > 0 && (
+        <div className="fixed bottom-20 left-0 right-0 flex justify-center px-4 z-50 pointer-events-none">
+          <div className="bg-theme-secondary border border-theme shadow-lg rounded-xl px-4 py-3 flex items-center gap-3 pointer-events-auto">
+            <span className="text-sm text-theme-primary">
+              {pendingDeleteCount === 1 ? '1 item removed' : `${pendingDeleteCount} items removed`}
+            </span>
+            <button
+              onClick={undoDelete}
+              className="text-[var(--accent-color)] font-semibold text-sm flex items-center gap-1 hover:opacity-80 transition-opacity"
+            >
+              <Undo2 className="w-4 h-4" />
+              Undo
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

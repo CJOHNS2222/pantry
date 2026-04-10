@@ -197,6 +197,88 @@ class CalendarService {
       console.error('Error opening calendar:', err);
     }
   }
+
+  /**
+   * Export a week of meal plans as an ICS file (web) or native calendar events (mobile).
+   * @param {DayPlan[]} days - Array of DayPlan objects to export
+   * @returns {Promise<void>}
+   */
+  async exportWeekAsICS(days: DayPlan[]): Promise<void> {
+    const platform = Capacitor.getPlatform();
+
+    if (platform !== 'web' && this.isAvailable()) {
+      // Mobile: create native calendar events
+      for (const day of days) {
+        const allMeals = [
+          ...(day.breakfast || []),
+          ...(day.lunch || []),
+          ...(day.dinner || []),
+          ...(day.meals || []),
+        ];
+        if (allMeals.length === 0) continue;
+        const date = new Date(day.date + 'T12:00:00');
+        await this.createMealPlanEvent(day, date);
+      }
+      return;
+    }
+
+    // Web: generate and download an ICS file
+    const escape = (str: string) =>
+      str.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
+
+    const lines: string[] = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//Stock & Spoon//EN',
+      'CALSCALE:GREGORIAN',
+      'METHOD:PUBLISH',
+    ];
+
+    for (const day of days) {
+      const allMeals = [
+        ...(day.breakfast || []).map(m => ({ type: 'Breakfast', ...m })),
+        ...(day.lunch || []).map(m => ({ type: 'Lunch', ...m })),
+        ...(day.dinner || []).map(m => ({ type: 'Dinner', ...m })),
+        ...(day.meals || []).map(m => ({ type: (m as any).mealType || 'Meal', ...m })),
+      ];
+      if (allMeals.length === 0) continue;
+
+      // Format date as YYYYMMDD (ICS all-day format)
+      const dateStr = day.date.replace(/-/g, '');
+      const nextDate = new Date(day.date + 'T00:00:00');
+      nextDate.setDate(nextDate.getDate() + 1);
+      const nextDateStr = nextDate.toISOString().slice(0, 10).replace(/-/g, '');
+
+      const description = allMeals
+        .map(m => `${m.type}: ${m.recipe?.title || 'Unknown'}`)
+        .join('\\n');
+
+      const uid = `stockandspoon-${day.date}-${Math.random().toString(36).substr(2, 6)}@stockandspoon.app`;
+
+      lines.push(
+        'BEGIN:VEVENT',
+        `DTSTART;VALUE=DATE:${dateStr}`,
+        `DTEND;VALUE=DATE:${nextDateStr}`,
+        `SUMMARY:${escape('Meal Plan – ' + day.dayName)}`,
+        `DESCRIPTION:${escape(description)}`,
+        `UID:${uid}`,
+        'END:VEVENT',
+      );
+    }
+
+    lines.push('END:VCALENDAR');
+
+    const icsContent = lines.join('\r\n');
+    const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'meal-plan.ics';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
 }
 
 export default new CalendarService();

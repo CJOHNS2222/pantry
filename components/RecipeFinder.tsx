@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Search, Loader2, Sparkles, ExternalLink, Globe, Plus, Clock, List, ChefHat, Star, Heart, Bookmark, Zap, Mic } from 'lucide-react';
 import { searchRecipes } from '../services/geminiService';
+import { setUserGeminiOptIn } from '../services/featureFlags';
 import { getSavedRecipes, getCachedPopularRecipes, saveRecipeToFirestore, saveRecipeToUserCache, uploadRecipeImageFile, submitRecipeForReview } from '../services/recipeService';
 import DatabaseMonitoringService from '../services/databaseMonitoringService';
 import { RecipeSearchResult, LoadingState, RecipeRating, StructuredRecipe, PantryItem, SavedRecipe, User, Household } from '../types';
@@ -937,11 +938,11 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
   const handleSpecificSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!specificQuery.trim()) {
-      alert('Please enter a recipe name or ingredients to search for.');
+      addToast?.('Please enter a recipe name or ingredients to search for.', 'info');
       return;
     }
     if (specificQuery.trim().length < 2) {
-      alert('Please enter at least 2 characters for your search.');
+      addToast?.('Please enter at least 2 characters for your search.', 'info');
       return;
     }
 
@@ -984,11 +985,11 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (inventory.length === 0) {
-        alert("Please add items to your pantry list first!");
+        addToast?.("Please add items to your pantry list first!", 'info');
         return;
     }
     if (inventory.length < 2) {
-        alert("Please add at least 2 items to your pantry for better recipe suggestions.");
+        addToast?.("Please add at least 2 items to your pantry for better recipe suggestions.", 'info');
         return;
     }
     
@@ -1021,7 +1022,8 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
         if (user) {
             try {
                 const limits = await UsageService.getUsageLimits(user);
-                const canSearch = await UsageService.canPerformSearch(user);
+                // Inline check using already-fetched limits (avoids a second getDoc via canPerformSearch)
+                const canSearch = limits.searches.weekly === -1 || limits.searches.used < limits.searches.weekly;
 
                 if (!canSearch) {
                     if (addToast) {
@@ -1032,8 +1034,6 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                             'Upgrade Now',
                             () => setActiveTab(Tab.SETTINGS)
                         );
-                    } else {
-                        alert('You\'ve reached your weekly search limit. Upgrade to Premium for 15 searches per week or Family for unlimited searches!');
                     }
                     return;
                 }
@@ -1860,31 +1860,50 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
 
             {loadingState === LoadingState.ERROR && (
                 <div className="p-4 bg-red-900/20 border border-red-500 text-red-400 rounded-xl text-center font-medium">
-                <div>Search failed. Please try again.</div>
-                {searchError && (
-                    <div className="text-xs mt-2 text-red-300">Error: {searchError}</div>
+                {searchError?.includes('opt-in required') ? (
+                    <>
+                        <div className="text-base mb-1">AI search requires your permission.</div>
+                        <div className="text-xs text-red-300 mb-3">Enable AI features to search with Gemini.</div>
+                        <button
+                            onClick={() => {
+                                setUserGeminiOptIn(user.id, true);
+                                setSearchError(null);
+                                setLoadingState(LoadingState.IDLE);
+                                const params = { ingredients: inventoryString, strictMode: strictMode };
+                                performSearchRef.current(params);
+                            }}
+                            className="mt-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors"
+                        >
+                            ✨ Enable AI &amp; Search
+                        </button>
+                    </>
+                ) : (
+                    <>
+                        <div>Search failed. Please try again.</div>
+                        {searchError && (
+                            <div className="text-xs mt-2 text-red-300">Error: {searchError}</div>
+                        )}
+                        <button
+                            onClick={() => {
+                                setSearchError(null);
+                                setLoadingState(LoadingState.IDLE);
+                                const params = { 
+                                    ingredients: inventoryString,
+                                    strictMode: strictMode
+                                };
+                                const estimate = estimateTokens(params);
+                                setEstimatedTokens(estimate.tokens);
+                                setEstimatedCost(estimate.cost);
+                                setFreeTierNote(estimate.freeTierNote);
+                                setPendingSearchParams(params);
+                                setShowTokenConfirmation(true);
+                            }}
+                            className="mt-3 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors"
+                        >
+                            Try Again
+                        </button>
+                    </>
                 )}
-                <button
-                    onClick={() => {
-                        // Reset error state and show token confirmation for retry
-                        setSearchError(null);
-                        setLoadingState(LoadingState.IDLE);
-                        // Get the current form parameters and show confirmation
-                        const params = { 
-                            ingredients: inventoryString,
-                            strictMode: strictMode
-                        };
-                        const estimate = estimateTokens(params);
-                        setEstimatedTokens(estimate.tokens);
-                        setEstimatedCost(estimate.cost);
-                        setFreeTierNote(estimate.freeTierNote);
-                        setPendingSearchParams(params);
-                        setShowTokenConfirmation(true);
-                    }}
-                    className="mt-3 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors"
-                >
-                    Try Again
-                </button>
                 </div>
             )}
 

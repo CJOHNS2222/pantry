@@ -52,7 +52,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
     if (!inviteEmail || isInviting) return;
 
     if (householdMemberLimitExceeded) {
-      alert('You have reached the maximum number of household members for your plan. Please upgrade to add more members.');
+      addToast('You have reached the maximum number of household members for your plan. Please upgrade to add more members.', 'error');
       return;
     }
 
@@ -60,7 +60,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
     try {
       const canAdd = await checkHouseholdMemberLimit();
       if (!canAdd) {
-        alert('You have reached the maximum number of household members for your plan. Please upgrade to add more members.');
+        addToast('You have reached the maximum number of household members for your plan. Please upgrade to add more members.', 'error');
         return;
       }
       const functions = getFunctions();
@@ -103,10 +103,6 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
   };
 
   const removeMember = async (id: string) => {
-    if (!confirm(`Are you sure you want to remove this member from the household?`)) {
-      return;
-    }
-
     try {
       if (!household) return;
       await removeMemberFromHousehold(household.id, id, user.id);
@@ -125,10 +121,6 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
   };
 
   const leaveHousehold = async () => {
-    if (!confirm(`Are you sure you want to leave this household? Your inventory and meal plans will be copied to your personal collections.`)) {
-      return;
-    }
-
     try {
       // Copy household data to user's personal collection using cache services
       if (!household) {
@@ -226,7 +218,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
       log.info('Household created and data migrated successfully', { householdId, userId }, 'Household');
     } catch (error) {
       log.error('Error creating household', error, 'Household');
-      alert('Failed to create household. Please try again.');
+      addToast('Failed to create household. Please try again.', 'error');
     } finally {
       setIsCreating(false);
     }
@@ -315,13 +307,18 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
   }
 
   const mainUI = (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm px-4 pt-[var(--app-header-h)] pb-[var(--app-nav-h)] animate-fade-in">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm px-4 pt-[var(--safe-area-inset-top,0px)] pb-[var(--safe-area-inset-bottom,0px)] animate-fade-in">
       <div className="bg-[#3F1016] border border-amber-500/30 w-full max-w-md rounded-2xl shadow-2xl relative overflow-hidden flex flex-col max-h-full">
         
         <div className="p-4 border-b border-red-900/50 flex justify-between items-center bg-[#2A0A10]">
           <div className="flex items-center gap-2">
             <Users className="w-5 h-5 text-amber-500" />
             <h2 className="font-serif font-bold text-amber-50 text-lg">{household?.name || 'Household'}</h2>
+            {household?.members && (
+              <span className="text-xs bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full font-medium">
+                {household.members.length} member{household.members.length !== 1 ? 's' : ''}
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <button 

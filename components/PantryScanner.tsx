@@ -1,9 +1,11 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { useModalOpen } from '../utils/useModalOpen';
 import { Camera as CapacitorCamera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { Camera, Upload, Loader2, Plus, Trash2, CheckCircle2, ShoppingBasket, X, Barcode, ChevronDown, ChevronRight, ChevronUp, Image, ChefHat, TrendingUp, Search, Filter, Settings2, Clock, Tag, FilePlus, Receipt } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { FixedSizeList as List } from 'react-window';
 import { analyzePantryImage, analyzeReceiptImage } from '../services/geminiService';
+import { setUserGeminiOptIn } from '../services/featureFlags';
 import StorageLocationIndicator from './StorageLocationIndicator';
 import { PantryItem, LoadingState, ConsumptionSuggestion, ExpirationAlert, CustomCategory, RecipeSuggestion, PantryFilter, User, ShoppingItem } from '../types';
 import { Tab } from '../types/app';
@@ -162,6 +164,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   const [rawBase64, setRawBase64] = useState<string | null>(null);
   const [mimeType, setMimeType] = useState<string>("");
   const [loadingState, setLoadingState] = useState<LoadingState>(LoadingState.IDLE);
+  const [imageAnalyzeError, setImageAnalyzeError] = useState<string | null>(null);
   const [newItemText, setNewItemText] = useState('');
   const [newQty, setNewQty] = useState(1);
   const [newUnit, setNewUnit] = useState('count');
@@ -172,6 +175,8 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   const [bulkMode, setBulkMode] = useState(false);
   const [selectedItems, setSelectedItems] = useState<Set<number>>(new Set());
   const [bulkLocationValue, setBulkLocationValue] = useState<string>('');
+  const [bulkProgress, setBulkProgress] = useState<{ current: number; total: number } | null>(null);
+  const [showBulkTip, setShowBulkTip] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [categoryOrder, setCategoryOrder] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<'category' | 'storage'>('storage');
@@ -185,6 +190,10 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   const [receiptDestination, setReceiptDestination] = useState<'pantry' | 'shopping'>('pantry');
   const [bulkQuantityEditItems, setBulkQuantityEditItems] = useState<PantryItem[]>([]);
   const [showBulkQuantityEdit, setShowBulkQuantityEdit] = useState(false);
+  const [showUseSoon, setShowUseSoon] = useState(false);
+
+  // Hide header/nav when any internal overlay is open
+  useModalOpen(isAddModalOpen || showScanReviewModal || showBulkQuantityEdit);
   
   // Search and filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -212,6 +221,23 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
       setNewUnit('count');
     }
   }, [newItemText]);
+
+  // Show a one-time non-blocking tip the first time bulk mode is activated
+  useEffect(() => {
+    if (bulkMode) {
+      if (localStorage.getItem('tip-bulk-select') !== 'seen') {
+        setShowBulkTip(true);
+        const timer = setTimeout(() => {
+          setShowBulkTip(false);
+          localStorage.setItem('tip-bulk-select', 'seen');
+        }, 6000);
+        return () => clearTimeout(timer);
+      }
+    } else {
+      setShowBulkTip(false);
+    }
+    return undefined;
+  }, [bulkMode]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const gestureStartRef = useRef<{ x: number; y: number } | null>(null);
@@ -506,6 +532,10 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
 
   // Barcode scanning with camera
   const handleScanBarcode = useCallback(async () => {
+    if (!(window as any).Capacitor) {
+      appActions.addToast('Barcode scanning requires the mobile app. Please use the camera or upload an image instead.', 'info', 6000);
+      return;
+    }
     try {
       // Track feature adoption
       AnalyticsService.trackFeatureFirstUse('pantry_scanner_barcode', { method: 'barcode' });
@@ -654,6 +684,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
       setScanResults(processedItems);
       setShowScanReviewModal(true);
       setLoadingState(LoadingState.SUCCESS);
+      setImageAnalyzeError(null);
 
       // Auto-close the modal after showing success message
       setTimeout(() => {
@@ -663,7 +694,9 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
       }, 3000);
     } catch (err) {
       console.error('Image analysis failed:', err);
-      alert(err instanceof Error ? err.message : 'Failed to analyze image. Please try again.');
+      const msg = err instanceof Error ? err.message : 'Failed to analyze image. Please try again.';
+      setImageAnalyzeError(msg);
+      appActions.addToast(msg, 'error');
       setLoadingState(LoadingState.ERROR);
     }
   }, [rawBase64, mimeType, user]);
@@ -685,7 +718,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
       }, 3000);
     } catch (err) {
       console.error('Receipt analysis failed:', err);
-      alert(err instanceof Error ? err.message : 'Failed to analyze receipt. Please try again.');
+      appActions.addToast(err instanceof Error ? err.message : 'Failed to analyze receipt. Please try again.', 'error');
       setLoadingState(LoadingState.ERROR);
     }
   }, [user]);
@@ -705,7 +738,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
       setNewUnit('count');
       setIsAddModalOpen(false); // Close modal after adding
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to add item. Please try again.');
+      appActions.addToast(err instanceof Error ? err.message : 'Failed to add item. Please try again.', 'error');
     }
   }, [newItemText, newQty, newUnit, inventory, onAddItem, setIsAddModalOpen]);
 
@@ -755,16 +788,18 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
 
   const bulkDelete = useCallback(async () => {
     if (selectedItems.size === 0) return;
-
-    if (confirm(`Delete ${selectedItems.size} selected item(s)?`)) {
-      const indicesToDelete = Array.from(selectedItems).sort((a, b) => b - a); // Delete from highest index first
-      for (const index of indicesToDelete) {
-        await onDeleteItem(index);
-      }
-      setSelectedItems(new Set());
-      setBulkMode(false);
+    const count = selectedItems.size;
+    const indicesToDelete = Array.from(selectedItems).sort((a, b) => b - a);
+    setBulkProgress({ current: 0, total: count });
+    for (let i = 0; i < indicesToDelete.length; i++) {
+      await onDeleteItem(indicesToDelete[i]);
+      setBulkProgress({ current: i + 1, total: count });
     }
-  }, [selectedItems, onDeleteItem, setSelectedItems, setBulkMode]);
+    setBulkProgress(null);
+    setSelectedItems(new Set());
+    setBulkMode(false);
+    appActions.addToast(`Deleted ${count} item${count > 1 ? 's' : ''}`, 'success');
+  }, [selectedItems, onDeleteItem, setSelectedItems, setBulkMode, appActions]);
 
   const bulkMoveToShoppingList = useCallback(async () => {
     if (selectedItems.size === 0) return;
@@ -772,13 +807,16 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
     const indicesToMove = Array.from(selectedItems).sort((a, b) => b - a); // Delete from highest index first
     const itemsToMove = PantryService.bulkMoveToShoppingList(inventory, indicesToMove);
     addToShoppingList(itemsToMove);
-    for (const index of indicesToMove) {
-      await onDeleteItem(index);
+    setBulkProgress({ current: 0, total: indicesToMove.length });
+    for (let i = 0; i < indicesToMove.length; i++) {
+      await onDeleteItem(indicesToMove[i]);
+      setBulkProgress({ current: i + 1, total: indicesToMove.length });
     }
+    setBulkProgress(null);
     setSelectedItems(new Set());
     setBulkMode(false);
-    alert(`Moved ${selectedItems.size} items to shopping list.`);
-  }, [selectedItems, inventory, addToShoppingList, onDeleteItem, setSelectedItems, setBulkMode]);
+    appActions.addToast(`Moved ${itemsToMove.length} item${itemsToMove.length > 1 ? 's' : ''} to shopping list`, 'success');
+  }, [selectedItems, inventory, addToShoppingList, onDeleteItem, setSelectedItems, setBulkMode, appActions]);
 
   const toggleCategory = useCallback((category: string) => {
     const newExpanded = new Set(expandedCategories);
@@ -827,8 +865,8 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
     }
     setSelectedItems(new Set());
     setBulkMode(false);
-    alert(`Moved ${itemsToMove.length} items to shopping list.`);
-  }, [selectedItems, inventory, addToShoppingList, onDeleteItem, setSelectedItems, setBulkMode]);
+    appActions.addToast(`Moved ${itemsToMove.length} item${itemsToMove.length > 1 ? 's' : ''} to shopping list`, 'success');
+  }, [selectedItems, inventory, addToShoppingList, onDeleteItem, setSelectedItems, setBulkMode, appActions]);
 
   const toggleStorageLocation = useCallback((location: string) => {
     // Bring clicked storage location section to the top
@@ -1205,7 +1243,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                     return;
                   }
                   try {
-                    const cookingToday = window.confirm('Are you cooking this today?\nOK = Yes (shorter window), Cancel = No (default defrost window)');
+                    const cookingToday = false; // default defrost window; user can adjust expiry after
                     const prev = { storageLocation: item.storageLocation, is_frozen: item.is_frozen, expirationDate: item.expirationDate } as any;
                     const result = await FreezerService.moveToFridgeFromFreezer(household.id, item.id, { cookingToday });
                     await onUpdateItem(primaryIndex, { storageLocation: 'fridge', is_frozen: false, expirationDate: result.newExpiry });
@@ -1960,8 +1998,8 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
 
       {/* Add Items Modal */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start sm:items-center justify-center z-[9999] px-4 pt-[var(--app-header-h)] pb-[var(--app-nav-h)]">
-          <div className="bg-theme-primary rounded-lg shadow-xl w-full max-w-md mx-auto max-h-full flex flex-col border border-theme">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start sm:items-center justify-center z-[9999] px-4 pt-[var(--safe-area-inset-top,0px)] pb-[var(--safe-area-inset-bottom,0px)]">
+          <div className="bg-theme-primary rounded-lg shadow-xl w-full max-w-md mx-auto h-full flex flex-col border border-theme">
             {/* Header - Fixed */}
             <div className="flex items-center justify-between p-4 pb-3 border-b border-theme flex-shrink-0 rounded-t-lg">
               <h3 className="text-lg font-semibold text-theme-primary">Add Items</h3>
@@ -2141,9 +2179,28 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
 
                 {/* Error State */}
                 {loadingState === LoadingState.ERROR && (
-                  <div className="w-full mt-4 py-3 rounded-lg bg-red-50 border border-red-200 flex items-center justify-center gap-2">
-                    <X className="w-5 h-5 text-red-600" />
-                    <span className="text-red-800 text-sm">Failed to analyze image. Please try again.</span>
+                  <div className="w-full mt-4 py-3 px-4 rounded-lg bg-red-50 border border-red-200 flex flex-col items-center justify-center gap-2 text-center">
+                    {imageAnalyzeError?.includes('opt-in required') ? (
+                      <>
+                        <span className="text-red-800 text-sm">AI scanning requires your permission.</span>
+                        <button
+                          onClick={() => {
+                            if (user) setUserGeminiOptIn(user.id, true);
+                            setImageAnalyzeError(null);
+                            setLoadingState(LoadingState.IDLE);
+                            handleAnalyze();
+                          }}
+                          className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors"
+                        >
+                          ✨ Enable AI &amp; Scan
+                        </button>
+                      </>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <X className="w-5 h-5 text-red-600 shrink-0" />
+                        <span className="text-red-800 text-sm">Failed to analyze image. Please try again.</span>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -2193,8 +2250,8 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
 
             {/* Scan Review Modal (appears after analyze) */}
             {showScanReviewModal && scanResults && (
-              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start sm:items-center justify-center z-[9999] px-4 pt-[var(--app-header-h)] pb-[var(--app-nav-h)]">
-                <div className="bg-theme-primary rounded-lg shadow-xl w-full max-w-sm sm:max-w-2xl mx-auto max-h-full flex flex-col border border-theme">
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start sm:items-center justify-center z-[9999] px-4 pt-[var(--safe-area-inset-top,0px)] pb-[var(--safe-area-inset-bottom,0px)]">
+                <div className="bg-theme-primary rounded-lg shadow-xl w-full max-w-sm sm:max-w-2xl mx-auto h-full flex flex-col border border-theme">
                   {/* Header - Fixed */}
                   <div className="flex items-center justify-between p-4 pb-3 border-b border-theme flex-shrink-0 rounded-t-lg">
                     <h3 className="text-sm sm:text-lg font-bold text-theme-secondary">Review Scanned Items ({scanResults.length})</h3>
@@ -2293,7 +2350,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                       } else {
                         // Add to shopping list with price options
                         if (!addShoppingListItem) {
-                          alert('Shopping list integration not available from this view.');
+                          appActions.addToast('Shopping list integration not available from this view.', 'info');
                           return;
                         }
 
@@ -2366,44 +2423,67 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
 
       {/* Recipe Suggestions - Use Soon */}
       {recipeSuggestions.length > 0 && (
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
-          <h3 className="text-sm font-semibold text-green-800 mb-2 flex items-center gap-2">
-            <ChefHat className="w-4 h-4" />
-            Use Soon - Recipe Ideas
-          </h3>
-          <div className="space-y-3">
-            {recipeSuggestions.slice(0, 3).map((suggestion) => (
-              <div key={suggestion.itemId} className="bg-white rounded border border-green-100 p-3">
-                <div className="flex items-start justify-between mb-2">
-                  <p className="text-sm font-medium text-gray-900">{suggestion.itemName}</p>
-                  <span className={`text-xs px-2 py-1 rounded ${
-                    suggestion.daysRemaining <= 1 ? 'bg-red-100 text-red-800' :
-                    suggestion.daysRemaining <= 3 ? 'bg-yellow-100 text-yellow-800' :
-                    'bg-blue-100 text-blue-800'
-                  }`}>
-                    {suggestion.daysRemaining}d left
-                  </span>
+        <div className="bg-green-50 border border-green-200 rounded-lg mb-4 overflow-hidden">
+          <button
+            onClick={() => setShowUseSoon(s => !s)}
+            className="w-full p-4 flex items-center justify-between text-left hover:bg-green-100 transition-colors"
+            aria-expanded={showUseSoon}
+          >
+            <h3 className="text-sm font-semibold text-green-800 flex items-center gap-2">
+              <ChefHat className="w-4 h-4" />
+              Use Soon - Recipe Ideas
+              {!showUseSoon && <span className="text-xs font-normal text-green-600">({recipeSuggestions.slice(0, 3).length})</span>}
+            </h3>
+            {showUseSoon ? <ChevronUp className="w-4 h-4 text-green-600 flex-shrink-0" /> : <ChevronDown className="w-4 h-4 text-green-600 flex-shrink-0" />}
+          </button>
+          {showUseSoon && (
+            <div className="space-y-3 px-4 pb-4">
+              {recipeSuggestions.slice(0, 3).map((suggestion) => (
+                <div key={suggestion.itemId} className="bg-white rounded border border-green-100 p-3">
+                  <div className="flex items-start justify-between mb-2">
+                    <p className="text-sm font-medium text-gray-900">{suggestion.itemName}</p>
+                    <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+                      <span className={`text-xs px-2 py-1 rounded ${
+                        suggestion.daysRemaining <= 1 ? 'bg-red-100 text-red-800' :
+                        suggestion.daysRemaining <= 3 ? 'bg-yellow-100 text-yellow-800' :
+                        'bg-blue-100 text-blue-800'
+                      }`}>
+                        {suggestion.daysRemaining}d left
+                      </span>
+                      <button
+                        onClick={async () => {
+                          const idx = inventory.findIndex(it => it.id === suggestion.itemId);
+                          if (idx !== -1) await onDeleteItem(idx);
+                        }}
+                        className="p-1 rounded hover:bg-red-100 text-red-400 hover:text-red-600 transition-colors"
+                        aria-label={`Delete ${suggestion.itemName}`}
+                        title="Delete from inventory"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-600 mb-2">{suggestion.reason}</p>
+                  <div className="flex flex-wrap gap-1">
+                    {suggestion.suggestedRecipes.map((recipe, index) => (
+                      <button
+                        key={index}
+                        onClick={() => {
+                          if (setActiveTab && setInitialSearchQuery) {
+                            setInitialSearchQuery(recipe);
+                            setActiveTab(Tab.RECIPES);
+                          }
+                        }}
+                        className="text-xs bg-green-100 hover:bg-green-200 text-green-800 px-2 py-1 rounded transition-colors"
+                      >
+                        {recipe}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <p className="text-xs text-gray-600 mb-2">{suggestion.reason}</p>
-                <div className="flex flex-wrap gap-1">
-                  {suggestion.suggestedRecipes.map((recipe, index) => (
-                    <button
-                      key={index}
-                      onClick={() => {
-                        if (setActiveTab && setInitialSearchQuery) {
-                          setInitialSearchQuery(recipe);
-                          setActiveTab(Tab.RECIPES);
-                        }
-                      }}
-                      className="text-xs bg-green-100 hover:bg-green-200 text-green-800 px-2 py-1 rounded transition-colors"
-                    >
-                      {recipe}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -2482,6 +2562,31 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
 
         {/* Items List */}
         <div className="mt-8 space-y-2">
+          {/* Bulk mode: one-time tip + progress bar */}
+          {bulkMode && showBulkTip && (
+            <div className="flex items-start gap-2 px-3 py-2 mb-2 rounded-lg bg-[var(--accent-color)]/10 border border-[var(--accent-color)]/30 text-sm text-theme-primary">
+              <span className="flex-1">Tap items to select them, then delete, move to shopping list, or change storage location.</span>
+              <button
+                onClick={() => { setShowBulkTip(false); localStorage.setItem('tip-bulk-select', 'seen'); }}
+                className="flex-shrink-0 text-theme-secondary hover:text-theme-primary transition-colors ml-1 mt-0.5"
+                aria-label="Dismiss tip"
+              >✕</button>
+            </div>
+          )}
+          {bulkProgress && (
+            <div className="px-1 mb-2">
+              <div className="flex justify-between text-xs text-theme-secondary mb-1">
+                <span>Processing…</span>
+                <span>{bulkProgress.current} / {bulkProgress.total}</span>
+              </div>
+              <div className="w-full bg-theme rounded-full h-1.5">
+                <div
+                  className="bg-[var(--accent-color)] h-1.5 rounded-full transition-all duration-300"
+                  style={{ width: `${(bulkProgress.current / bulkProgress.total) * 100}%` }}
+                />
+              </div>
+            </div>
+          )}
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-bold text-theme-primary">
               {viewMode === 'category' ? 'Pantry Items' : 'Storage Items'}
@@ -2616,8 +2721,8 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
 
       {/* Bulk Quantity Edit Modal */}
       {showBulkQuantityEdit && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] px-4 pt-[var(--app-header-h)] pb-[var(--app-nav-h)]">
-          <div className="bg-theme-primary rounded-lg shadow-xl w-full max-w-md mx-auto max-h-full overflow-y-auto border border-theme">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] px-4 pt-[var(--safe-area-inset-top,0px)] pb-[var(--safe-area-inset-bottom,0px)]">
+          <div className="bg-theme-primary rounded-lg shadow-xl w-full max-w-md mx-auto h-full overflow-y-auto border border-theme">
             <div className="p-6 pb-2.5">
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-xl font-bold text-theme-secondary">Edit Quantities</h3>

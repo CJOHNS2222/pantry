@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Mic, MicOff, Camera, Search, Plus, X, Loader2 } from 'lucide-react';
+import { useModalOpen } from '../utils/useModalOpen';
 
 interface QuickAddItem {
   name: string;
@@ -27,6 +28,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
   isOnline,
   recentItems = []
 }) => {
+  useModalOpen(isOpen);
   const [input, setInput] = useState('');
   const [isListening, setIsListening] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
@@ -197,8 +199,8 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] px-4 pt-[var(--app-header-h)] pb-[var(--app-nav-h)]" onClick={handleBackdropClick} data-testid="quickadd-backdrop">
-      <div className="bg-theme-primary rounded-lg shadow-xl w-full max-w-md mx-auto max-h-full flex flex-col overflow-hidden border border-theme" role="dialog" aria-modal="true" aria-label="Add Item">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] px-4 pt-[var(--safe-area-inset-top,0px)] pb-[var(--safe-area-inset-bottom,0px)]" onClick={handleBackdropClick} data-testid="quickadd-backdrop">
+      <div className="bg-theme-primary rounded-lg shadow-xl w-full max-w-md mx-auto h-full flex flex-col overflow-hidden border border-theme" role="dialog" aria-modal="true" aria-label="Add Item">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-theme">
           <h3 className="text-lg font-semibold text-theme-primary">Add Item</h3>

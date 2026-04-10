@@ -509,14 +509,25 @@ class DatabaseMonitoringService {
     });
 
     const unsubscribe = onSnapshot(ref, (snapshot: any) => {
-      // Track each snapshot received
+      // Count reads exactly as Firebase bills them:
+      // - Query/collection snapshot: 1 read per document on initial load, 1 per changed doc on updates (docChanges)
+      // - Document snapshot: always 1 read per delivery
       if (snapshot.docChanges) {
-        const changes = snapshot.docChanges().length;
-        if (changes > 0) {
-          console.log(`📡 SUBSCRIPTION UPDATE: ${path} | Changes: ${changes}`);
+        // Query/collection snapshot
+        const changedDocs = snapshot.docChanges().length;
+        this.metrics.reads += changedDocs;
+        if (changedDocs > 0) {
+          console.log(`📡 SUBSCRIPTION UPDATE: ${path} | Reads: ${changedDocs} | Total Reads: ${this.metrics.reads}`);
         }
-        AnalyticsService.trackDatabaseOperation('read', ref.parent?.id || 'unknown', changes, {
+        AnalyticsService.trackDatabaseOperation('read', ref.parent?.id || 'unknown', changedDocs, {
           operation: 'onSnapshot_update'
+        });
+      } else {
+        // Document snapshot: 1 read per delivery
+        this.metrics.reads++;
+        console.log(`📡 SNAPSHOT READ: ${path} | Total Reads: ${this.metrics.reads}`);
+        AnalyticsService.trackDatabaseOperation('read', ref.parent?.id || 'unknown', 1, {
+          operation: 'onSnapshot_read'
         });
       }
       callback(snapshot);
@@ -745,7 +756,24 @@ class DatabaseMonitoringService {
           type: 'subscription_start'
         });
 
-        const unsubscribe = originalOnSnapshot(ref, callback, errorCallback);
+        const wrappedCallback = (snapshot: any) => {
+          // Count reads exactly as Firebase bills them
+          if (snapshot.docChanges) {
+            const changedDocs = snapshot.docChanges().length;
+            this.metrics.reads += changedDocs;
+            AnalyticsService.trackDatabaseOperation('read', ref.parent?.id || 'unknown', changedDocs, {
+              operation: 'onSnapshot_update'
+            });
+          } else {
+            this.metrics.reads++;
+            AnalyticsService.trackDatabaseOperation('read', ref.parent?.id || 'unknown', 1, {
+              operation: 'onSnapshot_read'
+            });
+          }
+          if (typeof callback === 'function') callback(snapshot);
+        };
+
+        const unsubscribe = originalOnSnapshot(ref, wrappedCallback, errorCallback);
 
         return () => {
           this.metrics.realtimeSubscriptions--;

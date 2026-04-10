@@ -1,6 +1,6 @@
 import { GoogleGenAI, Type, Schema } from "@google/genai";
-import { PantryItem, RecipeSearchResult, RecipeSearchParams, StructuredRecipe, User } from "../types";
-import { getPerformance, trace } from "firebase/performance";
+import { PantryItem, RecipeSearchResult, RecipeSearchParams, StructuredRecipe, User, GroundingChunk } from "../types";
+import { getPerformance, trace, PerformanceTrace } from "firebase/performance";
 import featureFlags from './featureFlags';
 import { UsageService } from './usageService';
 import { log } from './logService';
@@ -23,19 +23,19 @@ interface QueuedRequest<T> {
   id: string;
   operation: () => Promise<T>;
   resolve: (value: T) => void;
-  reject: (error: any) => void;
+  reject: (error: unknown) => void;
   timestamp: number;
   priority: number; // Higher priority = processed first
 }
 
 class GeminiRequestBatcher {
-  private queue: QueuedRequest<any>[] = [];
+  private queue: QueuedRequest<unknown>[] = [];
   private isProcessing = false;
   private debounceTimer: NodeJS.Timeout | null = null;
   private readonly debounceDelay = 500; // 500ms debounce
   private readonly maxBatchSize = 3; // Process up to 3 requests simultaneously
   private readonly maxQueueSize = 10; // Maximum queue size
-  private requestCache = new Map<string, { result: any; timestamp: number }>();
+  private requestCache = new Map<string, { result: unknown; timestamp: number }>();
   private readonly cacheTTL = 5 * 60 * 1000; // 5 minutes cache
 
   // Debounced processing
@@ -77,8 +77,7 @@ class GeminiRequestBatcher {
           const result = await request.operation();
           request.resolve(result);
           log.debug(`Completed Gemini request: ${request.id}`, {}, 'GeminiBatcher');
-        } catch (err: any) {
-          request.reject(err);
+        } catch (err: unknown) {
           log.error(`Failed Gemini request: ${request.id}`, err, 'GeminiBatcher');
         }
       });
@@ -105,7 +104,7 @@ class GeminiRequestBatcher {
     const cached = this.requestCache.get(id);
     if (cached && (Date.now() - cached.timestamp) < this.cacheTTL) {
       log.debug(`Using cached Gemini result for: ${id}`, {}, 'GeminiBatcher');
-      return cached.result;
+      return cached.result as T;
     }
 
     return new Promise<T>((resolve, reject) => {
@@ -128,7 +127,7 @@ class GeminiRequestBatcher {
         priority
       };
 
-      this.queue.push(request);
+      this.queue.push(request as QueuedRequest<unknown>);
       log.debug(`Queued Gemini request: ${id} (priority: ${priority})`, {}, 'GeminiBatcher');
 
       this.scheduleProcessing();
@@ -262,7 +261,7 @@ If an item doesn't fit these categories, use "Uncategorized".`,
         },
       });
 
-      const response = await Promise.race([responsePromise, timeoutPromise]) as any;
+      const response = await Promise.race([responsePromise, timeoutPromise]) as { text: string };
       console.log('✅ Pantry image analysis API call completed');
 
       const jsonText = response.text;
@@ -302,7 +301,7 @@ If an item doesn't fit these categories, use "Uncategorized".`,
       }
 
       return items;
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error analyzing pantry image:", err);
       throw err;
     } finally {
@@ -448,7 +447,7 @@ Only include actual grocery items, not taxes, totals, or store information.`,
         },
       });
 
-      const response = await Promise.race([responsePromise, timeoutPromise]) as any;
+      const response = await Promise.race([responsePromise, timeoutPromise]) as { text: string };
 
       const jsonText = response.text;
       if (!jsonText) throw new Error("No data returned from Gemini.");
@@ -470,7 +469,7 @@ Only include actual grocery items, not taxes, totals, or store information.`,
       }
 
       return items;
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error analyzing receipt image:", err);
       throw err;
     } finally {
@@ -500,12 +499,13 @@ export const searchRecipes = async (params: RecipeSearchParams, user?: User): Pr
       }
 
       return await performSearch(params, user, perfTrace);
-    } catch (err: any) {
-      lastError = err as Error;
+    } catch (err: unknown) {
+      lastError = err instanceof Error ? err : new Error(String(err));
 
       // Only retry on 429/rate limit errors
-      if (attempt < maxRetries && (err.message?.includes('429') || err.message?.includes('Too Many Requests') || err.message?.includes('Resource exhausted'))) {
-        console.warn(`Gemini rate limit hit, retrying (attempt ${attempt + 1}/${maxRetries}):`, err.message);
+      const errMsg = lastError.message;
+      if (attempt < maxRetries && (errMsg.includes('429') || errMsg.includes('Too Many Requests') || errMsg.includes('Resource exhausted'))) {
+        console.warn(`Gemini rate limit hit, retrying (attempt ${attempt + 1}/${maxRetries}):`, errMsg);
         continue;
       }
 
@@ -518,7 +518,7 @@ export const searchRecipes = async (params: RecipeSearchParams, user?: User): Pr
 };
 
 // Internal function to perform the actual search
-const performSearch = async (params: RecipeSearchParams, user: User | undefined, perfTrace: any): Promise<RecipeSearchResult> => {
+const performSearch = async (params: RecipeSearchParams, user: User | undefined, perfTrace: PerformanceTrace | null): Promise<RecipeSearchResult> => {
   try {
     // Gate Gemini usage for recipe search as well
     if (!featureFlags.isGeminiGloballyEnabled()) {
@@ -593,14 +593,9 @@ const performSearch = async (params: RecipeSearchParams, user: User | undefined,
           { text: prompt }
         ]
       },
-      config: {
-        tools: [{ googleSearch: {} }]
-      },
     });
 
-    const response = await Promise.race([responsePromise, timeoutPromise]) as any;
-
-        // console.debug('Gemini raw response:', response);
+const response = await Promise.race([responsePromise, timeoutPromise]) as { text: string; candidates?: Array<{ groundingMetadata?: { groundingChunks?: unknown[] } }> };
 
     const jsonText = response.text;
     let recipes: StructuredRecipe[] = [];
@@ -657,27 +652,28 @@ const performSearch = async (params: RecipeSearchParams, user: User | undefined,
 
     return {
       recipes: recipes,
-      groundingChunks: response.candidates?.[0]?.groundingMetadata?.groundingChunks,
+      groundingChunks: response.candidates?.[0]?.groundingMetadata?.groundingChunks as GroundingChunk[] | undefined,
     };
   } catch (timeoutError) {
     console.error("Request timeout or API error:", timeoutError);
     throw timeoutError;
   }
 
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const errMsg = err instanceof Error ? err.message : String(err);
     console.error("Error searching recipes:", err);
 
     // Provide more specific error messages
-    if (err.message?.includes('API_KEY')) {
+    if (errMsg.includes('API_KEY')) {
       throw new Error('API configuration error. Please check your Gemini API key.');
-    } else if (err.message?.includes('429') || err.message?.includes('Too Many Requests') || err.message?.includes('Resource exhausted')) {
+    } else if (errMsg.includes('429') || errMsg.includes('Too Many Requests') || errMsg.includes('Resource exhausted')) {
       throw new Error('API rate limit exceeded. Please wait a moment and try again.');
-    } else if (err.message?.includes('quota') || err.message?.includes('limit')) {
+    } else if (errMsg.includes('quota') || errMsg.includes('limit')) {
       throw new Error('API quota exceeded. Please try again later.');
-    } else if (err.message?.includes('network') || err.message?.includes('fetch')) {
+    } else if (errMsg.includes('network') || errMsg.includes('fetch')) {
       throw new Error('Network error. Please check your internet connection.');
     } else {
-      throw new Error(`Recipe search failed: ${err.message || 'Unknown error'}`);
+      throw new Error(`Recipe search failed: ${errMsg}`);
     }
   } finally {
     perfTrace?.stop();
@@ -755,7 +751,7 @@ function parseNaturalLanguageRecipes(text: string): StructuredRecipe[] {
       });
     }
     
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Error parsing natural language recipes:", err);
     // Return a basic fallback recipe
     recipes.push({

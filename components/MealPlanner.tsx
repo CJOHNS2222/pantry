@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { CalendarClock, Plus, Move, AlertCircle, ShoppingBasket, Trash2, HelpCircle, Search, Copy, UtensilsCrossed } from 'lucide-react';
+import { CalendarClock, Plus, Move, AlertCircle, ShoppingBasket, Trash2, HelpCircle, Search, Copy, UtensilsCrossed, Download } from 'lucide-react';
 import { DayPlan, MealPlanItem, PantryItem, StructuredRecipe, User, SavedRecipe, ShoppingItem } from '../types';
 import RecipeModal from './RecipeModal';
 import LeftoverQuickCapture from './LeftoverQuickCapture';
@@ -14,14 +14,16 @@ import { parseIngredientForShoppingList } from '../utils/appUtils';
 import AnalyticsService from '../services/analyticsService';
 import { useIntl } from 'react-intl';
 import { useApp } from '../contexts/AppContext';
+import { useAppActions } from '../contexts/AppActionsContext';
 import { useSubscription } from '../hooks/useSubscription';
 import { searchRecipes } from '../utils/searchUtils';
 import { debounce } from '../utils/debounceUtils';
+import { useModalOpen } from '../utils/useModalOpen';
 import { CompactRecipeCardSkeleton, MealPlanSkeleton } from './SkeletonLoader';
 import { ProgressiveImage } from './ProgressiveImage';
 import { getMealPrepSuggestions, RecipeIngredientMatch } from '../utils/searchUtils';
 import { getUserMeasurementSystem } from '../utils/measurementUtils';
-// import CalendarService from '../services/calendarService'; // Temporarily disabled
+import CalendarService from '../services/calendarService';
 
 // Utility function to generate attractive recipe placeholder images
 const generateRecipePlaceholderImage = (title: string): string => {
@@ -516,6 +518,7 @@ const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
 };
 
 export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPlan, inventory, shoppingList, addToShoppingList, onAddToPlan, onSaveRecipe, onMarkAsMade, onRate, user, setActiveTab, recipeSaveLimitExceeded = false, mealPlanLimitExceeded = false, isLoadingMealPlan = false, isLoadingSavedRecipes = false, savedRecipes: propSavedRecipes = [], settings, onOpenRecipeSearch }) => {
+  const { addToast } = useAppActions();
   const intl = useIntl();
   const { household } = useApp();
   const { isPremium, isFamily } = useSubscription(user);
@@ -553,6 +556,8 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
   const [leftoverNotes, setLeftoverNotes] = useState<string>('');
   const [showLeftoverSwapModal, setShowLeftoverSwapModal] = useState(false);
   const [swapSource, setSwapSource] = useState<{ dayIndex: number; mealType: 'breakfast' | 'lunch' | 'dinner'; mealIndex: number } | null>(null);
+
+  useModalOpen(showRecipeSearch || showAddMealDialog || showLeftoverPrompt || showLeftoverCapture || showLeftoverSwapModal);
 
   // Check if a day has any meals scheduled
   const hasMealsScheduled = useCallback((dayIndex: number) => {
@@ -798,8 +803,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
       const allIngredients = itemsToAdd.map(item => item.ingredient);
       const batchSource = `meal plan: ${missing.length} missing ingredients for planned meals`;
       addToShoppingList(allIngredients, batchSource);
-      
-      alert(`Added ${missing.length} items to your shopping list.`);
+      addToast(`Added ${missing.length} item${missing.length > 1 ? 's' : ''} to your shopping list`, 'success');
     }
   };
 
@@ -868,7 +872,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
       recipe: leftoverRecipe,
     };
 
-    const pushForward = window.confirm('Swap may create a conflict. Push original meal to the next day?\nOK = Push to next day, Cancel = Replace only.');
+    const pushForward = true; // default: push meal forward to avoid conflicts
     if (pushForward && existingMeal) {
       const targetDayIndex = (dayIndex + 1) % newPlan.length;
       if (!newPlan[targetDayIndex][mealType]) newPlan[targetDayIndex][mealType] = [];
@@ -1027,6 +1031,24 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
     });
     updateMealPlan(updated);
   }, [currentDayIndex, displayPlan, mealPlan, updateMealPlan]);
+
+  const handleExportCalendar = useCallback(async () => {
+    const weekStart = Math.floor(currentDayIndex / 7) * 7;
+    const weekDays = displayPlan.slice(weekStart, weekStart + 7);
+    const daysWithMeals = weekDays.filter(
+      d => (d.breakfast?.length || 0) + (d.lunch?.length || 0) + (d.dinner?.length || 0) > 0
+    );
+    if (daysWithMeals.length === 0) {
+      addToast('No meals planned this week to export.', 'info');
+      return;
+    }
+    try {
+      await CalendarService.exportWeekAsICS(daysWithMeals);
+      addToast('Meal plan exported to calendar!', 'success');
+    } catch (err) {
+      addToast('Failed to export calendar. Please try again.', 'error');
+    }
+  }, [currentDayIndex, displayPlan, addToast]);
 
   // Memoized missing ingredients computation
   const missingIngredients = useMemo(() => {
@@ -1655,6 +1677,15 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
                 <Copy className="w-3.5 h-3.5" />
                 Copy to next week
               </button>
+              <button
+                onClick={handleExportCalendar}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-theme-secondary border border-theme text-theme-secondary hover:bg-[var(--accent-color)]/10 hover:text-[var(--accent-color)] hover:border-[var(--accent-color)]/30 transition-colors"
+                aria-label="Export week to calendar"
+                title="Download this week as a calendar file (.ics)"
+              >
+                <Download className="w-3.5 h-3.5" />
+                Export .ics
+              </button>
               </div>
             </div>
             <div className="flex items-center justify-between bg-theme-secondary rounded-xl p-4 border border-theme">
@@ -1826,8 +1857,8 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
       
       {/* Recipe Search Modal */}
       {showRecipeSearch && searchMealType && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-theme-primary rounded-xl max-w-4xl w-full max-h-[90vh] overflow-hidden shadow-2xl">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4 pt-[var(--safe-area-inset-top,0px)] pb-[var(--safe-area-inset-bottom,0px)]">
+          <div className="bg-theme-primary rounded-xl max-w-4xl w-full h-full flex flex-col overflow-hidden shadow-2xl">
             <div className="p-6 border-b border-theme">
               <div className="flex justify-between items-center">
                 <div>

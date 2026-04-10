@@ -8,7 +8,9 @@ import { ProgressiveImage } from './ProgressiveImage';
 import { generateBlurDataURL } from '../utils/appUtils';
 import { useKeyboardNavigation } from '../hooks/useKeyboardNavigation';
 import { useFocusTrap } from '../hooks/useFocusTrap';
+import { useModalOpen } from '../utils/useModalOpen';
 import { scaleRecipeIngredients, calculatePortionScaling } from '../utils/portionUtils';
+import { useAppActions } from '../contexts/AppActionsContext';
 
 interface RecipeModalProps {
   recipe: StructuredRecipe | SavedRecipe;
@@ -62,6 +64,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
   user
   , editable = false
 }) => {
+  const { addToast } = useAppActions();
   const [showLeftoverCapture, setShowLeftoverCapture] = useState(false);
   const [showCookingMode, setShowCookingMode] = useState(false);
   const [servings, setServings] = useState(household?.members?.length || 4); // Default to household size
@@ -83,6 +86,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
   
   // Focus trap for accessibility
   const modalRef = useFocusTrap({ isActive: isOpen });
+  useModalOpen();
   
   // Cooking Timer State
   const [timerActive, setTimerActive] = useState(false);
@@ -207,7 +211,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
     });
 
     if (missing.length === 0) {
-      alert('All ingredients are in your pantry! 🎉');
+      addToast('All ingredients are in your pantry! 🎉', 'success');
       return;
     }
 
@@ -239,14 +243,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
   };
 
   const handleMarkAsMadeClick = async () => {
-    // Step 1: Confirm deletion of used inventory
-    const confirmDelete = window.confirm(
-      `Are you sure you want to mark this recipe as made? This will remove the used ingredients from your pantry inventory.`
-    );
-
-    if (!confirmDelete) return;
-
-    // Step 2: Call the onMarkAsMade handler with inventory info
+    // Call the onMarkAsMade handler with inventory info
     if (onMarkAsMade) {
       onMarkAsMade(recipe as StructuredRecipe, inventory);
     }
@@ -256,41 +253,20 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
       onRemoveFromMealPlan(recipe as StructuredRecipe);
     }
 
-    // Step 3.5: If this was triggered from the meal plan, ask if user wants to save leftovers
+    // Step 3.5: If this was triggered from the meal plan, open leftover capture
     if (isFromMealPlan) {
-      const save = window.confirm('Save leftovers from this meal?');
-      if (save) {
-        // Open quick-capture UI pre-filled with default servings
-        setShowLeftoverCapture(true);
-        return; // Defer review prompt/close until leftover capture completes
-      }
+      setShowLeftoverCapture(true);
+      return; // Defer review prompt/close until leftover capture completes
     }
-    // Step 4: Ask if user wants to submit a review
+    // Step 4: Show rating modal
     setTimeout(() => {
-      const submitReview = window.confirm(
-        `Would you like to rate this recipe? This helps other users find great recipes!`
-      );
-      
-      if (submitReview) {
-        // Show rating modal
-        setShowRatingModal(true);
-      } else {
-        // Close modal if no review
-        onClose();
-      }
+      setShowRatingModal(true);
     }, 100);
   };
 
-  const handleLeftoverSaved = (id?: string) => {
-    // After saving leftovers, proceed to review prompt flow (ask for rating)
+  const handleLeftoverSaved = (_id?: string) => {
     setShowLeftoverCapture(false);
-    setTimeout(() => {
-      const submitReview = window.confirm(
-        `Would you like to rate this recipe? This helps other users find great recipes!`
-      );
-      if (submitReview) setShowRatingModal(true);
-      else onClose();
-    }, 100);
+    setTimeout(() => setShowRatingModal(true), 100);
   };
 
   // Scale ingredients based on servings
@@ -310,7 +286,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/40 z-50 flex items-start sm:items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center px-4 pt-[var(--safe-area-inset-top,0px)] pb-[var(--safe-area-inset-bottom,0px)]" onClick={onClose}>
       {/* Top-level leftover quick-capture overlay so it renders above other modals */}
       {showLeftoverCapture && user && (
         <div onClick={(e) => e.stopPropagation()} style={{ zIndex: 99999 }} className="fixed inset-0 flex items-center justify-center bg-black/40 p-4">
@@ -326,7 +302,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
           </div>
         </div>
       )}
-      <div ref={modalRef} role="dialog" aria-modal="true" aria-label={recipe.title} className="bg-theme-primary rounded-2xl shadow-2xl max-w-lg w-full relative flex flex-col max-h-[85vh] overflow-hidden" onClick={e => e.stopPropagation()}>
+      <div ref={modalRef} role="dialog" aria-modal="true" aria-label={recipe.title} className="bg-theme-primary rounded-2xl shadow-2xl max-w-lg w-full relative flex flex-col h-full overflow-hidden" onClick={e => e.stopPropagation()}>
         {/* Fixed Header */}
         <div className="flex items-center justify-between p-4 pb-3 border-b border-theme flex-shrink-0 rounded-t-2xl">
           <h2 className="text-lg font-semibold text-theme-primary truncate pr-2">{recipe.title}</h2>
@@ -835,14 +811,13 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
           )}
 
           {/* Secondary action buttons - Save, Delete, Close */}
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col gap-1">
+          <div className="flex items-stretch gap-2">
             <button className="flex-1 py-2 font-bold border border-[var(--accent-color)] rounded-lg flex items-center justify-center gap-2" onClick={onClose}>CLOSE</button>
             {isFromMealPlan && (
-              <div className="flex-1">
-                <button onClick={() => setShowLeftoverCapture(true)} className="w-full py-2 font-bold bg-yellow-500 text-black rounded-lg flex items-center justify-center gap-2">
-                  <RotateCcw className="w-4 h-4" /> Save Leftovers
-                </button>
-              </div>
+              <button onClick={() => setShowLeftoverCapture(true)} className="flex-1 py-2 font-bold bg-yellow-500 text-black rounded-lg flex items-center justify-center gap-2">
+                <RotateCcw className="w-4 h-4" /> Save Leftovers
+              </button>
             )}
             {showDeleteButton && onDeleteRecipe && (
               <button onClick={() => { onDeleteRecipe(recipe as SavedRecipe); onClose(); }} className="flex-1 py-2 font-bold bg-red-500 text-white rounded-lg flex items-center justify-center gap-2">
@@ -850,14 +825,6 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
               </button>
             )}
             {showSaveButton && onSaveRecipe && (
-              <div className="flex-1 flex flex-col gap-1">
-                {recipeSavedCount !== undefined && (
-                  <p className="text-xs text-theme-secondary text-center">
-                    {recipeSaveLimitExceeded
-                      ? 'Limit reached — upgrade to save more'
-                      : `${recipeSavedCount} saved`}
-                  </p>
-                )}
               <button
                 onClick={async () => { 
                   if (isSaving) return; // Prevent double-clicks
@@ -898,8 +865,15 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
               >
                 <Heart className="w-4 h-4" /> {isSaving ? 'Saving...' : recipeSaveLimitExceeded ? 'Limit Reached' : 'Save Recipe'}
               </button>
-              </div>
             )}
+          </div>
+          {showSaveButton && onSaveRecipe && recipeSavedCount !== undefined && (
+            <p className="text-xs text-theme-secondary text-center">
+              {recipeSaveLimitExceeded
+                ? 'Limit reached — upgrade to save more'
+                : `${recipeSavedCount} saved`}
+            </p>
+          )}
           </div>
         </div>
       </div>

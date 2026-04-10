@@ -7,6 +7,7 @@ import { log } from '../services/logService';
 
 interface UsageIndicatorProps {
   user: User | null;
+  savedRecipesCount?: number;
   compact?: boolean;
   showUpgradeCTA?: boolean;
   onUpgrade?: () => void;
@@ -14,6 +15,7 @@ interface UsageIndicatorProps {
 
 export const UsageIndicator: React.FC<UsageIndicatorProps> = ({
   user,
+  savedRecipesCount,
   compact = false,
   showUpgradeCTA = true,
   onUpgrade
@@ -37,7 +39,7 @@ export const UsageIndicator: React.FC<UsageIndicatorProps> = ({
     };
 
     fetchUsageLimits();
-  }, [user]);
+  }, [user, savedRecipesCount]);
 
   if (loading || !user || !usageLimits) {
     return null;
@@ -67,11 +69,15 @@ export const UsageIndicator: React.FC<UsageIndicatorProps> = ({
     return 'normal';
   };
 
-  const recipesPercentage = getUsagePercentage(usageLimits.recipes.used, usageLimits.recipes.max);
+  // Prefer the real-time prop count (passed from context) over the Firestore counter
+  // which never decrements on recipe deletion and can drift out of sync.
+  const recipesUsed = savedRecipesCount ?? usageLimits.recipes.used;
+
+  const recipesPercentage = getUsagePercentage(recipesUsed, usageLimits.recipes.max);
   const searchesPercentage = getUsagePercentage(usageLimits.searches.used, usageLimits.searches.weekly);
   const mealPlanPercentage = getUsagePercentage(usageLimits.mealPlanning.weeklyUsed, usageLimits.mealPlanning.weeklyRecipes);
 
-  const recipesStatus = getUsageStatus(usageLimits.recipes.used, usageLimits.recipes.max);
+  const recipesStatus = getUsageStatus(recipesUsed, usageLimits.recipes.max);
   const searchesStatus = getUsageStatus(usageLimits.searches.used, usageLimits.searches.weekly);
   const mealPlanStatus = getUsageStatus(usageLimits.mealPlanning.weeklyUsed, usageLimits.mealPlanning.weeklyRecipes);
 
@@ -85,7 +91,7 @@ export const UsageIndicator: React.FC<UsageIndicatorProps> = ({
       <div className="flex items-center gap-2 text-xs">
         {hasWarnings && <AlertTriangle className="w-3 h-3 text-yellow-500" />}
         <span className="text-theme-secondary">
-          Recipes: {usageLimits.recipes.used}/{usageLimits.recipes.max === -1 ? '∞' : usageLimits.recipes.max}
+          Recipes: {recipesUsed}/{usageLimits.recipes.max === -1 ? '∞' : usageLimits.recipes.max}
         </span>
         <span className="text-theme-secondary">•</span>
         <span className="text-theme-secondary">
@@ -135,7 +141,7 @@ export const UsageIndicator: React.FC<UsageIndicatorProps> = ({
             <div className="flex justify-between items-center mb-1">
               <span className="text-xs text-gray-600 dark:text-gray-400">Saved Recipes</span>
               <span className="text-xs font-medium text-gray-900 dark:text-white">
-                {usageLimits.recipes.used} / {usageLimits.recipes.max === -1 ? '∞' : usageLimits.recipes.max}
+                {recipesUsed} / {usageLimits.recipes.max === -1 ? '∞' : usageLimits.recipes.max}
               </span>
             </div>
             {usageLimits.recipes.max !== -1 && (

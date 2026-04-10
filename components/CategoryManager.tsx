@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Plus, Edit2, Trash2, X, Check, Palette } from 'lucide-react';
+import { useModalOpen } from '../utils/useModalOpen';
 import { CustomCategory } from '../types';
 import { getCategoryIcon, getCategoryColor } from '../utils/appUtils';
 
@@ -36,6 +37,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({
   onClose,
   maxCategories
 }) => {
+  useModalOpen(isOpen);
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
@@ -77,7 +79,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-4 pt-[var(--app-header-h)] pb-[var(--app-nav-h)]">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-4 pt-[var(--safe-area-inset-top,0px)] pb-[var(--safe-area-inset-bottom,0px)]">
       <div className="bg-theme-primary rounded-lg shadow-xl max-w-2xl w-full max-h-full overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-theme">

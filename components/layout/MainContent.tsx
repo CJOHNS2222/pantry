@@ -120,6 +120,7 @@ export const MainContent: React.FC = () => {
       {/* Usage Indicator - Show for free users */}
       <UsageIndicator
         user={user || undefined}
+        savedRecipesCount={savedRecipes.length}
         showUpgradeCTA={true}
         onUpgrade={() => setActiveTab(Tab.SETTINGS)}
       />

@@ -54,6 +54,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   const [showNotifications, setShowNotifications] = useState(false);
   const [showActivityFeed, setShowActivityFeed] = useState(false);
   const [expandedNotifId, setExpandedNotifId] = useState<string | null>(null);
+  const [visibleNotifCount, setVisibleNotifCount] = useState(50);
   const [swipingId, setSwipingId] = useState<string | null>(null);
   const [swipeX, setSwipeX] = useState(0);
   const touchStartX = useRef(0);
@@ -66,12 +67,20 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 
   useEffect(() => {
     if (showNotifications) {
-      notifTimerRef.current = setTimeout(() => setShowNotifications(false), 6000);
+      notifTimerRef.current = setTimeout(() => setShowNotifications(false), 15000);
     }
     return () => {
       if (notifTimerRef.current) clearTimeout(notifTimerRef.current);
     };
   }, [showNotifications]);
+
+  const handleNotifPanelMouseEnter = () => {
+    if (notifTimerRef.current) clearTimeout(notifTimerRef.current);
+  };
+
+  const handleNotifPanelMouseLeave = () => {
+    notifTimerRef.current = setTimeout(() => setShowNotifications(false), 5000);
+  };
 
   const handleToggleNotifications = () => {
     setShowActivityFeed(false);
@@ -191,7 +200,8 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   };
   return (
     <header 
-      className="bg-theme-secondary p-3 pt-[30px] pb-0 fixed top-0 left-0 right-0 max-w-md mx-auto z-20 shadow-md border-b border-theme transition-colors duration-300"
+      className="bg-theme-secondary p-3 fixed top-0 left-0 right-0 max-w-md mx-auto z-20 shadow-md border-b border-theme transition-colors duration-300"
+      style={{ paddingTop: 'max(12px, env(safe-area-inset-top))' }}
       role="banner"
     >
       <div className="flex justify-between items-center">
@@ -245,13 +255,17 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 
                 {/* Notification bell */}
                 {showNotifications && (
-                  <div className="absolute left-0 mt-2 w-80 max-h-96 overflow-auto bg-theme-primary border border-theme rounded shadow-lg z-50 p-2">
+                  <div
+                    className="absolute left-0 mt-2 w-80 max-h-96 overflow-auto bg-theme-primary border border-theme rounded shadow-lg z-50 p-2"
+                    onMouseEnter={handleNotifPanelMouseEnter}
+                    onMouseLeave={handleNotifPanelMouseLeave}
+                  >
                     <div className="flex items-center justify-between mb-2">
                       <div className="text-sm font-semibold">Notifications</div>
                       <button onClick={handleMarkAllRead} className="text-xs text-theme-secondary hover:underline">Mark all read</button>
                     </div>
                     <div className="space-y-1.5">
-                      {(items || []).slice().reverse().slice(0, 50).map((n: NotificationItem) => {
+                      {(items || []).slice().reverse().slice(0, visibleNotifCount).map((n: NotificationItem) => {
                         const isExpanded = expandedNotifId === n.id;
                         const bodyText = n.message || n.body;
                         const isSwiping = swipingId === n.id;
@@ -337,6 +351,14 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                         );
                       })}
                       {(items || []).length === 0 && <div className="text-xs text-theme-secondary py-2 text-center">No notifications</div>}
+                      {(items || []).length > visibleNotifCount && (
+                        <button
+                          onClick={() => setVisibleNotifCount(n => n + 50)}
+                          className="w-full text-xs text-theme-secondary hover:text-theme-primary py-2 border-t border-theme/30 mt-1 transition-colors"
+                        >
+                          Load more ({(items || []).length - visibleNotifCount} remaining)
+                        </button>
+                      )}
                     </div>
                   </div>
                 )}

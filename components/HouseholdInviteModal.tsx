@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Users, Check, X, Bell } from 'lucide-react';
+import { useModalOpen } from '../utils/useModalOpen';
 import { NotificationItem } from '../services/notificationService';
 import { User } from '../types';
 import { log } from '../services/logService';
@@ -19,6 +20,7 @@ export const HouseholdInviteModal: React.FC<HouseholdInviteModalProps> = ({
   onAccept,
   onDecline
 }) => {
+  useModalOpen();
   const [processing, setProcessing] = useState<string | null>(null);
 
   const handleAccept = async (invite: NotificationItem) => {

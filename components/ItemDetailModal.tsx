@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { X, TrendingUp, ShoppingBasket, Trash2, Edit3, Zap, History } from 'lucide-react';
 import { PantryItem } from '../types';
 import PriceTrends from './PriceTrends';
-import { getAllCategories, getExpirationColor, cleanItemNameForShopping, formatItemQuantity, parseQuantity } from '../utils/appUtils';
+import { getAllCategories, getExpirationColor, cleanItemNameForShopping, formatItemQuantity, parseQuantity, getFreezerShelfLifeDays } from '../utils/appUtils';
 import { getQuantityAmount, getQuantityUnit } from '../utils/quantityUtils';
 import { getNutritionFactsWithFallback, NutritionFacts, formatNutrition } from '../services/nutritionService';
 import { useKeyboardNavigation } from '../hooks/useKeyboardNavigation';
 import { useFocusTrap } from '../hooks/useFocusTrap';
+import { useModalOpen } from '../utils/useModalOpen';
 import QuantityUnitPicker from './QuantityUnitPicker';
 import { COMMON_UNITS, getSmartUnits } from './QuantityUnitPicker';
 import { useApp } from '../contexts/AppContext';
@@ -65,6 +66,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
 
   // Focus trap for accessibility
   const modalRef = useFocusTrap({ isActive: true });
+  useModalOpen();
 
   useEffect(() => {
     // Reset local state when item prop changes
@@ -137,6 +139,14 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   // Image handlers
   const handleFileInput = (file?: File) => {
     if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      addToast('Please select a valid image file.', 'error');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      addToast('Image must be smaller than 10MB.', 'error');
+      return;
+    }
     setSelectedFile(file);
     try {
       const url = URL.createObjectURL(file);
@@ -179,6 +189,24 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
     // Storage & Category
     if (localStorageLocation !== (item.storageLocation || 'pantry')) updates.storageLocation = localStorageLocation;
     if (localCategory !== (item.category || 'Manual')) updates.category = localCategory;
+
+    // When moving to freezer, auto-extend expiry to USDA freezer shelf life
+    if (localStorageLocation === 'freezer' && item.storageLocation !== 'freezer') {
+      const freezerDays = getFreezerShelfLifeDays(item.item);
+      const freezerDate = new Date();
+      freezerDate.setDate(freezerDate.getDate() + freezerDays);
+      const freezerDateStr = freezerDate.toISOString().split('T')[0];
+      updates.is_frozen = true;
+      updates.frozenAt = new Date().toISOString();
+      updates.freezerExpiry = freezerDateStr;
+      updates.expirationDate = freezerDateStr;
+      updates.expirationType = 'best-by';
+    } else if (localStorageLocation !== 'freezer' && item.storageLocation === 'freezer') {
+      // Moving out of freezer — clear frozen state
+      updates.is_frozen = false;
+      updates.frozenAt = undefined;
+      updates.freezerExpiry = undefined;
+    }
 
     // Expiration
     if (localExpirationDate !== (item.expirationDate || '') || localExpirationType !== (item.expirationType || 'best-by')) {
@@ -237,8 +265,8 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
 
   return (
     <>
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start sm:items-center justify-center z-[9999] px-4 pt-[var(--app-header-h)] pb-[var(--app-nav-h)]">
-        <div ref={modalRef} role="dialog" aria-modal="true" aria-label={item.item} className="bg-theme-primary rounded-lg shadow-xl w-full max-w-md mx-auto max-h-full flex flex-col border border-theme">
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start sm:items-center justify-center z-[9999] px-4 pt-[var(--safe-area-inset-top,0px)] pb-[var(--safe-area-inset-bottom,0px)]">
+        <div ref={modalRef} role="dialog" aria-modal="true" aria-label={item.item} className="bg-theme-primary rounded-lg shadow-xl w-full max-w-md mx-auto h-full flex flex-col border border-theme">
           {/* Header - Fixed */}
           <div className="flex items-center justify-between p-4 pb-3 border-b border-theme flex-shrink-0 rounded-t-lg">
             <h3 className="text-lg font-semibold text-theme-primary">{item.item}</h3>
@@ -641,10 +669,9 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
             <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={() => {
-                  if (window.confirm(`Are you sure you want to delete ${item.item}?`)) {
-                    onDeleteItem(originalIndex);
-                    onClose();
-                  }
+                  onDeleteItem(originalIndex);
+                  onClose();
+                  addToast(`${item.item} deleted`, 'success');
                 }}
                 className="flex items-center justify-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
                 data-testid="item-delete"

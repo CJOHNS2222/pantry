@@ -209,10 +209,6 @@ export const Settings: React.FC<SettingsProps> = ({
   const removeMemberFromHousehold = async (member: Member) => {
     if (!household || !user) return;
     
-    const confirmMessage = `Are you sure you want to remove ${member.name} from the household? All their household data will be copied to their personal account.`;
-    
-    if (!confirm(confirmMessage)) return;
-
     try {
       // Copy household data to user's personal collections
       await copyHouseholdDataToUser(member.id);
@@ -509,9 +505,8 @@ export const Settings: React.FC<SettingsProps> = ({
 
   const handleRemoveAvatar = async () => {
     if (!user) return;
-    if (confirm('Remove your avatar?')) {
-      setUpdatingAvatar(true);
-      try {
+    setUpdatingAvatar(true);
+    try {
         const userRef = DatabaseMonitoringService.doc('users', user.id);
         await DatabaseMonitoringService.updateDoc(userRef, {
           avatar: null
@@ -522,7 +517,6 @@ export const Settings: React.FC<SettingsProps> = ({
       } finally {
         setUpdatingAvatar(false);
       }
-    }
   };
 
   const handleFeedbackSubmit = async (e: React.FormEvent) => {
@@ -1819,10 +1813,6 @@ export const Settings: React.FC<SettingsProps> = ({
             </p>
             <button
               onClick={async () => {
-                if (!confirm('This will scan all your pantry items and attempt to update images for items with placeholders. This may take a few minutes. Continue?')) {
-                  return;
-                }
-
                 setUpdatingBulkImages(true);
                 try {
                   const { BulkImageUpdateService } = await import('../services/bulkImageUpdateService');

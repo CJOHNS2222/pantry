@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, FilePlus, Link } from 'lucide-react';
 import { parseCsvToPantryItems, fetchRecipeFromUrl, persistImportedPantryItems } from '../services/importService';
 import { useApp } from '../contexts/AppContext';
+import { useAppActions } from '../contexts/AppActionsContext';
 import { InventoryCacheService } from '../services/inventoryCacheService';
 import { saveRecipeToUserCache } from '../services/recipeService';
 import { PantryItem } from '../types';
@@ -15,6 +16,7 @@ interface ImportModalProps {
 
 const ImportModal: React.FC<ImportModalProps> = ({ open, onClose, defaultTab = 'pantry', onImported }) => {
   const { user, household } = useApp();
+  const { addToast } = useAppActions();
   const [tab, setTab] = useState<'pantry' | 'recipes'>(defaultTab);
   const [csvText, setCsvText] = useState('');
   const [url, setUrl] = useState('');
@@ -54,33 +56,38 @@ const ImportModal: React.FC<ImportModalProps> = ({ open, onClose, defaultTab = '
       } catch (cbErr) {
         console.warn('onImported callback failed', cbErr);
       }
-      alert(`Imported ${items.length} pantry items`);
+      addToast(`Imported ${items.length} pantry items`, 'success');
       onClose();
     } catch (err) {
       console.error(err);
-      alert('Failed to import pantry items');
+      addToast('Failed to import pantry items', 'error');
     } finally {
       setLoading(false);
     }
   };
 
   const handleImportRecipe = async () => {
-    if (!url) return alert('Please enter a recipe URL');
+    if (!url) {
+      addToast('Please enter a recipe URL', 'info');
+      return;
+    }
     setLoading(true);
     try {
       const recipe = await fetchRecipeFromUrl(url);
-      if (!recipe) return alert('Could not parse recipe from URL');
-      // Persist into user cache
+      if (!recipe) {
+        addToast('Could not parse recipe from URL', 'error');
+        return;
+      }
       if (user?.id) {
         await saveRecipeToUserCache(user.id, recipe);
-        alert(`Imported recipe: ${recipe.title}`);
+        addToast(`Imported recipe: ${recipe.title}`, 'success');
         onClose();
       } else {
-        alert('You must be signed in to save recipes');
+        addToast('You must be signed in to save recipes', 'error');
       }
     } catch (err) {
       console.error(err);
-      alert('Failed to import recipe');
+      addToast('Failed to import recipe', 'error');
     } finally {
       setLoading(false);
     }
@@ -116,7 +123,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ open, onClose, defaultTab = '
               <div className="text-sm text-theme-primary">Paste a recipe URL to import its title, ingredients and instructions where possible. This uses a lightweight scraper; results vary by site.</div>
               <div className="flex gap-2">
                   <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://example.com/recipe" className="flex-1 p-2 rounded border text-black" data-testid="import-recipe-url" />
-                  <button onClick={async () => { setLoading(true); const r = await fetchRecipeFromUrl(url); setLoading(false); if (r) alert(`Preview: ${r.title}\nIngredients: ${r.ingredients.length}`); else alert('No preview available'); }} className="px-3 py-1 bg-theme-secondary rounded" data-testid="import-preview">Preview</button>
+                  <button onClick={async () => { setLoading(true); const r = await fetchRecipeFromUrl(url); setLoading(false); if (r) addToast(`Preview: ${r.title} (${r.ingredients.length} ingredients)`, 'info'); else addToast('No preview available', 'info'); }} className="px-3 py-1 bg-theme-secondary rounded" data-testid="import-preview">Preview</button>
               </div>
               <div className="flex justify-end">
                   <button onClick={handleImportRecipe} disabled={loading || !url} className="px-3 py-1 bg-[var(--accent-color)] text-white rounded" data-testid="import-recipe">Import Recipe</button>

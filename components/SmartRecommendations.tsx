@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { ChefHat, Clock, Lightbulb, Star } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { ChefHat, Clock, Lightbulb, Star, ChevronDown, ChevronUp } from 'lucide-react';
 import AnalyticsService from '../services/analyticsService';
 import { log } from '../services/logService';
 import { PantryItem, SavedRecipe, User } from '../types';
@@ -36,6 +36,7 @@ interface SmartRecommendationsProps {
 }
 
 const SmartRecommendations: React.FC<SmartRecommendationsProps> = ({ inventory, savedRecipes, user }) => {
+  const [isCollapsed, setIsCollapsed] = useState(true);
   const recommendations = useMemo((): SmartRecommendation[] => {
     const recs: SmartRecommendation[] = [];
 
@@ -95,11 +96,12 @@ const SmartRecommendations: React.FC<SmartRecommendationsProps> = ({ inventory, 
       });
 
       if (expiringSoon.length > 0) {
+        const names = expiringSoon.map(i => i.item).join(', ');
         recs.push({
           id: 'use-expiring-items',
           type: 'recipe',
           title: 'Use Before It Expires',
-          description: `${expiringSoon.length} item${expiringSoon.length > 1 ? 's' : ''} ${expiringSoon.length > 1 ? 'are' : 'is'} expiring soon. Plan meals around them!`,
+          description: `Expiring soon: ${names}. Plan meals around them!`,
           impact: 'high',
           icon: <Clock className="w-5 h-5" />,
           actionText: 'Find Recipes',
@@ -216,19 +218,26 @@ const SmartRecommendations: React.FC<SmartRecommendationsProps> = ({ inventory, 
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border">
-      <div className="p-6 border-b">
-        <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
-          <Lightbulb className="w-6 h-6 text-blue-600" />
+    <div className="bg-white rounded-lg shadow-sm border mb-3">
+      <button
+        onClick={() => setIsCollapsed(c => !c)}
+        className="w-full p-4 border-b flex items-center justify-between text-left hover:bg-gray-50 transition-colors"
+        aria-expanded={!isCollapsed}
+      >
+        <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+          <Lightbulb className="w-5 h-5 text-blue-600 flex-shrink-0" />
           Smart Recommendations
+          {isCollapsed && recommendations.length > 0 && (
+            <span className="text-xs font-normal text-gray-500 ml-1">({recommendations.length})</span>
+          )}
         </h2>
-        <p className="text-gray-600 mt-1">
-          Personalized suggestions based on your usage patterns
-        </p>
-      </div>
+        {isCollapsed ? <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" /> : <ChevronUp className="w-4 h-4 text-gray-400 flex-shrink-0" />}
+      </button>
 
-      <div className="divide-y">
-        {recommendations.map((rec) => (
+      {!isCollapsed && (
+        <>
+        <div className="divide-y">
+          {recommendations.map((rec) => (
           <div key={rec.id} className="p-6 hover:bg-gray-50 transition-colors">
             <div className="flex items-start gap-4">
               <div className="flex-shrink-0">
@@ -268,6 +277,8 @@ const SmartRecommendations: React.FC<SmartRecommendationsProps> = ({ inventory, 
             More recommendations available as you continue using the app
           </p>
         </div>
+      )}
+        </>
       )}
     </div>
   );

@@ -5,13 +5,56 @@ import { StructuredRecipe, SavedRecipe } from "../types";
 import { getPerformance, trace } from "firebase/performance";
 import { withErrorHandling, AppError, ErrorCode } from "../utils/errorUtils";
 import { log } from "./logService";
-import { serverTimestamp } from 'firebase/firestore';
+import { serverTimestamp, DocumentData } from 'firebase/firestore';
 import { groceryPriceService } from './groceryPriceService';
 import { parseIngredientForShoppingList } from '../utils/appUtils';
 
 const SPOONACULAR_API_KEY = import.meta.env.VITE_SPOONACULAR_API_KEY;
 const SPOONACULAR_BASE_URL = "https://api.spoonacular.com";
 const performance = getPerformance();
+
+export interface AnalyzedInstructionStep {
+  number: number;
+  step: string;
+}
+
+export interface AnalyzedInstruction {
+  name: string;
+  steps: AnalyzedInstructionStep[];
+}
+
+export interface ExtendedIngredient {
+  id: number;
+  aisle: string;
+  image: string;
+  consistency: string;
+  name: string;
+  nameClean: string;
+  original: string;
+  originalName: string;
+  amount: number;
+  unit: string;
+  meta: string[];
+}
+
+export interface WinePairing {
+  pairedWines: string[];
+  pairingText: string;
+  productMatches: Array<{
+    id: number;
+    title: string;
+    description: string;
+    price: string;
+    imageUrl: string;
+    averageRating: number;
+    ratingCount: number;
+    score: number;
+    link: string;
+  }>;
+}
+
+/** Minimal Firestore doc shape returned by DatabaseMonitoringService.getDocs */
+type FirestoreDocLike = { id: string; data(): DocumentData; exists?: boolean | (() => boolean) };
 
 export interface SpoonacularRecipe {
   id: number;
@@ -28,7 +71,7 @@ export interface SpoonacularRecipe {
   healthScore: number;
   spoonacularScore: number;
   pricePerServing: number;
-  analyzedInstructions: any[];
+  analyzedInstructions: AnalyzedInstruction[];
   cheap: boolean;
   creditsText: string;
   cuisines: string[];
@@ -48,9 +91,9 @@ export interface SpoonacularRecipe {
   whole30: boolean;
   weightWatcherSmartPoints: number;
   dishTypes: string[];
-  extendedIngredients: any[];
+  extendedIngredients: ExtendedIngredient[];
   summary: string;
-  winePairing: any;
+  winePairing: WinePairing | null;
 }
 
 export interface BulkUploadResult {
@@ -101,7 +144,7 @@ export const fetchRecipesFromSpoonacular = async (
       try {
         const RecipeClient = await import('./spoonacularRecipeClient');
         const searchFn = RecipeClient.default && RecipeClient.default.searchRecipes;
-        const isMock = !!(searchFn && ((searchFn as any).mock || (searchFn as any).__isMock || (searchFn as any).isMockFunction));
+        const isMock = !!(searchFn && ((searchFn as unknown as Record<string, unknown>).mock || (searchFn as unknown as Record<string, unknown>).__isMock || (searchFn as unknown as Record<string, unknown>).isMockFunction));
 
         // If the adapter's searchRecipes has been mocked (tests spying on it), call it.
         if (isMock) {
@@ -189,7 +232,7 @@ export const getCachedCommunityRatedRecipes = async (): Promise<SavedRecipe[]> =
     // Fallback to retrieving saved recipes (not ideal but safe)
     console.log('📥 No community-rated cache found, falling back to saved recipes');
     return await getSavedRecipes(50);
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('❌ Error fetching community-rated cache:', err);
     return await getSavedRecipes(50);
   }
@@ -212,13 +255,13 @@ export const rebuildCommunityRatedRecipesFromRatings = async (days: number = 30,
     // Some test environments mock Firestore helpers (orderBy/where/query).
     // To be robust, read the collection and filter in-memory when query builders
     // are unavailable or mocked.
-    let snap: any;
+    let snap: { docs: FirestoreDocLike[] };
     try {
-      snap = await DatabaseMonitoringService.getDocs(ratingsRef);
+      const rawSnap = await DatabaseMonitoringService.getDocs(ratingsRef);
       // Filter by cutoff in-memory
-      snap = { docs: (snap.docs || []).filter((d: any) => {
-        const data = d.data ? d.data() : d;
-        const dateVal = data?.date ? new Date(data.date) : null;
+      snap = { docs: (rawSnap.docs || []).filter((d: FirestoreDocLike) => {
+        const data = d.data();
+        const dateVal = data?.date ? new Date(data.date as string) : null;
         return dateVal ? dateVal > cutoff : false;
       }) };
     } catch (e) {
@@ -228,8 +271,8 @@ export const rebuildCommunityRatedRecipesFromRatings = async (days: number = 30,
 
     const counts: Record<string, { count: number; sum: number; ids: Set<string> }> = {};
     for (const d of snap.docs) {
-      const data = d.data() as any;
-      const title = data.recipeTitle || (data.recipeId ?? 'Unknown Recipe');
+      const data = d.data();
+      const title = (data.recipeTitle as string | undefined) || ((data.recipeId as string | undefined) ?? 'Unknown Recipe');
       const rating = typeof data.rating === 'number' ? data.rating : 0;
       if (!counts[title]) counts[title] = { count: 0, sum: 0, ids: new Set() };
       counts[title].count += 1;
@@ -243,16 +286,16 @@ export const rebuildCommunityRatedRecipesFromRatings = async (days: number = 30,
       .sort((a, b) => b.popularityCount - a.popularityCount || b.averageRating - a.averageRating)
       .slice(0, topN);
 
-    const results: any[] = [];
+    const results: Array<DocumentData & { id: string | null }> = [];
     for (const item of aggregated) {
-      let recipeDoc: any = null;
+      let recipeDoc: (DocumentData & { id: string }) | null = null;
       // prefer recipeId if available
       if (item.recipeIds && item.recipeIds.length > 0) {
         try {
           const docRef = DatabaseMonitoringService.doc(`recipes/${item.recipeIds[0]}`);
           const ds = await DatabaseMonitoringService.getDoc(docRef);
           if (ds && ds.exists && typeof ds.exists === 'function' ? ds.exists() : ds.exists) {
-            const d = ds.data() as any;
+            const d = ds.data() as DocumentData;
             recipeDoc = { id: ds.id, ...d };
           }
         } catch (e) { /* ignore */ }
@@ -261,18 +304,18 @@ export const rebuildCommunityRatedRecipesFromRatings = async (days: number = 30,
       if (!recipeDoc) {
         try {
           const allRecipesSnap = await DatabaseMonitoringService.getDocs(DatabaseMonitoringService.collection('recipes'));
-          const found = (allRecipesSnap.docs || []).find((rd: any) => {
-            const data = rd.data ? rd.data() : rd;
+          const found = (allRecipesSnap.docs || []).find((rd: FirestoreDocLike) => {
+            const data = rd.data();
             return data?.title === item.title;
           });
           if (found) {
-            const d = found.data ? found.data() : {};
+            const d = found.data();
             recipeDoc = { id: found.id, ...d };
           }
         } catch (e) { /* ignore */ }
       }
 
-      const entry: any = recipeDoc ? { ...recipeDoc } : { id: null, title: item.title, description: null, ingredients: [], instructions: [], image: null };
+      const entry: DocumentData & { id: string | null } = recipeDoc ? { ...recipeDoc } : { id: null, title: item.title, description: null, ingredients: [], instructions: [], image: null };
 
       entry.popularityCount = item.popularityCount;
       entry.averageRating = item.averageRating;
@@ -292,7 +335,7 @@ export const rebuildCommunityRatedRecipesFromRatings = async (days: number = 30,
 
     perfTrace.putMetric('community_cached_count', results.length);
     log.info('Rebuilt community-rated recipes cache', { count: results.length });
-  } catch (err: any) {
+  } catch (err: unknown) {
     log.error('Failed to rebuild community-rated recipes cache', { error: err });
   } finally {
     perfTrace.stop();
@@ -312,22 +355,22 @@ export const upsertCommunityRatedRecipeByTitle = async (title: string, recipeId?
     const stats = statsSnap && statsSnap.exists && typeof statsSnap.exists === 'function' ? (statsSnap.exists() ? statsSnap.data() : {}) : (statsSnap && statsSnap.exists ? statsSnap.data() : {});
 
     // Try to locate the recipe document by title (or id if stats contains one)
-    let recipeDoc: any = null;
+    let recipeDoc: (DocumentData & { id: string }) | null = null;
     try {
       // If recipeId is provided, use it directly
       if (recipeId) {
         const rd = await DatabaseMonitoringService.getDoc(DatabaseMonitoringService.doc(`recipes/${recipeId}`));
         if (rd && rd.exists && typeof rd.exists === 'function' ? rd.exists() : rd.exists) {
-          const d = rd.data() as any;
+          const d = rd.data() as DocumentData;
           recipeDoc = { id: rd.id, ...d };
         }
       } else {
         // If stats contains a recipeId, try that first
-        const possibleId = (stats as any).recipeId;
+        const possibleId = stats?.recipeId as string | undefined;
         if (possibleId) {
           const rd = await DatabaseMonitoringService.getDoc(DatabaseMonitoringService.doc(`recipes/${possibleId}`));
           if (rd && rd.exists && typeof rd.exists === 'function' ? rd.exists() : rd.exists) {
-            const d = rd.data() as any;
+            const d = rd.data() as DocumentData;
             recipeDoc = { id: rd.id, ...d };
           }
         }
@@ -339,13 +382,13 @@ export const upsertCommunityRatedRecipeByTitle = async (title: string, recipeId?
         const q = DatabaseMonitoringService.query(DatabaseMonitoringService.collection('recipes'), DatabaseMonitoringService.where('title', '==', title), DatabaseMonitoringService.limit(1));
         const rq = await DatabaseMonitoringService.getDocs(q);
         if (rq && rq.docs && rq.docs.length > 0) {
-          const d = rq.docs[0].data() as any;
+          const d = (rq.docs[0] as FirestoreDocLike).data();
           recipeDoc = { id: rq.docs[0].id, ...d };
         }
       } catch (e) { /* ignore */ }
     }
 
-    const entry: any = recipeDoc ? { ...recipeDoc } : { id: null, title, description: null, ingredients: [], instructions: [], image: null };
+    const entry: DocumentData & { id: string | null } = recipeDoc ? { ...recipeDoc } : { id: null, title, description: null, ingredients: [], instructions: [], image: null };
 
     // Attach rating metadata from stats
     entry.totalRatings = stats?.totalRatings ?? (stats?.ratingsCount ?? 0);
@@ -357,7 +400,7 @@ export const upsertCommunityRatedRecipeByTitle = async (title: string, recipeId?
     // Upsert into the single-doc cache
     const cacheRef = DatabaseMonitoringService.doc('system/community_rated_recipes');
     const cacheSnap = await DatabaseMonitoringService.getDoc(cacheRef);
-    let arr: any[] = [];
+    let arr: Array<DocumentData & { id: string | null }> = [];
     if (cacheSnap && cacheSnap.exists && typeof cacheSnap.exists === 'function' ? cacheSnap.exists() : cacheSnap.exists) {
       const data = cacheSnap.data();
       arr = Array.isArray(data.recipes) ? data.recipes : [];
@@ -375,7 +418,7 @@ export const upsertCommunityRatedRecipeByTitle = async (title: string, recipeId?
 
     await DatabaseMonitoringService.setDoc(cacheRef, { recipes: arr, lastUpdated: serverTimestamp(), version: 1 });
     log.info('Upserted community-rated recipe cache entry', { title });
-  } catch (err: any) {
+  } catch (err: unknown) {
     log.error('Failed to upsert community-rated recipe', { error: err, title });
   }
 };
@@ -390,7 +433,7 @@ export const convertSpoonacularToStructured = (spoonacularRecipe: SpoonacularRec
     ingredients: spoonacularRecipe.extendedIngredients?.map(ing =>
       `${ing.amount} ${ing.unit} ${ing.name}`
     ) || [],
-    instructions: spoonacularRecipe.analyzedInstructions?.[0]?.steps?.map((step: any) =>
+    instructions: spoonacularRecipe.analyzedInstructions?.[0]?.steps?.map((step: AnalyzedInstructionStep) =>
       step.step
     ) || [spoonacularRecipe.instructions || "Instructions not available"],
     cookTime: `${spoonacularRecipe.readyInMinutes} mins`,
@@ -425,7 +468,7 @@ export const uploadRecipeImage = async (imageUrl: string, recipeId: string): Pro
     // Get download URL
     const downloadURL = await getDownloadURL(storageRef);
     return downloadURL;
-  } catch (err: any) {
+  } catch (err: unknown) {
     log.error("Error uploading recipe image", { error: err, recipeId }, "RecipeService");
     perfTrace.putAttribute('result', 'fallback_to_original');
     return imageUrl; // Return original URL if upload fails
@@ -446,7 +489,7 @@ export const saveRecipeToFirestore = async (
     perfTrace.start();
 
     try {
-      const savedRecipe: any = {
+      const savedRecipe = {
         ...recipe,
         dateSaved: new Date().toISOString(),
         userId: options?.userId ?? undefined,
@@ -458,7 +501,7 @@ export const saveRecipeToFirestore = async (
       perfTrace.putMetric('instructions_count', recipe.instructions.length);
       perfTrace.putAttribute('has_image', recipe.image ? 'true' : 'false');
 
-      const docRef = await DatabaseMonitoringService.addDoc(DatabaseMonitoringService.collection("recipes"), savedRecipe as any);
+      const docRef = await DatabaseMonitoringService.addDoc(DatabaseMonitoringService.collection("recipes"), savedRecipe);
       return docRef.id;
     } finally {
       perfTrace.stop();
@@ -476,11 +519,11 @@ export const uploadRecipeImageFile = async (file: File, recipeId: string): Promi
   try {
     // Upload the provided file directly
     const storageRef = ref(storage, `recipes/${recipeId}.jpg`);
-    await uploadBytes(storageRef, file as any);
+    await uploadBytes(storageRef, file);
     const downloadURL = await getDownloadURL(storageRef);
     perfTrace.putAttribute('result', 'uploaded');
     return downloadURL;
-  } catch (err: any) {
+  } catch (err: unknown) {
     log.error('Error uploading recipe image file', { error: err, recipeId }, 'RecipeService');
     perfTrace.putAttribute('result', 'error');
     throw err;
@@ -503,7 +546,7 @@ export const submitRecipeForReview = async (recipe: StructuredRecipe, submitterI
         dateSubmitted: new Date().toISOString(),
         submitterId: submitterId || null,
         status: 'pending'
-      } as any;
+      };
 
       const docRef = await DatabaseMonitoringService.addDoc(DatabaseMonitoringService.collection('recipes/submissions'), submission);
       return docRef.id;
@@ -527,7 +570,7 @@ export const saveRecipeToUserCache = async (uid: string, recipe: StructuredRecip
       const snap = await DatabaseMonitoringService.getDoc(cacheRef);
 
       const recipeId = `r_${Date.now()}`;
-      const savedItem: any = {
+      const savedItem = {
         ...recipe,
         id: recipeId,
         dateSaved: new Date().toISOString(),
@@ -660,22 +703,22 @@ export const getSavedRecipes = async (limitCount: number = 50): Promise<SavedRec
     // Read the collection and sort/limit in-memory as a robust fallback.
     try {
       const querySnapshot = await DatabaseMonitoringService.getDocs(recipesRef);
-      const items = (querySnapshot.docs || []).map((doc: any) => {
-        const d = doc.data ? doc.data() : doc;
-        return ({ id: doc.id, ...(d && typeof d === 'object' ? (d as Record<string, any>) : {}) } as SavedRecipe);
+      const items = (querySnapshot.docs || []).map((doc: FirestoreDocLike) => {
+        const d = doc.data();
+        return ({ id: doc.id, ...(d && typeof d === 'object' ? (d as Record<string, unknown>) : {}) } as SavedRecipe);
       });
       // Sort by dateSaved desc and apply limit
-      items.sort((a: any, b: any) => {
+      items.sort((a: SavedRecipe, b: SavedRecipe) => {
         const da = a.dateSaved ? new Date(a.dateSaved).getTime() : 0;
         const db = b.dateSaved ? new Date(b.dateSaved).getTime() : 0;
         return db - da;
       });
       return items.slice(0, limitCount);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error fetching saved recipes:', err);
       return [];
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Error fetching saved recipes:", err);
     return [];
   }
@@ -691,8 +734,8 @@ export const getCachedPopularRecipes = async (): Promise<SavedRecipe[]> => {
   try {
     // Prefer admin-written cache at recipe_caches/popular_recipes (admin scripts use this)
     const cachePaths = ["recipe_caches/popular_recipes", "system/popular_recipes"];
-    let docSnap: any = null;
-    let data: any = null;
+    let docSnap: Awaited<ReturnType<typeof DatabaseMonitoringService.getDoc>> | null = null;
+    let data: DocumentData | null = null;
 
     for (const path of cachePaths) {
       try {
@@ -710,8 +753,8 @@ export const getCachedPopularRecipes = async (): Promise<SavedRecipe[]> => {
     if (data) {
       const recipes = data?.recipes || [];
       // Remove duplicates based on title to ensure clean data
-      const uniqueRecipes = (recipes as any[]).filter((recipe: any, index: number, self: any[]) =>
-        index === self.findIndex((r: any) => r.title === recipe.title)
+      const uniqueRecipes = (recipes as SavedRecipe[]).filter((recipe, index, self) =>
+        index === self.findIndex(r => r.title === recipe.title)
       );
       console.log(`✅ Loaded ${uniqueRecipes.length} cached recipes (1 database read)`);
       return uniqueRecipes;
@@ -724,7 +767,7 @@ export const getCachedPopularRecipes = async (): Promise<SavedRecipe[]> => {
     return recipes.filter((recipe, index, self) =>
       index === self.findIndex(r => r.title === recipe.title)
     );
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("❌ Error fetching cached popular recipes:", err);
     // Fall back to direct loading if caching fails
     console.log("🔄 Falling back to direct recipe loading...");
@@ -766,15 +809,15 @@ export const getCachedRecipesCache = async (cachePath: string = 'recipe_caches/r
           console.log(`✅ Loaded ${sysRecipes.length} cached recipes from ${systemPath} (1 database read)`);
           return sysRecipes as SavedRecipe[];
         }
-      } catch (permErr: any) {
-        console.warn(`⚠️ Unable to read ${cachePath} (may be permission denied):`, (permErr as any)?.message || permErr);
+      } catch (permErr: unknown) {
+        console.warn(`⚠️ Unable to read ${cachePath} (may be permission denied):`, permErr instanceof Error ? permErr.message : permErr);
       }
     }
 
     console.log(`🔄 Falling back to getSavedRecipes(50)`);
     const recipes = await getSavedRecipes(50);
     return recipes;
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error(`❌ Error fetching cached recipes at ${cachePath}:`, err);
     // If we got a permission error when reading the cache, try the system path once
     if (cachePath.startsWith('recipe_caches/')) {
@@ -788,8 +831,8 @@ export const getCachedRecipesCache = async (cachePath: string = 'recipe_caches/r
           console.log(`✅ Loaded ${sysRecipes.length} cached recipes from ${systemPath} (1 database read)`);
           return sysRecipes as SavedRecipe[];
         }
-      } catch (innerErr) {
-        console.warn('⚠️ System cache read also failed:', (innerErr as any)?.message || innerErr);
+      } catch (innerErr: unknown) {
+        console.warn('⚠️ System cache read also failed:', innerErr instanceof Error ? innerErr.message : innerErr);
       }
     }
 
@@ -817,7 +860,7 @@ export const cachePopularRecipes = async (recipes: SavedRecipe[]): Promise<void>
       version: 1
     });
     console.log(`💾 Cached ${recipes.length} popular recipes for efficient loading`);
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("❌ Error caching popular recipes:", err);
     // Don't throw - caching failure shouldn't break the app
   }
@@ -846,8 +889,8 @@ export const rebuildCachedPopularRecipesFromRatings = async (days: number = 30, 
 
     const counts: Record<string, { count: number; sumRating: number }> = {};
     for (const d of snap.docs) {
-      const data = d.data() as any;
-      const title = data.recipeTitle || 'Unknown Recipe';
+      const data = d.data();
+      const title = (data.recipeTitle as string | undefined) || 'Unknown Recipe';
       const rating = typeof data.rating === 'number' ? data.rating : 0;
       if (!counts[title]) counts[title] = { count: 0, sumRating: 0 };
       counts[title].count += 1;
@@ -867,14 +910,14 @@ export const rebuildCachedPopularRecipesFromRatings = async (days: number = 30, 
       // Keep minimal fields for the cache; UI can fetch full recipe on demand
       popularityCount: item.popularityCount,
       averageRating: item.averageRating
-    } as any));
+    }));
 
     const popularRecipesRef = DatabaseMonitoringService.doc('system/popular_recipes');
     await DatabaseMonitoringService.setDoc(popularRecipesRef, { recipes: top, lastUpdated: new Date(), version: 1 });
 
     perfTrace.putMetric('cached_count', top.length);
     log.info('Rebuilt cached popular recipes', { count: top.length });
-  } catch (err: any) {
+  } catch (err: unknown) {
     log.error('Failed to rebuild cached popular recipes', { error: err });
   } finally {
     perfTrace.stop();
@@ -905,7 +948,7 @@ export const searchRecipesInFirestore = async (searchTerm: string): Promise<Save
     // Filter in memory for more flexible search (could be optimized further with Algolia)
     const searchResults = [];
     for (const doc of querySnapshot.docs) {
-      const searchEntry: any = doc.data() || {};
+      const searchEntry = doc.data() as DocumentData | Record<string, unknown>;
 
       // Check if search term matches title, description, ingredients, or keywords
       const matches =
@@ -931,10 +974,10 @@ export const searchRecipesInFirestore = async (searchTerm: string): Promise<Save
 
       const recipeDocs = await Promise.all(recipePromises);
 
-      for (const doc of recipeDocs as any[]) {
-        if (doc && (typeof (doc as any).exists === 'function' ? (doc as any).exists() : (doc as any).exists)) {
-          const d = (doc as any).data ? (doc as any).data() : {};
-          fullRecipes.push({ id: (doc as any).id, ...(d && typeof d === 'object' ? d as Record<string, any> : {}) } as SavedRecipe);
+      for (const doc of recipeDocs as FirestoreDocLike[]) {
+        if (doc && (typeof doc.exists === 'function' ? (doc as FirestoreDocLike & { exists(): boolean }).exists() : (doc as FirestoreDocLike & { exists: boolean }).exists)) {
+          const d = doc.data();
+          fullRecipes.push({ id: doc.id, ...(d && typeof d === 'object' ? d as Record<string, unknown> : {}) } as SavedRecipe);
         }
       }
     }
@@ -945,7 +988,7 @@ export const searchRecipesInFirestore = async (searchTerm: string): Promise<Save
     perfTrace.putMetric('results_found', fullRecipes.length);
 
     return fullRecipes;
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Error searching recipes:", err);
     // Fallback to old method if search index fails
     console.log("🔄 Falling back to full collection search...");
@@ -961,20 +1004,20 @@ const searchRecipesInFirestoreFallback = async (searchTerm: string): Promise<Sav
     const recipesRef = DatabaseMonitoringService.collection("recipes");
     const querySnapshot = await DatabaseMonitoringService.getDocs(recipesRef);
 
-    const allRecipes = querySnapshot.docs.map((doc: any) => {
-      const d = (doc as any).data();
-      return ({ id: (doc as any).id, ...(d && typeof d === 'object' ? d as Record<string, any> : {}) } as SavedRecipe);
+    const allRecipes = querySnapshot.docs.map((doc: FirestoreDocLike) => {
+      const d = doc.data();
+      return ({ id: doc.id, ...(d && typeof d === 'object' ? d as Record<string, unknown> : {}) } as SavedRecipe);
     });
 
     // Filter by search term (case-insensitive)
-    const filteredRecipes = allRecipes.filter((recipe: any) =>
-      String((recipe as any).title || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      String((recipe as any).description || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      Array.isArray((recipe as any).ingredients) && (recipe as any).ingredients.some((ing: any) => String(ing || '').toLowerCase().includes(searchTerm.toLowerCase()))
+    const filteredRecipes = allRecipes.filter((recipe: SavedRecipe) =>
+      String(recipe.title || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      String((recipe as unknown as { description?: string }).description || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      Array.isArray((recipe as unknown as { ingredients?: string[] }).ingredients) && ((recipe as unknown as { ingredients: string[] }).ingredients).some((ing: string) => String(ing || '').toLowerCase().includes(searchTerm.toLowerCase()))
     );
 
     return filteredRecipes;
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Error in fallback search:", err);
     return [];
   }

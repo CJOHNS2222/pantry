@@ -10,6 +10,8 @@ import { User, Household } from '../types';
 import { Tab } from '../types/app';
 
 export class HouseholdActivityService {
+  // Throttle logActivity writes: at most one write per user per household per 30 seconds
+  private static lastWriteTime: Record<string, number> = {};
   /**
    * Update member's current activity and last seen
    */
@@ -56,6 +58,13 @@ export class HouseholdActivityService {
     itemId?: string,
     itemName?: string
   ) {
+    // Throttle: at most one activity write per user per household every 30 seconds
+    const throttleKey = `${householdId}:${userId}`;
+    const now = Date.now();
+    if (now - (HouseholdActivityService.lastWriteTime[throttleKey] ?? 0) < 30_000) {
+      return;
+    }
+    HouseholdActivityService.lastWriteTime[throttleKey] = now;
     try {
       const activityData = {
         userId,

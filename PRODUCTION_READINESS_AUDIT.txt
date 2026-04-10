@@ -1,0 +1,479 @@
+==============================================================
+STOCK & SPOON — OUTSTANDING ITEMS (as of April 10, 2026)
+==============================================================
+
+All items from the original Production Readiness Audit that were
+quick/safe to fix have been resolved. The items below require
+either architectural refactoring, new feature work, or carry
+a meaningful risk of increased Firestore reads/writes.
+
+==============================================================
+SECTION 1: ARCHITECTURE / REFACTOR
+==============================================================
+
+[A — RESOLVED] MealPlanner 360-object generation: displayPlan is already
+wrapped in useMemo (line 926) and only generates a 7-day window —
+the audit description was stale.
+
+[B — RESOLVED] PantryScanner filter memoization: processedInventory is
+already wrapped in useMemo keyed to [inventory, debouncedSearchQuery,
+pantryFilter] (line 427) — the audit description was stale.
+
+C. Household Activity Feed re-enabled (v1.5.9)
+   - Subscription active whenever a household is loaded (header dropdown accessible from any tab)
+   - logActivity writes throttled to 1 write per user per household per 30 s
+   - limit(20) already in place on the query
+   - RESOLVED in v1.5.9
+
+
+==============================================================
+SECTION 2: STUBBED / UNIMPLEMENTED FEATURES
+==============================================================
+
+D. recipeRecommendationService is entirely stubbed
+   - Recipe lookup returns an empty mock
+   - Confidence score is hardcoded to 0.9
+   - Similarity algorithm is a placeholder comment
+   - File: services/recipeRecommendationService.ts
+   - Fix: Implement actual ingredient set-intersection scoring against inventory
+
+
+==============================================================
+SECTION 3: UX / DISCOVERABILITY
+==============================================================
+
+[H — WON'T FIX] LeftoverQuickCapture in ItemDetailModal: Leftovers can only
+be created from a cooked meal, not from individual pantry items. Adding the
+action to ItemDetailModal would misrepresent the leftover concept.
+
+[I — RESOLVED] Notifications pagination (v1.5.10): AppHeader notification
+panel now has a display-side visibleCount (starts at 50) with a "Load more
+(N remaining)" button that extends by 50 per tap. All notifications are
+already loaded via a single Firestore document listener; the pagination is
+display-only and requires no extra reads.
+
+[J — RESOLVED] Non-blocking feature tooltips (v1.5.10): PantryScanner now
+shows a one-time inline hint bar when bulk select mode is first activated.
+Auto-dismisses after 6 seconds, no modal/OK required. Persisted in
+localStorage (key: tip-bulk-select). ✕ button to manually dismiss earlier.
+
+[K — RESOLVED] Household onboarding (v1.5.10): ModernOnboardingFlow now
+accepts and forwards onOpenHousehold prop. App.tsx passes
+`() => { setShowOnboarding(false); setShowHousehold(true); }` so tapping
+"Set Up Household" in the onboarding quick-setup step opens the Household
+panel directly.
+
+[L — RESOLVED] Bulk ops progress feedback (v1.5.10): PantryScanner
+bulkDelete and bulkMoveToShoppingList now maintain bulkProgress state
+({ current, total }). A progress bar with "Processing… X / Y" count renders
+above the item list while the operation runs, then clears on completion.
+
+[M — WON'T FIX] Recipe modal jump-to-section: Most recipes are short enough
+that initial screen already shows both ingredients and instructions without
+scrolling. Not worth the added complexity.
+
+
+==============================================================
+SECTION 4: CODE QUALITY
+==============================================================
+
+[N — RESOLVED] ESLint no-explicit-any rule disabled globally
+   - Eliminated all explicit `any` from the three worst-offender files:
+     services/recipeService.ts (was 28), services/geminiService.ts (was 26),
+     services/groceryPriceService.ts (was 26).
+   - Added typed interfaces: AnalyzedInstruction, ExtendedIngredient, WinePairing,
+     FirestoreDocLike (recipeService); imported PerformanceTrace (geminiService).
+   - Replaced defensive (DatabaseMonitoringService as any) runtime checks with
+     direct typed method calls.
+   - All catch (err: any) → catch (err: unknown) across all three files.
+   - Re-enabled rule in eslint.config.ts: "error". Lint passes 0 errors on all 3 files.
+
+[O — RESOLVED] Auth state race condition in PriceDataCacheService
+   - isLoading flag already present as concurrency guard.
+   - Root bug fixed: hasLoaded was not set when the Firestore doc doesn't exist,
+     causing a new getDoc on every rapid auth state change for new users.
+   - Fix applied: hasLoaded = true now set after the if(docSnap.exists()) block
+     (both branches), so empty-doc case only reads once per session.
+   - Error path still leaves hasLoaded = false (intentional — allows retry).
+
+[P — RESOLVED] mealPlanSyncInProgress never resets on error
+   - updateMealPlan already has `finally { mealPlanSyncInProgress = false; }`
+     which covers all error paths including thrown exceptions.
+   - createMealPlanListener does not touch this flag; its error handler
+     calls setIsLoadingMealPlan(false) which is the correct cleanup there.
+   - No additional changes needed.
+
+==============================================================
+END OF ORIGINAL AUDIT
+==============================================================
+
+==============================================================
+SECTION 5: EXPIRY / STORAGE LOGIC GAPS  (Added 2026-04-10)
+==============================================================
+
+[Q — RESOLVED] Freezer-aware shelf life and expiry calculations
+   - Added getFreezerShelfLifeDays(itemName) — USDA-based lookup in appUtils.ts.
+   - getAutoExpirationDate now accepts optional storageLocation param; when
+     'freezer' is passed it returns the USDA shelf-life date, not fridge durations.
+   - shouldShowExpiryAlert: frozen items use freezerExpiry as ref date and only
+     trigger within 30 days (vs 7 for fridge items).
+   - generateExpirationAlerts: frozen path uses softer language, 30-day window,
+     "past its freezer date" vs "expired".
+   - ItemDetailModal: auto-sets is_frozen / frozenAt / freezerExpiry / expirationDate
+     when user moves an item to Freezer; clears them when moving back out.
+   - pantryService: all 3 getAutoExpirationDate call sites pass storageLocation.
+   - Resolved v1.5.11.
+
+R. ExpiredItemsModal + App.tsx expired check ignores frozen state
+   - ExpiredItemsModal.tsx line 46 and App.tsx line 901 both filter with
+     `item.expirationDate <= today && !item.is_immortal` — frozen items whose
+     fridge-date has passed (but are safely stored in the freezer) will show
+     up as "expired" and trigger the expired items modal on every login.
+   - Fix: Add `&& !item.is_frozen && item.storageLocation !== 'freezer'` to both
+     filters, or use the active-date helper logic from generateExpirationAlerts
+     (prefer freezerExpiry for frozen items).
+   - Files: components/ExpiredItemsModal.tsx (~line 46),
+            App.tsx (~line 901).
+   - Risk: Low-effort; 2 one-line guards. Zero Firestore impact.
+
+S. FreezeTransitionModal uses hardcoded default, ignores getFreezerShelfLifeDays
+   - FreezeTransitionModal.tsx defaults freezerDays = 90 (hardcoded).
+   - Fix: Pass item name as a prop to FreezeTransitionModal; call
+     getFreezerShelfLifeDays(itemName) in useState initializer so the input
+     field pre-fills with the USDA default for that specific food type.
+   - File: components/FreezeTransitionModal.tsx.
+   - Risk: Non-breaking; makes the UX more accurate without removing user control.
+
+T. searchUtils.ts expiring-soon filter uses expirationDate regardless of frozen state
+   - filterPantryItems (searchUtils.ts ~line 215) compares item.expirationDate
+     for the "expiring-soon" bucket. For pre-v1.5.11 frozen items still carrying
+     a fridge-date, this produces false "expiring soon" results.
+   - Fix: In the expiring-soon branch, mirror generateExpirationAlerts: if
+     isFrozen use freezerExpiry ?? expirationDate, and use 30 days as the
+     "soon" threshold instead of 7.
+   - File: utils/searchUtils.ts filterPantryItems function.
+
+U. openedExpiry only calculates for 2 categories
+   - ItemDetailModal handleCloseAndPersist sets openedExpiry only for
+     'Canned Goods' and 'Condiments & Sauces' (6 months). All other categories
+     get no openedExpiry when marked as opened.
+   - Practical impact: Dairy (opened: 7 days), Deli/Meat (opened: 3-5 days),
+     bread (opened: 5 days), nut butters (opened: 3 months), soft cheese
+     (opened: 7 days) are all unhandled.
+   - Fix: Create getOpenedShelfLifeDays(itemName, category) helper alongside
+     getFreezerShelfLifeDays and use it in the opened-item block.
+   - File: components/ItemDetailModal.tsx (if localIsOpened && !item.openedAt block).
+
+V. inferStorageLocationFromItemName routes fresh meat to freezer ambiguously
+   - The function's freezer block matches unqualified "chicken", "beef", "pork",
+     "fish", "salmon" etc. So "chicken breast" or "ground beef" infers 'freezer'
+     even when the user just bought it fresh.
+   - With v1.5.11, these items now get a 9-month or 4-month freezer expiry by
+     default. This is better than 4 days, but wrong for users who keep fresh
+     meat in the fridge to cook within the week.
+   - Fix: Default unqualified fresh meat to 'fridge' (2-4 day auto-expiry).
+     Only infer 'freezer' when the name explicitly contains "frozen", "freeze",
+     or a specific frozen phrasing. Users who move it to the freezer get the
+     correct auto-extended expiry via ItemDetailModal location-change logic.
+   - File: utils/appUtils.ts inferStorageLocationFromItemName.
+
+W. Batch-level expiry does not feed back into item.expirationDate
+   - PantryItems support multiple batches (each with .expires). The FEFO
+     principle means item.expirationDate should always reflect the soonest batch
+     expiry. Currently batch.expires and item.expirationDate are set
+     independently at creation time and can drift thereafter.
+   - Fix: When batches are present, derive item.expirationDate = min(batch.expires)
+     at write time in pantryService, or at read time in useDataManagement. A
+     read-time derivation is safer and non-destructive.
+   - Files: services/pantryService.ts, hooks/useDataManagement.ts.
+
+
+==============================================================
+SECTION 6: STUBBED / INCOMPLETE FEATURES  (Added 2026-04-10)
+==============================================================
+
+[D — STILL OPEN] recipeRecommendationService is entirely stubbed
+   (See Section 2 above. No changes made as of v1.5.11.)
+
+X. FreezeTransitionModal is unstyled (raw HTML + inline styles)
+   - FreezeTransitionModal.tsx is the only component using raw HTML elements with
+     inline style={{}} objects instead of Tailwind classes. It stands out
+     visually from every other modal in the app.
+   - Fix: Port to Tailwind + theme CSS vars (bg-theme-primary, text-theme-primary,
+     border-theme, etc.) matching the style of ItemDetailModal or ExpiredItemsModal.
+   - File: components/FreezeTransitionModal.tsx.
+   - Risk: Visual-only; zero logic changes required.
+
+
+==============================================================
+SECTION 7: UX / DISCOVERABILITY  (Added 2026-04-10)
+==============================================================
+
+Y. FAQ missing entries for new features (date labels, frozen items, dry goods)
+   - FAQPage.tsx does not explain:
+       1. What "Best By", "Use By", and "Sell By" labels mean and how the
+          app treats them differently.
+       2. How frozen items work — auto-extended expiry, 30-day alert window,
+          FreezeTransitionModal, freezerExpiry.
+       3. Why dry goods / canned items don't get automatic expiry dates.
+   - Fix: Add 3 FAQ entries (pantry-5, pantry-6, pantry-7) documented in
+     Section 8 below. Ready to implement in FAQPage.tsx.
+
+Z. Date-type education has no in-app touchpoint at the picker
+   - ExpirationDatePicker shows "Best By" and "Use By" toggle buttons with
+     one-line subtitles but no explanation of what the difference means in
+     practice, and no mention of "Sell By" (which many users will see on
+     packages and try to enter).
+   - Fix (low-cost): Add a <details> / <summary> collapsible "What do these
+     mean?" block inside the ExpirationDatePicker dropdown, after the type
+     toggle and before the quick-set buttons. Three bullet points; no modal.
+     Exact JSX is in Section 8.
+   - File: components/ExpirationDatePicker.tsx.
+
+AA. "Expired Items" modal fires for frozen items carrying old fridge-date
+   - A chicken breast scanned before v1.5.11 has expirationDate = ~4 days after
+     purchase. If later moved to the freezer, that date passes and the item
+     appears in the "You have expired items" modal on every login even though
+     it is safely frozen (same root cause as item R; separate surface).
+   - Fix: Both R and AA are resolved by the same guard in ExpiredItemsModal.tsx
+     line 46. Documenting separately because the login popup is high-visibility.
+
+BB. Dry goods auto-expiry suppression can hide user-entered dates (low priority)
+   - getAutoExpirationDate returns undefined for 'pasta & noodles', 'grains &
+     bread', etc. If a barcode scan returns a printed best-by date, the current
+     flow ignores it because auto-expiry is suppressed for that category.
+   - The pantry-1 FAQ says items are color-coded by freshness, but pastry/
+     crackers/cereal with no date are never color-coded, which creates a gap
+     in user understanding.
+   - Fix: No code change strictly needed. Add a FAQ clarification (item BB in
+     Section 8). Optionally allow barcode-scan flow to accept user-scanned date
+     even when auto-expiry is suppressed for the category.
+
+
+==============================================================
+SECTION 8: PLANNED FAQ + UI COPY  (Added 2026-04-10)
+==============================================================
+
+The entries below are written and ready to implement. Documented here for review
+before code commit. All three go in components/FAQPage.tsx inside FAQ_DATA.
+
+--------------------------------------------------------------
+FAQ entry — id: 'pantry-5'
+Category: Pantry Management
+--------------------------------------------------------------
+Question: What is the difference between Best By, Use By, and Sell By dates?
+
+Answer:
+  These three labels mean different things — and only two of them belong in
+  Stock & Spoon:
+
+  • Best By / Best If Used By — a quality date set by the manufacturer.
+    The food is safe to eat after this date but may lose flavour, texture,
+    or aroma. Most pantry staples (cereal, crackers, canned goods, frozen
+    vegetables) carry this label. Choose "Best By" in the app for these items.
+
+  • Use By — the last date the manufacturer recommends for peak quality and,
+    for many perishables, safety. Dairy, fresh meat, deli items, and prepared
+    foods often carry this label. The app treats Use By dates with higher
+    urgency (shorter alert window) than Best By dates. Choose "Use By" for
+    these items.
+
+  • Sell By — an inventory and restocking date for the store, not a safety
+    date for you as a consumer. Milk purchased on the sell-by date is
+    typically fine for 5–7 more days if properly refrigerated. You do not
+    need to enter sell-by dates in the app — find the best-by or use-by date
+    on the package and enter that instead.
+
+  When in doubt, choose "Best By." Stock & Spoon uses this as the safer
+  default for most items.
+
+Keywords: best by, use by, sell by, expiration, date label, safety, quality,
+          food date, printed date
+
+--------------------------------------------------------------
+FAQ entry — id: 'pantry-6'
+Category: Pantry Management
+--------------------------------------------------------------
+Question: How does the app handle items I put in the freezer?
+
+Answer:
+  When you change an item's storage location to Freezer (tap the item, change
+  Storage Location, then save), Stock & Spoon automatically extends its expiry
+  to the USDA-recommended freezer shelf life for that food type:
+
+  • Ground beef / hamburger — 4 months
+  • Chicken, turkey, duck — 9 months
+  • Beef steaks / roasts, lamb, veal — 9 months
+  • Pork, ham, sausage, bacon — 6 months
+  • Lean fish (cod, tilapia, halibut) — 6 months
+  • Salmon, tuna, and other fatty fish — 3 months
+  • Shrimp and shellfish — 4 months
+  • Deli / cured meats — 2 months
+  • Bread and baked goods — 3 months
+  • Everything else — 4 months (default)
+
+  Frozen items show expiry alerts only within 30 days of the expected
+  use-by date, and the language is gentler: "best used within N days
+  (frozen)" rather than a red "Expires in 3 days!" warning.
+
+  You can always tap the item and override the date manually. If you own
+  a chest freezer and tend to keep things longer, raise the expiry date — the
+  app trusts your judgment.
+
+Keywords: freezer, frozen, shelf life, usda, chicken, beef, ground meat,
+          auto expiry, freeze date, storage location
+
+--------------------------------------------------------------
+FAQ entry — id: 'pantry-7'
+Category: Pantry Management
+--------------------------------------------------------------
+Question: Why don't dry goods and canned items get automatic expiry dates?
+
+Answer:
+  Pasta, rice, flour, canned goods, cereals, crackers, spices, and similar
+  shelf-stable items typically last 1–4 years and pose very little safety
+  risk before that. Auto-assigning 30-day or 90-day expiry dates to these
+  would flood the app with low-value "expiring soon" noise, making it harder
+  to notice the alerts that actually matter (fresh meat, dairy, produce).
+
+  If a package has a printed best-by date you care about, you can always
+  set it manually — tap the item, tap the Expiration field, and choose a date.
+
+  Items that genuinely never expire (salt, sugar, honey, vinegar) can be
+  flagged as "Shelf Stable" from the item detail screen. That flag permanently
+  silences all expiry alerts for that item, even if a date gets set later.
+
+Keywords: dry goods, canned, pasta, rice, no expiry, shelf stable, immortal,
+          auto date, cereal, flour, pantry staple
+
+--------------------------------------------------------------
+ExpirationDatePicker inline tip — audit item Z
+File: components/ExpirationDatePicker.tsx
+--------------------------------------------------------------
+Add the following block inside the "Picker Dropdown" <div>, after the
+Type Selection block and before the "Quick Options" block:
+
+  <details className="mb-4 rounded-lg border border-theme overflow-hidden text-xs text-theme-secondary">
+    <summary className="px-3 py-2 cursor-pointer font-medium hover:bg-theme-secondary select-none">
+      What do these mean?
+    </summary>
+    <div className="px-3 pb-3 pt-1 space-y-1 bg-theme-secondary/30">
+      <p><strong>Best By</strong> — quality date; food is safe after this, may lose freshness.</p>
+      <p><strong>Use By</strong> — manufacturer safety/quality cutoff; triggers earlier alerts in the app.</p>
+      <p><strong>Sell By</strong> — store stocking date only; enter the best-by or use-by date from the label, not this one.</p>
+    </div>
+  </details>
+
+==============================================================
+SECTION 9: DEEP SCAN FINDINGS  (Added 2026-04-10 — Verified)
+==============================================================
+
+NOTE: All findings below were confirmed by direct file inspection. Sub-agent
+      findings that could not be verified (e.g. cleanup for setInterval /
+      addEventListener — all confirmed PRESENT) were excluded.
+
+--------------------------------------------------------------
+CC. FIXED: anonymous_user hardcoded in GroceryCostEstimator
+--------------------------------------------------------------
+   File: components/GroceryCostEstimator.tsx (was line 87)
+   Severity: HIGH — broken feature + attribution gap
+   
+   Code was:
+     const userId = 'anonymous_user';
+   Because Firestore rule for /groceryPrices requires
+     request.resource.data.userId == request.auth.uid
+   every price submission silently failed at the rule layer with no user
+   feedback (the "Price submitted successfully!" toast fired, then the write
+   was rejected server-side — the error was caught and a second toast showed
+   "Error submitting price" but users saw both, creating a confusing double-
+   toast experience).
+   
+   Fix applied: Replaced hardcoded string with real auth user ID:
+     import { useApp } from '../contexts/AppContext';
+     const { user } = useApp();
+     const userId = user?.id ?? '';
+   
+   Status: RESOLVED 2026-04-10
+
+--------------------------------------------------------------
+DD. FIXED: filterPantryItems "expiring-soon" blind to frozen state
+--------------------------------------------------------------
+   File: utils/searchUtils.ts (was ~lines 227-246)
+   Severity: HIGH — incorrect search results for frozen inventory
+   
+   The expiration-status filter compared item.expirationDate against a
+   7-day window without checking item.is_frozen or item.storageLocation.
+   Frozen items with pre-freeze fridge dates (e.g. chicken frozen 6 months ago
+   with a fridge date 3 days from now) incorrectly appeared in the
+   "expiring-soon" bucket even though they have years of freezer life left.
+   
+   Fix applied: Mirror the logic from generateExpirationAlerts:
+     - Frozen items (is_frozen OR storageLocation === 'freezer') use
+       freezerExpiry (falling back to expirationDate)
+     - Threshold extended to 30 days for frozen items (vs 7 for fridge/pantry)
+   
+   Status: RESOLVED 2026-04-10
+
+--------------------------------------------------------------
+EE. FIXED: offlineQueueService catch(err: any)
+--------------------------------------------------------------
+   File: services/offlineQueueService.ts (was line 158)
+   Severity: LOW — inconsistent with project ESLint no-explicit-any rule
+   
+   Inner catch block used `catch (err: any)` while the rest of the codebase
+   was cleaned up to `err: unknown` in a prior session. The fix mirrors
+   the pattern used in recipeService, geminiService, etc.
+   
+   Fix applied: Changed to `catch (err: unknown)`.
+   `err` was only used via `err instanceof Error ? err.message : 'Unknown'`
+   which works correctly with `unknown`.
+   
+   Status: RESOLVED 2026-04-10
+
+--------------------------------------------------------------
+FF. OPEN: Community ratings query not household-scoped
+--------------------------------------------------------------
+   File: hooks/useDataManagement.ts line 981 — getRatingsForRecipe()
+   Severity: MEDIUM — privacy gap (intentional design or oversight?)
+   
+   getRatingsForRecipe() queries /recipeRatings globally filtered only by
+   recipeTitle — no householdId or userId constraint. Any authenticated user
+   can retrieve ratings that other users submitted for a recipe with the same
+   title (including personal notes stored in the `review` field).
+   
+   The Firestore rule for /recipeRatings allows read to any auth'd user,
+   which confirms this is genuinely global and not household-scoped.
+   
+   Fix option: Add where('userId', '==', user.id) or optionally also accept
+   household-member ids for a "community within household" model. This requires
+   a Firestore composite index on (recipeTitle, userId).
+   
+   Alternative: Accept as intentional if ratings are meant to be community-
+   shared, but then remove any personal review text from the query result
+   display, or add a privacy toggle on each rating.
+   
+   Status: OPEN
+
+--------------------------------------------------------------
+GG. OPEN: storage.rules public read for recipe images
+--------------------------------------------------------------
+   File: storage.rules lines 4-10 (recipes/) and 14-16 (recipe-photos/)
+   Severity: LOW — intentional by comment, but worth reviewing periodically
+   
+   Both /recipes/ and /recipe-photos/ paths have `allow read: if true` with
+   comments saying "Allow public read access". This means unauthenticated
+   users (not logged in) can download any recipe photo by URL if they know
+   or guess the path.
+   
+   For a household food-management app this is probably acceptable (recipe
+   photos are not sensitive data), but the surface area should be noted so
+   future maintainers don't add sensitive files under these paths expecting
+   them to be private.
+   
+   Fix if privacy tightening desired: Change to `if request.auth != null`.
+   
+   Status: OPEN (low priority — design decision)
+
+==============================================================
+END
+==============================================================

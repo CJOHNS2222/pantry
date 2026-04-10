@@ -49,6 +49,7 @@ export interface NotificationSettings {
 }
 
 export class NotificationService {
+  static readonly COLLECTION = 'notifications';
 
   /**
    * Create a contextual notification
@@ -74,10 +75,7 @@ export class NotificationService {
     } catch (err: any) {
       // Log the error but don't fallback to inefficient root collection
       console.error('Failed to append notification to user cache:', {
-        error: err?.message || err,
-        authUid: auth?.currentUser?.uid,
-        targetUid: userId,
-        payload: item
+        error: err?.message || err
       });
       throw err; // Re-throw to prevent silent failures
     }
@@ -470,7 +468,7 @@ export class NotificationService {
   static async getUnreadNotifications(userId: string, userEmail?: string): Promise<NotificationItem[]> {
     try {
       // Read from per-user cache document instead of querying root collection
-      const cacheRef = DatabaseMonitoringService.doc('users', userId, 'cache', 'notifications');
+      const cacheRef = DatabaseMonitoringService.doc(`users/${userId}/cache/notifications`);
       const cacheSnap = await DatabaseMonitoringService.getDoc(cacheRef);
 
       if (!cacheSnap.exists()) {
@@ -488,7 +486,7 @@ export class NotificationService {
         if (n.read) return false;
 
         // Check if notification is within 30 days
-        const createdAt = n.createdAt ? new Date(n.createdAt) : null;
+        const createdAt = n.createdAt ? n.createdAt.toDate() : null;
         if (!createdAt || createdAt < thirtyDaysAgo) return false;
 
         return true;
@@ -496,8 +494,8 @@ export class NotificationService {
 
       // Sort by createdAt desc and limit to 20
       const sorted = unreadNotifications.slice().sort((a: NotificationItem, b: NotificationItem) => {
-        const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-        const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        const aTime = a.createdAt ? a.createdAt.toDate().getTime() : 0;
+        const bTime = b.createdAt ? b.createdAt.toDate().getTime() : 0;
         return bTime - aTime;
       }).slice(0, 20);
 
@@ -612,7 +610,7 @@ export class NotificationService {
    */
   static async cleanupOldNotifications(userId: string): Promise<void> {
     try {
-      const cacheRef = DatabaseMonitoringService.doc('users', userId, 'cache', 'notifications');
+      const cacheRef = DatabaseMonitoringService.doc(`users/${userId}/cache/notifications`);
       const cacheSnap = await DatabaseMonitoringService.getDoc(cacheRef);
 
       if (!cacheSnap.exists()) {
@@ -625,7 +623,7 @@ export class NotificationService {
       // Filter out notifications older than 30 days
       const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
       const recentNotifications = allNotifications.filter((n: NotificationItem) => {
-        const createdAt = n.createdAt ? new Date(n.createdAt) : null;
+        const createdAt = n.createdAt ? n.createdAt.toDate() : null;
         return createdAt && createdAt >= thirtyDaysAgo;
       });
 
@@ -644,7 +642,7 @@ export class NotificationService {
    */
   static async deleteExistingDailyNotifications(userId: string): Promise<void> {
     try {
-      const cacheRef = DatabaseMonitoringService.doc('users', userId, 'cache', 'notifications');
+      const cacheRef = DatabaseMonitoringService.doc(`users/${userId}/cache/notifications`);
       const cacheSnap = await DatabaseMonitoringService.getDoc(cacheRef);
 
       if (!cacheSnap.exists()) {

@@ -11,7 +11,7 @@ import { setRemoteInventoryUpdate, isRemoteInventoryUpdate, setRemoteShoppingLis
 import { log } from '../services/logService';
 import { generateConsumptionSuggestions, generateExpirationAlerts, generateRecipeSuggestions, isHouseholdMember, parseIngredientForShoppingList, shouldShowExpiryAlert } from '../utils/appUtils';
 import { offlineQueue } from '../services/offlineQueueService';
-import { undoService } from '../services/undoService';
+import { undoService, UndoAction } from '../services/undoService';
 import { NotificationService } from '../services/notificationService';
 import { LeftoverNotificationService } from '../services/leftoverNotificationService';
 import { auth } from '../firebaseConfig';
@@ -51,15 +51,6 @@ function createShoppingListListener(
   const resolvedHouseholdId = inHousehold ? (household?.id || user.householdId) : undefined;
   if (inHousehold && resolvedHouseholdId) {
     const householdId = resolvedHouseholdId;
-    ShoppingListCacheService.getCachedShoppingList(householdId).then(cachedItems => {
-      if (cachedItems.length > 0) {
-        setShoppingList(cachedItems);
-        setIsLoadingShoppingList(false);
-      }
-    }).catch(err => {
-      log.error('Failed to load cached shopping list', err, 'DataManagement');
-    });
-
     const cachePath = `households/${householdId}/cache/shoppingList`;
     return DatabaseMonitoringService.onSnapshot(DatabaseMonitoringService.doc(cachePath), snap => {
       if (snap.exists()) {
@@ -88,15 +79,6 @@ function createShoppingListListener(
     });
   } else {
     const userId = user.id;
-    ShoppingListCacheService.getCachedShoppingList(undefined, userId).then(cachedItems => {
-      if (cachedItems.length > 0) {
-        setShoppingList(cachedItems);
-        setIsLoadingShoppingList(false);
-      }
-    }).catch(err => {
-      log.error('Failed to load cached shopping list', err, 'DataManagement');
-    });
-
     const cachePath = `users/${userId}/cache/shoppingList`;
     return DatabaseMonitoringService.onSnapshot(DatabaseMonitoringService.doc(cachePath), snap => {
       if (snap.exists()) {
@@ -137,15 +119,6 @@ function createSavedRecipesListener(
   // Use user.householdId as fallback — household state may not be loaded yet when this runs
   const householdId = inHousehold ? (household?.id || user.householdId) : undefined;
   const userId = inHousehold ? undefined : user.id;
-
-  RecipesCacheService.getCachedRecipes(householdId, userId).then(cachedRecipes => {
-    if (cachedRecipes.length > 0) {
-      setSavedRecipes(cachedRecipes);
-      setIsLoadingSavedRecipes(false);
-    }
-  }).catch(err => {
-    log.error('Failed to load cached recipes', err, 'DataManagement');
-  });
 
   const cachePath = householdId 
     ? `households/${householdId}/cache/savedRecipes` 
@@ -314,7 +287,7 @@ export function useDataManagement(
   const [ratings, setRatings] = useState<RecipeRating[]>([]);
 
   // Undo actions
-  const [recentActions, setRecentActions] = useState<any[]>([]);
+  const [recentActions, setRecentActions] = useState<UndoAction[]>([]);
 
   // Online status
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -529,14 +502,6 @@ export function useDataManagement(
     if (!options?.disableInventoryListeners) {
       const inventoryPath = inHousehold ? `households/${user.householdId}/cache/inventory` : `users/${user.id}/cache/inventory`;
       
-      InventoryCacheService.getCachedInventory(inHousehold ? user.householdId : undefined, inHousehold ? undefined : user.id)
-        .then(cachedInventory => {
-          if (cachedInventory.length > 0) {
-            setInventory(cachedInventory);
-            setIsLoadingInventory(false);
-          }
-      }).catch(err => log.error('Failed to load cached inventory', err, 'DataManagement'));
-
       unsubs.push(DatabaseMonitoringService.onSnapshot(DatabaseMonitoringService.doc(inventoryPath), snap => {
         if (snap.exists()) {
           const data = snap.data() as CachedInventoryData & CacheMetadata;
@@ -680,10 +645,9 @@ export function useDataManagement(
 
   useEffect(() => {
     if(isOnline) {
-      offlineQueue.processQueue().then((processedCount: any) => {
-          if (typeof processedCount === 'number' && processedCount > 0) {
-            addToast?.(`Synced ${processedCount} offline changes.`, 'success');
-          }
+      offlineQueue.processQueue().then((_processedCount) => {
+          // processQueue returns void; sync success is implicit
+          addToast?.('Offline changes synced.', 'success');
         }).catch(err => {
           log.error('Failed to process offline queue', err, 'DataManagement');
         });
@@ -703,7 +667,7 @@ export function useDataManagement(
 
 
   // Handlers
-  const handleAddToPlan = async (recipe: any, targetDayIndex?: number, targetMealType?: 'breakfast' | 'lunch' | 'dinner') => {
+  const handleAddToPlan = async (recipe: StructuredRecipe | SavedRecipe, targetDayIndex?: number, targetMealType?: 'breakfast' | 'lunch' | 'dinner') => {
     if (!mealPlan) return;
 
     // If no target specified, show dialog
@@ -895,10 +859,10 @@ export function useDataManagement(
     // Omitted for brevity
   };
 
-  const recordUndo = async (type: string, data: any) => {
+  const recordUndo = async (type: string, data: unknown) => {
     if (!user?.id) return;
     try {
-      await undoService.recordAction({ type: type as any, data }, user.id);
+      await undoService.recordAction({ type: type as 'delete_item' | 'bulk_edit' | 'update_item', data }, user.id);
       const actions = await undoService.getRecentActions(user.id);
       setRecentActions(actions);
     } catch (err) {
@@ -906,7 +870,7 @@ export function useDataManagement(
     }
   };
 
-  const performUndo = async (action: any) => {
+  const performUndo = async (action: UndoAction) => {
     // Omitted for brevity
   };
 

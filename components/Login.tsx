@@ -25,16 +25,10 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [error, setError] = useState<React.ReactNode | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  // Debug timer to track when crash occurs
   useEffect(() => {
-    log.debug('Login component mounted', { timestamp: new Date().toISOString() }, 'Login');
-    const interval = setInterval(() => {
-      log.debug('Login component still alive', { timestamp: new Date().toISOString() }, 'Login');
-    }, 1000);
-
+    log.debug('Login component mounted', {}, 'Login');
     return () => {
-      log.debug('Login component unmounting', { timestamp: new Date().toISOString() }, 'Login');
-      clearInterval(interval);
+      log.debug('Login component unmounting', {}, 'Login');
     };
   }, []);
 

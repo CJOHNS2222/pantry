@@ -1,5 +1,6 @@
 import React from 'react';
 import { ShoppingItem } from '../types';
+import { useAppActions } from '../contexts/AppActionsContext';
 
 interface BatchOperationsProps {
   items: ShoppingItem[];
@@ -14,6 +15,7 @@ export const BatchOperations: React.FC<BatchOperationsProps> = ({
   onBatchUncheck,
   onDeleteSelected
 }) => {
+  const { addToast } = useAppActions();
 
   const handleSelectAll = () => {
     const uncheckedItems = items.filter(item => !item.checked);
@@ -24,11 +26,9 @@ export const BatchOperations: React.FC<BatchOperationsProps> = ({
     if (!onDeleteSelected) return;
     const checkedItems = items.filter(item => item.checked);
     if (checkedItems.length === 0) return;
-    
-    if (confirm(`Delete ${checkedItems.length} selected item(s)?`)) {
-      const itemIds = checkedItems.map(item => item.id);
-      onDeleteSelected(itemIds);
-    }
+    const itemIds = checkedItems.map(item => item.id);
+    onDeleteSelected(itemIds);
+    addToast(`Deleted ${checkedItems.length} item${checkedItems.length > 1 ? 's' : ''}`, 'success');
   };
 
   const checkedCount = items.filter(item => item.checked).length;

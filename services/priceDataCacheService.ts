@@ -63,15 +63,16 @@ export class PriceDataCacheService {
           }
         }
         this.priceData = data;
-        this.hasLoaded = true;
-        return data;
       }
+      // Mark loaded whether the doc existed or not — prevents repeated reads on every auth change
+      this.hasLoaded = true;
     } catch (err: any) {
       log.error("Failed to load price data cache:", err);
+      // hasLoaded stays false on error so the next auth state change retries
     } finally {
       this.isLoading = false;
     }
-    return {};
+    return this.priceData;
   }
 
   // Get price data for a single item from the in-memory cache

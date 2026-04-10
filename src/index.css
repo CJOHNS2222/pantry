@@ -11,6 +11,13 @@
   max-height: calc(100dvh - var(--app-header-h) - var(--app-nav-h) - 1.5rem);
 }
 
+/* Hide fixed header and nav while any full-screen modal is open */
+body.modal-open header.fixed,
+body.modal-open nav.fixed {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 /* Theme utility classes */
 .bg-theme-primary { background-color: var(--bg-primary); }
 .bg-theme-secondary { background-color: var(--bg-secondary); }

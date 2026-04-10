@@ -77,7 +77,7 @@ class OfflineQueueService {
 
     const queuedOp: QueuedOperation = {
       ...operation,
-      id: `${operation.type}_${operation.collection}_${operation.docId || Date.now()}_${Date.now()}`,
+      id: `${operation.type}_${operation.collection}_${crypto.randomUUID()}`,
       timestamp: Date.now(),
       retryCount: 0
     };
@@ -155,7 +155,7 @@ class OfflineQueueService {
             await this.executeOperationWithConflictResolution(op);
             await this.remove(op.id);
             progress.completed++;
-        } catch (err: any) {
+        } catch (err: unknown) {
             const errorMessage = err instanceof Error ? err.message : 'Unknown error';
 
             if (this.isConflictError(err)) {

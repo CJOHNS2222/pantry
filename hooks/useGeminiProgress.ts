@@ -18,15 +18,24 @@ export function useGeminiProgress(
   isActive: boolean,
   totalSeconds: number,
   stages: GeminiStage[],
+  onTimeout?: () => void,
 ): GeminiProgressState {
   const [elapsed, setElapsed] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const onTimeoutRef = useRef(onTimeout);
+  onTimeoutRef.current = onTimeout;
 
   useEffect(() => {
     if (isActive) {
       setElapsed(0);
       intervalRef.current = setInterval(() => {
-        setElapsed(prev => Math.min(prev + 1, totalSeconds));
+        setElapsed(prev => {
+          const next = Math.min(prev + 1, totalSeconds);
+          if (next >= totalSeconds) {
+            onTimeoutRef.current?.();
+          }
+          return next;
+        });
       }, 1000);
     } else {
       setElapsed(0);

@@ -7,6 +7,9 @@ import { serverTimestamp } from 'firebase/firestore';
 import DatabaseMonitoringService from '../services/databaseMonitoringService';
 import { getNotificationsOnce } from '../services/notificationsService';
 import { Timestamp } from 'firebase/firestore';
+import { useApp } from '../contexts/AppContext';
+import { useAppActions } from '../contexts/AppActionsContext';
+import { Tab } from '../types/app';
 
 interface PendingNotificationsProps {
   user: User;
@@ -20,6 +23,8 @@ export const PendingNotifications: React.FC<PendingNotificationsProps> = ({
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState<string | null>(null);
+  const { inventory } = useApp();
+  const { setActiveTab, onAddToShoppingList, addToast } = useAppActions();
 
   useEffect(() => {
     loadNotifications();
@@ -82,17 +87,35 @@ export const PendingNotifications: React.FC<PendingNotificationsProps> = ({
     try {
       // Handle different action types
       switch (notification.actionType) {
-        case 'add_to_shopping':
-          // Add item to shopping list
-          if (notification.actionData?.item) {
-            // This would need to be implemented based on your shopping list service
+        case 'add_to_shopping': {
+          const itemName = notification.actionData?.itemName
+            ?? notification.actionData?.items?.[0]?.itemName;
+          if (itemName) {
+            onAddToShoppingList([itemName]);
+            addToast(`Added "${itemName}" to shopping list`, 'success');
+          } else {
+            addToast('Could not determine item to add', 'error');
           }
+          setActiveTab(Tab.SHOPPING);
           break;
+        }
         case 'view_recipe':
-          // Navigate to recipe
-          if (notification.actionData?.recipeId) {
+          setActiveTab(Tab.RECIPES);
+          addToast('Viewing your saved recipes', 'info');
+          break;
+        case 'view_item': {
+          const itemId = notification.actionData?.items?.[0]?.itemId
+            ?? notification.actionData?.itemId;
+          const found = itemId ? inventory.findIndex(i => i.id === itemId) : -1;
+          if (found !== -1) {
+            setActiveTab(Tab.PANTRY);
+            addToast(`Viewing "${inventory[found].item}" in pantry`, 'info');
+          } else {
+            setActiveTab(Tab.PANTRY);
+            addToast('Item no longer found in pantry', 'info');
           }
           break;
+        }
         case 'join_household':
           // Join household invitation
           if (notification.actionData?.householdId) {

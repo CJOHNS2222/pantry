@@ -65,6 +65,12 @@ class UsageService {
     return null;
   }
 
+  // Short-lived in-memory cache to avoid redundant Firestore reads within the same
+  // search flow (RecipeFinder canPerformSearch → searchRecipes canUseGemini all read
+  // the same 'users/{uid}/usage/limits' doc). 30s TTL is negligible for limit enforcement.
+  private static readonly LIMITS_CACHE_TTL_MS = 30_000;
+  private static limitsCache = new Map<string, { limits: UsageLimits; fetchedAt: number }>();
+
   private static readonly PLAN_LIMITS: PlanLimits = {
     free: {
       searches: { weekly: 5 },
@@ -89,6 +95,13 @@ class UsageService {
   static async getUsageLimits(user: User): Promise<UsageLimits> {
     if (!user?.id) {
       throw new Error('User required for usage tracking');
+    }
+
+    // Deduplicate reads — RecipeFinder + canPerformSearch + canUseGemini all read
+    // the same doc; one Firestore read per 30s window is enough
+    const cached = UsageService.limitsCache.get(user.id);
+    if (cached && Date.now() - cached.fetchedAt < UsageService.LIMITS_CACHE_TTL_MS) {
+      return cached.limits;
     }
 
     // Determine user's plan tier
@@ -133,6 +146,7 @@ class UsageService {
         lastUpdated: now
       });
 
+      UsageService.limitsCache.set(user.id, { limits: initialUsage, fetchedAt: Date.now() });
       return initialUsage;
     }
 
@@ -171,7 +185,7 @@ class UsageService {
       data.gemini.resetDate = weekStart;
     }
 
-    return {
+    const result: UsageLimits = {
       searches: {
         weekly: planLimits.searches.weekly,
         used: data.searches?.used || 0,
@@ -193,6 +207,8 @@ class UsageService {
         resetDate: this.toDate(data.gemini?.resetDate) || weekStart
       }
     };
+    UsageService.limitsCache.set(user.id, { limits: result, fetchedAt: Date.now() });
+    return result;
   }
 
   static async canPerformSearch(user: User): Promise<boolean> {
@@ -202,7 +218,7 @@ class UsageService {
 
   static async recordSearch(user: User): Promise<void> {
     if (!user?.id) return;
-
+    UsageService.limitsCache.delete(user.id);
     const usageRef = DatabaseMonitoringService.doc('users/' + user.id + '/usage/limits');
     await DatabaseMonitoringService.updateDoc(usageRef, {
       'searches.used': increment(1),
@@ -222,7 +238,7 @@ class UsageService {
 
   static async recordRecipeSave(user: User): Promise<void> {
     if (!user?.id) return;
-
+    UsageService.limitsCache.delete(user.id);
     const usageRef = DatabaseMonitoringService.doc('users/' + user.id + '/usage/limits');
     await DatabaseMonitoringService.updateDoc(usageRef, {
       'recipes.used': increment(1),
@@ -232,7 +248,7 @@ class UsageService {
 
   static async recordMealPlanAddition(user: User): Promise<void> {
     if (!user?.id) return;
-
+    UsageService.limitsCache.delete(user.id);
     const usageRef = DatabaseMonitoringService.doc('users/' + user.id + '/usage/limits');
     await DatabaseMonitoringService.updateDoc(usageRef, {
       'mealPlanning.weeklyUsed': increment(1),
@@ -247,7 +263,7 @@ class UsageService {
 
   static async recordGeminiUsage(user: User): Promise<void> {
     if (!user?.id) return;
-
+    UsageService.limitsCache.delete(user.id);
     const usageRef = DatabaseMonitoringService.doc('users/' + user.id + '/usage/limits');
     await DatabaseMonitoringService.updateDoc(usageRef, {
       'gemini.used': increment(1),

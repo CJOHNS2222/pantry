@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Trash2, AlertTriangle, CheckCircle, Clock, ChefHat } from 'lucide-react';
+import { useModalOpen } from '../utils/useModalOpen';
 import { PantryItem } from '../types';
 import { generateExpirationAlerts } from '../utils/appUtils';
 import { getQuantityAmount } from '../utils/quantityUtils';
@@ -30,6 +31,7 @@ const ExpiredItemsModal: React.FC<ExpiredItemsModalProps> = ({
   userId,
   userName
 }) => {
+  useModalOpen(isOpen);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [disposalReason, setDisposalReason] = useState<DisposalReason>('thrown_away');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -142,10 +144,10 @@ const ExpiredItemsModal: React.FC<ExpiredItemsModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center px-4 pt-[var(--app-header-h)] pb-[var(--app-nav-h)]">
-      <div className="bg-theme-primary rounded-2xl border border-theme max-w-2xl w-full max-h-full overflow-hidden shadow-2xl">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center px-4 pt-[var(--safe-area-inset-top,0px)] pb-[var(--safe-area-inset-bottom,0px)]">
+      <div className="bg-theme-primary rounded-2xl border border-theme max-w-2xl w-full h-full flex flex-col overflow-hidden shadow-2xl">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-theme">
+        <div className="flex items-center justify-between p-6 border-b border-theme flex-shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-red-500/20 rounded-full flex items-center justify-center">
               <AlertTriangle className="w-5 h-5 text-red-500" />
@@ -166,7 +168,7 @@ const ExpiredItemsModal: React.FC<ExpiredItemsModalProps> = ({
         </div>
 
         {/* Content */}
-        <div className="p-6 max-h-96 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto p-6">
           {expiredItems.length === 0 ? (
             <div className="text-center py-8">
               <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-4" />
@@ -282,7 +284,7 @@ const ExpiredItemsModal: React.FC<ExpiredItemsModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between p-6 border-t border-theme">
+        <div className="flex items-center justify-between p-6 border-t border-theme flex-shrink-0">
           <button
             onClick={handleSkip}
             className="px-4 py-2 text-theme-secondary hover:text-theme-primary transition-colors"

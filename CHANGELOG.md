@@ -5,6 +5,91 @@ All notable changes to Stock & Spoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.12] - 2026-04-10
+
+### Fixed
+- **GroceryCostEstimator anonymous_user** (audit CC): Replaced hardcoded `'anonymous_user'` string with real authenticated user ID via `useApp()`. Previously every price submission silently failed at the Firestore rule layer (rule requires `userId == auth.uid`), causing a confusing double-toast and leaving no price data in the database.
+- **Expiry filter blind to frozen items** (audit DD): The "expiring-soon" filter in `filterPantryItems` now mirrors `generateExpirationAlerts` logic — frozen items (`is_frozen` or `storageLocation === 'freezer'`) use `freezerExpiry` as the reference date and a 30-day threshold, preventing pre-freeze fridge dates from triggering false "expiring soon" classifications.
+- **offlineQueueService `catch (err: any)`** (audit EE): Changed to `catch (err: unknown)` consistent with project-wide `no-explicit-any` ESLint rule.
+- **usageService PLAN_LIMITS missing `free:` key**: Restored missing `free:` key in `PLAN_LIMITS` object literal that caused TypeScript parse errors across the entire service file.
+- **geminiService type errors**: Added missing `GroundingChunk` import; fixed queue `push` covariance and request cache result cast to resolve TypeScript strictness errors introduced during prior `any` cleanup.
+- **recipeService `FirestoreDocLike` missing `exists`**: Added optional `exists` property to the local `FirestoreDocLike` type used for Firestore document existence checks.
+
+
+### Added
+- **Freezer-aware shelf life** (audit Q foundation): `getFreezerShelfLifeDays(itemName)` in `appUtils.ts` returns USDA-based freezer durations by food type — ground/hamburger meat 4 months, chicken/turkey 9 months, beef/pork steaks 9 months, sausage/bacon/ham 6 months, lean fish 6 months, fatty fish (salmon/tuna) 3 months, shrimp/shellfish 4 months, deli meats 2 months, bread/baked goods 3 months, butter 1 year, unrecognised items 4 months.
+- **`getAutoExpirationDate` freezer branch** (audit Q foundation): New optional third param `storageLocation?`. When `'freezer'` is passed the function returns the USDA freezer shelf-life date instead of fridge/pantry durations. Dry goods still return `undefined` (no auto-expiry) regardless of location.
+- **Auto-extend expiry on freezer move**: When a user changes a pantry item's storage location to Freezer in `ItemDetailModal` and saves, the app automatically sets `is_frozen`, `frozenAt`, `freezerExpiry`, and `expirationDate` to the USDA-derived date. Moving back out of the freezer clears all frozen-state fields.
+- **Frozen items skip fridge-style alerts**: `shouldShowExpiryAlert` and `generateExpirationAlerts` in `appUtils.ts` now detect frozen items (`is_frozen` or `storageLocation === 'freezer'`) and use `freezerExpiry` as the reference date. Frozen items only surface alerts within 30 days (vs 7 days for fridge items) and display gentler language — "best used within N days (frozen)" rather than urgent expiry warnings. Overdue frozen items show "past its freezer date" rather than "expired".
+- **pantryService freezer-pass-through**: All three `getAutoExpirationDate` call sites in `pantryService.ts` now pass `inferStorageLocationFromItemName(name)` as the third arg, so a scanned "frozen chicken breast" gets a 9-month expiry automatically at item creation time.
+
+### Fixed
+- **TypeScript `any` cleanup — three major service files** (audit N complete):
+  - `services/recipeService.ts`: Added typed interfaces `AnalyzedInstruction`, `ExtendedIngredient`, `WinePairing`, and local `FirestoreDocLike`. Eliminated all 28 explicit `any` annotations including `catch (err: any)` → `catch (err: unknown)` and cast-free Firestore snapshot handling.
+  - `services/geminiService.ts`: Imported `PerformanceTrace` from `firebase/performance`. Typed `QueuedRequest.reject` as `(error: unknown) => void`, queue as `QueuedRequest<unknown>[]`, request cache as `Map<string, { result: unknown; timestamp: number }>`, and `performSearch` perfTrace param. All 26 explicit `any` eliminated.
+  - `services/groceryPriceService.ts`: Replaced all verbose `(DatabaseMonitoringService as any)` defensive runtime-check cascades (`getIngredientPrice`, `getPriceTrends`, `saveGroceryPrice`) with direct typed method calls. All 26 explicit `any` eliminated.
+- **ESLint `no-explicit-any` rule re-enabled**: `eslint.config.ts` changed from `"off"` to `"error"`. Lint passes with 0 errors across all three cleaned files.
+
+## [1.5.10] - 2026-04-10
+
+### Added
+- **Notifications load-more** (audit I): AppHeader notification dropdown now shows 50 at a time. A "Load more (N remaining)" button appears at the bottom of the list and loads 50 more per tap — purely display-side, no extra Firestore reads.
+- **Bulk ops contextual tip** (audit J): First time a user enters bulk select mode in PantryScanner a small inline hint bar appears: "Tap items to select them, then delete, move to shopping list, or change storage location." Auto-hides after 6 seconds; ✕ to dismiss early. Shown once per device via localStorage.
+- **Household onboarding wired** (audit K): `ModernOnboardingFlow` now accepts and passes through `onOpenHousehold`. App.tsx passes a handler that closes onboarding and opens the Household panel, so new users can set up household sharing from the first-run flow.
+- **Bulk ops progress bar** (audit L): `bulkDelete` and `bulkMoveToShoppingList` in PantryScanner now show an animated progress bar (`Processing… X / Y`) above the item list while operations run. Bar clears automatically on completion.
+
+### Won't Fix
+- **LeftoverQuickCapture in ItemDetailModal** (audit H): Leftovers can only originate from a cooked meal — not individual pantry items.
+- **Recipe modal jump-to-section** (audit M): Most recipes fit on one screen without scrolling; not worth adding navigation anchors.
+
+## [1.5.9] - 2026-04-10
+
+### Added
+- **Household activity feed re-enabled**: The `HouseholdActivityFeed` lives in the `AppHeader` dropdown (accessible from any tab), so the subscription now activates as soon as the household is loaded — no tab gating. The `activityHousehold` state in `App.tsx` syncs from `useDataManagement`'s `household` value after load, resolving the circular hook dependency that kept the subscription permanently disabled.
+- **Write throttle on activity logging**: `HouseholdActivityService.logActivity` is now throttled to at most one write per user per household every 30 seconds, preventing write storms from rapid item operations.
+- **Household state sync**: Added `activityHousehold` state in `App.tsx` that syncs from `useDataManagement`'s `household` value after load, resolving the circular hook dependency that kept the subscription permanently disabled.
+
+### Fixed
+- **Audit items A + B (stale)**: Verified `MealPlanner.displayPlan` is already memoized over a 7-day window and `PantryScanner.processedInventory` is already memoized — both audit items were describing superseded code.
+
+## [1.5.8] - 2026-04-10
+
+### Added
+- **Calendar export (.ics)**: MealPlanner week toolbar now has an "Export .ics" button. On web it downloads a standards-compliant `.ics` file; on mobile it adds native calendar events via CapacitorCalendar. `calendarService.ts` now has `exportWeekAsICS(days)`.
+- **Shopping list delete undo toast**: A floating "X item removed · Undo" banner now appears above the bottom nav whenever a swipe-delete is pending. Tapping Undo cancels the 5-second timer and restores the item instantly.
+
+### Fixed
+- **MealPrepPlanner entry point** (audit F): Button in MealPlanner header (`CalendarClock` icon, top-right) was already present and functional — confirmed wired to `showMealPrepPlanner` state; audit item closed.
+
+## [1.5.7] - 2026-04-09
+
+### Fixed
+- **Notification action buttons**: `view_item`, `view_recipe`, `add_to_shopping` actions in both `AppHeader` notification panel and `PendingNotifications` (Settings) were non-functional stubs — now fully wired with inventory lookup, tab navigation, and toast feedback
+- **Notification panel auto-close**: Panel now stays open for 15 s (was 6 s); hovering pauses the timer, leaving resumes a 5 s countdown
+- **`add_to_shopping` stacked notifications**: Now handles `actionData.items` array for batched alerts in addition to single `itemName`
+- **Shopping list `confirm()` dialogs**: Replaced native `confirm()` / `alert()` calls in checkout flow and clipboard share with `addToast()`
+- **All `alert()` / `confirm()` native dialogs removed** across every component — replaced with `addToast()` from `AppActionsContext`:
+  - `MealPlanner`, `BatchOperations`, `ItemDetailModal`, `Household`, `PantryScanner` (bulk delete, receipt error, manual add error, move-to-shopping, defrost)
+  - `Settings` (remove member, remove avatar, bulk image scan)
+  - `ShoppingList` (duplicate item, SMS clipboard)
+  - `GroceryCostEstimator`, `ImportModal`, `RecipeModal`, `RecipeFinder`
+- **Login debug timer**: Removed `setInterval` that fired every 1 s during the entire Login component lifetime
+- **AdMob gate**: `ADMOB_ENABLED` now reads `import.meta.env.VITE_ADMOB_ENABLED === 'true'` instead of hardcoded `false`
+- **Offline queue ID**: Replaced `${Date.now()}_${Date.now()}` with `crypto.randomUUID()` for guaranteed uniqueness
+- **Gemini timeout failsafe**: `GeminiLoadingOverlay` now accepts `onTimeout` prop; `useGeminiProgress` fires it when the countdown reaches zero
+- **Image upload validation**: `ItemDetailModal` now rejects files that are not `image/*` or exceed 10 MB before uploading to Firebase Storage
+- **PII removed from error logs**: `notificationService.ts` error log no longer includes `authUid` or `targetUid`
+- **Source maps disabled in production**: `vite.config.ts` now sets `sourcemap: mode !== 'production'`
+- **Console logs stripped from production bundle**: Added `esbuild: { drop: ['console','debugger'] }` for production builds
+- **Safe area / notch support**: `index.html` viewport meta updated to `viewport-fit=cover`; `pt-safe` CSS class added; `AppHeader` uses `env(safe-area-inset-top)` for top padding
+- **Barcode scan web fallback**: Shows informative toast on web/desktop instead of silently failing with a Capacitor error
+- **Household member count**: Badge showing "N members" now visible next to household name in the household manager header
+- **TypeScript `any` cleanup in core hooks**: `useDataManagement.ts` — `recentActions` typed as `UndoAction[]`, `handleAddToPlan` typed as `StructuredRecipe | SavedRecipe`, `recordUndo` data typed as `unknown`; `AppContext.tsx` — replaced two `as any` stubs with proper `React.Dispatch` types
+
+### Removed
+- `functions/src/paypal.ts`, `functions/lib/stripe.js`, `functions/lib/stripe.js.map` — dead payment code deleted
+- `GEMINI_LEFTOVERS_NOTES.txt`, `GEMINI_SUGGESTIONS.txt`, `listing.txt`, `readme/consolelog.txt` — stale dev notes deleted
+
 ## [1.5.6] - 2026-03-24
 
 ### Added

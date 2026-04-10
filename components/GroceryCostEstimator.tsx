@@ -3,6 +3,8 @@ import { DollarSign, Calculator, ShoppingCart, TrendingUp, Users, RefreshCw } fr
 import { DayPlan, PantryItem } from '../types';
 import { groceryPriceService, PriceData } from '../services/groceryPriceService';
 import { parseIngredientForShoppingList } from '../utils/appUtils';
+import { useAppActions } from '../contexts/AppActionsContext';
+import { useApp } from '../contexts/AppContext';
 
 interface GroceryCostEstimatorProps {
   mealPlan: DayPlan[];
@@ -20,6 +22,8 @@ interface IngredientCost {
 }
 
 export const GroceryCostEstimator: React.FC<GroceryCostEstimatorProps> = ({ mealPlan, inventory, onEstimatorToggle, freeItemLimit }) => {
+  const { addToast } = useAppActions();
+  const { user } = useApp();
   const [showEstimator, setShowEstimator] = useState(false);
   const [customPrices, setCustomPrices] = useState<Record<string, number>>({});
   const [priceData, setPriceData] = useState<Record<string, PriceData>>({});
@@ -81,8 +85,8 @@ export const GroceryCostEstimator: React.FC<GroceryCostEstimatorProps> = ({ meal
       const price = parseFloat(input.price);
       if (isNaN(price) || price <= 0) return;
 
-      // For now, we'll use a placeholder user ID. In a real app, this would come from auth
-      const userId = 'anonymous_user';
+      // Use authenticated user's ID; userId is validated server-side by Firestore rules
+      const userId = user?.id ?? '';
 
       await groceryPriceService.submitPriceUpdate(
         ingredient,
@@ -103,10 +107,10 @@ export const GroceryCostEstimator: React.FC<GroceryCostEstimatorProps> = ({ meal
       // Refresh prices
       await fetchCurrentPrices();
 
-      alert('Price submitted successfully! Thank you for contributing.');
+      addToast('Price submitted successfully! Thank you for contributing.', 'success');
     } catch (error) {
       console.error('Error submitting price:', error);
-      alert('Error submitting price. Please try again.');
+      addToast('Error submitting price. Please try again.', 'error');
     }
   };
 

@@ -127,6 +127,18 @@ const ExpirationDatePicker: React.FC<ExpirationDatePickerProps> = ({
             </div>
           </div>
 
+          {/* Date label explainer */}
+          <details className="mb-4 rounded-lg border border-theme overflow-hidden text-xs text-theme-secondary">
+            <summary className="px-3 py-2 cursor-pointer font-medium hover:bg-theme-secondary select-none">
+              What do these mean?
+            </summary>
+            <div className="px-3 pb-3 pt-1 space-y-1 bg-theme-secondary/30">
+              <p><strong>Best By</strong> — quality date; food is safe after this date but may lose freshness.</p>
+              <p><strong>Use By</strong> — manufacturer's safety/quality cutoff; triggers earlier alerts in the app.</p>
+              <p><strong>Sell By</strong> — store stocking date only; enter the best-by or use-by date from the label instead.</p>
+            </div>
+          </details>
+
           {/* Quick Options */}
           <div className="mb-4">
             <label className="block text-sm font-medium text-theme-primary mb-2">Quick Set</label>

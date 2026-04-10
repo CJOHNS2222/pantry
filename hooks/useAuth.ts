@@ -32,30 +32,29 @@ export function useAuth() {
         return;
       }
 
-      // Create user document if it doesn't exist
       const userDocRef = DatabaseMonitoringService.doc('users', fbUser.uid);
-      const userDocSnap = await DatabaseMonitoringService.getDoc(userDocRef);
 
-      if (!userDocSnap.exists()) {
-        try {
-          await DatabaseMonitoringService.setDoc(userDocRef, {
-            subscription: {
-              tier: 'free',
-              status: 'active',
-              current_period_end: new Date(),
-              cancel_at_period_end: false
-            },
-            createdAt: new Date(),
-            email: fbUser.email,
-            name: fbUser.displayName || (fbUser.email ? fbUser.email.split('@')[0] : 'User'),
-          });
-        } catch (err: any) {
-          log.error('Failed to create user document:', { error: err?.message }, 'useAuth');
-        }
-      }
-
-      // Set up listener for user document changes
+      // Set up listener for user document changes (handles doc creation on first login)
       userDocUnsubscribe = DatabaseMonitoringService.onSnapshot(userDocRef, async (userDocSnap) => {
+        if (!userDocSnap.exists()) {
+          try {
+            await DatabaseMonitoringService.setDoc(userDocRef, {
+              subscription: {
+                tier: 'free',
+                status: 'active',
+                current_period_end: new Date(),
+                cancel_at_period_end: false
+              },
+              createdAt: new Date(),
+              email: fbUser.email,
+              name: fbUser.displayName || (fbUser.email ? fbUser.email.split('@')[0] : 'User'),
+            });
+          } catch (err: any) {
+            log.error('Failed to create user document:', { error: err?.message }, 'useAuth');
+          }
+          return; // Listener will re-fire once doc is created
+        }
+
         const userData = userDocSnap.data();
         const householdId = userData?.householdId;
 

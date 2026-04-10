@@ -952,14 +952,75 @@ export function inferStorageLocationFromItemName(itemName: string): 'pantry' | '
 }
 
 /**
+ * Returns USDA-based freezer shelf-life in days for a given food item name.
+ * Defaults to 120 days (4 months) for unrecognised items.
+ */
+export function getFreezerShelfLifeDays(itemName: string): number {
+  const name = itemName.toLowerCase();
+
+  // Ground / minced meat — highest turnover, 4 months
+  if (name.includes('ground') || name.includes('hamburger') || name.includes('mince')) return 120;
+
+  // Fatty fish — quality degrades faster, 3 months
+  if (name.includes('salmon') || name.includes('tuna') || name.includes('mackerel') || name.includes('sardine')) return 90;
+
+  // Shellfish / seafood, 4 months
+  if (name.includes('shrimp') || name.includes('prawn') || name.includes('crab') ||
+      name.includes('lobster') || name.includes('scallop') || name.includes('clam') ||
+      name.includes('mussel') || name.includes('oyster')) return 120;
+
+  // Lean fish, 6 months
+  if (name.includes('fish') || name.includes('tilapia') || name.includes('cod') ||
+      name.includes('halibut') || name.includes('flounder')) return 180;
+
+  // Poultry (whole bird or parts), 9 months
+  if (name.includes('chicken') || name.includes('turkey') || name.includes('duck')) return 270;
+
+  // Pork, sausage, bacon, 6 months
+  if (name.includes('pork') || name.includes('ham') || name.includes('bacon') ||
+      name.includes('sausage')) return 180;
+
+  // Beef steaks / roasts (ground already handled above), 9 months
+  if (name.includes('beef') || name.includes('steak') || name.includes('roast') ||
+      name.includes('brisket') || name.includes('rib')) return 270;
+
+  // Lamb / veal, 9 months
+  if (name.includes('lamb') || name.includes('veal')) return 270;
+
+  // Deli / cured meats, 2 months
+  if (name.includes('deli') || name.includes('cold cut') || name.includes('lunch meat') ||
+      name.includes('bologna') || name.includes('salami') || name.includes('pepperoni')) return 60;
+
+  // Bread and baked goods, 3 months
+  if (name.includes('bread') || name.includes('roll') || name.includes('bun') ||
+      name.includes('muffin') || name.includes('bagel') || name.includes('waffle') ||
+      name.includes('pancake')) return 90;
+
+  // Butter, 1 year
+  if (name.includes('butter')) return 365;
+
+  // Default for unrecognised items (casseroles, leftovers, etc.)
+  return 120;
+}
+
+/**
  * Determines if an item should have an automatic expiration date and returns the date
  * @param itemName The name of the item
  * @param category The category of the item
+ * @param storageLocation Optional storage location — 'freezer' returns freezer shelf-life dates
  * @returns ISO date string (YYYY-MM-DD) for expiration, or undefined if no auto-expiration
  */
-export function getAutoExpirationDate(itemName: string, category: string): string | undefined {
+export function getAutoExpirationDate(itemName: string, category: string, storageLocation?: string): string | undefined {
   const name = itemName.toLowerCase();
   const cat = category.toLowerCase();
+
+  // Frozen items: use USDA freezer shelf life instead of fridge durations
+  if (storageLocation === 'freezer') {
+    const days = getFreezerShelfLifeDays(itemName);
+    const d = new Date();
+    d.setDate(d.getDate() + days);
+    return d.toISOString().slice(0, 10);
+  }
 
   // Long-term storage items should not have expiration dates
   const longTermCategories = ['pasta & noodles', 'grains & bread', 'canned goods', 'baking supplies', 'condiments & sauces', 'spices & herbs', 'snacks', 'beverages'];
@@ -1096,6 +1157,19 @@ export function shouldShowExpiryAlert(item: PantryItem): boolean {
   // Never show expiry alerts for immortal items
   if (item.is_immortal) return false;
 
+  const isFrozen = item.is_frozen || item.storageLocation === 'freezer';
+
+  // Frozen items: use freezerExpiry if available; only alert within 30 days
+  if (isFrozen) {
+    const dateStr = item.freezerExpiry || item.expirationDate;
+    if (!dateStr || item.expiryAlertShown) return false;
+    const d = new Date(dateStr);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const daysRemaining = Math.ceil((d.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    return daysRemaining <= 30;
+  }
+
   if (!item.expirationDate || item.expiryAlertShown) {
     return false;
   }
@@ -1198,37 +1272,57 @@ export function generateExpirationAlerts(inventory: PantryItem[]): ExpirationAle
   inventory.forEach(item => {
     // Skip immortal items entirely
     if (item.is_immortal) return;
-    if (!item.expirationDate) return;
 
-    const expirationDate = new Date(item.expirationDate);
+    const isFrozen = item.is_frozen || item.storageLocation === 'freezer';
+    // Frozen: prefer freezerExpiry; non-frozen: use expirationDate
+    const activeDateStr = isFrozen ? (item.freezerExpiry || item.expirationDate) : item.expirationDate;
+    if (!activeDateStr) return;
+
+    const activeDate = new Date(activeDateStr);
     const todayDate = new Date(today);
-    const daysRemaining = Math.ceil((expirationDate.getTime() - todayDate.getTime()) / (1000 * 60 * 60 * 24));
+    const daysRemaining = Math.ceil((activeDate.getTime() - todayDate.getTime()) / (1000 * 60 * 60 * 24));
 
     const expirationType = item.expirationType || 'best-by';
     let alertLevel: 'expired' | 'critical' | 'warning' | 'info';
     let message: string;
 
-    // Special handling for milk - only warn when 3 days or less remain
-    const isMilk = item.item.toLowerCase().includes('milk') || item.category.toLowerCase() === 'dairy';
-    const warningThreshold = isMilk ? 3 : 7;
-
-    if (daysRemaining < 0) {
-      alertLevel = 'expired';
-      message = `${item.item} has expired!`;
-    } else if (daysRemaining === 0) {
-      alertLevel = 'critical';
-      message = `${item.item} expires today!`;
-    } else if (daysRemaining <= 1) {
-      alertLevel = 'critical';
-      message = `${item.item} expires in ${daysRemaining} day!`;
-    } else if (daysRemaining <= 3) {
-      alertLevel = 'warning';
-      message = `${item.item} expires in ${daysRemaining} days`;
-    } else if (daysRemaining <= warningThreshold) {
-      alertLevel = 'info';
-      message = `${item.item} expires in ${daysRemaining} days`;
+    if (isFrozen) {
+      // Frozen items: only surface alerts within 30 days; use gentler language
+      if (daysRemaining < 0) {
+        alertLevel = 'expired';
+        message = `${item.item} is past its freezer date`;
+      } else if (daysRemaining <= 7) {
+        alertLevel = 'critical';
+        message = `${item.item} should be used within ${daysRemaining} day${daysRemaining === 1 ? '' : 's'} (frozen)`;
+      } else if (daysRemaining <= 30) {
+        alertLevel = 'warning';
+        message = `${item.item} is best used within ${daysRemaining} days (frozen)`;
+      } else {
+        return; // Plenty of freezer time left
+      }
     } else {
-      return; // No alert needed
+      // Special handling for milk - only warn when 3 days or less remain
+      const isMilk = item.item.toLowerCase().includes('milk') || item.category.toLowerCase() === 'dairy';
+      const warningThreshold = isMilk ? 3 : 7;
+
+      if (daysRemaining < 0) {
+        alertLevel = 'expired';
+        message = `${item.item} has expired!`;
+      } else if (daysRemaining === 0) {
+        alertLevel = 'critical';
+        message = `${item.item} expires today!`;
+      } else if (daysRemaining <= 1) {
+        alertLevel = 'critical';
+        message = `${item.item} expires in ${daysRemaining} day!`;
+      } else if (daysRemaining <= 3) {
+        alertLevel = 'warning';
+        message = `${item.item} expires in ${daysRemaining} days`;
+      } else if (daysRemaining <= warningThreshold) {
+        alertLevel = 'info';
+        message = `${item.item} expires in ${daysRemaining} days`;
+      } else {
+        return; // No alert needed
+      }
     }
 
     alerts.push({
