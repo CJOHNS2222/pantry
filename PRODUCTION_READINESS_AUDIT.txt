@@ -192,45 +192,29 @@ SECTION 6: STUBBED / INCOMPLETE FEATURES  (Added 2026-04-10)
 SECTION 7: UX / DISCOVERABILITY  (Added 2026-04-10)
 ==============================================================
 
-Y. FAQ missing entries for new features (date labels, frozen items, dry goods)
-   - FAQPage.tsx does not explain:
-       1. What "Best By", "Use By", and "Sell By" labels mean and how the
-          app treats them differently.
-       2. How frozen items work — auto-extended expiry, 30-day alert window,
-          FreezeTransitionModal, freezerExpiry.
-       3. Why dry goods / canned items don't get automatic expiry dates.
-   - Fix: Add 3 FAQ entries (pantry-5, pantry-6, pantry-7) documented in
-     Section 8 below. Ready to implement in FAQPage.tsx.
+[Y — RESOLVED] FAQ missing entries for new features (date labels, frozen items, dry goods)
+   - Added pantry-5 (Best By / Use By / Sell By differences), pantry-6 (frozen
+     item auto-expiry with full USDA table), and pantry-7 (why dry goods don't
+     get auto-dates) to FAQPage.tsx FAQ_DATA.
+   - Resolved v1.5.11 (FAQ entries) + v1.5.13 (audit confirmation).
 
-Z. Date-type education has no in-app touchpoint at the picker
-   - ExpirationDatePicker shows "Best By" and "Use By" toggle buttons with
-     one-line subtitles but no explanation of what the difference means in
-     practice, and no mention of "Sell By" (which many users will see on
-     packages and try to enter).
-   - Fix (low-cost): Add a <details> / <summary> collapsible "What do these
-     mean?" block inside the ExpirationDatePicker dropdown, after the type
-     toggle and before the quick-set buttons. Three bullet points; no modal.
-     Exact JSX is in Section 8.
-   - File: components/ExpirationDatePicker.tsx.
+[Z — RESOLVED] Date-type education has no in-app touchpoint at the picker
+   - Added collapsible "What do these mean?" <details> block in
+     ExpirationDatePicker.tsx between the type-toggle and quick-options sections.
+   - Covers Best By, Use By, and Sell By with one-line explanations.
+   - Resolved v1.5.11.
 
-AA. "Expired Items" modal fires for frozen items carrying old fridge-date
-   - A chicken breast scanned before v1.5.11 has expirationDate = ~4 days after
-     purchase. If later moved to the freezer, that date passes and the item
-     appears in the "You have expired items" modal on every login even though
-     it is safely frozen (same root cause as item R; separate surface).
-   - Fix: Both R and AA are resolved by the same guard in ExpiredItemsModal.tsx
-     line 46. Documenting separately because the login popup is high-visibility.
+[AA — RESOLVED] "Expired Items" modal fires for frozen items carrying old fridge-date
+   - Resolved by the same frozen guard applied in audit item R (v1.5.13).
+   - ExpiredItemsModal.tsx now uses freezerExpiry as the reference date for
+     frozen items; stale fridge-dates no longer trigger the login popup.
 
-BB. Dry goods auto-expiry suppression can hide user-entered dates (low priority)
-   - getAutoExpirationDate returns undefined for 'pasta & noodles', 'grains &
-     bread', etc. If a barcode scan returns a printed best-by date, the current
-     flow ignores it because auto-expiry is suppressed for that category.
-   - The pantry-1 FAQ says items are color-coded by freshness, but pastry/
-     crackers/cereal with no date are never color-coded, which creates a gap
-     in user understanding.
-   - Fix: No code change strictly needed. Add a FAQ clarification (item BB in
-     Section 8). Optionally allow barcode-scan flow to accept user-scanned date
-     even when auto-expiry is suppressed for the category.
+[BB — NO CODE CHANGE] Dry goods auto-expiry suppression can hide user-entered dates
+   - No code change made. FAQ entry pantry-7 explains that dry goods don't get
+     auto-dates and directs users to set a date manually if desired.
+   - Future option: allow barcode-scan flow to accept a user-scanned date even
+     when auto-expiry is suppressed. Left for a later audit cycle.
+   - Decision: Won't fix in this cycle. Audit 2026-04-10.
 
 
 ==============================================================
