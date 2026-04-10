@@ -2840,6 +2840,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
             <FreezeTransitionModal
               householdId={household.id}
               inventoryId={inventory[freezeTargetIndex].id}
+              itemName={inventory[freezeTargetIndex].item}
               onClose={() => setFreezeTargetIndex(null)}
               onDone={async (res?: any) => {
                 const current = inventory[freezeTargetIndex];

@@ -124,45 +124,32 @@ SECTION 5: EXPIRY / STORAGE LOGIC GAPS  (Added 2026-04-10)
    - pantryService: all 3 getAutoExpirationDate call sites pass storageLocation.
    - Resolved v1.5.11.
 
-R. ExpiredItemsModal + App.tsx expired check ignores frozen state
-   - ExpiredItemsModal.tsx line 46 and App.tsx line 901 both filter with
-     `item.expirationDate <= today && !item.is_immortal` — frozen items whose
-     fridge-date has passed (but are safely stored in the freezer) will show
-     up as "expired" and trigger the expired items modal on every login.
-   - Fix: Add `&& !item.is_frozen && item.storageLocation !== 'freezer'` to both
-     filters, or use the active-date helper logic from generateExpirationAlerts
-     (prefer freezerExpiry for frozen items).
-   - Files: components/ExpiredItemsModal.tsx (~line 46),
-            App.tsx (~line 901).
-   - Risk: Low-effort; 2 one-line guards. Zero Firestore impact.
+[R — RESOLVED] ExpiredItemsModal + App.tsx expired check ignores frozen state
+   - ExpiredItemsModal.tsx and App.tsx both had `item.expirationDate <= today && !item.is_immortal`.
+   - Frozen items with old fridge-dates (but safely frozen) triggered the expired modal on login.
+   - Fix: Both filters now check is_frozen / storageLocation === 'freezer' and use freezerExpiry
+     (falling back to expirationDate) as the reference date.
+   - Resolved v1.5.13.
 
-S. FreezeTransitionModal uses hardcoded default, ignores getFreezerShelfLifeDays
-   - FreezeTransitionModal.tsx defaults freezerDays = 90 (hardcoded).
-   - Fix: Pass item name as a prop to FreezeTransitionModal; call
-     getFreezerShelfLifeDays(itemName) in useState initializer so the input
-     field pre-fills with the USDA default for that specific food type.
-   - File: components/FreezeTransitionModal.tsx.
-   - Risk: Non-breaking; makes the UX more accurate without removing user control.
+[S — RESOLVED] FreezeTransitionModal uses hardcoded default, ignores getFreezerShelfLifeDays
+   - Added optional itemName prop to FreezeTransitionModal.
+   - useState initializer now calls getFreezerShelfLifeDays(itemName) for the USDA default.
+   - PantryScanner passes itemName={inventory[freezeTargetIndex].item} to the modal.
+   - Shows the USDA default days in the modal subtitle so users know where the value came from.
+   - Resolved v1.5.13.
 
-T. searchUtils.ts expiring-soon filter uses expirationDate regardless of frozen state
-   - filterPantryItems (searchUtils.ts ~line 215) compares item.expirationDate
-     for the "expiring-soon" bucket. For pre-v1.5.11 frozen items still carrying
-     a fridge-date, this produces false "expiring soon" results.
-   - Fix: In the expiring-soon branch, mirror generateExpirationAlerts: if
-     isFrozen use freezerExpiry ?? expirationDate, and use 30 days as the
-     "soon" threshold instead of 7.
-   - File: utils/searchUtils.ts filterPantryItems function.
+[T — RESOLVED] searchUtils.ts expiring-soon filter uses expirationDate regardless of frozen state
+   - Fixed in v1.5.12 (audit item DD). filterPantryItems now uses freezerExpiry +
+     30-day window for frozen items, and expirationDate + 7-day window for all others.
 
-U. openedExpiry only calculates for 2 categories
-   - ItemDetailModal handleCloseAndPersist sets openedExpiry only for
-     'Canned Goods' and 'Condiments & Sauces' (6 months). All other categories
-     get no openedExpiry when marked as opened.
-   - Practical impact: Dairy (opened: 7 days), Deli/Meat (opened: 3-5 days),
-     bread (opened: 5 days), nut butters (opened: 3 months), soft cheese
-     (opened: 7 days) are all unhandled.
-   - Fix: Create getOpenedShelfLifeDays(itemName, category) helper alongside
-     getFreezerShelfLifeDays and use it in the opened-item block.
-   - File: components/ItemDetailModal.tsx (if localIsOpened && !item.openedAt block).
+[U — RESOLVED] openedExpiry only calculates for 2 categories
+   - Added getOpenedShelfLifeDays(itemName, category) to utils/appUtils.ts.
+   - Covers Dairy, Deli/Meat, Canned Goods, Condiments, Bread, Nut Butters, Produce, Beverages
+     with item-name overrides within each category (e.g. hard cheese 21d, soft cheese 7d).
+   - ItemDetailModal now calls getOpenedShelfLifeDays and sets openedExpiry for any
+     category that has a known opened shelf life. Returns undefined for unknown categories
+     so no spurious date is set.
+   - Resolved v1.5.13.
 
 V. inferStorageLocationFromItemName routes fresh meat to freezer ambiguously
    - The function's freezer block matches unqualified "chicken", "beef", "pork",
@@ -175,17 +162,15 @@ V. inferStorageLocationFromItemName routes fresh meat to freezer ambiguously
      Only infer 'freezer' when the name explicitly contains "frozen", "freeze",
      or a specific frozen phrasing. Users who move it to the freezer get the
      correct auto-extended expiry via ItemDetailModal location-change logic.
-   - File: utils/appUtils.ts inferStorageLocationFromItemName.
+   - File: utils/appUtils.ts inferStorageLocationFromItemName. 
+   leave as is, with new items stored to freezer by default.  possibly add note to items when added to inventory. 
 
-W. Batch-level expiry does not feed back into item.expirationDate
-   - PantryItems support multiple batches (each with .expires). The FEFO
-     principle means item.expirationDate should always reflect the soonest batch
-     expiry. Currently batch.expires and item.expirationDate are set
-     independently at creation time and can drift thereafter.
-   - Fix: When batches are present, derive item.expirationDate = min(batch.expires)
-     at write time in pantryService, or at read time in useDataManagement. A
-     read-time derivation is safer and non-destructive.
-   - Files: services/pantryService.ts, hooks/useDataManagement.ts.
+[W — RESOLVED] Batch-level expiry does not feed back into item.expirationDate
+   - Read-time derivation added in useDataManagement.ts inventory load loop.
+   - When an item has batches, item.expirationDate is overwritten at read-time
+     with the earliest batch.expires value (FEFO normalisation).
+   - Non-destructive: Firestore data is unchanged; only the in-memory item is updated.
+   - Resolved v1.5.13.
 
 
 ==============================================================
@@ -195,14 +180,12 @@ SECTION 6: STUBBED / INCOMPLETE FEATURES  (Added 2026-04-10)
 [D — STILL OPEN] recipeRecommendationService is entirely stubbed
    (See Section 2 above. No changes made as of v1.5.11.)
 
-X. FreezeTransitionModal is unstyled (raw HTML + inline styles)
-   - FreezeTransitionModal.tsx is the only component using raw HTML elements with
-     inline style={{}} objects instead of Tailwind classes. It stands out
-     visually from every other modal in the app.
-   - Fix: Port to Tailwind + theme CSS vars (bg-theme-primary, text-theme-primary,
-     border-theme, etc.) matching the style of ItemDetailModal or ExpiredItemsModal.
-   - File: components/FreezeTransitionModal.tsx.
-   - Risk: Visual-only; zero logic changes required.
+[X — RESOLVED] FreezeTransitionModal is unstyled (raw HTML + inline styles)
+   - Fully rewritten using Tailwind classes and theme CSS vars matching
+     ItemDetailModal / ExpiredItemsModal visual style.
+   - Added Snowflake + X lucide icons; error shown in themed red bubble;
+     action buttons styled to match the rest of the app.
+   - Resolved v1.5.13.
 
 
 ==============================================================
@@ -431,7 +414,7 @@ EE. FIXED: offlineQueueService catch(err: any)
    Status: RESOLVED 2026-04-10
 
 --------------------------------------------------------------
-FF. OPEN: Community ratings query not household-scoped
+FF. use alternative with public review text to all users: Community ratings query not household-scoped
 --------------------------------------------------------------
    File: hooks/useDataManagement.ts line 981 — getRatingsForRecipe()
    Severity: MEDIUM — privacy gap (intentional design or oversight?)
@@ -452,10 +435,10 @@ FF. OPEN: Community ratings query not household-scoped
    shared, but then remove any personal review text from the query result
    display, or add a privacy toggle on each rating.
    
-   Status: OPEN
+   Status: use alternative
 
 --------------------------------------------------------------
-GG. OPEN: storage.rules public read for recipe images
+GG. OK, public info: storage.rules public read for recipe images
 --------------------------------------------------------------
    File: storage.rules lines 4-10 (recipes/) and 14-16 (recipe-photos/)
    Severity: LOW — intentional by comment, but worth reviewing periodically
@@ -472,7 +455,7 @@ GG. OPEN: storage.rules public read for recipe images
    
    Fix if privacy tightening desired: Change to `if request.auth != null`.
    
-   Status: OPEN (low priority — design decision)
+   Status: public info
 
 ==============================================================
 END

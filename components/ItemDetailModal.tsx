@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, TrendingUp, ShoppingBasket, Trash2, Edit3, Zap, History } from 'lucide-react';
 import { PantryItem } from '../types';
 import PriceTrends from './PriceTrends';
-import { getAllCategories, getExpirationColor, cleanItemNameForShopping, formatItemQuantity, parseQuantity, getFreezerShelfLifeDays } from '../utils/appUtils';
+import { getAllCategories, getExpirationColor, cleanItemNameForShopping, formatItemQuantity, parseQuantity, getFreezerShelfLifeDays, getOpenedShelfLifeDays } from '../utils/appUtils';
 import { getQuantityAmount, getQuantityUnit } from '../utils/quantityUtils';
 import { getNutritionFactsWithFallback, NutritionFacts, formatNutrition } from '../services/nutritionService';
 import { useKeyboardNavigation } from '../hooks/useKeyboardNavigation';
@@ -235,12 +235,12 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
       if (localIsOpened && !item.openedAt) {
         // Item is being marked as opened for the first time
         updates.openedAt = new Date().toISOString();
-        // Calculate opened expiry based on category (simplified logic)
+        // Calculate opened expiry based on item name and category
         const category = localCategory || item.category;
-        if (category === 'Canned Goods' || category === 'Condiments & Sauces') {
-          // These typically last 6-12 months after opening
+        const openedDays = getOpenedShelfLifeDays(item.item, category);
+        if (openedDays !== undefined) {
           const openedExpiry = new Date();
-          openedExpiry.setMonth(openedExpiry.getMonth() + 6);
+          openedExpiry.setDate(openedExpiry.getDate() + openedDays);
           updates.openedExpiry = openedExpiry.toISOString().split('T')[0];
         }
       } else if (!localIsOpened) {

@@ -897,9 +897,15 @@ const App: React.FC = () => {
     const checkExpiredItems = async () => {
       if (user && notificationSettings.types.expired_items_check && inventory.length > 0) {
         const today = new Date().toISOString().slice(0, 10);
-        const expiredItems = inventory.filter(item =>
-          item.expirationDate && item.expirationDate <= today && !item.is_immortal
-        );
+        const expiredItems = inventory.filter(item => {
+          if (!item.expirationDate || item.is_immortal) return false;
+          // Frozen items use freezerExpiry; skip items with only a stale fridge-date
+          if (item.is_frozen || item.storageLocation === 'freezer') {
+            const ref = item.freezerExpiry || item.expirationDate;
+            return ref <= today;
+          }
+          return item.expirationDate <= today;
+        });
 
         if (expiredItems.length > 0) {
           setShowExpiredItemsModal(true);

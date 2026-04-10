@@ -5,6 +5,18 @@ All notable changes to Stock & Spoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.13] - 2026-04-10
+
+### Added
+- **`getOpenedShelfLifeDays(itemName, category)`** (audit U): New USDA/FDA-based helper in `utils/appUtils.ts` covering dairy, deli/meat, canned goods, condiments, bread, nut butters, produce, and beverages. Returns `undefined` for unknown categories so no spurious `openedExpiry` is set.
+- **FreezeTransitionModal USDA pre-fill** (audit S): Modal now accepts an `itemName` prop and initialises the freezer-days input via `getFreezerShelfLifeDays(itemName)` — e.g. chicken defaults to 270 days, salmon to 90 days. The subtitle shows the USDA source value so users know where the default came from.
+- **Batch FEFO read-time derivation** (audit W): Inventory cache listener in `useDataManagement.ts` now sets `item.expirationDate` to the earliest `batch.expires` value when batches are present. Read-time only; Firestore data is unchanged.
+
+### Fixed
+- **Frozen items in ExpiredItems modal** (audit R): `ExpiredItemsModal.tsx` and `App.tsx` expiry filters now use `freezerExpiry` as the reference date for frozen items, preventing false "expired" alerts for items safely stored in the freezer.
+- **ItemDetailModal opened expiry coverage** (audit U): All supported categories now receive an accurate `openedExpiry` date when an item is marked opened — not just Canned Goods and Condiments.
+- **FreezeTransitionModal Tailwind restyle** (audit X): Fully ported from raw HTML with inline `style={{}}` objects to Tailwind + theme CSS vars, matching the visual style of ItemDetailModal and ExpiredItemsModal. Added Snowflake lucide icon, fixed `catch (e: any)` → `catch (e: unknown)`.
+
 ## [1.5.12] - 2026-04-10
 
 ### Fixed

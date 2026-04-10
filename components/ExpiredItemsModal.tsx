@@ -42,9 +42,15 @@ const ExpiredItemsModal: React.FC<ExpiredItemsModalProps> = ({
     if (isOpen) {
       // Get expired items using the same logic as generateExpirationAlerts
       const today = new Date().toISOString().slice(0, 10);
-      const expired = inventory.filter(item =>
-        item.expirationDate && item.expirationDate <= today && !item.is_immortal
-      );
+      const expired = inventory.filter(item => {
+        if (!item.expirationDate || item.is_immortal) return false;
+        // Frozen items use freezerExpiry; don't flag them based on old fridge-date
+        if (item.is_frozen || item.storageLocation === 'freezer') {
+          const ref = item.freezerExpiry || item.expirationDate;
+          return ref <= today;
+        }
+        return item.expirationDate <= today;
+      });
       setExpiredItems(expired);
       setSelectedItems(new Set());
 

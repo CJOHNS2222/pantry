@@ -1004,6 +1004,82 @@ export function getFreezerShelfLifeDays(itemName: string): number {
 }
 
 /**
+ * Returns how many days an item typically lasts after being opened.
+ * Based on USDA / FDA shelf-life guidance.
+ * @param itemName Item name (used for name-based overrides within a category)
+ * @param category The item's category string
+ * @returns Number of days of opened shelf life, or undefined if unknown
+ */
+export function getOpenedShelfLifeDays(itemName: string, category: string): number | undefined {
+  const name = itemName.toLowerCase();
+  const cat = (category || '').toLowerCase();
+
+  // Dairy
+  if (cat.includes('dairy') || cat.includes('milk') || cat.includes('cheese')) {
+    if (name.includes('hard cheese') || name.includes('parmesan') || name.includes('romano')) return 21;
+    if (name.includes('soft cheese') || name.includes('brie') || name.includes('camembert') ||
+        name.includes('ricotta') || name.includes('cottage')) return 7;
+    if (name.includes('cream cheese') || name.includes('sour cream') || name.includes('creme fraiche')) return 14;
+    if (name.includes('butter')) return 21;
+    if (name.includes('yogurt')) return 7;
+    if (name.includes('milk') || name.includes('cream')) return 5;
+    return 7; // default dairy
+  }
+
+  // Deli / Meat
+  if (cat.includes('deli') || cat.includes('meat') || cat.includes('poultry') || cat.includes('seafood')) {
+    if (name.includes('deli') || name.includes('cold cut') || name.includes('lunch meat')) return 5;
+    if (name.includes('bacon')) return 7;
+    if (name.includes('sausage') && !name.includes('frozen')) return 4;
+    return 3; // fresh meat / fish after opening / thawing
+  }
+
+  // Canned Goods
+  if (cat.includes('canned') || cat.includes('can ')) {
+    if (name.includes('fish') || name.includes('tuna') || name.includes('salmon') ||
+        name.includes('sardine')) return 3; // canned fish refrigerated
+    return 5; // other canned goods once opened
+  }
+
+  // Condiments & Sauces
+  if (cat.includes('condiment') || cat.includes('sauce')) {
+    if (name.includes('ketchup') || name.includes('mustard')) return 60;
+    if (name.includes('mayonnaise') || name.includes('mayo')) return 60;
+    if (name.includes('salad dressing') || name.includes('dressing')) return 60;
+    if (name.includes('soy sauce')) return 180;
+    if (name.includes('hot sauce')) return 180;
+    if (name.includes('vinegar')) return 365;
+    return 90; // default condiment
+  }
+
+  // Bread / Bakery
+  if (cat.includes('bread') || cat.includes('bak')) {
+    return 5;
+  }
+
+  // Nut Butters
+  if (cat.includes('nut butter') || name.includes('peanut butter') || name.includes('almond butter') ||
+      name.includes('cashew butter') || name.includes('tahini')) {
+    return 90;
+  }
+
+  // Produce
+  if (cat.includes('produce') || cat.includes('vegetable') || cat.includes('fruit')) {
+    if (name.includes('leafy') || name.includes('lettuce') || name.includes('spinach') ||
+        name.includes('arugula') || name.includes('kale')) return 3;
+    if (name.includes('berry') || name.includes('berries')) return 3;
+    return 5;
+  }
+
+  // Beverages
+  if (cat.includes('beverage') || cat.includes('juice')) {
+    return 7;
+  }
+
+  return undefined; // category unknown — don't set openedExpiry
+}
+
+/**
  * Determines if an item should have an automatic expiration date and returns the date
  * @param itemName The name of the item
  * @param category The category of the item

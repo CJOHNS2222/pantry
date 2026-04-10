@@ -509,7 +509,19 @@ export function useDataManagement(
             const items: PantryItem[] = [];
             for (const itemId in data) {
               if (itemId !== 'lastUpdated' && itemId !== 'version' && itemId !== 'itemCount') {
-                items.push(InventoryCacheService.arrayToPantryItem(itemId, data[itemId] as any));
+                const item = InventoryCacheService.arrayToPantryItem(itemId, data[itemId] as any);
+                // W: Read-time FEFO normalisation — keep item.expirationDate in sync with
+                // the soonest batch expiry so filters and alerts always use the correct date.
+                if (item.batches && item.batches.length > 0) {
+                  const batchExpiries = item.batches
+                    .map(b => b.expires)
+                    .filter((e): e is string => !!e)
+                    .sort();
+                  if (batchExpiries.length > 0) {
+                    item.expirationDate = batchExpiries[0];
+                  }
+                }
+                items.push(item);
               }
             }
             if (hasPantryItemsChanged(items, inventory)) {
