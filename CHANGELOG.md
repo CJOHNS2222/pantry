@@ -5,6 +5,17 @@ All notable changes to Stock & Spoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.15] - 2026-04-10
+
+### Fixed
+- **Bundle optimization** (audit 2A): Removed `firebase-admin` from web dependencies — this Node.js-only library was bloating the production bundle unnecessarily.
+- **Security fix** (audit 3A): Fixed Firebase Storage rules for pantry images — delete permissions now restricted to the original uploader only (previously any authenticated user could delete any image).
+- **Build config** (audit 8C): Reduced Vite `chunkSizeWarningLimit` from 1000KB to 600KB to encourage smaller bundle chunks and better performance monitoring.
+- **Config cleanup** (audit 2C): Removed duplicate `capacitor.config.json` file, keeping only the TypeScript config for consistency.
+
+### Changed
+- **Environment setup** (audit 8D): Verified `.env.example` exists with all required VITE_ variables (Firebase config, Gemini API key, etc.) for easier developer onboarding.
+
 ## [1.5.14] - 2026-04-10
 
 ### Changed

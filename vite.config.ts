@@ -69,7 +69,7 @@ export default defineConfig(({ mode }) => {
             }
           }
         },
-        chunkSizeWarningLimit: 1000 // Increase limit to 1000KB since our chunks are reasonably sized
+        chunkSizeWarningLimit: 600 // Reduce to 600KB to encourage smaller chunks
       },
       test: {
         globals: true,

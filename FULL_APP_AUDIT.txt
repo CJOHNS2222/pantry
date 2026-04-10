@@ -1,0 +1,534 @@
+================================================================================
+  STOCK & SPOON — FULL APPLICATION AUDIT
+  Generated: 2025-07-24
+  Scope: Entire codebase — code quality, UI/UX, services, config, i18n, security
+================================================================================
+
+TABLE OF CONTENTS
+─────────────────
+  Section 1  — CRITICAL: Memory Leaks & Resource Management
+  Section 2  — CRITICAL: Bundle & Dependency Issues
+  Section 3  — HIGH: Security & Firestore Rules
+  Section 4  — HIGH: Accessibility (a11y)
+  Section 5  — HIGH: Internationalization (i18n) Gaps
+  Section 6  — HIGH: Code Quality — Type Safety
+  Section 7  — MEDIUM: UI/UX — Missing States & Validation
+  Section 8  — MEDIUM: Configuration & Build
+  Section 9  — MEDIUM: Console Logging & Observability
+  Section 10 — LOW: Incomplete Features & TODOs
+  Section 11 — LOW: Minor Polish & Cleanup
+  Summary Table
+
+================================================================================
+SECTION 1 — CRITICAL: MEMORY LEAKS & RESOURCE MANAGEMENT
+================================================================================
+
+1A) UNTRACKED setInterval CALLS — 5 instances
+    These intervals are never cleared, causing memory leaks if the service
+    module is re-initialized or the component unmounts.
+
+    - services/cacheService.ts (~L28)
+      Periodic cache cleanup interval — no clearInterval on teardown.
+
+    - services/databaseMonitoringService.ts (~L789)
+      Health-check polling interval — never cleared.
+
+    - services/offlineDataCache.ts (~L39)
+      Cache freshness check — no cleanup path.
+
+    - services/leftoverNotificationService.ts (~L80)
+      Notification schedule polling — never cleared.
+
+    - services/priceDataCacheService.ts (~L94)
+      Price cache refresh interval — no cleanup path.
+
+    FIX: Each service should expose a cleanup/destroy function that calls
+    clearInterval. Call these from the app teardown or unmount path.
+
+1B) UNBOUNDED IN-MEMORY CACHES — 3 instances
+
+    - services/geminiService.ts (~L116-125)
+      `requestCache` Map grows without limit. No TTL, no max-size eviction.
+      Heavy Gemini usage could exhaust browser memory.
+
+    - services/imageCacheService.ts
+      Image blob cache has no TTL eviction or size cap.
+
+    - services/writeQueueService.ts
+      Internal queue state accumulates without periodic pruning.
+
+    FIX: Add max-size (LRU) or TTL-based eviction to each cache. For
+    geminiService, cap at ~100 entries and evict oldest on overflow.
+
+1C) EVENT LISTENER LEAKS — 2 instances
+
+    - services/writeQueueService.ts (~L279)
+      Global event listener registered once, never removed.
+
+    - services/performanceMonitoringService.ts (~L66)
+      `beforeunload` listener added on init, never removed.
+
+    FIX: Store listener references and remove them in a cleanup function.
+
+1D) RACE CONDITIONS — 2 instances
+
+    - hooks/useOfflineStatus.ts (~L49-80)
+      Concurrent connectivity checks can overlap and produce stale results
+      when network state toggles rapidly.
+
+    - services/offlineQueueService.ts
+      Queue processing can be triggered concurrently if multiple components
+      call flush simultaneously.
+
+    FIX: Add a mutex/lock flag to prevent concurrent execution.
+
+1E) STALE CLOSURES — 2 instances
+
+    - hooks/useDataManagement.ts
+      Helper functions defined inside the hook capture stale `household`
+      and `user` values if those change between renders.
+
+    - hooks/useNotifications.ts
+      `mealPlan` in the dependency array causes effect thrashing (object
+      reference changes every render).
+
+    FIX: Use refs for values accessed in callbacks, or memoize object
+    references with useMemo.
+
+1F) UNHANDLED PROMISES — 1 instance
+
+    - services/freezerService.ts (~L23, L80)
+      `getDoc()` calls not wrapped in try-catch. A Firestore network error
+      will produce an unhandled promise rejection.
+
+    FIX: Wrap in try-catch with appropriate error handling.
+
+
+================================================================================
+SECTION 2 — CRITICAL: BUNDLE & DEPENDENCY ISSUES
+================================================================================
+
+2A) firebase-admin IN WEB BUNDLE                                    [CRITICAL]
+    package.json lists `firebase-admin` (v13.7.0) in `dependencies`.
+    This is a Node.js-only library and should NOT be in the web bundle.
+    It adds significant weight and may cause bundling errors.
+
+    FIX: Move to `devDependencies` or remove entirely. It should only
+    be used in `functions/` (which has its own package.json).
+
+2B) LOOSE DEPENDENCY VERSIONS                                       [MEDIUM]
+    - All Capacitor packages pinned to `^8.0.0` (allows minor bumps).
+      Tighten to `~8.0.0` for patch-only updates.
+    - Firebase `^12.6.0` allows major-version-breaking updates
+      if semver isn't respected.
+
+    FIX: Tighten version ranges: `~8.0.x` for Capacitor, `~12.6.x`
+    for Firebase.
+
+2C) CAPACITOR CONFIG DUPLICATION                                    [MEDIUM]
+    Both `capacitor.config.ts` and `capacitor.config.json` exist.
+    The JSON file has stale appName ("Smart Pantry" vs "Stock & Spoon").
+    Capacitor resolves the TS file first, but the JSON presence is
+    confusing and could cause issues with older tooling.
+
+    FIX: Delete `capacitor.config.json`, keep only `capacitor.config.ts`.
+
+
+================================================================================
+SECTION 3 — HIGH: SECURITY & FIRESTORE RULES
+================================================================================
+
+3A) STORAGE DELETE PERMISSIONS TOO BROAD                            [HIGH]
+    storage.rules: `allow delete: if request.auth != null` on pantry_images
+    lets ANY authenticated user delete ANY user's pantry images.
+
+    FIX: Restrict to uploader:
+      allow delete: if request.auth.uid == resource.metadata.uploader;
+
+3B) GROCERY PRICES — NO RATE LIMITING OR VALIDATION                 [MEDIUM]
+    firestore.rules: /groceryPrices/{docId} allows any authenticated user
+    to submit prices with no duplicate/spam checking, quantity limits, or
+    required field validation (itemName, price).
+
+    FIX: Add field validation:
+      && request.resource.data.itemName is string
+      && request.resource.data.itemName.size() > 0
+      && request.resource.data.price is number
+      && request.resource.data.price > 0
+
+3C) RECIPE MODIFICATIONS — NO SIZE LIMIT                            [MEDIUM]
+    firestore.rules: recipeModifications.description has no size() check.
+    Could allow very large payloads to be stored.
+
+    FIX: Add `&& request.resource.data.description.size() < 500`
+
+3D) PRICE HISTORY DATE NOT VALIDATED                                [LOW]
+    Price history entries accept any date value — no check for future dates
+    or obviously invalid timestamps.
+
+
+================================================================================
+SECTION 4 — HIGH: ACCESSIBILITY (a11y)
+================================================================================
+
+4A) MISSING ARIA-LABELS ON INTERACTIVE ELEMENTS                     [HIGH]
+    28 of 56 components have interactive elements (buttons, inputs, icons)
+    without aria-label or aria-labelledby attributes. Screen readers cannot
+    identify these controls.
+
+    Top offenders:
+    - PantryScanner.tsx: camera button, flash toggle, close button
+    - EnhancedShoppingListItem.tsx: check, edit, delete icon-buttons
+    - MealPlanner.tsx: day navigation arrows, recipe swap buttons
+    - RecipeFinder.tsx: filter toggles, search clear button
+    - QuantityUnitPicker.tsx: increment/decrement buttons
+    - BatchOperations.tsx: select-all checkbox, batch action buttons
+
+    FIX: Add aria-label to every icon-only button and interactive element.
+
+4B) MODALS MISSING ESCAPE KEY HANDLING                              [HIGH]
+    These modals don't close on Escape key press:
+    - ItemDetailModal
+    - ExpirationDatePicker
+    - CategoryManager
+    - QuickAddModal
+    - RecipeModal
+
+    FIX: Add onKeyDown handler for Escape key to each modal's root element.
+
+4C) MODALS MISSING BACKDROP CLICK-TO-CLOSE                         [MEDIUM]
+    - CategoryManager
+    - ItemDetailModal
+    - ExpiredItemsModal
+    - ImportModal
+
+    FIX: Add onClick handler on backdrop overlay to close the modal.
+
+4D) TOUCH TARGETS BELOW 44px MINIMUM                               [MEDIUM]
+    Mobile tap targets smaller than Apple/Google 44px minimum:
+    - PortionSelector.tsx: serving size buttons
+    - EnhancedShoppingListItem.tsx: action icons
+    - QuantityUnitPicker.tsx: +/- spinners
+    - FreezeTransitionModal.tsx: shelf life spinners
+
+    FIX: Ensure all tappable elements have min-width and min-height of
+    44px (or use p-3 / w-11 h-11 in Tailwind).
+
+4E) MISSING FOCUS MANAGEMENT                                       [MEDIUM]
+    Modals do not trap focus or return focus to the trigger element on close.
+    Tab key can escape the modal overlay.
+
+    FIX: Use a focus-trap library or implement manual focus cycling.
+
+
+================================================================================
+SECTION 5 — HIGH: INTERNATIONALIZATION (i18n) GAPS
+================================================================================
+
+5A) HARDCODED ENGLISH IN COMPONENTS                                 [CRITICAL]
+    Multiple components contain English strings that bypass the i18n system.
+    These will never be translated for non-English users.
+
+    CRITICAL — Entire component untranslated:
+    - FAQPage.tsx (L79-215): 20+ long FAQ answer strings all in English.
+
+    HIGH — Significant untranslated sections:
+    - FreezeTransitionModal.tsx (L47-101): "Move to Freezer", shelf labels
+      ("Top shelf", "Middle shelf", "Bottom shelf", "Door", "Drawer / bin")
+    - CookingMode.tsx (L72-77): "No step-by-step instructions available",
+      "Exit Cooking Mode"
+    - GroceryCostEstimator.tsx (L547): "Pro tip: Costs only include..."
+    - Household.tsx (L246, 481): "Create a household to start sharing..."
+    - ItemDetailModal.tsx (L524): Category names ("Canned Goods",
+      "Condiments & Sauces", "Snacks", "Beverages")
+
+5B) HARDCODED TOAST / ALERT MESSAGES                               [HIGH]
+    35+ addToast() calls use hardcoded English strings:
+    - Household.tsx (L55): "You have reached the maximum..."
+    - ImportModal.tsx (L59): "Imported {count} pantry items"
+    - ItemDetailModal.tsx (L143, 147): "Image must be smaller than 10MB"
+    - GroceryCostEstimator.tsx (L110): "Price submitted successfully!"
+    - Plus ~30 more across components
+
+    FIX: Replace all hardcoded strings with intl.formatMessage() calls
+    and add corresponding keys to all locale files.
+
+5C) HARDCODED ENGLISH IN App.tsx                                    [HIGH]
+    App.tsx (L431-476): Tab labels and section headers contain hardcoded
+    English strings that should use i18n keys.
+
+5D) SECONDARY LOCALE COMPLETENESS UNKNOWN                          [MEDIUM]
+    Locale files exist for de, fr, ja, ru, zh but have not been verified
+    for completeness against en.json. These may have missing keys that
+    would show raw key strings to users.
+
+    FIX: Run a script to diff all locale files against en.json and fill gaps.
+
+
+================================================================================
+SECTION 6 — HIGH: CODE QUALITY — TYPE SAFETY
+================================================================================
+
+6A) `any` TYPE VIOLATIONS                                          [HIGH]
+    ~150+ remaining `any` usages across ~25 files. ESLint rule is set to
+    ERROR but these appear in existing code that may have been grandfathered.
+
+    Priority files with most violations:
+    - contexts/AppActionsContext.tsx: `noop as any` used 26 times for
+      default context values. Replace with properly typed no-op functions.
+    - hooks/useAuth.ts: catch(err: any)
+    - hooks/useOfflineStatus.ts: catch(err: any)
+    - hooks/useSubscription.ts: catch(err: any)
+    - App.tsx: catch(err: any), event handler types
+    - utils/searchUtils.ts: catch(err: any)
+    - functions/src/*.ts: multiple `any` in Cloud Functions code
+
+    FIX: Replace `catch (err: any)` with `catch (err: unknown)` and use
+    type narrowing. Replace `noop as any` with typed stub functions.
+
+6B) `@typescript-eslint/no-unused-vars` SET TO WARN                [MEDIUM]
+    Should be ERROR. Unused variables are dead code and should be removed.
+
+    FIX: Change to "error" in eslint.config.ts.
+
+
+================================================================================
+SECTION 7 — MEDIUM: UI/UX — MISSING STATES & VALIDATION
+================================================================================
+
+7A) MISSING LOADING STATES                                          [MEDIUM]
+    These components perform async operations without showing a loading
+    indicator, leaving the user with no feedback:
+    - RecipeRating.tsx: photo upload
+    - ItemDetailModal.tsx: nutrition data fetch
+    - LeftoverAnalytics.tsx: analytics computation
+    - Community.tsx: community data load
+    - RecipeFinder.tsx: search results loading
+    - MealPlanner.tsx: recipe search
+    - GroceryCostEstimator.tsx: price history fetch
+    - DatabaseAnalytics.tsx: stats computation
+
+    FIX: Add spinner or skeleton UI during async operations.
+
+7B) MISSING ERROR STATES                                            [MEDIUM]
+    These components silently swallow errors or show nothing on failure:
+    - PantryScanner.tsx: image analysis failure (no user feedback)
+    - ItemDetailModal.tsx: nutrition fetch failure
+    - GroceryCostEstimator.tsx: price fetch failure
+    - MealPlanner.tsx: recipe search failure
+    - RecipeFinder.tsx: API error handling
+    - Household.tsx: member management errors
+    - CookingMode.tsx: recipe load failure
+
+    FIX: Show user-friendly error messages with retry option.
+
+7C) FORM VALIDATION GAPS                                            [MEDIUM]
+    - CategoryManager.tsx: no maxLength on category name input
+    - FreezeTransitionModal.tsx: no max on shelf-life number input
+    - GroceryCostEstimator.tsx: accepts negative prices
+    - QuantityUnitPicker.tsx: accepts negative quantities
+    - Household.tsx: no validation on household name
+    - ImportModal.tsx: no file size validation before processing
+
+    FIX: Add appropriate min/max/maxLength constraints to inputs.
+
+7D) LANDING PAGE INLINE STYLES                                     [MEDIUM]
+    LandingPage.tsx uses inline style={{}} objects throughout the entire
+    component instead of Tailwind classes. This is inconsistent with
+    every other component in the app.
+
+    FIX: Convert to Tailwind utility classes.
+
+7E) MISSING EMPTY STATES                                            [LOW]
+    Several list views show nothing when data is empty (no helpful message
+    or illustration):
+    - MealPlanner.tsx: empty day plan
+    - RecipeFinder.tsx: no search results
+    - LeftoverAnalytics.tsx: no leftover data
+    - Community.tsx: no community content
+
+
+================================================================================
+SECTION 8 — MEDIUM: CONFIGURATION & BUILD
+================================================================================
+
+8A) TSCONFIG STRICTNESS GAPS                                        [MEDIUM]
+    These strictness options are disabled:
+    - noUnusedLocals: false          → dead imports/variables not caught
+    - noUnusedParameters: false      → unused params not caught
+    - noUncheckedIndexedAccess: false → array[i] not checked for undefined
+
+    FIX: Enable `noUnusedLocals` and `noUnusedParameters` at minimum.
+
+8B) ESLINT RULES NOT ENFORCED                                      [MEDIUM]
+    - no-console: not configured — allows 150+ console.* calls in production
+    - prefer-const: set to "warn" instead of "error"
+    - no-var: missing entirely
+
+    FIX: Add `"no-console": ["error", { allow: ["warn", "error"] }]`,
+    change prefer-const to "error", add no-var as "error".
+
+8C) CHUNK SIZE WARNING LIMIT HIGH                                   [LOW]
+    vite.config.ts: chunkSizeWarningLimit is 1000KB (standard is 500KB).
+    Large chunks degrade initial load performance.
+
+    FIX: Reduce to 600KB and investigate any bundles that exceed it.
+
+8D) MISSING .env.example                                            [LOW]
+    No .env.example or documentation of required environment variables.
+    Developers must discover VITE_GEMINI_API_KEY and other vars by reading
+    source code.
+
+    FIX: Create .env.example listing all required VITE_ variables.
+
+8E) PWA AUTO-UPDATE STRATEGY                                       [LOW]
+    VitePWA registerType is 'autoUpdate' — silently updates without user
+    consent. Could cause unexpected behavior mid-session.
+
+    Consider: Change to 'prompt' for user-controlled updates.
+
+8F) MISSING FIRESTORE INDEXES                                      [LOW]
+    No composite index for:
+    - Recipe queries on (visibility, userId) — "my recipes" filter
+    - Household pantry items on (is_leftover, createdAt) — leftover views
+
+    If these queries are used, Firestore will return errors or fall back
+    to client-side filtering.
+
+
+================================================================================
+SECTION 9 — MEDIUM: CONSOLE LOGGING & OBSERVABILITY
+================================================================================
+
+9A) EXCESSIVE console.* STATEMENTS                                  [MEDIUM]
+    ~150+ console.log/warn/error calls across 18+ files. While Vite strips
+    these in production builds, they clutter development and mask real issues.
+
+    Top offenders:
+    - services/recipeService.ts: 25 calls
+    - services/pushNotificationService.ts: 17 calls
+    - services/shoppingListCacheService.ts: 16 calls
+    - services/bulkImageUpdateService.ts: 15+ calls
+    - components/PantryScanner.tsx: 10+ calls
+    - components/MealPlanner.tsx: 8+ calls
+
+    FIX: Replace with structured logging via analyticsService or remove
+    entirely. Critical errors should go through Sentry.
+
+9B) ANALYTICS SERVICE UNDERUTILIZED                                 [LOW]
+    services/analyticsService.ts exists but many components log errors
+    directly to console instead of routing through analytics/Sentry.
+
+    FIX: Replace console.error in catch blocks with Sentry.captureException
+    or analyticsService calls.
+
+
+================================================================================
+SECTION 10 — LOW: INCOMPLETE FEATURES & TODOs
+================================================================================
+
+10A) TODO/FIXME COMMENTS — 45+ instances
+     These indicate acknowledged but unfinished work:
+
+     HIGH-priority TODOs:
+     - PantryScanner.tsx (~L284): autoReaddStaples — feature stub
+     - recipeRatingService.ts (~L403, 448, 457): unfinished rating logic
+     - ShoppingList.tsx (~L711): suggestion dismissal not implemented
+
+     MEDIUM-priority TODOs:
+     - services/leftoverNotificationService.ts: notification scheduling
+     - services/priceDataCacheService.ts: cache invalidation strategy
+     - hooks/useDataManagement.ts: batch operation optimization
+     - components/MealPlanner.tsx: drag-and-drop reordering
+
+     LOW-priority TODOs:
+     - Various "TODO: add tests" comments in services
+     - "TODO: add error boundary" comments in minor components
+     - Cosmetic TODOs (icon changes, color tweaks)
+
+     NOTE: Not all TODOs need immediate action. Review each and either
+     implement, create a ticket, or remove if no longer relevant.
+
+10B) DUPLICATE LOGIC PATTERNS                                       [LOW]
+     Quantity parsing appears in both:
+     - hooks/useDataManagement.ts
+     - utils/searchUtils.ts
+
+     Date formatting appears in multiple services without a shared utility.
+
+     FIX: Consolidate into shared utility functions.
+
+
+================================================================================
+SECTION 11 — LOW: MINOR POLISH & CLEANUP
+================================================================================
+
+11A) ICON PATH CAPITALIZATION
+     capacitor.config.ts references `icon.PNG` (uppercase extension).
+     Should be `icon.png` for cross-platform consistency.
+
+11B) VITEST WATCH MODE DISABLED
+     vitest.config.ts has `watch: false`. Developers must manually add
+     --watch flag. Consider removing this default.
+
+11C) ESLINT IGNORE GAPS
+     eslint.config.js ignores dist/, node_modules/, functions/lib/,
+     android/, build/ but not ios/ or coverage/.
+
+11D) DEAD EXPORTS
+     Some services export functions that are never imported elsewhere.
+     Run `ts-prune` or similar tool to identify and remove.
+
+
+================================================================================
+SUMMARY TABLE
+================================================================================
+
+  Sev.     | Count | Category
+  ─────────┼───────┼──────────────────────────────────────
+  CRITICAL |   4   | Memory leaks (1A-1C), FAQPage i18n (5A)
+  HIGH     |  11   | Security rules (3A ✓), a11y (4A-4B), i18n strings (5A-5C),
+           |       | type safety (6A), stale closures (1E)
+  MEDIUM   |  21   | UI states (7A-7D), config (8A-8B), console (9A),
+           |       | validation (7C), security (3B), deps (2B), capacitor config (2C ✓),
+           |       | i18n completeness (5D), race conditions (1D)
+  LOW      |  14   | TODOs (10A), polish (11A-11D), empty states (7E),
+           |       | missing indexes (8F), minor config (8C ✓, 8D ✓, 8E)
+  ─────────┼───────┼──────────────────────────────────────
+  TOTAL    |  50   | (4 items completed: 2A, 2C, 3A, 8C)
+
+================================================================================
+RECOMMENDED PRIORITY ORDER
+================================================================================
+
+  Phase 1 — CRITICAL (fix immediately):
+    [1A] Clear untracked intervals (5 services)
+    [1B] Add cache eviction to geminiService, imageCacheService
+    [2A] Remove firebase-admin from web dependencies ✓ DONE
+    [5A] i18n for FAQPage (entire component hardcoded English) skip this for now
+
+  Phase 2 — HIGH (fix this sprint):
+    [3A] Fix storage.rules delete permission ✓ DONE
+    [4A] Add aria-labels to 28 components (batch effort)
+    [4B] Add Escape key handling to 5 modals
+    [5B] Externalize 35+ hardcoded toast messages skip this for now
+    [5C] Externalize App.tsx hardcoded strings skip this for now
+    [6A] Fix 150+ any violations (start with catch blocks) skip this for now
+
+  Phase 3 — MEDIUM (fix next sprint):
+    [7A-7C] Add loading/error states and form validation
+    [7D] Convert LandingPage from inline styles to Tailwind
+    [8A-8B] Tighten tsconfig + eslint rules skip this for now
+    [9A] Clean up console.* statements
+    [1D] Fix race conditions in useOfflineStatus + offlineQueueService
+    [1E] Fix stale closures in useDataManagement
+
+  Phase 4 — LOW (backlog):
+    [10A] Review and triage 45+ TODO comments
+    [10B] Consolidate duplicate utility logic
+    [11A-11D] Minor config/polish items
+    [8C-8F] Build config tweaks ✓ PARTIALLY DONE (chunk size limit reduced)
+
+================================================================================
+END OF AUDIT
+================================================================================
