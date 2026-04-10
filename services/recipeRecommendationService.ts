@@ -1,5 +1,5 @@
-import DatabaseMonitoringService from './databaseMonitoringService';
-import { RecipeRating, StructuredRecipe } from '../types';
+import { SavedRecipe, StructuredRecipe } from '../types';
+import { getCachedRecipesCache } from './recipeService';
 import { log } from './logService';
 
 export interface RecipeRecommendation {
@@ -10,12 +10,43 @@ export interface RecipeRecommendation {
   basedOn?: string[]; // What influenced this recommendation
 }
 
+// Module-level cache — load once, reuse for 30 minutes (0 additional Firestore reads)
+let _recipeCache: SavedRecipe[] | null = null;
+let _recipeCacheTimestamp = 0;
+const CACHE_TTL_MS = 30 * 60 * 1000;
+
+async function loadRecipeCache(): Promise<SavedRecipe[]> {
+  if (_recipeCache && Date.now() - _recipeCacheTimestamp < CACHE_TTL_MS) {
+    return _recipeCache;
+  }
+  const recipes = await getCachedRecipesCache('recipe_caches/recipes_cache_1');
+  _recipeCache = recipes;
+  _recipeCacheTimestamp = Date.now();
+  return recipes;
+}
+
+// Season keyword sets used for matching titles/descriptions in the recipe cache
+const SEASONAL_KEYWORDS: Record<number, string[]> = {
+  0:  ['soup', 'stew', 'roast', 'chili', 'bake', 'hearty', 'casserole', 'braise', 'hot'],
+  1:  ['soup', 'stew', 'roast', 'chili', 'bake', 'hearty', 'casserole', 'braise', 'hot'],
+  11: ['soup', 'stew', 'roast', 'chili', 'bake', 'hearty', 'casserole', 'braise', 'hot'],
+  2:  ['salad', 'fresh', 'spring', 'asparagus', 'pea', 'lemon', 'light', 'green'],
+  3:  ['salad', 'fresh', 'spring', 'asparagus', 'pea', 'lemon', 'light', 'green'],
+  4:  ['salad', 'fresh', 'spring', 'asparagus', 'pea', 'lemon', 'light', 'green'],
+  5:  ['grill', 'bbq', 'cold', 'salad', 'pasta', 'summer', 'smoothie', 'ice', 'fresh'],
+  6:  ['grill', 'bbq', 'cold', 'salad', 'pasta', 'summer', 'smoothie', 'ice', 'fresh'],
+  7:  ['grill', 'bbq', 'cold', 'salad', 'pasta', 'summer', 'smoothie', 'ice', 'fresh'],
+  8:  ['pumpkin', 'apple', 'squash', 'harvest', 'soup', 'stew', 'chili', 'cider'],
+  9:  ['pumpkin', 'apple', 'squash', 'harvest', 'soup', 'stew', 'chili', 'cider'],
+  10: ['pumpkin', 'apple', 'squash', 'harvest', 'soup', 'stew', 'chili', 'cider'],
+};
+
 export class RecipeRecommendationService {
-  private static readonly RATINGS_COLLECTION = 'recipeRatings';
-  private static readonly RECIPES_COLLECTION = 'recipes';
 
   /**
-   * Get personalized recipe recommendations
+   * Get personalized recipe recommendations.
+   * All matching is done against the pre-built recipe cache (recipe_caches/recipes_cache_1)
+   * so no per-call Firestore reads are needed after the first load.
    */
   static async getPersonalizedRecommendations(
     userId: string,
@@ -25,348 +56,164 @@ export class RecipeRecommendationService {
     limitCount: number = 5
   ): Promise<RecipeRecommendation[]> {
     try {
+      const allRecipes = await loadRecipeCache();
+      if (allRecipes.length === 0) return [];
+
       const recommendations: RecipeRecommendation[] = [];
 
-      // Get user's rating history
-      const userRatings = await this.getUserRatings(userId, 20);
-
-      // Get household preferences
-      const householdRatings = householdId ? await this.getHouseholdRatings(householdId, 50) : [];
-
-      // 1. Household-loved recipes that user hasn't rated
-      const householdLoved = await this.getHouseholdLovedRecipes(userRatings, householdRatings);
-      recommendations.push(...householdLoved);
-
-      // 2. Recipes with similar ingredients to pantry
-      const pantryBased = await this.getPantryBasedRecommendations(pantryItems, userRatings, dietaryRestrictions);
+      // 1. Pantry-based: recipes whose ingredients overlap with what the user has
+      const pantryBased = this.getPantryBasedFromCache(allRecipes, pantryItems, dietaryRestrictions);
       recommendations.push(...pantryBased);
 
-      // 3. Trending recipes in community
-      const trending = await this.getTrendingRecommendations(userRatings);
-      recommendations.push(...trending);
-
-      // 4. Seasonal recommendations (simplified)
-      const seasonal = await this.getSeasonalRecommendations();
+      // 2. Seasonal: pick real recipes from the cache that match season keywords
+      const usedAfterPantry = new Set(recommendations.map(r => r.recipe.title));
+      const seasonal = this.getSeasonalFromCache(allRecipes, usedAfterPantry);
       recommendations.push(...seasonal);
 
-      // Sort by confidence and limit results
+      // 3. Fill remaining slots with a diverse selection from the cache
+      const usedAfterSeasonal = new Set(recommendations.map(r => r.recipe.title));
+      const filler = this.getTrendingFromCache(allRecipes, usedAfterSeasonal);
+      recommendations.push(...filler);
+
       return recommendations
         .sort((a, b) => b.confidence - a.confidence)
         .slice(0, limitCount);
 
-    } catch (err: any) {
+    } catch (err: unknown) {
       log.error('Failed to get personalized recommendations', { error: err, userId });
       return [];
     }
   }
 
   /**
-   * Get recipes loved by household but not rated by user
+   * Score recipes by how many pantry items appear in their ingredient list.
    */
-  private static async getHouseholdLovedRecipes(
-    userRatings: RecipeRating[],
-    householdRatings: RecipeRating[]
-  ): Promise<RecipeRecommendation[]> {
-    if (householdRatings.length === 0) return [];
-
-    const userRatedTitles = new Set(userRatings.map(r => r.recipeTitle));
-
-    // Find recipes loved by household
-    const householdLoved = householdRatings
-      .filter(r => r.wouldMakeAgain && !userRatedTitles.has(r.recipeTitle))
-      .reduce((acc, rating) => {
-        acc[rating.recipeTitle] = (acc[rating.recipeTitle] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>);
-
-    const recommendations: RecipeRecommendation[] = [];
-
-    for (const [recipeTitle, count] of Object.entries(householdLoved)) {
-      if (count >= 2) { // At least 2 household members loved it
-        // TODO: Get actual recipe data from recipes collection
-        const mockRecipe: StructuredRecipe = {
-          title: recipeTitle,
-          description: recipeTitle,
-          ingredients: [],
-          instructions: [],
-          cookTime: '0 mins'
-        };
-
-        recommendations.push({
-          recipe: mockRecipe,
-          reason: `${count} household members loved this recipe`,
-          confidence: Math.min(0.9, count / 5),
-          type: 'household-loved',
-          basedOn: ['household-preferences']
-        });
-      }
-    }
-
-    return recommendations;
-  }
-
-  /**
-   * Get recommendations based on pantry ingredients
-   */
-  private static async getPantryBasedRecommendations(
+  private static getPantryBasedFromCache(
+    allRecipes: SavedRecipe[],
     pantryItems: string[],
-    userRatings: RecipeRating[],
     dietaryRestrictions: string[]
-  ): Promise<RecipeRecommendation[]> {
+  ): RecipeRecommendation[] {
     if (pantryItems.length === 0) return [];
 
-    const recommendations: RecipeRecommendation[] = [];
+    const pantryTokens = pantryItems.map(item => item.toLowerCase().trim());
+    const restrictionTokens = dietaryRestrictions.map(r => r.toLowerCase().trim());
 
-    // Get recipes that use pantry ingredients
-    // TODO: Implement actual recipe search based on ingredients
-    // For now, return mock recommendations
+    const scored = allRecipes
+      .filter(recipe => {
+        if (restrictionTokens.length === 0) return true;
+        const searchText = `${recipe.title} ${recipe.ingredients.join(' ')}`.toLowerCase();
+        return !restrictionTokens.some(r => searchText.includes(r));
+      })
+      .map(recipe => {
+        const ingText = recipe.ingredients.join(' ').toLowerCase();
+        const matchCount = pantryTokens.filter(token => ingText.includes(token)).length;
+        return { recipe, matchCount };
+      })
+      .filter(({ matchCount }) => matchCount > 0)
+      .sort((a, b) => b.matchCount - a.matchCount)
+      .slice(0, 5);
 
-    const pantryKeywords = pantryItems.map(item => item.toLowerCase());
-
-    // Mock logic: recommend recipes that might use common pantry items
-    const mockRecommendations = [
-      {
-        title: 'Quick Pasta with Pantry Staples',
-        ingredients: ['pasta', 'tomato sauce', 'olive oil'],
-        reason: 'Uses your pasta and tomato sauce',
-        confidence: 0.8
-      },
-      {
-        title: 'Simple Stir Fry',
-        ingredients: ['rice', 'vegetables', 'soy sauce'],
-        reason: 'Perfect for your vegetables and rice',
-        confidence: 0.7
-      }
-    ];
-
-    for (const rec of mockRecommendations) {
-      const hasIngredients = rec.ingredients.some(ing =>
-        pantryKeywords.some(keyword => ing.includes(keyword))
-      );
-
-      if (hasIngredients) {
-        const mockRecipe: StructuredRecipe = {
-          title: rec.title,
-          description: rec.title,
-          ingredients: rec.ingredients,
-          instructions: [],
-          cookTime: '20 mins'
-        };
-
-        recommendations.push({
-          recipe: mockRecipe,
-          reason: rec.reason,
-          confidence: rec.confidence,
-          type: 'similar-ingredients',
-          basedOn: ['pantry-items']
-        });
-      }
-    }
-
-    return recommendations;
-  }
-
-  /**
-   * Get trending recipes in the community
-   */
-  private static async getTrendingRecommendations(userRatings: RecipeRating[]): Promise<RecipeRecommendation[]> {
-    try {
-      // Get recent highly-rated recipes
-      const recentRatingsQuery = DatabaseMonitoringService.query(
-        DatabaseMonitoringService.collection(this.RATINGS_COLLECTION),
-        DatabaseMonitoringService.where('wouldMakeAgain', '==', true),
-        DatabaseMonitoringService.orderBy('date', 'desc'),
-        DatabaseMonitoringService.limit(50)
-      );
-
-      const recentRatings = await DatabaseMonitoringService.getDocs(recentRatingsQuery);
-        const ratingData = recentRatings.docs.map((doc: any) => {
-        const d = doc.data() as any;
-        // Normalize date to a JS Date for safe comparisons
-        let parsedDate: Date;
-        if (d && d.date) {
-          if (typeof d.date.toDate === 'function') parsedDate = d.date.toDate();
-          else if (typeof d.date === 'string') parsedDate = new Date(d.date);
-          else parsedDate = new Date(d.date);
-        } else {
-          parsedDate = new Date();
-        }
-        return { ...d, __parsedDate: parsedDate };
-      });
-
-      // Count ratings per recipe in the last 30 days
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-      const trendingRecipes = ratingData
-          .filter((r: any) => (r.__parsedDate as Date) > thirtyDaysAgo)
-            .reduce((acc: Record<string, number>, rating: any) => {
-              const title = rating.recipeTitle || 'unknown';
-              acc[title] = (acc[title] || 0) + 1;
-              return acc;
-            }, {} as Record<string, number>);
-
-      const userRatedTitles = new Set((userRatings as any[]).map((r: any) => r.recipeTitle));
-
-      const recommendations: RecipeRecommendation[] = [];
-
-      for (const [recipeTitle, count] of Object.entries(trendingRecipes) as [string, number][]) {
-        const cnt = Number(count || 0);
-        if (cnt >= 3 && !userRatedTitles.has(recipeTitle)) {
-          const mockRecipe: StructuredRecipe = {
-            title: recipeTitle,
-            description: recipeTitle,
-            ingredients: [],
-            instructions: [],
-            cookTime: '0 mins'
-          };
-
-          recommendations.push({
-            recipe: mockRecipe,
-            reason: `Trending in the community (${count} recent ratings)`,
-            confidence: Math.min(0.8, cnt / 10),
-            type: 'trending',
-            basedOn: ['community-trends']
-          });
-        }
-      }
-
-      return recommendations;
-    } catch (err: any) {
-      log.error('Failed to get trending recommendations', { error: err });
-      return [];
-    }
-  }
-
-  /**
-   * Get seasonal recommendations (simplified)
-   */
-  private static async getSeasonalRecommendations(): Promise<RecipeRecommendation[]> {
-    const month = new Date().getMonth();
-    const seasonalRecipes = {
-      // Winter (Dec-Feb)
-      [11]: ['Hearty Soup', 'Roast Chicken', 'Hot Chocolate'],
-      [0]: ['Hearty Soup', 'Roast Chicken', 'Hot Chocolate'],
-      [1]: ['Hearty Soup', 'Roast Chicken', 'Hot Chocolate'],
-      // Spring (Mar-May)
-      [2]: ['Fresh Salad', 'Grilled Fish', 'Berry Smoothie'],
-      [3]: ['Fresh Salad', 'Grilled Fish', 'Berry Smoothie'],
-      [4]: ['Fresh Salad', 'Grilled Fish', 'Berry Smoothie'],
-      // Summer (Jun-Aug)
-      [5]: ['Cold Pasta', 'BBQ', 'Ice Cream'],
-      [6]: ['Cold Pasta', 'BBQ', 'Ice Cream'],
-      [7]: ['Cold Pasta', 'BBQ', 'Ice Cream'],
-      // Fall (Sep-Nov)
-      [8]: ['Pumpkin Soup', 'Apple Pie', 'Chili'],
-      [9]: ['Pumpkin Soup', 'Apple Pie', 'Chili'],
-      [10]: ['Pumpkin Soup', 'Apple Pie', 'Chili']
-    };
-
-    const currentSeasonRecipes = seasonalRecipes[month as keyof typeof seasonalRecipes] || [];
-
-    return currentSeasonRecipes.slice(0, 2).map(recipeTitle => ({
-      recipe: {
-        title: recipeTitle,
-        description: recipeTitle,
-        ingredients: [],
-        instructions: [],
-        cookTime: '0 mins'
-      },
-      reason: 'Perfect for this season',
-      confidence: 0.6,
-      type: 'seasonal',
-      basedOn: ['seasonal-trends']
+    return scored.map(({ recipe, matchCount }) => ({
+      recipe,
+      reason: `Uses ${matchCount} item${matchCount === 1 ? '' : 's'} from your pantry`,
+      confidence: Math.min(0.95, 0.4 + matchCount / Math.max(pantryTokens.length, 1)),
+      type: 'similar-ingredients',
+      basedOn: ['pantry-items'],
     }));
   }
 
   /**
-   * Get user's rating history
+   * Pick recipes from the cache whose title/description/tags match current-season keywords.
    */
-  private static async getUserRatings(userId: string, limitCount: number): Promise<RecipeRating[]> {
-    try {
-      const ratingsQuery = DatabaseMonitoringService.query(
-          DatabaseMonitoringService.collection(this.RATINGS_COLLECTION),
-          DatabaseMonitoringService.where('userId', '==', userId),
-          DatabaseMonitoringService.orderBy('date', 'desc'),
-          DatabaseMonitoringService.limit(limitCount)
-        );
+  private static getSeasonalFromCache(
+    allRecipes: SavedRecipe[],
+    usedTitles: Set<string>
+  ): RecipeRecommendation[] {
+    const month = new Date().getMonth();
+    const keywords = SEASONAL_KEYWORDS[month as keyof typeof SEASONAL_KEYWORDS] ?? [];
+    if (keywords.length === 0) return [];
 
-        const ratingsSnapshot = await DatabaseMonitoringService.getDocs(ratingsQuery);
-      return ratingsSnapshot.docs.map((doc: any) => {
-        const data = (doc as any).data();
-        return {
-          ...data,
-          date: data?.date && typeof data.date.toDate === 'function' ? data.date.toDate().toISOString() : (data?.date || new Date()).toString()
-        } as RecipeRating;
-      });
-    } catch (err: any) {
-      log.error('Failed to get user ratings', { error: err, userId });
-      return [];
-    }
+    const seasonal = allRecipes
+      .filter(recipe => {
+        if (usedTitles.has(recipe.title)) return false;
+        const text = `${recipe.title} ${recipe.description} ${(recipe.tags ?? []).join(' ')}`.toLowerCase();
+        return keywords.some(kw => text.includes(kw));
+      })
+      .slice(0, 3);
+
+    return seasonal.map(recipe => ({
+      recipe,
+      reason: 'Perfect for this season',
+      confidence: 0.6,
+      type: 'seasonal',
+      basedOn: ['seasonal-trends'],
+    }));
   }
 
   /**
-   * Get household ratings
+   * Return a diverse selection from the cache as filler / "popular" picks.
+   * Uses a deterministic pseudo-shuffle (title char-code hash) so results are
+   * consistent per session without any extra reads.
    */
-  private static async getHouseholdRatings(householdId: string, limitCount: number): Promise<RecipeRating[]> {
-    try {
-      const ratingsQuery = DatabaseMonitoringService.query(
-          DatabaseMonitoringService.collection(this.RATINGS_COLLECTION),
-          DatabaseMonitoringService.where('householdId', '==', householdId),
-          DatabaseMonitoringService.orderBy('date', 'desc'),
-          DatabaseMonitoringService.limit(limitCount)
-        );
+  private static getTrendingFromCache(
+    allRecipes: SavedRecipe[],
+    usedTitles: Set<string>
+  ): RecipeRecommendation[] {
+    const unused = allRecipes
+      .filter(r => !usedTitles.has(r.title))
+      .sort((a, b) => {
+        const hashA = a.title.split('').reduce((n, c) => n + c.charCodeAt(0), 0);
+        const hashB = b.title.split('').reduce((n, c) => n + c.charCodeAt(0), 0);
+        return (hashA % 97) - (hashB % 97);
+      })
+      .slice(0, 3);
 
-        const ratingsSnapshot = await DatabaseMonitoringService.getDocs(ratingsQuery);
-      return ratingsSnapshot.docs.map((doc: any) => {
-        const data = (doc as any).data();
-        return {
-          ...data,
-          date: data?.date && typeof data.date.toDate === 'function' ? data.date.toDate().toISOString() : (data?.date || new Date()).toString()
-        } as RecipeRating;
-      });
-    } catch (err: any) {
-      log.error('Failed to get household ratings', { error: err, householdId });
-      return [];
-    }
+    return unused.map(recipe => ({
+      recipe,
+      reason: 'Popular in the community',
+      confidence: 0.55,
+      type: 'trending',
+      basedOn: ['community-trends'],
+    }));
   }
 
   /**
-   * Get recipes similar to user's preferences
+   * Find recipes from the cache similar to a given recipe by ingredient overlap.
    */
-  static async getSimilarRecipes(userId: string, baseRecipe: StructuredRecipe, limitCount: number = 3): Promise<RecipeRecommendation[]> {
+  static async getSimilarRecipes(
+    userId: string,
+    baseRecipe: StructuredRecipe,
+    limitCount: number = 3
+  ): Promise<RecipeRecommendation[]> {
     try {
-      // Get user's positive ratings
-      const positiveRatings = await this.getUserRatings(userId, 10);
-      const lovedRecipes = positiveRatings.filter(r => r.wouldMakeAgain);
+      const allRecipes = await loadRecipeCache();
+      if (allRecipes.length === 0) return [];
 
-      // Find recipes with similar ingredients or tags
-      // TODO: Implement actual similarity algorithm
-      // For now, return mock similar recipes
+      const baseIngredients = new Set(
+        (Array.isArray(baseRecipe.ingredients) ? baseRecipe.ingredients as string[] : [])
+          .map((i: string) => i.toLowerCase().trim())
+      );
 
-      const similarRecipe: StructuredRecipe = {
-        title: `Similar to ${baseRecipe.title}`,
-        description: baseRecipe.description || `Similar to ${baseRecipe.title}`,
-        ingredients: Array.isArray(baseRecipe.ingredients) ? (baseRecipe.ingredients as string[]) : [],
-        instructions: Array.isArray(baseRecipe.instructions) ? (baseRecipe.instructions as string[]) : [],
-        cookTime: typeof baseRecipe.cookTime === 'string' ? baseRecipe.cookTime : `${(baseRecipe as any).cookTime || 0} mins`,
-        type: (baseRecipe as any).type,
-        image: (baseRecipe as any).image
-      };
+      const scored = allRecipes
+        .filter(r => r.title !== baseRecipe.title)
+        .map(recipe => {
+          const ingText = recipe.ingredients.join(' ').toLowerCase();
+          const matchCount = [...baseIngredients].filter(ing => ingText.includes(ing)).length;
+          return { recipe, matchCount };
+        })
+        .filter(({ matchCount }) => matchCount > 0)
+        .sort((a, b) => b.matchCount - a.matchCount)
+        .slice(0, limitCount);
 
-      const similarRecipes: RecipeRecommendation[] = [
-        {
-          recipe: similarRecipe,
-          reason: 'Similar ingredients and cooking method',
-          confidence: 0.7,
-          type: 'personal-preference',
-          basedOn: ['ingredient-similarity']
-        }
-      ];
-
-      return similarRecipes.slice(0, limitCount);
-    } catch (err: any) {
-      const baseRecipeId = (baseRecipe as any)?.id || baseRecipe.title || 'unknown';
+      return scored.map(({ recipe, matchCount }) => ({
+        recipe,
+        reason: `Shares ${matchCount} ingredient${matchCount === 1 ? '' : 's'} with ${baseRecipe.title}`,
+        confidence: Math.min(0.9, 0.3 + matchCount / Math.max(baseIngredients.size, 1)),
+        type: 'similar-ingredients',
+        basedOn: ['ingredient-similarity'],
+      }));
+    } catch (err: unknown) {
+      const baseRecipeId = (baseRecipe as { id?: string }).id ?? baseRecipe.title ?? 'unknown';
       log.error('Failed to get similar recipes', { error: err, userId, baseRecipeId });
       return [];
     }

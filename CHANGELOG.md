@@ -5,6 +5,16 @@ All notable changes to Stock & Spoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.14] - 2026-04-10
+
+### Changed
+- **Recipe recommendations now use the app recipe cache** (audit D): `recipeRecommendationService` completely rewritten. All mock data and per-call Firestore rating queries removed. Recommendations are now generated entirely from `recipe_caches/recipes_cache_1` (400+ recipes) which is loaded once and cached in memory for 30 minutes.
+  - **Pantry-match** (`similar-ingredients`): scores every cached recipe by ingredient overlap with the user's current pantry items; returns top 5 by match count with dynamic confidence scoring.
+  - **Seasonal** (`seasonal`): keyword-matches recipe titles, descriptions, and tags against a season table (winter/spring/summer/fall keyword sets) to return contextually relevant picks.
+  - **Trending** (`trending`): deterministic pseudo-shuffle of remaining cache entries for diversity without repeating pantry or seasonal results.
+  - `getSimilarRecipes()` also uses the cache, scoring by shared ingredient count with the base recipe.
+  - Net Firestore reads per recommendation call: **1** (cache load, then 0 for 30 min). Previously fired 3 queries (up to 120 docs) on every render, returning mock results.
+
 ## [1.5.13] - 2026-04-10
 
 ### Added

@@ -177,8 +177,23 @@ V. inferStorageLocationFromItemName routes fresh meat to freezer ambiguously
 SECTION 6: STUBBED / INCOMPLETE FEATURES  (Added 2026-04-10)
 ==============================================================
 
-[D — STILL OPEN] recipeRecommendationService is entirely stubbed
-   (See Section 2 above. No changes made as of v1.5.11.)
+[D — RESOLVED] recipeRecommendationService is entirely stubbed
+   - Rewrote service to use recipe_caches/recipes_cache_1 (400+ recipes, 1 read
+     cached for 30 min at module level) instead of mock data + per-call Firestore
+     rating queries.
+   - Three recommendation types:
+     1. similar-ingredients: scores all cached recipes by pantry item overlap;
+        returns top 5 ordered by match count.
+     2. seasonal: keyword-matches title/description/tags against a season table
+        (winter/spring/summer/fall keywords).
+     3. trending: deterministic pseudo-shuffle of remaining cache for diversity.
+   - getSimilarRecipes() now performs real ingredient-overlap scoring against
+     the cache rather than returning a mock "Similar to X" stub.
+   - Removed all ratings Firestore queries (getUserRatings, getHouseholdRatings,
+     getTrendingRecommendations). Zero new reads per recommendation call after
+     the first 30-minute window.
+   - Fixed catch (err: any) → catch (err: unknown) throughout.
+   - Resolved v1.5.14.
 
 [X — RESOLVED] FreezeTransitionModal is unstyled (raw HTML + inline styles)
    - Fully rewritten using Tailwind classes and theme CSS vars matching
