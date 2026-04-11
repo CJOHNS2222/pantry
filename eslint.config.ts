@@ -21,6 +21,7 @@ export default defineConfig([
       "@typescript-eslint/no-unused-vars": "warn", // Reduce noise, warn instead of error
       "@typescript-eslint/no-explicit-any": "error",
       "react/no-unescaped-entities": "off", // Disable quote escaping warnings
+      "react/prop-types": "off", // TypeScript handles prop validation
       "@typescript-eslint/no-require-imports": "off", // Allow require in scripts
       "no-undef": "off", // Allow globals like process in scripts
       "no-useless-escape": "off", // Disable unnecessary escape warnings

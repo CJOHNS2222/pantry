@@ -90,8 +90,8 @@ export const useOfflineStatus = () => {
           pendingOperations: pendingCount,
           hasConflicts: conflicts.length > 0
         }));
-      } catch (err: any) {
-        log.error('Failed to initialize offline queue:', { error: err?.message }, 'useOfflineStatus');
+      } catch (err: unknown) {
+        log.error('Failed to initialize offline queue:', { error: err instanceof Error ? err.message : String(err) }, 'useOfflineStatus');
       }
     };
 
@@ -216,11 +216,10 @@ export const useOfflineStatus = () => {
       }));
 
       endSync(true);
-    } catch (err: any) {
+    } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Sync failed';
       endSync(false, errorMessage);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Auto-sync when coming back online

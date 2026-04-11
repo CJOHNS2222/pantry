@@ -4,7 +4,7 @@ import { searchRecipes } from '../services/geminiService';
 import { setUserGeminiOptIn } from '../services/featureFlags';
 import { getSavedRecipes, getCachedPopularRecipes, saveRecipeToFirestore, saveRecipeToUserCache, uploadRecipeImageFile, submitRecipeForReview } from '../services/recipeService';
 import DatabaseMonitoringService from '../services/databaseMonitoringService';
-import { RecipeSearchResult, LoadingState, RecipeRating, StructuredRecipe, PantryItem, SavedRecipe, User, Household } from '../types';
+import { RecipeSearchResult, LoadingState, RecipeRating, StructuredRecipe, PantryItem, SavedRecipe, User, Household, RecipeSearchParams } from '../types';
 import { Tab } from '../types/app';
 import { RecipeCardSkeleton } from './SkeletonLoader';
 import { GeminiLoadingOverlay, RECIPE_SEARCH_STAGES } from './GeminiLoadingOverlay';
@@ -27,6 +27,9 @@ import { useIntl } from 'react-intl';
 import { Capacitor } from '@capacitor/core';
 import { SpeechRecognition } from '@capacitor-community/speech-recognition';
 import { maybeRequestReviewAfterRecipeSave } from '../services/appReviewService';
+
+/** Internal search params — partial RecipeSearchParams plus component-local filter fields */
+type RecipeFinderSearchParams = Partial<RecipeSearchParams> & { type?: string };
 
 interface RecipeFinderProps {
     onAddToPlan: (recipe: StructuredRecipe) => void;
@@ -208,11 +211,11 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
     const [estimatedTokens, setEstimatedTokens] = useState<number>(0);
     const [estimatedCost, setEstimatedCost] = useState<number>(0);
     const [freeTierNote, setFreeTierNote] = useState<string>('');
-    const [pendingSearchParams, setPendingSearchParams] = useState<any>(null);
+    const [pendingSearchParams, setPendingSearchParams] = useState<RecipeFinderSearchParams | null>(null);
     const [showTokenConfirmation, setShowTokenConfirmation] = useState<boolean>(false);
 
     // Token estimation function
-    const estimateTokens = (params: any) => {
+    const estimateTokens = (params: RecipeFinderSearchParams) => {
         // Simple estimation based on ingredients count
         const ingredients = params.ingredients || '';
         const ingredientCount = ingredients.split(',').length;
@@ -316,7 +319,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
     };
 
     // Generate cache key for search parameters
-    const getCacheKey = (params: any): string => {
+    const getCacheKey = (params: RecipeFinderSearchParams): string => {
         return JSON.stringify({
             query: params.query || '',
             ingredients: params.ingredients || '',
@@ -982,7 +985,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
   // (the old useMemo([specificQuery]) pattern fired one Gemini call per character typed)
   const specificQueryRef = useRef(specificQuery);
   specificQueryRef.current = specificQuery;
-  const performSearchRef = useRef<(params: any) => Promise<void>>(async () => {});
+  const performSearchRef = useRef<(params: RecipeFinderSearchParams) => Promise<void>>(async () => {});
   // performSearchRef.current is set after performSearch is defined below
 
   // Debounced search - created once, never recreated
@@ -1037,7 +1040,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
 
 
 
-    const performSearch = async (params: any) => {
+    const performSearch = async (params: RecipeFinderSearchParams) => {
         // Debounce: prevent searches within 2 seconds of each other
         const now = Date.now();
         if (now - lastSearchTime < 2000) {
@@ -1106,7 +1109,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
         try {
             log.debug('Recipe search params:', params);
             // First, if there's a text query, try the cached popular recipes document
-            let data: any = null;
+            let data: RecipeSearchResult | null = null;
             if (params.query && String(params.query).trim()) {
                 try {
                     const cachedList = await getCachedPopularRecipes();
@@ -1115,7 +1118,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                         const title = (r.title || '').toLowerCase();
                         const desc = (r.description || '')?.toLowerCase() || '';
                         const ingredients = (Array.isArray(r.ingredients) ? r.ingredients.join(' ') : (r.ingredients || '')).toLowerCase();
-                        const keywords = (Array.isArray((r as any).keywords) ? (r as any).keywords.join(' ') : '').toLowerCase();
+                        const keywords = (Array.isArray((r as SavedRecipe & { keywords?: string[] }).keywords) ? (r as SavedRecipe & { keywords?: string[] }).keywords!.join(' ') : '').toLowerCase();
                         return title.includes(q) || desc.includes(q) || ingredients.includes(q) || keywords.includes(q);
                     });
 
@@ -1142,7 +1145,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                     servings: parseInt(servings),
                     userId: user?.id,
                     userProfile: user?.profile
-                }, user);
+                } as RecipeSearchParams, user);
                 setIsResultFromCache(false);
             }
             // Filter results by type (quick meal, dinner, dessert)
@@ -1233,9 +1236,9 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                     // Don't fail the search if recording fails
                 }
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
             log.error('performSearch error', { error }, 'RecipeFinder');
-            let errorMessage = error?.message ? String(error.message) : JSON.stringify(error);
+            let errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
             
             // Provide user-friendly error messages
             if (errorMessage.includes('API key not configured')) {
@@ -1270,7 +1273,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
       };
   };
 
-        const openRecipeModal = (recipe: any, isSavedView = false) => {
+        const openRecipeModal = (recipe: StructuredRecipe | SavedRecipe, isSavedView = false) => {
             // Track recipe view
             AnalyticsService.trackRecipeView(
                 recipe.title || 'Untitled Recipe',
@@ -1279,7 +1282,11 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
             );
 
             // Normalize recipe shape so modal can safely render instructions/ingredients
-            const normalized: any = { ...recipe };
+            type NormalizedRecipe = Omit<StructuredRecipe, 'instructions' | 'ingredients'> & {
+              instructions: string | string[];
+              ingredients: string | string[];
+            };
+            const normalized = { ...(recipe as StructuredRecipe) } as NormalizedRecipe;
             normalized.title = normalized.title || 'Untitled Recipe';
             if (!Array.isArray(normalized.instructions)) {
                 if (typeof normalized.instructions === 'string') {
@@ -1306,17 +1313,19 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
             setShowRecipeModal(true);
         };
 
-        const handleModalSaveRecipe = async (r: any) => {
+        const handleModalSaveRecipe = async (r: StructuredRecipe & { __imageFile?: File; __submitForInclusion?: boolean }) => {
             try {
                 // Track save event
                 AnalyticsService.trackRecipeSave(r.title || 'Untitled Recipe', r.title || 'Untitled Recipe');
 
                 // Build minimal recipe object for saving
+                const rIngredients = r.ingredients as string | string[];
+                const rInstructions = r.instructions as string | string[];
                 const recipeToSave: StructuredRecipe = {
                     title: r.title || '',
                     description: r.description || '',
-                    ingredients: Array.isArray(r.ingredients) ? r.ingredients : (typeof r.ingredients === 'string' ? r.ingredients.split('\n').map((s:string)=>s.trim()).filter(Boolean) : []),
-                    instructions: Array.isArray(r.instructions) ? r.instructions : (typeof r.instructions === 'string' ? r.instructions.split('\n').map((s:string)=>s.trim()).filter(Boolean) : []),
+                    ingredients: Array.isArray(rIngredients) ? rIngredients : (typeof rIngredients === 'string' ? rIngredients.split('\n').map((s:string)=>s.trim()).filter(Boolean) : []),
+                    instructions: Array.isArray(rInstructions) ? rInstructions : (typeof rInstructions === 'string' ? rInstructions.split('\n').map((s:string)=>s.trim()).filter(Boolean) : []),
                     cookTime: r.cookTime || '',
                     type: r.type || 'Dinner',
                     image: r.image || ''
@@ -1340,8 +1349,8 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                     try {
                         // Generate a temporary ID for submission
                         const tempId = `temp_${Date.now()}`;
-                        await submitRecipeForReview({ ...(recipeToSave as any), id: tempId } as any, user?.id);
-                    } catch (subErr: any) {
+                        await submitRecipeForReview({ ...recipeToSave, id: tempId }, user?.id);
+                    } catch (subErr: unknown) {
                         console.error('Failed to submit recipe for review', subErr);
                     }
                 }
@@ -1624,9 +1633,10 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                                             URL.revokeObjectURL(url);
                                         }, 100);
                                         AnalyticsService.trackFeatureUsage('recipe_export', { success: true, count: savedRecipes.length });
-                                    } catch (error: any) {
-                                        AnalyticsService.trackFeatureUsage('recipe_export', { success: false, error: error?.message || error });
-                                        AnalyticsService.trackError('recipe_export_error', error?.message || error, 'RecipeFinder');
+                                    } catch (error: unknown) {
+                                        const errMsg = error instanceof Error ? error.message : String(error);
+                                        AnalyticsService.trackFeatureUsage('recipe_export', { success: false, error: errMsg });
+                                        AnalyticsService.trackError('recipe_export_error', errMsg, 'RecipeFinder');
                                         if (addToast) addToast('Failed to export recipes', 'error');
                                     }
                                 }}
@@ -1639,7 +1649,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                                     className="px-4 py-2 bg-theme-secondary text-theme-primary rounded-lg font-bold shadow hover:bg-theme-secondary/80 transition-colors"
                                     onClick={() => {
                                         // Open editor modal for new recipe
-                                        const empty: any = {
+                                        const empty: StructuredRecipe & { __editing: boolean } = {
                                             title: '',
                                             description: '',
                                             ingredients: [],
@@ -2027,7 +2037,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
             onAddToPlan(r); 
           }}
                     onSaveRecipe={handleModalSaveRecipe}
-                    editable={Boolean((modalRecipe as any).__editing)}
+                    editable={Boolean((modalRecipe as (StructuredRecipe & { __editing?: boolean }) | null)?.__editing)}
           onDeleteRecipe={(r) => { onDeleteRecipe(r); }}
           onRate={onRate}
           onMarkAsMade={(r) => { 

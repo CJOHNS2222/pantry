@@ -3,7 +3,7 @@ import { useIntl } from 'react-intl';
 import { ShoppingBasket, Check, Trash2, Archive, Plus, X, Share2, Copy, Download, MessageSquare, Calendar, Undo2 } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { Share } from '@capacitor/share';
-import { ShoppingItem, User, Household } from '../types';
+import { ShoppingItem, User, Household, Settings } from '../types';
 import { inferCategoryFromItemName, getItemImage, isHouseholdMember } from '../utils/appUtils';
 import { log } from '../services/logService';
 import { validateItemName, validateQuantity } from '@/src/utils/validation';
@@ -68,7 +68,7 @@ interface ShoppingListProps {
     currentActivity?: string;
   }>;
   onHouseholdMessage?: (message: string) => void;
-  settings?: any; // Settings object
+  settings?: Settings; // Settings object
 }
 
 export const ShoppingList: React.FC<ShoppingListProps> = ({
@@ -147,11 +147,11 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     if (savedSessions) {
       try {
         const parsed = JSON.parse(savedSessions);
-        setPreviousSessions(parsed.map((session: any) => ({
+        setPreviousSessions(parsed.map((session: { startTime: string; endTime?: string; totalSpent: number; items: Array<{ addedAt?: string; completedAt?: string; [key: string]: unknown }> }) => ({
           ...session,
           startTime: new Date(session.startTime),
           endTime: session.endTime ? new Date(session.endTime) : undefined,
-          items: session.items.map((item: any) => ({
+          items: session.items.map((item: { addedAt?: string; completedAt?: string; [key: string]: unknown }) => ({
             ...item,
             addedAt: item.addedAt ? new Date(item.addedAt) : undefined,
             completedAt: item.completedAt ? new Date(item.completedAt) : undefined,
@@ -243,7 +243,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   // Hooks for offline functionality
   const { isOnline } = useOfflineStatus();
   const { user: authUser } = useAuth();
-  const addToQueue = (op: any) => offlineQueue.enqueue(op);
+  const addToQueue = (op: { type: 'add' | 'update' | 'delete' | 'batch'; collection: string; docId?: string; data: unknown }) => offlineQueue.enqueue(op as Parameters<typeof offlineQueue.enqueue>[0]);
   const processQueue = () => offlineQueue.processQueue();
 
   // Suggested items for quick adding
@@ -541,7 +541,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   };
 
   // Handle smart suggestions
-  const handleAddSuggestion = (suggestion: any) => {
+  const handleAddSuggestion = (suggestion: { itemName: string; estimatedQuantity?: string; category?: string }) => {
     handleQuickAdd({
       name: suggestion.itemName,
       quantity: suggestion.estimatedQuantity,

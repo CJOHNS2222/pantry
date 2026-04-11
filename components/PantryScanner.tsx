@@ -8,7 +8,15 @@ import { analyzePantryImage, analyzeReceiptImage } from '../services/geminiServi
 import { extractReceiptItems } from '../services/receiptOcrService';
 import { setUserGeminiOptIn } from '../services/featureFlags';
 import StorageLocationIndicator from './StorageLocationIndicator';
-import { PantryItem, LoadingState, ConsumptionSuggestion, ExpirationAlert, CustomCategory, RecipeSuggestion, PantryFilter, User, ShoppingItem } from '../types';
+import { PantryItem, LoadingState, ConsumptionSuggestion, ExpirationAlert, CustomCategory, RecipeSuggestion, PantryFilter, User, ShoppingItem, StructuredRecipe, SavedRecipe } from '../types';
+
+/** Processed list item — PantryItem enriched with display-time index info */
+type DisplayedPantryItem = PantryItem & {
+  originalIndex: number;
+  originalIndices?: number[];
+  combinedItems?: PantryItem[];
+  totalQuantity?: number;
+};
 import { Tab } from '../types/app';
 import AnalyticsService from '../services/analyticsService';
 import { GeminiLoadingOverlay, IMAGE_ANALYSIS_STAGES } from './GeminiLoadingOverlay';
@@ -211,7 +219,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
 
   // Recipe modal state
   const [showRecipeModal, setShowRecipeModal] = useState(false);
-  const [modalRecipe, setModalRecipe] = useState<any>(null);
+  const [modalRecipe, setModalRecipe] = useState<StructuredRecipe | SavedRecipe | null>(null);
   const [modalContext, setModalContext] = useState<'search' | 'scheduled'>('search');
   const [freezeTargetIndex, setFreezeTargetIndex] = useState<number | null>(null);
 
@@ -253,7 +261,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
     }
   };
 
-  const applyQuickConsume = useCallback(async (item: any) => {
+  const applyQuickConsume = useCallback(async (item: DisplayedPantryItem) => {
     const original = inventory[item.originalIndex];
     if (!original) return;
 
@@ -290,12 +298,12 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
     }
   }, [inventory, onUpdateItem, appActions, addToShoppingList]);
 
-  const applyQuickAddToShopping = useCallback((item: any) => {
+  const applyQuickAddToShopping = useCallback((item: DisplayedPantryItem) => {
     addToShoppingList([item.item]);
     appActions.addToast(`Added ${item.item} to shopping list`, 'info');
   }, [addToShoppingList, appActions]);
 
-  const getRowActionHandlers = useCallback((item: any) => {
+  const getRowActionHandlers = useCallback((item: DisplayedPantryItem) => {
     return {
       tabIndex: 0,
       onContextMenu: (e: React.MouseEvent) => {
@@ -485,16 +493,17 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
         setRawBase64(base64Data);
         setMimeType(photo.format ? `image/${photo.format}` : 'image/jpeg');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       setLoadingState(LoadingState.IDLE);
+      const errMsg = err instanceof Error ? err.message : '';
       // Handle camera permission errors
-      if (err?.message?.includes('permission') || err?.message?.includes('denied') || err?.message?.includes('Permission')) {
+      if (errMsg.includes('permission') || errMsg.includes('denied') || errMsg.includes('Permission')) {
         appActions.addToast(
           'Camera permission is required. Please enable camera access in your device settings and try again.',
           'error',
           8000
         );
-      } else if (!err?.message?.includes('cancelled') && !err?.message?.includes('dismissed')) {
+      } else if (!errMsg.includes('cancelled') && !errMsg.includes('dismissed')) {
         // Only show error for non-user-cancellation errors
         appActions.addToast('Failed to access camera. Please try again.', 'error');
       }
@@ -516,15 +525,16 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
         setRawBase64(base64Data);
         setMimeType(photo.format ? `image/${photo.format}` : 'image/jpeg');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : '';
       // Handle photo library permission errors
-      if (err?.message?.includes('permission') || err?.message?.includes('denied') || err?.message?.includes('Permission')) {
+      if (errMsg.includes('permission') || errMsg.includes('denied') || errMsg.includes('Permission')) {
         appActions.addToast(
           'Photo library permission is required. Please enable photo access in your device settings and try again.',
           'error',
           8000
         );
-      } else if (!err?.message?.includes('cancelled') && !err?.message?.includes('dismissed')) {
+      } else if (!errMsg.includes('cancelled') && !errMsg.includes('dismissed')) {
         // Only show error for non-user-cancellation errors
         appActions.addToast('Failed to access photo library. Please try again.', 'error');
       }
@@ -534,7 +544,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
 
   // Barcode scanning with camera
   const handleScanBarcode = useCallback(async () => {
-    if (!(window as any).Capacitor) {
+    if (!Capacitor.isNativePlatform()) {
       appActions.addToast('Barcode scanning requires the mobile app. Please use the camera or upload an image instead.', 'info', 6000);
       return;
     }
@@ -566,12 +576,12 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
               // Look up the product name via Spoonacular UPC search
               try {
                 const product = await SpoonacularFoodClient.searchGroceryProductByUPC(barcode);
-                if (product && (product as any).title) {
-                  const p = product as any;
+                const p = product as { title?: string; breadcrumbs?: string[] };
+                if (product && p.title) {
                   setNewItemText(p.title);
                   // Use the first breadcrumb as a category hint if available
                   if (p.breadcrumbs?.length) {
-                    const hint = (p.breadcrumbs[p.breadcrumbs.length - 1] as string);
+                    const hint = p.breadcrumbs[p.breadcrumbs.length - 1];
                     // capitalise first letter
                     setNewItemText(p.title);
                     // store breadcrumb in unit field temporarily isn't clean — just pre-fill name
@@ -601,16 +611,17 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
         };
         img.src = photo.dataUrl;
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       setLoadingState(LoadingState.IDLE);
+      const errMsg = err instanceof Error ? err.message : '';
       // Handle camera permission errors for barcode scanning
-      if (err?.message?.includes('permission') || err?.message?.includes('denied') || err?.message?.includes('Permission')) {
+      if (errMsg.includes('permission') || errMsg.includes('denied') || errMsg.includes('Permission')) {
         appActions.addToast(
           'Camera permission is required for barcode scanning. Please enable camera access in your device settings and try again.',
           'error',
           8000
         );
-      } else if (!err?.message?.includes('cancelled') && !err?.message?.includes('dismissed')) {
+      } else if (!errMsg.includes('cancelled') && !errMsg.includes('dismissed')) {
         // Only show error for non-user-cancellation errors
         appActions.addToast('Failed to access camera for barcode scanning. Please try again.', 'error');
       }
@@ -640,16 +651,17 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
         // Process receipt
         await processReceiptImage(base64Data, photo.format ? `image/${photo.format}` : 'image/jpeg');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       setLoadingState(LoadingState.IDLE);
+      const errMsg = err instanceof Error ? err.message : '';
       // Handle camera permission errors for receipt scanning
-      if (err?.message?.includes('permission') || err?.message?.includes('denied') || err?.message?.includes('Permission')) {
+      if (errMsg.includes('permission') || errMsg.includes('denied') || errMsg.includes('Permission')) {
         appActions.addToast(
           'Camera permission is required for receipt scanning. Please enable camera access in your device settings and try again.',
           'error',
           8000
         );
-      } else if (!err?.message?.includes('cancelled') && !err?.message?.includes('dismissed')) {
+      } else if (!errMsg.includes('cancelled') && !errMsg.includes('dismissed')) {
         // Only show error for non-user-cancellation errors
         appActions.addToast('Failed to access camera for receipt scanning. Please try again.', 'error');
       }
@@ -1115,7 +1127,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
 
   const storageViewContent = storageSectionOrder.map(location => {
     const items = storageItemsArrays[location] || [];
-    const locationLabel = (storageLabels as any)[location] || location;
+    const locationLabel = (storageLabels as Record<string, string>)[location] || location;
 
     return (
       <div key={location} className="bg-theme-secondary rounded-lg border border-theme overflow-hidden">
@@ -1266,7 +1278,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                   }
                   try {
                     const cookingToday = false; // default defrost window; user can adjust expiry after
-                    const prev = { storageLocation: item.storageLocation, is_frozen: item.is_frozen, expirationDate: item.expirationDate } as any;
+                    const prev = { storageLocation: item.storageLocation, is_frozen: item.is_frozen, expirationDate: item.expirationDate };
                     const result = await FreezerService.moveToFridgeFromFreezer(household.id, item.id, { cookingToday });
                     await onUpdateItem(primaryIndex, { storageLocation: 'fridge', is_frozen: false, expirationDate: result.newExpiry });
                     appActions.addToast(
@@ -1397,7 +1409,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   };
 
   // Simple list item renderer used for non-virtualized lists
-  function renderListItem(item: any) {
+  function renderListItem(item: DisplayedPantryItem) {
     const daysRemaining = item.expirationDate ? Math.ceil((new Date(item.expirationDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : undefined;
     const expirationBorderClass = (d?: number) => {
       if (d == null) return ''
@@ -2046,7 +2058,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                   className="relative group cursor-pointer transition-all duration-300"
                   onClick={async () => {
                     // Use Capacitor Camera if available, else fallback to file input
-                    if ((window as any).Capacitor) {
+                    if (Capacitor.isNativePlatform()) {
                       await handleTakePhoto();
                     } else {
                       fileInputRef.current?.click();
@@ -2089,7 +2101,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                 <div className="flex gap-2 mt-4">
                   <button
                     onClick={async () => {
-                      if ((window as any).Capacitor) {
+                      if (Capacitor.isNativePlatform()) {
                         await handleTakePhoto();
                       } else {
                         fileInputRef.current?.click();
@@ -2105,7 +2117,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                   
                   <button
                     onClick={async () => {
-                      if ((window as any).Capacitor) {
+                      if (Capacitor.isNativePlatform()) {
                         await handleSelectFromGallery();
                       } else {
                         fileInputRef.current?.click();
@@ -2347,7 +2359,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                                 {getAllCategories(customCategories).map(cat => <option key={cat} value={cat}>{cat}</option>)}
                               </select>
                               {('confidence' in sItem) && (
-                                <div className="text-sm text-theme-secondary opacity-80">Conf: {(sItem as any).confidence}</div>
+                                <div className="text-sm text-theme-secondary opacity-80">Conf: {(sItem as ReceiptScanResult & { confidence?: string | number }).confidence}</div>
                               )}
                             </div>
                           </div>
@@ -2648,7 +2660,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                     onChange={(e) => {
                       const value = e.target.value;
                       if (value) {
-                        bulkChangeLocation(value as any);
+                        bulkChangeLocation(value as 'pantry' | 'fridge' | 'freezer' | 'spices' | 'other');
                         setBulkLocationValue('');
                       }
                     }}
@@ -2868,7 +2880,9 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
               inventoryId={inventory[freezeTargetIndex].id}
               itemName={inventory[freezeTargetIndex].item}
               onClose={() => setFreezeTargetIndex(null)}
-              onDone={async (res?: any) => {
+              onDone={async (res?: unknown) => {
+                type FreezeResult = { newExpiry?: string; updates?: { freezerZone?: string; freezerLabelPhotoUrl?: string; freezerPortionCount?: number } };
+                const freezeResult = res as FreezeResult | undefined;
                 const current = inventory[freezeTargetIndex];
                 if (!current) {
                   setFreezeTargetIndex(null);
@@ -2886,10 +2900,10 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                 const updates: Partial<PantryItem> = {
                   storageLocation: 'freezer',
                   is_frozen: true,
-                  expirationDate: res?.newExpiry,
-                  freezerZone: res?.updates?.freezerZone,
-                  freezerLabelPhotoUrl: res?.updates?.freezerLabelPhotoUrl,
-                  freezerPortionCount: res?.updates?.freezerPortionCount,
+                  expirationDate: freezeResult?.newExpiry,
+                  freezerZone: freezeResult?.updates?.freezerZone,
+                  freezerLabelPhotoUrl: freezeResult?.updates?.freezerLabelPhotoUrl,
+                  freezerPortionCount: freezeResult?.updates?.freezerPortionCount,
                 };
 
                 await onUpdateItem(freezeTargetIndex, updates);

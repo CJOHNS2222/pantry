@@ -2,9 +2,11 @@ import { initializeApp } from "firebase/app";
 import { getAuth, setPersistence, browserLocalPersistence, indexedDBLocalPersistence } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
+import type { Analytics } from "firebase/analytics";
 import { getAnalytics } from "firebase/analytics";
 import { getFunctions } from "firebase/functions";
-import { getMessaging, onMessage, isSupported } from "firebase/messaging";
+import type { Messaging } from "firebase/messaging";
+import { getMessaging, isSupported } from "firebase/messaging";
 import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
 import { Capacitor } from '@capacitor/core';
 import webFirebaseConfig from './VITE_firebaseConfig';
@@ -15,9 +17,8 @@ import { log } from './services/logService';
 // this module). We'll dynamically import and initialize it after `db`
 // is created.
 
-let config;
 // Use the web config for all platforms (including Capacitor)
-config = webFirebaseConfig;
+const config = webFirebaseConfig;
 
 const app = initializeApp(config);
 export const auth = getAuth(app);
@@ -54,16 +55,16 @@ if (appCheckSiteKey && !import.meta.env.DEV) {
     if (mod && typeof mod.default?.initializeMonitoring === 'function') {
       mod.default.initializeMonitoring();
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     // Soft failure: warn in development only — monitoring services are non-critical on init
     if (import.meta.env.DEV) {
-      log.warn('DatabaseMonitoringService failed to initialize (deferred)', { message: err?.message || err });
+      log.warn('DatabaseMonitoringService failed to initialize (deferred)', { message: err instanceof Error ? err.message : String(err) });
     }
   }
 })();
 
 // Initialize messaging (FCM) - only on supported platforms
-let messaging: any = null;
+let messaging: Messaging | null = null;
 if (typeof window !== 'undefined') {
   isSupported().then(supported => {
     if (supported) {
@@ -85,8 +86,8 @@ if (Capacitor.getPlatform() === 'web') {
 }
 
 // Initialize analytics only if measurementId is configured
-let analytics: any;
-if ((config as any)?.measurementId) {
+let analytics: Analytics | undefined;
+if ((config as { measurementId?: string }).measurementId) {
   analytics = getAnalytics(app);
 }
 export { analytics };
