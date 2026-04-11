@@ -223,6 +223,23 @@ class RemoteConfigService {
       type: this.getString('announcement_type'),
     };
   }
+
+  /** Return all resolved Remote Config values for admin diagnostics. */
+  getDebugSnapshot(): Record<string, string | number | boolean> {
+    return Object.fromEntries(
+      Object.entries(IN_APP_DEFAULTS).map(([key, defaultValue]) => {
+        if (typeof defaultValue === 'boolean') {
+          return [key, this.getBoolean(key)];
+        }
+
+        if (typeof defaultValue === 'number') {
+          return [key, this.getNumber(key)];
+        }
+
+        return [key, this.getString(key)];
+      })
+    );
+  }
 }
 
 const remoteConfig = new RemoteConfigService();

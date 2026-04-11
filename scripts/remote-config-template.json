@@ -1,419 +1,379 @@
 {
-  "parameters": {
-    "flag_geminiIntegration_enabled": {
-      "defaultValue": { "value": "true" },
-      "description": "Enable/disable Gemini AI integration globally",
-      "valueType": "BOOLEAN"
-    },
-    "flag_smartRecommendations_enabled": {
-      "defaultValue": { "value": "true" },
-      "description": "Enable/disable smart recipe and shopping recommendations",
-      "valueType": "BOOLEAN"
-    },
-    "flag_offlineMode_enabled": {
-      "defaultValue": { "value": "false" },
-      "description": "Enable/disable offline pantry management capabilities",
-      "valueType": "BOOLEAN"
-    },
-    "flag_advancedAnalytics_enabled": {
-      "defaultValue": { "value": "true" },
-      "description": "Enable/disable detailed performance and usage analytics",
-      "valueType": "BOOLEAN"
-    },
-    "flag_mealPlanning_enabled": {
-      "defaultValue": { "value": "true" },
-      "description": "Enable/disable weekly meal planning and grocery generation",
-      "valueType": "BOOLEAN"
-    },
-    "flag_householdSharing_enabled": {
-      "defaultValue": { "value": "true" },
-      "description": "Enable/disable multi-user household pantry sharing",
-      "valueType": "BOOLEAN"
-    },
-    "flag_barcodeScanning_enabled": {
-      "defaultValue": { "value": "true" },
-      "description": "Enable/disable barcode scanning for quick item addition",
-      "valueType": "BOOLEAN"
-    },
-    "flag_priceTracking_enabled": {
-      "defaultValue": { "value": "true" },
-      "description": "Enable/disable grocery price tracking and trends",
-      "valueType": "BOOLEAN"
-    },
-    "flag_darkMode_enabled": {
-      "defaultValue": { "value": "true" },
-      "description": "Enable/disable dark theme support",
-      "valueType": "BOOLEAN"
-    },
-    "flag_notifications_enabled": {
-      "defaultValue": { "value": "true" },
-      "description": "Enable/disable push notifications and reminders",
-      "valueType": "BOOLEAN"
-    },
-    "flag_newTutorial_enabled": {
-      "defaultValue": { "value": "false" },
-      "description": "Enable/disable interactive first-time tutorial (staged rollout)",
-      "valueType": "BOOLEAN"
-    },
-
-    "flag_geminiIntegration_rollout": {
-      "defaultValue": { "value": "100" },
-      "description": "Rollout percentage for Gemini AI (0–100)",
-      "valueType": "NUMBER"
-    },
-    "flag_smartRecommendations_rollout": {
-      "defaultValue": { "value": "100" },
-      "description": "Rollout percentage for smart recommendations (0–100)",
-      "valueType": "NUMBER"
-    },
-    "flag_offlineMode_rollout": {
-      "defaultValue": { "value": "0" },
-      "description": "Rollout percentage for offline mode (0–100)",
-      "valueType": "NUMBER"
-    },
-    "flag_advancedAnalytics_rollout": {
-      "defaultValue": { "value": "50" },
-      "description": "Rollout percentage for advanced analytics (0–100)",
-      "valueType": "NUMBER"
-    },
-    "flag_mealPlanning_rollout": {
-      "defaultValue": { "value": "100" },
-      "description": "Rollout percentage for meal planning (0–100)",
-      "valueType": "NUMBER"
-    },
-    "flag_householdSharing_rollout": {
-      "defaultValue": { "value": "100" },
-      "description": "Rollout percentage for household sharing (0–100)",
-      "valueType": "NUMBER"
-    },
-    "flag_barcodeScanning_rollout": {
-      "defaultValue": { "value": "100" },
-      "description": "Rollout percentage for barcode scanning (0–100)",
-      "valueType": "NUMBER"
-    },
-    "flag_priceTracking_rollout": {
-      "defaultValue": { "value": "75" },
-      "description": "Rollout percentage for price tracking (0–100)",
-      "valueType": "NUMBER"
-    },
-    "flag_darkMode_rollout": {
-      "defaultValue": { "value": "100" },
-      "description": "Rollout percentage for dark mode (0–100)",
-      "valueType": "NUMBER"
-    },
-    "flag_notifications_rollout": {
-      "defaultValue": { "value": "100" },
-      "description": "Rollout percentage for notifications (0–100)",
-      "valueType": "NUMBER"
-    },
-    "flag_newTutorial_rollout": {
-      "defaultValue": { "value": "0" },
-      "description": "Rollout percentage for new tutorial (0–100)",
-      "valueType": "NUMBER"
-    },
-
-    "kill_geminiIntegration": {
-      "defaultValue": { "value": "false" },
-      "description": "Kill switch: set true to immediately disable Gemini AI for all users",
-      "valueType": "BOOLEAN"
-    },
-    "kill_smartRecommendations": {
-      "defaultValue": { "value": "false" },
-      "description": "Kill switch: set true to immediately disable smart recommendations",
-      "valueType": "BOOLEAN"
-    },
-    "kill_offlineMode": {
-      "defaultValue": { "value": "false" },
-      "description": "Kill switch: set true to immediately disable offline mode",
-      "valueType": "BOOLEAN"
-    },
-    "kill_advancedAnalytics": {
-      "defaultValue": { "value": "false" },
-      "description": "Kill switch: set true to immediately disable advanced analytics",
-      "valueType": "BOOLEAN"
-    },
-    "kill_mealPlanning": {
-      "defaultValue": { "value": "false" },
-      "description": "Kill switch: set true to immediately disable meal planning",
-      "valueType": "BOOLEAN"
-    },
-    "kill_householdSharing": {
-      "defaultValue": { "value": "false" },
-      "description": "Kill switch: set true to immediately disable household sharing",
-      "valueType": "BOOLEAN"
-    },
-    "kill_barcodeScanning": {
-      "defaultValue": { "value": "false" },
-      "description": "Kill switch: set true to immediately disable barcode scanning",
-      "valueType": "BOOLEAN"
-    },
-    "kill_priceTracking": {
-      "defaultValue": { "value": "false" },
-      "description": "Kill switch: set true to immediately disable price tracking",
-      "valueType": "BOOLEAN"
-    },
-    "kill_darkMode": {
-      "defaultValue": { "value": "false" },
-      "description": "Kill switch: set true to immediately disable dark mode",
-      "valueType": "BOOLEAN"
-    },
-    "kill_notifications": {
-      "defaultValue": { "value": "false" },
-      "description": "Kill switch: set true to immediately disable all notifications",
-      "valueType": "BOOLEAN"
-    },
-    "kill_newTutorial": {
-      "defaultValue": { "value": "false" },
-      "description": "Kill switch: set true to immediately disable the new tutorial",
-      "valueType": "BOOLEAN"
-    },
-    "kill_receiptScanning": {
-      "defaultValue": { "value": "false" },
-      "description": "Kill switch: set true to immediately disable receipt OCR scanning",
-      "valueType": "BOOLEAN"
-    },
-    "kill_ads": {
-      "defaultValue": { "value": "false" },
-      "description": "Kill switch: set true to suppress all AdMob banner ads",
-      "valueType": "BOOLEAN"
-    },
-
-    "limit_free_searches_weekly": {
-      "defaultValue": { "value": "5" },
-      "description": "Free tier: max Spoonacular recipe searches per week",
-      "valueType": "NUMBER"
-    },
-    "limit_free_recipes_max": {
-      "defaultValue": { "value": "2" },
-      "description": "Free tier: max saved recipes total",
-      "valueType": "NUMBER"
-    },
-    "limit_free_mealplanning_weekly": {
-      "defaultValue": { "value": "1" },
-      "description": "Free tier: max meal plan recipe additions per week",
-      "valueType": "NUMBER"
-    },
-    "limit_free_gemini_weekly": {
-      "defaultValue": { "value": "5" },
-      "description": "Free tier: max Gemini AI requests per week",
-      "valueType": "NUMBER"
-    },
-
-    "limit_premium_searches_weekly": {
-      "defaultValue": { "value": "15" },
-      "description": "Premium tier: max Spoonacular recipe searches per week",
-      "valueType": "NUMBER"
-    },
-    "limit_premium_recipes_max": {
-      "defaultValue": { "value": "20" },
-      "description": "Premium tier: max saved recipes total",
-      "valueType": "NUMBER"
-    },
-    "limit_premium_mealplanning_weekly": {
-      "defaultValue": { "value": "-1" },
-      "description": "Premium tier: max meal plan recipe additions per week (-1 = unlimited)",
-      "valueType": "NUMBER"
-    },
-    "limit_premium_gemini_weekly": {
-      "defaultValue": { "value": "15" },
-      "description": "Premium tier: max Gemini AI requests per week",
-      "valueType": "NUMBER"
-    },
-
-    "limit_family_searches_weekly": {
-      "defaultValue": { "value": "-1" },
-      "description": "Family tier: max Spoonacular recipe searches per week (-1 = unlimited)",
-      "valueType": "NUMBER"
-    },
-    "limit_family_recipes_max": {
-      "defaultValue": { "value": "-1" },
-      "description": "Family tier: max saved recipes total (-1 = unlimited)",
-      "valueType": "NUMBER"
-    },
-    "limit_family_mealplanning_weekly": {
-      "defaultValue": { "value": "-1" },
-      "description": "Family tier: max meal plan recipe additions per week (-1 = unlimited)",
-      "valueType": "NUMBER"
-    },
-    "limit_family_gemini_weekly": {
-      "defaultValue": { "value": "-1" },
-      "description": "Family tier: max Gemini AI requests per week (-1 = unlimited)",
-      "valueType": "NUMBER"
-    },
-
-    "expiry_critical_days": {
-      "defaultValue": { "value": "1" },
-      "description": "Days remaining threshold for red (critical) expiry badge",
-      "valueType": "NUMBER"
-    },
-    "expiry_warning_days": {
-      "defaultValue": { "value": "3" },
-      "description": "Days remaining threshold for orange (warning) expiry badge",
-      "valueType": "NUMBER"
-    },
-    "expiry_info_days": {
-      "defaultValue": { "value": "7" },
-      "description": "Days remaining threshold for yellow (info) expiry badge",
-      "valueType": "NUMBER"
-    },
-    "expiry_frozen_alert_days": {
-      "defaultValue": { "value": "30" },
-      "description": "Days remaining before frozen items surface expiry alerts",
-      "valueType": "NUMBER"
-    },
-    "expiry_recipe_suggestion_days": {
-      "defaultValue": { "value": "7" },
-      "description": "Suggest use-up recipes for items expiring within this many days",
-      "valueType": "NUMBER"
-    },
-
-    "app_review_min_days_between_prompts": {
-      "defaultValue": { "value": "60" },
-      "description": "Minimum days between App Store / Play Store review prompts",
-      "valueType": "NUMBER"
-    },
-    "notifications_max_stored": {
-      "defaultValue": { "value": "200" },
-      "description": "Maximum notifications stored per user in Firestore cache",
-      "valueType": "NUMBER"
-    },
-    "search_history_max_items": {
-      "defaultValue": { "value": "20" },
-      "description": "Maximum search history entries stored in localStorage",
-      "valueType": "NUMBER"
-    },
-    "undo_max_actions": {
-      "defaultValue": { "value": "20" },
-      "description": "Maximum undoable actions kept in IndexedDB",
-      "valueType": "NUMBER"
-    },
-    "ads_enabled": {
-      "defaultValue": { "value": "true" },
-      "description": "Master switch for AdMob banner ads (free tier, native only)",
-      "valueType": "BOOLEAN"
-    },
-
-    "maintenance_mode": {
-      "defaultValue": { "value": "false" },
-      "description": "Set true to show a maintenance banner and block write operations",
-      "valueType": "BOOLEAN"
-    },
-    "maintenance_message": {
-      "defaultValue": { "value": "" },
-      "description": "User-facing text shown in the maintenance banner",
-      "valueType": "STRING"
-    },
-    "announcement_enabled": {
-      "defaultValue": { "value": "false" },
-      "description": "Set true to show an in-app announcement banner to all users",
-      "valueType": "BOOLEAN"
-    },
-    "announcement_message": {
-      "defaultValue": { "value": "" },
-      "description": "Text displayed in the announcement banner",
-      "valueType": "STRING"
-    },
-    "announcement_type": {
-      "defaultValue": { "value": "info" },
-      "description": "Announcement banner style: 'info' | 'warning' | 'error'",
-      "valueType": "STRING"
-    },
-
-    "gemini_model": {
-      "defaultValue": { "value": "gemini-2.5-flash" },
-      "description": "Gemini model ID for text / recipe / analysis requests",
-      "valueType": "STRING"
-    },
-    "gemini_model_vision": {
-      "defaultValue": { "value": "gemini-2.5-flash" },
-      "description": "Gemini model ID for pantry image and receipt scan tasks",
-      "valueType": "STRING"
-    },
-    "gemini_max_batch_size": {
-      "defaultValue": { "value": "3" },
-      "description": "Maximum concurrent Gemini requests processed per batch",
-      "valueType": "NUMBER"
-    },
-    "gemini_debounce_delay_ms": {
-      "defaultValue": { "value": "500" },
-      "description": "Milliseconds to wait before flushing the Gemini request queue",
-      "valueType": "NUMBER"
-    },
-
-    "min_app_version": {
-      "defaultValue": { "value": "1.0.0" },
-      "description": "Minimum supported app version (semver). Older builds get an update prompt.",
-      "valueType": "STRING"
-    }
-  },
   "parameterGroups": {
     "Feature Flags": {
-      "description": "Enable / disable features and control staged rollout percentages",
-      "parameters": [
-        "flag_geminiIntegration_enabled", "flag_geminiIntegration_rollout",
-        "flag_smartRecommendations_enabled", "flag_smartRecommendations_rollout",
-        "flag_offlineMode_enabled", "flag_offlineMode_rollout",
-        "flag_advancedAnalytics_enabled", "flag_advancedAnalytics_rollout",
-        "flag_mealPlanning_enabled", "flag_mealPlanning_rollout",
-        "flag_householdSharing_enabled", "flag_householdSharing_rollout",
-        "flag_barcodeScanning_enabled", "flag_barcodeScanning_rollout",
-        "flag_priceTracking_enabled", "flag_priceTracking_rollout",
-        "flag_darkMode_enabled", "flag_darkMode_rollout",
-        "flag_notifications_enabled", "flag_notifications_rollout",
-        "flag_newTutorial_enabled", "flag_newTutorial_rollout"
-      ]
+      "description": "Enable or disable app features and control staged rollouts.",
+      "parameters": {
+        "flag_geminiIntegration_enabled": {
+          "defaultValue": { "value": "true" },
+          "description": "Enable/disable Gemini AI integration globally",
+          "valueType": "BOOLEAN"
+        },
+        "flag_geminiIntegration_rollout": {
+          "defaultValue": { "value": "100" },
+          "description": "Rollout percentage for Gemini AI (0-100)",
+          "valueType": "NUMBER"
+        },
+        "flag_smartRecommendations_enabled": {
+          "defaultValue": { "value": "true" },
+          "description": "Enable/disable smart recipe and shopping recommendations",
+          "valueType": "BOOLEAN"
+        },
+        "flag_smartRecommendations_rollout": {
+          "defaultValue": { "value": "100" },
+          "description": "Rollout percentage for smart recommendations (0-100)",
+          "valueType": "NUMBER"
+        },
+        "flag_offlineMode_enabled": {
+          "defaultValue": { "value": "false" },
+          "description": "Enable/disable offline pantry management capabilities",
+          "valueType": "BOOLEAN"
+        },
+        "flag_offlineMode_rollout": {
+          "defaultValue": { "value": "0" },
+          "description": "Rollout percentage for offline mode (0-100)",
+          "valueType": "NUMBER"
+        },
+        "flag_advancedAnalytics_enabled": {
+          "defaultValue": { "value": "true" },
+          "description": "Enable/disable detailed performance and usage analytics",
+          "valueType": "BOOLEAN"
+        },
+        "flag_advancedAnalytics_rollout": {
+          "defaultValue": { "value": "50" },
+          "description": "Rollout percentage for advanced analytics (0-100)",
+          "valueType": "NUMBER"
+        },
+        "flag_mealPlanning_enabled": {
+          "defaultValue": { "value": "true" },
+          "description": "Enable/disable weekly meal planning and grocery generation",
+          "valueType": "BOOLEAN"
+        },
+        "flag_mealPlanning_rollout": {
+          "defaultValue": { "value": "100" },
+          "description": "Rollout percentage for meal planning (0-100)",
+          "valueType": "NUMBER"
+        },
+        "flag_householdSharing_enabled": {
+          "defaultValue": { "value": "true" },
+          "description": "Enable/disable multi-user household pantry sharing",
+          "valueType": "BOOLEAN"
+        },
+        "flag_householdSharing_rollout": {
+          "defaultValue": { "value": "100" },
+          "description": "Rollout percentage for household sharing (0-100)",
+          "valueType": "NUMBER"
+        },
+        "flag_barcodeScanning_enabled": {
+          "defaultValue": { "value": "true" },
+          "description": "Enable/disable barcode scanning for quick item addition",
+          "valueType": "BOOLEAN"
+        },
+        "flag_barcodeScanning_rollout": {
+          "defaultValue": { "value": "100" },
+          "description": "Rollout percentage for barcode scanning (0-100)",
+          "valueType": "NUMBER"
+        },
+        "flag_priceTracking_enabled": {
+          "defaultValue": { "value": "true" },
+          "description": "Enable/disable grocery price tracking and trends",
+          "valueType": "BOOLEAN"
+        },
+        "flag_priceTracking_rollout": {
+          "defaultValue": { "value": "75" },
+          "description": "Rollout percentage for price tracking (0-100)",
+          "valueType": "NUMBER"
+        },
+        "flag_darkMode_enabled": {
+          "defaultValue": { "value": "true" },
+          "description": "Enable/disable dark theme support",
+          "valueType": "BOOLEAN"
+        },
+        "flag_darkMode_rollout": {
+          "defaultValue": { "value": "100" },
+          "description": "Rollout percentage for dark mode (0-100)",
+          "valueType": "NUMBER"
+        },
+        "flag_notifications_enabled": {
+          "defaultValue": { "value": "true" },
+          "description": "Enable/disable push notifications and reminders",
+          "valueType": "BOOLEAN"
+        },
+        "flag_notifications_rollout": {
+          "defaultValue": { "value": "100" },
+          "description": "Rollout percentage for notifications (0-100)",
+          "valueType": "NUMBER"
+        },
+        "flag_newTutorial_enabled": {
+          "defaultValue": { "value": "false" },
+          "description": "Enable/disable interactive first-time tutorial",
+          "valueType": "BOOLEAN"
+        },
+        "flag_newTutorial_rollout": {
+          "defaultValue": { "value": "0" },
+          "description": "Rollout percentage for new tutorial (0-100)",
+          "valueType": "NUMBER"
+        }
+      }
     },
     "Kill Switches": {
-      "description": "Emergency kill switches — set true to immediately disable a feature for all users without a release",
-      "parameters": [
-        "kill_geminiIntegration", "kill_smartRecommendations", "kill_offlineMode",
-        "kill_advancedAnalytics", "kill_mealPlanning", "kill_householdSharing",
-        "kill_barcodeScanning", "kill_priceTracking", "kill_darkMode",
-        "kill_notifications", "kill_newTutorial", "kill_receiptScanning", "kill_ads"
-      ]
+      "description": "Emergency kill switches for fast rollback without a release.",
+      "parameters": {
+        "kill_geminiIntegration": {
+          "defaultValue": { "value": "false" },
+          "description": "Immediately disable Gemini AI for all users",
+          "valueType": "BOOLEAN"
+        },
+        "kill_smartRecommendations": {
+          "defaultValue": { "value": "false" },
+          "description": "Immediately disable smart recommendations",
+          "valueType": "BOOLEAN"
+        },
+        "kill_offlineMode": {
+          "defaultValue": { "value": "false" },
+          "description": "Immediately disable offline mode",
+          "valueType": "BOOLEAN"
+        },
+        "kill_advancedAnalytics": {
+          "defaultValue": { "value": "false" },
+          "description": "Immediately disable advanced analytics",
+          "valueType": "BOOLEAN"
+        },
+        "kill_mealPlanning": {
+          "defaultValue": { "value": "false" },
+          "description": "Immediately disable meal planning",
+          "valueType": "BOOLEAN"
+        },
+        "kill_householdSharing": {
+          "defaultValue": { "value": "false" },
+          "description": "Immediately disable household sharing",
+          "valueType": "BOOLEAN"
+        },
+        "kill_barcodeScanning": {
+          "defaultValue": { "value": "false" },
+          "description": "Immediately disable barcode scanning",
+          "valueType": "BOOLEAN"
+        },
+        "kill_priceTracking": {
+          "defaultValue": { "value": "false" },
+          "description": "Immediately disable price tracking",
+          "valueType": "BOOLEAN"
+        },
+        "kill_darkMode": {
+          "defaultValue": { "value": "false" },
+          "description": "Immediately disable dark mode",
+          "valueType": "BOOLEAN"
+        },
+        "kill_notifications": {
+          "defaultValue": { "value": "false" },
+          "description": "Immediately disable all notifications",
+          "valueType": "BOOLEAN"
+        },
+        "kill_newTutorial": {
+          "defaultValue": { "value": "false" },
+          "description": "Immediately disable the new tutorial",
+          "valueType": "BOOLEAN"
+        },
+        "kill_receiptScanning": {
+          "defaultValue": { "value": "false" },
+          "description": "Immediately disable receipt OCR scanning",
+          "valueType": "BOOLEAN"
+        },
+        "kill_ads": {
+          "defaultValue": { "value": "false" },
+          "description": "Suppress all AdMob banner ads",
+          "valueType": "BOOLEAN"
+        }
+      }
     },
     "Plan Limits": {
-      "description": "Usage caps per subscription tier. Requires app re-fetch to apply. -1 = unlimited.",
-      "parameters": [
-        "limit_free_searches_weekly", "limit_free_recipes_max",
-        "limit_free_mealplanning_weekly", "limit_free_gemini_weekly",
-        "limit_premium_searches_weekly", "limit_premium_recipes_max",
-        "limit_premium_mealplanning_weekly", "limit_premium_gemini_weekly",
-        "limit_family_searches_weekly", "limit_family_recipes_max",
-        "limit_family_mealplanning_weekly", "limit_family_gemini_weekly"
-      ]
+      "description": "Usage caps per subscription tier. Use -1 for unlimited.",
+      "parameters": {
+        "limit_free_searches_weekly": {
+          "defaultValue": { "value": "5" },
+          "description": "Free tier: max recipe searches per week",
+          "valueType": "NUMBER"
+        },
+        "limit_free_recipes_max": {
+          "defaultValue": { "value": "2" },
+          "description": "Free tier: max saved recipes total",
+          "valueType": "NUMBER"
+        },
+        "limit_free_mealplanning_weekly": {
+          "defaultValue": { "value": "1" },
+          "description": "Free tier: max meal plan additions per week",
+          "valueType": "NUMBER"
+        },
+        "limit_free_gemini_weekly": {
+          "defaultValue": { "value": "5" },
+          "description": "Free tier: max Gemini requests per week",
+          "valueType": "NUMBER"
+        },
+        "limit_premium_searches_weekly": {
+          "defaultValue": { "value": "15" },
+          "description": "Premium tier: max recipe searches per week",
+          "valueType": "NUMBER"
+        },
+        "limit_premium_recipes_max": {
+          "defaultValue": { "value": "20" },
+          "description": "Premium tier: max saved recipes total",
+          "valueType": "NUMBER"
+        },
+        "limit_premium_mealplanning_weekly": {
+          "defaultValue": { "value": "-1" },
+          "description": "Premium tier: max meal plan additions per week (-1 = unlimited)",
+          "valueType": "NUMBER"
+        },
+        "limit_premium_gemini_weekly": {
+          "defaultValue": { "value": "15" },
+          "description": "Premium tier: max Gemini requests per week",
+          "valueType": "NUMBER"
+        },
+        "limit_family_searches_weekly": {
+          "defaultValue": { "value": "-1" },
+          "description": "Family tier: max recipe searches per week (-1 = unlimited)",
+          "valueType": "NUMBER"
+        },
+        "limit_family_recipes_max": {
+          "defaultValue": { "value": "-1" },
+          "description": "Family tier: max saved recipes total (-1 = unlimited)",
+          "valueType": "NUMBER"
+        },
+        "limit_family_mealplanning_weekly": {
+          "defaultValue": { "value": "-1" },
+          "description": "Family tier: max meal plan additions per week (-1 = unlimited)",
+          "valueType": "NUMBER"
+        },
+        "limit_family_gemini_weekly": {
+          "defaultValue": { "value": "-1" },
+          "description": "Family tier: max Gemini requests per week (-1 = unlimited)",
+          "valueType": "NUMBER"
+        }
+      }
     },
     "Expiry Alerts": {
-      "description": "Day thresholds that control when expiry badges and suggestion prompts appear",
-      "parameters": [
-        "expiry_critical_days", "expiry_warning_days", "expiry_info_days",
-        "expiry_frozen_alert_days", "expiry_recipe_suggestion_days"
-      ]
+      "description": "Thresholds for expiry badges, alerts, and recipe suggestions.",
+      "parameters": {
+        "expiry_critical_days": {
+          "defaultValue": { "value": "1" },
+          "description": "Days remaining threshold for red critical expiry badge",
+          "valueType": "NUMBER"
+        },
+        "expiry_warning_days": {
+          "defaultValue": { "value": "3" },
+          "description": "Days remaining threshold for orange warning expiry badge",
+          "valueType": "NUMBER"
+        },
+        "expiry_info_days": {
+          "defaultValue": { "value": "7" },
+          "description": "Days remaining threshold for yellow info expiry badge",
+          "valueType": "NUMBER"
+        },
+        "expiry_frozen_alert_days": {
+          "defaultValue": { "value": "30" },
+          "description": "Days remaining before frozen items show expiry alerts",
+          "valueType": "NUMBER"
+        },
+        "expiry_recipe_suggestion_days": {
+          "defaultValue": { "value": "7" },
+          "description": "Suggest recipes for items expiring within this many days",
+          "valueType": "NUMBER"
+        }
+      }
     },
     "App Behaviour": {
-      "description": "Tunable app-wide behaviour constants",
-      "parameters": [
-        "app_review_min_days_between_prompts", "notifications_max_stored",
-        "search_history_max_items", "undo_max_actions", "ads_enabled"
-      ]
+      "description": "General app behavior tuning values.",
+      "parameters": {
+        "app_review_min_days_between_prompts": {
+          "defaultValue": { "value": "60" },
+          "description": "Minimum days between app review prompts",
+          "valueType": "NUMBER"
+        },
+        "notifications_max_stored": {
+          "defaultValue": { "value": "200" },
+          "description": "Maximum notifications stored per user",
+          "valueType": "NUMBER"
+        },
+        "search_history_max_items": {
+          "defaultValue": { "value": "20" },
+          "description": "Maximum search history entries stored locally",
+          "valueType": "NUMBER"
+        },
+        "undo_max_actions": {
+          "defaultValue": { "value": "20" },
+          "description": "Maximum undo actions stored locally",
+          "valueType": "NUMBER"
+        },
+        "ads_enabled": {
+          "defaultValue": { "value": "true" },
+          "description": "Master switch for AdMob banner ads",
+          "valueType": "BOOLEAN"
+        }
+      }
     },
-    "Maintenance & Announcements": {
-      "description": "Maintenance mode and in-app announcement banners — no release required",
-      "parameters": [
-        "maintenance_mode", "maintenance_message",
-        "announcement_enabled", "announcement_message", "announcement_type"
-      ]
+    "Maintenance And Announcements": {
+      "description": "Global maintenance and announcement banner controls.",
+      "parameters": {
+        "maintenance_mode": {
+          "defaultValue": { "value": "false" },
+          "description": "Show maintenance banner and signal maintenance mode",
+          "valueType": "BOOLEAN"
+        },
+        "maintenance_message": {
+          "defaultValue": { "value": "" },
+          "description": "User-facing maintenance banner text",
+          "valueType": "STRING"
+        },
+        "announcement_enabled": {
+          "defaultValue": { "value": "false" },
+          "description": "Show in-app announcement banner",
+          "valueType": "BOOLEAN"
+        },
+        "announcement_message": {
+          "defaultValue": { "value": "" },
+          "description": "Announcement banner text",
+          "valueType": "STRING"
+        },
+        "announcement_type": {
+          "defaultValue": { "value": "info" },
+          "description": "Announcement banner style: info, warning, or error",
+          "valueType": "STRING"
+        }
+      }
     },
     "Gemini AI": {
-      "description": "Gemini model selection and request batching tuning",
-      "parameters": [
-        "gemini_model", "gemini_model_vision",
-        "gemini_max_batch_size", "gemini_debounce_delay_ms"
-      ]
+      "description": "Gemini model selection and request batching tuning.",
+      "parameters": {
+        "gemini_model": {
+          "defaultValue": { "value": "gemini-2.5-flash" },
+          "description": "Gemini model ID for text, recipe, and analysis requests",
+          "valueType": "STRING"
+        },
+        "gemini_model_vision": {
+          "defaultValue": { "value": "gemini-2.5-flash" },
+          "description": "Gemini model ID for pantry image and receipt scan tasks",
+          "valueType": "STRING"
+        },
+        "gemini_max_batch_size": {
+          "defaultValue": { "value": "3" },
+          "description": "Maximum concurrent Gemini requests processed per batch",
+          "valueType": "NUMBER"
+        },
+        "gemini_debounce_delay_ms": {
+          "defaultValue": { "value": "500" },
+          "description": "Milliseconds to wait before flushing the Gemini request queue",
+          "valueType": "NUMBER"
+        }
+      }
     },
     "App Version": {
-      "description": "Minimum version enforcement",
-      "parameters": ["min_app_version"]
+      "description": "Minimum version enforcement.",
+      "parameters": {
+        "min_app_version": {
+          "defaultValue": { "value": "1.0.0" },
+          "description": "Minimum supported app version; older builds get an update prompt",
+          "valueType": "STRING"
+        }
+      }
     }
   }
 }

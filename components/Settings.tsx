@@ -34,6 +34,8 @@ import { UsageService } from '../services/usageService';
 import type { UsageLimits } from '../services/usageService';
 import { ShoppingListCacheService } from '../services/shoppingListCacheService';
 import { setDoc } from 'firebase/firestore';
+import { useIsAdmin } from '../hooks/useIsAdmin';
+import { RemoteConfigDebugPanel } from './RemoteConfigDebugPanel';
 
 const defaultStoreLayout = [
   'Produce',
@@ -108,6 +110,7 @@ export const Settings: React.FC<SettingsProps> = ({
   const [sending, setSending] = useState(false);
   const { isPremium, isFamily } = useSubscription(user || null);
   const [usageLimits, setUsageLimits] = useState<UsageLimits | null>(null);
+  const { isAdmin } = useIsAdmin(user?.id);
 
   useEffect(() => {
     if (!user) return;
@@ -322,11 +325,11 @@ export const Settings: React.FC<SettingsProps> = ({
   // Use the notifications hook
   useNotifications(settings.notifications, user?.email, mealPlan);
 
-  const handleChange = (field: string, value: any) => {
+  const handleChange = (field: string, value: Record<string, unknown>) => {
     setSettings((prev) => ({
       ...prev,
       [field]: {
-        ...(prev as any)[field],
+        ...(prev as Record<string, unknown>)[field],
         ...value,
       },
     }));
@@ -341,10 +344,10 @@ export const Settings: React.FC<SettingsProps> = ({
     }
   };
 
-  const _handleNotifChange = (key: string, value: any) => {
+  const _handleNotifChange = (key: string, value: unknown) => {
     setPendingNotifications(prev => ({
       ...prev,
-      [key]: typeof value === 'object' ? { ...(prev as any)[key], ...value } : value,
+      [key]: typeof value === 'object' && value !== null ? { ...(prev as Record<string, unknown>)[key], ...value } : value,
     }));
     setNotifChanged(false);
   };
@@ -360,7 +363,7 @@ export const Settings: React.FC<SettingsProps> = ({
     AnalyticsService.trackNotificationSettingsUpdate(pendingNotifications);
   };
 
-  const handleProfileChange = (field: string, value: any) => {
+  const handleProfileChange = (field: string, value: unknown) => {
     setUserProfile(prev => ({
       ...prev,
       [field]: value
@@ -1903,6 +1906,30 @@ export const Settings: React.FC<SettingsProps> = ({
         )}
       </div>
 
+      {isAdmin && (
+        <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden">
+          <div
+            onClick={() => toggleSection('Remote Config Debug')}
+            className="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-theme-primary transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              {expandedSections.has('Remote Config Debug') ? (
+                <ChevronDown className="w-5 h-5 text-theme-primary" />
+              ) : (
+                <ChevronRight className="w-5 h-5 text-theme-primary" />
+              )}
+              <h3 className="font-semibold text-theme-primary">Remote Config Debug</h3>
+            </div>
+          </div>
+
+          {expandedSections.has('Remote Config Debug') && (
+            <div className="border-t border-theme p-4">
+              <RemoteConfigDebugPanel addToast={addToast} />
+            </div>
+          )}
+        </div>
+      )}
+
       </>}
 
       </div> {/* end tab content */}
@@ -2008,7 +2035,7 @@ export const Settings: React.FC<SettingsProps> = ({
                   <label className="block text-sm font-medium text-theme-primary mb-3">Diet Goal</label>
                   <select
                     value={memberPreferences.dietGoal || ''}
-                    onChange={(e) => setMemberPreferences(prev => ({ ...prev, dietGoal: e.target.value as any || undefined }))}
+                    onChange={(e) => setMemberPreferences(prev => ({ ...prev, dietGoal: e.target.value as UserProfile['dietGoal'] || undefined }))}
                     className="w-full bg-theme-secondary border border-theme rounded-lg px-3 py-2 text-sm text-theme-primary focus:border-theme-primary outline-none"
                   >
                     <option value="">No specific goal</option>
@@ -2161,7 +2188,7 @@ export const Settings: React.FC<SettingsProps> = ({
             <div className="flex flex-wrap gap-2 mt-3">
               <button
                 onClick={() => {
-                  const privacyUrl = (window as any).PRIVACY_POLICY_URL || 'https://smartpantrymobile.page.gd/privacy.html';
+                  const privacyUrl = (window as Window & { PRIVACY_POLICY_URL?: string }).PRIVACY_POLICY_URL || 'https://smartpantrymobile.page.gd/privacy.html';
                   window.open(privacyUrl, '_blank');
                 }}
                 className="bg-[var(--accent-color)] text-white px-3 py-1 rounded-lg font-medium text-sm hover:bg-opacity-90 transition-colors"
@@ -2170,7 +2197,7 @@ export const Settings: React.FC<SettingsProps> = ({
               </button>
               <button
                 onClick={() => {
-                  const privacyUrl = (window as any).PRIVACY_POLICY_URL || 'https://smartpantrymobile.page.gd/privacy.html';
+                  const privacyUrl = (window as Window & { PRIVACY_POLICY_URL?: string }).PRIVACY_POLICY_URL || 'https://smartpantrymobile.page.gd/privacy.html';
                   if (navigator.clipboard) navigator.clipboard.writeText(privacyUrl);
                   addToast?.('Privacy policy URL copied to clipboard', 'success');
                 }}
@@ -2180,7 +2207,7 @@ export const Settings: React.FC<SettingsProps> = ({
               </button>
               <button
                 onClick={() => {
-                  const delUrl = (window as any).DELETE_ACCOUNT_URL || 'https://smartpantrymobile.page.gd/delete-account.html';
+                  const delUrl = (window as Window & { DELETE_ACCOUNT_URL?: string }).DELETE_ACCOUNT_URL || 'https://smartpantrymobile.page.gd/delete-account.html';
                   window.open(delUrl, '_blank');
                 }}
                 className="bg-red-500 text-white px-3 py-1 rounded-lg font-medium text-sm hover:bg-red-600 transition-colors"
@@ -2189,7 +2216,7 @@ export const Settings: React.FC<SettingsProps> = ({
               </button>
               <button
                 onClick={() => {
-                  const delUrl = (window as any).DELETE_ACCOUNT_URL || 'https://smartpantrymobile.page.gd/delete-account.html';
+                  const delUrl = (window as Window & { DELETE_ACCOUNT_URL?: string }).DELETE_ACCOUNT_URL || 'https://smartpantrymobile.page.gd/delete-account.html';
                   if (navigator.clipboard) navigator.clipboard.writeText(delUrl);
                   addToast?.('Account deletion URL copied to clipboard', 'success');
                 }}

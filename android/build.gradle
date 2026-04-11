@@ -8,7 +8,7 @@ buildscript {
     }
     dependencies {
         // Use AGP version from libs.versions.toml if possible, otherwise fallback to stable 8.7.3
-        classpath 'com.android.tools.build:gradle:9.1.0'
+        classpath 'com.android.tools.build:gradle:8.13.2'
 
         // NOTE: Do not place your application dependencies here; they belong
         // in the individual module build.gradle files
@@ -31,8 +31,18 @@ task clean(type: Delete) {
     delete rootProject.layout.buildDirectory.get().asFile
 }
 
-// Resolve Duplicate class kotlin.* errors by forcing a single version
+// Resolve Duplicate class kotlin.* errors by handling module replacements
 allprojects {
+    dependencies {
+        modules {
+            module("org.jetbrains.kotlin:kotlin-stdlib-jdk7") {
+                replacedBy("org.jetbrains.kotlin:kotlin-stdlib", "merged into kotlin-stdlib")
+            }
+            module("org.jetbrains.kotlin:kotlin-stdlib-jdk8") {
+                replacedBy("org.jetbrains.kotlin:kotlin-stdlib", "merged into kotlin-stdlib")
+            }
+        }
+    }
     configurations.all {
         resolutionStrategy.eachDependency { DependencyResolveDetails details ->
             if (details.requested.group == 'org.jetbrains.kotlin' && details.requested.name.startsWith('kotlin-stdlib')) {

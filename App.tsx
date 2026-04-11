@@ -32,6 +32,7 @@ import { log } from './services/logService';
 import { pushNotificationService } from './services/pushNotificationService';
 import { HouseholdActivityService } from './services/householdActivityService';
 import { App as CapacitorApp, BackButtonListenerEvent } from '@capacitor/app';
+import { PluginListenerHandle } from '@capacitor/core';
 import { AppProvider, useApp } from './contexts/AppContext';
 import { AppActionsProvider, useAppActions } from './contexts/AppActionsContext';
 import SafeAreaService from './services/safeAreaService';
@@ -39,6 +40,7 @@ import { GlobalUpdatePrompt } from './components/GlobalUpdatePrompt';
 import { joinHousehold } from './services/householdService';
 import { setAppContext, trackNavigation, trackShoppingListAction } from './services/sentryService';
 import remoteConfig from './services/remoteConfigService';
+import { useIsAdmin } from './hooks/useIsAdmin';
 import PerformanceMonitoringService from './services/performanceMonitoringService';
 import HapticService from './services/hapticService';
 import { ShoppingListCacheService } from './services/shoppingListCacheService';
@@ -126,12 +128,13 @@ const App: React.FC = () => {
     }
   });
 
-  const backButtonListenerRef = useRef<any>(null);
+  const backButtonListenerRef = useRef<PluginListenerHandle | null>(null);
 
   const { user, setUser, handleLogout, isAuthReady } = useAuth(); // Use isAuthReady
   const { settings, setSettings } = useSettings();
   const { addToast, toasts, setToasts } = useToasts();
   const { syncStatus, syncNow, updateSyncStatus } = useOfflineStatus();
+  const { isAdmin } = useIsAdmin(user?.id);
   const maintenanceInfo = remoteConfig.getMaintenanceInfo();
   const announcementInfo = remoteConfig.getAnnouncementInfo();
 
@@ -149,7 +152,7 @@ const App: React.FC = () => {
   // Load notification settings from user profile
   useEffect(() => {
     // Some older user profile shapes may not include notificationSettings.
-    const ns = (user as any)?.profile?.notificationSettings;
+    const ns = (user as User & { profile?: UserProfile & { notificationSettings?: NotificationSettings } })?.profile?.notificationSettings;
     if (ns) setNotificationSettings(ns as NotificationSettings);
   }, [user]);
 
@@ -472,10 +475,10 @@ const App: React.FC = () => {
               } else {
                 addToast('Failed to join household - invitation not found', 'error');
               }
-            } catch (error: any) {
+            } catch (error: unknown) {
               log.error('Error joining household', { error }, 'App');
               let message = 'Failed to join household';
-              if (error.message?.includes('not invited')) {
+              if (error instanceof Error && error.message?.includes('not invited')) {
                 message = 'Unable to join 9: You are not invited to this household or have already joined';
               }
               addToast(message, 'error');
@@ -619,10 +622,10 @@ const App: React.FC = () => {
       } else {
         addToast('Failed to join household - invitation not found', 'error');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       log.error('Error accepting household invite', { error }, 'App');
       let message = 'Failed to join household';
-      if (error.message?.includes('not invited')) {
+      if (error instanceof Error && error.message?.includes('not invited')) {
         message = 'Unable to join: You are not invited to this household or have already joined';
       }
       addToast(message, 'error');
@@ -645,7 +648,7 @@ const App: React.FC = () => {
       }
       
       addToast('Household invitation declined and removed', 'info');
-    } catch (error: any) {
+    } catch (error: unknown) {
       log.error('Error declining household invite', { error }, 'App');
       addToast('Failed to decline invitation', 'error');
     }
@@ -1264,7 +1267,7 @@ const App: React.FC = () => {
                   }
                   
                   // Build pantry item and convert any purchased batch/quantity into batches[]
-                  const batches: any[] = [];
+                  const batches: Batch[] = [];
                   const nowIso = new Date().toISOString();
 
                   if (i.purchasedBatch) {
@@ -1408,9 +1411,11 @@ const App: React.FC = () => {
 
       <GlobalUpdatePrompt />
 
-      <Suspense fallback={<LoadingSpinner />}>
-        <DatabaseAnalytics />
-      </Suspense>
+      {isAdmin && (
+        <Suspense fallback={<LoadingSpinner />}>
+          <DatabaseAnalytics />
+        </Suspense>
+      )}
     </>
   );
 };
