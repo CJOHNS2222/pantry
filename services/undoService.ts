@@ -1,4 +1,5 @@
 import { PantryItem } from '../types';
+import remoteConfig from './remoteConfigService';
 
 type ActionType = 'delete_item' | 'bulk_edit' | 'update_item';
 
@@ -12,7 +13,9 @@ export interface UndoAction {
 
 const DB_NAME = 'SmartPantryUndo';
 const STORE_NAME = 'actions';
-const MAX_ACTIONS = 20;
+
+// Number of undo actions to retain — read from RC so it can be tuned without a release.
+const getMaxActions = () => remoteConfig.getNumber('undo_max_actions');
 
 class UndoService {
   private db: IDBDatabase | null = null;
@@ -54,14 +57,14 @@ class UndoService {
 
       request.onerror = () => reject(request.error);
       request.onsuccess = () => {
-        // Keep only last MAX_ACTIONS per user
+        // Keep only last getMaxActions() per user
         this.pruneOldActions(userId);
         resolve();
       };
     });
   }
 
-  async getRecentActions(userId: string, limit: number = MAX_ACTIONS): Promise<UndoAction[]> {
+  async getRecentActions(userId: string, limit: number = getMaxActions()): Promise<UndoAction[]> {
     if (!this.db) await this.init();
 
     return new Promise((resolve, reject) => {
@@ -124,9 +127,10 @@ class UndoService {
   }
 
   private async pruneOldActions(userId: string): Promise<void> {
-    const actions = await this.getRecentActions(userId, MAX_ACTIONS + 10);
-    if (actions.length > MAX_ACTIONS) {
-      const toDelete = actions.slice(MAX_ACTIONS);
+    const maxActions = getMaxActions();
+    const actions = await this.getRecentActions(userId, maxActions + 10);
+    if (actions.length > maxActions) {
+      const toDelete = actions.slice(maxActions);
       for (const action of toDelete) {
         await this.removeAction(action.id);
       }

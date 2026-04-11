@@ -3,6 +3,7 @@ import DatabaseMonitoringService from '../services/databaseMonitoringService';
 import { DayPlan, User, Household } from '../types';
 import { Capacitor } from '@capacitor/core';
 import { UsageService } from '../services/usageService';
+import remoteConfig from '../services/remoteConfigService';
 import { ConsumptionSuggestion, ExpirationAlert, RecipeSuggestion, PantryItem, CustomCategory, Member } from '../types';
 import { getQuantityAmount, getQuantityUnit } from './quantityUtils';
 import { getPerformance, trace } from "firebase/performance";
@@ -1235,7 +1236,7 @@ export function shouldShowExpiryAlert(item: PantryItem): boolean {
 
   const isFrozen = item.is_frozen || item.storageLocation === 'freezer';
 
-  // Frozen items: use freezerExpiry if available; only alert within 30 days
+  // Frozen items: use freezerExpiry if available; only alert within RC-configured window
   if (isFrozen) {
     const dateStr = item.freezerExpiry || item.expirationDate;
     if (!dateStr || item.expiryAlertShown) return false;
@@ -1243,7 +1244,7 @@ export function shouldShowExpiryAlert(item: PantryItem): boolean {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const daysRemaining = Math.ceil((d.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-    return daysRemaining <= 30;
+    return daysRemaining <= remoteConfig.getNumber('expiry_frozen_alert_days');
   }
 
   if (!item.expirationDate || item.expiryAlertShown) {
@@ -1363,14 +1364,14 @@ export function generateExpirationAlerts(inventory: PantryItem[]): ExpirationAle
     let message: string;
 
     if (isFrozen) {
-      // Frozen items: only surface alerts within 30 days; use gentler language
+      // Frozen items: only surface alerts within RC-configured window; use gentler language
       if (daysRemaining < 0) {
         alertLevel = 'expired';
         message = `${item.item} is past its freezer date`;
-      } else if (daysRemaining <= 7) {
+      } else if (daysRemaining <= remoteConfig.getNumber('expiry_critical_days')) {
         alertLevel = 'critical';
         message = `${item.item} should be used within ${daysRemaining} day${daysRemaining === 1 ? '' : 's'} (frozen)`;
-      } else if (daysRemaining <= 30) {
+      } else if (daysRemaining <= remoteConfig.getNumber('expiry_frozen_alert_days')) {
         alertLevel = 'warning';
         message = `${item.item} is best used within ${daysRemaining} days (frozen)`;
       } else {
@@ -1379,7 +1380,7 @@ export function generateExpirationAlerts(inventory: PantryItem[]): ExpirationAle
     } else {
       // Special handling for milk - only warn when 3 days or less remain
       const isMilk = item.item.toLowerCase().includes('milk') || item.category.toLowerCase() === 'dairy';
-      const warningThreshold = isMilk ? 3 : 7;
+      const warningThreshold = isMilk ? remoteConfig.getNumber('expiry_warning_days') : remoteConfig.getNumber('expiry_info_days');
 
       if (daysRemaining < 0) {
         alertLevel = 'expired';
@@ -1387,10 +1388,10 @@ export function generateExpirationAlerts(inventory: PantryItem[]): ExpirationAle
       } else if (daysRemaining === 0) {
         alertLevel = 'critical';
         message = `${item.item} expires today!`;
-      } else if (daysRemaining <= 1) {
+      } else if (daysRemaining <= remoteConfig.getNumber('expiry_critical_days')) {
         alertLevel = 'critical';
         message = `${item.item} expires in ${daysRemaining} day!`;
-      } else if (daysRemaining <= 3) {
+      } else if (daysRemaining <= remoteConfig.getNumber('expiry_warning_days')) {
         alertLevel = 'warning';
         message = `${item.item} expires in ${daysRemaining} days`;
       } else if (daysRemaining <= warningThreshold) {
@@ -1475,8 +1476,8 @@ export function generateRecipeSuggestions(inventory: PantryItem[]): RecipeSugges
     const todayDate = new Date(today);
     const daysRemaining = Math.ceil((expirationDate.getTime() - todayDate.getTime()) / (1000 * 60 * 60 * 24));
 
-    // Only suggest recipes for items expiring within 7 days
-    if (daysRemaining < 0 || daysRemaining > 7) return;
+    // Only suggest recipes for items expiring within RC-configured window
+    if (daysRemaining < 0 || daysRemaining > remoteConfig.getNumber('expiry_recipe_suggestion_days')) return;
 
     // Find recipes based on item name (case insensitive partial match)
     const itemNameLower = item.item.toLowerCase();
@@ -1556,10 +1557,10 @@ export function getExpirationColor(daysOrDate: number | string, expirationType: 
 
   if (daysRemaining < 0) return 'text-red-600 bg-red-50 border-red-200'; // Expired
   if (daysRemaining === 0) return 'text-red-600 bg-red-50 border-red-200'; // Expires today
-  if (daysRemaining <= 1) return 'text-red-600 bg-red-50 border-red-200'; // Critical (1 day)
-  if (daysRemaining <= 3) return 'text-orange-600 bg-orange-50 border-orange-200'; // Warning (2-3 days)
-  if (daysRemaining <= 7) return 'text-yellow-600 bg-yellow-50 border-yellow-200'; // Info (4-7 days)
-  return 'text-green-600 bg-green-50 border-green-200'; // Good (>7 days)
+  if (daysRemaining <= remoteConfig.getNumber('expiry_critical_days')) return 'text-red-600 bg-red-50 border-red-200'; // Critical
+  if (daysRemaining <= remoteConfig.getNumber('expiry_warning_days')) return 'text-orange-600 bg-orange-50 border-orange-200'; // Warning
+  if (daysRemaining <= remoteConfig.getNumber('expiry_info_days')) return 'text-yellow-600 bg-yellow-50 border-yellow-200'; // Info
+  return 'text-green-600 bg-green-50 border-green-200'; // Good
 }
 
 // Custom Category Management Functions

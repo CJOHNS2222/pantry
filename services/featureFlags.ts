@@ -1,6 +1,7 @@
 // Comprehensive feature flag system with gradual rollout, A/B testing, and kill switches
 import { UsageService } from './usageService';
 import { log } from './logService';
+import remoteConfig from './remoteConfigService';
 
 const GEMINI_ENABLED_ENV = typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_ENABLE_GEMINI === 'true';
 
@@ -105,6 +106,38 @@ class FeatureFlagService {
 
   private constructor() {
     this.loadFlagsFromStorage();
+    this.applyRemoteConfig();
+  }
+
+  /**
+   * Overlay Remote Config values on top of the hardcoded defaults.
+   * Called once at construction; also exposed so the bootstrap code can
+   * call it again after remoteConfig.init() resolves.
+   */
+  applyRemoteConfig(): void {
+    try {
+      Object.keys(this.flags).forEach(flagName => {
+        const rcRollout = remoteConfig.getRolloutPercentage(flagName);
+        const rcKill = remoteConfig.getBoolean(`kill_${flagName}`);
+
+        // Only override if RC actually has a value (non-zero / non-default)
+        // We check the raw enabled key rather than the convenience method
+        // so a deliberate "false" in RC wins over the hardcoded default.
+        const rcEnabledRaw = remoteConfig.getBoolean(`flag_${flagName}_enabled`);
+        this.flags[flagName] = {
+          ...this.flags[flagName],
+          enabled: rcEnabledRaw,
+          rolloutPercentage: rcRollout,
+          killSwitch: rcKill || this.flags[flagName].killSwitch,
+        };
+      });
+      this.userCache.clear();
+      log.info('[FeatureFlags] Applied Remote Config overrides', {}, 'FeatureFlags');
+    } catch (err: unknown) {
+      log.warn('[FeatureFlags] Could not apply Remote Config, using defaults', {
+        message: err instanceof Error ? err.message : String(err),
+      }, 'FeatureFlags');
+    }
   }
 
   static getInstance(): FeatureFlagService {
@@ -270,6 +303,14 @@ class FeatureFlagService {
 
 // Create singleton instance
 const featureFlagService = FeatureFlagService.getInstance();
+
+/**
+ * Re-apply Remote Config overrides after remoteConfig.init() resolves at boot.
+ * Call this once from index.tsx after awaiting remoteConfig.init().
+ */
+export function applyRemoteConfigToFlags(): void {
+  featureFlagService.applyRemoteConfig();
+}
 
 // Legacy functions for backward compatibility
 export function isGeminiGloballyEnabled(): boolean {

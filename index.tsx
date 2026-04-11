@@ -10,6 +10,8 @@ import { AppActionsProvider } from './contexts/AppActionsContext';
 import { cleanupCacheService } from './services/cacheService';
 import DatabaseMonitoringService from './services/databaseMonitoringService';
 import { offlineDataCache } from './services/offlineDataCache';
+import remoteConfig from './services/remoteConfigService';
+import { applyRemoteConfigToFlags } from './services/featureFlags';
 
 // Initialize Sentry for error reporting only when a real DSN is configured
 // and running in production. This avoids noisy reports during local testing.
@@ -35,6 +37,13 @@ window.addEventListener('pagehide', () => {
   DatabaseMonitoringService.cleanupMonitoring();
   offlineDataCache.destroy();
 });
+
+// Initialise Remote Config early (fire-and-forget — app renders immediately
+// from in-app defaults; RC values apply on next getBoolean/getNumber call once
+// the fetch resolves, which is nearly instant from cache on repeat launches).
+remoteConfig.init().then(() => {
+  applyRemoteConfigToFlags();
+}).catch(() => { /* non-fatal — in-app defaults remain active */ });
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {

@@ -5,6 +5,7 @@ import featureFlags from './featureFlags';
 import { UsageService } from './usageService';
 import { log } from './logService';
 import { getUserNutritionTargets, generatePersonalizedSearchPrompt } from '../utils/nutritionUtils';
+import remoteConfig from './remoteConfigService';
 
 // Initialize Gemini Client
 const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
@@ -32,8 +33,8 @@ class GeminiRequestBatcher {
   private queue: QueuedRequest<unknown>[] = [];
   private isProcessing = false;
   private debounceTimer: NodeJS.Timeout | null = null;
-  private readonly debounceDelay = 500; // 500ms debounce
-  private readonly maxBatchSize = 3; // Process up to 3 requests simultaneously
+  private get debounceDelay() { return remoteConfig.getNumber('gemini_debounce_delay_ms'); }
+  private get maxBatchSize() { return remoteConfig.getNumber('gemini_max_batch_size'); }
   private readonly maxQueueSize = 10; // Maximum queue size
   private requestCache = new Map<string, { result: unknown; timestamp: number }>();
   private readonly cacheTTL = 5 * 60 * 1000; // 5 minutes cache
@@ -209,10 +210,10 @@ export const analyzePantryImage = async (base64Image: string, mimeType: string, 
         throw new Error('Gemini API key not configured. Please check your environment variables.');
       }
 
-      console.log('🔍 Starting pantry image analysis with model:', "gemini-2.5-flash");
+      console.log('🔍 Starting pantry image analysis with model:', remoteConfig.getString('gemini_model_vision'));
       console.log('📊 Image size:', Math.round(base64Image.length / 1024), 'KB');
 
-      const modelId = "gemini-2.5-flash";
+      const modelId = remoteConfig.getString('gemini_model_vision');
 
       const schema: Schema = {
         type: Type.ARRAY,
@@ -361,10 +362,10 @@ export const analyzeReceiptImage = async (base64Image: string, mimeType: string,
     perfTrace?.start();
 
     try {
-      console.log('🔍 Starting receipt image analysis with model:', "gemini-2.5-flash");
+      console.log('🔍 Starting receipt image analysis with model:', remoteConfig.getString('gemini_model_vision'));
       console.log('📊 Image size:', Math.round(base64Image.length / 1024), 'KB');
 
-      const modelId = "gemini-2.5-flash";
+      const modelId = remoteConfig.getString('gemini_model_vision');
 
       const schema: Schema = {
         type: Type.ARRAY,
@@ -557,7 +558,7 @@ const performSearch = async (params: RecipeSearchParams, user: User | undefined,
     if (!(await UsageService.canUseGemini(user))) {
       throw new Error('Gemini usage not permitted: weekly limit reached.');
     }
-    const modelId = "gemini-2.5-flash";
+    const modelId = remoteConfig.getString('gemini_model');
   
   // Check if API key is available
   if (!import.meta.env.VITE_GEMINI_API_KEY) {

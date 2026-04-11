@@ -16,9 +16,9 @@
 
 import { Capacitor } from '@capacitor/core';
 import { log } from './logService';
+import remoteConfig from './remoteConfigService';
 
 const STORAGE_KEY = 'stockspoon_last_review_prompt';
-const MIN_DAYS_BETWEEN_PROMPTS = 60;
 
 function daysSinceLastPrompt(): number {
   const raw = localStorage.getItem(STORAGE_KEY);
@@ -38,7 +38,7 @@ function recordPromptShown(): void {
 export async function requestAppReview(reason: string): Promise<void> {
   if (!Capacitor.isNativePlatform()) return;
 
-  if (daysSinceLastPrompt() < MIN_DAYS_BETWEEN_PROMPTS) {
+  if (daysSinceLastPrompt() < remoteConfig.getNumber('app_review_min_days_between_prompts')) {
     log.debug(`App review skipped (too soon). Reason: ${reason}`, {}, 'AppReviewService');
     return;
   }

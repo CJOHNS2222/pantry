@@ -1,6 +1,7 @@
 import Fuse from 'fuse.js';
 import { PantryItem, StructuredRecipe, SavedRecipe } from '../types';
 import { log } from '../services/logService';
+import remoteConfig from '../services/remoteConfigService';
 
 // Ingredient matching result interface
 export interface IngredientMatch {
@@ -226,8 +227,8 @@ export const filterPantryItems = (items: PantryItem[], filter: PantryFilter): Pa
   // Filter by expiration status
   if (filter.expirationStatus !== 'all') {
     const now = new Date();
-    const soon = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // 7 days from now
-    const soonFrozen = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days for frozen items
+    const soon = new Date(now.getTime() + remoteConfig.getNumber('expiry_info_days') * 24 * 60 * 60 * 1000);
+    const soonFrozen = new Date(now.getTime() + remoteConfig.getNumber('expiry_frozen_alert_days') * 24 * 60 * 60 * 1000);
 
     filtered = filtered.filter(item => {
       const isFrozen = item.is_frozen || item.storageLocation === 'freezer';
@@ -326,7 +327,8 @@ export interface SearchHistoryItem {
 }
 
 const SEARCH_HISTORY_KEY = 'smartpantry-search-history';
-const MAX_HISTORY_ITEMS = 20;
+// Max search history entries — read from RC so it can be tuned without a release.
+const getMaxHistoryItems = () => remoteConfig.getNumber('search_history_max_items');
 
 // Save search to history
 export const saveSearchToHistory = (query: string, type: 'pantry' | 'recipe', resultCount?: number): void => {
@@ -348,7 +350,7 @@ export const saveSearchToHistory = (query: string, type: 'pantry' | 'recipe', re
     filtered.unshift(newItem);
 
     // Keep only recent items
-    const recentHistory = filtered.slice(0, MAX_HISTORY_ITEMS);
+    const recentHistory = filtered.slice(0, getMaxHistoryItems());
 
     localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(recentHistory));
   } catch (err: any) {

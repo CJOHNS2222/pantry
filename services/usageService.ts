@@ -3,6 +3,7 @@ import { increment, Timestamp } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 import { User } from '../types';
 import { log } from './logService';
+import remoteConfig from './remoteConfigService';
 
 export interface UsageLimits {
   searches: {
@@ -71,26 +72,34 @@ class UsageService {
   private static readonly LIMITS_CACHE_TTL_MS = 30_000;
   private static limitsCache = new Map<string, { limits: UsageLimits; fetchedAt: number }>();
 
-  private static readonly PLAN_LIMITS: PlanLimits = {
-    free: {
-      searches: { weekly: 5 },
-      recipes: { max: 2 },
-      mealPlanning: { weeklyRecipes: 1, twoWeekPlanning: false },
-      gemini: { weekly: 5 }
-    },
-    premium: {
-      searches: { weekly: 15 },
-      recipes: { max: 20 },
-      mealPlanning: { weeklyRecipes: -1, twoWeekPlanning: false }, // 7-day planning with unlimited entries
-      gemini: { weekly: 15 }
-    },
-    family: {
-      searches: { weekly: -1 }, // unlimited searches
-      recipes: { max: -1 }, // unlimited saved recipes
-      mealPlanning: { weeklyRecipes: -1, twoWeekPlanning: true }, // 2-week planning with unlimited entries
-      gemini: { weekly: -1 } // unlimited Gemini usage
-    }
-  };
+  private static buildPlanLimits(): PlanLimits {
+    return {
+      free: {
+        searches: { weekly: remoteConfig.getNumber('limit_free_searches_weekly') },
+        recipes: { max: remoteConfig.getNumber('limit_free_recipes_max') },
+        mealPlanning: {
+          weeklyRecipes: remoteConfig.getNumber('limit_free_mealplanning_weekly'),
+          twoWeekPlanning: false
+        },
+        gemini: { weekly: remoteConfig.getNumber('limit_free_gemini_weekly') }
+      },
+      premium: {
+        searches: { weekly: remoteConfig.getNumber('limit_premium_searches_weekly') },
+        recipes: { max: remoteConfig.getNumber('limit_premium_recipes_max') },
+        mealPlanning: {
+          weeklyRecipes: remoteConfig.getNumber('limit_premium_mealplanning_weekly'),
+          twoWeekPlanning: false
+        },
+        gemini: { weekly: remoteConfig.getNumber('limit_premium_gemini_weekly') }
+      },
+      family: {
+        searches: { weekly: -1 }, // unlimited
+        recipes: { max: -1 }, // unlimited
+        mealPlanning: { weeklyRecipes: -1, twoWeekPlanning: true },
+        gemini: { weekly: -1 } // unlimited
+      }
+    };
+  }
 
   static async getUsageLimits(user: User): Promise<UsageLimits> {
     if (!user?.id) {
@@ -106,7 +115,7 @@ class UsageService {
 
     // Determine user's plan tier
     const planTier = user.subscription?.tier || 'free';
-    const planLimits = this.PLAN_LIMITS[planTier];
+    const planLimits = this.buildPlanLimits()[planTier];
 
     const usageRef = DatabaseMonitoringService.doc('users/' + user.id + '/usage/limits');
     const usageDoc = await DatabaseMonitoringService.getDoc(usageRef);
@@ -321,7 +330,7 @@ class UsageService {
   static async updatePlanLimits(user: User, plan: 'free' | 'premium' | 'family'): Promise<void> {
     if (!user?.id) return;
 
-    const limits = this.PLAN_LIMITS[plan];
+    const limits = this.buildPlanLimits()[plan];
     const usageRef = DatabaseMonitoringService.doc('users/' + user.id + '/usage/limits');
 
     await DatabaseMonitoringService.updateDoc(usageRef, {
@@ -343,7 +352,7 @@ class UsageService {
   }
 
   static getPlanLimits(): PlanLimits {
-    return this.PLAN_LIMITS;
+    return this.buildPlanLimits();
   }
 }
 

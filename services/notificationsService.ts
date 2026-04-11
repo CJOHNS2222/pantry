@@ -1,5 +1,6 @@
 import { db } from '../firebaseConfig';
 import { doc, runTransaction, serverTimestamp, onSnapshot, DocumentReference, updateDoc, deleteDoc } from 'firebase/firestore';
+import remoteConfig from './remoteConfigService';
 
 export interface NotificationItem {
   id: string;
@@ -20,8 +21,6 @@ export interface NotificationItem {
   snoozedUntil?: any;
   expiresAt?: any;
 }
-
-const DEFAULT_MAX_NOTIFICATIONS = 200;
 
 function getNotificationsDocRef(uid: string): DocumentReference {
   return doc(db, 'users', uid, 'cache', 'notifications');
@@ -51,7 +50,7 @@ function serializeWrite(uid: string, fn: () => Promise<void>): Promise<void> {
  * Calls are serialized per-uid and retried on failed-precondition (optimistic
  * concurrency conflicts that Firebase does not auto-retry).
  */
-export async function appendNotificationToUser(uid: string, notification: NotificationItem, maxItems = DEFAULT_MAX_NOTIFICATIONS) {
+export async function appendNotificationToUser(uid: string, notification: NotificationItem, maxItems = remoteConfig.getNumber('notifications_max_stored')) {
   return serializeWrite(uid, () => _appendWithRetry(uid, notification, maxItems));
 }
 

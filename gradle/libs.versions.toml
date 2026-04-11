@@ -1,0 +1,16 @@
+[versions]
+appcompat = "1.7.1"
+billing = "8.3.0"
+framework = "15.0.0"
+gradle = "9.1.0"
+gradle-toolchains-foojay-resolver-convention = "1.0.0"
+compileSdk = "36"
+
+[libraries]
+androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
+billing = { group = "com.android.billingclient", name = "billing", version.ref = "billing" }
+framework = { group = "org.apache.cordova", name = "framework", version.ref = "framework" }
+gradle = { group = "com.android.tools.build", name = "gradle", version.ref = "gradle" }
+
+[plugins]
+gradle-toolchains-foojay-resolver-convention = { id = "org.gradle.toolchains.foojay-resolver-convention", version.ref = "gradle-toolchains-foojay-resolver-convention" }
