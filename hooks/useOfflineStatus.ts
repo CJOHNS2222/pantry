@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { offlineQueue } from '../services/offlineQueueService';
 import DatabaseMonitoringService from '../services/databaseMonitoringService';
 import { log } from '../services/logService';
@@ -28,7 +28,10 @@ export const useOfflineStatus = () => {
     syncProgress: null,
     hasConflicts: false
   });
-
+  const connectivityTestInProgress = useRef(false);
+  // Ref-based guards prevent stale closure race conditions
+  const isSyncingRef = useRef(false);
+  const isOnlineRef = useRef(navigator.onLine);
   // Function to test actual internet connectivity
   const testConnectivity = useCallback(async (): Promise<boolean> => {
     try {
@@ -54,11 +57,22 @@ export const useOfflineStatus = () => {
 
   // Update online status with actual connectivity test
   const updateOnlineStatus = useCallback(async () => {
-    const isActuallyOnline = await testConnectivity();
-    setSyncStatus(prev => ({
-      ...prev,
-      isOnline: isActuallyOnline
-    }));
+    // Prevent concurrent connectivity tests
+    if (connectivityTestInProgress.current) {
+      return;
+    }
+
+    connectivityTestInProgress.current = true;
+    try {
+      const isActuallyOnline = await testConnectivity();
+      isOnlineRef.current = isActuallyOnline;
+      setSyncStatus(prev => ({
+        ...prev,
+        isOnline: isActuallyOnline
+      }));
+    } finally {
+      connectivityTestInProgress.current = false;
+    }
   }, [testConnectivity]);
 
   // Initialize offline queue and load initial state
@@ -87,6 +101,7 @@ export const useOfflineStatus = () => {
     const handleOnline = async () => {
       // Test actual connectivity when browser reports online
       const isActuallyOnline = await testConnectivity();
+      isOnlineRef.current = isActuallyOnline;
       setSyncStatus(prev => ({
         ...prev,
         isOnline: isActuallyOnline,
@@ -95,6 +110,7 @@ export const useOfflineStatus = () => {
     };
 
     const handleOffline = () => {
+      isOnlineRef.current = false;
       setSyncStatus(prev => ({
         ...prev,
         isOnline: false
@@ -126,6 +142,7 @@ export const useOfflineStatus = () => {
   };
 
   const startSync = () => {
+    isSyncingRef.current = true;
     setSyncStatus(prev => ({
       ...prev,
       isSyncing: true,
@@ -135,6 +152,7 @@ export const useOfflineStatus = () => {
   };
 
   const endSync = (success: boolean = true, error?: string) => {
+    isSyncingRef.current = false;
     setSyncStatus(prev => ({
       ...prev,
       isSyncing: false,
@@ -153,7 +171,8 @@ export const useOfflineStatus = () => {
 
   // Enhanced sync method with progress tracking
   const syncNow = useCallback(async () => {
-    if (!syncStatus.isOnline || syncStatus.isSyncing) {
+    // Use refs to avoid stale closure race conditions
+    if (!isOnlineRef.current || isSyncingRef.current) {
       return;
     }
 
@@ -183,7 +202,8 @@ export const useOfflineStatus = () => {
       const errorMessage = err instanceof Error ? err.message : 'Sync failed';
       endSync(false, errorMessage);
     }
-  }, [syncStatus.isOnline, syncStatus.isSyncing]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Auto-sync when coming back online
   useEffect(() => {

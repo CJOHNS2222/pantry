@@ -123,7 +123,7 @@ export const estimateRecipeCostFromIngredients = async (ingredients: string[]) :
       breakdown.push({ ingredient: parsed.itemName || ing, estimatedCost, source: priceData ? 'known' : 'estimated' });
       total += estimatedCost;
     } catch (err) {
-      console.warn('estimateRecipeCostFromIngredients failed for', ing, err);
+      log.warn('estimateRecipeCostFromIngredients failed for', ing, err instanceof Error ? err.message : String(err));
       breakdown.push({ ingredient: ing, estimatedCost: 0, source: 'error' });
     }
   }
@@ -225,15 +225,15 @@ export const getCachedCommunityRatedRecipes = async (): Promise<SavedRecipe[]> =
     if (docSnap.exists()) {
       const data = docSnap.data();
       const recipes = data?.recipes || [];
-      console.log(`✅ Loaded ${recipes.length} community-rated recipes (1 database read)`);
+      // Loaded community-rated recipes from cache
       return recipes as SavedRecipe[];
     }
 
     // Fallback to retrieving saved recipes (not ideal but safe)
-    console.log('📥 No community-rated cache found, falling back to saved recipes');
+    // No community-rated cache found, falling back to saved recipes
     return await getSavedRecipes(50);
   } catch (err: unknown) {
-    console.error('❌ Error fetching community-rated cache:', err);
+    log.error('Error fetching community-rated cache', err);
     return await getSavedRecipes(50);
   }
 };
@@ -628,7 +628,7 @@ export const bulkUploadRecipes = async (
 
     for (const searchQuery of searchQueries) {
       try {
-        console.log(`Fetching recipes for: ${searchQuery}`);
+        // Fetching recipes for search query
 
         // Fetch recipes from Spoonacular
         const spoonacularRecipes = await fetchRecipesFromSpoonacular(searchQuery, recipesPerQuery);
@@ -655,12 +655,12 @@ export const bulkUploadRecipes = async (
             }
 
             result.success++;
-            console.log(`Saved recipe: ${structuredRecipe.title}`);
+            // Recipe saved successfully
 
           } catch (recipeError) {
             result.failed++;
             result.errors.push(`Failed to save recipe "${spoonacularRecipe.title}": ${recipeError}`);
-            console.error(`Failed to save recipe:`, recipeError);
+            log.error(`Failed to save recipe: ${spoonacularRecipe.title}`, recipeError);
           }
         }
 
@@ -672,7 +672,7 @@ export const bulkUploadRecipes = async (
 
       } catch (queryError) {
         result.errors.push(`Failed to fetch recipes for "${searchQuery}": ${queryError}`);
-        console.error(`Failed to fetch recipes for ${searchQuery}:`, queryError);
+        log.error(`Failed to fetch recipes for ${searchQuery}`, queryError);
         completedQueries++;
         onProgress?.(completedQueries, totalQueries);
       }
@@ -715,11 +715,11 @@ export const getSavedRecipes = async (limitCount: number = 50): Promise<SavedRec
       });
       return items.slice(0, limitCount);
     } catch (err: unknown) {
-      console.error('Error fetching saved recipes:', err);
+      log.error('Error fetching saved recipes', err);
       return [];
     }
   } catch (err: unknown) {
-    console.error("Error fetching saved recipes:", err);
+    log.error("Error fetching saved recipes", err);
     return [];
   }
 };
@@ -756,21 +756,21 @@ export const getCachedPopularRecipes = async (): Promise<SavedRecipe[]> => {
       const uniqueRecipes = (recipes as SavedRecipe[]).filter((recipe, index, self) =>
         index === self.findIndex(r => r.title === recipe.title)
       );
-      console.log(`✅ Loaded ${uniqueRecipes.length} cached recipes (1 database read)`);
+      // Loaded cached recipes
       return uniqueRecipes;
     }
 
     // If no cached recipes exist, fall back to loading individual recipes
-    console.log("📥 No cached popular recipes found, falling back to individual recipe loading...");
+    // No cached popular recipes found, falling back to individual recipe loading
     const recipes = await getSavedRecipes(50);
     // Remove duplicates even in fallback
     return recipes.filter((recipe, index, self) =>
       index === self.findIndex(r => r.title === recipe.title)
     );
   } catch (err: unknown) {
-    console.error("❌ Error fetching cached popular recipes:", err);
+    log.error("Error fetching cached popular recipes", err);
     // Fall back to direct loading if caching fails
-    console.log("🔄 Falling back to direct recipe loading...");
+    // Falling back to direct recipe loading
     const recipes = await getSavedRecipes(50);
     // Remove duplicates even in fallback
     return recipes.filter((recipe, index, self) =>
@@ -790,11 +790,11 @@ export const getCachedRecipesCache = async (cachePath: string = 'recipe_caches/r
     if (docSnap && docSnap.exists && typeof docSnap.exists === 'function' ? docSnap.exists() : docSnap.exists) {
       const data = docSnap.data();
       const recipes = Array.isArray(data?.recipes) ? data.recipes : [];
-      console.log(`✅ Loaded ${recipes.length} cached recipes from ${cachePath} (1 database read)`);
+      // Loaded cached recipes from path
       return recipes as SavedRecipe[];
     }
 
-    console.log(`📥 No cache found at ${cachePath}`);
+    // No cache found at path
 
     // If the `recipe_caches` path is not readable by the client (security rules),
     // try the system fallback path which is readable by authenticated users.
@@ -806,19 +806,19 @@ export const getCachedRecipesCache = async (cachePath: string = 'recipe_caches/r
         if (sysSnap && sysSnap.exists && typeof sysSnap.exists === 'function' ? sysSnap.exists() : sysSnap.exists) {
           const sysData = sysSnap.data();
           const sysRecipes = Array.isArray(sysData?.recipes) ? sysData.recipes : [];
-          console.log(`✅ Loaded ${sysRecipes.length} cached recipes from ${systemPath} (1 database read)`);
+          // Loaded cached recipes from system path
           return sysRecipes as SavedRecipe[];
         }
       } catch (permErr: unknown) {
-        console.warn(`⚠️ Unable to read ${cachePath} (may be permission denied):`, permErr instanceof Error ? permErr.message : permErr);
+        log.warn(`Unable to read ${cachePath} (may be permission denied)`, permErr instanceof Error ? permErr.message : permErr);
       }
     }
 
-    console.log(`🔄 Falling back to getSavedRecipes(50)`);
+    // Falling back to getSavedRecipes(50)
     const recipes = await getSavedRecipes(50);
     return recipes;
   } catch (err: unknown) {
-    console.error(`❌ Error fetching cached recipes at ${cachePath}:`, err);
+    log.error(`Error fetching cached recipes at ${cachePath}`, err);
     // If we got a permission error when reading the cache, try the system path once
     if (cachePath.startsWith('recipe_caches/')) {
       try {
@@ -828,11 +828,11 @@ export const getCachedRecipesCache = async (cachePath: string = 'recipe_caches/r
         if (sysSnap && sysSnap.exists && typeof sysSnap.exists === 'function' ? sysSnap.exists() : sysSnap.exists) {
           const sysData = sysSnap.data();
           const sysRecipes = Array.isArray(sysData?.recipes) ? sysData.recipes : [];
-          console.log(`✅ Loaded ${sysRecipes.length} cached recipes from ${systemPath} (1 database read)`);
+          // Loaded cached recipes from system path
           return sysRecipes as SavedRecipe[];
         }
       } catch (innerErr: unknown) {
-        console.warn('⚠️ System cache read also failed:', innerErr instanceof Error ? innerErr.message : innerErr);
+        log.warn('System cache read also failed', innerErr instanceof Error ? innerErr.message : innerErr);
       }
     }
 
@@ -849,7 +849,7 @@ export const cachePopularRecipes = async (recipes: SavedRecipe[]): Promise<void>
     const { getAuth } = await import('firebase/auth');
     const auth = getAuth();
     if (!auth.currentUser) {
-      console.log("⚠️ User not authenticated, skipping recipe caching");
+      // User not authenticated, skipping recipe caching
       return;
     }
 
@@ -859,9 +859,9 @@ export const cachePopularRecipes = async (recipes: SavedRecipe[]): Promise<void>
       lastUpdated: new Date(),
       version: 1
     });
-    console.log(`💾 Cached ${recipes.length} popular recipes for efficient loading`);
+    // Cached popular recipes for efficient loading
   } catch (err: unknown) {
-    console.error("❌ Error caching popular recipes:", err);
+    log.error("Error caching popular recipes", err);
     // Don't throw - caching failure shouldn't break the app
   }
 };
@@ -989,9 +989,9 @@ export const searchRecipesInFirestore = async (searchTerm: string): Promise<Save
 
     return fullRecipes;
   } catch (err: unknown) {
-    console.error("Error searching recipes:", err);
+    log.error("Error searching recipes", err);
     // Fallback to old method if search index fails
-    console.log("🔄 Falling back to full collection search...");
+    // Falling back to full collection search
     return await searchRecipesInFirestoreFallback(searchTerm);
   } finally {
     perfTrace.stop();
@@ -1018,7 +1018,7 @@ const searchRecipesInFirestoreFallback = async (searchTerm: string): Promise<Sav
 
     return filteredRecipes;
   } catch (err: unknown) {
-    console.error("Error in fallback search:", err);
+    log.error("Error in fallback search", err);
     return [];
   }
 };

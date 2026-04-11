@@ -7,6 +7,9 @@ import { log } from './services/logService';
 import { I18nProvider } from './src/components/I18nProvider';
 import { AppProvider } from './contexts/AppContext';
 import { AppActionsProvider } from './contexts/AppActionsContext';
+import { cleanupCacheService } from './services/cacheService';
+import DatabaseMonitoringService from './services/databaseMonitoringService';
+import { offlineDataCache } from './services/offlineDataCache';
 
 // Initialize Sentry for error reporting only when a real DSN is configured
 // and running in production. This avoids noisy reports during local testing.
@@ -24,6 +27,13 @@ window.addEventListener('error', (event) => {
 window.addEventListener('unhandledrejection', (event) => {
   log.error('Unhandled promise rejection:', { reason: String(event.reason) }, 'GlobalError');
   captureError(event.reason instanceof Error ? event.reason : new Error(String(event.reason)));
+});
+
+// Cleanup service intervals on page unload to prevent memory leaks
+window.addEventListener('pagehide', () => {
+  cleanupCacheService();
+  DatabaseMonitoringService.cleanupMonitoring();
+  offlineDataCache.destroy();
 });
 
 const rootElement = document.getElementById('root');

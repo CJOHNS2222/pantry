@@ -404,6 +404,11 @@ export class OfflineDataCache {
     // This would need to be implemented with pattern matching in a real scenario
     log.info(`Invalidating cache for household: ${householdId}`, {}, 'OfflineDataCache');
   }
+
+  // Cleanup method to clear intervals
+  destroy(): void {
+    this.cache.destroy();
+  }
 }
 
 // Create singleton instance

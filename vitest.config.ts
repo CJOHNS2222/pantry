@@ -11,6 +11,6 @@ export default defineConfig({
     exclude: ['e2e/**', 'node_modules/**', 'functions/**', 'functions/**/node_modules/**'],
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
-    watch: false
+    watch: false // Disabled for CI; run `vitest --watch` for interactive dev
   }
 });

@@ -37,6 +37,7 @@ class GeminiRequestBatcher {
   private readonly maxQueueSize = 10; // Maximum queue size
   private requestCache = new Map<string, { result: unknown; timestamp: number }>();
   private readonly cacheTTL = 5 * 60 * 1000; // 5 minutes cache
+  private readonly maxCacheSize = 100; // Maximum cache entries
 
   // Debounced processing
   private scheduleProcessing(): void {
@@ -118,8 +119,8 @@ class GeminiRequestBatcher {
         id,
         operation,
         resolve: (result) => {
-          // Cache successful results
-          this.requestCache.set(id, { result, timestamp: Date.now() });
+          // Cache successful results with eviction
+          this.setCacheEntry(id, result);
           resolve(result);
         },
         reject,
@@ -138,6 +139,24 @@ class GeminiRequestBatcher {
   clearCache(): void {
     this.requestCache.clear();
     log.info('Cleared Gemini request cache', {}, 'GeminiBatcher');
+  }
+
+  // Set cache entry with eviction
+  private setCacheEntry(id: string, result: unknown): void {
+    // Evict oldest entries if at max size
+    if (this.requestCache.size >= this.maxCacheSize) {
+      const entries = Array.from(this.requestCache.entries());
+      // Sort by timestamp (oldest first)
+      entries.sort((a, b) => a[1].timestamp - b[1].timestamp);
+      // Remove oldest 10% or at least 1 entry
+      const toRemove = Math.max(1, Math.floor(this.maxCacheSize * 0.1));
+      for (let i = 0; i < toRemove && entries.length > 0; i++) {
+        this.requestCache.delete(entries[i][0]);
+      }
+      log.debug(`Evicted ${toRemove} old cache entries`, {}, 'GeminiBatcher');
+    }
+
+    this.requestCache.set(id, { result, timestamp: Date.now() });
   }
 
   // Get queue status

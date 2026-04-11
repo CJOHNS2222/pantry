@@ -1539,6 +1539,8 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                             <div className="flex gap-1">
                                 <button
                                     onClick={() => setSavedSort('recent')}
+                                    aria-label="Sort by most recent"
+                                    aria-pressed={savedSort === 'recent'}
                                     className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${
                                         savedSort === 'recent'
                                             ? 'bg-[var(--accent-color)] text-white'
@@ -1549,6 +1551,8 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                                 </button>
                                 <button
                                     onClick={() => setSavedSort('top-rated')}
+                                    aria-label="Sort by top rated"
+                                    aria-pressed={savedSort === 'top-rated'}
                                     className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${
                                         savedSort === 'top-rated'
                                             ? 'bg-[var(--accent-color)] text-white'
@@ -1566,6 +1570,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                             <div className="flex gap-2">
                                                                 <button
                                                                 data-testid="recipefinder-import-button"
+                                                                aria-label="Import recipes from file"
                                                                 className="px-4 py-2 bg-theme-secondary text-theme-primary rounded-lg font-bold shadow hover:bg-theme-secondary/90 transition-colors"
                                                                 onClick={() => setShowImportModal(true)}
                                                                 >
@@ -1600,6 +1605,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                                 Export Recipes
                             </button>
                                 <button
+                                    aria-label="Add a new recipe manually"
                                     className="px-4 py-2 bg-theme-secondary text-theme-primary rounded-lg font-bold shadow hover:bg-theme-secondary/80 transition-colors"
                                     onClick={() => {
                                         // Open editor modal for new recipe
@@ -1653,7 +1659,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                                 data-testid="recipefinder-search-button"
                                 disabled={loadingState === LoadingState.LOADING}
                                 className="absolute right-10 top-1/2 -translate-y-1/2 p-1 rounded-lg text-theme-secondary hover:text-[var(--accent-color)] hover:bg-theme-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                title="Search recipes"
+                                aria-label="Search recipes"
                                 data-tutorial="search-button"
                             >
                                 <Search className="w-4 h-4" />
@@ -1670,7 +1676,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                                         ? 'bg-red-500 text-white animate-pulse'
                                         : 'text-theme-secondary hover:text-[var(--accent-color)] hover:bg-theme-secondary'
                                 }`}
-                                title="Voice search"
+                                aria-label={isListening ? 'Stop voice search' : 'Start voice search'}
                                 data-tutorial="voice-search"
                             >
                                 <Mic className="w-4 h-4" />
@@ -1786,6 +1792,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                                                                 id="maxPrepTime"
                                                                 name="maxPrepTime"
                                                                 type="number"
+                                                                min="0"
                                                                 value={maxPrepTime}
                                                                 onChange={(e) => setMaxPrepTime(e.target.value)}
                                                                 className="w-full p-2 rounded-lg border border-theme bg-theme-primary text-theme-primary focus:border-[var(--accent-color)] outline-none text-sm"
@@ -1799,6 +1806,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                                                                 id="servings"
                                                                 name="servings"
                                                                 type="number"
+                                                                min="0"
                                                                 value={servings}
                                                                 onChange={(e) => setServings(e.target.value)}
                                                                 className="w-full p-2 rounded-lg border border-theme bg-theme-primary text-theme-primary focus:border-[var(--accent-color)] outline-none text-sm"
@@ -1811,6 +1819,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                                                                 id="maxCookTime"
                                                                 name="maxCookTime"
                                                                 type="number"
+                                                                min="0"
                                                                 value={maxCookTime}
                                                                 onChange={(e) => setMaxCookTime(e.target.value)}
                                                                 className="w-full p-2 rounded-lg border border-theme bg-theme-primary text-theme-primary focus:border-[var(--accent-color)] outline-none text-sm"
@@ -1824,6 +1833,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                                                                 id="maxIngredients"
                                                                 name="maxIngredients"
                                                                 type="number"
+                                                                min="0"
                                                                 value={maxIngredients}
                                                                 onChange={(e) => setMaxIngredients(e.target.value)}
                                                                 className="w-full p-2 rounded-lg border border-theme bg-theme-primary text-theme-primary focus:border-[var(--accent-color)] outline-none text-sm"
@@ -1944,18 +1954,21 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                         <span className="text-theme-secondary/60">Suggestions:</span>
                         <button 
                             onClick={() => setSpecificQuery('chicken')}
+                            aria-label="Search for chicken recipes"
                             className="px-3 py-1 bg-theme-secondary/50 rounded-full hover:bg-theme-secondary/70 transition-colors"
                         >
                             chicken
                         </button>
                         <button 
                             onClick={() => setSpecificQuery('pasta')}
+                            aria-label="Search for pasta recipes"
                             className="px-3 py-1 bg-theme-secondary/50 rounded-full hover:bg-theme-secondary/70 transition-colors"
                         >
                             pasta
                         </button>
                         <button 
                             onClick={() => setSpecificQuery('salad')}
+                            aria-label="Search for salad recipes"
                             className="px-3 py-1 bg-theme-secondary/50 rounded-full hover:bg-theme-secondary/70 transition-colors"
                         >
                             salad

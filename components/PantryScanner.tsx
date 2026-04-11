@@ -11,6 +11,7 @@ import { PantryItem, LoadingState, ConsumptionSuggestion, ExpirationAlert, Custo
 import { Tab } from '../types/app';
 import AnalyticsService from '../services/analyticsService';
 import { GeminiLoadingOverlay, IMAGE_ANALYSIS_STAGES } from './GeminiLoadingOverlay';
+import { log } from '../services/logService';
 
 // Temporary interface for receipt scan results that may include price data
 interface ReceiptScanResult {
@@ -133,7 +134,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
     try {
       await onUpdateItem(index, updates);
     } catch (error) {
-      console.error('Failed to update item:', error);
+      log.error('Failed to update item', { error });
     }
   };
 
@@ -153,7 +154,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
       
       appActions.addToast('Found some meal ideas!', 'success');
     } catch (error) {
-      console.error('Failed to get meal suggestions:', error);
+      log.error('Failed to get meal suggestions', { error });
       appActions.addToast('Failed to get meal suggestions. Try again.', 'error');
     } finally {
       setLoadingState(LoadingState.IDLE);
@@ -374,7 +375,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
           setShowBulkQuantityEdit(true);
         }
       } catch (error) {
-        console.error('Failed to parse pending quantity edits:', error);
+        log.error('Failed to parse pending quantity edits', { error });
       }
     }
   }, []);
@@ -591,7 +592,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
               appActions.addToast('No barcode detected. Try taking a clearer photo or use manual entry.', 'error');
             }
           } catch (error) {
-            console.error('Barcode detection error:', error);
+            log.error('Barcode detection error', { error });
             appActions.addToast('Barcode detection failed. Try taking a clearer photo or use manual entry.', 'error');
           } finally {
             setLoadingState(LoadingState.IDLE);
@@ -693,7 +694,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
         setLoadingState(LoadingState.IDLE);
       }, 3000);
     } catch (err) {
-      console.error('Image analysis failed:', err);
+      log.error('Image analysis failed', { err });
       const msg = err instanceof Error ? err.message : 'Failed to analyze image. Please try again.';
       setImageAnalyzeError(msg);
       appActions.addToast(msg, 'error');
@@ -717,7 +718,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
         setLoadingState(LoadingState.IDLE);
       }, 3000);
     } catch (err) {
-      console.error('Receipt analysis failed:', err);
+      log.error('Receipt analysis failed', { err });
       appActions.addToast(err instanceof Error ? err.message : 'Failed to analyze receipt. Please try again.', 'error');
       setLoadingState(LoadingState.ERROR);
     }
@@ -1596,7 +1597,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                     try {
                       await InventoryCacheService.removeItemFromCache(it.id, household?.id, user?.id);
                     } catch (err) {
-                      console.error('Failed to remove imported item from cache', err);
+                      log.error('Failed to remove imported item from cache', { err });
                     }
                   }
                 } finally {
@@ -1732,7 +1733,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
               // Add to current session via provided prop
               await onAddItems(items);
             } catch (err) {
-              console.error('Failed to add imported items to session', err);
+              log.error('Failed to add imported items to session', { err });
             }
           }}
         />
@@ -1765,6 +1766,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                 <button
                   onClick={() => setSearchQuery('')}
                   className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-theme-secondary opacity-50 hover:opacity-100"
+                  aria-label="Clear search"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -1852,6 +1854,8 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
           {/* Filter Button */}
           <button
             onClick={() => setShowFilters(!showFilters)}
+            aria-label={showFilters ? 'Hide filters' : 'Show filters'}
+            aria-expanded={showFilters}
             className={`p-2 rounded-lg border transition-colors ${
               showFilters || Object.values(pantryFilter).some(v => 
                 Array.isArray(v) ? v.length > 0 : v !== defaultPantryFilter[v as keyof PantryFilter]
@@ -2006,6 +2010,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
               <button
                 onClick={closeModal}
                 data-testid="pantry-add-modal-close"
+                aria-label="Close add items"
                 className="p-2 hover:bg-theme-secondary rounded-full transition-colors"
               >
                 <X className="w-5 h-5 text-theme-secondary" />
@@ -2308,7 +2313,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                               setScanResults(updated);
                             }} className="w-full px-2 py-1 rounded bg-theme-primary border border-theme text-theme-primary text-sm" />
                             <div className="flex flex-wrap gap-2 mt-2">
-                              <input type="number" value={parseInt(sItem.quantity_estimate || '1')} onChange={(e) => {
+                              <input type="number" min="0" value={parseInt(sItem.quantity_estimate || '1')} onChange={(e) => {
                                 const updated = [...scanResults];
                                 updated[idx] = { ...updated[idx], quantity_estimate: e.target.value };
                                 setScanResults(updated);

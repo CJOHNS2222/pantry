@@ -61,7 +61,7 @@ export function useNotifications(settings: NotificationSettings, userEmail?: str
     };
 
     setupNotifications();
-  }, [settings.enabled, settings.time, settings.types, userEmail, mealPlan]);
+  }, [settings.enabled, settings.time, settings.types, userEmail]);
 
   const requestNotificationPermission = async () => {
     try {

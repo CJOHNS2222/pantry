@@ -204,6 +204,7 @@ export const EnhancedShoppingListItem: React.FC<ShoppingListItemProps> = ({
               }}
               className="p-2 text-theme-secondary opacity-60 hover:opacity-100 hover:text-[var(--accent-color)] transition-opacity"
               title="Compare prices"
+              aria-label="Compare prices"
             >
               <Calculator className="w-4 h-4" />
             </button>
@@ -216,6 +217,7 @@ export const EnhancedShoppingListItem: React.FC<ShoppingListItemProps> = ({
               onRemove(item.id);
             }}
             className="p-2 text-theme-secondary opacity-30 hover:opacity-100 hover:text-red-500 transition-opacity"
+            aria-label={`Remove ${item.item}`}
           >
             <Trash2 className="w-4 h-4" />
           </button>

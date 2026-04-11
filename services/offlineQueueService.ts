@@ -1,6 +1,7 @@
 import { db } from '../firebaseConfig';
 import DatabaseMonitoringService from './databaseMonitoringService';
 import { serverTimestamp } from 'firebase/firestore';
+import { log } from './logService';
 
 // IndexedDB setup
 const DB_NAME = 'SmartPantryQueue';
@@ -242,7 +243,7 @@ class OfflineQueueService {
 
     if (retryCount >= maxRetries) {
       // Move to failed operations or notify user
-      console.error(`Operation failed after ${maxRetries} retries:`, op, errorMessage);
+      log.error(`Operation failed after ${maxRetries} retries`, { op, errorMessage }, 'offlineQueueService');
       return;
     }
 

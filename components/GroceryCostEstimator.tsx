@@ -5,6 +5,7 @@ import { groceryPriceService, PriceData } from '../services/groceryPriceService'
 import { parseIngredientForShoppingList } from '../utils/appUtils';
 import { useAppActions } from '../contexts/AppActionsContext';
 import { useApp } from '../contexts/AppContext';
+import { log } from '../services/logService';
 
 interface GroceryCostEstimatorProps {
   mealPlan: DayPlan[];
@@ -71,7 +72,7 @@ export const GroceryCostEstimator: React.FC<GroceryCostEstimatorProps> = ({ meal
 
       setPriceData(newPriceData);
     } catch (error) {
-      console.error('Error fetching prices:', error);
+      log.error('Error fetching prices', { error });
     } finally {
       setLoadingPrices(false);
     }
@@ -109,7 +110,7 @@ export const GroceryCostEstimator: React.FC<GroceryCostEstimatorProps> = ({ meal
 
       addToast('Price submitted successfully! Thank you for contributing.', 'success');
     } catch (error) {
-      console.error('Error submitting price:', error);
+      log.error('Error submitting price', { error });
       addToast('Error submitting price. Please try again.', 'error');
     }
   };
@@ -469,6 +470,7 @@ export const GroceryCostEstimator: React.FC<GroceryCostEstimatorProps> = ({ meal
                           <input
                             type="number"
                             step="0.01"
+                            min="0"
                             placeholder="Price"
                             className="px-2 py-1 text-sm border rounded text-black"
                             value={userPriceInputs[item.ingredient]?.price || ''}

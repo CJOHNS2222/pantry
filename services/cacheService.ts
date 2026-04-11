@@ -19,13 +19,22 @@ class ReadThroughCache<T> {
   private stats: CacheStats = { hits: 0, misses: 0, evictions: 0, size: 0 };
   private maxSize: number;
   private defaultTTL: number;
+  private cleanupInterval: NodeJS.Timeout | null = null;
 
   constructor(maxSize: number = 1000, defaultTTL: number = 5 * 60 * 1000) { // 5 minutes default TTL
     this.maxSize = maxSize;
     this.defaultTTL = defaultTTL;
 
     // Periodic cleanup
-    setInterval(() => this.cleanup(), 60000); // Clean up every minute
+    this.cleanupInterval = setInterval(() => this.cleanup(), 60000); // Clean up every minute
+  }
+
+  // Cleanup method to clear the interval
+  destroy(): void {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = null;
+    }
   }
 
   // Get data from cache or fetch from source
@@ -212,11 +221,23 @@ class FirestoreCache {
     this.queryCache.clear();
     this.documentCache.clear();
   }
+
+  // Cleanup method to clear intervals
+  destroy(): void {
+    this.queryCache.destroy();
+    this.documentCache.destroy();
+  }
 }
 
 // Create singleton instances
 export const firestoreCache = new FirestoreCache();
 export const generalCache = new ReadThroughCache(1000, 10 * 60 * 1000); // 10 minutes general cache
+
+// Cleanup function for memory management
+export const cleanupCacheService = (): void => {
+  firestoreCache.destroy();
+  generalCache.destroy();
+};
 
 // Utility functions for common caching patterns
 export const cacheUtils = {

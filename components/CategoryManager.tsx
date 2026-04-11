@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Plus, Edit2, Trash2, X, Check, Palette } from 'lucide-react';
 import { useModalOpen } from '../utils/useModalOpen';
+import { useKeyboardNavigation } from '../hooks/useKeyboardNavigation';
 import { CustomCategory } from '../types';
 import { getCategoryIcon, getCategoryColor } from '../utils/appUtils';
 
@@ -38,6 +39,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({
   maxCategories
 }) => {
   useModalOpen(isOpen);
+  useKeyboardNavigation({ onEscape: onClose, enabled: isOpen });
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
@@ -126,6 +128,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({
                     value={formData.name}
                     onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                     placeholder="Enter category name"
+                    maxLength={50}
                     className="w-full px-3 py-2 bg-theme-primary border border-theme rounded-lg text-theme-primary placeholder-theme-secondary focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]"
                     data-testid="category-name-input"
                   />

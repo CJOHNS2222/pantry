@@ -1,5 +1,6 @@
 import DatabaseMonitoringService from './databaseMonitoringService';
 import { PantryItem } from '../types';
+import { log } from './logService';
 
 export interface CachedInventoryData {
   // Item ID -> [category, imageUrl, name, quantity, location, recipeId?, recipeName?, ...other fields]
@@ -113,17 +114,17 @@ export class InventoryCacheService {
               }
         }
 
-        console.log(`✅ Loaded ${items.length} cached inventory items (1 database read)`);
+        // Loaded cached inventory items
         return items;
       }
 
       // Cache doesn't exist or is invalid
-      console.log("📥 No cached inventory found");
+      // No cached inventory found
       return [];
     } catch (err: any) {
       // Don't log permission errors as they may be expected
       if (!err.message.includes('Missing or insufficient permissions')) {
-        console.error("❌ Error fetching cached inventory:", err);
+        log.error("Error fetching cached inventory", { err });
       }
       return [];
     }
@@ -159,7 +160,7 @@ export class InventoryCacheService {
 
       await DatabaseMonitoringService.setDoc(cacheRef, cachedData);
     } catch (err: any) {
-      console.error("❌ Error updating inventory cache:", err);
+      log.error("Error updating inventory cache", { err });
       // Don't throw - caching failures shouldn't break the app
     }
   }
@@ -192,7 +193,7 @@ export class InventoryCacheService {
         await DatabaseMonitoringService.setDoc(cacheRef, updateData);
       }
     } catch (err: any) {
-      console.error("❌ Error adding item to cache:", err);
+      log.error("Error adding item to cache", { err });
     }
   }
 
@@ -224,9 +225,9 @@ export class InventoryCacheService {
 
       // Update cache with all items at once (1 write operation)
       await this.updateCache(allItems, householdId, userId);
-      console.log(`📦 Added ${items.length} items to cache in 1 batch operation`);
+      // Added items to cache in 1 batch operation
     } catch (err: any) {
-      console.error("❌ Error adding items to cache:", err);
+      log.error("Error adding items to cache", { err });
     }
   }
 
@@ -259,7 +260,7 @@ export class InventoryCacheService {
 
       await DatabaseMonitoringService.updateDoc(cacheRef, updateData);
     } catch (err: any) {
-      console.error("❌ Error updating item in cache:", err);
+      log.error("Error updating item in cache", { err });
     }
   }
 
@@ -286,7 +287,7 @@ export class InventoryCacheService {
 
       await DatabaseMonitoringService.updateDoc(cacheRef, updateData);
     } catch (err: any) {
-      console.error("❌ Error removing item from cache:", err);
+      log.error("Error removing item from cache", { err });
     }
   }
 
@@ -299,9 +300,9 @@ export class InventoryCacheService {
       // This is essentially a cache refresh/replacement operation
       // It replaces the entire cached inventory with the new state
       await this.updateCache(newItems, householdId, userId);
-      console.log(`🔄 Bulk updated inventory cache with ${newItems.length} items (1 write operation)`);
+      // Bulk updated inventory cache
     } catch (err: any) {
-      console.error("❌ Error bulk updating inventory cache:", err);
+      log.error("Error bulk updating inventory cache", { err });
     }
   }
 
@@ -309,7 +310,7 @@ export class InventoryCacheService {
    * Force refresh the cache by reloading from individual documents
    */
   static async refreshCache(householdId?: string, userId?: string): Promise<PantryItem[]> {
-    console.log('🔄 Force refreshing inventory cache...');
+    // Force refreshing inventory cache
     return await this.loadAndCacheInventory(householdId, userId);
   }
 
@@ -325,9 +326,9 @@ export class InventoryCacheService {
         version: this.CACHE_VERSION,
         itemCount: 0
       });
-      console.log("🗑️ Cleared inventory cache");
+      // Cleared inventory cache
     } catch (err: any) {
-      console.error("❌ Error clearing inventory cache:", err);
+      log.error("Error clearing inventory cache", { err });
     }
   }
 }

@@ -2,6 +2,7 @@ import { PushNotifications, PushNotificationSchema, ActionPerformed } from '@cap
 import { Capacitor } from '@capacitor/core';
 import { messaging } from '../firebaseConfig';
 import { getToken, onMessage } from 'firebase/messaging';
+import { log } from './logService';
 
 class PushNotificationService {
   private static instance: PushNotificationService;
@@ -26,7 +27,7 @@ class PushNotificationService {
       // Request permission for push notifications
       const permission = await PushNotifications.requestPermissions();
       if (permission.receive !== 'granted') {
-        console.log('Push notification permissions not granted');
+        // Push notification permissions not granted
         return;
       }
 
@@ -37,16 +38,16 @@ class PushNotificationService {
       this.setupListeners();
 
       this.isInitialized = true;
-      console.log('Push notifications initialized successfully');
+      // Push notifications initialized successfully
     } catch (err: any) {
-      console.error('Failed to initialize push notifications:', err);
+      log.error('Failed to initialize push notifications', err);
     }
   }
 
   private setupListeners(): void {
     // When registration succeeds
     PushNotifications.addListener('registration', (token) => {
-      console.log('Push notification registration successful, token:', token.value);
+      // Push notification registration successful
       this.fcmToken = token.value;
       // Store token for server-side sending
       this.storeToken(token.value);
@@ -54,19 +55,19 @@ class PushNotificationService {
 
     // When registration fails
     PushNotifications.addListener('registrationError', (error) => {
-      console.error('Push notification registration failed:', error);
+      log.error('Push notification registration failed', { error });
     });
 
     // When a notification is received while app is in foreground
     PushNotifications.addListener('pushNotificationReceived', (notification) => {
-      console.log('Push notification received:', notification);
+      // Push notification received
       // Handle foreground notification (could show in-app notification)
       this.handleForegroundNotification(notification);
     });
 
     // When a notification action is performed
     PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
-      console.log('Push notification action performed:', action);
+      // Push notification action performed
       this.handleNotificationAction(action);
     });
   }
@@ -75,16 +76,16 @@ class PushNotificationService {
     try {
       // Store token in localStorage for now (in production, send to your server)
       localStorage.setItem('fcmToken', token);
-      console.log('FCM token stored:', token);
+      // FCM token stored
     } catch (err: any) {
-      console.error('Failed to store FCM token:', err);
+      log.error('Failed to store FCM token', { err });
     }
   }
 
   private handleForegroundNotification(notification: PushNotificationSchema): void {
     // When app is in foreground, show in-app notification instead of system notification
     // This prevents duplicate notifications
-    console.log('Handling foreground notification:', notification);
+    // Handling foreground notification
 
     // You could dispatch to your existing notification system here
     // For example, create an in-app notification banner
@@ -92,7 +93,7 @@ class PushNotificationService {
 
   private handleNotificationAction(action: ActionPerformed): void {
     // Handle user tapping on notification or action buttons
-    console.log('Handling notification action:', action);
+    // Handling notification action
 
     const { notification, actionId } = action;
 
@@ -130,13 +131,13 @@ class PushNotificationService {
   private navigateToPantry(itemId?: string): void {
     // Use your app's navigation system
     // For example: router.push('/pantry' + (itemId ? `?highlight=${itemId}` : ''));
-    console.log('Navigate to pantry, highlight item:', itemId);
+    // Navigate to pantry, highlight item
   }
 
   private navigateToShoppingList(): void {
     // Use your app's navigation system
     // For example: router.push('/shopping');
-    console.log('Navigate to shopping list');
+    // Navigate to shopping list
   }
 
   private handleDailyCheck(notification: PushNotificationSchema): void {
@@ -159,19 +160,19 @@ class PushNotificationService {
   private navigateToMeals(): void {
     // Use your app's navigation system
     // For example: router.push('/meals');
-    console.log('Navigate to meal planner');
+    // Navigate to meal planner
   }
 
   // Method to send test push notification (for development)
   async sendTestNotification(): Promise<void> {
     if (!this.fcmToken) {
-      console.error('No FCM token available');
+      log.error('No FCM token available');
       return;
     }
 
     // In production, this would be done server-side
     // For testing, you could use Firebase Admin SDK or REST API
-    console.log('Test notification would be sent to token:', this.fcmToken);
+    // Test notification would be sent
   }
 
   // Get current FCM token
@@ -191,9 +192,9 @@ class PushNotificationService {
       localStorage.removeItem('fcmToken');
       this.fcmToken = null;
       this.isInitialized = false;
-      console.log('Push notifications unregistered');
+      // Push notifications unregistered
     } catch (err: any) {
-      console.error('Failed to unregister push notifications:', err);
+      log.error('Failed to unregister push notifications', { err });
     }
   }
 }

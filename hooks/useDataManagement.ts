@@ -312,6 +312,8 @@ export function useDataManagement(
   const prevMealPlanRef = useRef<DayPlan[]>([]);
   const prevShoppingListRef = useRef<ShoppingItem[]>([]);
   const prevSavedRecipesRef = useRef<SavedRecipe[]>([]);
+  // Ref to hold latest inventory for closure-safe comparisons inside Firestore listeners
+  const inventoryRef = useRef<PantryItem[]>([]);
 
   // Helper function to clean objects by removing undefined fields (Firestore requirement)
   const cleanObject = (obj: any): any => {
@@ -447,6 +449,11 @@ export function useDataManagement(
     return id;
   }, []);
 
+  // Keep inventoryRef current so Firestore listeners can do stale-closure-safe comparisons
+  useEffect(() => {
+    inventoryRef.current = inventory;
+  }, [inventory]);
+
   // Firestore synchronization effects
   useEffect(() => {
     if (!user?.id) {
@@ -524,7 +531,7 @@ export function useDataManagement(
                 items.push(item);
               }
             }
-            if (hasPantryItemsChanged(items, inventory)) {
+            if (hasPantryItemsChanged(items, inventoryRef.current)) {
               setRemoteInventoryUpdate(true);
               setInventory(items);
             }
@@ -664,7 +671,7 @@ export function useDataManagement(
           log.error('Failed to process offline queue', err, 'DataManagement');
         });
     }
-  }, [isOnline]);
+  }, [isOnline, addToast]);
 
   // Show risk questionnaire to new users shortly after first login
   useEffect(() => {

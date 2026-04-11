@@ -5,6 +5,36 @@ All notable changes to Stock & Spoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.17] - 2026-04-10
+
+### Fixed
+- **Landing page styles** (audit 7D): Converted LandingPage.tsx from extensive inline style objects to Tailwind CSS utility classes for consistency with the rest of the application. Added custom font families (Inter, Playfair Display) to Tailwind config.
+- **Memory leak cleanup** (audit 1A): Wired `pagehide` event in `index.tsx` to call `cleanupCacheService()`, `DatabaseMonitoringService.cleanupMonitoring()`, and `offlineDataCache.destroy()` — prevents orphaned intervals and listeners on page unload.
+- **Cache eviction** (audit 1B): Added LRU eviction to `imageCacheService.ts` (`MAX_MEMORY_CACHE_SIZE = 300`, evicts oldest 10% on overflow) — prevents unbounded memory growth from cached image URLs.
+- **Race conditions** (audit 1D): Added `isSyncingRef`/`isOnlineRef` refs to `useOfflineStatus.ts` so `syncNow` reads from refs instead of stale closure state, eliminating the risk of concurrent sync execution.
+- **Stale closures** (audit 1E): Added `inventoryRef` in `useDataManagement.ts` to give Firestore snapshot listeners stable access to current inventory without re-subscription; added missing `addToast` to a `useEffect` dependency array.
+- **Escape key handling** (audit 4B): Added Escape key handling to `CategoryManager` (via `useKeyboardNavigation`) and `ExpirationDatePicker` (via `useEffect` keydown listener).
+- **Accessibility aria-labels** (audit 4A): Added `aria-label` attributes to icon-only buttons across `EnhancedShoppingListItem`, `QuantityUnitPicker`, `MealPlanner`, `RecipeFinder`, and `PantryScanner`.
+- **Icon path casing** (audit 11A): Renamed `public/icons/icon.PNG` → `icon.png` and updated `index.html`, `android/capacitor.config.json`, and `public/manifest.webmanifest` for Linux/case-sensitive server compatibility.
+- **TypeScript errors**: Fixed `maxLength` prop type in `Household.tsx` (`string` → `number`), narrowed `unknown` catch in `recipeService.ts`, and fixed undefined variable reference in `recipeService.ts`.
+- **Offline queue logging**: Replaced remaining `console.error` in `offlineQueueService.ts` with `log.error`.
+
+### Changed
+- **ESLint ignores** (audit 11C): Added `ios/**` and `coverage/**` to ignore list in `eslint.config.ts`.
+- **Vitest config** (audit 11B): Added explanatory comment to `watch: false` in `vitest.config.ts`.
+
+## [1.5.16] - 2026-04-10
+
+### Fixed
+- **Form validation** (audit 7C): Added input validation constraints to prevent invalid data entry:
+  - CategoryManager: maxLength="50" on category name inputs
+  - FreezeTransitionModal: max="730" on freezer shelf-life input
+  - GroceryCostEstimator: min="0.01" on price inputs
+  - PantryScanner: min="0" on quantity inputs
+  - Household: maxLength="50" on household name inputs
+  - Settings: min="0" on weight and age inputs
+  - RecipeFinder: min="0" on prep time, servings, cook time, and ingredients inputs
+
 ## [1.5.15] - 2026-04-10
 
 ### Fixed

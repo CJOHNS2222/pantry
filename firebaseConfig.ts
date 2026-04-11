@@ -40,8 +40,7 @@ export const functions = getFunctions(app);
   } catch (err: any) {
     // Soft failure: warn in development only — monitoring services are non-critical on init
     if (import.meta.env.DEV) {
-      // eslint-disable-next-line no-console
-      console.warn('DatabaseMonitoringService failed to initialize (deferred):', err?.message || err);
+      log.warn('DatabaseMonitoringService failed to initialize (deferred)', { message: err?.message || err });
     }
   }
 })();

@@ -74,6 +74,7 @@ export default function FreezeTransitionModal({ householdId, inventoryId, itemNa
           <input
             type="number"
             min={7}
+            max={730}
             value={freezerDays}
             onChange={e => setFreezerDays(Number(e.target.value) || defaultDays)}
             className="w-28 px-3 py-2 rounded-lg bg-theme-secondary border border-theme text-theme-primary text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"

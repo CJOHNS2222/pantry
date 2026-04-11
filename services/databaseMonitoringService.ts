@@ -58,6 +58,7 @@ class DatabaseMonitoringService {
   private static readonly HEAVY_WRITE_WINDOW = 60000; // 1 minute in milliseconds
   private static readonly PERFORMANCE_THRESHOLD = 5000; // 5 seconds
   private static isInitialized = false;
+  private static metricsInterval: NodeJS.Timeout | null = null;
 
   // Track write patterns for heavy write detection
   private static trackWritePattern(collection: string): void {
@@ -786,7 +787,7 @@ class DatabaseMonitoringService {
       };
 
       // Set up periodic metrics logging every 30 seconds
-      setInterval(() => {
+      this.metricsInterval = setInterval(() => {
         this.logCurrentMetrics();
       }, 30000);
 
@@ -794,6 +795,14 @@ class DatabaseMonitoringService {
       console.log('🔥 Database monitoring initialized with function overrides');
     } catch (err: any) {
       console.error('Failed to initialize database monitoring:', err);
+    }
+  }
+
+  // Cleanup method to clear the metrics interval
+  static cleanupMonitoring(): void {
+    if (this.metricsInterval) {
+      clearInterval(this.metricsInterval);
+      this.metricsInterval = null;
     }
   }
 }

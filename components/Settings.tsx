@@ -725,6 +725,7 @@ export const Settings: React.FC<SettingsProps> = ({
                   id="weight"
                   name="weight"
                   type="number"
+                  min="0"
                   value={userProfile?.weight || ''}
                   onChange={(e) => handleProfileChange('weight', e.target.value ? parseInt(e.target.value) : undefined)}
                   placeholder="154"
@@ -742,6 +743,7 @@ export const Settings: React.FC<SettingsProps> = ({
                   id="age"
                   name="age"
                   type="number"
+                  min="0"
                   value={userProfile?.age || ''}
                   onChange={(e) => handleProfileChange('age', e.target.value ? parseInt(e.target.value) : undefined)}
                   placeholder="30"

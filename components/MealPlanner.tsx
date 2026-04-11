@@ -18,6 +18,7 @@ import { useAppActions } from '../contexts/AppActionsContext';
 import { useSubscription } from '../hooks/useSubscription';
 import { searchRecipes } from '../utils/searchUtils';
 import { debounce } from '../utils/debounceUtils';
+import { log } from '../services/logService';
 import { useModalOpen } from '../utils/useModalOpen';
 import { CompactRecipeCardSkeleton, MealPlanSkeleton } from './SkeletonLoader';
 import { ProgressiveImage } from './ProgressiveImage';
@@ -124,12 +125,12 @@ const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
         setCachedRecipes(recipes);
         setCachedRecipesLoaded(true);
       } catch (error) {
-        console.error('Failed to load cached recipes for meal planner, falling back:', error);
+        log.error('Failed to load cached recipes for meal planner, falling back', { error });
         try {
           const fallback = await getCachedPopularRecipes();
           setCachedRecipes(fallback);
         } catch (e) {
-          console.error('Fallback also failed:', e);
+          log.error('Fallback also failed', { e });
         }
         setCachedRecipesLoaded(true);
       }
@@ -207,7 +208,7 @@ const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
         setSearchResultsSource(null);
       }
     } catch (error) {
-      console.error('Search error:', error);
+      log.error('Search error', { error });
       setSearchResults([]);
       setSearchResultsSource(null);
     } finally {
@@ -1229,6 +1230,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
         onClick={() => setShowHelpTooltip(!showHelpTooltip)}
         className="absolute top-12 right-4 p-2 rounded-full hover:bg-theme-secondary/10 transition-colors z-10"
         title="Help"
+        aria-label="Show meal planning help"
       >
         <HelpCircle className="w-5 h-5 text-theme-secondary opacity-60 hover:opacity-100" />
       </button>
@@ -1238,6 +1240,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
         onClick={() => setShowMealPrepPlanner(true)}
         className="absolute top-12 right-16 p-2 rounded-full hover:bg-theme-secondary/10 transition-colors z-10"
         title="Smart Meal Prep Planner"
+        aria-label="Open meal prep planner"
       >
         <CalendarClock className="w-5 h-5 text-theme-secondary opacity-60 hover:opacity-100" />
       </button>
@@ -1478,6 +1481,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
                     setCurrentCalendarMonth(newMonth);
                   }}
                   className="p-1 rounded hover:bg-theme-primary/20 text-theme-secondary"
+                  aria-label="Previous month"
                 >
                   ‹
                 </button>
@@ -1514,6 +1518,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
                     setCurrentCalendarMonth(newMonth);
                   }}
                   className="p-1 rounded hover:bg-theme-primary/20 text-theme-secondary"
+                  aria-label="Next month"
                 >
                   ›
                 </button>

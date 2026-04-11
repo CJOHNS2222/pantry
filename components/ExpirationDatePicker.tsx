@@ -1,5 +1,5 @@
 // components/ExpirationDatePicker.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, AlertTriangle, CheckCircle, Info } from 'lucide-react';
 
 interface ExpirationDatePickerProps {
@@ -18,6 +18,14 @@ const ExpirationDatePicker: React.FC<ExpirationDatePickerProps> = ({
   className = ''
 }) => {
   const [isOpen, setIsOpen] = useState(false);
+
+  // Close dropdown on Escape key
+  useEffect(() => {
+    if (!isOpen) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setIsOpen(false); };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [isOpen]);
 
   // Quick date options
   const quickOptions = [

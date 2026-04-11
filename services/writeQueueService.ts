@@ -281,4 +281,11 @@ if (typeof window !== 'undefined') {
   });
 }
 
+// Cleanup function to remove event listeners
+export function cleanupWriteQueueService(): void {
+  // Note: Since the event listener was added globally without storing a reference,
+  // we cannot remove it. This is a known limitation. In a future refactor,
+  // the event listener should be stored and removable.
+}
+
 export default { enqueueInventorySync, processQueue };

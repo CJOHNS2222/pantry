@@ -160,6 +160,7 @@ const QuantityUnitPicker: React.FC<QuantityUnitPickerProps> = ({
             type="button"
             onClick={handleDecrement}
             disabled={quantity <= 0}
+            aria-label="Decrease quantity"
             className="w-8 h-8 rounded-full bg-theme-primary border border-theme flex items-center justify-center text-theme-primary hover:bg-theme-secondary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <Minus className="w-4 h-4" />
@@ -182,6 +183,7 @@ const QuantityUnitPicker: React.FC<QuantityUnitPickerProps> = ({
             type="button"
             onClick={handleIncrement}
             disabled={quantity >= maxQuantity}
+            aria-label="Increase quantity"
             className="w-8 h-8 rounded-full bg-theme-primary border border-theme flex items-center justify-center text-theme-primary hover:bg-theme-secondary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <Plus className="w-4 h-4" />
@@ -193,6 +195,7 @@ const QuantityUnitPicker: React.FC<QuantityUnitPickerProps> = ({
       <select
         value={unit}
         onChange={(e) => onUnitChange(e.target.value)}
+        aria-label="Unit of measurement"
         className="flex-1 px-3 py-2 bg-theme-secondary border border-theme rounded-lg text-theme-primary focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:border-transparent"
       >
         {smartUnits.map(unitOption => (

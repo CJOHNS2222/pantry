@@ -11,9 +11,9 @@
     "SafeArea": {}
   },
   "android": {
-    "icon": "public/icons/icon.PNG"
+    "icon": "public/icons/icon.png"
   },
   "ios": {
-    "icon": "public/icons/icon.PNG"
+    "icon": "public/icons/icon.png"
   }
 }

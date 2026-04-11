@@ -249,6 +249,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
               <div className="mb-4">
                 <input
                   type="text"
+                  maxLength={50}
                   value={householdName}
                   onChange={(e) => setHouseholdName(e.target.value)}
                   placeholder="Enter household name"

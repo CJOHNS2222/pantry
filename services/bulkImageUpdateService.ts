@@ -3,6 +3,7 @@ import { InventoryCacheService } from './inventoryCacheService';
 import { PantryItem, User } from '../types';
 import { fetchExternalItemImage } from '../utils/appUtils';
 import { getCachedImageUrls, cacheImagesFromUrls, initializeImageCache } from './imageCacheService';
+import { log } from './logService';
 
 export interface BulkImageUpdateResult {
   totalItems: number;
@@ -37,10 +38,10 @@ export class BulkImageUpdateService {
         !item.image || item.image.includes('placeholder') || item.image.includes('default')
       );
 
-      console.log(`Found ${itemsNeedingImages.length} items needing image updates out of ${items.length} total items`);
+      // Found items needing image updates
 
       if (itemsNeedingImages.length === 0) {
-        console.log('No items need image updates');
+        // No items need image updates
         return result;
       }
 
@@ -48,13 +49,13 @@ export class BulkImageUpdateService {
       const itemNames = itemsNeedingImages.map(item => item.item);
       const cachedImages = await getCachedImageUrls(itemNames);
 
-      console.log(`Found ${cachedImages.size} items already cached`);
+      // Found items already cached
 
       // Separate cached vs uncached items
       const uncachedItems = itemsNeedingImages.filter(item => !cachedImages.has(item.item));
 
       // Fetch images for uncached items
-      console.log(`Fetching images for ${uncachedItems.length} uncached items...`);
+      // Fetching images for uncached items
       const fetchedImages = new Map<string, string>();
 
       // Process in smaller batches to avoid overwhelming external APIs
@@ -69,7 +70,7 @@ export class BulkImageUpdateService {
               fetchedImages.set(item.item, newImage);
             }
           } catch (err: any) {
-            console.error(`Failed to fetch image for ${item.item}:`, err);
+            log.error(`Failed to fetch image for ${item.item}`, { err });
           }
         });
 
@@ -81,20 +82,20 @@ export class BulkImageUpdateService {
         }
       }
 
-      console.log(`Fetched ${fetchedImages.size} new images`);
+      // Fetched new images
 
       // Cache all new images in one batch operation
       let newlyCachedImages = new Map<string, string>();
       if (fetchedImages.size > 0) {
         newlyCachedImages = await cacheImagesFromUrls(fetchedImages);
-        console.log(`Successfully cached ${newlyCachedImages.size} images`);
+        // Successfully cached images
       }
 
       // Combine cached and newly cached images
       const allImageUrls = new Map([...cachedImages, ...newlyCachedImages]);
 
       // Update all items with their final image URLs
-      console.log('Updating pantry items with new images...');
+      // Updating pantry items with new images
       const updatePromises = itemsNeedingImages.map(async (item) => {
         try {
           const finalImageUrl = allImageUrls.get(item.item);
@@ -107,12 +108,12 @@ export class BulkImageUpdateService {
             });
 
             result.updatedItems++;
-            console.log(`✅ Updated image for: ${item.item}`);
+            // Updated image for item
           }
         } catch (err: any) {
           result.failedItems++;
           result.errors.push(`Failed to update item ${item.item}: ${err}`);
-          console.error(`Failed to update ${item.item}:`, err);
+          log.error(`Failed to update ${item.item}`, { err });
         }
       });
 
@@ -126,11 +127,11 @@ export class BulkImageUpdateService {
         onProgress?.(completed, itemsNeedingImages.length);
       }
 
-      console.log(`Bulk image update complete: ${result.updatedItems} updated, ${result.failedItems} failed`);
+      // Bulk image update complete
 
     } catch (err: any) {
       result.errors.push(`Bulk update failed: ${err}`);
-      console.error('Bulk image update failed:', err);
+      log.error('Bulk image update failed', { err });
     }
 
     return result;
@@ -161,10 +162,10 @@ export class BulkImageUpdateService {
         !item.image || item.image.includes('placeholder') || item.image.includes('default')
       );
 
-      console.log(`Found ${itemsNeedingImages.length} household items needing image updates out of ${items.length} total items`);
+      // Found household items needing image updates
 
       if (itemsNeedingImages.length === 0) {
-        console.log('No household items need image updates');
+        // No household items need image updates
         return result;
       }
 
@@ -172,13 +173,13 @@ export class BulkImageUpdateService {
       const itemNames = itemsNeedingImages.map(item => item.item);
       const cachedImages = await getCachedImageUrls(itemNames);
 
-      console.log(`Found ${cachedImages.size} household items already cached`);
+      // Found household items already cached
 
       // Separate cached vs uncached items
       const uncachedItems = itemsNeedingImages.filter(item => !cachedImages.has(item.item));
 
       // Fetch images for uncached items
-      console.log(`Fetching images for ${uncachedItems.length} uncached household items...`);
+      // Fetching images for uncached household items
       const fetchedImages = new Map<string, string>();
 
       const fetchBatchSize = 3;
@@ -192,7 +193,7 @@ export class BulkImageUpdateService {
               fetchedImages.set(item.item, newImage);
             }
           } catch (err: any) {
-            console.error(`Failed to fetch image for household item ${item.item}:`, err);
+            log.error(`Failed to fetch image for household item ${item.item}`, { err });
           }
         });
 
@@ -203,20 +204,20 @@ export class BulkImageUpdateService {
         }
       }
 
-      console.log(`Fetched ${fetchedImages.size} new household images`);
+      // Fetched new household images
 
       // Cache all new images in one batch operation
       let newlyCachedImages = new Map<string, string>();
       if (fetchedImages.size > 0) {
         newlyCachedImages = await cacheImagesFromUrls(fetchedImages);
-        console.log(`Successfully cached ${newlyCachedImages.size} household images`);
+        // Successfully cached household images
       }
 
       // Combine cached and newly cached images
       const allImageUrls = new Map([...cachedImages, ...newlyCachedImages]);
 
       // Update all household items with their final image URLs
-      console.log('Updating household pantry items with new images...');
+      // Updating household pantry items with new images
       const updatePromises = itemsNeedingImages.map(async (item) => {
         try {
           const finalImageUrl = allImageUrls.get(item.item);
@@ -229,12 +230,12 @@ export class BulkImageUpdateService {
             });
 
             result.updatedItems++;
-            console.log(`✅ Updated household image for: ${item.item}`);
+            // Updated household image for item
           }
         } catch (err: any) {
           result.failedItems++;
           result.errors.push(`Failed to update household item ${item.item}: ${err}`);
-          console.error(`Failed to update household item ${item.item}:`, err);
+          log.error(`Failed to update household item ${item.item}`, { err });
         }
       });
 
@@ -248,11 +249,11 @@ export class BulkImageUpdateService {
         onProgress?.(completed, itemsNeedingImages.length);
       }
 
-      console.log(`Household bulk image update complete: ${result.updatedItems} updated, ${result.failedItems} failed`);
+      // Household bulk image update complete
 
     } catch (err: any) {
       result.errors.push(`Household bulk update failed: ${err}`);
-      console.error('Household bulk image update failed:', err);
+      log.error('Household bulk image update failed', { err });
     }
 
     return result;

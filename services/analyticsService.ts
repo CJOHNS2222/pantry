@@ -1,5 +1,6 @@
 import { analytics } from '../firebaseConfig';
 import { logEvent, setUserProperties, setUserId } from 'firebase/analytics';
+import { log } from './logService';
 
 // Analytics service for tracking user interactions and app performance
 class AnalyticsService {
@@ -435,7 +436,7 @@ class AnalyticsService {
         logEvent(analytics, eventName, parameters);
       }
     } catch (err: any) {
-      console.warn('Analytics event failed:', err);
+      log.warn('Analytics event failed', { err });
     }
   }
 
