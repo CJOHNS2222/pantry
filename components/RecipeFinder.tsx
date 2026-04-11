@@ -24,6 +24,9 @@ import { debounce } from '../utils/debounceUtils';
 import { filterRecipesByHouseholdPreferences, filterRecipesByUserProfile } from '../utils/preferenceUtils';
 import { getUserMeasurementSystem } from '../utils/measurementUtils';
 import { useIntl } from 'react-intl';
+import { Capacitor } from '@capacitor/core';
+import { SpeechRecognition } from '@capacitor-community/speech-recognition';
+import { maybeRequestReviewAfterRecipeSave } from '../services/appReviewService';
 
 interface RecipeFinderProps {
     onAddToPlan: (recipe: StructuredRecipe) => void;
@@ -231,9 +234,13 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
         };
     };
 
-    // Check for speech recognition support
+    // Check for speech recognition support (native on Capacitor, Web Speech API on web)
     useEffect(() => {
-        if ((window as any).webkitSpeechRecognition || (window as any).SpeechRecognition) {
+        if (Capacitor.isNativePlatform()) {
+            SpeechRecognition.available().then(({ available }) => {
+                setVoiceSearchSupported(available);
+            }).catch(() => setVoiceSearchSupported(false));
+        } else if ((window as Window & typeof globalThis & { webkitSpeechRecognition?: unknown; SpeechRecognition?: unknown }).webkitSpeechRecognition || (window as Window & typeof globalThis & { SpeechRecognition?: unknown }).SpeechRecognition) {
             setVoiceSearchSupported(true);
         }
     }, []);
@@ -244,47 +251,68 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
         setRecentRecipeSearches(recent);
     }, []);
 
-    // Voice search function
-    const startVoiceSearch = () => {
+    // Voice search function — uses native Capacitor plugin on iOS/Android, Web Speech API on web
+    const startVoiceSearch = async () => {
         if (!voiceSearchSupported) return;
 
-        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-        const recognition = new SpeechRecognition();
+        if (Capacitor.isNativePlatform()) {
+            try {
+                await SpeechRecognition.requestPermissions();
+                setIsListening(true);
+                await SpeechRecognition.start({
+                    language: 'en-US',
+                    maxResults: 1,
+                    popup: false,
+                });
+                const { matches } = await new Promise<{ matches: string[] }>((resolve, reject) => {
+                    const listener = SpeechRecognition.addListener('partialResults', (data: { matches: string[] }) => {
+                        listener.then(h => h.remove());
+                        resolve(data);
+                    });
+                    // Timeout safety
+                    setTimeout(() => reject(new Error('timeout')), 10000);
+                });
+                const transcript = matches?.[0] ?? '';
+                if (transcript) {
+                    setSpecificQuery(transcript);
+                    AnalyticsService.trackVoiceSearch(true);
+                    setTimeout(() => performSearch({ query: transcript, ingredients: '' }), 300);
+                }
+            } catch (err) {
+                AnalyticsService.trackVoiceSearch(false, String(err));
+            } finally {
+                setIsListening(false);
+                await SpeechRecognition.stop().catch(() => {});
+            }
+        } else {
+            // Web Speech API fallback
+            type WebSpeechCtor = new() => { continuous: boolean; interimResults: boolean; lang: string; onstart: (() => void) | null; onresult: ((e: Event) => void) | null; onerror: ((e: Event) => void) | null; onend: (() => void) | null; start(): void; };
+            const SpeechRecognitionClass = ((window as unknown as Record<string, unknown>).SpeechRecognition
+                ?? (window as unknown as Record<string, unknown>).webkitSpeechRecognition) as WebSpeechCtor | undefined;
+            if (!SpeechRecognitionClass) return;
 
-        recognition.continuous = false;
-        recognition.interimResults = false;
-        recognition.lang = 'en-US';
+            const recognition = new SpeechRecognitionClass();
+            recognition.continuous = false;
+            recognition.interimResults = false;
+            recognition.lang = 'en-US';
 
-        recognition.onstart = () => {
-            setIsListening(true);
-        };
-
-        recognition.onresult = (event: any) => {
-            const transcript = event.results[0][0].transcript;
-            setSpecificQuery(transcript);
-            setIsListening(false);
-
-            // Track successful voice search
-            AnalyticsService.trackVoiceSearch(true);
-
-            // Auto-submit the search
-            setTimeout(() => {
-                const params = { query: transcript, ingredients: '' };
-                performSearch(params);
-            }, 500);
-        };
-
-        recognition.onerror = (event: any) => {
-            setIsListening(false);
-            // Track failed voice search
-            AnalyticsService.trackVoiceSearch(false, event?.error);
-        };
-
-        recognition.onend = () => {
-            setIsListening(false);
-        };
-
-        recognition.start();
+            recognition.onstart = () => setIsListening(true);
+            recognition.onresult = (event: Event) => {
+                const se = event as Event & { results: { [key: number]: { [key: number]: { transcript: string } } } };
+                const transcript = se.results[0][0].transcript;
+                setSpecificQuery(transcript);
+                setIsListening(false);
+                AnalyticsService.trackVoiceSearch(true);
+                setTimeout(() => performSearch({ query: transcript, ingredients: '' }), 500);
+            };
+            recognition.onerror = (event: Event) => {
+                const se = event as Event & { error?: string };
+                setIsListening(false);
+                AnalyticsService.trackVoiceSearch(false, se?.error);
+            };
+            recognition.onend = () => setIsListening(false);
+            recognition.start();
+        }
     };
 
     // Generate cache key for search parameters
@@ -1297,6 +1325,8 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                 // Call the proper save handler that will update the cache correctly
                 if (onSaveRecipe) {
                     await onSaveRecipe(recipeToSave);
+                    // Prompt for app store review at meaningful milestones
+                    await maybeRequestReviewAfterRecipeSave(savedRecipes.length + 1);
                 }
 
                 // If an image File was attached, we need to handle it separately

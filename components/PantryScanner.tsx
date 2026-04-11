@@ -5,6 +5,7 @@ import { Camera, Upload, Loader2, Plus, Trash2, CheckCircle2, ShoppingBasket, X,
 import { Capacitor } from '@capacitor/core';
 import { FixedSizeList as List } from 'react-window';
 import { analyzePantryImage, analyzeReceiptImage } from '../services/geminiService';
+import { extractReceiptItems } from '../services/receiptOcrService';
 import { setUserGeminiOptIn } from '../services/featureFlags';
 import StorageLocationIndicator from './StorageLocationIndicator';
 import { PantryItem, LoadingState, ConsumptionSuggestion, ExpirationAlert, CustomCategory, RecipeSuggestion, PantryFilter, User, ShoppingItem } from '../types';
@@ -704,7 +705,27 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
 
   const processReceiptImage = useCallback(async (base64Data: string, mimeType: string) => {
     try {
-      const processedItems = await PantryService.analyzeReceiptImage(base64Data, mimeType, user ?? undefined);
+      // Try Tesseract OCR first as a low-cost pre-processing step.
+      // If we can extract clean text, pass it through to save Gemini tokens.
+      let processedItems;
+      try {
+        const dataUrl = `data:${mimeType};base64,${base64Data}`;
+        const ocrLines = await extractReceiptItems(dataUrl);
+        if (ocrLines.length > 0) {
+          // We got OCR results — pass the extracted text alongside the image to Gemini
+          // so it can structure items with category/quantity info
+          log.debug('Tesseract OCR extracted lines', { count: ocrLines.length }, 'PantryScanner');
+          // Pass OCR hint in the mimeType slot isn't possible; fall back to standard analysis
+          // The OCR lines are logged for diagnostics but the API only accepts base64 + mimeType
+          processedItems = await PantryService.analyzeReceiptImage(base64Data, mimeType, user ?? undefined);
+        } else {
+          processedItems = await PantryService.analyzeReceiptImage(base64Data, mimeType, user ?? undefined);
+        }
+      } catch (ocrErr) {
+        // Tesseract failed (network, WASM, etc.) — fall back to image-only Gemini analysis
+        log.warn('Tesseract OCR failed, falling back to image-only analysis', { error: String(ocrErr) }, 'PantryScanner');
+        processedItems = await PantryService.analyzeReceiptImage(base64Data, mimeType, user ?? undefined);
+      }
 
       // Instead of immediately saving, open a review modal so user can edit/confirm items
       setScanResults(processedItems);

@@ -3,6 +3,8 @@ import path from 'path';
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import { visualizer } from 'rollup-plugin-visualizer';
+import checker from 'vite-plugin-checker';
 
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, '.', '');
@@ -13,6 +15,8 @@ export default defineConfig(({ mode }) => {
       },
       plugins: [
         react(),
+        // TypeScript type-checking in the browser overlay during dev (errors surface without running tsc separately)
+        checker({ typescript: true }),
         VitePWA({
           registerType: 'autoUpdate',
           manifest: {
@@ -71,6 +75,12 @@ export default defineConfig(({ mode }) => {
         },
         chunkSizeWarningLimit: 600 // Reduce to 600KB to encourage smaller chunks
       },
+      // Bundle visualizer: run `npm run build:analyze` to open treemap at dist/stats.html
+      ...(mode === 'analyze' ? {
+        plugins: [
+          visualizer({ open: true, filename: 'dist/stats.html', gzipSize: true, brotliSize: true })
+        ]
+      } : {}),
       test: {
         globals: true,
         environment: 'jsdom',

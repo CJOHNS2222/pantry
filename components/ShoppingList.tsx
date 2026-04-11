@@ -2,6 +2,7 @@ import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { useIntl } from 'react-intl';
 import { ShoppingBasket, Check, Trash2, Archive, Plus, X, Share2, Copy, Download, MessageSquare, Calendar, Undo2 } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
+import { Share } from '@capacitor/share';
 import { ShoppingItem, User, Household } from '../types';
 import { inferCategoryFromItemName, getItemImage, isHouseholdMember } from '../utils/appUtils';
 import { log } from '../services/logService';
@@ -625,12 +626,16 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   };
 
   const handleShare = async () => {
-    if (navigator.share) {
+    const shareTitle = intl.formatMessage({ id: 'shoppingList.shareTitle' });
+    if (Capacitor.isNativePlatform()) {
       try {
-        await navigator.share({
-          title: intl.formatMessage({ id: 'shoppingList.shareTitle' }),
-          text: uncheckedItemsText
-        });
+        await Share.share({ title: shareTitle, text: uncheckedItemsText });
+      } catch (err) {
+        log.debug('Share cancelled or failed', { error: err }, 'ShoppingList');
+      }
+    } else if (navigator.share) {
+      try {
+        await navigator.share({ title: shareTitle, text: uncheckedItemsText });
       } catch (err) {
         log.debug('Share cancelled or failed', { error: err }, 'ShoppingList');
       }

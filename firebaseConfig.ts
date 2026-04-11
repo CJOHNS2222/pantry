@@ -5,6 +5,7 @@ import { getStorage } from "firebase/storage";
 import { getAnalytics } from "firebase/analytics";
 import { getFunctions } from "firebase/functions";
 import { getMessaging, onMessage, isSupported } from "firebase/messaging";
+import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
 import { Capacitor } from '@capacitor/core';
 import webFirebaseConfig from './VITE_firebaseConfig';
 import { log } from './services/logService';
@@ -27,6 +28,22 @@ export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const storage = getStorage(app);
 export const functions = getFunctions(app);
+
+// Firebase App Check — prevents unauthorized clients from hitting Firestore/Storage.
+// Requires VITE_RECAPTCHA_SITE_KEY in .env.local (web) or device attestation (native).
+// In development, enable debug mode via: self.FIREBASE_APPCHECK_DEBUG_TOKEN = true (before initializeApp)
+const appCheckSiteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
+if (appCheckSiteKey && !import.meta.env.DEV) {
+  try {
+    initializeAppCheck(app, {
+      provider: new ReCaptchaV3Provider(appCheckSiteKey),
+      isTokenAutoRefreshEnabled: true,
+    });
+  } catch (err: unknown) {
+    // Non-fatal: App Check failing won't break the app (Firestore rules still apply)
+    log.warn('Firebase App Check initialization failed', { message: err instanceof Error ? err.message : String(err) });
+  }
+}
 
 // Initialize database monitoring asynchronously to avoid circular import
 // issues. This will attempt to initialize monitoring but won't block

@@ -6,6 +6,9 @@ import { useAppActions } from '../contexts/AppActionsContext';
 import { InventoryCacheService } from '../services/inventoryCacheService';
 import { saveRecipeToUserCache } from '../services/recipeService';
 import { PantryItem } from '../types';
+import { Capacitor } from '@capacitor/core';
+import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
+import { log } from '../services/logService';
 
 interface ImportModalProps {
   open: boolean;
@@ -54,15 +57,43 @@ const ImportModal: React.FC<ImportModalProps> = ({ open, onClose, defaultTab = '
           onImported(items);
         }
       } catch (cbErr) {
-        console.warn('onImported callback failed', cbErr);
+        log.warn('onImported callback failed', { error: String(cbErr) }, 'ImportModal');
       }
       addToast(`Imported ${items.length} pantry items`, 'success');
       onClose();
     } catch (err) {
-      console.error(err);
+      log.error('Failed to import pantry items', { error: String(err) }, 'ImportModal');
       addToast('Failed to import pantry items', 'error');
     } finally {
       setLoading(false);
+    }
+  };
+
+  /** Export the current CSV text as a native file on mobile, or trigger a web download on web. */
+  const handleExportFile = async (content: string, filename: string) => {
+    if (Capacitor.isNativePlatform()) {
+      try {
+        await Filesystem.writeFile({
+          path: filename,
+          data: content,
+          directory: Directory.Documents,
+          encoding: Encoding.UTF8,
+        });
+        addToast(`Saved to Documents/${filename}`, 'success');
+      } catch (err) {
+        log.error('Native file export failed', { error: String(err) }, 'ImportModal');
+        addToast('Could not save file to device', 'error');
+      }
+    } else {
+      const blob = new Blob([content], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
     }
   };
 
@@ -86,7 +117,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ open, onClose, defaultTab = '
         addToast('You must be signed in to save recipes', 'error');
       }
     } catch (err) {
-      console.error(err);
+      log.error('Failed to import recipe', { error: String(err) }, 'ImportModal');
       addToast('Failed to import recipe', 'error');
     } finally {
       setLoading(false);
@@ -113,7 +144,12 @@ const ImportModal: React.FC<ImportModalProps> = ({ open, onClose, defaultTab = '
                 <textarea value={csvText} onChange={(e) => { setCsvText(e.target.value); const items = parseCsvToPantryItems(e.target.value); setPreviewCount(items.length); }} rows={8} className="w-full p-2 rounded border text-black" data-testid="import-csv-textarea" />
               <div className="flex items-center justify-between">
                 <div className="text-sm opacity-70">Parsed rows: {previewCount}</div>
-                <div>
+                <div className="flex gap-2">
+                  {csvText && (
+                    <button onClick={() => handleExportFile(csvText, 'pantry-export.csv')} className="px-3 py-1 bg-theme-secondary rounded text-sm" data-testid="import-export">
+                      Save to Device
+                    </button>
+                  )}
                     <button onClick={handleImportPantry} disabled={loading || previewCount===0} className="px-3 py-1 bg-[var(--accent-color)] text-white rounded" data-testid="import-pantry">Import Pantry</button>
                 </div>
               </div>

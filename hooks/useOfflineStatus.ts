@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { offlineQueue } from '../services/offlineQueueService';
 import DatabaseMonitoringService from '../services/databaseMonitoringService';
 import { log } from '../services/logService';
+import { Network } from '@capacitor/network';
+import { Capacitor } from '@capacitor/core';
 
 export interface SyncStatus {
   isOnline: boolean;
@@ -98,39 +100,55 @@ export const useOfflineStatus = () => {
   }, []);
 
   useEffect(() => {
-    const handleOnline = async () => {
-      // Test actual connectivity when browser reports online
-      const isActuallyOnline = await testConnectivity();
-      isOnlineRef.current = isActuallyOnline;
+    let networkListener: (() => void) | null = null;
+
+    const handleNetworkChange = (isOnline: boolean) => {
+      isOnlineRef.current = isOnline;
       setSyncStatus(prev => ({
         ...prev,
-        isOnline: isActuallyOnline,
-        syncError: null
+        isOnline,
+        syncError: isOnline ? null : prev.syncError
       }));
     };
 
-    const handleOffline = () => {
-      isOnlineRef.current = false;
-      setSyncStatus(prev => ({
-        ...prev,
-        isOnline: false
-      }));
-    };
+    if (Capacitor.isNativePlatform()) {
+      // Use hardware-level network detection on iOS/Android
+      Network.addListener('networkStatusChange', (status) => {
+        handleNetworkChange(status.connected);
+      }).then(handle => {
+        networkListener = () => handle.remove();
+      });
 
-    // Listen for online/offline events
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
+      // Check initial state
+      Network.getStatus().then(status => {
+        handleNetworkChange(status.connected);
+      }).catch(() => {
+        // Fall back to navigator.onLine on error
+        handleNetworkChange(navigator.onLine);
+      });
+    } else {
+      // Web: test actual connectivity (not just navigator.onLine)
+      const handleOnline = async () => {
+        const isActuallyOnline = await testConnectivity();
+        handleNetworkChange(isActuallyOnline);
+      };
+      const handleOffline = () => handleNetworkChange(false);
 
-    // Initial connectivity check
-    updateOnlineStatus();
+      window.addEventListener('online', handleOnline);
+      window.addEventListener('offline', handleOffline);
+      updateOnlineStatus();
 
-    // Periodic connectivity checks every 30 seconds
-    const connectivityInterval = setInterval(updateOnlineStatus, 30000);
+      // Periodic check every 30 s on web
+      const connectivityInterval = setInterval(updateOnlineStatus, 30000);
+      networkListener = () => {
+        window.removeEventListener('online', handleOnline);
+        window.removeEventListener('offline', handleOffline);
+        clearInterval(connectivityInterval);
+      };
+    }
 
     return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-      clearInterval(connectivityInterval);
+      networkListener?.();
     };
   }, [testConnectivity, updateOnlineStatus]);
 
