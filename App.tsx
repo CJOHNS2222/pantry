@@ -38,6 +38,7 @@ import SafeAreaService from './services/safeAreaService';
 import { GlobalUpdatePrompt } from './components/GlobalUpdatePrompt';
 import { joinHousehold } from './services/householdService';
 import { setAppContext, trackNavigation, trackShoppingListAction } from './services/sentryService';
+import remoteConfig from './services/remoteConfigService';
 import PerformanceMonitoringService from './services/performanceMonitoringService';
 import HapticService from './services/hapticService';
 import { ShoppingListCacheService } from './services/shoppingListCacheService';
@@ -131,6 +132,8 @@ const App: React.FC = () => {
   const { settings, setSettings } = useSettings();
   const { addToast, toasts, setToasts } = useToasts();
   const { syncStatus, syncNow, updateSyncStatus } = useOfflineStatus();
+  const maintenanceInfo = remoteConfig.getMaintenanceInfo();
+  const announcementInfo = remoteConfig.getAnnouncementInfo();
 
   // Apply theme to document
   useTheme(settings.theme);
@@ -1125,6 +1128,32 @@ const App: React.FC = () => {
           recentActivities={recentActivities}
           isLoadingActivities={isLoadingActivities}
         />
+
+        {maintenanceInfo.active && maintenanceInfo.message && (
+          <div className="sticky top-[calc(var(--safe-area-top,0px)+56px)] z-20 mx-auto max-w-3xl px-3 pt-2">
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900 shadow-sm">
+              <div className="font-semibold">Maintenance Mode</div>
+              <div className="mt-1 opacity-90">{maintenanceInfo.message}</div>
+            </div>
+          </div>
+        )}
+
+        {announcementInfo.enabled && announcementInfo.message && !maintenanceInfo.active && (
+          <div className="sticky top-[calc(var(--safe-area-top,0px)+56px)] z-20 mx-auto max-w-3xl px-3 pt-2">
+            <div
+              className={`rounded-xl border px-4 py-3 text-sm shadow-sm ${
+                announcementInfo.type === 'error'
+                  ? 'border-red-200 bg-red-50 text-red-900'
+                  : announcementInfo.type === 'warning'
+                    ? 'border-amber-200 bg-amber-50 text-amber-900'
+                    : 'border-blue-200 bg-blue-50 text-blue-900'
+              }`}
+            >
+              <div className="font-semibold">Announcement</div>
+              <div className="mt-1 opacity-90">{announcementInfo.message}</div>
+            </div>
+          </div>
+        )}
 
         {/* Persistent household invite banner — stays visible until acted on */}
         {householdInvites.length > 0 && !showHouseholdInviteModal && (

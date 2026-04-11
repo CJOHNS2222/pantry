@@ -300,6 +300,8 @@ export function cleanItemNameForShopping(itemName: string): string {
 export async function canShowAds(user?: User | null): Promise<boolean> {
   try {
     if (!user) return false;
+    if (!remoteConfig.getBoolean('ads_enabled')) return false;
+    if (remoteConfig.getBoolean('kill_ads')) return false;
     // Don't show ads on web
     if (Capacitor.getPlatform() === 'web') return false;
     // Only consider free tier for ad display
@@ -317,6 +319,8 @@ export async function canShowAds(user?: User | null): Promise<boolean> {
     // Conservative fallback: show ads for free users if limit check fails
     try {
       if (!user) return false;
+      if (!remoteConfig.getBoolean('ads_enabled')) return false;
+      if (remoteConfig.getBoolean('kill_ads')) return false;
       return user.subscription?.tier === 'free';
     } catch {
       return false;
