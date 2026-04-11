@@ -329,7 +329,7 @@ export const Settings: React.FC<SettingsProps> = ({
     setSettings((prev) => ({
       ...prev,
       [field]: {
-        ...(prev as Record<string, unknown>)[field],
+        ...(prev as any)[field],
         ...value,
       },
     }));
@@ -347,7 +347,7 @@ export const Settings: React.FC<SettingsProps> = ({
   const _handleNotifChange = (key: string, value: unknown) => {
     setPendingNotifications(prev => ({
       ...prev,
-      [key]: typeof value === 'object' && value !== null ? { ...(prev as Record<string, unknown>)[key], ...value } : value,
+      [key]: typeof value === 'object' && value !== null ? { ...(prev as any)[key], ...value } : value,
     }));
     setNotifChanged(false);
   };

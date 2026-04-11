@@ -5,6 +5,11 @@ All notable changes to Stock & Spoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.19] - 2026-04-11
+
+### Changed
+- Enabled code minification for Android release builds to reduce app size and prepare for deobfuscation mapping.
+
 ## [1.5.18] - 2026-04-11
 
 ### Added

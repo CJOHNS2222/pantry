@@ -19,3 +19,9 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# Add rules to suppress R8 warnings
+-dontwarn kotlin.coroutines.jvm.internal.SpillingKt
+-dontwarn kotlin.uuid.ExperimentalUuidApi
+-dontwarn kotlin.uuid.Uuid$Companion
+-dontwarn kotlin.uuid.Uuid

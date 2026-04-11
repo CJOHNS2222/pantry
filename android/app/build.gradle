@@ -16,8 +16,8 @@ android {
         applicationId "com.smart.pantry"
         minSdk 24
         targetSdk 36
-        versionCode 33
-        versionName "1.5.18"
+        versionCode 34
+        versionName "1.5.19"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         
         buildFeatures {
@@ -43,7 +43,7 @@ android {
     }
     buildTypes {
         release {
-            minifyEnabled false
+            minifyEnabled true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             signingConfig signingConfigs.release
             

@@ -10,7 +10,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import { AppHeader } from './components/layout/AppHeader';
 import { AppNavigation } from './components/layout/AppNavigation';
 import { MainContent } from './components/layout/MainContent';
-import { User, PantryItem, DayPlan, StructuredRecipe, Household, ShoppingItem, SavedRecipe, RecipeRating, RecipeSearchResult } from './types';
+import { User, PantryItem, DayPlan, StructuredRecipe, Household, ShoppingItem, SavedRecipe, RecipeRating, RecipeSearchResult, UserProfile, Batch } from './types';
 import { Tab } from './types/app';
 import { useAuth } from './hooks/useAuth';
 import { useTheme } from './hooks/useTheme';
