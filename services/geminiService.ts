@@ -339,6 +339,10 @@ export const analyzeReceiptImage = async (base64Image: string, mimeType: string,
     throw new Error('Gemini integration is disabled by configuration.');
   }
 
+  if (remoteConfig.getBoolean('kill_receiptScanning')) {
+    throw new Error('Receipt scanning is temporarily disabled by configuration.');
+  }
+
   if (!user?.id) {
     throw new Error('User authentication required for Gemini usage.');
   }
