@@ -5,10 +5,36 @@ All notable changes to Stock & Spoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.23] - 2026-04-12
+
+### Fixed
+- Rapid backButton listener add/remove cycling on startup caused by `addToast` missing `useCallback` — every render re-ran the backButton effect, skipping 30–54 frames and causing severe main thread jank on Android
+- `appUrlOpen` Capacitor listener leak — was never cleaned up on effect re-runs, causing listeners to accumulate with each render cycle
+
+## [1.5.22] - 2026-04-12
+
+### Fixed
+- **App crash on startup**: Fully stubbed out `useOfflineStatus` hook — disabled IndexedDB queue init, connectivity fetch (which triggered a 5-second `AbortSignal` timeout crash on Android WebView), and auto-sync logic. Firebase SDK handles offline writes natively. Also removed a dead duplicate `useDataManagement` call in `LeftoverQuickCapture` that was spawning extra Firestore listeners.
+
+## [1.5.21] - 2026-04-12
+
+### Fixed
+- **Offline sync toast flood**: Disabled the offline queue processing effect that was causing the app to show dozens of "Offline changes synced." toasts on startup, locking up and crashing the Android app. Firebase's built-in offline persistence handles connectivity transparently in the meantime.
+
+## [1.5.20] - 2026-04-11
+
+### Added
+- Comprehensive Google Analytics tracking across all major app features including recipe interactions, shopping list usage, household management, authentication flows, cost estimation, category management, and data imports for improved user behavior analysis and app insights.
+
 ## [1.5.19] - 2026-04-11
 
 ### Changed
 - Enabled code minification for Android release builds to reduce app size and prepare for deobfuscation mapping.
+
+### Fixed
+- **Repeated offline sync toasts** (audit 1F): Fixed useEffect in `useDataManagement.ts` that was triggering "offline changes synced" toast multiple times on app load by using a ref for `addToast` to avoid dependency array issues causing repeated effect execution.
+- **Notification timestamp errors** (audit 1G): Fixed `TypeError: n.createdAt.toDate is not a function` in `notificationService.ts` by handling both Firestore Timestamp objects and ISO date strings for `createdAt`, `snoozedUntil`, and `expiresAt` fields in notification filtering, sorting, and cleanup methods.
+- **Database monitoring logging** (audit 1H): Fixed incorrect subscription path logging in `databaseMonitoringService.ts` that was showing parent collection paths instead of document paths, making it appear that multiple subscriptions were to the same document when they were actually to different cache documents.
 
 ## [1.5.18] - 2026-04-11
 

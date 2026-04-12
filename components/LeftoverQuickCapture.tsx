@@ -4,7 +4,7 @@ import { useModalOpen } from '../utils/useModalOpen'
 import { useApp } from '../contexts/AppContext'
 import { uploadLeftoverImage } from '../services/leftoverImageService'
 import { LeftoverService, LeftoverCreateData } from '../services/leftoverService'
-import { useDataManagement } from '../hooks/useDataManagement'
+import AnalyticsService from '../services/analyticsService'
 
 interface LeftoverQuickCaptureProps {
   createdBy: string
@@ -28,7 +28,6 @@ export default function LeftoverQuickCapture({
 }: LeftoverQuickCaptureProps) {
   useModalOpen()
   const { user, household } = useApp()
-  const dm = useDataManagement(user)
   const [photoUrl, setPhotoUrl] = useState<string | undefined>(recipeImageUrl)
   const [file, setFile] = useState<File | null>(null)
   const [servings, setServings] = useState<number>(initialServings)
@@ -66,9 +65,18 @@ export default function LeftoverQuickCapture({
       // Create the leftover
       const leftover = await LeftoverService.create(leftoverData)
 
+      // Track leftover creation
+      AnalyticsService.trackLeftoverCreated(
+        household?.id || user?.id || '',
+        createdBy,
+        servings,
+        initialTags
+      );
+
       setLoading(false)
       onSaved?.(leftover.id)
       onClose?.()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       setLoading(false)
       setError(err?.message || 'Failed to save leftover')

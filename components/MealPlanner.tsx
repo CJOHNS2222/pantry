@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { CalendarClock, Plus, Move, AlertCircle, ShoppingBasket, Trash2, HelpCircle, Search, Copy, UtensilsCrossed, Download } from 'lucide-react';
+import { CalendarClock, Plus, Move, AlertCircle, ShoppingBasket, Trash2, HelpCircle, Search, Copy, UtensilsCrossed, Download, ChevronDown, ChevronRight } from 'lucide-react';
 import { DayPlan, MealPlanItem, PantryItem, StructuredRecipe, User, SavedRecipe, ShoppingItem } from '../types';
 import RecipeModal from './RecipeModal';
 import LeftoverQuickCapture from './LeftoverQuickCapture';
@@ -74,6 +74,7 @@ interface MealPlannerProps {
   onAddToPlan?: (recipe: StructuredRecipe, dayIndex?: number, mealType?: 'breakfast' | 'lunch' | 'dinner') => void;
   onSaveRecipe?: (recipe: StructuredRecipe) => void;
   onMarkAsMade?: (recipe: StructuredRecipe) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onRate?: (rating: any) => void;
   user: User;
   setActiveTab: (tab: Tab) => void;
@@ -82,6 +83,7 @@ interface MealPlannerProps {
   isLoadingMealPlan?: boolean;
   isLoadingSavedRecipes?: boolean;
   savedRecipes?: SavedRecipe[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   settings?: any;
   onOpenRecipeSearch?: () => void;
 }
@@ -557,6 +559,21 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
   const [leftoverNotes, setLeftoverNotes] = useState<string>('');
   const [showLeftoverSwapModal, setShowLeftoverSwapModal] = useState(false);
   const [swapSource, setSwapSource] = useState<{ dayIndex: number; mealType: 'breakfast' | 'lunch' | 'dinner'; mealIndex: number } | null>(null);
+
+  // Collapsible sections state
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['TodaysMeals']));
+
+  const toggleSection = (section: string) => {
+    setExpandedSections(prev => {
+      const next = new Set(prev);
+      if (next.has(section)) {
+        next.delete(section);
+      } else {
+        next.add(section);
+      }
+      return next;
+    });
+  };
 
   useModalOpen(showRecipeSearch || showAddMealDialog || showLeftoverPrompt || showLeftoverCapture || showLeftoverSwapModal);
 
@@ -1293,34 +1310,55 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
         {/* Today's Meals Highlight */}
         {todaysMeals.length > 0 && (
           <div className="bg-gradient-to-r from-[var(--accent-color)]/10 to-[var(--accent-color)]/5 border border-[var(--accent-color)]/20 rounded-xl p-4 mb-4">
-            <div className="flex items-center gap-2 mb-3">
+            <div
+              onClick={() => todaysMeals.length > 1 && toggleSection('TodaysMeals')}
+              className={`flex items-center gap-2 mb-3 ${todaysMeals.length > 1 ? 'cursor-pointer' : ''}`}
+            >
               <CalendarClock className="w-5 h-5 text-[var(--accent-color)]" />
               <h3 className="font-semibold text-theme-primary">Today's Meals</h3>
+              {todaysMeals.length > 1 && (
+                <span className="text-xs bg-[var(--accent-color)]/20 text-[var(--accent-color)] px-2 py-1 rounded-full ml-auto">
+                  {todaysMeals.length} meals
+                </span>
+              )}
+              {todaysMeals.length > 1 && (
+                expandedSections.has('TodaysMeals') ? (
+                  <ChevronDown className="w-4 h-4 text-theme-secondary ml-2" />
+                ) : (
+                  <ChevronRight className="w-4 h-4 text-theme-secondary ml-2" />
+                )
+              )}
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              {todaysMeals.map((meal, index) => (
-                <div
-                  key={meal.id}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setModalRecipe(meal.recipe);
-                    setModalContext('scheduled');
-                    setShowRecipeModal(true);
-                  }}
-                  className="bg-theme-secondary/80 backdrop-blur-sm border border-[var(--accent-color)]/30 rounded-lg p-3 cursor-pointer hover:bg-theme-secondary transition-all hover:shadow-md"
-                >
-                  <div className="text-xs font-semibold text-[var(--accent-color)] mb-1 uppercase">
-                    {meal.mealType ? (meal.mealType.charAt(0).toUpperCase() + meal.mealType.slice(1)) : 'Meal'}
+            {expandedSections.has('TodaysMeals') && (
+              <div className="space-y-2">
+                {todaysMeals.map((meal, index) => (
+                  <div
+                    key={meal.id}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setModalRecipe(meal.recipe);
+                      setModalContext('scheduled');
+                      setShowRecipeModal(true);
+                    }}
+                    className="bg-theme-secondary/80 backdrop-blur-sm border border-[var(--accent-color)]/30 rounded-lg p-4 cursor-pointer hover:bg-theme-secondary transition-all hover:shadow-md w-full"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="text-xs font-semibold text-[var(--accent-color)] mb-1 uppercase">
+                          {meal.mealType ? (meal.mealType.charAt(0).toUpperCase() + meal.mealType.slice(1)) : 'Meal'}
+                        </div>
+                        <div className="text-sm font-medium text-theme-primary">
+                          {meal.recipe.title}
+                        </div>
+                      </div>
+                      <div className="text-xs text-theme-secondary opacity-60 ml-4 flex-shrink-0">
+                        Click to view recipe
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-sm font-medium text-theme-primary truncate">
-                    {meal.recipe.title}
-                  </div>
-                  <div className="text-xs text-theme-secondary opacity-60 mt-1">
-                    Click to view recipe
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -1654,15 +1692,6 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
             {/* Navigation Header */}
             <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between gap-2">
-              <button
-                onClick={() => { setShowLeftoverCapture(true); }}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-theme-secondary border border-theme text-theme-secondary hover:bg-yellow-500/10 hover:text-yellow-400 hover:border-yellow-400/30 transition-colors"
-                aria-label="Log a leftover"
-                title="Quickly log a leftover from today"
-              >
-                <UtensilsCrossed className="w-3.5 h-3.5" />
-                Log leftover
-              </button>
               <div className="flex items-center gap-2">
               <button
                 onClick={handleClearWeek}

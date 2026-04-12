@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 
 export function useToasts() {
   const [toasts, setToasts] = useState<Array<{
@@ -9,11 +9,11 @@ export function useToasts() {
     action?: () => void
   }>>([]);
 
-  const addToast = (message: string, type: 'error' | 'info' | 'success' | 'warning' = 'info', ttl = 4000, actionLabel?: string, action?: () => void) => {
+  const addToast = useCallback((message: string, type: 'error' | 'info' | 'success' | 'warning' = 'info', ttl = 4000, actionLabel?: string, action?: () => void) => {
     const id = Date.now() + Math.floor(Math.random() * 1000);
     setToasts(prev => [{ id, message, type, actionLabel, action }, ...prev]);
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), ttl);
-  };
+  }, []);
 
   return { toasts, setToasts, addToast };
 }

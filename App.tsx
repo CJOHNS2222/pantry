@@ -102,6 +102,7 @@ const App: React.FC = () => {
   const [showNotificationsModal, setShowNotificationsModal] = useState(false);
   const [showHouseholdInviteModal, setShowHouseholdInviteModal] = useState(false);
   const [showExpiredItemsModal, setShowExpiredItemsModal] = useState(false);
+  const [expiredItemsModalSpecificItems, setExpiredItemsModalSpecificItems] = useState<PantryItem[] | undefined>(undefined);
   const [notificationViewItem, setNotificationViewItem] = useState<{ item: PantryItem; index: number } | null>(null);
   const [showAddToPlanDialog, setShowAddToPlanDialog] = useState(false);
   const [pendingRecipeForPlan, setPendingRecipeForPlan] = useState<StructuredRecipe | null>(null);
@@ -129,6 +130,7 @@ const App: React.FC = () => {
   });
 
   const backButtonListenerRef = useRef<PluginListenerHandle | null>(null);
+  const appUrlOpenListenerRef = useRef<PluginListenerHandle | null>(null);
 
   const { user, setUser, handleLogout, isAuthReady } = useAuth(); // Use isAuthReady
   const { settings, setSettings } = useSettings();
@@ -446,20 +448,37 @@ const App: React.FC = () => {
           addToast('Viewing your saved recipes', 'info');
           break;
         case 'view_item': {
-          // Try to open ItemDetailModal for the specific item; fall back to navigating to the tab
-          const itemId = notification.actionData?.items?.[0]?.itemId
-            ?? notification.actionData?.itemId;
-          const found = itemId
-            ? inventory.findIndex(i => i.id === itemId)
-            : -1;
-          if (found !== -1) {
-            setActiveTab(Tab.PANTRY);
-            setNotificationViewItem({ item: inventory[found], index: found });
-          } else if (notification.actionData?.tab === 'shopping') {
-            setActiveTab(Tab.SHOPPING);
+          // Check if this notification contains multiple items
+          const notificationItems = notification.actionData?.items;
+          if (notificationItems && notificationItems.length > 1) {
+            // Show ExpiredItemsModal for multiple items
+            const specificItems = notificationItems
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              .map((item: any) => inventory.find(invItem => invItem.id === item.itemId))
+              .filter((item: PantryItem | undefined): item is PantryItem => item !== undefined);
+            
+            if (specificItems.length > 0) {
+              setExpiredItemsModalSpecificItems(specificItems);
+              setShowExpiredItemsModal(true);
+            } else {
+              addToast('Items no longer found in pantry', 'info');
+            }
           } else {
-            setActiveTab(Tab.PANTRY);
-            addToast('Item no longer found in pantry', 'info');
+            // Single item - show ItemDetailModal
+            const itemId = notification.actionData?.items?.[0]?.itemId
+              ?? notification.actionData?.itemId;
+            const found = itemId
+              ? inventory.findIndex(i => i.id === itemId)
+              : -1;
+            if (found !== -1) {
+              setActiveTab(Tab.PANTRY);
+              setNotificationViewItem({ item: inventory[found], index: found });
+            } else if (notification.actionData?.tab === 'shopping') {
+              setActiveTab(Tab.SHOPPING);
+            } else {
+              setActiveTab(Tab.PANTRY);
+              addToast('Item no longer found in pantry', 'info');
+            }
           }
           break;
         }
@@ -812,6 +831,8 @@ const App: React.FC = () => {
         // The redirect result will be handled by the Login component
         // when it mounts and calls getRedirectResult
       }
+    }).then((listener) => {
+      appUrlOpenListenerRef.current = listener;
     }).catch((error) => {
       log.error('Failed to add app URL open listener', { error }, 'App');
     });
@@ -820,6 +841,10 @@ const App: React.FC = () => {
       if (backButtonListenerRef.current && backButtonListenerRef.current.remove) {
         backButtonListenerRef.current.remove();
         backButtonListenerRef.current = null;
+      }
+      if (appUrlOpenListenerRef.current && appUrlOpenListenerRef.current.remove) {
+        appUrlOpenListenerRef.current.remove();
+        appUrlOpenListenerRef.current = null;
       }
     };
   }, [showNotificationsModal, showHousehold, showHouseholdInviteModal, showExpiredItemsModal, showOnboarding, activeTab, lastBackPress, addToast]);
@@ -1410,6 +1435,34 @@ const App: React.FC = () => {
       </ErrorBoundary>
 
       <GlobalUpdatePrompt />
+
+      {showExpiredItemsModal && (
+        <ExpiredItemsModal
+          isOpen={showExpiredItemsModal}
+          onClose={() => {
+            setShowExpiredItemsModal(false);
+            setExpiredItemsModalSpecificItems(undefined);
+          }}
+          inventory={inventory}
+          onRemoveItems={handleRemoveExpiredItems}
+          householdId={household?.id}
+          userId={user?.id}
+          userName={user?.name}
+          specificItems={expiredItemsModalSpecificItems}
+        />
+      )}
+
+      {notificationViewItem && (
+        <ItemDetailModal
+          item={notificationViewItem.item}
+          onClose={() => setNotificationViewItem(null)}
+          onUpdateItem={updateItem}
+          onDeleteItem={deleteItem}
+          onAddToShoppingList={addToShoppingList}
+          customCategories={customCategories}
+          originalIndex={notificationViewItem.index}
+        />
+      )}
 
       {isAdmin && (
         <Suspense fallback={<LoadingSpinner />}>

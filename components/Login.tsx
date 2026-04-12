@@ -4,8 +4,7 @@ import { ChefHat, Mail, Chrome } from 'lucide-react';
 import { User } from '../types';
 import { Browser } from '@capacitor/browser';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, sendEmailVerification, sendPasswordResetEmail } from 'firebase/auth';
-import { logEvent } from 'firebase/analytics';
-import { analytics } from '../firebaseConfig';
+import AnalyticsService from '../services/analyticsService';
 import { validateEmail, validatePassword, validateName } from '../src/utils/validation';
 import { log } from '../services/logService';
 
@@ -73,9 +72,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
         userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
         await sendEmailVerification(user);
-        if (analytics) {
-          logEvent(analytics, 'sign_up', { email: user.email, provider: 'email' });
-        }
+        AnalyticsService.trackSignup('email');
         setSuccess('Signup successful! Please check your email to verify your account.');
         onLogin({
           id: user.uid,
@@ -87,9 +84,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
         return;
       } else {
         userCredential = await signInWithEmailAndPassword(auth, email, password);
-        if (analytics) {
-          logEvent(analytics, 'login', { email: userCredential.user.email, provider: 'email' });
-        }
+        AnalyticsService.trackLogin('email');
         setSuccess('Login successful!');
         const user = userCredential.user;
         onLogin({
@@ -130,6 +125,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
       googleProvider.addScope('profile');
 
       // For mobile, we need to handle the redirect differently
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       if ((window as any).Capacitor && Browser) {
         // Set the redirect URL for mobile
         googleProvider.setCustomParameters({
@@ -144,9 +140,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
         try {
           const result = await signInWithPopup(auth, googleProvider);
           const user = result.user;
-          if (analytics) {
-            logEvent(analytics, 'login', { email: user.email, provider: 'google' });
-          }
+          AnalyticsService.trackLogin('google');
           onLogin({
             id: user.uid,
             name: user.displayName || user.email?.split('@')[0] || '',
@@ -154,6 +148,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
             provider: 'google',
             hasSeenTutorial: false
           });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (popupError: any) {
           log.warn('Google popup failed, trying redirect', { error: popupError.message, code: popupError.code }, 'Login');
           // If popup is blocked or fails, use redirect as fallback
@@ -166,6 +161,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
           }
         }
       }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       log.error('Google login error', error, 'Login');
       setError(<FormattedMessage id="auth.error.googleLoginFailed" values={{ message: error.message }} />);
@@ -184,9 +180,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
         if (result && result.user) {
           const user = result.user;
           log.info('User authenticated via redirect', { uid: user.uid, provider: 'google' }, 'Login');
-          if (analytics) {
-            logEvent(analytics, 'login', { email: user.email, provider: 'google' });
-          }
+          AnalyticsService.trackLogin('google');
           onLogin({
             id: user.uid,
             name: user.displayName || user.email?.split('@')[0] || '',
@@ -197,6 +191,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
         } else {
           log.debug('No redirect result found', {}, 'Login');
         }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (error: any) {
         log.warn('Redirect result error', { error: error.message, code: error.code }, 'Login');
         // Only show error if it's not a "no redirect result" scenario
@@ -211,13 +206,12 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
     // Also listen for auth state changes in case the redirect happens while component is mounted
     let unsubscribe = () => {};
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     if (auth && typeof (auth as any).onAuthStateChanged === 'function') {
       unsubscribe = auth.onAuthStateChanged((user) => {
         if (user && user.providerData.some(provider => provider.providerId === 'google.com')) {
           // User is signed in with Google, trigger login callback
-          if (analytics) {
-            logEvent(analytics, 'login', { email: user.email, provider: 'google' });
-          }
+          AnalyticsService.trackLogin('google');
           onLogin({
             id: user.uid,
             name: user.displayName || user.email?.split('@')[0] || '',

@@ -15,6 +15,7 @@ import { MealPlanCacheService } from '../services/MealPlanCacheService';
 import { RecipesCacheService } from '../services/recipesCacheService';
 import { ShoppingListCacheService } from '../services/shoppingListCacheService';
 import { useIntl } from 'react-intl';
+import AnalyticsService from '../services/analyticsService';
 
 interface HouseholdManagerProps {
   user: User;
@@ -76,11 +77,14 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
 
       await UsageService.recordHouseholdMemberAdd(user.id);
 
+      await AnalyticsService.trackHouseholdInviteSent(inviteEmail);
+
       await auth.currentUser?.getIdToken(true);
 
       setInviteEmail('');
       log.info('Invitation sent and member added as pending', { email: inviteEmail, householdId: household.id }, 'Household');
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       log.error('Error sending invitation', error, 'Household');
       
@@ -106,6 +110,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
     try {
       if (!household) return;
       await removeMemberFromHousehold(household.id, id, user.id);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       log.error('Error removing member', { error: error?.message, code: error?.code }, 'Household');
       
@@ -145,6 +150,8 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
       const leaveHouseholdFunction = httpsCallable(getFunctions(), 'leaveHousehold');
       await leaveHouseholdFunction({ householdId });
       
+      await AnalyticsService.trackEvent('household_leave', { householdId });
+
       const userRef = DatabaseMonitoringService.doc('users', userId);
       await DatabaseMonitoringService.updateDoc(userRef, {
         householdId: null,
@@ -155,6 +162,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
       onClose();
       
       addToast('You have left the household. Your data has been copied to your personal collections.', 'info');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       log.error('Error leaving household', { error: error?.message, code: error?.code }, 'Household');
       
@@ -214,6 +222,9 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
       const savedRecipes = await RecipesCacheService.getCachedRecipes(undefined, userId);
       await RecipesCacheService.updateCache(savedRecipes, householdId, undefined);
       await RecipesCacheService.updateCache([], undefined, userId); // Clear user's cache
+      
+      // Track household creation
+      AnalyticsService.trackHouseholdJoin(createdRef.id, 'owner');
       
       log.info('Household created and data migrated successfully', { householdId, userId }, 'Household');
     } catch (error) {
