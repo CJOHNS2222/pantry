@@ -1,7 +1,6 @@
 import { PushNotifications, PushNotificationSchema, ActionPerformed } from '@capacitor/push-notifications';
 import { Capacitor } from '@capacitor/core';
-import { messaging } from '../firebaseConfig';
-import { getToken, onMessage } from 'firebase/messaging';
+import { App as CapApp } from '@capacitor/app';
 import { log } from './logService';
 
 class PushNotificationService {
@@ -18,12 +17,44 @@ class PushNotificationService {
     return PushNotificationService.instance;
   }
 
+  /**
+   * Waits until the app is in the foreground (isActive: true) before resolving.
+   * This prevents a NullPointerException in Bridge.getPermissionStates on Android
+   * cold starts where getActivity() can return null during early initialization.
+   */
+  private async waitForAppActive(): Promise<void> {
+    try {
+      const { isActive } = await CapApp.getState();
+      if (!isActive) {
+        await new Promise<void>((resolve) => {
+          const listenerPromise = CapApp.addListener('appStateChange', ({ isActive: active }) => {
+            if (active) {
+              listenerPromise.then(l => l.remove());
+              resolve();
+            }
+          });
+        });
+      }
+      // Brief delay to ensure Bridge.getActivity() is non-null before requestPermissions().
+      // On Android, the Activity reference can be transiently null during cold-start
+      // even after the app appears active.
+      await new Promise<void>(r => setTimeout(r, 300));
+    } catch {
+      // App plugin unavailable (e.g. web); proceed anyway
+    }
+  }
+
   async initialize(): Promise<void> {
     if (this.isInitialized || !Capacitor.isNativePlatform()) {
       return;
     }
 
     try {
+      // Ensure the app is foregrounded before requesting permissions.
+      // Calling requestPermissions() before Bridge.getActivity() is set causes a
+      // fatal NullPointerException on the CapacitorPlugins thread during cold start.
+      await this.waitForAppActive();
+
       // Request permission for push notifications
       const permission = await PushNotifications.requestPermissions();
       if (permission.receive !== 'granted') {
@@ -39,7 +70,7 @@ class PushNotificationService {
 
       this.isInitialized = true;
       // Push notifications initialized successfully
-    } catch (err: any) {
+    } catch (err: unknown) {
       log.error('Failed to initialize push notifications', err);
     }
   }
@@ -77,12 +108,12 @@ class PushNotificationService {
       // Store token in localStorage for now (in production, send to your server)
       localStorage.setItem('fcmToken', token);
       // FCM token stored
-    } catch (err: any) {
+    } catch (err: unknown) {
       log.error('Failed to store FCM token', { err });
     }
   }
 
-  private handleForegroundNotification(notification: PushNotificationSchema): void {
+  private handleForegroundNotification(_notification: PushNotificationSchema): void {
     // When app is in foreground, show in-app notification instead of system notification
     // This prevents duplicate notifications
     // Handling foreground notification
@@ -128,7 +159,7 @@ class PushNotificationService {
     }
   }
 
-  private navigateToPantry(itemId?: string): void {
+  private navigateToPantry(_itemId?: string): void {
     // Use your app's navigation system
     // For example: router.push('/pantry' + (itemId ? `?highlight=${itemId}` : ''));
     // Navigate to pantry, highlight item
@@ -193,7 +224,7 @@ class PushNotificationService {
       this.fcmToken = null;
       this.isInitialized = false;
       // Push notifications unregistered
-    } catch (err: any) {
+    } catch (err: unknown) {
       log.error('Failed to unregister push notifications', { err });
     }
   }
