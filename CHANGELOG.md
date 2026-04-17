@@ -20,7 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`services/recipeService.ts` `getCachedRecipesCache`** — iterates `_1.._N` chunk documents until an empty chunk is found (up to 20), merges all into a single array
 - **`RecipeModal` substitution feature** — replaced the old hardcoded 5-category pantry-match lookup (only showed missing items) with the new full ingredient substitution panel available on any recipe regardless of pantry contents
 
-
+## [1.5.25] - 2026-04-17
 
 ### Fixed
 - **Android crash (NPE)**: Added `RuntimeVisibleAnnotations` ProGuard keep rule so R8 doesn't strip `@CapacitorPlugin`/`@Permission` annotation data in release builds, which caused `Bridge.getPermissionStates()` to NPE
