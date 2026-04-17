@@ -11,6 +11,7 @@ import { useFocusTrap } from '../hooks/useFocusTrap';
 import { useModalOpen } from '../utils/useModalOpen';
 import { scaleRecipeIngredients, calculatePortionScaling } from '../utils/portionUtils';
 import { useAppActions } from '../contexts/AppActionsContext';
+import AnalyticsService from '../services/analyticsService';
 
 interface RecipeModalProps {
   recipe: StructuredRecipe | SavedRecipe;
@@ -19,7 +20,7 @@ interface RecipeModalProps {
   onAddToPlan?: (recipe: StructuredRecipe) => void;
   onSaveRecipe?: (recipe: StructuredRecipe) => void;
   onDeleteRecipe?: (recipe: SavedRecipe) => void;
-  onRate?: (rating: any) => void;
+  onRate?: (rating: RecipeRating) => void;
   onMarkAsMade?: (recipe: StructuredRecipe, inventory?: PantryItem[]) => void;
   onRemoveFromMealPlan?: (recipe: StructuredRecipe) => void;
   showSaveButton?: boolean;
@@ -99,19 +100,25 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       setIsSaving(false);
+      // Track recipe view
+      AnalyticsService.trackRecipeView(
+        recipe.id || recipe.title,
+        recipe.title,
+        isFromMealPlan ? 'meal_plan' : 'search'
+      );
     }
-  }, [isOpen]);
+  }, [isOpen, recipe, isFromMealPlan]);
 
   // Populate editable fields when modal opens for editing
   useEffect(() => {
     if (isOpen && editable && recipe) {
-      setEditTitle((recipe as any).title || '');
-      setEditDescription((recipe as any).description || '');
-      setEditIngredientsText(Array.isArray((recipe as any).ingredients) ? (recipe as any).ingredients.join('\n') : '');
-      setEditInstructionsText(Array.isArray((recipe as any).instructions) ? (recipe as any).instructions.join('\n') : '');
-      setEditCookTime((recipe as any).cookTime || '');
-      setEditType((recipe as any).type || 'Dinner');
-      setImagePreview((recipe as any).image || null);
+      setEditTitle(recipe.title || '');
+      setEditDescription(recipe.description || '');
+      setEditIngredientsText(Array.isArray(recipe.ingredients) ? recipe.ingredients.join('\n') : '');
+      setEditInstructionsText(Array.isArray(recipe.instructions) ? recipe.instructions.join('\n') : '');
+      setEditCookTime(typeof recipe.cookTime === 'string' ? recipe.cookTime : String(recipe.cookTime || ''));
+      setEditType(recipe.type || 'Dinner');
+      setImagePreview(recipe.image || null);
       setImageFile(null);
       setSubmitForInclusion(false);
     }
@@ -174,6 +181,12 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
       seconds = parseTimeToSeconds((recipe as StructuredRecipe).cookTime);
     }
     if (seconds > 0) {
+      // Track timer start
+      AnalyticsService.trackCookingReminderSet(
+        recipe.id || recipe.title,
+        recipe.title,
+        seconds / 60 // Convert to minutes
+      );
       setTotalTime(seconds);
       setTimeRemaining(seconds);
       setTimerActive(true);
@@ -243,6 +256,13 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
   };
 
   const handleMarkAsMadeClick = async () => {
+    // Track recipe completion
+    AnalyticsService.trackRecipeCompleted(
+      recipe.id || recipe.title,
+      recipe.title,
+      parseTimeToSeconds(recipe.cookTime) / 60 // Convert to minutes
+    );
+
     // Call the onMarkAsMade handler with inventory info
     if (onMarkAsMade) {
       onMarkAsMade(recipe as StructuredRecipe, inventory);
@@ -255,6 +275,12 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
 
     // Step 3.5: If this was triggered from the meal plan, open leftover capture
     if (isFromMealPlan) {
+      // Track leftover capture start
+      AnalyticsService.trackFeatureUsage('leftover_capture', {
+        recipe_id: recipe.id || recipe.title,
+        recipe_name: recipe.title,
+        trigger: 'mark_as_made'
+      });
       setShowLeftoverCapture(true);
       return; // Defer review prompt/close until leftover capture completes
     }
@@ -660,7 +686,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
               <ol className="list-decimal list-inside text-theme-secondary opacity-80 space-y-1">
               {(() => {
                 // Process instructions - some recipes have them as arrays with concatenated steps
-                let processedSteps: string[] = [];
+                const processedSteps: string[] = [];
 
                 if (Array.isArray(recipe.instructions) && recipe.instructions.length > 0) {
                   recipe.instructions.forEach(instruction => {
@@ -693,6 +719,12 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
              recipeTitle={recipe.title}
              recipe={recipe}
              onRatingSubmitted={(rating) => {
+              // Track recipe rating
+              AnalyticsService.trackRecipeRating(
+                recipe.id || recipe.title,
+                recipe.title,
+                rating.rating
+              );
               if (onRate) onRate(rating);
               setShowReviewPrompt(false);
               setTimeout(() => onClose(), 300); // Close modal after submitting a rating
@@ -732,7 +764,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
                   setIsSaving(true);
                   try {
                     // Build StructuredRecipe from editable fields
-                    const built: any = {
+                    const built: StructuredRecipe & { __imageFile?: File; __submitForInclusion?: boolean } = {
                       title: editTitle.trim(),
                       description: editDescription.trim(),
                       ingredients: editIngredientsText.split('\n').map(s => s.trim()).filter(Boolean),
@@ -749,6 +781,8 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
                     if (onSaveRecipe) {
                       await onSaveRecipe(built as StructuredRecipe);
                     }
+                    // Track recipe save
+                    AnalyticsService.trackRecipeSave((built as StructuredRecipe).id || built.title, built.title);
                     onClose();
                   } finally {
                     setIsSaving(false);
@@ -803,7 +837,14 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
           {/* Cooking Mode button */}
           {!editable && Array.isArray(recipe.instructions) && recipe.instructions.some(s => s.trim()) && (
             <button
-              onClick={() => setShowCookingMode(true)}
+              onClick={() => {
+                // Track cooking mode start
+                AnalyticsService.trackFeatureUsage('cooking_mode', {
+                  recipe_id: recipe.id || recipe.title,
+                  recipe_name: recipe.title
+                });
+                setShowCookingMode(true);
+              }}
               className="w-full py-2.5 font-bold bg-[var(--accent-color)] text-white rounded-lg flex items-center justify-center gap-2 mb-1"
             >
               <UtensilsCrossed className="w-4 h-4" /> Start Cooking
@@ -832,12 +873,12 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
                   try {
                     // Sanitize placeholder recipe text so we don't persist UI-only messages
                     const sanitized: StructuredRecipe = {
-                      title: (recipe as any).title || '',
-                      description: (recipe as any).description || '',
-                      ingredients: Array.isArray((recipe as any).ingredients) ? [...(recipe as any).ingredients] : [],
-                      instructions: Array.isArray((recipe as any).instructions) ? [...(recipe as any).instructions] : [],
-                      cookTime: (recipe as any).cookTime || '' ,
-                      image: (recipe as any).image
+                      title: recipe.title || '',
+                      description: recipe.description || '',
+                      ingredients: Array.isArray(recipe.ingredients) ? [...recipe.ingredients] : [],
+                      instructions: Array.isArray(recipe.instructions) ? [...recipe.instructions] : [],
+                      cookTime: recipe.cookTime || '',
+                      image: recipe.image
                     };
 
                     const placeholderPattern = /Full recipe not available in this rating/i;
@@ -849,8 +890,10 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
                       sanitized.instructions = [];
                     }
 
-                    await onSaveRecipe(sanitized as StructuredRecipe); 
-                    onClose(); 
+                    await onSaveRecipe(sanitized as StructuredRecipe);
+                    // Track recipe save
+                    AnalyticsService.trackRecipeSave(sanitized.id || sanitized.title, sanitized.title);
+                    onClose();
                   } finally {
                     setIsSaving(false);
                   }

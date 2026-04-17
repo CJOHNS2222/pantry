@@ -129,23 +129,21 @@ export function generateExpirationMessage(
   itemName: string,
   daysUntilExpiry: number,
   riskLevel: number
-): { title: string; message: string; actionLabel: string } {
+): { title: string; message: string } {
   const { emoji } = getNotificationTone(riskLevel);
 
   // Special cases
   if (itemName.toLowerCase().includes('cooked rice') && daysUntilExpiry <= 0) {
     return {
       title: 'Cooked Rice Alert!',
-      message: `🍚 It's been 4 days. Even if it looks fine, Bacillus cereus isn't worth the risk. Time to toss.`,
-      actionLabel: 'Mark as Tossed'
+      message: `🍚 It's been 4 days. Even if it looks fine, Bacillus cereus isn't worth the risk. Time to toss.`
     };
   }
 
   if (itemName.toLowerCase().includes('deli') && itemName.toLowerCase().includes('meat') && daysUntilExpiry <= 0) {
     return {
       title: 'Deli Meat Alert',
-      message: `Your ${itemName} has reached its safety limit. Toss it and we'll add a fresh pack to your list.`,
-      actionLabel: 'Add to Shopping List'
+      message: `Your ${itemName} has reached its safety limit. Toss it and we'll add a fresh pack to your list.`
     };
   }
 
@@ -155,14 +153,12 @@ export function generateExpirationMessage(
       if (daysUntilExpiry <= 0) {
         return {
           title: 'Action Required!',
-          message: `${emoji} Use your ${itemName} by tonight or move it to the freezer. Safety first!`,
-          actionLabel: 'Move to Freezer'
+          message: `${emoji} Use your ${itemName} by tonight or move it to the freezer. Safety first!`
         };
       } else if (daysUntilExpiry === 1) {
         return {
           title: 'Cook or Freeze',
-          message: `That ${itemName} expires today. Cook it now or freeze it for later. Don't let a good meal go to waste (or get you sick)!`,
-          actionLabel: 'Add to Meal Plan'
+          message: `That ${itemName} expires today. Cook it now or freeze it for later. Don't let a good meal go to waste (or get you sick)!`
         };
       }
       break;
@@ -171,14 +167,12 @@ export function generateExpirationMessage(
       if (daysUntilExpiry <= 0) {
         return {
           title: 'Time to Use!',
-          message: `${emoji} Your ${itemName} needs attention today.`,
-          actionLabel: 'Add to Meal Plan'
+          message: `${emoji} Your ${itemName} needs attention today.`
         };
       } else if (daysUntilExpiry === 1) {
         return {
           title: 'Clock\'s Ticking',
-          message: `${emoji} Clock's ticking on that ${itemName}! Lunch today or freezer bound?`,
-          actionLabel: 'Add to Meal Plan'
+          message: `${emoji} Clock's ticking on that ${itemName}! Lunch today or freezer bound?`
         };
       }
       break;
@@ -187,14 +181,12 @@ export function generateExpirationMessage(
       if (daysUntilExpiry <= 0) {
         return {
           title: 'Time to Cook',
-          message: `${emoji} Your ${itemName} is ready to be used today.`,
-          actionLabel: 'Add to Meal Plan'
+          message: `${emoji} Your ${itemName} is ready to be used today.`
         };
       } else if (daysUntilExpiry === 1) {
         return {
           title: 'Getting Sad',
-          message: `${emoji} Your ${itemName} is starting to look sad. Sauté it tonight before it wilts!`,
-          actionLabel: 'Add to Meal Plan'
+          message: `${emoji} Your ${itemName} is starting to look sad. Sauté it tonight before it wilts!`
         };
       }
       break;
@@ -202,16 +194,14 @@ export function generateExpirationMessage(
     case 2: // Hardy Fridge
       return {
         title: 'Checking In',
-        message: `${emoji} Checking in on your ${itemName}. Still looking fresh? Tap to update.`,
-        actionLabel: 'Update Status'
+        message: `${emoji} Checking in on your ${itemName}. Still looking fresh? Tap to update.`
       };
 
     case 1: // Staples
     default:
       return {
         title: 'Inventory Check',
-        message: `${emoji} Running low on ${itemName}? Tap to add it to your shopping list.`,
-        actionLabel: 'Add to Shopping List'
+        message: `${emoji} Running low on ${itemName}? Tap to add it to your shopping list.`
       };
   }
 
@@ -219,20 +209,17 @@ export function generateExpirationMessage(
   if (daysUntilExpiry <= 0) {
     return {
       title: 'Item Expired',
-      message: `${itemName} has expired and should be used or discarded.`,
-      actionLabel: 'Mark as Used'
+      message: `${itemName} has expired and should be used or discarded.`
     };
   } else if (daysUntilExpiry === 1) {
     return {
       title: 'Expires Tomorrow',
-      message: `${itemName} expires tomorrow.`,
-      actionLabel: 'Add to Meal Plan'
+      message: `${itemName} expires tomorrow.`
     };
   } else {
     return {
       title: 'Expires Soon',
-      message: `${itemName} expires in ${daysUntilExpiry} days.`,
-      actionLabel: 'View Item'
+      message: `${itemName} expires in ${daysUntilExpiry} days.`
     };
   }
 }

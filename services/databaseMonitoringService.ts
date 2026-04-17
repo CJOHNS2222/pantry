@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import {
   collection as firestoreCollection,
   doc,
@@ -501,7 +502,7 @@ class DatabaseMonitoringService {
   static onSnapshot(ref: any, callback: (snapshot: any) => void, errorCallback?: (err: any) => void): Unsubscribe {
     this.metrics.realtimeSubscriptions++;
 
-    const path = ref.parent?.path || ref.path || 'unknown';
+    const path = ref.path || 'unknown';
     console.log(`📡 SUBSCRIPTION: ${path} | Total Subscriptions: ${this.metrics.realtimeSubscriptions}`);
 
     AnalyticsService.trackDatabaseOperation('read', ref.parent?.id || 'unknown', 0, {

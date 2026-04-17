@@ -32,6 +32,7 @@ import { offlineDataCache } from '../services/offlineDataCache';
 import { useAppActions } from '../contexts/AppActionsContext';
 import { groceryPriceService } from '../services/groceryPriceService';
 import { priceCacheService } from '../services/priceCacheService';
+import AnalyticsService from '../services/analyticsService';
 
 // Firestore access is instrumented via DatabaseMonitoringService when needed
 import DatabaseMonitoringService from '../services/databaseMonitoringService';
@@ -339,6 +340,12 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     const item = items.find(i => i.id === id);
     if (!item) return;
 
+    // Track item completion/uncompletion
+    if (!item.checked) {
+      // Item is being checked (completed)
+      AnalyticsService.trackShoppingListComplete(1, items.length);
+    }
+
     // Simply toggle the checked state without opening purchase modal
     const now = new Date();
     setItems(prev => prev.map(i => i.id === id ? {
@@ -490,6 +497,9 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
 
     setItems(prev => [...prev, newShoppingItem]);
 
+    // Track shopping list item addition
+    AnalyticsService.trackShoppingListAdd(newItem, newShoppingItem.category);
+
     // Offline queue for sync
     if (!isOnline) {
       addToQueue({
@@ -529,6 +539,9 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     };
 
     setItems(prev => [...prev, newShoppingItem]);
+
+    // Track shopping list item addition
+    AnalyticsService.trackShoppingListAdd(quickAddItem.name, newShoppingItem.category);
 
     // Offline queue for sync
     if (!isOnline) {

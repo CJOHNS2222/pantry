@@ -9,6 +9,7 @@ import { PantryItem } from '../types';
 import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { log } from '../services/logService';
+import AnalyticsService from '../services/analyticsService';
 
 interface ImportModalProps {
   open: boolean;
@@ -61,6 +62,12 @@ const ImportModal: React.FC<ImportModalProps> = ({ open, onClose, defaultTab = '
       }
       addToast(`Imported ${items.length} pantry items`, 'success');
       onClose();
+      
+      AnalyticsService.trackEvent('pantry_imported', {
+        itemCount: items.length,
+        householdId: household?.id,
+        userId: user?.id
+      });
     } catch (err) {
       log.error('Failed to import pantry items', { error: String(err) }, 'ImportModal');
       addToast('Failed to import pantry items', 'error');
@@ -113,6 +120,12 @@ const ImportModal: React.FC<ImportModalProps> = ({ open, onClose, defaultTab = '
         await saveRecipeToUserCache(user.id, recipe);
         addToast(`Imported recipe: ${recipe.title}`, 'success');
         onClose();
+        
+        AnalyticsService.trackEvent('recipe_imported', {
+          recipeTitle: recipe.title,
+          sourceUrl: url,
+          userId: user.id
+        });
       } else {
         addToast('You must be signed in to save recipes', 'error');
       }

@@ -29,7 +29,10 @@ import HapticService from '../services/hapticService';
 // Helper to normalize quantity from PantryItem
 const getQuantityValue = (item: PantryItem): number => {
   if (typeof item.quantity === 'number') return item.quantity;
-  if (item.quantity && typeof item.quantity === 'object') return (item.quantity as any).amount || 0;
+  if (item.quantity && typeof item.quantity === 'object') return (
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (item.quantity as any).amount || 0
+  );
   // Fallback to legacy estimate string
   const est = parseFloat(item.quantity_estimate || '0');
   return isNaN(est) ? 0 : est;
@@ -245,7 +248,7 @@ export function useDataManagement(
   user?: User | null,
   addToast?: (message: string, type: 'success' | 'error' | 'info' | 'warning', duration?: number) => void,
   addToShoppingList?: (items: string[]) => void,
-  updateSyncStatus?: (status: any) => void,
+  updateSyncStatus?: (status: Partial<{ isOnline: boolean; isSyncing: boolean; lastSyncTime: Date | null; pendingOperations: number; syncError: string | null }>) => void,
   loggingOptions?: {
     logItemAdded?: (item: string, itemId: string) => void;
     logItemRemoved?: (item: string, itemId: string) => void;
@@ -315,7 +318,16 @@ export function useDataManagement(
   // Ref to hold latest inventory for closure-safe comparisons inside Firestore listeners
   const inventoryRef = useRef<PantryItem[]>([]);
 
+  // Ref to hold latest addToast function to avoid useEffect dependency issues
+  const addToastRef = useRef(addToast);
+
+  // Update the ref whenever addToast changes
+  useEffect(() => {
+    addToastRef.current = addToast;
+  }, [addToast]);
+
   // Helper function to clean objects by removing undefined fields (Firestore requirement)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const cleanObject = (obj: any): any => {
     if (obj === null || obj === undefined) {
       return undefined;
@@ -328,6 +340,7 @@ export function useDataManagement(
           .map(item => cleanObject(item))
           .filter(item => item !== undefined);
       } else {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const cleaned: any = {};
         for (const key in obj) {
           if (Object.prototype.hasOwnProperty.call(obj, key)) {
@@ -345,37 +358,28 @@ export function useDataManagement(
   };
 
   // Helper function for offline-aware writes
-  const performWrite = async (operation: { type: 'add' | 'update' | 'delete'; collection: string; docId?: string; data?: any }) => {
+  const performWrite = async (operation: { type: 'add' | 'update' | 'delete'; collection: string; docId?: string;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    data?: any }) => {
     // Ensure operation has a data field to satisfy queue typing
     if (operation.data === undefined) {
       operation.data = {};
     }
 
-    if (!isOnline) {
-      await offlineQueue.enqueue(operation as any);
-      if (typeof updateSyncStatus === 'function') {
-        // This needs to be a function to correctly update state
-        // updateSyncStatus((prev: any) => ({
-        //   ...prev,
-        //   pendingOperations: prev.pendingOperations + 1
-        // }));
+    // Firebase SDK queues writes natively when offline and syncs on reconnect.
+    // No custom queue needed — write directly and let the SDK handle persistence.
+    try {
+      if (operation.type === 'add') {
+        await DatabaseMonitoringService.addDoc(DatabaseMonitoringService.collection(operation.collection), operation.data);
+      } else if (operation.type === 'update' && operation.docId) {
+        await DatabaseMonitoringService.updateDoc(DatabaseMonitoringService.doc(operation.collection, operation.docId), operation.data);
+      } else if (operation.type === 'delete' && operation.docId) {
+        await DatabaseMonitoringService.deleteDoc(DatabaseMonitoringService.doc(operation.collection, operation.docId));
       }
-      addToast?.('Change queued for when you\'re back online.', 'info');
-    } else {
-      try {
-        if (operation.type === 'add') {
-          await DatabaseMonitoringService.addDoc(DatabaseMonitoringService.collection(operation.collection), operation.data);
-        } else if (operation.type === 'update' && operation.docId) {
-          await DatabaseMonitoringService.updateDoc(DatabaseMonitoringService.doc(operation.collection, operation.docId), operation.data);
-        } else if (operation.type === 'delete' && operation.docId) {
-          await DatabaseMonitoringService.deleteDoc(DatabaseMonitoringService.doc(operation.collection, operation.docId));
-        }
-        
-        firestoreCache.invalidateCollection(operation.collection);
-      } catch (err) {
-        log.error('Online write operation failed', err, 'DataManagement');
-        addToast?.(ERROR_MESSAGES.SAVE_FAILED, 'error');
-      }
+      firestoreCache.invalidateCollection(operation.collection);
+    } catch (err) {
+      log.error('Write operation failed', err, 'DataManagement');
+      addToast?.(ERROR_MESSAGES.SAVE_FAILED, 'error');
     }
   };
 
@@ -399,7 +403,11 @@ export function useDataManagement(
         return true;
       })
       .map(day => {
-        const cleanMeal = (meal: any) => meal && meal.id && meal.recipe && meal.recipe.title;
+        const cleanMeal = (meal: unknown) => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const m = meal as any;
+          return m && m.id && m.recipe && m.recipe.title;
+        };
 
         return {
           date: day.date,
@@ -516,7 +524,10 @@ export function useDataManagement(
             const items: PantryItem[] = [];
             for (const itemId in data) {
               if (itemId !== 'lastUpdated' && itemId !== 'version' && itemId !== 'itemCount') {
-                const item = InventoryCacheService.arrayToPantryItem(itemId, data[itemId] as any);
+                const item = InventoryCacheService.arrayToPantryItem(itemId,
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                data[itemId] as any
+              );
                 // W: Read-time FEFO normalisation — keep item.expirationDate in sync with
                 // the soonest batch expiry so filters and alerts always use the correct date.
                 if (item.batches && item.batches.length > 0) {
@@ -608,6 +619,7 @@ export function useDataManagement(
           } else {
             if (dangerCandidates.length >= 2) {
               // Create a single aggregated Danger Zone notification
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               await NotificationService.createDangerZoneAlert(user.id, dangerCandidates as any);
             } else {
               // Fetch once and reuse for all items to avoid redundant Firestore queries
@@ -616,7 +628,7 @@ export function useDataManagement(
               for (const item of itemsExpiringSoon.slice(0, 3)) {
                 const daysUntilExpiry = Math.ceil((new Date(item.expirationDate!).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
                 // pass user risk level to tailor priority
-                // eslint-disable-next-line no-await-in-loop
+                 
                 await NotificationService.createExpirationAlert(user.id, item.item, daysUntilExpiry, item.id, user?.profile?.riskLevel, item.category, cachedNotifications);
               }
             }
@@ -662,16 +674,18 @@ export function useDataManagement(
     }
   }, []);
 
+  // When the app comes back online, ask the Firebase offline queue to flush any
+  // pending writes that were held during the outage. addToastRef avoids the
+  // stale-closure repeated-toast issue that originally caused this to be disabled.
   useEffect(() => {
-    if(isOnline) {
-      offlineQueue.processQueue().then((_processedCount) => {
-          // processQueue returns void; sync success is implicit
-          addToast?.('Offline changes synced.', 'success');
-        }).catch(err => {
-          log.error('Failed to process offline queue', err, 'DataManagement');
-        });
+    if (isOnline) {
+      offlineQueue.processQueue().then(() => {
+        addToastRef.current?.('Back online — changes synced.', 'success');
+      }).catch(err => {
+        log.error('Failed to process offline queue', err, 'DataManagement');
+      });
     }
-  }, [isOnline, addToast]);
+  }, [isOnline]);
 
   // Show risk questionnaire to new users shortly after first login
   useEffect(() => {
@@ -702,7 +716,7 @@ export function useDataManagement(
     }
 
     let dayIndex = targetDayIndex;
-    let mealType = targetMealType || 'breakfast';
+    const mealType = targetMealType || 'breakfast';
 
     if (dayIndex === undefined) {
       const today = new Date().toISOString().slice(0, 10);
@@ -1007,8 +1021,10 @@ export function useDataManagement(
       );
       const snap = await DatabaseMonitoringService.getDocs(q);
       if (snap.empty) return [];
-      return snap.docs.map((d: any) => {
-        const data = d.data() as any;
+      return snap.docs.map((d: unknown) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const doc = d as any;
+        const data = doc.data();
         const dateField = data.date;
         let dateStr: string | null = null;
         if (dateField) {
@@ -1056,8 +1072,10 @@ export function useDataManagement(
         return;
       }
 
-      const mapped: RecipeRating[] = snap.docs.map((d: any) => {
-        const data = d.data() as any;
+      const mapped: RecipeRating[] = snap.docs.map((d: unknown) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const doc = d as any;
+        const data = doc.data();
         const dateField = data.date;
         let dateStr: string | null = null;
         if (dateField) {

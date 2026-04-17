@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Notification Service
  * Manages contextual notifications, timing, and user preferences
@@ -291,14 +292,16 @@ export class NotificationService {
     }
 
     // Generate contextual message based on risk level
-    const { title, message, actionLabel } = generateExpirationMessage(itemName, daysUntilExpiry, itemRiskLevel);
+    const { title, message } = generateExpirationMessage(itemName, daysUntilExpiry, itemRiskLevel);
 
     // Determine action type based on context
     let actionType: 'add_to_shopping' | 'view_item' = 'view_item';
-    let actionData: any = { itemId, itemName };
+    let actionLabel = 'View Item';
+    const actionData: any = { itemId, itemName };
 
     if (daysUntilExpiry <= 1 || itemRiskLevel >= 4) {
       actionType = 'add_to_shopping';
+      actionLabel = 'Add to Shopping List';
     }
 
     return this.createNotification(userId, {
@@ -486,7 +489,14 @@ export class NotificationService {
         if (n.read) return false;
 
         // Check if notification is within 30 days
-        const createdAt = n.createdAt ? n.createdAt.toDate() : null;
+        let createdAt: Date | null = null;
+        if (n.createdAt) {
+          if (typeof n.createdAt === 'string') {
+            createdAt = new Date(n.createdAt);
+          } else if (n.createdAt && typeof n.createdAt.toDate === 'function') {
+            createdAt = n.createdAt.toDate();
+          }
+        }
         if (!createdAt || createdAt < thirtyDaysAgo) return false;
 
         return true;
@@ -494,8 +504,17 @@ export class NotificationService {
 
       // Sort by createdAt desc and limit to 20
       const sorted = unreadNotifications.slice().sort((a: NotificationItem, b: NotificationItem) => {
-        const aTime = a.createdAt ? a.createdAt.toDate().getTime() : 0;
-        const bTime = b.createdAt ? b.createdAt.toDate().getTime() : 0;
+        const getTime = (n: NotificationItem): number => {
+          if (!n.createdAt) return 0;
+          if (typeof n.createdAt === 'string') {
+            return new Date(n.createdAt).getTime();
+          } else if (n.createdAt && typeof n.createdAt.toDate === 'function') {
+            return n.createdAt.toDate().getTime();
+          }
+          return 0;
+        };
+        const aTime = getTime(a);
+        const bTime = getTime(b);
         return bTime - aTime;
       }).slice(0, 20);
 
@@ -574,8 +593,16 @@ export class NotificationService {
     }
 
     // Check if snoozed
-    if (notification.snoozedUntil && notification.snoozedUntil.toDate() > new Date()) {
-      return false;
+    if (notification.snoozedUntil) {
+      let snoozedDate: Date | null = null;
+      if (typeof notification.snoozedUntil === 'string') {
+        snoozedDate = new Date(notification.snoozedUntil);
+      } else if (notification.snoozedUntil && typeof notification.snoozedUntil.toDate === 'function') {
+        snoozedDate = notification.snoozedUntil.toDate();
+      }
+      if (snoozedDate && snoozedDate > new Date()) {
+        return false;
+      }
     }
 
     return true;
@@ -623,7 +650,14 @@ export class NotificationService {
       // Filter out notifications older than 30 days
       const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
       const recentNotifications = allNotifications.filter((n: NotificationItem) => {
-        const createdAt = n.createdAt ? n.createdAt.toDate() : null;
+        let createdAt: Date | null = null;
+        if (n.createdAt) {
+          if (typeof n.createdAt === 'string') {
+            createdAt = new Date(n.createdAt);
+          } else if (n.createdAt && typeof n.createdAt.toDate === 'function') {
+            createdAt = n.createdAt.toDate();
+          }
+        }
         return createdAt && createdAt >= thirtyDaysAgo;
       });
 

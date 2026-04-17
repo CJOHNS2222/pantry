@@ -5,6 +5,29 @@ All notable changes to Stock & Spoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.25] - 2026-04-17
+
+### Fixed
+- **Android crash (NPE)**: Added `RuntimeVisibleAnnotations` ProGuard keep rule so R8 doesn't strip `@CapacitorPlugin`/`@Permission` annotation data in release builds, which caused `Bridge.getPermissionStates()` to NPE
+- **Android crash (NPE)**: Added `requestPermissionsWithRetry()` to `pushNotificationService` — retries up to 3× with exponential back-off to survive transient Bridge NPE on cold start
+- **POST_NOTIFICATIONS**: Added explicit `<uses-permission>` to `AndroidManifest.xml` for Android 13+ (API 33+)
+- **Offline mode**: Restored real network detection in `useOfflineStatus` — uses Capacitor `@capacitor/network` on Android/iOS and `window` online/offline events on web; was previously hardcoded to `isOnline: true`
+- **Offline reconnect toast**: Re-enabled `offlineQueue.processQueue()` on reconnect using `addToastRef` to prevent stale-closure repeated-toast crash
+- **Offline queue dead code**: Removed `if (false) {}` wrapper from `performWrite` in `useDataManagement`
+- **Notification date crash**: Fixed `.toDate()` calls on `createdAt` and `snoozedUntil` fields which can be ISO strings or Firestore Timestamps — now handles both types
+- **Notification action label**: Fixed missing `actionLabel` after `generateExpirationMessage` return-type was simplified; label is now set inline in the caller
+
+### Added
+- Analytics tracking for category create/update/delete events (`CategoryManager`)
+- Analytics tracking for grocery cost estimator open and price submit events (`GroceryCostEstimator`)
+- Analytics tracking for pantry import and recipe import events (`ImportModal`)
+- Analytics tracking for recipe view, timer start, completion, save, rate, leftover capture, and cooking mode start events (`RecipeModal`)
+- Analytics tracking for shopping list item add and check-off events (`ShoppingList`)
+- `specificItems` prop on `ExpiredItemsModal` to support notification-driven expired-item flows
+
+### Changed
+- `generateExpirationMessage` return type simplified — removed `actionLabel` from return value; callers now determine the label contextually
+
 ## [1.5.24] - 2026-04-12
 
 ### Fixed

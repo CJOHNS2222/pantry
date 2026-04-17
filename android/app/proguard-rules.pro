@@ -20,6 +20,13 @@
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
 
+# Preserve runtime-visible annotations so Capacitor Bridge can read
+# @CapacitorPlugin / @Permission via reflection at runtime.
+-keepattributes RuntimeVisibleAnnotations,AnnotationDefault
+
+# Keep Capacitor annotation classes themselves
+-keep class com.getcapacitor.annotation.** { *; }
+
 # Add rules to suppress R8 warnings
 -dontwarn kotlin.coroutines.jvm.internal.SpillingKt
 -dontwarn kotlin.uuid.ExperimentalUuidApi

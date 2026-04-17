@@ -18,6 +18,7 @@ interface ExpiredItemsModalProps {
   householdId?: string;
   userId?: string;
   userName?: string;
+  specificItems?: PantryItem[]; // Optional: show specific items instead of all expired items
 }
 
 type DisposalReason = 'thrown_away' | 'cooked' | 'remove';
@@ -29,7 +30,8 @@ const ExpiredItemsModal: React.FC<ExpiredItemsModalProps> = ({
   onRemoveItems,
   householdId,
   userId,
-  userName
+  userName,
+  specificItems
 }) => {
   useModalOpen(isOpen);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
@@ -40,26 +42,38 @@ const ExpiredItemsModal: React.FC<ExpiredItemsModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      // Get expired items using the same logic as generateExpirationAlerts
-      const today = new Date().toISOString().slice(0, 10);
-      const expired = inventory.filter(item => {
-        if (!item.expirationDate || item.is_immortal) return false;
-        // Frozen items use freezerExpiry; don't flag them based on old fridge-date
-        if (item.is_frozen || item.storageLocation === 'freezer') {
-          const ref = item.freezerExpiry || item.expirationDate;
-          return ref <= today;
-        }
-        return item.expirationDate <= today;
-      });
-      setExpiredItems(expired);
-      setSelectedItems(new Set());
+      if (specificItems) {
+        // Use specific items from notification
+        setExpiredItems(specificItems);
+        setSelectedItems(new Set());
 
-      // Track modal opened
-      AnalyticsService.trackEvent('expired_items_modal_opened', {
-        expired_count: expired.length
-      });
+        // Track modal opened
+        AnalyticsService.trackEvent('expired_items_modal_opened', {
+          expired_count: specificItems.length,
+          source: 'notification'
+        });
+      } else {
+        // Get expired items using the same logic as generateExpirationAlerts
+        const today = new Date().toISOString().slice(0, 10);
+        const expired = inventory.filter(item => {
+          if (!item.expirationDate || item.is_immortal) return false;
+          // Frozen items use freezerExpiry; don't flag them based on old fridge-date
+          if (item.is_frozen || item.storageLocation === 'freezer') {
+            const ref = item.freezerExpiry || item.expirationDate;
+            return ref <= today;
+          }
+          return item.expirationDate <= today;
+        });
+        setExpiredItems(expired);
+        setSelectedItems(new Set());
+
+        // Track modal opened
+        AnalyticsService.trackEvent('expired_items_modal_opened', {
+          expired_count: expired.length
+        });
+      }
     }
-  }, [isOpen, inventory]);
+  }, [isOpen, inventory, specificItems]);
 
   const getDaysExpired = (expirationDate: string): number => {
     const today = new Date();

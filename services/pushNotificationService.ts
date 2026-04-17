@@ -35,13 +35,33 @@ class PushNotificationService {
           });
         });
       }
-      // Brief delay to ensure Bridge.getActivity() is non-null before requestPermissions().
-      // On Android, the Activity reference can be transiently null during cold-start
-      // even after the app appears active.
+      // Brief delay to ensure Bridge internals are ready after the app appears active.
       await new Promise<void>(r => setTimeout(r, 300));
     } catch {
       // App plugin unavailable (e.g. web); proceed anyway
     }
+  }
+
+  /**
+   * Requests push notification permissions with retry logic.
+   * On Android (especially API 36+ / Capacitor 8), the native Bridge can throw a
+   * NullPointerException in Bridge.getPermissionStates() during cold start because
+   * the PluginHandle's annotation field is not yet visible on the CapacitorPlugins
+   * handler thread. Retrying after a short delay gives the JMM time to propagate
+   * the field write.
+   */
+  private async requestPermissionsWithRetry(maxAttempts = 3): Promise<{ receive: string }> {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        return await PushNotifications.requestPermissions();
+      } catch (err) {
+        if (attempt === maxAttempts) throw err;
+        // Exponential back-off: 500ms, 1000ms
+        await new Promise<void>(r => setTimeout(r, attempt * 500));
+      }
+    }
+    // Unreachable, but satisfies TypeScript
+    throw new Error('requestPermissions failed after retries');
   }
 
   async initialize(): Promise<void> {
@@ -55,8 +75,8 @@ class PushNotificationService {
       // fatal NullPointerException on the CapacitorPlugins thread during cold start.
       await this.waitForAppActive();
 
-      // Request permission for push notifications
-      const permission = await PushNotifications.requestPermissions();
+      // Request permission with retry to survive transient Bridge NPE on cold start.
+      const permission = await this.requestPermissionsWithRetry();
       if (permission.receive !== 'granted') {
         // Push notification permissions not granted
         return;

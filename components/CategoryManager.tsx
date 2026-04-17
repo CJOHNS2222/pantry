@@ -4,6 +4,7 @@ import { useModalOpen } from '../utils/useModalOpen';
 import { useKeyboardNavigation } from '../hooks/useKeyboardNavigation';
 import { CustomCategory } from '../types';
 import { getCategoryIcon, getCategoryColor } from '../utils/appUtils';
+import AnalyticsService from '../services/analyticsService';
 
 interface CategoryManagerProps {
   customCategories: CustomCategory[];
@@ -63,8 +64,19 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({
         icon: formData.icon,
         color: formData.color
       });
+      AnalyticsService.trackEvent('category_updated', {
+        categoryId: editingId,
+        name: formData.name.trim(),
+        icon: formData.icon,
+        color: formData.color
+      });
     } else {
       onAddCategory(formData.name.trim(), formData.icon, formData.color);
+      AnalyticsService.trackEvent('category_created', {
+        name: formData.name.trim(),
+        icon: formData.icon,
+        color: formData.color
+      });
     }
     resetForm();
   };
@@ -290,7 +302,13 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({
                         <Edit2 className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => onDeleteCategory(category.id)}
+                        onClick={() => {
+                          onDeleteCategory(category.id);
+                          AnalyticsService.trackEvent('category_deleted', {
+                            categoryId: category.id,
+                            name: category.name
+                          });
+                        }}
                         className="p-2 text-theme-secondary hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                         title="Delete category"
                         aria-label={`Delete category: ${category.name}`}

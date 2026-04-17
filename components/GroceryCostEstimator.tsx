@@ -6,6 +6,7 @@ import { parseIngredientForShoppingList } from '../utils/appUtils';
 import { useAppActions } from '../contexts/AppActionsContext';
 import { useApp } from '../contexts/AppContext';
 import { log } from '../services/logService';
+import AnalyticsService from '../services/analyticsService';
 
 interface GroceryCostEstimatorProps {
   mealPlan: DayPlan[];
@@ -36,6 +37,10 @@ export const GroceryCostEstimator: React.FC<GroceryCostEstimatorProps> = ({ meal
   const toggleEstimator = (isOpen: boolean) => {
     setShowEstimator(isOpen);
     onEstimatorToggle?.(isOpen);
+    
+    if (isOpen) {
+      AnalyticsService.trackEvent('grocery_cost_estimator_opened', { mealPlanLength: mealPlan.length });
+    }
   };
 
   // Fetch current prices when component mounts or meal plan changes
@@ -109,6 +114,13 @@ export const GroceryCostEstimator: React.FC<GroceryCostEstimatorProps> = ({ meal
       await fetchCurrentPrices();
 
       addToast('Price submitted successfully! Thank you for contributing.', 'success');
+      
+      AnalyticsService.trackEvent('grocery_price_submitted', {
+        ingredient,
+        price: price.toString(),
+        unit: input.unit,
+        store: input.store || 'unknown'
+      });
     } catch (error) {
       log.error('Error submitting price', { error });
       addToast('Error submitting price. Please try again.', 'error');
