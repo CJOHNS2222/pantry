@@ -5,6 +5,22 @@ All notable changes to Stock & Spoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.26] - 2026-04-17
+
+### Added
+- **Ingredient Substitutions panel** in `RecipeModal` — "Ingredient Substitutions" button scans the recipe's ingredient list against a built-in lookup table (~95 common ingredients) and shows substitutes with usage ratio and a practical note, all client-side with no API calls
+- **Substitution lookup table** covers dairy, baking staples, sauces & condiments, nut butters, spices & aromatics, acids, proteins, nuts, and miscellaneous pantry items; longest key matched first to prevent false matches (e.g. "buttermilk" before "butter")
+- **Recipe database** — 943 recipes now in Firestore sourced from TheMealDB (all categories + areas), up from 436
+
+### Changed
+- **`scripts/bulk-upload-recipes.js`** — switched to Firebase Admin SDK auth; replaced Spoonacular query loop with TheMealDB full-browse (all categories + areas); instruction parser now splits "step N …" strings into proper arrays
+- **`scripts/rebuild-recipes-cache.js`** — added `CHUNK_SIZE = 400` chunking across `recipes_cache_1`, `_2`, `_3` … to stay within Firestore's 1 MB document limit
+- **`services/recipeService.ts` `getCachedRecipesCache`** — reads all `_1.._N` chunks automatically and merges into a single array
+- **`RecipeModal` substitution feature** — replaced old hardcoded 5-category pantry-match lookup with the new full ingredient substitution panel; works on any recipe regardless of pantry contents
+
+### Fixed
+- **TS errors in `useDataManagement.ts`** — fixed `d.id` accessed on `unknown` in both `getRatingsForRecipe` and `refreshCommunityRatings` map callbacks; changed to `doc.id` (the correctly typed `as any` alias)
+
 ## [Unreleased] - 2026-04-17
 
 ### Added

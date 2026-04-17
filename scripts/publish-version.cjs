@@ -22,6 +22,7 @@ const path = require('path');
 const args = process.argv.slice(2);
 const argVersion = args.find((_, i) => args[i - 1] === '--version');
 const argNotes = args.find((_, i) => args[i - 1] === '--notes');
+const forceUpdate = args.includes('--force');
 
 // --- Read version from package.json if not provided ---
 const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
@@ -58,7 +59,7 @@ async function publishVersion() {
       version,
       platform,
       releaseNotes,
-      forceUpdate: false,
+      forceUpdate,
       downloadUrl: downloadUrl ?? null,
       publishedAt: admin.firestore.FieldValue.serverTimestamp(),
     };

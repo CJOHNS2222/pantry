@@ -1038,7 +1038,7 @@ export function useDataManagement(
             dateStr = dateField;
           }
         }
-        return { ...data, id: d.id, date: dateStr } as RecipeRating;
+        return { ...data, id: doc.id, date: dateStr } as RecipeRating;
       });
     } catch (err) {
       log.error('Failed to get ratings for recipe', { err, recipeTitle }, 'DataManagement');
@@ -1089,7 +1089,7 @@ export function useDataManagement(
             dateStr = dateField;
           }
         }
-        return { ...data, id: d.id, date: dateStr } as RecipeRating;
+        return { ...data, id: doc.id, date: dateStr } as RecipeRating;
       });
 
       setRatings(mapped);
