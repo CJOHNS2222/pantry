@@ -5,7 +5,22 @@ All notable changes to Stock & Spoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.5.25] - 2026-04-17
+## [Unreleased] - 2026-04-17
+
+### Added
+- **Ingredient Substitutions panel** in `RecipeModal` — an "Ingredient Substitutions" button scans the recipe's ingredient list against a built-in lookup table (~95 common ingredients) and shows substitutes with usage ratio and a practical note, all client-side with no API calls
+- **Substitution lookup table** covers dairy, baking staples, sauces & condiments, nut butters, spices & aromatics, acids, proteins, nuts, and miscellaneous pantry items; longest key matched first to avoid false matches (e.g. "buttermilk" before "butter")
+- **Recipe database seeded** — 943 recipes now in Firestore sourced from TheMealDB (all categories + areas), up from 436
+- **Recipe cache chunking** — `rebuild-recipes-cache.js` now splits large recipe collections across multiple Firestore documents (`recipes_cache_1..N`, 400 per chunk) to stay under the 1 MB document limit; `getCachedRecipesCache` in `recipeService.ts` reads all chunks automatically
+- **`scripts/fix-recipe-instructions.js`** — one-time migration script that reformatted "step 1 … step 2 …" raw strings into proper `string[]` arrays for 274 recipes; already executed
+
+### Changed
+- **`scripts/bulk-upload-recipes.js`** — switched auth from anonymous signIn (disabled in project) to Firebase Admin SDK; replaced Spoonacular search-query loop with `fetchAllMealDBRecipes` (browses all TheMealDB categories + areas); instruction parser splits on `/step\s+\d+/i` regex into proper arrays
+- **`scripts/rebuild-recipes-cache.js`** — added `CHUNK_SIZE = 400` chunking; writes `recipes_cache_1`, `_2`, `_3` … instead of a single document
+- **`services/recipeService.ts` `getCachedRecipesCache`** — iterates `_1.._N` chunk documents until an empty chunk is found (up to 20), merges all into a single array
+- **`RecipeModal` substitution feature** — replaced the old hardcoded 5-category pantry-match lookup (only showed missing items) with the new full ingredient substitution panel available on any recipe regardless of pantry contents
+
+
 
 ### Fixed
 - **Android crash (NPE)**: Added `RuntimeVisibleAnnotations` ProGuard keep rule so R8 doesn't strip `@CapacitorPlugin`/`@Permission` annotation data in release builds, which caused `Bridge.getPermissionStates()` to NPE

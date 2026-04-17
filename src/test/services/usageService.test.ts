@@ -42,6 +42,10 @@ describe('UsageService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
+    // Clear the static in-memory limits cache to prevent cross-test pollution
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (UsageService as any).limitsCache.clear();
+
     // Set up default mock behaviors
     const mockTimestamp = {
       toDate: vi.fn(() => new Date()),
@@ -51,7 +55,7 @@ describe('UsageService', () => {
     };
 
     // Mock doc function to return a mock reference
-    vi.mocked(doc).mockReturnValue('mock-doc-ref' as any);
+    vi.mocked(doc).mockReturnValue('mock-doc-ref' as unknown as ReturnType<typeof doc>);
 
     vi.mocked(getDoc).mockResolvedValue({
       exists: vi.fn(() => true),

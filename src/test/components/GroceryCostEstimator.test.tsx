@@ -12,6 +12,20 @@ vi.mock('../../../services/groceryPriceService', () => ({
   },
 }));
 
+// Mock AppActionsContext so the component doesn't need a provider
+vi.mock('../../../contexts/AppActionsContext', () => ({
+  useAppActions: () => ({
+    addToast: vi.fn(),
+  }),
+}));
+
+// Mock AppContext so the component doesn't need a provider
+vi.mock('../../../contexts/AppContext', () => ({
+  useApp: () => ({
+    user: null,
+  }),
+}));
+
 describe('GroceryCostEstimator', () => {
   const mockMealPlan = [
     {

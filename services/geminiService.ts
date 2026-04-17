@@ -217,22 +217,12 @@ export const analyzePantryImage = async (base64Image: string, mimeType: string, 
 
       const schema: Schema = {
         type: Type.ARRAY,
-        description: "A comprehensive list of pantry items identified in the image.",
         items: {
           type: Type.OBJECT,
           properties: {
-            item: {
-              type: Type.STRING,
-              description: "The specific name of the item.",
-            },
-            category: {
-              type: Type.STRING,
-              description: "The broad category.",
-            },
-            quantity_estimate: {
-              type: Type.STRING,
-              description: "Visual estimate of quantity.",
-            },
+            item: { type: Type.STRING },
+            category: { type: Type.STRING },
+            quantity_estimate: { type: Type.STRING },
           },
           required: ["item", "category", "quantity_estimate"],
         },
@@ -254,30 +244,14 @@ export const analyzePantryImage = async (base64Image: string, mimeType: string, 
               },
             },
             {
-              text: `Analyze this image and provide a detailed inventory of the pantry items visible. Be precise with item names.
-
-For categorization, use these standard categories when possible:
-- Fruits & Vegetables (fresh produce, fruits, vegetables)
-- Dairy & Eggs (milk, cheese, yogurt, eggs, butter)
-- Meat & Poultry (beef, chicken, pork, turkey, bacon, sausage)
-- Seafood (fish, shrimp, crab, canned tuna)
-- Grains & Bread (rice, pasta, bread, cereals, flour, oats)
-- Canned Goods (canned vegetables, soups, beans, tomatoes)
-- Condiments & Sauces (ketchup, mustard, mayo, oils, vinegars, dressings)
-- Snacks (chips, cookies, nuts, crackers, candy)
-- Beverages (soda, juice, coffee, tea, water, alcohol)
-- Frozen Foods (frozen vegetables, meals, ice cream, pizza)
-- Baking Supplies (sugar, baking powder, vanilla, chocolate chips)
-- Spices & Herbs (salt, pepper, garlic, herbs, spices)
-- Breakfast Foods (cereal, oatmeal, pancake mix, syrup)
-
-If an item doesn't fit these categories, use "Uncategorized".`,
+              text: `List all pantry items visible. Categories: Fruits & Vegetables, Dairy & Eggs, Meat & Poultry, Seafood, Grains & Bread, Canned Goods, Condiments & Sauces, Snacks, Beverages, Frozen Foods, Baking Supplies, Spices & Herbs, Breakfast Foods, Uncategorized.`,
             },
           ],
         },
         config: {
           responseMimeType: "application/json",
           responseSchema: schema,
+          maxOutputTokens: 1200,
         },
       });
 
@@ -373,44 +347,21 @@ export const analyzeReceiptImage = async (base64Image: string, mimeType: string,
 
       const schema: Schema = {
         type: Type.ARRAY,
-        description: "A comprehensive list of grocery items extracted from the receipt.",
         items: {
           type: Type.OBJECT,
           properties: {
-            item: {
-              type: Type.STRING,
-              description: "The specific name of the grocery item.",
-            },
-            category: {
-              type: Type.STRING,
-              description: "The broad category.",
-            },
-            quantity_estimate: {
-              type: Type.STRING,
-              description: "Estimated quantity based on receipt information.",
-            },
-            estimatedPrice: {
-              type: Type.NUMBER,
-              description: "Price per item if available.",
-            },
+            item: { type: Type.STRING },
+            category: { type: Type.STRING },
+            quantity_estimate: { type: Type.STRING },
+            estimatedPrice: { type: Type.NUMBER },
             priceOptions: {
               type: Type.ARRAY,
-              description: "Multiple price options if the receipt shows different sizes/prices for the same item.",
               items: {
                 type: Type.OBJECT,
                 properties: {
-                  amount: {
-                    type: Type.NUMBER,
-                    description: "The quantity amount (e.g., 32 for 32oz).",
-                  },
-                  unit: {
-                    type: Type.STRING,
-                    description: "The unit of measurement (e.g., 'oz', 'lbs', 'cups').",
-                  },
-                  price: {
-                    type: Type.NUMBER,
-                    description: "The price for this quantity.",
-                  },
+                  amount: { type: Type.NUMBER },
+                  unit: { type: Type.STRING },
+                  price: { type: Type.NUMBER },
                 },
                 required: ["amount", "unit", "price"],
               },
@@ -436,38 +387,14 @@ export const analyzeReceiptImage = async (base64Image: string, mimeType: string,
               },
             },
             {
-              text: `Analyze this grocery receipt image and extract all the purchased items. For each item, provide:
-
-1. The exact item name as it appears on the receipt
-2. An appropriate category
-3. A reasonable quantity estimate (use common units like "1 count", "2 lbs", "1 gallon", etc.)
-4. The price if clearly visible
-
-IMPORTANT: If you see multiple sizes or quantities of the same item with different prices (like "16oz for $2.79" and "32oz for $4.99"), include them as separate priceOptions entries for the same item. This helps with price comparison.
-
-For categorization, use these standard categories:
-- Fruits & Vegetables (fresh produce, fruits, vegetables)
-- Dairy & Eggs (milk, cheese, yogurt, eggs, butter)
-- Meat & Poultry (beef, chicken, pork, turkey, bacon, sausage)
-- Seafood (fish, shrimp, crab, canned tuna)
-- Grains & Bread (rice, pasta, bread, cereals, flour, oats)
-- Canned Goods (canned vegetables, soups, beans, tomatoes)
-- Condiments & Sauces (ketchup, mustard, mayo, oils, vinegars, dressings)
-- Snacks (chips, cookies, nuts, crackers, candy)
-- Beverages (soda, juice, coffee, tea, water, alcohol)
-- Frozen Foods (frozen vegetables, meals, ice cream, pizza)
-- Baking Supplies (sugar, baking powder, vanilla, chocolate chips)
-- Spices & Herbs (salt, pepper, garlic, herbs, spices)
-- Breakfast Foods (cereal, oatmeal, pancake mix, syrup)
-- Household (cleaning supplies, paper products, etc.)
-
-Only include actual grocery items, not taxes, totals, or store information.`,
+              text: `Extract grocery items from this receipt. Include item name, price, and quantity. For same items with multiple sizes/prices, use separate priceOptions entries. Categories: Fruits & Vegetables, Dairy & Eggs, Meat & Poultry, Seafood, Grains & Bread, Canned Goods, Condiments & Sauces, Snacks, Beverages, Frozen Foods, Baking Supplies, Spices & Herbs, Breakfast Foods, Household, Uncategorized. Skip taxes, totals, and store info.`,
             },
           ],
         },
         config: {
           responseMimeType: "application/json",
           responseSchema: schema,
+          maxOutputTokens: 1500,
         },
       });
 
@@ -601,8 +528,26 @@ const performSearch = async (params: RecipeSearchParams, user: User | undefined,
     prompt = generatePersonalizedSearchPrompt(prompt, params.userProfile, macroTargets || undefined);
   }
 
-  // Ultra-concise JSON structure - be very explicit
-  prompt += `. Respond ONLY with valid JSON in this exact format, no other text: {"recipes":[{"title":"string","description":"brief summary","ingredients":["concise ingredient with quantity"],"instructions":["3-5 key steps"],"cookTime":"string"}]}`;
+  const recipeSchema: Schema = {
+    type: Type.OBJECT,
+    properties: {
+      recipes: {
+        type: Type.ARRAY,
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            title: { type: Type.STRING },
+            description: { type: Type.STRING },
+            ingredients: { type: Type.ARRAY, items: { type: Type.STRING } },
+            instructions: { type: Type.ARRAY, items: { type: Type.STRING } },
+            cookTime: { type: Type.STRING },
+          },
+          required: ["title", "description", "ingredients", "instructions", "cookTime"],
+        },
+      },
+    },
+    required: ["recipes"],
+  };
 
   try {
     // Add timeout to prevent hanging requests
@@ -616,6 +561,11 @@ const performSearch = async (params: RecipeSearchParams, user: User | undefined,
         parts: [
           { text: prompt }
         ]
+      },
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: recipeSchema,
+        maxOutputTokens: 800,
       },
     });
 
@@ -789,3 +739,5 @@ function parseNaturalLanguageRecipes(text: string): StructuredRecipe[] {
   
   return recipes;
 }
+
+

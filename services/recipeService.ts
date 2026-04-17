@@ -784,58 +784,64 @@ export const getCachedPopularRecipes = async (): Promise<SavedRecipe[]> => {
  * Example: `recipe_caches/recipes_cache_1` used by MealPlanner to avoid many reads.
  */
 export const getCachedRecipesCache = async (cachePath: string = 'recipe_caches/recipes_cache_1'): Promise<SavedRecipe[]> => {
+  // Helper: try to read one doc, returns [] if missing/denied
+  const readChunk = async (path: string): Promise<SavedRecipe[]> => {
+    try {
+      const ref = DatabaseMonitoringService.doc(path);
+      const snap = await DatabaseMonitoringService.getDoc(ref);
+      const exists = snap && (typeof snap.exists === 'function' ? snap.exists() : snap.exists);
+      if (exists) {
+        const data = snap.data();
+        return Array.isArray(data?.recipes) ? (data.recipes as SavedRecipe[]) : [];
+      }
+    } catch { /* permission denied or missing — caller handles */ }
+    return [];
+  };
+
+  // Derive the base path (strip trailing _N so we can iterate chunks)
+  const basePathMatch = cachePath.match(/^(.+?)(_\d+)?$/);
+  const basePath = basePathMatch ? basePathMatch[1] : cachePath;
+  const isRecipeCaches = cachePath.startsWith('recipe_caches/');
+
   try {
-    const ref = DatabaseMonitoringService.doc(cachePath);
-    const docSnap = await DatabaseMonitoringService.getDoc(ref);
-    if (docSnap && docSnap.exists && typeof docSnap.exists === 'function' ? docSnap.exists() : docSnap.exists) {
-      const data = docSnap.data();
-      const recipes = Array.isArray(data?.recipes) ? data.recipes : [];
-      // Loaded cached recipes from path
-      return recipes as SavedRecipe[];
+    // Read all numbered chunks until one comes back empty
+    const allRecipes: SavedRecipe[] = [];
+    let chunkNum = 1;
+    while (true) {
+      const chunkPath = `${basePath}_${chunkNum}`;
+      const chunk = await readChunk(chunkPath);
+      if (chunk.length === 0) break;
+      allRecipes.push(...chunk);
+      chunkNum++;
+      if (chunkNum > 20) break; // safety limit
     }
 
-    // No cache found at path
+    if (allRecipes.length > 0) return allRecipes;
 
-    // If the `recipe_caches` path is not readable by the client (security rules),
-    // try the system fallback path which is readable by authenticated users.
-    if (cachePath.startsWith('recipe_caches/')) {
+    // Fallback: try system/ mirror for permission-gated paths
+    if (isRecipeCaches) {
       try {
-        const systemPath = cachePath.replace('recipe_caches', 'system');
-        const sysRef = DatabaseMonitoringService.doc(systemPath);
-        const sysSnap = await DatabaseMonitoringService.getDoc(sysRef);
-        if (sysSnap && sysSnap.exists && typeof sysSnap.exists === 'function' ? sysSnap.exists() : sysSnap.exists) {
-          const sysData = sysSnap.data();
-          const sysRecipes = Array.isArray(sysData?.recipes) ? sysData.recipes : [];
-          // Loaded cached recipes from system path
-          return sysRecipes as SavedRecipe[];
+        const systemBase = basePath.replace('recipe_caches', 'system');
+        const sysChunk = await readChunk(`${systemBase}_1`);
+        if (sysChunk.length > 0) {
+          const all = [...sysChunk];
+          let n = 2;
+          while (n <= 20) {
+            const c = await readChunk(`${systemBase}_${n}`);
+            if (c.length === 0) break;
+            all.push(...c);
+            n++;
+          }
+          return all;
         }
       } catch (permErr: unknown) {
-        log.warn(`Unable to read ${cachePath} (may be permission denied)`, permErr instanceof Error ? permErr.message : permErr);
+        log.warn('System cache read failed', permErr instanceof Error ? permErr.message : permErr);
       }
     }
 
-    // Falling back to getSavedRecipes(50)
-    const recipes = await getSavedRecipes(50);
-    return recipes;
+    return await getSavedRecipes(50);
   } catch (err: unknown) {
     log.error(`Error fetching cached recipes at ${cachePath}`, err);
-    // If we got a permission error when reading the cache, try the system path once
-    if (cachePath.startsWith('recipe_caches/')) {
-      try {
-        const systemPath = cachePath.replace('recipe_caches', 'system');
-        const sysRef = DatabaseMonitoringService.doc(systemPath);
-        const sysSnap = await DatabaseMonitoringService.getDoc(sysRef);
-        if (sysSnap && sysSnap.exists && typeof sysSnap.exists === 'function' ? sysSnap.exists() : sysSnap.exists) {
-          const sysData = sysSnap.data();
-          const sysRecipes = Array.isArray(sysData?.recipes) ? sysData.recipes : [];
-          // Loaded cached recipes from system path
-          return sysRecipes as SavedRecipe[];
-        }
-      } catch (innerErr: unknown) {
-        log.warn('System cache read also failed', innerErr instanceof Error ? innerErr.message : innerErr);
-      }
-    }
-
     return await getSavedRecipes(50);
   }
 };

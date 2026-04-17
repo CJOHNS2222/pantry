@@ -127,7 +127,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
   
   // Smart Substitutions State
   const [showSubstitutions, setShowSubstitutions] = useState(false);
-  const [missingIngredients, setMissingIngredients] = useState<{ingredient: string, suggestions: string[]}[]>([]);
+  const [ingredientSubstitutions, setIngredientSubstitutions] = useState<{ingredient: string, substitutes: {name: string, ratio: string, notes: string}[]}[]>([]);
 
   // Parse cook time (string like "15 min" or numeric minutes) to seconds
   const parseTimeToSeconds = (time: string | number | undefined): number => {
@@ -211,47 +211,433 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Find missing ingredients and suggest substitutions
+  // Common ingredient substitution lookup
+  const SUBSTITUTIONS: Record<string, {name: string, ratio: string, notes: string}[]> = {
+    'butter': [
+      { name: 'Coconut oil', ratio: '1:1', notes: 'Works well in most baking; adds slight coconut flavour' },
+      { name: 'Vegetable oil', ratio: '¾ cup per 1 cup butter', notes: 'Best for moist cakes and quick breads' },
+      { name: 'Applesauce', ratio: '½ cup per 1 cup butter', notes: 'Reduces fat; best in muffins and brownies' },
+    ],
+    'egg': [
+      { name: 'Flaxseed meal + water', ratio: '1 tbsp flax + 3 tbsp water per egg', notes: 'Let sit 5 min; great binder for baking' },
+      { name: 'Applesauce', ratio: '¼ cup per egg', notes: 'Adds moisture; best in cakes and muffins' },
+      { name: 'Plain yogurt', ratio: '¼ cup per egg', notes: 'Adds richness; good for dense baked goods' },
+    ],
+    'milk': [
+      { name: 'Almond milk', ratio: '1:1', notes: 'Neutral flavour; works in most recipes' },
+      { name: 'Oat milk', ratio: '1:1', notes: 'Slightly sweet; great for baking and sauces' },
+      { name: 'Coconut milk', ratio: '1:1', notes: 'Richer; adds coconut flavour to sweet dishes' },
+    ],
+    'buttermilk': [
+      { name: 'Milk + vinegar', ratio: '1 cup milk + 1 tbsp white vinegar', notes: 'Let sit 5 min before using' },
+      { name: 'Plain yogurt', ratio: '1:1', notes: 'Thin with a little water if needed' },
+    ],
+    'heavy cream': [
+      { name: 'Evaporated milk', ratio: '1:1', notes: 'Lower fat; works in soups and sauces' },
+      { name: 'Coconut cream', ratio: '1:1', notes: 'Dairy-free; adds subtle coconut flavour' },
+    ],
+    'cream': [
+      { name: 'Evaporated milk', ratio: '1:1', notes: 'Lower fat; works in soups and sauces' },
+      { name: 'Coconut cream', ratio: '1:1', notes: 'Dairy-free substitute' },
+    ],
+    'flour': [
+      { name: 'Almond flour', ratio: '1:1 (may need extra egg)', notes: 'Denser, gluten-free; great for cookies' },
+      { name: 'Oat flour', ratio: '1:1', notes: 'Mild flavour; good for pancakes and muffins' },
+      { name: 'Cornstarch (as thickener)', ratio: '1 tbsp per 2 tbsp flour', notes: 'Use only for thickening sauces' },
+    ],
+    'sugar': [
+      { name: 'Honey', ratio: '¾ cup per 1 cup sugar', notes: 'Reduce liquids by ¼ cup; lower oven temp by 25°F' },
+      { name: 'Maple syrup', ratio: '¾ cup per 1 cup sugar', notes: 'Reduce liquids slightly; adds warm flavour' },
+      { name: 'Coconut sugar', ratio: '1:1', notes: 'Less processed; slight caramel flavour' },
+    ],
+    'brown sugar': [
+      { name: 'White sugar + molasses', ratio: '1 cup sugar + 1 tbsp molasses', notes: 'Mix well before using' },
+      { name: 'Coconut sugar', ratio: '1:1', notes: 'Similar depth of flavour' },
+    ],
+    'olive oil': [
+      { name: 'Vegetable oil', ratio: '1:1', notes: 'Neutral flavour; good for high-heat cooking' },
+      { name: 'Avocado oil', ratio: '1:1', notes: 'High smoke point; great for sautéing' },
+    ],
+    'vegetable oil': [
+      { name: 'Olive oil', ratio: '1:1', notes: 'Adds flavour; best for lower-heat cooking' },
+      { name: 'Coconut oil', ratio: '1:1', notes: 'Solid at room temp; slight coconut flavour' },
+      { name: 'Applesauce', ratio: '1:1', notes: 'For baking only; reduces fat significantly' },
+    ],
+    'sour cream': [
+      { name: 'Plain Greek yogurt', ratio: '1:1', notes: 'Higher protein; slightly tangier' },
+      { name: 'Crème fraîche', ratio: '1:1', notes: 'Richer texture; milder tang' },
+    ],
+    'cream cheese': [
+      { name: 'Mascarpone', ratio: '1:1', notes: 'Richer and less tangy' },
+      { name: 'Plain Greek yogurt', ratio: '1:1 (drained)', notes: 'Lower fat; tangier flavour' },
+    ],
+    'parmesan': [
+      { name: 'Pecorino Romano', ratio: '1:1', notes: 'Sharper and saltier' },
+      { name: 'Nutritional yeast', ratio: '1:1', notes: 'Dairy-free; nutty, cheesy flavour' },
+    ],
+    'chicken broth': [
+      { name: 'Vegetable broth', ratio: '1:1', notes: 'Good vegetarian substitute' },
+      { name: 'Water + bouillon cube', ratio: '1 cup water + 1 cube', notes: 'Quick pantry fix' },
+    ],
+    'beef broth': [
+      { name: 'Vegetable broth', ratio: '1:1', notes: 'Lighter; add a dash of soy sauce for depth' },
+      { name: 'Water + bouillon cube', ratio: '1 cup water + 1 cube', notes: 'Good enough for most stews' },
+    ],
+    'lemon juice': [
+      { name: 'White wine vinegar', ratio: '½ tsp per 1 tsp lemon juice', notes: 'More acidic; use less' },
+      { name: 'Apple cider vinegar', ratio: '½ tsp per 1 tsp lemon juice', notes: 'Mild fruitiness' },
+      { name: 'Lime juice', ratio: '1:1', notes: 'Similar acidity; slightly different flavour' },
+    ],
+    'vinegar': [
+      { name: 'Lemon juice', ratio: '1:1', notes: 'Brighter, citrusy acidity' },
+      { name: 'White wine', ratio: '2:1', notes: 'Less acidic; good in sauces' },
+    ],
+    'soy sauce': [
+      { name: 'Tamari', ratio: '1:1', notes: 'Gluten-free; slightly richer' },
+      { name: 'Coconut aminos', ratio: '1:1', notes: 'Soy-free; slightly sweeter' },
+      { name: 'Worcestershire sauce', ratio: '1:1', notes: 'Adds umami; slightly different flavour' },
+    ],
+    'honey': [
+      { name: 'Maple syrup', ratio: '1:1', notes: 'Vegan alternative; slightly thinner' },
+      { name: 'Agave syrup', ratio: '1:1', notes: 'Milder; vegan-friendly' },
+      { name: 'Sugar', ratio: '¾ cup per 1 cup honey + 1 tbsp water', notes: 'Adjust liquids accordingly' },
+    ],
+    'baking powder': [
+      { name: 'Baking soda + cream of tartar', ratio: '¼ tsp soda + ½ tsp cream of tartar per 1 tsp baking powder', notes: 'Use immediately after mixing' },
+      { name: 'Baking soda + yogurt', ratio: '¼ tsp soda per 1 tsp baking powder (reduce liquids)', notes: 'Adds slight tang' },
+    ],
+    'baking soda': [
+      { name: 'Baking powder', ratio: '3 tsp per 1 tsp baking soda', notes: 'Less effective leavening; may affect taste' },
+    ],
+    'vanilla extract': [
+      { name: 'Vanilla bean paste', ratio: '1:1', notes: 'Stronger flavour with visible seeds' },
+      { name: 'Almond extract', ratio: '½ tsp per 1 tsp vanilla', notes: 'More intense; pairs well with fruit' },
+      { name: 'Maple syrup', ratio: '1:1', notes: 'Adds sweetness alongside flavour' },
+    ],
+    'breadcrumbs': [
+      { name: 'Rolled oats', ratio: '1:1', notes: 'Pulse in blender for finer crumb' },
+      { name: 'Crushed crackers', ratio: '1:1', notes: 'Works well as a topping or binder' },
+      { name: 'Almond flour', ratio: '1:1', notes: 'Gluten-free option; slightly nutty' },
+    ],
+    'cornstarch': [
+      { name: 'Arrowroot powder', ratio: '1:1', notes: 'Works better at lower temps; stays clear' },
+      { name: 'Flour', ratio: '2 tbsp per 1 tbsp cornstarch', notes: 'Less effective; may cloud sauces' },
+    ],
+    'tomato paste': [
+      { name: 'Tomato sauce', ratio: '3 tbsp per 1 tbsp paste (reduce other liquids)', notes: 'Less concentrated; adjust seasoning' },
+      { name: 'Ketchup', ratio: '1:1', notes: 'Sweeter; works in a pinch' },
+    ],
+    'mayo': [
+      { name: 'Plain Greek yogurt', ratio: '1:1', notes: 'Lighter; tangier flavour' },
+      { name: 'Sour cream', ratio: '1:1', notes: 'Richer; similar creaminess' },
+    ],
+    'mayonnaise': [
+      { name: 'Plain Greek yogurt', ratio: '1:1', notes: 'Lighter; tangier flavour' },
+      { name: 'Sour cream', ratio: '1:1', notes: 'Richer; similar creaminess' },
+    ],
+    'mustard': [
+      { name: 'Horseradish', ratio: '1:1', notes: 'Spicier; use sparingly' },
+      { name: 'Wasabi', ratio: 'use half the amount', notes: 'Much hotter; use carefully' },
+    ],
+    'garlic': [
+      { name: 'Garlic powder', ratio: '⅛ tsp per clove', notes: 'Less pungent; no texture' },
+      { name: 'Shallots', ratio: '1 shallot per 2 cloves', notes: 'Milder; adds slight sweetness' },
+    ],
+    'onion': [
+      { name: 'Onion powder', ratio: '1 tsp per medium onion', notes: 'No texture; works in cooked dishes' },
+      { name: 'Leeks', ratio: '1:1 (white part only)', notes: 'Milder flavour; same technique' },
+      { name: 'Shallots', ratio: '3 shallots per 1 onion', notes: 'Sweeter, more delicate' },
+    ],
+    'wine': [
+      { name: 'Broth (chicken or veg)', ratio: '1:1', notes: 'Reduces richness; non-alcoholic' },
+      { name: 'Grape juice + vinegar', ratio: '¾ cup juice + splash of vinegar per 1 cup wine', notes: 'Closest flavour match' },
+    ],
+    'red wine': [
+      { name: 'Beef broth', ratio: '1:1', notes: 'Savoury; works well in stews and braises' },
+      { name: 'Cranberry juice', ratio: '1:1', notes: 'Sweet and tart; good for braised meats' },
+    ],
+    'white wine': [
+      { name: 'Chicken broth', ratio: '1:1', notes: 'Good in savory dishes and risotto' },
+      { name: 'Apple juice', ratio: '1:1', notes: 'Adds sweetness; works in sauces' },
+    ],
+    // Dairy extras
+    'half and half': [
+      { name: 'Equal parts milk + heavy cream', ratio: '1:1 combined', notes: 'Closest substitute' },
+      { name: 'Whole milk', ratio: '1:1', notes: 'Less rich; fine for most uses' },
+    ],
+    'evaporated milk': [
+      { name: 'Heavy cream', ratio: '1:1', notes: 'Richer; use in equal amounts' },
+      { name: 'Coconut milk (canned)', ratio: '1:1', notes: 'Dairy-free; adds coconut note' },
+    ],
+    'condensed milk': [
+      { name: 'Coconut condensed milk', ratio: '1:1', notes: 'Dairy-free; similar sweetness' },
+      { name: 'Evaporated milk + sugar', ratio: '1 cup evap + ¾ cup sugar (simmer until thick)', notes: 'DIY version' },
+    ],
+    'ricotta': [
+      { name: 'Cottage cheese (blended smooth)', ratio: '1:1', notes: 'Drain first for best texture' },
+      { name: 'Cream cheese (softened)', ratio: '1:1', notes: 'Richer and denser; works in pasta fillings' },
+      { name: 'Tofu (silken, blended)', ratio: '1:1', notes: 'Dairy-free; add a pinch of salt' },
+    ],
+    'yogurt': [
+      { name: 'Sour cream', ratio: '1:1', notes: 'Richer; slightly more tang' },
+      { name: 'Buttermilk', ratio: '¾ cup per 1 cup yogurt (reduce other liquids)', notes: 'More liquid; best in batter' },
+      { name: 'Coconut yogurt', ratio: '1:1', notes: 'Dairy-free option' },
+    ],
+    'whipped cream': [
+      { name: 'Coconut cream (chilled, whipped)', ratio: '1:1', notes: 'Dairy-free; whip when very cold' },
+      { name: 'Chilled heavy cream', ratio: '1:1', notes: 'The real thing; whip to stiff peaks' },
+    ],
+    'feta': [
+      { name: 'Goat cheese', ratio: '1:1', notes: 'Creamier; similar tang' },
+      { name: 'Halloumi (crumbled)', ratio: '1:1', notes: 'Saltier; holds up to heat' },
+      { name: 'Firm tofu + lemon + salt', ratio: '1:1', notes: 'Dairy-free; marinate for 30 min' },
+    ],
+    'mozzarella': [
+      { name: 'Provolone', ratio: '1:1', notes: 'Melts well; slightly stronger flavour' },
+      { name: 'Monterey Jack', ratio: '1:1', notes: 'Very good melter; mild flavour' },
+    ],
+    'cheddar': [
+      { name: 'Colby Jack', ratio: '1:1', notes: 'Milder; melts similarly' },
+      { name: 'Gruyère', ratio: '1:1', notes: 'Nuttier flavour; excellent for gratins' },
+    ],
+    // Baking extras
+    'cocoa powder': [
+      { name: 'Carob powder', ratio: '1:1', notes: 'Naturally sweet; caffeine-free' },
+      { name: 'Dark chocolate (melted)', ratio: '1 oz per 3 tbsp cocoa + reduce fat by 1 tbsp', notes: 'Richer flavour' },
+    ],
+    'chocolate': [
+      { name: 'Cocoa powder + butter', ratio: '3 tbsp cocoa + 1 tbsp butter per 1 oz chocolate', notes: 'Works in baking; adjust sweetness' },
+      { name: 'Carob chips', ratio: '1:1', notes: 'Caffeine-free; naturally sweeter' },
+    ],
+    'shortening': [
+      { name: 'Butter', ratio: '1:1', notes: 'Adds flavour; very slight texture change' },
+      { name: 'Coconut oil (solid)', ratio: '1:1', notes: 'Similar texture; slight coconut taste' },
+    ],
+    'lard': [
+      { name: 'Butter', ratio: '1:1', notes: 'Adds flavour; works in pastry' },
+      { name: 'Vegetable shortening', ratio: '1:1', notes: 'Neutral flavour; closest texture match' },
+    ],
+    'cream of tartar': [
+      { name: 'Lemon juice', ratio: '2 tsp per 1 tsp cream of tartar', notes: 'Works for stabilising egg whites' },
+      { name: 'White vinegar', ratio: '2 tsp per 1 tsp cream of tartar', notes: 'Same function; no flavour impact' },
+    ],
+    'molasses': [
+      { name: 'Honey', ratio: '¾ cup per 1 cup molasses', notes: 'Sweeter; lighter colour' },
+      { name: 'Maple syrup', ratio: '¾ cup per 1 cup molasses', notes: 'Milder; works well in marinades' },
+      { name: 'Dark corn syrup', ratio: '1:1', notes: 'Similar texture; less bold' },
+    ],
+    'corn syrup': [
+      { name: 'Honey', ratio: '1:1', notes: 'Adds flavour; use light honey if possible' },
+      { name: 'Maple syrup', ratio: '1:1', notes: 'Works in most candies and bakes' },
+      { name: 'Sugar + water (simple syrup)', ratio: '1¼ cups sugar + ¼ cup water per 1 cup syrup', notes: 'Simmer until dissolved' },
+    ],
+    'powdered sugar': [
+      { name: 'Blended granulated sugar + cornstarch', ratio: '1 cup sugar + 1 tbsp cornstarch, blended fine', notes: 'Blend until powdery' },
+      { name: 'Coconut sugar (blended)', ratio: '1:1', notes: 'Less sweet; slightly caramel flavour' },
+    ],
+    'cake flour': [
+      { name: 'All-purpose flour + cornstarch', ratio: '¾ cup + 2 tbsp AP flour + 2 tbsp cornstarch per 1 cup', notes: 'Sift together before using' },
+    ],
+    'self-rising flour': [
+      { name: 'All-purpose flour + baking powder + salt', ratio: '1 cup AP + 1½ tsp baking powder + ¼ tsp salt', notes: 'Mix before using' },
+    ],
+    'whole wheat flour': [
+      { name: 'All-purpose flour', ratio: '1:1', notes: 'Lighter texture; loses some fibre' },
+      { name: 'Spelt flour', ratio: '1:1', notes: 'Similar nutrients; slightly nuttier' },
+    ],
+    'yeast': [
+      { name: 'Baking powder', ratio: '1 tsp per ¼ oz yeast (no rise time)', notes: 'Quick breads only; no fermentation flavour' },
+      { name: 'Sourdough starter', ratio: '1 cup per packet of yeast (adjust liquid)', notes: 'Adds tang; longer rise time' },
+    ],
+    // Sauces & condiments
+    'worcestershire sauce': [
+      { name: 'Soy sauce + ketchup + vinegar', ratio: '1 tbsp soy + ½ tsp ketchup + ½ tsp vinegar per 1 tbsp', notes: 'Good approximation for marinades' },
+      { name: 'Fish sauce', ratio: '1:1', notes: 'More pungent; very similar umami base' },
+      { name: 'Coconut aminos + apple cider vinegar', ratio: '1 tbsp aminos + dash vinegar', notes: 'Vegan alternative' },
+    ],
+    'fish sauce': [
+      { name: 'Soy sauce + lime juice', ratio: '1 tbsp soy + ½ tsp lime juice per 1 tbsp', notes: 'Less pungent; works in most dishes' },
+      { name: 'Worcestershire sauce', ratio: '1:1', notes: 'Similar umami depth' },
+      { name: 'Miso paste + water', ratio: '1 tsp miso + 1 tsp water per 1 tbsp fish sauce', notes: 'Vegan; fermented depth' },
+    ],
+    'hoisin sauce': [
+      { name: 'Soy sauce + honey + garlic powder', ratio: '2 tbsp soy + 1 tbsp honey + ¼ tsp garlic powder', notes: 'Close substitution for glazes' },
+      { name: 'Oyster sauce', ratio: '1:1', notes: 'Less sweet; similar consistency' },
+    ],
+    'oyster sauce': [
+      { name: 'Hoisin sauce', ratio: '1:1', notes: 'Sweeter; works in stir-fries' },
+      { name: 'Soy sauce + sugar', ratio: '1 tbsp soy + ½ tsp sugar', notes: 'Quick substitute; thinner' },
+    ],
+    'hot sauce': [
+      { name: 'Chili flakes + vinegar', ratio: '½ tsp flakes + 1 tsp vinegar per 1 tbsp', notes: 'More texture; adjust heat level' },
+      { name: 'Sriracha', ratio: '1:1', notes: 'Slightly thicker and garlicky' },
+      { name: 'Cayenne + water + vinegar', ratio: 'pinch cayenne + 1 tsp each water and vinegar', notes: 'Very close to tabasco-style' },
+    ],
+    'ketchup': [
+      { name: 'Tomato paste + sugar + vinegar', ratio: '2 tbsp paste + 1 tsp sugar + 1 tsp vinegar', notes: 'Mix well; closest match' },
+      { name: 'BBQ sauce', ratio: '1:1', notes: 'Smokier; avoid in delicate dishes' },
+    ],
+    // Fats & nut butters
+    'tahini': [
+      { name: 'Peanut butter', ratio: '1:1', notes: 'Stronger flavour; works in sauces and dressings' },
+      { name: 'Almond butter', ratio: '1:1', notes: 'Milder; good in hummus and dips' },
+      { name: 'Sunflower seed butter', ratio: '1:1', notes: 'Nut-free option; similar consistency' },
+    ],
+    'peanut butter': [
+      { name: 'Almond butter', ratio: '1:1', notes: 'Milder; slightly less protein' },
+      { name: 'Sunflower butter', ratio: '1:1', notes: 'Nut-free; similar texture' },
+      { name: 'Tahini', ratio: '1:1', notes: 'More savoury; great in sauces and noodles' },
+    ],
+    'almond butter': [
+      { name: 'Peanut butter', ratio: '1:1', notes: 'Stronger flavour' },
+      { name: 'Cashew butter', ratio: '1:1', notes: 'Creamier; very mild flavour' },
+    ],
+    'coconut oil': [
+      { name: 'Vegetable oil', ratio: '1:1', notes: 'Neutral flavour; liquid at room temp' },
+      { name: 'Butter', ratio: '1:1', notes: 'Adds dairy flavour; solid at room temp' },
+    ],
+    // Spices & aromatics
+    'ginger': [
+      { name: 'Ground ginger', ratio: '¼ tsp per 1 tbsp fresh', notes: 'More concentrated; no moisture' },
+      { name: 'Galangal', ratio: '1:1', notes: 'Sharper, more citrusy; common in Thai cooking' },
+    ],
+    'ground ginger': [
+      { name: 'Fresh ginger (grated)', ratio: '1 tbsp fresh per ¼ tsp ground', notes: 'More moisture; brighter flavour' },
+      { name: 'Allspice + cinnamon', ratio: 'pinch of each', notes: 'Warm spice notes without the sharp bite' },
+    ],
+    'cinnamon': [
+      { name: 'Allspice', ratio: '¼ tsp per ½ tsp cinnamon', notes: 'Bolder; use less' },
+      { name: 'Nutmeg + cardamom', ratio: 'pinch each per ½ tsp cinnamon', notes: 'Warm but different aroma' },
+    ],
+    'cumin': [
+      { name: 'Coriander', ratio: '1:1', notes: 'Earthier and citrusy; similar warmth' },
+      { name: 'Chili powder', ratio: '1:1', notes: 'Contains cumin; adds other spices too' },
+      { name: 'Caraway seeds', ratio: '1:1', notes: 'Similar earthy note; works in savoury dishes' },
+    ],
+    'paprika': [
+      { name: 'Cayenne pepper', ratio: 'use ¼ the amount', notes: 'Much hotter; adjust to taste' },
+      { name: 'Chili powder', ratio: '1:1', notes: 'More complex blend; similar colour' },
+      { name: 'Ancho chili powder', ratio: '1:1', notes: 'Smoky and mild; great substitute' },
+    ],
+    'turmeric': [
+      { name: 'Saffron (small pinch)', ratio: 'pinch per 1 tsp turmeric', notes: 'Similar colour; very different flavour' },
+      { name: 'Curry powder', ratio: '1:1', notes: 'Contains turmeric plus other spices' },
+    ],
+    'cayenne': [
+      { name: 'Chili flakes', ratio: '½ tsp per ¼ tsp cayenne', notes: 'Coarser texture; similar heat' },
+      { name: 'Hot sauce', ratio: '1 tsp per ¼ tsp cayenne', notes: 'Adds moisture; tangy' },
+      { name: 'Chili powder', ratio: '4:1 (less heat)', notes: 'Milder blend; use more' },
+    ],
+    'oregano': [
+      { name: 'Thyme', ratio: '1:1', notes: 'Earthier; slightly more floral' },
+      { name: 'Marjoram', ratio: '1:1', notes: 'Very close; milder oregano cousin' },
+      { name: 'Italian seasoning', ratio: '1:1', notes: 'Contains oregano plus other herbs' },
+    ],
+    'thyme': [
+      { name: 'Oregano', ratio: '1:1', notes: 'Bolder; works in most savoury dishes' },
+      { name: 'Marjoram', ratio: '1:1', notes: 'Milder and sweeter than thyme' },
+    ],
+    'basil': [
+      { name: 'Oregano', ratio: '1:1', notes: 'Earthier but similar Italian profile' },
+      { name: 'Spinach + pinch of oregano', ratio: 'matches volume', notes: 'Adds greenery without herbiness' },
+    ],
+    'rosemary': [
+      { name: 'Thyme', ratio: '1:1', notes: 'Milder pine notes; very compatible' },
+      { name: 'Savory', ratio: '1:1', notes: 'Peppery and herby; rare but close' },
+    ],
+    'cilantro': [
+      { name: 'Parsley', ratio: '1:1', notes: 'No citrus note; mild green flavour' },
+      { name: 'Thai basil', ratio: '1:1', notes: 'Slightly anise-like; good in Asian dishes' },
+    ],
+    // Acids & juices
+    'lime juice': [
+      { name: 'Lemon juice', ratio: '1:1', notes: 'Very close; slightly less bitter' },
+      { name: 'White wine vinegar', ratio: '½ tsp per 1 tsp lime', notes: 'More acidic; use less' },
+    ],
+    'orange juice': [
+      { name: 'Tangerine juice', ratio: '1:1', notes: 'Sweeter; nearly identical' },
+      { name: 'Pineapple juice', ratio: '1:1', notes: 'Sweeter and tropical' },
+      { name: 'Lemon juice + water + pinch of sugar', ratio: '¼ cup lemon + ¾ cup water + 2 tbsp sugar', notes: 'Closest citrus sub' },
+    ],
+    // Proteins
+    'anchovies': [
+      { name: 'Worcestershire sauce', ratio: '1 tsp per 3 fillets', notes: 'Similar umami punch' },
+      { name: 'Capers', ratio: '1:1', notes: 'Briny; no fishiness' },
+      { name: 'Miso paste', ratio: '1 tsp per 3 fillets', notes: 'Vegan umami depth' },
+    ],
+    'tofu': [
+      { name: 'Tempeh', ratio: '1:1', notes: 'More protein; nuttier and firmer texture' },
+      { name: 'Chickpeas', ratio: '1:1', notes: 'Good for scrambles and curries' },
+      { name: 'Paneer', ratio: '1:1', notes: 'Dairy-based; holds shape well when cooked' },
+    ],
+    // Nuts & seeds
+    'pine nuts': [
+      { name: 'Slivered almonds', ratio: '1:1', notes: 'Toast first for similar nutty warmth' },
+      { name: 'Walnuts (chopped)', ratio: '1:1', notes: 'Stronger flavour; good in pesto' },
+      { name: 'Sunflower seeds', ratio: '1:1', notes: 'Nut-free; toast for best flavour' },
+    ],
+    'walnuts': [
+      { name: 'Pecans', ratio: '1:1', notes: 'Sweeter; similar crunch' },
+      { name: 'Almonds', ratio: '1:1', notes: 'Drier; slightly firmer texture' },
+    ],
+    // Misc
+    'espresso': [
+      { name: 'Strong brewed coffee', ratio: '2x the amount', notes: 'Less concentrated; use double' },
+      { name: 'Instant coffee + water', ratio: '1 tsp instant + 1 tbsp water per shot', notes: 'Good enough for baking' },
+    ],
+    'coffee': [
+      { name: 'Chicory', ratio: '1:1', notes: 'Caffeine-free; similar bitter notes' },
+      { name: 'Instant coffee dissolved in water', ratio: '1:1', notes: 'Use in baking for flavour' },
+    ],
+    'beer': [
+      { name: 'Apple cider + splash of vinegar', ratio: '1:1', notes: 'Good for batters and braises' },
+      { name: 'Chicken or beef broth', ratio: '1:1', notes: 'No fizz; works in stews' },
+      { name: 'Ginger ale', ratio: '1:1', notes: 'Lighter; good for tempura batter' },
+    ],
+    'coconut milk': [
+      { name: 'Evaporated milk', ratio: '1:1', notes: 'Dairy-based; no coconut flavour' },
+      { name: 'Heavy cream + water', ratio: '¾ cup cream + ¼ cup water', notes: 'Similar richness' },
+    ],
+    'miso': [
+      { name: 'Soy sauce + splash of tahini', ratio: '½ tsp soy + small dab tahini per 1 tbsp miso', notes: 'Close umami flavour' },
+      { name: 'Fish sauce', ratio: '½ the amount', notes: 'Much saltier; use sparingly' },
+    ],
+    'arrowroot': [
+      { name: 'Cornstarch', ratio: '1:1', notes: 'Works hot; may go cloudy' },
+      { name: 'Tapioca starch', ratio: '1:1', notes: 'Similar; stays clear in sauces' },
+    ],
+    'tapioca': [
+      { name: 'Cornstarch', ratio: '1:1 (for starch)', notes: 'Good thickener but different texture in puddings' },
+      { name: 'Arrowroot powder', ratio: '1:1', notes: 'Closest match; stays clear' },
+    ],
+  };
+
   const findSubstitutions = () => {
     const recipeIngredients = (recipe as StructuredRecipe).ingredients || [];
-    const inventoryLower = inventory.map(item => item.item.toLowerCase());
-    
-    const missing = recipeIngredients.filter(ing => {
-      const ingLower = ing.toLowerCase();
-      return !inventoryLower.some(inv => 
-        inv.includes(ingLower.split(/\s+/)[0]) || ingLower.split(/\s+/)[0].includes(inv)
-      );
-    });
+    if (recipeIngredients.length === 0) return;
 
-    if (missing.length === 0) {
-      addToast('All ingredients are in your pantry! 🎉', 'success');
+    const results: {ingredient: string, substitutes: {name: string, ratio: string, notes: string}[]}[] = [];
+
+    // Sort longest keys first so "evaporated milk" matches before "milk",
+    // "buttermilk" before "butter", "heavy cream" before "cream", etc.
+    const sortedEntries = Object.entries(SUBSTITUTIONS).sort((a, b) => b[0].length - a[0].length);
+
+    for (const ing of recipeIngredients) {
+      const ingLower = ing.toLowerCase();
+      for (const [key, subs] of sortedEntries) {
+        if (ingLower.includes(key)) {
+          results.push({ ingredient: ing, substitutes: subs });
+          break;
+        }
+      }
+    }
+
+    if (results.length === 0) {
+      addToast('No common substitutions found for these ingredients.', 'info');
       return;
     }
 
-    // Generate substitution suggestions
-    const substitutions = missing.map(ing => ({
-      ingredient: ing,
-      suggestions: inventory
-        .filter(inv => {
-          const invLower = inv.item.toLowerCase();
-          const ingLower = ing.toLowerCase();
-          // Basic category matching for substitutions
-          const categories = {
-            'butter': ['oil', 'margarine', 'ghee'],
-            'milk': ['almond milk', 'coconut milk', 'cream'],
-            'egg': ['applesauce', 'banana', 'flax'],
-            'flour': ['almond flour', 'coconut flour', 'cornstarch'],
-            'sugar': ['honey', 'maple syrup', 'agave']
-          };
-          return Object.entries(categories).some(([key, subs]) => 
-            ingLower.includes(key) && subs.some(sub => invLower.includes(sub))
-          );
-        })
-        .slice(0, 2)
-        .map(inv => inv.item)
-    }));
-
-    setMissingIngredients(substitutions);
+    setIngredientSubstitutions(results);
     setShowSubstitutions(true);
   };
 
@@ -533,23 +919,21 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
           )}
 
           {/* Smart Substitutions Button */}
-          {inventory.length > 0 && (
-            <div className="mb-4">
-              <button
-                onClick={findSubstitutions}
-                className="w-full py-2 px-4 bg-theme-secondary/20 hover:bg-theme-secondary/30 border border-[var(--accent-color)]/20 rounded-lg flex items-center justify-center gap-2 text-sm font-medium text-theme-primary transition-colors"
-              >
-                <AlertCircle className="w-4 h-4" /> Check Substitutions
-              </button>
-            </div>
-          )}
+          <div className="mb-4">
+            <button
+              onClick={findSubstitutions}
+              className="w-full py-2 px-4 bg-theme-secondary/20 hover:bg-theme-secondary/30 border border-[var(--accent-color)]/20 rounded-lg flex items-center justify-center gap-2 text-sm font-medium text-theme-primary transition-colors"
+            >
+              <AlertCircle className="w-4 h-4" /> Ingredient Substitutions
+            </button>
+          </div>
 
           {/* Substitutions Modal */}
-          {showSubstitutions && missingIngredients.length > 0 && (
+          {showSubstitutions && (
             <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4" onClick={() => setShowSubstitutions(false)}>
               <div className="bg-theme-primary rounded-xl max-w-md w-full p-6 max-h-[80vh] overflow-y-auto shadow-2xl" onClick={e => e.stopPropagation()}>
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-bold text-[var(--accent-color)]">Missing Ingredients</h3>
+                  <h3 className="text-lg font-bold text-[var(--accent-color)]">Ingredient Substitutions</h3>
                   <button
                     onClick={() => setShowSubstitutions(false)}
                     className="text-theme-secondary opacity-50 hover:opacity-100"
@@ -557,26 +941,27 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
                     &times;
                   </button>
                 </div>
-                
-                <div className="space-y-4">
-                  {missingIngredients.map((item, idx) => (
-                    <div key={idx} className="border-l-4 border-red-500 pl-3">
-                      <p className="text-sm font-medium text-red-500 mb-2">{item.ingredient}</p>
-                      {item.suggestions.length > 0 ? (
-                        <div className="space-y-1">
-                          <p className="text-xs text-theme-secondary opacity-70 mb-1">Available substitutes:</p>
-                          {item.suggestions.map((sugg, sidx) => (
-                            <span key={sidx} className="block text-xs bg-green-500/20 text-green-600 px-2 py-1 rounded">
-                              ✓ {sugg}
-                            </span>
+
+                {ingredientSubstitutions.length === 0 ? (
+                  <p className="text-sm text-theme-secondary opacity-70 text-center py-6">No substitutions found for these ingredients.</p>
+                ) : (
+                  <div className="space-y-4">
+                    {ingredientSubstitutions.map((item, idx) => (
+                      <div key={idx} className="border-l-4 border-[var(--accent-color)]/50 pl-3">
+                        <p className="text-sm font-semibold text-theme-primary mb-2">{item.ingredient}</p>
+                        <div className="space-y-2">
+                          {item.substitutes.map((sub, sidx) => (
+                            <div key={sidx} className="bg-theme-secondary/10 rounded-lg px-3 py-2">
+                              <p className="text-sm font-medium text-[var(--accent-color)]">{sub.name}</p>
+                              <p className="text-xs text-theme-secondary opacity-80">{sub.ratio}</p>
+                              {sub.notes && <p className="text-xs text-theme-secondary opacity-60 mt-0.5 italic">{sub.notes}</p>}
+                            </div>
                           ))}
                         </div>
-                      ) : (
-                        <p className="text-xs text-theme-secondary opacity-70">No substitutes available in pantry</p>
-                      )}
-                    </div>
-                  ))}
-                </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
                 <button
                   onClick={() => setShowSubstitutions(false)}

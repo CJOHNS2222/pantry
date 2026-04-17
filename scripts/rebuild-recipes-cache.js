@@ -91,28 +91,40 @@ async function getAllSavedRecipes(limitCount = 1000) {
   }
 }
 
-// Rebuild the recipes cache with complete data
+const CHUNK_SIZE = 400; // Firestore 1MB doc limit — keep well under it
+
+// Rebuild the recipes cache with complete data, split into chunks if needed
 async function rebuildRecipesCache(recipes) {
   try {
     console.log(`💾 Rebuilding recipes cache with ${recipes.length} recipes...`);
 
-    // Check how many recipes have images
     const withImages = recipes.filter(r => r.image).length;
     console.log(`📸 ${withImages}/${recipes.length} recipes have images`);
 
-    const recipesCacheRef = db.doc("recipe_caches/recipes_cache_1");
-    await recipesCacheRef.set({
-      recipes,
-      lastUpdated: new Date(),
-      version: 2, // Increment version to indicate rebuild
-      totalRecipes: recipes.length,
-      recipesWithImages: withImages
-    });
+    const chunks = [];
+    for (let i = 0; i < recipes.length; i += CHUNK_SIZE) {
+      chunks.push(recipes.slice(i, i + CHUNK_SIZE));
+    }
 
-    console.log(`✅ Successfully rebuilt recipes cache at recipe_caches/recipes_cache_1`);
-    console.log(`   - Total recipes: ${recipes.length}`);
+    const lastUpdated = new Date();
+    for (let i = 0; i < chunks.length; i++) {
+      const chunkNum = i + 1;
+      const docPath = `recipe_caches/recipes_cache_${chunkNum}`;
+      await db.doc(docPath).set({
+        recipes: chunks[i],
+        lastUpdated,
+        version: 3,
+        totalRecipes: recipes.length,
+        chunkIndex: chunkNum,
+        totalChunks: chunks.length,
+        recipesWithImages: withImages
+      });
+      console.log(`✅ Wrote chunk ${chunkNum}/${chunks.length} (${chunks[i].length} recipes) → ${docPath}`);
+    }
+
+    console.log(`✅ Successfully rebuilt recipes cache (${chunks.length} chunk(s), ${recipes.length} total)`);
     console.log(`   - Recipes with images: ${withImages}`);
-    console.log(`   - Last updated: ${new Date().toISOString()}`);
+    console.log(`   - Last updated: ${lastUpdated.toISOString()}`);
 
   } catch (error) {
     console.error("❌ Error rebuilding recipes cache:", error);
