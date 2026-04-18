@@ -21,6 +21,7 @@ dependencies {
     implementation project(':capacitor-push-notifications')
     implementation project(':capacitor-share')
     implementation project(':capawesome-capacitor-app-review')
+    implementation project(':codetrix-studio-capacitor-google-auth')
     implementation project(':capacitor-plugin-safe-area')
     implementation "com.android.billingclient:billing:8.3.0"
 }

@@ -186,6 +186,10 @@ export const analyzePantryImage = async (base64Image: string, mimeType: string, 
     throw new Error('User authentication required for Gemini usage.');
   }
 
+  if (user.isGuest) {
+    throw new Error('AI features are not available in guest mode. Please sign up for a free account.');
+  }
+
   // Note: we expect the caller to set user opt-in before invoking this in UI flows.
   if (!featureFlags.userOptedInToGemini(user.id)) {
     throw new Error('Gemini usage not permitted: opt-in required.');
@@ -319,6 +323,10 @@ export const analyzeReceiptImage = async (base64Image: string, mimeType: string,
 
   if (!user?.id) {
     throw new Error('User authentication required for Gemini usage.');
+  }
+
+  if (user.isGuest) {
+    throw new Error('AI features are not available in guest mode. Please sign up for a free account.');
   }
 
   // Note: we expect the caller to set user opt-in before invoking this in UI flows.
@@ -478,6 +486,10 @@ const performSearch = async (params: RecipeSearchParams, user: User | undefined,
 
     if (!user?.id) {
       throw new Error('User authentication required for Gemini usage.');
+    }
+
+    if (user.isGuest) {
+      throw new Error('AI features are not available in guest mode. Please sign up for a free account.');
     }
 
     // Note: we expect the caller to set user opt-in before invoking this in UI flows.

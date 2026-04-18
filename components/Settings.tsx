@@ -21,7 +21,7 @@ import { DayPlan } from '../types';
 import { Loader2, ChevronDown, ChevronRight, Heart, AlertTriangle, Edit2, X, Settings as SettingsIcon } from 'lucide-react';
 import { userOptedInToGemini, setUserGeminiOptIn, getGeminiUsage } from '../services/featureFlags';
 import { VersionUpdate } from './VersionUpdate';
-import { MonitoringDashboard } from './MonitoringDashboard';
+
 import { Household } from '../types';
 import LeftoverPersonaQuestionnaire from './LeftoverPersonaQuestionnaire';
 import { LeftoverAnalytics } from './LeftoverAnalytics';
@@ -35,6 +35,7 @@ import type { UsageLimits } from '../services/usageService';
 import { ShoppingListCacheService } from '../services/shoppingListCacheService';
 import { setDoc } from 'firebase/firestore';
 import { useIsAdmin } from '../hooks/useIsAdmin';
+import { useAndroidBack } from '../hooks/useAndroidBack';
 import { RemoteConfigDebugPanel } from './RemoteConfigDebugPanel';
 
 const defaultStoreLayout = [
@@ -119,15 +120,14 @@ export const Settings: React.FC<SettingsProps> = ({
   const [savingProfile, setSavingProfile] = useState(false);
   const [updatingAvatar, setUpdatingAvatar] = useState(false);
   const [pendingNotifications, setPendingNotifications] = useState(settings?.notifications || defaultSettings.notifications);
-  const [_notifChanged, setNotifChanged] = useState(false);
+  const [, setNotifChanged] = useState(false);
   const [showAvatarSelection, setShowAvatarSelection] = useState(false);
-  const [_householdMembers, _setHouseholdMembers] = useState(user?.householdMembers || []);
-  const [_showHouseholdManager, _setShowHouseholdManager] = useState(false);
+
   const [profileChanged, setProfileChanged] = useState(false);
   const [showCategoryManager, setShowCategoryManager] = useState(false);
   const [userProfile, setUserProfile] = useState<UserProfile | undefined>(user?.profile);
   const [geminiOptedIn, setGeminiOptedIn] = useState(() => userOptedInToGemini(user?.id));
-  const [_geminiUsage, setGeminiUsage] = useState(() => getGeminiUsage(user?.id));
+  const [, setGeminiUsage] = useState(() => getGeminiUsage(user?.id));
   const [updatingBulkImages, setUpdatingBulkImages] = useState(false);
   const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>(
     NotificationService.getDefaultSettings()
@@ -143,6 +143,12 @@ export const Settings: React.FC<SettingsProps> = ({
 
   // FAQ modal state
   const [showFAQModal, setShowFAQModal] = useState(false);
+
+  // Android back-button registration for Settings modals
+  useAndroidBack(showAvatarSelection, () => setShowAvatarSelection(false));
+  useAndroidBack(showCategoryManager, () => setShowCategoryManager(false));
+  useAndroidBack(showMemberPreferencesModal, () => setShowMemberPreferencesModal(false));
+  useAndroidBack(showFAQModal, () => setShowFAQModal(false));
 
   // Household creation state
   const [householdName, setHouseholdName] = useState('');
@@ -329,7 +335,7 @@ export const Settings: React.FC<SettingsProps> = ({
     setSettings((prev) => ({
       ...prev,
       [field]: {
-        ...(prev as any)[field],
+        ...(prev as Record<string, unknown>)[field] as object,
         ...value,
       },
     }));
@@ -344,14 +350,16 @@ export const Settings: React.FC<SettingsProps> = ({
     }
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const _handleNotifChange = (key: string, value: unknown) => {
     setPendingNotifications(prev => ({
       ...prev,
-      [key]: typeof value === 'object' && value !== null ? { ...(prev as any)[key], ...value } : value,
+      [key]: typeof value === 'object' && value !== null ? { ...(prev as Record<string, unknown>)[key] as object, ...value } : value,
     }));
     setNotifChanged(false);
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const _confirmNotifChanges = () => {
     setSettings(prev => ({
       ...prev,
@@ -515,7 +523,7 @@ export const Settings: React.FC<SettingsProps> = ({
           avatar: null
         });
         addToast?.('Avatar removed successfully!', 'success');
-      } catch (_error) {
+      } catch {
         addToast?.('Failed to remove avatar', 'error');
       } finally {
         setUpdatingAvatar(false);
@@ -539,7 +547,7 @@ export const Settings: React.FC<SettingsProps> = ({
       });
       addToast?.('Thank you for your feedback!', 'success');
       setFeedback('');
-    } catch (_err) {
+    } catch {
       addToast?.('Failed to send feedback. Please try again later.', 'error');
     }
     setSending(false);
@@ -577,8 +585,35 @@ export const Settings: React.FC<SettingsProps> = ({
 
       {activeSettingsTab === 'account' && <>
 
+      {/* Guest upgrade banner */}
+      {user?.isGuest && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <span className="text-amber-600 text-lg">👤</span>
+            <h3 className="font-semibold text-amber-800">You're browsing as a Guest</h3>
+          </div>
+          <p className="text-sm text-amber-700">
+            Your data is stored on this device only. Sign up for free to sync across devices, access AI features, and more.
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={onLogout}
+              className="flex-1 bg-amber-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-amber-700 transition-colors"
+            >
+              Sign Up (Free)
+            </button>
+            <button
+              onClick={onLogout}
+              className="flex-1 border border-amber-600 text-amber-700 py-2 rounded-lg text-sm font-medium hover:bg-amber-50 transition-colors"
+            >
+              Log In
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Profile Section */}
-      {user && onLogout && (
+      {user && onLogout && !user.isGuest && (
         <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden" data-section="profile">
           <div
             onClick={() => toggleSection('Profile')}
@@ -1909,8 +1944,45 @@ export const Settings: React.FC<SettingsProps> = ({
       {isAdmin && (
         <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden">
           <div
-            onClick={() => toggleSection('Remote Config Debug')}
+            onClick={() => toggleSection('Reset Usage')}
             className="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-theme-primary transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              {expandedSections.has('Reset Usage') ? (
+                <ChevronDown className="w-5 h-5 text-theme-primary" />
+              ) : (
+                <ChevronRight className="w-5 h-5 text-theme-primary" />
+              )}
+              <h3 className="font-semibold text-theme-primary">Reset Usage Counters</h3>
+            </div>
+          </div>
+          {expandedSections.has('Reset Usage') && (
+            <div className="border-t border-theme p-4 space-y-3">
+              <p className="text-sm text-theme-secondary">Resets all usage counters (searches, AI scans, meal plan, saved recipes) to 0 for the current user. Use after fixing the reset bug so counts start fresh.</p>
+              <button
+                onClick={async () => {
+                  if (!user) return;
+                  try {
+                    await UsageService.resetUsage(user);
+                    UsageService.getUsageLimits(user).then(limits => setUsageLimits(limits)).catch(() => {});
+                    addToast?.('Usage counters reset successfully.', 'success');
+                  } catch {
+                    addToast?.('Failed to reset usage counters.', 'error');
+                  }
+                }}
+                className="px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600 transition-colors"
+              >
+                Reset My Usage Counters
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {isAdmin && (
+        <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden">
+          <div
+            onClick={() => toggleSection('Remote Config Debug')}
           >
             <div className="flex items-center gap-3">
               {expandedSections.has('Remote Config Debug') ? (

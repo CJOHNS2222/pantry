@@ -34,7 +34,12 @@ const config: CapacitorConfig = {
     // },
     Browser: {
       // toolbarColor: '#2A0A10'
-    }
+    },
+    GoogleAuth: {
+      scopes: ['profile', 'email'],
+      serverClientId: '13848266518-0co4dav6sn9epov13vt0covii2nmg1ne.apps.googleusercontent.com',
+      forceCodeForRefreshToken: true,
+    },
   },
   // App icon configuration (icons are handled by the build pipeline)
 };

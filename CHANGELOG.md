@@ -5,6 +5,17 @@ All notable changes to Stock & Spoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.27] - 2026-04-18
+
+### Fixed
+- **Usage counter reset bug** — weekly counters (`searches`, `mealPlanning`, `gemini`) were resetting to 0 on every `getUsageLimits` call due to incorrect `now > earliestResetDate` condition; changed to `weekStart > earliestResetDate` so reset only fires when a new week begins
+- **Recipe count drift** — `handleDeleteRecipe` never decremented `recipes.used`; added `recordRecipeDelete()` that reads and decrements with a floor of 0
+- **Android back button** — wired `useAndroidBack` to all remaining modal states across MealPlanner (7), RecipeModal sub-modals (6), ShoppingList (3), and Settings (4)
+- **Store brand prefix stripping** — receipt-scanned item names now strip leading "CV" (Clover Valley) and "GV" (Great Value) prefixes in `parseItemText` and `cleanItemNameForShopping`
+
+### Added
+- **Admin usage reset** — `UsageService.resetUsage(user)` and a "Reset Usage Counters" panel in Settings → More tab for per-user manual resets
+
 ## [1.5.26] - 2026-04-17
 
 ### Added

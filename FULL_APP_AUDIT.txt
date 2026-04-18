@@ -60,7 +60,7 @@ SECTION 1 — CRITICAL: MEMORY LEAKS & RESOURCE MANAGEMENT
     FIX: Add max-size (LRU) or TTL-based eviction to each cache. For
     geminiService, cap at ~100 entries and evict oldest on overflow.
 
-1C) EVENT LISTENER LEAKS — 2 instances
+1C) EVENT LISTENER LEAKS — 2 instances                              ✓ DONE
 
     - services/writeQueueService.ts (~L279)
       Global event listener registered once, never removed.
@@ -95,7 +95,7 @@ SECTION 1 — CRITICAL: MEMORY LEAKS & RESOURCE MANAGEMENT
     FIX: Use refs for values accessed in callbacks, or memoize object
     references with useMemo.
 
-1F) UNHANDLED PROMISES — 1 instance
+1F) UNHANDLED PROMISES — 1 instance                                 ✓ DONE
 
     - services/freezerService.ts (~L23, L80)
       `getDoc()` calls not wrapped in try-catch. A Firestore network error
@@ -116,7 +116,7 @@ SECTION 2 — CRITICAL: BUNDLE & DEPENDENCY ISSUES
     FIX: Move to `devDependencies` or remove entirely. It should only
     be used in `functions/` (which has its own package.json).
 
-2B) LOOSE DEPENDENCY VERSIONS                                       [MEDIUM]
+2B) LOOSE DEPENDENCY VERSIONS                                       ✓ DONE
     - All Capacitor packages pinned to `^8.0.0` (allows minor bumps).
       Tighten to `~8.0.0` for patch-only updates.
     - Firebase `^12.6.0` allows major-version-breaking updates
@@ -145,7 +145,7 @@ SECTION 3 — HIGH: SECURITY & FIRESTORE RULES
     FIX: Restrict to uploader:
       allow delete: if request.auth.uid == resource.metadata.uploader;
 
-3B) GROCERY PRICES — NO RATE LIMITING OR VALIDATION                 [MEDIUM]
+3B) GROCERY PRICES — NO RATE LIMITING OR VALIDATION                 ✓ DONE
     firestore.rules: /groceryPrices/{docId} allows any authenticated user
     to submit prices with no duplicate/spam checking, quantity limits, or
     required field validation (itemName, price).
@@ -156,7 +156,7 @@ SECTION 3 — HIGH: SECURITY & FIRESTORE RULES
       && request.resource.data.price is number
       && request.resource.data.price > 0
 
-3C) RECIPE MODIFICATIONS — NO SIZE LIMIT                            [MEDIUM]
+3C) RECIPE MODIFICATIONS — NO SIZE LIMIT                            ✓ DONE
     firestore.rules: recipeModifications.description has no size() check.
     Could allow very large payloads to be stored.
 
@@ -196,7 +196,7 @@ SECTION 4 — HIGH: ACCESSIBILITY (a11y)
 
     FIX: Add onKeyDown handler for Escape key to each modal's root element.
 
-4C) MODALS MISSING BACKDROP CLICK-TO-CLOSE                         [MEDIUM]
+4C) MODALS MISSING BACKDROP CLICK-TO-CLOSE                         ✓ DONE
     - CategoryManager
     - ItemDetailModal
     - ExpiredItemsModal
@@ -204,7 +204,7 @@ SECTION 4 — HIGH: ACCESSIBILITY (a11y)
 
     FIX: Add onClick handler on backdrop overlay to close the modal.
 
-4D) TOUCH TARGETS BELOW 44px MINIMUM                               [MEDIUM]
+4D) TOUCH TARGETS BELOW 44px MINIMUM                               ✓ DONE
     Mobile tap targets smaller than Apple/Google 44px minimum:
     - PortionSelector.tsx: serving size buttons
     - EnhancedShoppingListItem.tsx: action icons
@@ -214,7 +214,7 @@ SECTION 4 — HIGH: ACCESSIBILITY (a11y)
     FIX: Ensure all tappable elements have min-width and min-height of
     44px (or use p-3 / w-11 h-11 in Tailwind).
 
-4E) MISSING FOCUS MANAGEMENT                                       [MEDIUM]
+4E) MISSING FOCUS MANAGEMENT                                       ✓ DONE
     Modals do not trap focus or return focus to the trigger element on close.
     Tab key can escape the modal overlay.
 
@@ -257,7 +257,7 @@ SECTION 5 — HIGH: INTERNATIONALIZATION (i18n) GAPS
     App.tsx (L431-476): Tab labels and section headers contain hardcoded
     English strings that should use i18n keys.
 
-5D) SECONDARY LOCALE COMPLETENESS UNKNOWN                          [MEDIUM]
+5D) SECONDARY LOCALE COMPLETENESS UNKNOWN                          ✓ DONE
     Locale files exist for de, fr, ja, ru, zh but have not been verified
     for completeness against en.json. These may have missing keys that
     would show raw key strings to users.
@@ -286,7 +286,7 @@ SECTION 6 — HIGH: CODE QUALITY — TYPE SAFETY
     FIX: Replace `catch (err: any)` with `catch (err: unknown)` and use
     type narrowing. Replace `noop as any` with typed stub functions.
 
-6B) `@typescript-eslint/no-unused-vars` SET TO WARN                [MEDIUM]
+6B) `@typescript-eslint/no-unused-vars` SET TO WARN                ✓ DONE
     Should be ERROR. Unused variables are dead code and should be removed.
 
     FIX: Change to "error" in eslint.config.ts.
@@ -509,7 +509,8 @@ SUMMARY TABLE
   LOW      |  14   | TODOs (10A), polish (11A-11D), empty states (7E),
            |       | missing indexes (8F), minor config (8C ✓, 8D ✓, 8E)
   ─────────┼───────┼──────────────────────────────────────
-  TOTAL    |  39   | (24 items completed: 1A ✓, 1B ✓, 1D ✓, 1E ✓, 2A ✓, 2C ✓, 3A ✓, 4A ✓, 4B ✓,
+  TOTAL    |  39   | (29 items completed: 1A ✓, 1B ✓, 1C ✓, 1D ✓, 1E ✓, 1F ✓, 2A ✓, 2B ✓, 2C ✓,
+           |       |  3A ✓, 3B ✓, 3C ✓, 4A ✓, 4B ✓, 4C ✓, 4D ✓, 4E ✓, 5D ✓, 6B ✓,
            |       |  7A ✓, 7B ✓, 7C ✓, 7D ✓, 8C ✓, 8D ✓, 9A ✓, 11A ✓, 11B ✓, 11C ✓)
 
 ================================================================================
@@ -520,20 +521,27 @@ RECOMMENDED PRIORITY ORDER
     [1A] Clear untracked intervals (5 services) ✓ DONE
     [1B] Add cache eviction to geminiService, imageCacheService ✓ DONE
     [2A] Remove firebase-admin from web dependencies ✓ DONE
-    [5A] i18n for FAQPage (entire component hardcoded English) skip this for now
+    [1C] Clear event listener leaks (2 services) ✓ DONE
+    [1F] Wrap unhandled promises in freezerService ✓ DONE
 
   Phase 2 — HIGH (fix this sprint):
     [3A] Fix storage.rules delete permission ✓ DONE
     [4A] Add aria-labels to 28 components (batch effort) ✓ DONE
     [4B] Add Escape key handling to 5 modals ✓ DONE
-    [5B] Externalize 35+ hardcoded toast messages skip this for now
+    [2B] Tighten dependency version ranges ✓ DONE
     [5C] Externalize App.tsx hardcoded strings skip this for now
     [6A] Fix 150+ any violations (start with catch blocks) skip this for now
 
   Phase 3 — MEDIUM (fix next sprint):
     [7A-7C] Add loading/error states and form validation ✓ DONE
     [7D] Convert LandingPage from inline styles to Tailwind ✓ DONE
-    [8A-8B] Tighten tsconfig + eslint rules skip this for now
+    [3B] Add grocery price validation rules ✓ DONE
+    [3C] Add recipe modifications size limit ✓ DONE
+    [4C] Add backdrop click-to-close for modals ✓ DONE
+    [4D] Fix touch targets below 44px ✓ DONE
+    [4E] Add focus management to modals ✓ DONE
+    [5D] Verify secondary locale completeness ✓ DONE
+    [6B] Change no-unused-vars to error ✓ DONE
     [9A] Clean up console.* statements ✓ DONE
     [1D] Fix race conditions in useOfflineStatus + offlineQueueService ✓ DONE
     [1E] Fix stale closures in useDataManagement ✓ DONE

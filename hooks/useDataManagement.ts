@@ -1,15 +1,14 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { serverTimestamp, Timestamp } from 'firebase/firestore';
 import DatabaseMonitoringService from '../services/databaseMonitoringService';
 import AnalyticsService from '../services/analyticsService';
 import { UsageService } from '../services/usageService';
-import { RecipeRatingService } from '../services/recipeRatingService';
-import { User, PantryItem, DayPlan, Household, ShoppingItem, SavedRecipe, RecipeRating, RecipeRatingInput, CustomCategory, MealPlanItem, StructuredRecipe, ConsumptionSuggestion, ExpirationAlert, RecipeSuggestion, Member } from '../types';
-import { AppError } from '../utils/errorUtils';
+
+import { User, PantryItem, DayPlan, Household, ShoppingItem, SavedRecipe, RecipeRating, CustomCategory, MealPlanItem, StructuredRecipe } from '../types';
+
 import { hasPantryItemsChanged, hasArraysChanged, hasMealPlansChanged } from '../utils/comparisonUtils';
-import { setRemoteInventoryUpdate, isRemoteInventoryUpdate, setRemoteShoppingListUpdate, isRemoteShoppingListUpdate, setRemoteMealPlanUpdate, isRemoteMealPlanUpdate, setRemoteSavedRecipesUpdate } from '../services/syncStateService';
+import { setRemoteInventoryUpdate, setRemoteShoppingListUpdate, setRemoteMealPlanUpdate, setRemoteSavedRecipesUpdate } from '../services/syncStateService';
 import { log } from '../services/logService';
-import { generateConsumptionSuggestions, generateExpirationAlerts, generateRecipeSuggestions, isHouseholdMember, parseIngredientForShoppingList, shouldShowExpiryAlert } from '../utils/appUtils';
+import { generateConsumptionSuggestions, generateExpirationAlerts, generateRecipeSuggestions, isHouseholdMember, shouldShowExpiryAlert } from '../utils/appUtils';
 import { offlineQueue } from '../services/offlineQueueService';
 import { undoService, UndoAction } from '../services/undoService';
 import { NotificationService } from '../services/notificationService';
@@ -17,13 +16,13 @@ import { LeftoverNotificationService } from '../services/leftoverNotificationSer
 import { auth } from '../firebaseConfig';
 import RiskProfileService from '../services/riskProfileService';
 import { ERROR_MESSAGES } from '../constants/errorMessages';
-import { useScopedDataListener } from './useDataListener';
+
 import { firestoreCache } from '../services/cacheService';
 import { HouseholdPreferenceService } from '../services/householdPreferenceService';
 import { InventoryCacheService, CachedInventoryData, CacheMetadata } from '../services/inventoryCacheService';
 import { MealPlanCacheService } from '../services/MealPlanCacheService';
 import { RecipesCacheService, CachedRecipesData, RecipesCacheMetadata } from '../services/recipesCacheService';
-import { ShoppingListCacheService, CachedShoppingListData, ShoppingListCacheMetadata, ShoppingListCache } from '../services/shoppingListCacheService';
+import { ShoppingListCacheService, CachedShoppingListData, ShoppingListCache } from '../services/shoppingListCacheService';
 import HapticService from '../services/hapticService';
 
 // Helper to normalize quantity from PantryItem
@@ -37,6 +36,12 @@ const getQuantityValue = (item: PantryItem): number => {
   const est = parseFloat(item.quantity_estimate || '0');
   return isNaN(est) ? 0 : est;
 };
+
+// Guest user local-storage keys and limits (no Firestore for guests)
+const GUEST_INVENTORY_KEY = 'guest_inventory';
+const GUEST_SHOPPING_KEY = 'guest_shopping';
+const GUEST_ITEM_CAP = 20;
+const GUEST_SHOPPING_CAP = 30;
 
 // Global flag to prevent multiple meal plan syncs
 let mealPlanSyncInProgress = false;
@@ -121,8 +126,6 @@ function createSavedRecipesListener(
 ) {
   // Use user.householdId as fallback — household state may not be loaded yet when this runs
   const householdId = inHousehold ? (household?.id || user.householdId) : undefined;
-  const userId = inHousehold ? undefined : user.id;
-
   const cachePath = householdId 
     ? `households/${householdId}/cache/savedRecipes` 
     : `users/${user.id}/cache/savedRecipes`;
@@ -296,13 +299,17 @@ export function useDataManagement(
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   // Retry counter for household listener permissions issues
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [householdListenerRetry, setHouseholdListenerRetry] = useState(0);
 
   // Writing state refs to prevent concurrent operations
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const writingMealPlanRef = useRef(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const mealPlanCleanupDoneRef = useRef(false);
 
   // Ref to track last shopping list collection path for sync
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const lastShoppingListCollectionPathRef = useRef<string | undefined>(undefined);
 
   // Ref to prevent repeated household clearing on permission errors
@@ -327,7 +334,7 @@ export function useDataManagement(
   }, [addToast]);
 
   // Helper function to clean objects by removing undefined fields (Firestore requirement)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any
   const cleanObject = (obj: any): any => {
     if (obj === null || obj === undefined) {
       return undefined;
@@ -358,6 +365,7 @@ export function useDataManagement(
   };
 
   // Helper function for offline-aware writes
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const performWrite = async (operation: { type: 'add' | 'update' | 'delete'; collection: string; docId?: string;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     data?: any }) => {
@@ -434,12 +442,15 @@ export function useDataManagement(
 
   const mealPlan = useMemo(() => mealPlanState, [mealPlanState]);
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const householdUnsubsRef = useRef<{ inventory?: (() => void) | null; shopping?: (() => void) | null; recipes?: (() => void) | null; mealPlan?: (() => void) | null }>({});
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const listenersReadyRef = useRef(false);
 
   const initialDataLoadedRef = useRef(false);
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const totalReadsRef = useRef(0);
 
   const prevHouseholdRef = useRef<Household | null>(null);
@@ -448,6 +459,7 @@ export function useDataManagement(
 
   const lastAllergyCheckRef = useRef<number>(0);
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const clientId = useMemo(() => {
     let id = localStorage.getItem('clientId');
     if (!id) {
@@ -465,6 +477,25 @@ export function useDataManagement(
   // Firestore synchronization effects
   useEffect(() => {
     if (!user?.id) {
+      return;
+    }
+
+    // Guest users: hydrate state from localStorage instead of Firestore
+    if (user.isGuest) {
+      try {
+        const inv = JSON.parse(localStorage.getItem(GUEST_INVENTORY_KEY) || '[]') as PantryItem[];
+        const shop = JSON.parse(localStorage.getItem(GUEST_SHOPPING_KEY) || '[]') as ShoppingItem[];
+        setInventory(inv);
+        setShoppingList(shop);
+      } catch {
+        setInventory([]);
+        setShoppingList([]);
+      }
+      setIsLoadingInventory(false);
+      setIsLoadingShoppingList(false);
+      setIsLoadingMealPlan(false);
+      setIsLoadingSavedRecipes(false);
+      setIsLoadingHousehold(false);
       return;
     }
 
@@ -582,7 +613,7 @@ export function useDataManagement(
   }, [user?.id, user?.householdId]);
 
   useEffect(() => {
-    if (!inventory.length || !user?.id) return;
+    if (!inventory.length || !user?.id || user.isGuest) return;
 
     const today = new Date().toISOString().slice(0, 10);
     const expiredItems = inventory.filter(item => 
@@ -596,46 +627,48 @@ export function useDataManagement(
     const now = Date.now();
     if (now - lastExpirationCheckRef.current > 5 * 60 * 1000) { // 5 minutes
       const runExpirationChecks = async () => {
+        // Ensure the currently authenticated user matches the `user` passed
+        // into this hook. If they don't match (or auth not ready), bail WITHOUT
+        // stamping the throttle timestamp — this allows the next render to retry
+        // rather than silently losing the check for up to 5 minutes.
+        if (!auth?.currentUser || auth.currentUser.uid !== user.id) {
+          log.warn('Skipping expiration notifications: auth user mismatch', { expectedUid: user.id, actualUid: auth?.currentUser?.uid }, 'DataManagement');
+          return;
+        }
+
         const itemsExpiringSoon = inventory.filter(item => {
           // Never notify or create alerts for immortal items
           if (item.is_immortal) return false;
           if (!item.expirationDate) return false;
           const daysUntilExpiry = Math.ceil((new Date(item.expirationDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
-          return daysUntilExpiry > 0 && daysUntilExpiry <= 7;
+          // Include expired items (daysUntilExpiry <= 0) and items expiring within 7 days
+          return daysUntilExpiry <= 7;
         });
 
-        // Build danger-list for aggregation: prioritize items expiring within 3 days
+        // Build danger-list for aggregation: prioritize items expiring within 3 days (including expired)
         const dangerCandidates = itemsExpiringSoon.map(item => {
           const daysUntilExpiry = Math.ceil((new Date(item.expirationDate!).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
           return { itemId: item.id, itemName: item.item, daysUntilExpiry, risk_level: item.productRiskLevel };
         }).filter(x => x.daysUntilExpiry <= 3).slice(0, 6);
 
         try {
-          // Ensure the currently authenticated user matches the `user` passed
-          // into this hook. If they don't match (or auth not ready), skip
-          // creating notifications to avoid Firestore permission-denied errors.
-          if (!auth?.currentUser || auth.currentUser.uid !== user.id) {
-            log.warn('Skipping expiration notifications: auth user mismatch', { expectedUid: user.id, actualUid: auth?.currentUser?.uid }, 'DataManagement');
+          if (dangerCandidates.length >= 2) {
+            // Create a single aggregated Danger Zone notification
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await NotificationService.createDangerZoneAlert(user.id, dangerCandidates as any);
           } else {
-            if (dangerCandidates.length >= 2) {
-              // Create a single aggregated Danger Zone notification
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              await NotificationService.createDangerZoneAlert(user.id, dangerCandidates as any);
-            } else {
-              // Fetch once and reuse for all items to avoid redundant Firestore queries
-              const cachedNotifications = await NotificationService.getUnreadNotifications(user.id);
-              // Fallback to individual notifications for up to 3 items
-              for (const item of itemsExpiringSoon.slice(0, 3)) {
-                const daysUntilExpiry = Math.ceil((new Date(item.expirationDate!).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
-                // pass user risk level to tailor priority
-                 
-                await NotificationService.createExpirationAlert(user.id, item.item, daysUntilExpiry, item.id, user?.profile?.riskLevel, item.category, cachedNotifications);
-              }
+            // Fetch once and reuse for all items to avoid redundant Firestore queries
+            const cachedNotifications = await NotificationService.getUnreadNotifications(user.id);
+            // Fallback to individual notifications for up to 3 items
+            for (const item of itemsExpiringSoon.slice(0, 3)) {
+              const daysUntilExpiry = Math.ceil((new Date(item.expirationDate!).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+              await NotificationService.createExpirationAlert(user.id, item.item, daysUntilExpiry, item.id, user?.profile?.riskLevel, item.category, cachedNotifications);
             }
           }
         } catch (err) {
           log.error('Failed to create expiration notifications', err, 'DataManagement');
         } finally {
+          // Only stamp the throttle after the check actually ran (auth matched)
           lastExpirationCheckRef.current = Date.now();
         }
       };
@@ -644,7 +677,7 @@ export function useDataManagement(
       void runExpirationChecks();
     }
 
-  }, [inventory, user?.id, addToShoppingList, addToast]);
+  }, [inventory, user?.id]);
 
   useEffect(() => {
     if (!inventory.length || !user?.id || !household?.id) return;
@@ -830,7 +863,8 @@ export function useDataManagement(
       const userId = inHousehold ? undefined : user.id;
       
       await RecipesCacheService.removeRecipeFromCache(recipe.id, householdId, userId);
-      
+      await UsageService.recordRecipeDelete(user);
+
       addToast?.(`Removed ${recipe.title} from your saved recipes.`, 'success');
     } catch (err) {
       log.error('Error deleting recipe:', err, 'DataManagement');
@@ -874,12 +908,12 @@ export function useDataManagement(
     }
   };
 
-  const updateCustomCategory = async (categoryId: string, updates: Partial<Pick<CustomCategory, 'name' | 'icon' | 'color'>>) => {
+  const updateCustomCategory = async () => {
     if (!user?.id) return;
     // Omitted for brevity
   };
 
-  const deleteCustomCategory = async (categoryId: string) => {
+  const deleteCustomCategory = async () => {
     if (!user?.id) return;
     // Omitted for brevity
   };
@@ -888,7 +922,7 @@ export function useDataManagement(
     return generateRecipeSuggestions(inventory);
   }, [inventory]);
 
-  const handleMarkAsMade = async (recipe: StructuredRecipe) => {
+  const handleMarkAsMade = async () => {
     // Omitted for brevity
   };
 
@@ -903,7 +937,7 @@ export function useDataManagement(
     }
   };
 
-  const performUndo = async (action: UndoAction) => {
+  const performUndo = async () => {
     // Omitted for brevity
   };
 
@@ -911,13 +945,22 @@ export function useDataManagement(
     const currentItem = inventory[index];
     if (!currentItem) return;
 
+    const updatedItem = { ...currentItem, ...updates, expiryAlertShown: shouldShowExpiryAlert({ ...currentItem, ...updates }) };
+
+    if (user?.isGuest) {
+      setInventory(prev => {
+        const updated = prev.map((item, i) => i === index ? updatedItem : item);
+        try { localStorage.setItem(GUEST_INVENTORY_KEY, JSON.stringify(updated)); } catch { /* storage full */ }
+        return updated;
+      });
+      return;
+    }
+
     await recordUndo('update_item', {
       itemId: currentItem.id,
       previousState: currentItem,
       updates
     });
-
-    const updatedItem = { ...currentItem, ...updates, expiryAlertShown: shouldShowExpiryAlert({ ...currentItem, ...updates }) };
 
     setInventory(prev => prev.map((item, i) => i === index ? updatedItem : item));
 
@@ -946,6 +989,15 @@ export function useDataManagement(
       loggingOptions.updateActivityStatus('managing inventory');
     }
 
+    if (user?.isGuest) {
+      setInventory(prev => {
+        const updated = prev.filter((_, i) => i !== index);
+        try { localStorage.setItem(GUEST_INVENTORY_KEY, JSON.stringify(updated)); } catch { /* storage full */ }
+        return updated;
+      });
+      return;
+    }
+
     await recordUndo('delete_item', itemToDelete);
 
     setInventory(prev => prev.filter((_, i) => i !== index));
@@ -955,6 +1007,17 @@ export function useDataManagement(
 
   const addItem = async (item: PantryItem) => {
     const itemWithAlert = { ...item, expiryAlertShown: shouldShowExpiryAlert(item) };
+
+    if (user?.isGuest) {
+      setInventory(prev => {
+        if (prev.length >= GUEST_ITEM_CAP) return prev;
+        const updated = [...prev, itemWithAlert];
+        try { localStorage.setItem(GUEST_INVENTORY_KEY, JSON.stringify(updated)); } catch { /* storage full */ }
+        return updated;
+      });
+      HapticService.itemAdded();
+      return;
+    }
 
     setInventory(prev => [...prev, itemWithAlert]);
 
@@ -970,12 +1033,32 @@ export function useDataManagement(
   };
 
   const addItems = async (items: PantryItem[]) => {
+    if (user?.isGuest) {
+      setInventory(prev => {
+        const remaining = GUEST_ITEM_CAP - prev.length;
+        if (remaining <= 0) return prev;
+        const toAdd = items.slice(0, remaining);
+        const updated = [...prev, ...toAdd];
+        try { localStorage.setItem(GUEST_INVENTORY_KEY, JSON.stringify(updated)); } catch { /* storage full */ }
+        return updated;
+      });
+      return;
+    }
     await InventoryCacheService.addItemsToCache(items, user?.householdId, user?.id);
   };
 
   const addShoppingListItem = async (item: Omit<ShoppingItem, 'id'>) => {
     if (!user?.id) return;
     const fullItem: ShoppingItem = { ...item, id: `shop-${Date.now()}`, addedAt: new Date() };
+    if (user.isGuest) {
+      setShoppingList(prev => {
+        if (prev.length >= GUEST_SHOPPING_CAP) return prev;
+        const updated = [...prev, fullItem];
+        try { localStorage.setItem(GUEST_SHOPPING_KEY, JSON.stringify(updated)); } catch { /* storage full */ }
+        return updated;
+      });
+      return;
+    }
     await ShoppingListCacheService.addItemToCache(fullItem, user?.householdId, user?.id);
     if (loggingOptions?.updateActivityStatus) {
       loggingOptions.updateActivityStatus('managing shopping list');
@@ -985,6 +1068,17 @@ export function useDataManagement(
   const addShoppingListItems = async (items: Omit<ShoppingItem, 'id' | 'addedAt'>[]) => {
     if (!user?.id || !items.length) return;
     const itemsWithIds = items.map(item => ({ ...item, id: `shop-${Date.now()}-${Math.random()}`, addedAt: new Date() }));
+    if (user.isGuest) {
+      setShoppingList(prev => {
+        const remaining = GUEST_SHOPPING_CAP - prev.length;
+        if (remaining <= 0) return prev;
+        const toAdd = itemsWithIds.slice(0, remaining);
+        const updated = [...prev, ...toAdd];
+        try { localStorage.setItem(GUEST_SHOPPING_KEY, JSON.stringify(updated)); } catch { /* storage full */ }
+        return updated;
+      });
+      return;
+    }
     await ShoppingListCacheService.addItemsToCache(itemsWithIds, user?.householdId, user?.id);
     if (loggingOptions?.updateActivityStatus) {
       loggingOptions.updateActivityStatus('managing shopping list');
@@ -993,21 +1087,56 @@ export function useDataManagement(
 
   const updateShoppingListItem = async (itemId: string, updates: Partial<ShoppingItem>) => {
     if (!user?.id) return;
+    if (user.isGuest) {
+      setShoppingList(prev => {
+        const updated = prev.map(item => item.id === itemId ? { ...item, ...updates } : item);
+        try { localStorage.setItem(GUEST_SHOPPING_KEY, JSON.stringify(updated)); } catch { /* storage full */ }
+        return updated;
+      });
+      return;
+    }
     await ShoppingListCacheService.updateItemsInCache([{ id: itemId, updates }], user?.householdId, user?.id);
   };
 
   const updateShoppingListItems = async (itemsToUpdate: { id: string, updates: Partial<ShoppingItem> }[]) => {
     if (!user?.id || !itemsToUpdate.length) return;
+    if (user.isGuest) {
+      setShoppingList(prev => {
+        const updated = prev.map(item => {
+          const change = itemsToUpdate.find(u => u.id === item.id);
+          return change ? { ...item, ...change.updates } : item;
+        });
+        try { localStorage.setItem(GUEST_SHOPPING_KEY, JSON.stringify(updated)); } catch { /* storage full */ }
+        return updated;
+      });
+      return;
+    }
     await ShoppingListCacheService.updateItemsInCache(itemsToUpdate, user?.householdId, user?.id);
   };
 
   const removeShoppingListItem = async (itemId: string) => {
     if (!user?.id) return;
+    if (user.isGuest) {
+      setShoppingList(prev => {
+        const updated = prev.filter(item => item.id !== itemId);
+        try { localStorage.setItem(GUEST_SHOPPING_KEY, JSON.stringify(updated)); } catch { /* storage full */ }
+        return updated;
+      });
+      return;
+    }
     await ShoppingListCacheService.removeItemsFromCache([itemId], user?.householdId, user?.id);
   };
 
   const removeShoppingListItems = async (itemIds: string[]) => {
     if (!user?.id || !itemIds.length) return;
+    if (user.isGuest) {
+      setShoppingList(prev => {
+        const updated = prev.filter(item => !itemIds.includes(item.id));
+        try { localStorage.setItem(GUEST_SHOPPING_KEY, JSON.stringify(updated)); } catch { /* storage full */ }
+        return updated;
+      });
+      return;
+    }
     await ShoppingListCacheService.removeItemsFromCache(itemIds, user?.householdId, user?.id);
   };
   
@@ -1056,6 +1185,7 @@ export function useDataManagement(
     }
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const refreshCommunityRatings = useCallback(async (): Promise<void> => {
     if (!user?.id) return;
     setIsLoadingRatings(true);
@@ -1099,7 +1229,7 @@ export function useDataManagement(
     setIsLoadingRatings(false);
   }, [user?.id]);
 
-  const submitRating = async (ratingData: RecipeRatingInput) => {
+  const submitRating = async () => {
     if (!user?.id) return;
     // Omitted for brevity
   };

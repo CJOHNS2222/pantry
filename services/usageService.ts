@@ -1,6 +1,5 @@
 import DatabaseMonitoringService from './databaseMonitoringService';
 import { increment, Timestamp } from 'firebase/firestore';
-import { db } from '../firebaseConfig';
 import { User } from '../types';
 import { log } from './logService';
 import remoteConfig from './remoteConfigService';
@@ -51,10 +50,10 @@ export interface PlanLimits {
 
 class UsageService {
   // Helper function to safely convert Firestore timestamps or Date objects to Date
-  private static toDate(value: any): Date | null {
+  private static toDate(value: unknown): Date | null {
     if (!value) return null;
     if (value instanceof Date) return value;
-    if (value && typeof value.toDate === 'function') return value.toDate();
+    if (value && typeof (value as { toDate?: unknown }).toDate === 'function') return (value as { toDate(): Date }).toDate();
     if (value instanceof Timestamp) return value.toDate();
     // If it's a number (timestamp), convert it
     if (typeof value === 'number') return new Date(value);
@@ -159,7 +158,13 @@ class UsageService {
       return initialUsage;
     }
 
-    const data = usageDoc.data() as any;
+    type UsageData = {
+      searches?: { used?: number; resetDate?: unknown };
+      mealPlanning?: { weeklyUsed?: number; resetDate?: unknown };
+      gemini?: { used?: number; resetDate?: unknown };
+      recipes?: { used?: number };
+    };
+    const data = usageDoc.data() as UsageData;
 
     // Get the earliest reset date from all weekly limits, or use weekStart if none exist
     const searchResetDate = this.toDate(data.searches?.resetDate);
@@ -170,8 +175,10 @@ class UsageService {
       .filter(date => date instanceof Date)
       .sort((a, b) => a.getTime() - b.getTime())[0] || weekStart;
 
-    // Reset weekly counters if the earliest reset date is in the past
-    if (now > earliestResetDate) {
+    // Reset weekly counters only when we've crossed into a new week
+    // (weekStart is the start of the current week; earliestResetDate is the start
+    // of the week when counters were last reset — if they differ, we're in a new week)
+    if (weekStart > earliestResetDate) {
       await DatabaseMonitoringService.updateDoc(usageRef, {
         'searches.used': 0,
         'searches.resetDate': weekStart,
@@ -197,12 +204,12 @@ class UsageService {
     const result: UsageLimits = {
       searches: {
         weekly: planLimits.searches.weekly,
-        used: data.searches?.used || 0,
+        used: Math.max(0, data.searches?.used || 0),
         resetDate: this.toDate(data.searches?.resetDate) || weekStart
       },
       recipes: {
         max: planLimits.recipes.max,
-        used: data.recipes?.used || 0
+        used: Math.max(0, data.recipes?.used || 0)
       },
       mealPlanning: {
         weeklyRecipes: planLimits.mealPlanning.weeklyRecipes,
@@ -251,6 +258,21 @@ class UsageService {
     const usageRef = DatabaseMonitoringService.doc('users/' + user.id + '/usage/limits');
     await DatabaseMonitoringService.updateDoc(usageRef, {
       'recipes.used': increment(1),
+      lastUpdated: new Date()
+    });
+  }
+
+  static async recordRecipeDelete(user: User): Promise<void> {
+    if (!user?.id) return;
+    UsageService.limitsCache.delete(user.id);
+    const usageRef = DatabaseMonitoringService.doc('users/' + user.id + '/usage/limits');
+    // Decrement but never go below 0
+    const usageDoc = await DatabaseMonitoringService.getDoc(usageRef);
+    if (!usageDoc.exists()) return;
+    const current = (usageDoc.data() as Record<string, unknown> | undefined)?.recipes as { used?: number } | undefined;
+    const currentUsed = current?.used || 0;
+    await DatabaseMonitoringService.updateDoc(usageRef, {
+      'recipes.used': Math.max(0, currentUsed - 1),
       lastUpdated: new Date()
     });
   }
@@ -353,6 +375,21 @@ class UsageService {
 
   static getPlanLimits(): PlanLimits {
     return this.buildPlanLimits();
+  }
+
+  static async resetUsage(user: User): Promise<void> {
+    if (!user?.id) return;
+    UsageService.limitsCache.delete(user.id);
+    const planLimits = this.buildPlanLimits()[user.subscription?.tier || 'free'];
+    const weekStart = this.getWeekStart(new Date());
+    const usageRef = DatabaseMonitoringService.doc('users/' + user.id + '/usage/limits');
+    await DatabaseMonitoringService.setDoc(usageRef, {
+      searches: { weekly: planLimits.searches.weekly, used: 0, resetDate: weekStart },
+      recipes: { max: planLimits.recipes.max, used: 0 },
+      mealPlanning: { weeklyRecipes: planLimits.mealPlanning.weeklyRecipes, weeklyUsed: 0, twoWeekPlanning: planLimits.mealPlanning.twoWeekPlanning, resetDate: weekStart },
+      gemini: { weekly: planLimits.gemini.weekly, used: 0, resetDate: weekStart },
+      lastUpdated: new Date()
+    });
   }
 }
 

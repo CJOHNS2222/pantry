@@ -24,9 +24,14 @@ export default class FreezerService {
     }
   ) {
     const itemRef = doc(db, 'households', householdId, 'inventory', itemId)
-    const itemSnap = await getDoc(itemRef)
+    let itemSnap;
+    try {
+      itemSnap = await getDoc(itemRef)
+    } catch (err) {
+      throw new Error(`Failed to fetch item for freezer move: ${err instanceof Error ? err.message : String(err)}`)
+    }
     if (!itemSnap.exists()) throw new Error('Item not found')
-    const item = itemSnap.data() as any
+    const item = itemSnap.data() as Record<string, unknown>
 
     // Prefer any denormalized freezer-life hints on the item itself to avoid product_master lookups.
     let defaultFreezerMonths = 3 // fallback ~90 days
@@ -37,7 +42,7 @@ export default class FreezerService {
         defaultFreezerMonths = Math.max(1, Math.round(item.default_freezer_life / 30))
       }
       // If no denormalized hint present, keep the conservative default; do NOT call product_master.
-    } catch (e) {
+    } catch {
       // non-fatal; use fallback
     }
 
@@ -47,7 +52,7 @@ export default class FreezerService {
       ? new Date(now.getTime() + freezerDays * 24 * 60 * 60 * 1000)
       : addMonths(now, defaultFreezerMonths)
 
-    const updatePayload: Record<string, any> = {
+    const updatePayload: Record<string, unknown> = {
       // canonical fields
       storageLocation: 'freezer',
       expirationDate: newExpiry.toISOString(),
@@ -88,7 +93,12 @@ export default class FreezerService {
     opts?: { cookingToday?: boolean; defrostDays?: number }
   ) {
     const itemRef = doc(db, 'households', householdId, 'inventory', itemId)
-    const itemSnap = await getDoc(itemRef)
+    let itemSnap;
+    try {
+      itemSnap = await getDoc(itemRef)
+    } catch (err) {
+      throw new Error(`Failed to fetch item for defrost: ${err instanceof Error ? err.message : String(err)}`)
+    }
     if (!itemSnap.exists()) throw new Error('Item not found')
 
     const now = new Date()

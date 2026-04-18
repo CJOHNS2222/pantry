@@ -18,7 +18,7 @@ export default defineConfig([
       },
     },
     rules: {
-      "@typescript-eslint/no-unused-vars": "warn", // Reduce noise, warn instead of error
+      "@typescript-eslint/no-unused-vars": "error",
       "@typescript-eslint/no-explicit-any": "error",
       "react/no-unescaped-entities": "off", // Disable quote escaping warnings
       "react/prop-types": "off", // TypeScript handles prop validation

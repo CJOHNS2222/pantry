@@ -148,7 +148,7 @@ export interface StructuredRecipe {
     protein?: number;
     carbs?: number;
     fat?: number;
-    [key: string]: any;
+    [key: string]: number | undefined;
   };
   tags?: string[];
 }
@@ -274,7 +274,9 @@ export interface User {
   name: string;
   email: string;
   avatar?: string;
-  provider: 'email' | 'google' | 'facebook';
+  provider: 'email' | 'google' | 'facebook' | 'guest';
+  /** true for users who skipped sign-up; data is localStorage-only */
+  isGuest?: boolean;
   hasSeenTutorial: boolean;
   subscription?: Subscription;
   profile?: UserProfile;
@@ -376,7 +378,7 @@ export interface Household {
   members: Member[];
   memberIds: string[]; // For querying households by user ID
   /** Live presence map written by householdActivityService — keyed by userId */
-  memberActivity?: Record<string, { isOnline?: boolean; lastSeen?: any; currentActivity?: string }>;
+  memberActivity?: Record<string, { isOnline?: boolean; lastSeen?: { toDate(): Date } | string; currentActivity?: string }>;
 }
 
 export interface Member {
@@ -435,6 +437,6 @@ export interface HouseholdActivity {
   details?: string;
   itemId?: string;
   itemName?: string;
-  timestamp: any; // Firebase Timestamp
+  timestamp: unknown; // Firebase Timestamp
   householdId: string;
 }
