@@ -1,15 +1,17 @@
 import React, { useState } from 'react';
-import { X, FilePlus, Link } from 'lucide-react';
+import { X } from 'lucide-react';
 import { parseCsvToPantryItems, fetchRecipeFromUrl, persistImportedPantryItems } from '../services/importService';
 import { useApp } from '../contexts/AppContext';
 import { useAppActions } from '../contexts/AppActionsContext';
-import { InventoryCacheService } from '../services/inventoryCacheService';
+import { useFocusTrap } from '../hooks/useFocusTrap';
+
 import { saveRecipeToUserCache } from '../services/recipeService';
 import { PantryItem } from '../types';
 import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { log } from '../services/logService';
 import AnalyticsService from '../services/analyticsService';
+import { useAndroidBack } from '../hooks/useAndroidBack';
 
 interface ImportModalProps {
   open: boolean;
@@ -21,6 +23,8 @@ interface ImportModalProps {
 const ImportModal: React.FC<ImportModalProps> = ({ open, onClose, defaultTab = 'pantry', onImported }) => {
   const { user, household } = useApp();
   const { addToast } = useAppActions();
+  const modalRef = useFocusTrap({ isActive: open });
+  useAndroidBack(open, onClose);
   const [tab, setTab] = useState<'pantry' | 'recipes'>(defaultTab);
   const [csvText, setCsvText] = useState('');
   const [url, setUrl] = useState('');
@@ -138,8 +142,8 @@ const ImportModal: React.FC<ImportModalProps> = ({ open, onClose, defaultTab = '
   };
 
   return (
-    <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black bg-opacity-50 p-4">
-      <div className="w-full max-w-2xl bg-theme-primary rounded shadow-lg border border-theme">
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black bg-opacity-50 p-4" onClick={onClose}>
+      <div ref={modalRef} role="dialog" aria-modal="true" aria-label="Import" className="w-full max-w-2xl bg-theme-primary rounded shadow-lg border border-theme" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between p-3 border-b border-theme">
           <h3 className="text-lg font-semibold">Import</h3>
             <button onClick={onClose} className="text-theme-secondary" data-testid="import-close"><X className="w-5 h-5"/></button>

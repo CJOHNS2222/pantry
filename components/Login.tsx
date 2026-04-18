@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { FormattedMessage, useIntl } from 'react-intl';
-import { ChefHat, Mail, Chrome } from 'lucide-react';
+import { ChefHat, Chrome, UserX } from 'lucide-react';
 import { User } from '../types';
-import { Browser } from '@capacitor/browser';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, sendEmailVerification, sendPasswordResetEmail } from 'firebase/auth';
+import { Capacitor } from '@capacitor/core';
+import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, sendEmailVerification, sendPasswordResetEmail, signInWithCredential } from 'firebase/auth';
 import AnalyticsService from '../services/analyticsService';
 import { validateEmail, validatePassword, validateName } from '../src/utils/validation';
 import { log } from '../services/logService';
+
+export const GUEST_USER_ID_KEY = 'guest_user_id';
 
 
 
@@ -117,48 +120,74 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
     }
   };
 
+  const handleGuestLogin = () => {
+    let guestId = localStorage.getItem(GUEST_USER_ID_KEY);
+    if (!guestId) {
+      guestId = `guest-${crypto.randomUUID()}`;
+      localStorage.setItem(GUEST_USER_ID_KEY, guestId);
+    }
+    AnalyticsService.trackLogin('guest');
+    onLogin({
+      id: guestId,
+      name: 'Guest',
+      email: '',
+      provider: 'guest',
+      isGuest: true,
+      hasSeenTutorial: false
+    });
+  };
+
   const handleGoogleLogin = async () => {
     try {
       const auth = getAuth();
+
+      // Native Capacitor path — uses native Google Sign-In to avoid localhost redirect issue
+      if (Capacitor.getPlatform() !== 'web') {
+        await GoogleAuth.initialize({
+          clientId: '13848266518-0co4dav6sn9epov13vt0covii2nmg1ne.apps.googleusercontent.com',
+          scopes: ['profile', 'email'],
+          grantOfflineAccess: true,
+        });
+        const googleUser = await GoogleAuth.signIn();
+        const idToken = googleUser.authentication.idToken;
+        const credential = GoogleAuthProvider.credential(idToken);
+        const result = await signInWithCredential(auth, credential);
+        const user = result.user;
+        AnalyticsService.trackLogin('google');
+        onLogin({
+          id: user.uid,
+          name: user.displayName || user.email?.split('@')[0] || '',
+          email: user.email || '',
+          provider: 'google',
+          hasSeenTutorial: false
+        });
+        return;
+      }
+
+      // Web path: popup first, redirect fallback
       const googleProvider = new GoogleAuthProvider();
       googleProvider.addScope('email');
       googleProvider.addScope('profile');
-
-      // For mobile, we need to handle the redirect differently
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      if ((window as any).Capacitor && Browser) {
-        // Set the redirect URL for mobile
-        googleProvider.setCustomParameters({
-          prompt: 'select_account',
-          redirect_uri: 'com.smart.pantry://'
+      try {
+        const result = await signInWithPopup(auth, googleProvider);
+        const user = result.user;
+        AnalyticsService.trackLogin('google');
+        onLogin({
+          id: user.uid,
+          name: user.displayName || user.email?.split('@')[0] || '',
+          email: user.email || '',
+          provider: 'google',
+          hasSeenTutorial: false
         });
-
-        // Use redirect for mobile with Capacitor Browser
-        await signInWithRedirect(auth, googleProvider);
-      } else {
-        // Desktop: Try popup first, fallback to redirect if popup fails
-        try {
-          const result = await signInWithPopup(auth, googleProvider);
-          const user = result.user;
-          AnalyticsService.trackLogin('google');
-          onLogin({
-            id: user.uid,
-            name: user.displayName || user.email?.split('@')[0] || '',
-            email: user.email || '',
-            provider: 'google',
-            hasSeenTutorial: false
-          });
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } catch (popupError: any) {
-          log.warn('Google popup failed, trying redirect', { error: popupError.message, code: popupError.code }, 'Login');
-          // If popup is blocked or fails, use redirect as fallback
-          if (popupError.code === 'auth/popup-blocked' ||
-              popupError.code === 'auth/popup-closed-by-user' ||
-              popupError.code === 'auth/cancelled-popup-request') {
-            await signInWithRedirect(auth, googleProvider);
-          } else {
-            throw popupError;
-          }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } catch (popupError: any) {
+        log.warn('Google popup failed, trying redirect', { error: popupError.message, code: popupError.code }, 'Login');
+        if (popupError.code === 'auth/popup-blocked' ||
+            popupError.code === 'auth/popup-closed-by-user' ||
+            popupError.code === 'auth/cancelled-popup-request') {
+          await signInWithRedirect(auth, googleProvider);
+        } else {
+          throw popupError;
         }
       }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -363,7 +392,19 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
             <Chrome className="w-5 h-5 text-red-500" />
             Google
           </button>
+          <button
+            type="button"
+            onClick={handleGuestLogin}
+            className="flex items-center justify-center gap-2 bg-[#2A0A10] border border-red-900/40 text-red-200/70 font-medium py-3 rounded-xl hover:bg-red-900/20 transition-colors"
+            data-testid="login-guest"
+          >
+            <UserX className="w-5 h-5" />
+            Continue as Guest
+          </button>
         </div>
+        <p className="text-xs text-red-200/40 text-center mt-3">
+          Guest mode uses local storage only. Your data won't sync across devices.
+        </p>
       </div>
     </div>
   );

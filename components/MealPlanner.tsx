@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { CalendarClock, Plus, Move, AlertCircle, ShoppingBasket, Trash2, HelpCircle, Search, Copy, UtensilsCrossed, Download, ChevronDown, ChevronRight } from 'lucide-react';
+import { CalendarClock, Plus, ShoppingBasket, Trash2, HelpCircle, Search, Copy, Download, ChevronDown, ChevronRight } from 'lucide-react';
 import { DayPlan, MealPlanItem, PantryItem, StructuredRecipe, User, SavedRecipe, ShoppingItem } from '../types';
 import RecipeModal from './RecipeModal';
 import LeftoverQuickCapture from './LeftoverQuickCapture';
@@ -8,7 +8,7 @@ import { PremiumFeature } from './PremiumFeature';
 import { GroceryCostEstimator } from './GroceryCostEstimator';
 import { Tab } from '../types/app';
 import { searchRecipes as searchRecipesGemini } from '../services/geminiService';
-import { getSavedRecipes, getCachedPopularRecipes, getCachedRecipesCache } from '../services/recipeService';
+import { getCachedPopularRecipes, getCachedRecipesCache } from '../services/recipeService';
 // Firestore access is instrumented via DatabaseMonitoringService when needed
 import { parseIngredientForShoppingList } from '../utils/appUtils';
 import AnalyticsService from '../services/analyticsService';
@@ -20,13 +20,15 @@ import { searchRecipes } from '../utils/searchUtils';
 import { debounce } from '../utils/debounceUtils';
 import { log } from '../services/logService';
 import { useModalOpen } from '../utils/useModalOpen';
+import { useAndroidBack } from '../hooks/useAndroidBack';
 import { CompactRecipeCardSkeleton, MealPlanSkeleton } from './SkeletonLoader';
 import { ProgressiveImage } from './ProgressiveImage';
-import { getMealPrepSuggestions, RecipeIngredientMatch } from '../utils/searchUtils';
+import { getMealPrepSuggestions } from '../utils/searchUtils';
 import { getUserMeasurementSystem } from '../utils/measurementUtils';
 import CalendarService from '../services/calendarService';
 
 // Utility function to generate attractive recipe placeholder images
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const generateRecipePlaceholderImage = (title: string): string => {
   // Create a simple hash from the title for consistent colors
   let hash = 0;
@@ -102,7 +104,6 @@ const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
   mealType,
   dayIndex,
   onAddRecipe,
-  onClose,
   inventory,
   user,
   savedRecipes: propSavedRecipes
@@ -112,7 +113,9 @@ const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
   const [searchResults, setSearchResults] = useState<StructuredRecipe[]>([]);
   const [searchResultsSource, setSearchResultsSource] = useState<'saved' | 'gemini' | null>(null);
   const [isSearching, setIsSearching] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [savedRecipes, setSavedRecipes] = useState<SavedRecipe[]>(propSavedRecipes);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [recipesLoaded, setRecipesLoaded] = useState(true); // Already loaded from props
   const [cachedRecipes, setCachedRecipes] = useState<SavedRecipe[]>([]);
   const [cachedRecipesLoaded, setCachedRecipesLoaded] = useState(false);
@@ -520,7 +523,7 @@ const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
   );
 };
 
-export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPlan, inventory, shoppingList, addToShoppingList, onAddToPlan, onSaveRecipe, onMarkAsMade, onRate, user, setActiveTab, recipeSaveLimitExceeded = false, mealPlanLimitExceeded = false, isLoadingMealPlan = false, isLoadingSavedRecipes = false, savedRecipes: propSavedRecipes = [], settings, onOpenRecipeSearch }) => {
+export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPlan, inventory, shoppingList, addToShoppingList, onAddToPlan, onSaveRecipe, onMarkAsMade, onRate, user, setActiveTab, recipeSaveLimitExceeded = false, mealPlanLimitExceeded = false, isLoadingMealPlan = false, savedRecipes: propSavedRecipes = [], settings }) => {
   const { addToast } = useAppActions();
   const intl = useIntl();
   const { household } = useApp();
@@ -529,7 +532,9 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
     const STAPLES = ['salt', 'pepper', 'oil', 'water', 'flour', 'sugar', 'butter', 'vinegar', 'baking powder', 'baking soda', 'spices', 'seasoning', 'soy sauce', 'cornstarch', 'yeast'];
     const includeStaples = settings?.shopping?.includeStaples || false;
   const [draggedMeal, setDraggedMeal] = useState<{ dayIndex: number, mealType: string, mealIndex: number } | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [dragOverDay, setDragOverDay] = useState<number | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [dragOverMealType, setDragOverMealType] = useState<{ dayIndex: number, mealType: string } | null>(null);
   const [missingItemsCount, setMissingItemsCount] = useState(0);
   const [showRecipeModal, setShowRecipeModal] = useState(false);
@@ -542,6 +547,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
   const [currentCalendarMonth, setCurrentCalendarMonth] = useState(new Date());
 
   // Use prop savedRecipes or local state as fallback
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [localSavedRecipes, setLocalSavedRecipes] = useState<SavedRecipe[]>([]);
   const savedRecipes = propSavedRecipes.length > 0 ? propSavedRecipes : localSavedRecipes;
 
@@ -576,6 +582,15 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
   };
 
   useModalOpen(showRecipeSearch || showAddMealDialog || showLeftoverPrompt || showLeftoverCapture || showLeftoverSwapModal);
+
+  // Android back-button registration for all MealPlanner modals
+  useAndroidBack(showRecipeModal, () => setShowRecipeModal(false));
+  useAndroidBack(showRecipeSearch, () => setShowRecipeSearch(false));
+  useAndroidBack(showMealPrepPlanner, () => setShowMealPrepPlanner(false));
+  useAndroidBack(showAddMealDialog, () => setShowAddMealDialog(false));
+  useAndroidBack(showLeftoverPrompt, () => setShowLeftoverPrompt(false));
+  useAndroidBack(showLeftoverCapture, () => setShowLeftoverCapture(false));
+  useAndroidBack(showLeftoverSwapModal, () => setShowLeftoverSwapModal(false));
 
   // Check if a day has any meals scheduled
   const hasMealsScheduled = useCallback((dayIndex: number) => {
@@ -696,7 +711,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
   // Handle recipe modal opening from search tiles
   useEffect(() => {
     const handleOpenRecipeModal = (event: CustomEvent) => {
-      const { recipe, isSavedView } = event.detail;
+      const { recipe } = event.detail;
       setModalRecipe(recipe);
       setModalContext('search');
       setShowRecipeModal(true);
@@ -709,6 +724,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
     };
   }, []);
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleDragStart = (e: React.DragEvent, dayIndex: number, mealType: string, mealIndex: number) => {
     setDraggedMeal({ dayIndex, mealType, mealIndex });
     setIsDragging(true);
@@ -717,6 +733,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
     e.dataTransfer.setData('text/plain', `${dayIndex}-${mealType}-${mealIndex}`);
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleDragEnd = () => {
     setDraggedMeal(null);
     setDragOverDay(null);
@@ -725,6 +742,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
     setIsDragging(false);
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleDragOver = (e: React.DragEvent, dayIndex?: number, mealType?: string) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
@@ -738,6 +756,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
     }
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleDragLeave = (e: React.DragEvent) => {
     // Only clear drag over if we're actually leaving the drop zone
     const rect = e.currentTarget.getBoundingClientRect();
@@ -944,6 +963,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
   // Display plan rotated to start on today's date. When today's date isn't
   // present in the saved `mealPlan`, build a 7-day view starting from today
   // and map display indexes back to the original mealPlan indexes.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { displayPlan, displayToOriginal } = useMemo(() => {
     const d = new Date();
     const yyyy = d.getFullYear();
@@ -1063,7 +1083,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
     try {
       await CalendarService.exportWeekAsICS(daysWithMeals);
       addToast('Meal plan exported to calendar!', 'success');
-    } catch (err) {
+    } catch {
       addToast('Failed to export calendar. Please try again.', 'error');
     }
   }, [currentDayIndex, displayPlan, addToast]);
@@ -1212,6 +1232,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
   }, [missingIngredients]);
 
   // Ensure a DayPlan exists in the canonical mealPlan for a given date.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const ensureDayExists = useCallback((dateIso: string, dayName?: string) => {
     const idx = mealPlan.findIndex(d => d.date === dateIso);
     if (idx >= 0) return idx;
@@ -1331,7 +1352,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
             </div>
             {expandedSections.has('TodaysMeals') && (
               <div className="space-y-2">
-                {todaysMeals.map((meal, index) => (
+                {todaysMeals.map((meal) => (
                   <div
                     key={meal.id}
                     onClick={(e) => {
@@ -1577,7 +1598,6 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
                 {(() => {
                   const today = new Date();
                   const firstDay = new Date(currentCalendarMonth.getFullYear(), currentCalendarMonth.getMonth(), 1);
-                  const lastDay = new Date(currentCalendarMonth.getFullYear(), currentCalendarMonth.getMonth() + 1, 0);
                   const startDate = new Date(firstDay);
                   startDate.setDate(startDate.getDate() - firstDay.getDay()); // Start from Sunday
                   
@@ -2066,7 +2086,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
                   defaultValue=""
                 >
                   <option value="" disabled>Select a day...</option>
-                  {displayPlan.map((day, displayIndex) => {
+                  {displayPlan.map((day) => {
                       const valueIndex = mealPlan.findIndex(d => d.date === day.date);
                       return (
                         <option key={day.date} value={valueIndex}>

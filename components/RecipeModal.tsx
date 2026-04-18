@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Plus, Heart, Trash2, Minus, Users, CheckCircle2, Play, Pause, RotateCcw, AlertCircle, X, UtensilsCrossed } from 'lucide-react';
+import { Plus, Heart, Trash2, Minus, CheckCircle2, Play, Pause, RotateCcw, AlertCircle, X, UtensilsCrossed } from 'lucide-react';
 import { StructuredRecipe, RecipeRating, SavedRecipe, PantryItem, Household } from '../types';
 import LeftoverQuickCapture from './LeftoverQuickCapture';
 import { CookingMode } from './CookingMode';
@@ -9,6 +9,7 @@ import { generateBlurDataURL } from '../utils/appUtils';
 import { useKeyboardNavigation } from '../hooks/useKeyboardNavigation';
 import { useFocusTrap } from '../hooks/useFocusTrap';
 import { useModalOpen } from '../utils/useModalOpen';
+import { useAndroidBack } from '../hooks/useAndroidBack';
 import { scaleRecipeIngredients, calculatePortionScaling } from '../utils/portionUtils';
 import { useAppActions } from '../contexts/AppActionsContext';
 import AnalyticsService from '../services/analyticsService';
@@ -70,7 +71,6 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
   const [showCookingMode, setShowCookingMode] = useState(false);
   const [servings, setServings] = useState(household?.members?.length || 4); // Default to household size
   const [isSaving, setIsSaving] = useState(false); // Prevent double-clicks
-  const originalServings = 4; // Assume recipes are for 4 servings
   const ratingRef = useRef<HTMLDivElement>(null);
   const [showReviewPrompt, setShowReviewPrompt] = useState(false);
   const [showRatingModal, setShowRatingModal] = useState(false);
@@ -88,6 +88,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
   // Focus trap for accessibility
   const modalRef = useFocusTrap({ isActive: isOpen });
   useModalOpen();
+  useAndroidBack(isOpen, onClose);
   
   // Cooking Timer State
   const [timerActive, setTimerActive] = useState(false);
@@ -128,6 +129,14 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
   // Smart Substitutions State
   const [showSubstitutions, setShowSubstitutions] = useState(false);
   const [ingredientSubstitutions, setIngredientSubstitutions] = useState<{ingredient: string, substitutes: {name: string, ratio: string, notes: string}[]}[]>([]);
+
+  // Sub-modal back-button registration (LIFO — closed inner-first)
+  useAndroidBack(showCookingMode, () => setShowCookingMode(false));
+  useAndroidBack(showLeftoverCapture, () => setShowLeftoverCapture(false));
+  useAndroidBack(showReviewPrompt, () => setShowReviewPrompt(false));
+  useAndroidBack(showRatingModal, () => setShowRatingModal(false));
+  useAndroidBack(showCustomTimer, () => setShowCustomTimer(false));
+  useAndroidBack(showSubstitutions, () => setShowSubstitutions(false));
 
   // Parse cook time (string like "15 min" or numeric minutes) to seconds
   const parseTimeToSeconds = (time: string | number | undefined): number => {
@@ -676,6 +685,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
     }, 100);
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleLeftoverSaved = (_id?: string) => {
     setShowLeftoverCapture(false);
     setTimeout(() => setShowRatingModal(true), 100);

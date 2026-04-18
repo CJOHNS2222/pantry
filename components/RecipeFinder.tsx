@@ -1,9 +1,8 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Search, Loader2, Sparkles, ExternalLink, Globe, Plus, Clock, List, ChefHat, Star, Heart, Bookmark, Zap, Mic } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { Search, Loader2, Sparkles, Plus, Clock, List, ChefHat, Star, Bookmark, Zap, Mic } from 'lucide-react';
 import { searchRecipes } from '../services/geminiService';
 import { setUserGeminiOptIn } from '../services/featureFlags';
-import { getSavedRecipes, getCachedPopularRecipes, saveRecipeToFirestore, saveRecipeToUserCache, uploadRecipeImageFile, submitRecipeForReview } from '../services/recipeService';
-import DatabaseMonitoringService from '../services/databaseMonitoringService';
+import { getCachedPopularRecipes, submitRecipeForReview } from '../services/recipeService';
 import { RecipeSearchResult, LoadingState, RecipeRating, StructuredRecipe, PantryItem, SavedRecipe, User, Household, RecipeSearchParams } from '../types';
 import { Tab } from '../types/app';
 import { RecipeCardSkeleton } from './SkeletonLoader';
@@ -18,7 +17,7 @@ import RecipeModal from './RecipeModal';
 import ImportModal from './ImportModal';
 import AnalyticsService from '../services/analyticsService';
 import { UsageService } from '../services/usageService';
-import { searchPantryItems, getEnhancedAutocompleteSuggestions, filterPantryItems, savePantryFilter, loadPantryFilter, defaultPantryFilter, saveSearchToHistory, getRecentSearchSuggestions, AutocompleteSuggestion } from '../utils/searchUtils';
+import { saveSearchToHistory, getRecentSearchSuggestions } from '../utils/searchUtils';
 import { useKeyboardNavigation } from '../hooks/useKeyboardNavigation';
 import { debounce } from '../utils/debounceUtils';
 import { filterRecipesByHouseholdPreferences, filterRecipesByUserProfile } from '../utils/preferenceUtils';
@@ -100,6 +99,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
     const [showImportModal, setShowImportModal] = useState(false);
     
     // Get recipe suggestions based on inventory
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const getRecipeSuggestions = useMemo(() => {
         if (!savedRecipes.length || !inventory.length) return { canMake: [], needMore: [] };
         
@@ -136,7 +136,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
 
     // Extract search logic to custom hook
     const [activeView, setActiveView] = useState<'search' | 'saved'>('search');
-    const [selectedCategory, setSelectedCategory] = useState<string>('All');
+    const [selectedCategory] = useState<string>('All');
     
     // Search parameters
     const [specificQuery, setSpecificQuery] = useState('');
@@ -164,11 +164,14 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
 
     // Firebase recipes state
     const [firebaseRecipes, setFirebaseRecipes] = useState<SavedRecipe[]>([]);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const [firebaseRecipesLoading, setFirebaseRecipesLoading] = useState(false);
     // Visible count for incremental rendering from cached doc
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const [visibleFirebaseCount, setVisibleFirebaseCount] = useState<number>(25);
 
     // Memoized filtered recipes for category selection so we can paginate easily
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const filteredFirebaseRecipes = useMemo(() => {
         return firebaseRecipes.filter(recipe => {
             if (selectedCategory === 'All') return true;
@@ -208,10 +211,15 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
     const [voiceSearchSupported, setVoiceSearchSupported] = useState(false);
 
     // Token estimation state
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const [estimatedTokens, setEstimatedTokens] = useState<number>(0);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const [estimatedCost, setEstimatedCost] = useState<number>(0);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const [freeTierNote, setFreeTierNote] = useState<string>('');
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const [pendingSearchParams, setPendingSearchParams] = useState<RecipeFinderSearchParams | null>(null);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const [showTokenConfirmation, setShowTokenConfirmation] = useState<boolean>(false);
 
     // Token estimation function
@@ -337,6 +345,9 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
     const [modalRecipe, setModalRecipe] = useState<StructuredRecipe | null>(null);
     const [modalIsSavedView, setModalIsSavedView] = useState(false);
 
+    // Stable ref so window event handler can call the latest openRecipeModal closure
+    const openRecipeModalRef = useRef<((recipe: StructuredRecipe | SavedRecipe, isSavedView?: boolean) => void) | null>(null);
+
     // Keyboard navigation support
     useKeyboardNavigation({
       onEscape: () => {
@@ -355,7 +366,18 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
         }
     }, [initialSearchQuery]);
 
+    // Allow sibling components (e.g. SmartRecommendations) to open a recipe via window event
+    useEffect(() => {
+        const handleOpenRecipeModal = (event: CustomEvent) => {
+            const { recipe, isSavedView } = event.detail;
+            openRecipeModalRef.current?.(recipe, isSavedView ?? true);
+        };
+        window.addEventListener('openRecipeModal', handleOpenRecipeModal as EventListener);
+        return () => window.removeEventListener('openRecipeModal', handleOpenRecipeModal as EventListener);
+    }, []);
+
     // Surprise me feature
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const handleSurpriseMe = async () => {
         const allRecipes = firebaseRecipes.filter(recipe => {
             if (selectedCategory === 'All') return true;
@@ -428,6 +450,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
     }, [user]); // Depend on user authentication
 
     // Popular recipes from CSV
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const csvRecipes: StructuredRecipe[] = [
         {
             title: "Chicken Parmesan",
@@ -1312,6 +1335,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
             setModalIsSavedView(Boolean(isSavedView));
             setShowRecipeModal(true);
         };
+        openRecipeModalRef.current = openRecipeModal;
 
         const handleModalSaveRecipe = async (r: StructuredRecipe & { __imageFile?: File; __submitForInclusion?: boolean }) => {
             try {
@@ -1366,6 +1390,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
 
         const renderRecipeCard = (recipe: StructuredRecipe, isSavedView = false, isCompact = false) => {
             const ratingInfo = getRatingInfo(recipe.title);
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
             const isSaved = savedRecipes.some(r => r.title === recipe.title);
             const titleKey = `${recipe.title || 'Untitled Recipe'}-${Math.random()}`;
             
@@ -1979,7 +2004,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                             </div>
                         )}
                         <div className="grid grid-cols-3 gap-4">
-                            {result.recipes.map((recipe, idx) => renderRecipeTile(recipe))}
+                            {result.recipes.map((recipe) => renderRecipeTile(recipe))}
                         </div>
                     </div>
             )}

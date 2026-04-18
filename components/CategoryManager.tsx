@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Plus, Edit2, Trash2, X, Check, Palette } from 'lucide-react';
+import { Plus, Edit2, Trash2, X, Check } from 'lucide-react';
 import { useModalOpen } from '../utils/useModalOpen';
 import { useKeyboardNavigation } from '../hooks/useKeyboardNavigation';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 import { CustomCategory } from '../types';
 import { getCategoryIcon, getCategoryColor } from '../utils/appUtils';
 import AnalyticsService from '../services/analyticsService';
@@ -41,6 +42,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({
 }) => {
   useModalOpen(isOpen);
   useKeyboardNavigation({ onEscape: onClose, enabled: isOpen });
+  const modalRef = useFocusTrap({ isActive: isOpen });
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
@@ -93,8 +95,8 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-4 pt-[var(--safe-area-inset-top,0px)] pb-[var(--safe-area-inset-bottom,0px)]">
-      <div className="bg-theme-primary rounded-lg shadow-xl max-w-2xl w-full max-h-full overflow-hidden">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-4 pt-[var(--safe-area-inset-top,0px)] pb-[var(--safe-area-inset-bottom,0px)]" onClick={onClose}>
+      <div ref={modalRef} role="dialog" aria-modal="true" aria-label="Manage Categories" className="bg-theme-primary rounded-lg shadow-xl max-w-2xl w-full max-h-full overflow-hidden" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-theme">
           <h2 className="text-xl font-bold text-theme-primary">Manage Categories</h2>

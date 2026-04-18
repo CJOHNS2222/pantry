@@ -1,15 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { X, TrendingUp, ShoppingBasket, Trash2, Edit3, Zap, History } from 'lucide-react';
-import { PantryItem } from '../types';
+import { X, Trash2, Edit3, ChevronDown, ChevronRight, Minus, Plus, CalendarClock } from 'lucide-react';
+import { PantryItem, CustomCategory } from '../types';
 import PriceTrends from './PriceTrends';
-import { getAllCategories, getExpirationColor, cleanItemNameForShopping, formatItemQuantity, parseQuantity, getFreezerShelfLifeDays, getOpenedShelfLifeDays } from '../utils/appUtils';
+import { getAllCategories, cleanItemNameForShopping, getFreezerShelfLifeDays, getOpenedShelfLifeDays, getItemImageCdnUrl, getPreferredItemDisplayImage } from '../utils/appUtils';
 import { getQuantityAmount, getQuantityUnit } from '../utils/quantityUtils';
-import { getNutritionFactsWithFallback, NutritionFacts, formatNutrition } from '../services/nutritionService';
+import { getNutritionFactsWithFallback, NutritionFacts } from '../services/nutritionService';
 import { useKeyboardNavigation } from '../hooks/useKeyboardNavigation';
+import QuantityUnitPicker from './QuantityUnitPicker';
 import { useFocusTrap } from '../hooks/useFocusTrap';
 import { useModalOpen } from '../utils/useModalOpen';
-import QuantityUnitPicker from './QuantityUnitPicker';
-import { COMMON_UNITS, getSmartUnits } from './QuantityUnitPicker';
 import { useApp } from '../contexts/AppContext';
 import { useAppActions } from '../contexts/AppActionsContext';
 import { useIntl } from 'react-intl';
@@ -22,7 +21,7 @@ interface ItemDetailModalProps {
   onUpdateItem: (index: number, updates: Partial<PantryItem>) => void;
   onDeleteItem: (index: number) => void;
   onAddToShoppingList: (items: string[]) => void;
-  customCategories: any[];
+  customCategories: CustomCategory[];
   originalIndex: number;
 }
 
@@ -59,7 +58,6 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   const { household, user, settings } = useApp();
   const { addToast } = useAppActions();
   const showNutrition = settings?.shopping?.showNutrition ?? false;
-  const showPriceData = settings?.shopping?.showPriceData ?? false;
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -93,7 +91,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
       try {
         const nutritionData = await getNutritionFactsWithFallback(item.item, item.category || 'Manual');
         setNutrition(nutritionData);
-      } catch (error) {
+      } catch {
         log.warn('Failed to fetch nutrition', { item: item.item }, 'ItemDetailModal');
         setNutrition(null);
       } finally {
@@ -151,7 +149,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
     try {
       const url = URL.createObjectURL(file);
       setPreviewUrl(url);
-    } catch (err) {
+    } catch {
       setPreviewUrl(null);
     }
   };
@@ -169,8 +167,8 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
       // clear local selection after success
       setSelectedFile(null);
       setPreviewUrl(null);
-    } catch (err: any) {
-      log.error('Failed to upload image', { item: item.item, error: err?.message }, 'ItemDetailModal');
+    } catch (err: unknown) {
+      log.error('Failed to upload image', { item: item.item, error: (err as Error)?.message }, 'ItemDetailModal');
       addToast('Failed to upload image. Please try again.', 'error');
     } finally {
       setUploadingImage(false);
@@ -182,7 +180,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
 
     // Quantity
     if (localQuantity !== getQuantityAmount(item.quantity ?? item.quantity_estimate) || localUnit !== getQuantityUnit(item.quantity ?? item.quantity_estimate)) {
-      updates.quantity = { amount: localQuantity, unit: localUnit } as any;
+      updates.quantity = { amount: localQuantity, unit: localUnit } as unknown as PantryItem['quantity'];
       updates.quantity_estimate = String(localQuantity);
     }
 
@@ -263,441 +261,528 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
     enabled: true
   });
 
+  // Collapsible section state
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
+  const toggleSection = (key: string) => setOpenSections(prev => ({ ...prev, [key]: !prev[key] }));
+
   return (
     <>
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start sm:items-center justify-center z-[9999] px-4 pt-[var(--safe-area-inset-top,0px)] pb-[var(--safe-area-inset-bottom,0px)]">
-        <div ref={modalRef} role="dialog" aria-modal="true" aria-label={item.item} className="bg-theme-primary rounded-lg shadow-xl w-full max-w-md mx-auto h-full flex flex-col border border-theme">
-          {/* Header - Fixed */}
-          <div className="flex items-center justify-between p-4 pb-3 border-b border-theme flex-shrink-0 rounded-t-lg">
-            <h3 className="text-lg font-semibold text-theme-primary">{item.item}</h3>
-            <div className="flex items-center gap-2">
-              <div className="text-sm text-theme-secondary">
-                {intl.formatMessage({ id: 'common.addedOn' }, { date: item.dateAdded ? new Date(item.dateAdded).toLocaleDateString() : intl.formatMessage({ id: 'common.unknown' }) })}
-              </div>
-              <button
-                onClick={handleCloseAndPersist}
-                className="p-1 hover:bg-theme-secondary rounded-full transition-colors"
-                aria-label={intl.formatMessage({ id: 'common.closeModal' })}
-                data-testid="item-close"
-              >
-                <X className="w-5 h-5 text-theme-secondary" />
-              </button>
-            </div>
-          </div>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start sm:items-center justify-center z-[9999] px-4 pt-[var(--safe-area-inset-top,0px)] pb-[var(--safe-area-inset-bottom,0px)]" onClick={handleCloseAndPersist}>
+      <div ref={modalRef} role="dialog" aria-modal="true" aria-label={item.item} className="bg-theme-primary rounded-lg shadow-xl w-full max-w-md mx-auto h-full flex flex-col border border-theme" onClick={e => e.stopPropagation()}>
 
-          {/* Scrollable Content */}
-          <div className="flex-1 overflow-y-auto p-4">
-            {/* Item Image + upload */}
-            <div className="pb-2 flex items-center gap-4">
-              {/* Change picture button - left side */}
-              <label className="cursor-pointer px-2 py-1 bg-theme-secondary text-theme-primary rounded text-xs hover:bg-theme-primary hover:text-theme-secondary border border-theme flex-shrink-0" data-testid="item-change-photo">
-                Change Photo
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto">
+
+          {/* ── Hero section ── */}
+          <div className="relative px-4 pt-4 pb-2">
+            {/* Close button */}
+            <button
+              onClick={handleCloseAndPersist}
+              className="absolute top-4 left-4 p-1.5 hover:bg-theme-secondary rounded-full transition-colors z-10"
+              aria-label={intl.formatMessage({ id: 'common.closeModal' })}
+              data-testid="item-close"
+            >
+              <X className="w-5 h-5 text-theme-secondary" />
+            </button>
+
+            {/* Item image */}
+            <div className="flex justify-center pt-2 pb-4">
+              <label className="cursor-pointer group relative">
+                <img
+                  src={previewUrl || getPreferredItemDisplayImage(item.item, item.category, item.image)}
+                  alt={item.item}
+                  className="w-28 h-28 rounded-xl object-cover border-2 border-theme group-hover:opacity-80 transition-opacity"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement | null;
+                    if (!target) return;
+                    const cdn = getItemImageCdnUrl(item.item);
+                    if (cdn && target.src !== cdn) {
+                      target.src = cdn;
+                    } else {
+                      target.src = '/images/placeholder.svg';
+                    }
+                  }}
+                />
+                {uploadingImage && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-xl">
+                    <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  </div>
+                )}
                 <input
                   type="file"
                   accept="image/*"
-                  onChange={(e) => handleFileInput(e.target.files?.[0])}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      handleFileInput(file);
+                      if (file.type.startsWith('image/') && file.size <= 10 * 1024 * 1024) {
+                        setSelectedFile(file);
+                        setTimeout(() => handleUploadImage(), 100);
+                      }
+                    }
+                  }}
                   className="hidden"
                   data-testid="item-file-input"
                 />
               </label>
-
-              {/* Image in center */}
-              <div className="flex-1 flex justify-center">
-                <img
-                  src={previewUrl || item.image || '/images/placeholder.svg'}
-                  alt={item.item}
-                  className="w-24 h-24 rounded-lg object-cover border-2 border-theme"
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement | null;
-                    if (target) target.src = '/images/placeholder.svg';
-                  }}
-                />
-              </div>
-
-              {/* Upload button - right side */}
-              <button
-                onClick={handleUploadImage}
-                disabled={!selectedFile || uploadingImage}
-                className="px-2 py-1 bg-[var(--accent-color)] text-white rounded text-xs flex-shrink-0 disabled:opacity-50"
-                data-testid="item-upload-photo"
-              >
-                {uploadingImage ? 'Uploading...' : 'Save Photo'}
-              </button>
             </div>
 
-            {/* Item Details */}
-            <div className="px-3 space-y-2">
-            {/* Quantity Section - Compact */}
-            <div className="bg-theme-secondary p-1.5 rounded-lg border border-theme">
-              <label className="block text-sm font-medium text-theme-primary mb-1.5">
-                Quantity
-              </label>
-              <QuantityUnitPicker
-                quantity={editQuantity}
-                unit={editUnit}
-                onQuantityChange={handleQuantityChange}
-                onUnitChange={handleUnitChange}
-                itemName={item.item}
-                showControls={true}
-              />
-              {/* Visual fill level selector */}
-              <div className="mt-2">
-                <div className="text-xs font-medium text-theme-primary opacity-70 uppercase mb-1">Fill Level</div>
-                <div className="flex gap-1.5">
-                  {([
-                    { value: 'quarter',      label: '¼',  icon: '◔', color: '#f59e0b' },
-                    { value: 'half',         label: '½',  icon: '◑', color: '#f97316' },
-                    { value: 'threeQuarter', label: '¾',  icon: '◕', color: '#22c55e' },
-                    { value: 'full',         label: 'Full', icon: '●', color: '#16a34a' },
-                  ] as { value: NonNullable<PantryItem['visualLevel']>; label: string; icon: string; color: string }[]).map(({ value, label, icon, color }) => {
-                    const selected = localVisualLevel === value;
-                    return (
-                      <button
-                        key={value}
-                        type="button"
-                        onClick={() => setLocalVisualLevel(selected ? undefined : value)}
-                        className={`flex-1 flex flex-col items-center gap-0.5 px-1 py-1.5 rounded-lg border transition-all duration-150 ${
-                          selected
-                            ? 'border-[var(--accent-color)] bg-[var(--accent-color)]/10 scale-105'
-                            : 'border-theme bg-theme-primary hover:bg-theme-secondary hover:scale-105'
-                        }`}
-                        data-testid={`item-visual-${value}`}
-                        aria-pressed={selected}
-                        title={`${label} full`}
-                      >
-                        <span
-                          className="text-xl leading-none transition-all"
-                          style={{ color: selected ? color : 'rgb(156 163 175)', filter: selected ? `drop-shadow(0 0 4px ${color}80)` : undefined }}
-                        >
-                          {icon}
-                        </span>
-                        <span className={`text-[10px] font-medium leading-none ${
-                          selected ? 'text-[var(--accent-color)]' : 'text-theme-secondary'
-                        }`}>{label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-
-            {/* Original Quantity (from recipe/shopping list) */}
-            {(item as any).originalQuantity && (
-              <div className="bg-theme-secondary p-2 rounded-lg border border-theme">
-                <label className="block text-xs font-medium text-theme-primary mb-1 uppercase opacity-70">
-                  {intl.formatMessage({ id: 'pantry.recipeQty' })}
-                </label>
-                <div className="text-sm text-theme-primary">
-                  {(item as any).originalQuantity}
-                </div>
-              </div>
-            )}
-
-            {/* Expiration Date */}
-            <div className="bg-theme-secondary p-2 rounded-lg border border-theme">
-              <label className="block text-xs font-medium text-theme-primary mb-1 uppercase opacity-70">
-                {intl.formatMessage({ id: 'pantry.expiration' })}
-              </label>
-              {isEditingExpiration ? (
-                <div className="space-y-2">
-                  <div className="flex gap-2">
-                    <input
-                      type="date"
-                      value={editExpirationDate}
-                      onChange={(e) => setEditExpirationDate(e.target.value)}
-                      className="flex-1 px-2 py-1 text-sm border border-theme rounded-md bg-white text-black focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]"
-                    />
-                    <select
-                      value={editExpirationType}
-                      onChange={(e) => setEditExpirationType(e.target.value as 'use-by' | 'best-by')}
-                      className="px-2 py-1 text-sm border border-theme rounded-md bg-white text-black focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]"
-                    >
-                      <option value="best-by">{intl.formatMessage({ id: 'pantry.bestBy' })}</option>
-                      <option value="use-by">{intl.formatMessage({ id: 'pantry.useBy' })}</option>
-                    </select>
-                  </div>
-                  <div className="flex gap-2 justify-end">
-                    <button
-                      onClick={handleSaveExpiration}
-                      className="px-3 py-1 text-sm bg-[var(--accent-color)] text-white rounded-lg hover:bg-[var(--accent-color)]/80 transition-colors"
-                      data-testid="item-save-expiration"
-                    >
-                      {intl.formatMessage({ id: 'common.save' })}
-                    </button>
-                    <button
-                      onClick={handleCancelExpirationEdit}
-                      className="px-3 py-1 text-sm bg-theme-primary text-theme-primary border border-theme rounded-lg hover:bg-theme-secondary transition-colors"
-                      data-testid="item-cancel-expiration"
-                    >
-                      {intl.formatMessage({ id: 'common.cancel' })}
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-center justify-between">
-                  {item.expirationDate ? (
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-theme-primary">
-                        {new Date(item.expirationDate).toLocaleDateString()}
-                      </span>
-                      <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                        getExpirationColor(item.expirationDate, item.expirationType) === 'red'
-                          ? 'bg-red-100 text-red-800'
-                          : getExpirationColor(item.expirationDate, item.expirationType) === 'yellow'
-                          ? 'bg-yellow-100 text-yellow-800'
-                          : 'bg-green-100 text-green-800'
-                      }`}>
-                        {Math.ceil((new Date(item.expirationDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} days
-                      </span>
-                    </div>
-                  ) : (
-                    <span className="text-sm text-theme-secondary opacity-70">{intl.formatMessage({ id: 'pantry.noExpirationSet' })}</span>
-                  )}
-                  <button
-                    onClick={() => {
-                      setEditExpirationDate((localExpirationDate || '').split('T')[0]);
-                      setEditExpirationType(localExpirationType);
-                      setIsEditingExpiration(true);
-                    }}
-                    className="text-[var(--accent-color)] hover:text-[var(--accent-color)]/80"
-                  >
-                    <Edit3 className="w-4 h-4" />
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Storage Location & Category - Side by Side */}
-            <div className="grid grid-cols-2 gap-2">
-              <div className="bg-theme-secondary p-2 rounded-lg border border-theme">
-                <label className="block text-xs font-medium text-theme-primary mb-1 uppercase opacity-70">
-                  Storage
-                </label>
-                <select
-                  value={item.storageLocation || 'pantry'}
-                  onChange={(e) => handleStorageChange(e.target.value as PantryItem['storageLocation'])}
-                  className="w-full px-2 py-1.5 text-sm border border-theme rounded-md bg-theme-primary text-theme-primary focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]"
-                  data-testid="item-storage-select"
-                >
-                  <option value="pantry">{intl.formatMessage({ id: 'pantry.storageLocations.pantry' })}</option>
-                  <option value="fridge">{intl.formatMessage({ id: 'pantry.storageLocations.fridge' })}</option>
-                  <option value="freezer">{intl.formatMessage({ id: 'pantry.storageLocations.freezer' })}</option>
-                  <option value="spices">{intl.formatMessage({ id: 'pantry.storageLocations.spices' })}</option>
-                  <option value="other">{intl.formatMessage({ id: 'pantry.storageLocations.other' })}</option>
-                </select>
-              </div>
-
-              <div className="bg-theme-secondary p-2 rounded-lg border border-theme">
-                <label className="block text-xs font-medium text-theme-primary mb-1 uppercase opacity-70">
-                  Category
-                </label>
-                <select
-                  value={item.category || 'Manual'}
-                  onChange={(e) => handleCategoryChange(e.target.value)}
-                  className="w-full px-2 py-1.5 text-sm border border-theme rounded-md bg-theme-primary text-theme-primary focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]"
-                  data-testid="item-category-select"
-                >
-                  {getAllCategories(customCategories).map(category => (
-                    <option key={category} value={category}>
-                      {category}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* Staple Checkbox */}
-            <div className="bg-theme-secondary p-2 rounded-lg border border-theme">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={localIsStaple}
-                  onChange={(e) => setLocalIsStaple(e.target.checked)}
-                  className="flex-shrink-0"
-                  data-testid="item-staple-checkbox"
-                />
-                <span className="text-sm text-theme-primary">Mark as staple (auto-readds to shopping list when depleted)</span>
-              </label>
-            </div>
-
-            {/* Opened Tracking Checkbox - Only show for certain categories */}
-            {['Canned Goods', 'Condiments & Sauces', 'Spices & Herbs', 'Baking Supplies', 'Snacks', 'Beverages'].includes(localCategory) && (
-              <div className="bg-theme-secondary p-2 rounded-lg border border-theme">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={localIsOpened}
-                    onChange={(e) => setLocalIsOpened(e.target.checked)}
-                    className="flex-shrink-0"
-                    data-testid="item-opened-checkbox"
-                  />
-                  <span className="text-sm text-theme-primary">
-                    Mark as opened {localIsOpened && item.openedAt && `(opened ${new Date(item.openedAt).toLocaleDateString()})`}
-                  </span>
-                </label>
-                {localIsOpened && item.openedExpiry && (
-                  <p className="text-xs text-theme-secondary mt-1">
-                    Opened expiry: {new Date(item.openedExpiry).toLocaleDateString()}
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* User Notes Section */}
-            <div className="bg-theme-secondary p-2 rounded-lg border border-theme">
-              <label className="block text-xs font-medium text-theme-primary mb-1 uppercase opacity-70">
-                Notes
-              </label>
-              <textarea
-                value={localNotes}
-                onChange={(e) => setLocalNotes(e.target.value)}
-                placeholder="Add any notes about this item..."
-                className="w-full px-2 py-1.5 text-sm border border-theme rounded-md bg-theme-primary text-theme-primary focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] resize-none"
-                rows={3}
-                data-testid="item-notes"
-              />
-            </div>
-
-            {/* Nutrition Facts Section */}
-            {showNutrition && loadingNutrition ? (
-              <div className="bg-theme-secondary p-3 rounded-lg border border-theme">
-                <div className="flex items-center gap-2 text-sm text-theme-primary">
-                  <Zap className="w-4 h-4 opacity-50 animate-pulse" />
-                  <span className="opacity-70">Loading nutrition info...</span>
-                </div>
-              </div>
-            ) : showNutrition && nutrition ? (
-              <div className="bg-gradient-to-br from-theme-secondary to-theme-secondary/80 p-3 rounded-lg border border-theme">
-                <div className="flex items-center gap-2 mb-3">
-                  <Zap className="w-4 h-4 text-[var(--accent-color)]" />
-                  <h4 className="font-semibold text-theme-primary text-sm">{intl.formatMessage({ id: 'pantry.nutritionFacts' })}</h4>
-                  <span className="text-xs text-theme-primary/70 ml-auto">{nutrition.servingSize}</span>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  {nutrition.calories && (
-                    <div className="bg-theme-primary/30 p-1.5 rounded">
-                      <div className="text-xs text-theme-primary/70">Calories</div>
-                      <div className="text-sm font-bold text-theme-primary">{Math.round(nutrition.calories)}</div>
-                    </div>
-                  )}
-                  {nutrition.protein && (
-                    <div className="bg-theme-primary/30 p-1.5 rounded">
-                      <div className="text-xs text-theme-primary/70">Protein</div>
-                      <div className="text-sm font-bold text-theme-primary">{nutrition.protein.toFixed(1)}g</div>
-                    </div>
-                  )}
-                  {nutrition.carbs && (
-                    <div className="bg-theme-primary/30 p-1.5 rounded">
-                      <div className="text-xs text-theme-primary/70">Carbs</div>
-                      <div className="text-sm font-bold text-theme-primary">{nutrition.carbs.toFixed(1)}g</div>
-                    </div>
-                  )}
-                  {nutrition.fat && (
-                    <div className="bg-theme-primary/30 p-1.5 rounded">
-                      <div className="text-xs text-theme-primary/70">Fat</div>
-                      <div className="text-sm font-bold text-theme-primary">{nutrition.fat.toFixed(1)}g</div>
-                    </div>
-                  )}
-                  {nutrition.fiber && (
-                    <div className="bg-theme-primary/30 p-1.5 rounded">
-                      <div className="text-xs text-theme-primary/70">Fiber</div>
-                      <div className="text-sm font-bold text-theme-primary">{nutrition.fiber.toFixed(1)}g</div>
-                    </div>
-                  )}
-                  {nutrition.sugar && (
-                    <div className="bg-theme-primary/30 p-1.5 rounded">
-                      <div className="text-xs text-theme-primary/70">Sugar</div>
-                      <div className="text-sm font-bold text-theme-primary">{nutrition.sugar.toFixed(1)}g</div>
-                    </div>
-                  )}
-                </div>
-                <p className="text-xs text-theme-primary/60 mt-3">
-                  Source: USDA FoodData Central • Per {nutrition.servingSize}
+            {/* Item name + weight + edit icon */}
+            <div className="flex items-start justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-theme-primary">{item.item}</h2>
+                <p className="text-sm text-theme-secondary">
+                  {`${localQuantity} ${localUnit}`}
                 </p>
               </div>
-            ) : null}
+              <button
+                onClick={() => toggleSection('productDetails')}
+                className="p-1.5 hover:bg-theme-secondary rounded-full transition-colors"
+                aria-label="Edit item details"
+              >
+                <Edit3 className="w-4 h-4 text-theme-secondary" />
+              </button>
+            </div>
 
-            {/* Consumption History Section */}
-            {item.consumptionHistory && item.consumptionHistory.length > 0 && (
-              <div className="bg-theme-secondary p-3 rounded-lg border border-theme">
-                <div className="flex items-center gap-2 mb-3">
-                  <History className="w-4 h-4 text-[var(--accent-color)]" />
-                  <h4 className="font-semibold text-theme-primary text-sm">{intl.formatMessage({ id: 'pantry.consumptionHistory' })}</h4>
-                </div>
-                <div className="space-y-2">
-                  {item.consumptionHistory.slice(-5).reverse().map((date, index) => (
-                    <div key={index} className="flex items-center justify-between text-sm">
-                      <span className="text-theme-primary/70">Consumed</span>
-                      <span className="text-theme-primary font-medium">
-                        {new Date(date).toLocaleDateString()}
+            {/* Quantity +/- controls */}
+            <div className="flex items-center gap-3 mt-3">
+              <button
+                onClick={() => handleQuantityChange(Math.max(0, localQuantity - 1))}
+                className="w-9 h-9 flex items-center justify-center rounded-full border border-theme text-theme-secondary hover:bg-theme-secondary transition-colors"
+                aria-label="Decrease quantity"
+                data-testid="item-qty-minus"
+              >
+                <Minus className="w-4 h-4" />
+              </button>
+              <span className="text-lg font-semibold text-theme-primary min-w-[2rem] text-center">{localQuantity}</span>
+              <button
+                onClick={() => handleQuantityChange(localQuantity + 1)}
+                className="w-9 h-9 flex items-center justify-center rounded-full border border-theme text-theme-secondary hover:bg-theme-secondary transition-colors"
+                aria-label="Increase quantity"
+                data-testid="item-qty-plus"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Fill Level - Portion Selector */}
+            <div className="mt-4">
+              <div className="text-xs font-medium text-theme-secondary mb-2">Select Amount Left</div>
+              <div className="flex gap-1.5">
+                {([
+                  { value: 'quarter',      label: '¼',  icon: '◔', color: '#f59e0b' },
+                  { value: 'half',         label: '½',  icon: '◑', color: '#f97316' },
+                  { value: 'threeQuarter', label: '¾',  icon: '◕', color: '#22c55e' },
+                  { value: 'full',         label: 'Full', icon: '●', color: '#16a34a' },
+                ] as { value: NonNullable<PantryItem['visualLevel']>; label: string; icon: string; color: string }[]).map(({ value, label, icon, color }) => {
+                  const selected = localVisualLevel === value;
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setLocalVisualLevel(selected ? undefined : value)}
+                      className={`flex-1 flex flex-col items-center gap-0.5 px-1 py-1.5 rounded-lg border transition-all duration-150 ${
+                        selected
+                          ? 'border-[var(--accent-color)] bg-[var(--accent-color)]/10 scale-105'
+                          : 'border-theme bg-theme-primary hover:bg-theme-secondary hover:scale-105'
+                      }`}
+                      data-testid={`item-visual-${value}`}
+                      aria-pressed={selected}
+                      title={`${label} full`}
+                    >
+                      <span
+                        className="text-xl leading-none transition-all"
+                        style={{ color: selected ? color : 'rgb(156 163 175)', filter: selected ? `drop-shadow(0 0 4px ${color}80)` : undefined }}
+                      >
+                        {icon}
                       </span>
-                    </div>
-                  ))}
-                  {item.consumptionHistory.length > 5 && (
-                    <div className="text-xs text-theme-primary/60 text-center mt-2">
-                      +{item.consumptionHistory.length - 5} more entries
-                    </div>
-                  )}
-                </div>
+                      <span className={`text-[10px] font-medium leading-none ${
+                        selected ? 'text-[var(--accent-color)]' : 'text-theme-secondary'
+                      }`}>{label}</span>
+                    </button>
+                  );
+                })}
               </div>
-            )}
-          </div>
+            </div>
 
-
-          {/* Action Buttons - Fixed at bottom */}
-          <div className="flex-shrink-0 border-t border-theme bg-theme-primary p-4 rounded-b-lg space-y-3">
-            <div className="grid grid-cols-2 gap-2">
+            {/* Action Buttons */}
+            <div className="flex flex-wrap gap-2 mt-3">
               <button
                 onClick={() => onAddToShoppingList([cleanItemNameForShopping(item.item)])}
-                className="flex items-center justify-center gap-2 px-4 py-2 bg-[var(--accent-color)] text-[var(--text-theme-primary)] rounded-lg hover:bg-[var(--accent-color)]/80 transition-colors"
+                className="px-3 py-1.5 text-sm font-medium border border-[var(--accent-color)] text-[var(--accent-color)] rounded-lg hover:bg-[var(--accent-color)]/10 transition-colors"
                 data-testid="item-add-to-shopping"
               >
-                <ShoppingBasket className="w-4 h-4" />
-                {intl.formatMessage({ id: 'pantry.buyMore' })}
+                ADD TO SHOPPING LIST
               </button>
-              {showPriceData && (
-                <button
-                  onClick={() => setShowPriceTrends(true)}
-                  className="flex items-center justify-center gap-2 px-4 py-2 bg-[var(--bg-theme-secondary)] text-[var(--text-theme-primary)] border border-[var(--border-theme)] rounded-lg hover:bg-[var(--bg-theme-primary)] transition-colors"
-                  data-testid="item-price-trends"
-                >
-                  <TrendingUp className="w-4 h-4" />
-                  {intl.formatMessage({ id: 'pantry.priceTrends' })}
-                </button>
-              )}
-            </div>
-            <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={() => {
                   onDeleteItem(originalIndex);
                   onClose();
                   addToast(`${item.item} deleted`, 'success');
                 }}
-                className="flex items-center justify-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                className="p-1.5 text-theme-secondary hover:text-red-500 transition-colors ml-auto"
                 data-testid="item-delete"
+                aria-label="Delete item"
               >
-                <Trash2 className="w-4 h-4" />
-                {intl.formatMessage({ id: 'pantry.deleteItem' })}
-              </button>
-              <button
-                onClick={handleCloseAndPersist}
-                className="flex items-center justify-center gap-2 px-4 py-2 bg-[var(--bg-theme-secondary)] text-[var(--text-theme-primary)] border border-[var(--border-theme)] rounded-lg hover:bg-[var(--bg-theme-primary)] transition-colors"
-                data-testid="item-close-bottom"
-              >
-                <X className="w-4 h-4" />
-                {intl.formatMessage({ id: 'common.close' })}
+                <Trash2 className="w-5 h-5" />
               </button>
             </div>
           </div>
 
-          {/* Price Trends Modal */}
-          {showPriceTrends && (
-            <PriceTrends
-              ingredient={item.item}
-              onClose={() => setShowPriceTrends(false)}
-            />
-          )}
+          <div className="border-t border-theme mt-2" />
+
+          {/* ── Collapsible Sections ── */}
+
+          {/* Product Details Section */}
+          <div className="border-b border-theme">
+            <button
+              onClick={() => toggleSection('productDetails')}
+              className="w-full flex items-center justify-between px-4 py-4 text-left"
+            >
+              <span className="text-base font-semibold text-theme-primary">Product Details</span>
+              {openSections.productDetails ? <ChevronDown className="w-5 h-5 text-theme-secondary" /> : <ChevronRight className="w-5 h-5 text-theme-secondary" />}
+            </button>
+            {openSections.productDetails && (
+              <div className="px-4 pb-4 space-y-3">
+                {/* Category */}
+                <div className="bg-theme-secondary rounded-lg p-3">
+                  <div className="text-xs text-theme-secondary mb-1">Category</div>
+                  <select
+                    value={localCategory}
+                    onChange={(e) => handleCategoryChange(e.target.value)}
+                    className="w-full px-2 py-1.5 text-sm border border-theme rounded-lg bg-theme-primary text-theme-primary focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]"
+                    data-testid="item-category-select"
+                  >
+                    {getAllCategories(customCategories).map(category => (
+                      <option key={category} value={category}>
+                        {category}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Notes */}
+                <div className="bg-theme-secondary rounded-lg p-3">
+                  <div className="text-xs text-theme-secondary mb-1">Notes (Private)</div>
+                  <textarea
+                    value={localNotes}
+                    onChange={(e) => setLocalNotes(e.target.value)}
+                    placeholder="Add any notes about this item..."
+                    className="w-full px-2 py-1.5 text-sm border border-theme rounded-lg bg-theme-primary text-theme-primary focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] resize-none"
+                    rows={2}
+                    data-testid="item-notes"
+                  />
+                </div>
+
+                {/* Quantity / Unit Picker */}
+                <div className="bg-theme-secondary rounded-lg p-3">
+                  <div className="text-xs text-theme-secondary mb-1">Weight / Volume</div>
+                  <QuantityUnitPicker
+                    quantity={editQuantity}
+                    unit={editUnit}
+                    onQuantityChange={handleQuantityChange}
+                    onUnitChange={handleUnitChange}
+                    itemName={item.item}
+                    showControls={false}
+                  />
+                </div>
+
+                {/* Staple toggle */}
+                <label className="flex items-center gap-3 bg-theme-secondary rounded-lg p-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={localIsStaple}
+                    onChange={(e) => setLocalIsStaple(e.target.checked)}
+                    className="flex-shrink-0 w-4 h-4 accent-[var(--accent-color)]"
+                    data-testid="item-staple-checkbox"
+                  />
+                  <span className="text-sm text-theme-primary">Mark as staple (auto-readds when depleted)</span>
+                </label>
+
+                {/* Opened Tracking */}
+                {['Canned Goods', 'Condiments & Sauces', 'Spices & Herbs', 'Baking Supplies', 'Snacks', 'Beverages'].includes(localCategory) && (
+                  <label className="flex items-center gap-3 bg-theme-secondary rounded-lg p-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={localIsOpened}
+                      onChange={(e) => setLocalIsOpened(e.target.checked)}
+                      className="flex-shrink-0 w-4 h-4 accent-[var(--accent-color)]"
+                      data-testid="item-opened-checkbox"
+                    />
+                    <div>
+                      <span className="text-sm text-theme-primary">
+                        Mark as opened {localIsOpened && item.openedAt && `(opened ${new Date(item.openedAt).toLocaleDateString()})`}
+                      </span>
+                      {localIsOpened && item.openedExpiry && (
+                        <p className="text-xs text-theme-secondary mt-0.5">
+                          Opened expiry: {new Date(item.openedExpiry).toLocaleDateString()}
+                        </p>
+                      )}
+                    </div>
+                  </label>
+                )}
+
+                {/* Save Button */}
+                <button
+                  onClick={handleCloseAndPersist}
+                  className="w-full py-2 bg-[var(--accent-color)] text-white rounded-lg font-medium text-sm hover:bg-[var(--accent-color)]/80 transition-colors"
+                  data-testid="item-save-details"
+                >
+                  SAVE
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Storage Section */}
+          <div className="border-b border-theme">
+            <button
+              onClick={() => toggleSection('storage')}
+              className="w-full flex items-center justify-between px-4 py-4 text-left"
+            >
+              <span className="text-base font-semibold text-theme-primary">Storage</span>
+              {openSections.storage ? <ChevronDown className="w-5 h-5 text-theme-secondary" /> : <ChevronRight className="w-5 h-5 text-theme-secondary" />}
+            </button>
+            {openSections.storage && (
+              <div className="px-4 pb-4 space-y-3">
+                {/* Storage location chips */}
+                <div>
+                  <div className="text-xs font-medium text-theme-secondary mb-2">Choose Storage Space</div>
+                  <div className="flex flex-wrap gap-2">
+                    {(['fridge', 'pantry', 'freezer', 'spices', 'other'] as PantryItem['storageLocation'][]).map(loc => (
+                      <button
+                        key={loc}
+                        onClick={() => handleStorageChange(loc!)}
+                        className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+                          localStorageLocation === loc
+                            ? 'bg-[var(--accent-color)] text-white'
+                            : 'bg-theme-secondary text-theme-primary hover:bg-theme-primary'
+                        }`}
+                        data-testid={`item-storage-${loc}`}
+                      >
+                        {loc ? loc.charAt(0).toUpperCase() + loc.slice(1) : ''}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Expiry Date */}
+                <div className="bg-theme-secondary rounded-lg p-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-xs text-theme-secondary">Expiry Date</div>
+                      <div className="text-sm font-medium text-theme-primary">
+                        {localExpirationDate
+                          ? new Date(localExpirationDate).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
+                          : 'Not set'}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setEditExpirationDate((localExpirationDate || '').split('T')[0]);
+                        setEditExpirationType(localExpirationType);
+                        setIsEditingExpiration(!isEditingExpiration);
+                      }}
+                      className="p-1.5 hover:bg-theme-primary rounded-full transition-colors"
+                    >
+                      <CalendarClock className="w-4 h-4 text-theme-secondary" />
+                    </button>
+                  </div>
+                  {isEditingExpiration && (
+                    <div className="mt-2 space-y-2">
+                      <div className="flex gap-2">
+                        <input
+                          type="date"
+                          value={editExpirationDate}
+                          onChange={(e) => setEditExpirationDate(e.target.value)}
+                          className="flex-1 px-2 py-1.5 text-sm border border-theme rounded-lg bg-theme-primary text-theme-primary focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]"
+                        />
+                        <select
+                          value={editExpirationType}
+                          onChange={(e) => setEditExpirationType(e.target.value as 'use-by' | 'best-by')}
+                          className="px-2 py-1.5 text-sm border border-theme rounded-lg bg-theme-primary text-theme-primary focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]"
+                        >
+                          <option value="best-by">{intl.formatMessage({ id: 'pantry.bestBy' })}</option>
+                          <option value="use-by">{intl.formatMessage({ id: 'pantry.useBy' })}</option>
+                        </select>
+                      </div>
+                      <div className="flex gap-2 justify-end">
+                        <button
+                          onClick={handleSaveExpiration}
+                          className="px-3 py-1 text-sm bg-[var(--accent-color)] text-white rounded-lg"
+                          data-testid="item-save-expiration"
+                        >
+                          {intl.formatMessage({ id: 'common.save' })}
+                        </button>
+                        <button
+                          onClick={handleCancelExpirationEdit}
+                          className="px-3 py-1 text-sm bg-theme-primary text-theme-primary border border-theme rounded-lg"
+                          data-testid="item-cancel-expiration"
+                        >
+                          {intl.formatMessage({ id: 'common.cancel' })}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Nutritional Information Section */}
+          <div className="border-b border-theme">
+              <button
+                onClick={() => toggleSection('nutrition')}
+                className="w-full flex items-center justify-between px-4 py-4 text-left"
+              >
+                <span className="text-base font-semibold text-theme-primary">Nutritional Information</span>
+                {openSections.nutrition ? <ChevronDown className="w-5 h-5 text-theme-secondary" /> : <ChevronRight className="w-5 h-5 text-theme-secondary" />}
+              </button>
+              {openSections.nutrition && (
+                <div className="px-4 pb-4">
+                  {!showNutrition ? (
+                    <p className="text-sm text-theme-secondary py-2">Enable nutrition tracking in Settings to see data here.</p>
+                  ) : loadingNutrition ? (
+                    <div className="flex items-center gap-2 text-sm text-theme-secondary py-2">
+                      <div className="w-4 h-4 border-2 border-[var(--accent-color)] border-t-transparent rounded-full animate-spin" />
+                      Loading nutrition info...
+                    </div>
+                  ) : nutrition ? (
+                    <div className="space-y-3">
+                      {/* Serving Size */}
+                      <div className="bg-theme-secondary rounded-lg p-3">
+                        <div className="text-xs text-theme-secondary">Serving Size</div>
+                        <div className="flex items-baseline justify-between">
+                          <div className="text-lg font-semibold text-theme-primary">{nutrition.servingSize || '100.0'}</div>
+                          <div className="text-sm text-theme-secondary">g/ml</div>
+                        </div>
+                      </div>
+
+                      {/* Nutrition grid - 2 columns */}
+                      <div className="grid grid-cols-2 gap-2">
+                        {nutrition.calories != null && (
+                          <div className="bg-theme-secondary rounded-lg p-3">
+                            <div className="text-xs text-theme-secondary">Calories</div>
+                            <div className="flex items-baseline justify-between">
+                              <div className="text-lg font-semibold text-theme-primary">{Math.round(nutrition.calories)}</div>
+                              <div className="text-xs text-theme-secondary">Cal</div>
+                            </div>
+                          </div>
+                        )}
+                        {nutrition.sugar != null && (
+                          <div className="bg-theme-secondary rounded-lg p-3">
+                            <div className="text-xs text-theme-secondary">Sugar</div>
+                            <div className="flex items-baseline justify-between">
+                              <div className="text-lg font-semibold text-theme-primary">{nutrition.sugar.toFixed(1)}</div>
+                              <div className="text-xs text-theme-secondary">g</div>
+                            </div>
+                          </div>
+                        )}
+                        {nutrition.fat != null && (
+                          <div className="bg-theme-secondary rounded-lg p-3">
+                            <div className="text-xs text-theme-secondary">Fat</div>
+                            <div className="flex items-baseline justify-between">
+                              <div className="text-lg font-semibold text-theme-primary">{nutrition.fat.toFixed(1)}</div>
+                              <div className="text-xs text-theme-secondary">g</div>
+                            </div>
+                          </div>
+                        )}
+                        {nutrition.fiber != null && (
+                          <div className="bg-theme-secondary rounded-lg p-3">
+                            <div className="text-xs text-theme-secondary">Fiber</div>
+                            <div className="flex items-baseline justify-between">
+                              <div className="text-lg font-semibold text-theme-primary">{nutrition.fiber.toFixed(1)}</div>
+                              <div className="text-xs text-theme-secondary">g</div>
+                            </div>
+                          </div>
+                        )}
+                        {nutrition.carbs != null && (
+                          <div className="bg-theme-secondary rounded-lg p-3">
+                            <div className="text-xs text-theme-secondary">Carbs</div>
+                            <div className="flex items-baseline justify-between">
+                              <div className="text-lg font-semibold text-theme-primary">{nutrition.carbs.toFixed(1)}</div>
+                              <div className="text-xs text-theme-secondary">g</div>
+                            </div>
+                          </div>
+                        )}
+                        {nutrition.protein != null && (
+                          <div className="bg-theme-secondary rounded-lg p-3">
+                            <div className="text-xs text-theme-secondary">Protein</div>
+                            <div className="flex items-baseline justify-between">
+                              <div className="text-lg font-semibold text-theme-primary">{nutrition.protein.toFixed(1)}</div>
+                              <div className="text-xs text-theme-secondary">g</div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-xs text-theme-secondary opacity-60 mt-2">
+                        Source: USDA FoodData Central • Per {nutrition.servingSize}
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-theme-secondary py-2">No nutrition data available.</p>
+                  )}
+                </div>
+              )}
+            </div>
+
+          {/* History Section */}
+          <div className="border-b border-theme">
+              <button
+                onClick={() => toggleSection('history')}
+                className="w-full flex items-center justify-between px-4 py-4 text-left"
+              >
+                <span className="text-base font-semibold text-theme-primary">History</span>
+                {openSections.history ? <ChevronDown className="w-5 h-5 text-theme-secondary" /> : <ChevronRight className="w-5 h-5 text-theme-secondary" />}
+              </button>
+              {openSections.history && (
+                <div className="px-4 pb-4 space-y-3">
+                  {/* Date added */}
+                  {item.dateAdded && (
+                    <div>
+                      <div className="text-sm font-medium text-[var(--accent-color)]">
+                        {new Date(item.dateAdded).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })}
+                      </div>
+                      <div className="text-sm text-theme-secondary">
+                        Product added · {`${getQuantityAmount(item.quantity ?? item.quantity_estimate)} ${getQuantityUnit(item.quantity ?? item.quantity_estimate)}`}
+                      </div>
+                    </div>
+                  )}
+                  {/* Consumption history entries */}
+                  {item.consumptionHistory && item.consumptionHistory.length > 0 ? (
+                    <>
+                      {item.consumptionHistory.slice(-5).reverse().map((date, index) => (
+                        <div key={index}>
+                          <div className="text-sm font-medium text-[var(--accent-color)]">
+                            {new Date(date).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })}
+                          </div>
+                          <div className="text-sm text-theme-secondary">Consumed</div>
+                        </div>
+                      ))}
+                      {item.consumptionHistory.length > 5 && (
+                        <div className="text-xs text-theme-secondary opacity-60">
+                          +{item.consumptionHistory.length - 5} more entries
+                        </div>
+                      )}
+                    </>
+                  ) : !item.dateAdded ? (
+                    <p className="text-sm text-theme-secondary py-2">No history available yet.</p>
+                  ) : null}
+                </div>
+              )}
+            </div>
+
+          {/* Bottom padding for safe scrolling */}
+          <div className="h-4" />
         </div>
+
+        {/* Price Trends Modal */}
+        {showPriceTrends && (
+          <PriceTrends
+            ingredient={item.item}
+            onClose={() => setShowPriceTrends(false)}
+          />
+        )}
       </div>
     </div>
     </>

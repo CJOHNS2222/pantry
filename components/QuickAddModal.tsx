@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Mic, MicOff, Camera, Search, Plus, X, Loader2 } from 'lucide-react';
 import { useModalOpen } from '../utils/useModalOpen';
+import { useAndroidBack } from '../hooks/useAndroidBack';
 
 interface QuickAddItem {
   name: string;
@@ -29,6 +30,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
   recentItems = []
 }) => {
   useModalOpen(isOpen);
+  useAndroidBack(isOpen, onClose);
   const [input, setInput] = useState('');
   const [isListening, setIsListening] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
@@ -37,6 +39,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Voice recognition setup
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const recognitionRef = useRef<any>(null);
 
   useEffect(() => {
@@ -48,6 +51,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
   }, [isOpen]);
 
   useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const win: any = window;
     if (win.webkitSpeechRecognition || win.SpeechRecognition) {
       const SpeechRecognition = win.SpeechRecognition || win.webkitSpeechRecognition;
@@ -57,12 +61,14 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
         recognitionRef.current.interimResults = false;
         recognitionRef.current.lang = 'en-US';
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         recognitionRef.current.onresult = (event: any) => {
           const transcript = event.results?.[0]?.[0]?.transcript;
           if (transcript) setInput(transcript);
           setIsListening(false);
         };
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars
         recognitionRef.current.onerror = (_ev: any) => {
           setIsListening(false);
         };
@@ -70,9 +76,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
         recognitionRef.current.onend = () => {
           setIsListening(false);
         };
-      } catch (e) {
-        // Speech API not available or failed to initialize
-        recognitionRef.current = null;
+      } catch {
       }
     }
 
@@ -81,7 +85,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
         if (recognitionRef.current && typeof recognitionRef.current.stop === 'function') {
           recognitionRef.current.stop();
         }
-      } catch (_) {
+      } catch {
         // ignore
       }
     };

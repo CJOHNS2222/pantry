@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Check, Undo2, Package, ShoppingCart, Trash2, Calculator } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Check, Trash2, Calculator } from 'lucide-react';
 import { ShoppingItem } from '../types';
 import { comparePriceOptions, formatPricePerUnit, getPriceComparisonSummary } from '../utils/priceCalculator';
 
@@ -202,7 +202,7 @@ export const EnhancedShoppingListItem: React.FC<ShoppingListItemProps> = ({
                 e.stopPropagation();
                 setShowPriceComparison(!showPriceComparison);
               }}
-              className="p-2 text-theme-secondary opacity-60 hover:opacity-100 hover:text-[var(--accent-color)] transition-opacity"
+              className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-theme-secondary opacity-60 hover:opacity-100 hover:text-[var(--accent-color)] transition-opacity"
               title="Compare prices"
               aria-label="Compare prices"
             >
@@ -216,7 +216,7 @@ export const EnhancedShoppingListItem: React.FC<ShoppingListItemProps> = ({
               e.stopPropagation();
               onRemove(item.id);
             }}
-            className="p-2 text-theme-secondary opacity-30 hover:opacity-100 hover:text-red-500 transition-opacity"
+            className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-theme-secondary opacity-30 hover:opacity-100 hover:text-red-500 transition-opacity"
             aria-label={`Remove ${item.item}`}
           >
             <Trash2 className="w-4 h-4" />

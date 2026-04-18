@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, Suspense } from 'react';
+import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { serverTimestamp } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import DatabaseMonitoringService from './services/databaseMonitoringService';
@@ -10,7 +10,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import { AppHeader } from './components/layout/AppHeader';
 import { AppNavigation } from './components/layout/AppNavigation';
 import { MainContent } from './components/layout/MainContent';
-import { User, PantryItem, DayPlan, StructuredRecipe, Household, ShoppingItem, SavedRecipe, RecipeRating, RecipeSearchResult, UserProfile, Batch } from './types';
+import { User, PantryItem, StructuredRecipe, Household, ShoppingItem, RecipeSearchResult, UserProfile, Batch } from './types';
 import { Tab } from './types/app';
 import { useAuth } from './hooks/useAuth';
 import { useTheme } from './hooks/useTheme';
@@ -22,7 +22,7 @@ import LeftoversHotZone from './components/LeftoversHotZone';
 import { useHouseholdActivity } from './hooks/useHouseholdActivity';
 import { useOfflineStatus } from './hooks/useOfflineStatus';
 import AnalyticsService from './services/analyticsService';
-import featureFlags from './services/featureFlags';
+
 import { isHouseholdMember, inferCategoryFromItemName, inferStorageLocationFromItemName, parseIngredientForShoppingList, getItemImage, fetchExternalItemImage } from './utils/appUtils';
 import { getQuantityAmount } from './utils/quantityUtils';
 import { NotificationBanner } from './components/NotificationBanner';
@@ -31,10 +31,10 @@ import { markNotificationRead, deleteNotification, snoozeNotificationInCache, up
 import { log } from './services/logService';
 import { pushNotificationService } from './services/pushNotificationService';
 import { HouseholdActivityService } from './services/householdActivityService';
-import { App as CapacitorApp, BackButtonListenerEvent } from '@capacitor/app';
+import { App as CapacitorApp } from '@capacitor/app';
 import { PluginListenerHandle } from '@capacitor/core';
-import { AppProvider, useApp } from './contexts/AppContext';
-import { AppActionsProvider, useAppActions } from './contexts/AppActionsContext';
+import { AppProvider } from './contexts/AppContext';
+import { AppActionsProvider } from './contexts/AppActionsContext';
 import SafeAreaService from './services/safeAreaService';
 import { GlobalUpdatePrompt } from './components/GlobalUpdatePrompt';
 import { joinHousehold } from './services/householdService';
@@ -63,7 +63,7 @@ const LoadingSpinner: React.FC = () => (
   </div>
 );
 
-type Theme = 'dark' | 'light';
+
 
 const App: React.FC = () => {
   const intl = useIntl();
@@ -211,6 +211,7 @@ const App: React.FC = () => {
   const {
     recentActivities,
     isLoadingActivities,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     logActivity,
     logItemAdded,
     logItemRemoved,
@@ -226,6 +227,7 @@ const App: React.FC = () => {
     shoppingList,
     setShoppingList,
     savedRecipes,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     setSavedRecipes,
     ratings,
     mealPlan,
@@ -240,15 +242,21 @@ const App: React.FC = () => {
     addCustomCategory,
     updateCustomCategory,
     deleteCustomCategory,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     generateRecipeSuggestionsOnDemand,
     handleAddToPlan,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     addMealToPlan,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     updateMealOnPlan,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     removeMealFromPlan,
     handleSaveRecipe,
     handleDeleteRecipe,
     submitRating,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     getRatingsForRecipe,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     getCommunityRatings,
     handleMarkAsMade,
     updateItem,
@@ -256,6 +264,7 @@ const App: React.FC = () => {
     addItem,
     addItems,
     recentActions,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     recordUndo,
     performUndo,
     recipeSaveLimitExceeded,
@@ -263,10 +272,15 @@ const App: React.FC = () => {
     checkRecipeSaveLimit,
     checkMealPlanLimit,
     addShoppingListItem,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     addShoppingListItems,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     updateShoppingListItem,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     updateShoppingListItems,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     removeShoppingListItem,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     removeShoppingListItems,
     isLoadingInventory,
     isLoadingShoppingList,
@@ -673,7 +687,7 @@ const App: React.FC = () => {
     }
   };
 
-  const handleRemoveExpiredItems = async (itemIds: string[], disposalReason: string) => {
+  const handleRemoveExpiredItems = async (itemIds: string[]) => {
     try {
       // Find items to remove
       const itemsToRemove = inventory.filter(item => itemIds.includes(item.id));
@@ -779,7 +793,7 @@ const App: React.FC = () => {
 
   const [lastBackPress, setLastBackPress] = useState<number>(0);
   useEffect(() => {
-    const handleBackButton = (event: BackButtonListenerEvent) => {
+    const handleBackButton = () => {
       if (showNotificationsModal) {
         setShowNotificationsModal(false);
         return;
@@ -1039,7 +1053,7 @@ const App: React.FC = () => {
                 await handleRiskQuestionnaireComplete(level, sensitive);
                 // Optimistically update local user object if available
                 setUser(prev => prev ? { ...prev, profile: { ...prev.profile, riskLevel: level, sensitiveHealthMode: !!sensitive } } : prev);
-              } catch (err) {
+              } catch {
                 // handler already logs; no-op here
               }
             }}

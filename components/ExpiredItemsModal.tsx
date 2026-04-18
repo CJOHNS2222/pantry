@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { X, Trash2, AlertTriangle, CheckCircle, Clock, ChefHat } from 'lucide-react';
+import { X, Trash2, AlertTriangle, CheckCircle } from 'lucide-react';
 import { useModalOpen } from '../utils/useModalOpen';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 import { PantryItem } from '../types';
-import { generateExpirationAlerts } from '../utils/appUtils';
+
 import { getQuantityAmount } from '../utils/quantityUtils';
 import AnalyticsService from '../services/analyticsService';
 import HapticService from '../services/hapticService';
-import FoodWasteAnalyticsService, { DisposalRecord } from '../services/foodWasteAnalyticsService';
+import FoodWasteAnalyticsService from '../services/foodWasteAnalyticsService';
 import { log } from '../services/logService';
 import { useIntl } from 'react-intl';
 
@@ -34,6 +35,7 @@ const ExpiredItemsModal: React.FC<ExpiredItemsModalProps> = ({
   specificItems
 }) => {
   useModalOpen(isOpen);
+  const modalRef = useFocusTrap({ isActive: isOpen });
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [disposalReason, setDisposalReason] = useState<DisposalReason>('thrown_away');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -164,8 +166,8 @@ const ExpiredItemsModal: React.FC<ExpiredItemsModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center px-4 pt-[var(--safe-area-inset-top,0px)] pb-[var(--safe-area-inset-bottom,0px)]">
-      <div className="bg-theme-primary rounded-2xl border border-theme max-w-2xl w-full h-full flex flex-col overflow-hidden shadow-2xl">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center px-4 pt-[var(--safe-area-inset-top,0px)] pb-[var(--safe-area-inset-bottom,0px)]" onClick={onClose}>
+      <div ref={modalRef} role="dialog" aria-modal="true" aria-label="Expired Items" className="bg-theme-primary rounded-2xl border border-theme max-w-2xl w-full h-full flex flex-col overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-theme flex-shrink-0">
           <div className="flex items-center gap-3">

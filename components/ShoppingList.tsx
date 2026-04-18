@@ -1,10 +1,10 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { useIntl } from 'react-intl';
-import { ShoppingBasket, Check, Trash2, Archive, Plus, X, Share2, Copy, Download, MessageSquare, Calendar, Undo2 } from 'lucide-react';
+import { ShoppingBasket, Archive, Plus, X, Share2, Copy, Download, MessageSquare, Calendar, Undo2 } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { Share } from '@capacitor/share';
 import { ShoppingItem, User, Household, Settings } from '../types';
-import { inferCategoryFromItemName, getItemImage, isHouseholdMember } from '../utils/appUtils';
+import { inferCategoryFromItemName, isHouseholdMember } from '../utils/appUtils';
 import { log } from '../services/logService';
 import { validateItemName, validateQuantity } from '@/src/utils/validation';
 import { ShoppingListItemSkeleton } from './SkeletonLoader';
@@ -14,7 +14,6 @@ import { ShoppingListCacheService } from '../services/shoppingListCacheService';
 import { EnhancedShoppingListItem } from './EnhancedShoppingListItem';
 import { SmartShoppingListOrganizer } from './SmartShoppingListOrganizer';
 import { BatchOperations } from './BatchOperations';
-import { OfflineShoppingIndicator } from './OfflineShoppingIndicator';
 import { HouseholdShoppingShare } from './HouseholdShoppingShare';
 import { QuickAdd } from './QuickAdd';
 import { ShoppingListAnalytics } from './ShoppingListAnalytics';
@@ -25,17 +24,14 @@ import { canShowAds } from '../utils/appUtils';
 
 // Import hooks and services
 import { useOfflineStatus } from '../hooks/useOfflineStatus';
-import { useDataManagement } from '../hooks/useDataManagement';
 import { useAuth } from '../hooks/useAuth';
 import { offlineQueue } from '../services/offlineQueueService';
-import { offlineDataCache } from '../services/offlineDataCache';
 import { useAppActions } from '../contexts/AppActionsContext';
+import { useAndroidBack } from '../hooks/useAndroidBack';
 import { groceryPriceService } from '../services/groceryPriceService';
-import { priceCacheService } from '../services/priceCacheService';
 import AnalyticsService from '../services/analyticsService';
 
 // Firestore access is instrumented via DatabaseMonitoringService when needed
-import DatabaseMonitoringService from '../services/databaseMonitoringService';
 
 interface ShoppingListProps {
   items: ShoppingItem[];
@@ -118,9 +114,15 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   const [pendingDeleteCount, setPendingDeleteCount] = useState(0);;
   const [purchaseModalOpen, setPurchaseModalOpen] = useState(false);
   const [purchaseTargetItem, setPurchaseTargetItem] = useState<ShoppingItem | null>(null);
+
+  // Android back-button registration for ShoppingList modals
+  useAndroidBack(isAddModalOpen, () => setIsAddModalOpen(false));
+  useAndroidBack(showAnalytics, () => setShowAnalytics(false));
+  useAndroidBack(purchaseModalOpen, () => setPurchaseModalOpen(false));
   const [purchaseQty, setPurchaseQty] = useState<number>(1);
   const [purchaseUnit, setPurchaseUnit] = useState<string>('count');
   const [purchaseExpires, setPurchaseExpires] = useState<string | undefined>(undefined);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [householdActivity, setHouseholdActivity] = useState<Array<{
     id: string;
     memberId: string;
@@ -245,6 +247,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   const { isOnline } = useOfflineStatus();
   const { user: authUser } = useAuth();
   const addToQueue = (op: { type: 'add' | 'update' | 'delete' | 'batch'; collection: string; docId?: string; data: unknown }) => offlineQueue.enqueue(op as Parameters<typeof offlineQueue.enqueue>[0]);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const processQueue = () => offlineQueue.processQueue();
 
   // Suggested items for quick adding
@@ -305,6 +308,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     });
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const addRecipeItem = async (itemName: string, requiredQuantity: string, recipeName: string) => {
     // Check if item already exists
     const existingItem = items.find(item => item.item.toLowerCase() === itemName.toLowerCase());
@@ -388,10 +392,12 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     setUndoHistory(prev => prev.slice(0, -1));
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const selectAll = () => {
     setItems(prev => prev.map(i => ({ ...i, checked: true })));
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const deselectAll = () => {
     setItems(prev => prev.map(i => ({ ...i, checked: false })));
   };
@@ -442,6 +448,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     ));
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const deleteCheckedItems = async () => {
     const checkedItems = items.filter(i => i.checked);
     if (checkedItems.length === 0) return;
@@ -563,6 +570,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   };
 
   // Batch operations
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleBatchOperation = (category: string, operation: 'check' | 'uncheck') => {
     setItems(prev => prev.map(item =>
       item.category === category

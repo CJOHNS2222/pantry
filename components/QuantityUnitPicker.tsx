@@ -161,7 +161,7 @@ const QuantityUnitPicker: React.FC<QuantityUnitPickerProps> = ({
             onClick={handleDecrement}
             disabled={quantity <= 0}
             aria-label="Decrease quantity"
-            className="w-8 h-8 rounded-full bg-theme-primary border border-theme flex items-center justify-center text-theme-primary hover:bg-theme-secondary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="w-11 h-11 rounded-full bg-theme-primary border border-theme flex items-center justify-center text-theme-primary hover:bg-theme-secondary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <Minus className="w-4 h-4" />
           </button>
@@ -184,7 +184,7 @@ const QuantityUnitPicker: React.FC<QuantityUnitPickerProps> = ({
             onClick={handleIncrement}
             disabled={quantity >= maxQuantity}
             aria-label="Increase quantity"
-            className="w-8 h-8 rounded-full bg-theme-primary border border-theme flex items-center justify-center text-theme-primary hover:bg-theme-secondary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="w-11 h-11 rounded-full bg-theme-primary border border-theme flex items-center justify-center text-theme-primary hover:bg-theme-secondary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <Plus className="w-4 h-4" />
           </button>

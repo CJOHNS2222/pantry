@@ -7,8 +7,36 @@ import remoteConfig from '../services/remoteConfigService';
 import { ConsumptionSuggestion, ExpirationAlert, RecipeSuggestion, PantryItem, CustomCategory, Member } from '../types';
 import { getQuantityAmount, getQuantityUnit } from './quantityUtils';
 import { getPerformance, trace } from "firebase/performance";
+import { itemImages, ITEM_IMAGE_CDN_BASE } from '../data/item-images';
 
 const performance = getPerformance();
+
+function normalizeItemImageLookupName(itemName: string): string {
+  return itemName.toLowerCase().trim()
+    .replace(/^\d+\s+/, '')
+    .replace(/\b(large|medium|small|big|tiny|huge|giant)\s+/g, '')
+    .replace(/\b(red|green|yellow|blue|black|white|brown|orange|purple|pink)\s+/g, '')
+    .replace(/\b(fresh|dried|canned|chopped|sliced|diced|minced|crushed|ground|cubed|grated|finely)\s+/g, '')
+    .replace(/\b(ripe|raw|cooked|baked|fried|organic)\s+/g, '')
+    .trim();
+}
+
+function resolveSeededItemImageFilename(itemName: string): string | undefined {
+  const name = itemName.toLowerCase().trim();
+  const cleanedName = normalizeItemImageLookupName(itemName);
+
+  if (itemImages[cleanedName]) return itemImages[cleanedName];
+  if (itemImages[name]) return itemImages[name];
+
+  let bestKey = '';
+  for (const key of Object.keys(itemImages)) {
+    if ((cleanedName.includes(key) || name.includes(key)) && key.length > bestKey.length) {
+      bestKey = key;
+    }
+  }
+
+  return bestKey ? itemImages[bestKey] : undefined;
+}
 
 export async function saveDayPlan(householdId: string, day: DayPlan) {
   const id = day.date; // 'YYYY-MM-DD'
@@ -71,6 +99,8 @@ export function parseItemText(itemText: string): { quantity: number; description
   let description = text
     // Remove quantities at the beginning
     .replace(/^\d+\s+/, '')
+    // Remove leading store-brand abbreviations (CV = Clover Valley, GV = Great Value)
+    .replace(/^(CV|GV)\s+/i, '')
     // Remove common size descriptors
     .replace(/\b(large|medium|small|big|tiny|huge|giant)\s+/g, '')
     // Keep colors for distinguishing items (like red vs green apples)
@@ -273,6 +303,8 @@ export function cleanItemNameForShopping(itemName: string): string {
   let cleaned = itemName.toLowerCase()
     // Remove quantities at the beginning (e.g., "1 ", "2 ", "3 ", etc.)
     .replace(/^\d+\s+/, '')
+    // Remove leading store-brand abbreviations (CV = Clover Valley, GV = Great Value)
+    .replace(/^(cv|gv)\s+/, '')
     // Remove common size descriptors
     .replace(/\b(large|medium|small|big|tiny|huge|giant)\s+/g, '')
     // Remove common color descriptors
@@ -315,7 +347,7 @@ export async function canShowAds(user?: User | null): Promise<boolean> {
 
     // Show ads when user is within at least one of the usage limits
     return underRecipeLimit || underMealPlanLimit || underSearchLimit;
-  } catch (err) {
+  } catch {
     // Conservative fallback: show ads for free users if limit check fails
     try {
       if (!user) return false;
@@ -329,7 +361,7 @@ export async function canShowAds(user?: User | null): Promise<boolean> {
 }
 
 export function getItemImage(itemName: string, category: string): string {
-  const name = itemName.toLowerCase();
+  const name = itemName.toLowerCase().trim();
   const cat = category.toLowerCase();
 
   // Clean the item name by removing quantities and common descriptors
@@ -395,6 +427,13 @@ export function getItemImage(itemName: string, category: string): string {
   };
 
   const normalizedCat = cat === 'manual' || cat === 'uncategorized' ? inferCategoryFromName(cleanedName) : normalizeCategory(cat);
+
+  // Prefer seeded local item photos when available.
+  const seededFilename = resolveSeededItemImageFilename(itemName);
+  if (seededFilename) {
+    const ext = seededFilename.includes('.') ? '' : '.jpg';
+    return `/images/items/${seededFilename}${ext}`;
+  }
 
   // Priority function for image types: png > svg
   const getImagePriority = (image: string): number => {
@@ -721,6 +760,44 @@ export function getItemImage(itemName: string, category: string): string {
 
   // Default placeholder
   return '/images/placeholder.svg';
+}
+
+export function getPreferredItemDisplayImage(itemName: string, category: string, currentImage?: string | null): string {
+  const preferredImage = getItemImage(itemName, category);
+  const normalizedCurrentImage = currentImage?.trim();
+
+  if (!normalizedCurrentImage) {
+    return preferredImage;
+  }
+
+  if (
+    normalizedCurrentImage.startsWith('http://') ||
+    normalizedCurrentImage.startsWith('https://') ||
+    normalizedCurrentImage.startsWith('blob:') ||
+    normalizedCurrentImage.startsWith('data:')
+  ) {
+    return normalizedCurrentImage;
+  }
+
+  if (normalizedCurrentImage.startsWith('/images/items/')) {
+    return normalizedCurrentImage;
+  }
+
+  if (normalizedCurrentImage.startsWith('/images/')) {
+    return preferredImage;
+  }
+
+  return normalizedCurrentImage;
+}
+
+/**
+ * Returns the Spoonacular CDN URL for an item name if it exists in the
+ * seeded image map. Use this in <img onError> handlers to fall back from a
+ * missing local file to the CDN before hitting the placeholder.
+ */
+export function getItemImageCdnUrl(itemName: string): string | null {
+  const filename = resolveSeededItemImageFilename(itemName);
+  return filename ? `${ITEM_IMAGE_CDN_BASE}${filename}` : null;
 }
 
 export async function fetchExternalItemImage(itemName: string): Promise<string | null> {
@@ -1544,7 +1621,8 @@ export function generateRecipeSuggestions(inventory: PantryItem[]): RecipeSugges
  * @param expirationType Type of expiration date
  * @returns Color class name
  */
-export function getExpirationColor(daysOrDate: number | string, expirationType: 'use-by' | 'best-by' = 'best-by'): string {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function getExpirationColor(daysOrDate: number | string, _expirationType: 'use-by' | 'best-by' = 'best-by'): string {
   // Accept either a precomputed daysRemaining number or an ISO date string.
   let daysRemaining: number;
   if (typeof daysOrDate === 'number') {

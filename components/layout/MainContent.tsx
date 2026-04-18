@@ -1,6 +1,6 @@
 import React, { Suspense } from 'react';
 import { Tab } from '../../types/app';
-import { User, PantryItem, DayPlan, StructuredRecipe, Household, ShoppingItem, SavedRecipe, RecipeRating, RecipeSearchResult, CustomCategory } from '../../types';
+import { User, PantryItem, DayPlan, StructuredRecipe } from '../../types';
 
 // Lazy load all major components for better performance
 const PantryScanner = React.lazy(() => import('../PantryScanner').then(module => ({ default: module.PantryScanner })));
@@ -10,14 +10,11 @@ const RecipeFinder = React.lazy(() => import('../RecipeFinder').then(module => (
 const Community = React.lazy(() => import('../Community').then(module => ({ default: module.Community })));
 const Settings = React.lazy(() => import('../Settings').then(module => ({ default: module.Settings })));
 
-// Keep Login and Tutorial as regular imports since they're shown immediately
-import { Login } from '../Login';
 import SmartRecommendations from '../SmartRecommendations';
 import { UsageIndicator } from '../UsageIndicator';
 import ComponentErrorBoundary from '../ComponentErrorBoundary';
 import { useApp } from '../../contexts/AppContext';
 import { useAppActions } from '../../contexts/AppActionsContext';
-import { parseIngredientForShoppingList, parseQuantity, subtractQuantities } from '../../utils/appUtils';
 
 // Loading component for lazy-loaded components
 const LoadingSpinner: React.FC = () => (
@@ -51,13 +48,17 @@ export const MainContent: React.FC = () => {
     isLoadingShoppingList,
     isLoadingMealPlan,
     isLoadingSavedRecipes,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     isLoadingRatings,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     isLoadingHousehold,
     consumptionSuggestions,
     expirationAlerts,
     recipeSuggestions,
     household,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     recentActivities,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     isLoadingActivities
   } = appState;
 
@@ -82,9 +83,10 @@ export const MainContent: React.FC = () => {
     onLogout,
     onShowHousehold,
     updateMealPlan,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     refreshAllData
   } = appActions;
-  // Helper function to match ingredients to inventory
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const inventoryNeeded = (ingredients: string[], pantryInventory: PantryItem[]): PantryItem[] => {
     const toRemove: PantryItem[] = [];
     
@@ -103,7 +105,7 @@ export const MainContent: React.FC = () => {
     return toRemove;
   };
 
-  // Handler for removing a recipe from meal plan
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleRemoveFromMealPlan = (recipe: StructuredRecipe) => {
     const recipeTitle = recipe.title;
     const newMealPlan = mealPlan.map(day => ({
@@ -202,6 +204,7 @@ export const MainContent: React.FC = () => {
             inventory={inventory}
             savedRecipes={savedRecipes}
             user={user}
+            setActiveTab={setActiveTab}
           />
           <ComponentErrorBoundary componentName="RecipeFinder">
           <Suspense fallback={<LoadingSpinner />}>

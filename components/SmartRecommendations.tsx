@@ -3,6 +3,7 @@ import { ChefHat, Clock, Lightbulb, Star, ChevronDown, ChevronUp } from 'lucide-
 import AnalyticsService from '../services/analyticsService';
 import { log } from '../services/logService';
 import { PantryItem, SavedRecipe, User } from '../types';
+import { Tab } from '../types/app';
 
 /**
  * Interface for smart recommendation data
@@ -16,6 +17,7 @@ interface SmartRecommendation {
   icon: React.ReactNode;
   actionText: string;
   category: string;
+  recipe?: SavedRecipe;
 }
 
 /**
@@ -33,9 +35,10 @@ interface SmartRecommendationsProps {
   inventory: PantryItem[];
   savedRecipes: SavedRecipe[];
   user?: User | null;
+  setActiveTab: (tab: Tab) => void;
 }
 
-const SmartRecommendations: React.FC<SmartRecommendationsProps> = ({ inventory, savedRecipes, user }) => {
+const SmartRecommendations: React.FC<SmartRecommendationsProps> = ({ inventory, savedRecipes, user, setActiveTab }) => {
   const [isCollapsed, setIsCollapsed] = useState(true);
   const recommendations = useMemo((): SmartRecommendation[] => {
     const recs: SmartRecommendation[] = [];
@@ -64,7 +67,8 @@ const SmartRecommendations: React.FC<SmartRecommendationsProps> = ({ inventory, 
           impact: 'high',
           icon: <ChefHat className="w-5 h-5" />,
           actionText: 'View Recipe',
-          category: 'Recipe Match'
+          category: 'Recipe Match',
+          recipe: matchingRecipes[0]
         });
       }
     }
@@ -166,41 +170,34 @@ const SmartRecommendations: React.FC<SmartRecommendationsProps> = ({ inventory, 
   };
 
   const handleRecommendationAction = (rec: SmartRecommendation) => {
-    // Track the recommendation action
-    (AnalyticsService as any).trackRecommendationAction?.(rec.id, rec.type);
+    (AnalyticsService as unknown as { trackRecommendationAction?: (id: string, type: string) => void }).trackRecommendationAction?.(rec.id, rec.type);
 
     switch (rec.type) {
       case 'recipe':
-        // Navigate to recipes tab
-        if (rec.actionText.includes('View Recipe') || rec.actionText.includes('Browse Recipes')) {
-          // This would need to be passed as a prop or accessed via context
-          // For now, we'll just show a toast
-          log.debug(`Navigate to recipes for: ${rec.title}`);
-        } else if (rec.actionText.includes('Find Recipes')) {
-          log.debug(`Find recipes using expiring items for: ${rec.title}`);
+        if (rec.recipe) {
+          window.dispatchEvent(new CustomEvent('openRecipeModal', { detail: { recipe: rec.recipe, isSavedView: true } }));
+        } else if (rec.actionText.includes('Browse Recipes')) {
+          // Already on recipes tab — scroll RecipeFinder into view
+          document.querySelector('[data-recipe-finder]')?.scrollIntoView({ behavior: 'smooth' });
+        } else if (rec.actionText.includes('Find Recipes') && savedRecipes.length > 0) {
+          window.dispatchEvent(new CustomEvent('openRecipeModal', { detail: { recipe: savedRecipes[0], isSavedView: true } }));
         }
         break;
       case 'feature':
-        if (rec.actionText.includes('Create Meal Plan')) {
-          log.debug('Navigate to meal planning');
-        } else if (rec.actionText.includes('Upgrade Now')) {
-          log.debug('Navigate to premium upgrade');
+        if (rec.actionText.includes('Upgrade Now') || rec.actionText.includes('Create Meal Plan')) {
+          setActiveTab(Tab.SETTINGS);
         } else if (rec.actionText.includes('Add First Item')) {
-          log.debug('Navigate to add inventory item');
+          setActiveTab(Tab.PANTRY);
         }
         break;
       case 'shopping':
         if (rec.actionText.includes('Create List')) {
-          log.debug('Navigate to shopping list creation');
+          setActiveTab(Tab.SHOPPING);
         }
         break;
       default:
-        log.debug(`Action for ${rec.type}: ${rec.actionText}`);
+        log.debug(`Unhandled recommendation action: ${rec.actionText}`);
     }
-
-    // For now, show a toast indicating the action
-    // In a real implementation, this would navigate or perform the action
-    log.debug(`Recommendation action: ${rec.actionText} for ${rec.title}`);
   };
 
   if (recommendations.length === 0) {

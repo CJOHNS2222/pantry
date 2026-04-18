@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Users, Minus, Plus, ChefHat } from 'lucide-react';
 import { Household } from '../types';
-import { calculatePortionScaling, PORTION_PRESETS, getRecommendedServings, PortionConfig } from '../utils/portionUtils';
+import { calculatePortionScaling, PORTION_PRESETS, getRecommendedServings } from '../utils/portionUtils';
 
 interface PortionSelectorProps {
   household: Household | null;
@@ -24,14 +24,14 @@ export const PortionSelector: React.FC<PortionSelectorProps> = ({
   household,
   currentServings,
   onPortionChange,
-  originalIngredients,
+  // originalIngredients is part of the props API but not used in this view
   className = '',
   user
 }) => {
   const [selectedPreset, setSelectedPreset] = useState<string>('smallFamily');
   const [customServings, setCustomServings] = useState<number>(currentServings);
 
-  // Calculate current portion config
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const portionConfig = calculatePortionScaling(household, currentServings);
 
   // Update when household changes
@@ -115,7 +115,7 @@ export const PortionSelector: React.FC<PortionSelectorProps> = ({
         <div className="flex items-center gap-2">
           <button
             onClick={() => handleCustomServingsChange(customServings - 1)}
-            className="p-1 rounded bg-theme-primary hover:bg-theme-secondary transition-colors"
+            className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded bg-theme-primary hover:bg-theme-secondary transition-colors"
             disabled={customServings <= 1}
           >
             <Minus className="w-4 h-4 text-theme-primary" />
@@ -125,7 +125,7 @@ export const PortionSelector: React.FC<PortionSelectorProps> = ({
           </span>
           <button
             onClick={() => handleCustomServingsChange(customServings + 1)}
-            className="p-1 rounded bg-theme-primary hover:bg-theme-secondary transition-colors"
+            className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded bg-theme-primary hover:bg-theme-secondary transition-colors"
           >
             <Plus className="w-4 h-4 text-theme-primary" />
           </button>

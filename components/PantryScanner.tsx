@@ -1,10 +1,10 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { useModalOpen } from '../utils/useModalOpen';
+import { useAndroidBack } from '../hooks/useAndroidBack';
 import { Camera as CapacitorCamera, CameraResultType, CameraSource } from '@capacitor/camera';
-import { Camera, Upload, Loader2, Plus, Trash2, CheckCircle2, ShoppingBasket, X, Barcode, ChevronDown, ChevronRight, ChevronUp, Image, ChefHat, TrendingUp, Search, Filter, Settings2, Clock, Tag, FilePlus, Receipt } from 'lucide-react';
+import { Camera, Upload, Loader2, Plus, Trash2, CheckCircle2, ShoppingBasket, X, Barcode, ChevronDown, ChevronRight, ChevronUp, Image, ChefHat, TrendingUp, Search, Filter, Clock, Tag, FilePlus, Receipt } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { FixedSizeList as List } from 'react-window';
-import { analyzePantryImage, analyzeReceiptImage } from '../services/geminiService';
 import { extractReceiptItems } from '../services/receiptOcrService';
 import { setUserGeminiOptIn } from '../services/featureFlags';
 import StorageLocationIndicator from './StorageLocationIndicator';
@@ -47,8 +47,8 @@ import { ProgressiveImage } from './ProgressiveImage';
 import { PantryItemSkeleton } from './SkeletonLoader';
 import { generateIntelligentRecipeQuery, searchPantryItems, getEnhancedAutocompleteSuggestions, filterPantryItems, savePantryFilter, loadPantryFilter, defaultPantryFilter, saveSearchToHistory, getRecentSearchSuggestions, AutocompleteSuggestion, getMealPrepSuggestions, RecipeIngredientMatch } from '../utils/searchUtils';
 import { debounce } from '../utils/debounceUtils';
-import { formatItemQuantity, getExpirationColor, getAllCategories, getItemImage } from '../utils/appUtils';
-import { getQuantityAmount, getQuantityUnit } from '../utils/quantityUtils';
+import { formatItemQuantity, getExpirationColor, getAllCategories, getPreferredItemDisplayImage } from '../utils/appUtils';
+import { getQuantityAmount } from '../utils/quantityUtils';
 import { PantryService } from '../services/pantryService';
 import { useApp } from '../contexts/AppContext';
 import { useAppActions } from '../contexts/AppActionsContext';
@@ -91,6 +91,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   onAddItems,
   onUpdateItem,
   consumptionSuggestions = [],
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   expirationAlerts = [],
   recipeSuggestions = [],
   customCategories = [],
@@ -104,7 +105,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
 
   // Destructure needed values
   const { household, savedRecipes, recipeSaveLimitExceeded } = appState;
-  const { onSaveRecipe, onRateRecipe, checkRecipeSaveLimit, checkMealPlanLimit } = appActions;
+  const { onSaveRecipe, onRateRecipe } = appActions;
 
   const [canShowAdBanner, setCanShowAdBanner] = React.useState<boolean>(false);
 
@@ -191,6 +192,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   const [categoryOrder, setCategoryOrder] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<'category' | 'storage'>('storage');
   const [sortBy, setSortBy] = useState<'name' | 'lastAdded' | 'expiration' | 'category' | 'location'>('location');
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [storageOrder, setStorageOrder] = useState<string[]>(['pantry', 'fridge', 'freezer', 'spices', 'other']);
   const [storageSectionOrder, setStorageSectionOrder] = useState<string[]>(['pantry', 'fridge', 'freezer', 'spices', 'other']);
   const [showPriceTrends, setShowPriceTrends] = useState<string | null>(null);
@@ -204,6 +206,9 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
 
   // Hide header/nav when any internal overlay is open
   useModalOpen(isAddModalOpen || showScanReviewModal || showBulkQuantityEdit);
+  useAndroidBack(isAddModalOpen, () => setIsAddModalOpen(false));
+  useAndroidBack(showScanReviewModal, () => setShowScanReviewModal(false));
+  useAndroidBack(showBulkQuantityEdit, () => setShowBulkQuantityEdit(false));
   
   // Search and filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -222,6 +227,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   const [modalRecipe, setModalRecipe] = useState<StructuredRecipe | SavedRecipe | null>(null);
   const [modalContext, setModalContext] = useState<'search' | 'scheduled'>('search');
   const [freezeTargetIndex, setFreezeTargetIndex] = useState<number | null>(null);
+  useAndroidBack(showRecipeModal, () => setShowRecipeModal(false));
 
   // Auto-set smart unit when item name changes in the quick-add form
   useEffect(() => {
@@ -431,7 +437,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   // Handle recipe modal opening from meal prep suggestions
   React.useEffect(() => {
     const handleOpenRecipeModal = (event: CustomEvent) => {
-      const { recipe, isSavedView } = event.detail;
+      const { recipe } = event.detail;
       setModalRecipe(recipe);
       setModalContext('search');
       setShowRecipeModal(true);
@@ -472,7 +478,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
     filtered = filterPantryItems(filtered, pantryFilter);
 
     // Add original index for bulk operations
-    return filtered.map((item, idx) => ({ ...item, originalIndex: inventory.indexOf(item) }));
+    return filtered.map((item) => ({ ...item, originalIndex: inventory.indexOf(item) }));
   }, [inventory, debouncedSearchQuery, pantryFilter]);
 
   // Use Capacitor Camera for mobile
@@ -757,6 +763,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
     }
   }, [user]);
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const removeItem = useCallback(async (index: number) => {
     await onDeleteItem(index);
   }, [onDeleteItem]);
@@ -787,10 +794,12 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
     setNewUnit('count');
   }, []);
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const incrementQty = useCallback(() => {
     setNewQty(prev => prev + 1);
   }, [setNewQty]);
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const decrementQty = useCallback(() => {
     setNewQty(prev => Math.max(1, prev - 1));
   }, [setNewQty]);
@@ -835,6 +844,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
     appActions.addToast(`Deleted ${count} item${count > 1 ? 's' : ''}`, 'success');
   }, [selectedItems, onDeleteItem, setSelectedItems, setBulkMode, appActions]);
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const bulkMoveToShoppingList = useCallback(async () => {
     if (selectedItems.size === 0) return;
 
@@ -879,6 +889,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
     setBulkMode(false);
   }, [selectedItems, onUpdateItem, setSelectedItems, setBulkMode]);
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const bulkSetExpiration = useCallback(async (isoDate: string) => {
     if (selectedItems.size === 0) return;
     const indicesToUpdate = Array.from(selectedItems);
@@ -889,6 +900,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
     setBulkMode(false);
   }, [selectedItems, onUpdateItem, setSelectedItems, setBulkMode]);
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const bulkAddToShoppingListWithRemove = useCallback(async () => {
     if (selectedItems.size === 0) return;
     const indicesToMove = Array.from(selectedItems).sort((a, b) => b - a); // Delete from highest index first
@@ -1048,6 +1060,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
     return acc;
   }, {} as Record<string, (PantryItem & { combinedItems: PantryItem[]; totalQuantity: number; originalIndices: number[]; originalIndex: number })[]>);
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const storageLocations = ['pantry', 'fridge', 'freezer', 'spices', 'other'] as const;
   const storageLabels = {
     pantry: 'Pantry',
@@ -1057,10 +1070,12 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
     other: 'Other'
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const updateStorageLocation = async (itemIndex: number, newLocation: 'pantry' | 'freezer' | 'fridge' | 'spices' | 'other') => {
     await onUpdateItem(itemIndex, { storageLocation: newLocation });
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const updateCategory = async (itemIndex: number, newCategory: string) => {
     await onUpdateItem(itemIndex, { category: newCategory });
   };
@@ -1227,7 +1242,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
 
         <div className="flex items-center gap-1 flex-1">
           <ProgressiveImage
-            src={item.image || '/images/placeholder.svg'}
+            src={getPreferredItemDisplayImage(item.item, item.category, item.image)}
             alt={item.item}
             className="w-10 h-10 rounded-lg object-cover bg-theme-primary border border-theme"
             placeholderSrc="/images/placeholder.svg"
@@ -1372,7 +1387,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
 
         <div className="flex items-center gap-1 flex-1">
           <ProgressiveImage
-            src={item.image || '/images/placeholder.svg'}
+            src={getPreferredItemDisplayImage(item.item, item.category, item.image)}
             alt={item.item}
             className="w-10 h-10 rounded-lg object-cover bg-theme-primary border border-theme"
             placeholderSrc="/images/placeholder.svg"
@@ -1467,7 +1482,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
 
         <div className="flex items-center gap-1 flex-1">
           <img
-            src={item.image || '/images/placeholder.svg'}
+            src={getPreferredItemDisplayImage(item.item, item.category, item.image)}
             alt={item.item}
             className="w-10 h-10 rounded-lg object-cover bg-theme-primary border border-theme"
             onError={(e) => { (e.target as HTMLImageElement).src = '/images/placeholder.svg'; }}
@@ -1533,7 +1548,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
         )}
 
         <div className="flex items-center gap-1 flex-1">
-          <img src={item.image || '/images/placeholder.svg'} alt={item.item} className="w-10 h-10 rounded-lg object-cover bg-theme-primary border border-theme" onError={(e) => { (e.target as HTMLImageElement).src = '/images/placeholder.svg'; }} />
+          <img src={getPreferredItemDisplayImage(item.item, item.category, item.image)} alt={item.item} className="w-10 h-10 rounded-lg object-cover bg-theme-primary border border-theme" onError={(e) => { (e.target as HTMLImageElement).src = '/images/placeholder.svg'; }} />
           <div className="flex-1">
             <div className="flex items-center gap-2">
               <div className="font-medium text-theme-primary">{item.item}</div>
@@ -1723,7 +1738,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                   </button>
                   {suggestion.missingIngredients.length > 0 && (
                     <button
-                      onClick={(e) => {
+                      onClick={() => {
                         const missingItems = suggestion.missingIngredients
                           .filter(match => !match.available)
                           .map(match => match.ingredient);
@@ -2338,7 +2353,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                     {scanResults.map((sItem, idx) => (
                       <div key={sItem.id} className="bg-theme-secondary p-3 rounded-lg border border-theme">
                         <div className="flex items-start gap-3">
-                            <img src={sItem.image || '/images/placeholder.svg'} alt={sItem.item} className="w-12 h-12 rounded object-cover flex-shrink-0" onError={(e) => { (e.target as HTMLImageElement).src = '/images/placeholder.svg'; }} />
+                            <img src={getPreferredItemDisplayImage(sItem.item, sItem.category, sItem.image)} alt={sItem.item} className="w-12 h-12 rounded object-cover flex-shrink-0" onError={(e) => { (e.target as HTMLImageElement).src = '/images/placeholder.svg'; }} />
                           <div className="flex-1 min-w-0">
                             <input value={sItem.item} onChange={(e) => {
                               const updated = [...scanResults];
@@ -2539,7 +2554,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
           <div className="grid grid-cols-4 gap-4">
             {sortedCategories.map(category => {
               const items = categoryItemsArrays[category] || [];
-              const representativeImage = items[0]?.image || getItemImage('', category);
+              const representativeImage = getPreferredItemDisplayImage(items[0]?.item || '', category, items[0]?.image);
               return (
                 <div
                   key={category}
@@ -2783,7 +2798,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                 {bulkQuantityEditItems.map((item, index) => (
                   <div key={item.id} className="flex items-center gap-3 p-3 bg-theme-secondary rounded-lg">
                     <img
-                      src={item.image}
+                      src={getPreferredItemDisplayImage(item.item, item.category, item.image)}
                       alt={item.item}
                       className="w-10 h-10 rounded-lg object-cover"
                       onError={(e) => {

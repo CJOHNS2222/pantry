@@ -8,6 +8,7 @@ import AnalyticsService from '../services/analyticsService';
 import { setUserContext, clearUserContext, trackAuthEvent } from '../services/sentryService';
 import { PriceDataCacheService } from '../services/priceDataCacheService';
 import { log } from '../services/logService';
+import { GUEST_USER_ID_KEY } from '../components/Login';
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
@@ -28,6 +29,20 @@ export function useAuth() {
         setUser(null);
         clearUserContext();
         PriceDataCacheService.clearCache(); // Clear cache on logout
+
+        // Restore a guest session if the user had previously chosen guest mode
+        const guestId = localStorage.getItem(GUEST_USER_ID_KEY);
+        if (guestId) {
+          setUser({
+            id: guestId,
+            name: 'Guest',
+            email: '',
+            provider: 'guest',
+            isGuest: true,
+            hasSeenTutorial: false
+          });
+        }
+
         setIsAuthReady(true); // Auth is ready, even with no user
         return;
       }
@@ -49,8 +64,8 @@ export function useAuth() {
               email: fbUser.email,
               name: fbUser.displayName || (fbUser.email ? fbUser.email.split('@')[0] : 'User'),
             });
-          } catch (err: any) {
-            log.error('Failed to create user document:', { error: err?.message }, 'useAuth');
+          } catch (err: unknown) {
+            log.error('Failed to create user document:', { error: (err as Error)?.message }, 'useAuth');
           }
           return; // Listener will re-fire once doc is created
         }
@@ -73,8 +88,8 @@ export function useAuth() {
               });
               return; // Listener will refire
             }
-          } catch (err: any) {
-            log.error('Failed to check for existing household:', { error: err?.message }, 'useAuth');
+          } catch (err: unknown) {
+            log.error('Failed to check for existing household:', { error: (err as Error)?.message }, 'useAuth');
           }
         }
 
@@ -117,9 +132,22 @@ export function useAuth() {
     if (confirm("Are you sure you want to log out?")) {
       trackAuthEvent('logout');
       AnalyticsService.trackLogout();
+      // Guest users have no Firebase session — just clear localStorage
+      const currentUser = await new Promise<User | null>(resolve => resolve(null)).then(() => null);
+      void currentUser; // unused, just keeping async shape
+      const guestId = localStorage.getItem(GUEST_USER_ID_KEY);
+      if (guestId) {
+        localStorage.removeItem(GUEST_USER_ID_KEY);
+        // Also clear guest data from localStorage
+        localStorage.removeItem('guest_inventory');
+        localStorage.removeItem('guest_shopping');
+        localStorage.removeItem('guest_recipes');
+        localStorage.removeItem('guest_mealplan');
+        setUser(null);
+        return;
+      }
       await signOut(getAuth());
       // No need to call setUser(null), onAuthStateChanged will handle it.
-      // No need for localStorage.clear() or window.location.reload()
     }
   };
 
