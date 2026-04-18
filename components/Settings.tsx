@@ -335,7 +335,7 @@ export const Settings: React.FC<SettingsProps> = ({
     setSettings((prev) => ({
       ...prev,
       [field]: {
-        ...(prev as Record<string, unknown>)[field] as object,
+        ...(prev as unknown as Record<string, unknown>)[field] as object,
         ...value,
       },
     }));

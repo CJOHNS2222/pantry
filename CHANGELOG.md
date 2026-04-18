@@ -5,6 +5,12 @@ All notable changes to Stock & Spoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.28] - 2026-04-18
+
+### Fixed
+- **ESLint cleanup** — removed unused imports, variables, and destructured assignments across all major components (App.tsx, ItemDetailModal, QuickAddModal, ShoppingList, MainContent, MealPlanner, PantryScanner, RecipeFinder, Settings, and 9 others); 0 lint errors remaining
+- **Settings.tsx type error** — fixed `TS2352` double-cast (`prev as unknown as Record<string, unknown>`) in `handleChange` to satisfy TypeScript's type overlap check
+
 ## [1.5.27] - 2026-04-18
 
 ### Fixed
