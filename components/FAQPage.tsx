@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowLeft, Search, ChevronDown, ChevronRight, AlertTriangle, Heart, X } from 'lucide-react';
+import { ArrowLeft, Search, ChevronDown, ChevronRight } from 'lucide-react';
 
 // FAQ Data Structure
 interface FAQItem {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, X, ArrowRight, Gift } from 'lucide-react';
+import { Sparkles, X, ArrowRight } from 'lucide-react';
 
 interface FeatureDiscoveryProps {
   featureId: string;

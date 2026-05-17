@@ -8,7 +8,8 @@ interface MonitoringDashboardProps {
   compact?: boolean;
 }
 
-export const MonitoringDashboard: React.FC<MonitoringDashboardProps> = ({ user, compact = false }) => {
+export const MonitoringDashboard: React.FC<MonitoringDashboardProps> = ({ user: _user, compact = false }) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [metrics, setMetrics] = useState<any>(null);
   const [alerts, setAlerts] = useState<string[]>([]);
 

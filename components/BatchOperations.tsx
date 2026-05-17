@@ -12,7 +12,7 @@ interface BatchOperationsProps {
 export const BatchOperations: React.FC<BatchOperationsProps> = ({
   items,
   onBatchCheck,
-  onBatchUncheck,
+  onBatchUncheck: _onBatchUncheck,
   onDeleteSelected
 }) => {
   const { addToast } = useAppActions();

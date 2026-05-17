@@ -11,11 +11,9 @@ import {
   CheckCircle,
   X,
   Zap,
-  Heart,
   Camera,
+  Heart,
 } from 'lucide-react';
-import { Tab } from '../types/app';
-
 interface OnboardingData {
   completed: boolean;
   selectedSetup?: string | null;
@@ -23,7 +21,7 @@ interface OnboardingData {
 }
 
 interface ModernOnboardingProps {
-  user: any;
+  user: unknown;
   onComplete: (data: OnboardingData) => void;
   onSkip: () => void;
   onScanPantry?: () => void;
@@ -44,9 +42,9 @@ interface QuickSetupOption {
 }
 
 export const ModernOnboarding: React.FC<ModernOnboardingProps> = ({
-  user,
+  user: _user,
   onComplete,
-  onSkip,
+  onSkip: _onSkip,
   onScanPantry,
   onQuickAddItems,
   onOpenHousehold

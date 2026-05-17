@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Star, MessageSquare, Camera, Heart, X, ThumbsUp, Users, TrendingUp, ChefHat, Loader2 } from 'lucide-react';
+import { Star, MessageSquare, Camera, Heart, X, Users, TrendingUp, ChefHat, Loader2 } from 'lucide-react';
 import { RecipeRating, StructuredRecipe, RecipeFeedback, RecipePhoto, RecipeModification, RecipeCommunityStats } from '../types';
 import { RecipeRatingService } from '../services/recipeRatingService';
 import { RecipePhotoService } from '../services/recipePhotoService';
@@ -26,6 +26,7 @@ export const RecipeRatingUI: React.FC<RecipeRatingUIProps> = ({
   const { addToast } = useToasts();
   const [existingRating, setExistingRating] = useState<RecipeRating | null>(null);
   // Support prop user override for testing
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const user = (typeof (window as any).TEST_USER !== 'undefined') ? (window as any).TEST_USER : (contextUser ?? undefined);
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -279,7 +280,10 @@ export const RecipeRatingUI: React.FC<RecipeRatingUIProps> = ({
                 <button
                   key={option.key}
                   type="button"
-                  onClick={() => handleVerdictSelect(option.key as any)}
+                  onClick={() => {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    handleVerdictSelect(option.key as any)
+                  }}
                   className={`flex-1 flex flex-col items-center gap-2 p-3 rounded-lg border transition-all ${
                     isSelected
                       ? 'border-[var(--accent-color)] bg-[var(--accent-color)]/10'

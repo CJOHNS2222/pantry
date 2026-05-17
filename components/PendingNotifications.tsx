@@ -18,7 +18,7 @@ interface PendingNotificationsProps {
 
 export const PendingNotifications: React.FC<PendingNotificationsProps> = ({
   user,
-  onNavigateToSettings
+  onNavigateToSettings: _onNavigateToSettings
 }) => {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -44,6 +44,7 @@ export const PendingNotifications: React.FC<PendingNotificationsProps> = ({
       const allNotifications = [...topLevelNotifications];
       
       // Add cached notifications that aren't already in the top-level list
+      /* eslint-disable @typescript-eslint/no-explicit-any */
       for (const cached of cachedNotifications) {
         if (!cached.read && !allNotifications.find(n => n.id === cached.id)) {
           // Convert cached notification format to NotificationItem format
@@ -73,6 +74,7 @@ export const PendingNotifications: React.FC<PendingNotificationsProps> = ({
         const bTime = b.createdAt && b.createdAt.toMillis ? b.createdAt.toMillis() : (b.createdAt ? new Date(b.createdAt).getTime() : 0);
         return bTime - aTime;
       }).slice(0, 20);
+      /* eslint-enable @typescript-eslint/no-explicit-any */
       
       setNotifications(sorted);
     } catch (error) {
@@ -140,6 +142,7 @@ export const PendingNotifications: React.FC<PendingNotificationsProps> = ({
                   existingMembers = householdData.members;
                 } else if (householdData?.members && typeof householdData.members === 'object') {
                   // Convert map to array (handle legacy data where members might be stored as a map)
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   const mapMembers = householdData.members as Record<string, any>;
                   existingMembers = Object.keys(mapMembers).map(id => ({ id, ...mapMembers[id] }));
                 }
@@ -173,7 +176,7 @@ export const PendingNotifications: React.FC<PendingNotificationsProps> = ({
       // Mark notification as read - try both methods
       try {
         await markNotificationRead(user.id, notification.id);
-      } catch (error) {
+      } catch (_error) {
         // If top-level update fails, try updating in cache
         await updateNotificationInCache(user.id, notification.id, { read: true });
       }
@@ -206,7 +209,7 @@ export const PendingNotifications: React.FC<PendingNotificationsProps> = ({
       // Mark notification as read - try both methods
       try {
         await markNotificationRead(user.id, notification.id);
-      } catch (error) {
+      } catch (_error) {
         // If top-level update fails, try updating in cache
         await updateNotificationInCache(user.id, notification.id, { read: true });
       }
@@ -289,11 +292,13 @@ export const PendingNotifications: React.FC<PendingNotificationsProps> = ({
                 </div>
                 <span className="text-xs text-theme-secondary">
                   {(() => {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     const v: any = notification.createdAt;
                     let d: Date | null = null;
                     if (!v) return '—';
                     if (typeof v.toDate === 'function') d = v.toDate();
                     else if (typeof v.toMillis === 'function') d = new Date(v.toMillis());
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     else if (typeof v === 'string' || typeof v === 'number') d = new Date(v as any);
                     return d ? d.toLocaleDateString() : '—';
                   })()}

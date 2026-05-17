@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Calendar, Clock, Users, ChefHat, Plus, CheckCircle, X } from 'lucide-react';
+import { Clock, Users, ChefHat, CheckCircle } from 'lucide-react';
 import { StructuredRecipe, SavedRecipe, PantryItem } from '../types';
 
 interface MealPrepPlannerProps {
@@ -20,7 +20,7 @@ interface MealPrepPlan {
 
 export const MealPrepPlanner: React.FC<MealPrepPlannerProps> = ({
   savedRecipes,
-  inventory,
+  inventory: _inventory,
   onAddToPlan,
   onClose
 }) => {

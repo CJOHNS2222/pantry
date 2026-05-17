@@ -2,21 +2,21 @@ import React from 'react';
 import { ModernOnboarding } from './ModernOnboarding';
 
 interface ModernOnboardingFlowProps {
-  user: any;
+  user: unknown;
   onComplete: () => void;
   onSkip: () => void;
   onOpenHousehold?: () => void;
 }
 
 export const ModernOnboardingFlow: React.FC<ModernOnboardingFlowProps> = ({
-  user,
+  user: _user,
   onComplete,
   onSkip,
   onOpenHousehold
 }) => {
   return (
     <ModernOnboarding
-      user={user}
+      user={_user}
       onComplete={() => onComplete()}
       onSkip={onSkip}
       onOpenHousehold={onOpenHousehold}

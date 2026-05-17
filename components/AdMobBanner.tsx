@@ -5,9 +5,12 @@ import { log } from '../services/logService';
 // Use Google's sample/test ad unit for development/testing:
 // Banner test unit: ca-app-pub-3940256099942544/6300978111
 // Production unit: ca-app-pub-5084706792909644/2077776375
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const PROD_AD_UNIT = 'ca-app-pub-5084706792909644/2077776375';
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const TEST_AD_UNIT = 'ca-app-pub-3940256099942544/6300978111';
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const useTestAds = (): boolean => {
   return import.meta.env.MODE !== 'production' || import.meta.env.VITE_ADMOB_USE_TEST === 'true';
 };

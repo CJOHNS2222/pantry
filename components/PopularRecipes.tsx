@@ -5,13 +5,14 @@ import { ProgressiveImage } from './ProgressiveImage';
 
 interface Props {
   openRecipeModal: (recipe: SavedRecipe, isSavedView: boolean) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onAddToPlan?: (r: any) => void;
   user?: User | null;
   household?: Household | null;
   recipes?: SavedRecipe[]; // Optional prop to avoid duplicate loading
 }
 
-export const PopularRecipes: React.FC<Props> = ({ openRecipeModal, onAddToPlan, user, recipes: propRecipes }) => {
+export const PopularRecipes: React.FC<Props> = ({ openRecipeModal, onAddToPlan: _onAddToPlan, user, recipes: propRecipes }) => {
   const [recipes, setRecipes] = useState<SavedRecipe[]>(propRecipes || []);
   const [loading, setLoading] = useState(!propRecipes); // Only load if recipes not provided
   const [visible, setVisible] = useState(25);
@@ -33,7 +34,7 @@ export const PopularRecipes: React.FC<Props> = ({ openRecipeModal, onAddToPlan, 
         const r = await getCachedPopularRecipes();
         setRecipes(r);
         setVisible(25);
-      } catch (e) {
+      } catch (_e) {
         // ignore
       } finally {
         setLoading(false);

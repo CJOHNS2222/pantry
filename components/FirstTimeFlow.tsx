@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { CheckCircle, ArrowRight, Sparkles, Users, ChefHat, Calendar } from 'lucide-react';
 import { Tab } from '../types/app';
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, TrendingUp, ChefHat, ThumbsUp, MessageSquare, Star, Loader2 } from 'lucide-react';
+import { Users, TrendingUp, ChefHat, MessageSquare, Loader2, ThumbsUp } from 'lucide-react';
 import { RecipeCommunityStats, RecipeModification, RecipeRating } from '../types';
 import { RecipeRatingService } from '../services/recipeRatingService';
 import DatabaseMonitoringService from '../services/databaseMonitoringService';

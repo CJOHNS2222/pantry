@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Plus, Lightbulb, TrendingUp, Package, Clock, Archive, Undo2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Lightbulb, TrendingUp, Package, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
 import { getItemImage, inferCategoryFromItemName } from '../utils/appUtils';
 import { QuickAddModal } from './QuickAddModal';
 
@@ -66,7 +66,6 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [dismissedSuggestions, setDismissedSuggestions] = useState<Set<string>>(new Set());
   const [expanded, setExpanded] = useState(false);
-  const [scrollPosition, setScrollPosition] = useState(0);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
 
@@ -264,7 +263,6 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
     const scrollWidth = target.scrollWidth;
     const clientWidth = target.clientWidth;
     
-    setScrollPosition(scrollLeft);
     setCanScrollLeft(scrollLeft > 0);
     setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 1);
   };

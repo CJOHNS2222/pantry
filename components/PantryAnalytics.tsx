@@ -2,7 +2,6 @@ import React, { useMemo, useEffect } from 'react';
 import { PantryItem } from '../types';
 import { TrendingUp, Package, Flame, AlertTriangle } from 'lucide-react';
 import AnalyticsService from '../services/analyticsService';
-import { formatItemQuantity } from '../utils/appUtils';
 
 interface PantryAnalyticsProps {
   inventory: PantryItem[];
@@ -63,10 +62,10 @@ export const PantryAnalytics: React.FC<PantryAnalyticsProps> = ({ inventory }) =
 
   // Usage Frequency (based on quantity - lower quantity = more used)
   const usageData = useMemo(() => {
-    const toNumber = (q: any): number => {
+    const toNumber = (q: unknown): number => {
       if (q == null) return 0;
       if (typeof q === 'number') return q;
-      if (typeof q === 'object' && typeof q.amount === 'number') return q.amount;
+      if (typeof q === 'object' && q !== null && typeof (q as { amount?: number }).amount === 'number') return (q as { amount?: number }).amount as number;
       return 0;
     };
 

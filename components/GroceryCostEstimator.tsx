@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { DollarSign, Calculator, ShoppingCart, TrendingUp, Users, RefreshCw } from 'lucide-react';
+import { DollarSign, Calculator, TrendingUp, Users, RefreshCw } from 'lucide-react';
 import { DayPlan, PantryItem } from '../types';
 import { groceryPriceService, PriceData } from '../services/groceryPriceService';
 import { parseIngredientForShoppingList } from '../utils/appUtils';

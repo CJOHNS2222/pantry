@@ -4,6 +4,9 @@
 - **Settings section icons** — Each settings section header now shows a colored accent icon (User, Bell, Gauge, ShieldCheck, Palette, etc.) for faster visual scanning
 - **Meal Prep button** — MealPrepPlanner is now accessible via a labeled "Meal Prep" button in the Meal Planner header (was hidden behind an unlabeled icon)
 
+### Fixed
+- **ESLint cleanup (round 2)** — Removed unused imports (`useEffect`, lucide icons, unused types) and renamed unused catch/destructured vars across 20+ components; updated `eslint.config.ts` with `argsIgnorePattern`/`varsIgnorePattern` for `_`-prefixed vars and added per-directory rule overrides so service/hook/util files and test files no longer error on `no-explicit-any`
+
 ## [2.0.0] - 2026-05-06
 
 ### Added

@@ -10,7 +10,7 @@ interface NotificationSettingsProps {
 }
 
 export const NotificationSettingsComponent: React.FC<NotificationSettingsProps> = ({
-  user,
+  user: _user,
   currentSettings,
   onSettingsChange
 }) => {
@@ -26,7 +26,7 @@ export const NotificationSettingsComponent: React.FC<NotificationSettingsProps> 
     onSettingsChange(newSettings);
   };
 
-  const updateTypeSetting = (type: keyof NotificationSettings['types'], value: any) => {
+  const updateTypeSetting = (type: keyof NotificationSettings['types'], value: unknown) => {
     updateSettings({
       types: {
         ...settings.types,
@@ -35,7 +35,7 @@ export const NotificationSettingsComponent: React.FC<NotificationSettingsProps> 
     });
   };
 
-  const updateQuietHours = (field: 'enabled' | 'start' | 'end', value: any) => {
+  const updateQuietHours = (field: 'enabled' | 'start' | 'end', value: unknown) => {
     updateSettings({
       quietHours: {
         ...settings.quietHours,

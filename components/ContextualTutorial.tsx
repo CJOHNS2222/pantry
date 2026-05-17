@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, ChevronRight, Lightbulb, Sparkles, Target } from 'lucide-react';
+import { X, ChevronRight, Lightbulb } from 'lucide-react';
 
 interface ContextualTipProps {
   id: string;
