@@ -1,6 +1,6 @@
 
 import path from 'path';
-import { defineConfig, loadEnv } from 'vite';
+import { defineConfig, loadEnv, type ESBuildOptions } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import { visualizer } from 'rollup-plugin-visualizer';
@@ -54,22 +54,40 @@ export default defineConfig(({ mode }) => {
           '@': path.resolve(__dirname, '.'),
         }
       },
-      // Strip console.* and debugger statements in production builds
-      esbuild: mode === 'production' ? { drop: ['console', 'debugger'] } : {},
+      // In production, disable the OXC transformer so the esbuild transformer
+      // can run with the `drop` option (OXC and esbuild transforms cannot both
+      // be active at once — Vite 8 emits a warning if they are).
+      // OXC minification (build.minify default) is unaffected by this.
+      ...(mode === 'production' ? {
+        oxc: false as const,
+        esbuild: { drop: ['console', 'debugger'] } as ESBuildOptions,
+      } : {}),
       build: {
         sourcemap: mode !== 'production',
         rollupOptions: {
           output: {
-            manualChunks: {
+            manualChunks: (id) => {
               // Firebase and database operations
-              'firebase-vendor': ['firebase/app', 'firebase/auth', 'firebase/firestore', 'firebase/analytics', 'firebase/storage'],
+              if (id.includes('firebase/')) {
+                return 'firebase-vendor';
+              }
               // AI and ML services - split Gemini separately as it's largest
-              'gemini-service': ['./services/geminiService'],
-              'analytics-service': ['./services/analyticsService'],
+              if (id.includes('services/geminiService')) {
+                return 'gemini-service';
+              }
+              if (id.includes('services/analyticsService')) {
+                return 'analytics-service';
+              }
               // Utility functions
-              'utils': ['./utils/appUtils'],
+              if (id.includes('utils/appUtils')) {
+                return 'utils';
+              }
               // UI components and icons
-              'ui-vendor': ['lucide-react']
+              if (id.includes('lucide-react')) {
+                return 'ui-vendor';
+              }
+              // Default chunk for everything else
+              return undefined;
             }
           }
         },

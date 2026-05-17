@@ -1244,11 +1244,31 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
 
   return (
     <div className="space-y-6 pb-24 animate-fade-in">
-      <div className="text-center mb-1 relative">
-        <div className="flex items-center justify-center gap-2">
+      <div className="mb-1">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex-1" />
           <h2 className="text-3xl font-serif font-bold text-theme-secondary">{intl.formatMessage({ id: 'mealPlanner.mealSchedule' })}</h2>
+          <div className="flex-1 flex items-center justify-end gap-1">
+            <button
+              onClick={() => setShowMealPrepPlanner(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-theme-secondary/20 hover:bg-theme-secondary/30 text-theme-secondary text-sm font-medium transition-colors"
+              title="Smart Meal Prep Planner"
+              aria-label="Open meal prep planner"
+            >
+              <CalendarClock className="w-4 h-4" />
+              <span>Meal Prep</span>
+            </button>
+            <button
+              onClick={() => setShowHelpTooltip(!showHelpTooltip)}
+              className="p-2 rounded-full hover:bg-theme-secondary/10 transition-colors"
+              title="Help"
+              aria-label="Show meal planning help"
+            >
+              <HelpCircle className="w-5 h-5 text-theme-secondary opacity-60 hover:opacity-100" />
+            </button>
+          </div>
         </div>
-        
+
         {/* Help Tooltip */}
         {showHelpTooltip && (
           <div className="help-tooltip-container mt-4 p-4 bg-theme-secondary/5 border border-theme-secondary/20 rounded-lg text-left max-w-md mx-auto">
@@ -1263,31 +1283,21 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
         )}
       </div>
 
-      {/* Help Button - positioned absolutely below the header */}
-      <button
-        onClick={() => setShowHelpTooltip(!showHelpTooltip)}
-        className="absolute top-12 right-4 p-2 rounded-full hover:bg-theme-secondary/10 transition-colors z-10"
-        title="Help"
-        aria-label="Show meal planning help"
-      >
-        <HelpCircle className="w-5 h-5 text-theme-secondary opacity-60 hover:opacity-100" />
-      </button>
-
-      {/* Meal Prep Planner Button */}
-      <button
-        onClick={() => setShowMealPrepPlanner(true)}
-        className="absolute top-12 right-16 p-2 rounded-full hover:bg-theme-secondary/10 transition-colors z-10"
-        title="Smart Meal Prep Planner"
-        aria-label="Open meal prep planner"
-      >
-        <CalendarClock className="w-5 h-5 text-theme-secondary opacity-60 hover:opacity-100" />
-      </button>
-
       <PremiumFeature
         feature="mealPlanning"
         user={user}
         limit={10}
-        currentCount={mealPlan.reduce((total, day) => total + (day.breakfast?.length || 0) + (day.lunch?.length || 0) + (day.dinner?.length || 0), 0)}
+        currentCount={(() => {
+          const now = new Date();
+          const weekStart = new Date(now);
+          weekStart.setDate(now.getDate() - now.getDay());
+          weekStart.setHours(0, 0, 0, 0);
+          // Only count entries in the current week or future weeks — past entries
+          // should never count against the user's quota.
+          return mealPlan
+            .filter(day => new Date(day.date) >= weekStart)
+            .reduce((total, day) => total + (day.breakfast?.length || 0) + (day.lunch?.length || 0) + (day.dinner?.length || 0), 0);
+        })()}
         fallbackMessage="Upgrade to Premium to plan more than 10 meals per week"
         onUpgrade={() => setActiveTab(Tab.SETTINGS)}
       >

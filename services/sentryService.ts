@@ -40,6 +40,12 @@ export const initSentry = () => {
         }
       }
 
+      // Scrub PII: remove email from user context before sending to Sentry
+      if (event.user) {
+        const { email: _email, ...userWithoutEmail } = event.user;
+        event.user = userWithoutEmail;
+      }
+
       return event;
     },
 

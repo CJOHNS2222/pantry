@@ -1,10 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { useApp } from '../contexts/AppContext';
-import { Star, Clock, ChefHat, Plus, X } from 'lucide-react';
+import { useAppActions } from '../contexts/AppActionsContext';
+import { Tab } from '../types/app';
+import { Star, Clock, ChefHat, Plus, X, UtensilsCrossed } from 'lucide-react';
 import { RecipeRating, StructuredRecipe } from '../types';
 import RecipeModal from './RecipeModal';
 import { getCachedCommunityRatedRecipes } from '../services/recipeService';
 import { log } from '../services/logService';
+
+// Staple items to ignore in ingredient display
+const STAPLES = ['salt', 'pepper', 'oil', 'water', 'flour', 'sugar', 'butter', 'vinegar', 'baking powder', 'baking soda', 'spices', 'seasoning', 'soy sauce', 'cornstarch', 'yeast'];
 
 interface CommunityProps {
   onAddToPlan: (recipe: StructuredRecipe) => void;
@@ -30,6 +35,7 @@ interface RecipeStats {
 export const Community: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecipe, user }) => {
   const app = useApp();
   const { isLoadingRatings, setLoadingRatingsComplete } = app;
+  const { setActiveTab } = useAppActions();
   const [localLoading, setLocalLoading] = useState(false);
   const [ratingsState, setRatingsState] = useState<RecipeRating[]>([]);
   // Load community-rated cache once when the tab/component mounts (don't refresh on focus)
@@ -73,8 +79,6 @@ export const Community: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecipe,
     load();
     return () => { mounted = false; };
   }, []);
-    // List of staple items to ignore in ingredient display
-    const STAPLES = ['salt', 'pepper', 'oil', 'water', 'flour', 'sugar', 'butter', 'vinegar', 'baking powder', 'baking soda', 'spices', 'seasoning', 'soy sauce', 'cornstarch', 'yeast'];
   const [showModal, setShowModal] = useState(false);
   const [selectedRecipe, setSelectedRecipe] = useState<{ title: string, comments: RecipeRating[] } | null>(null);
   
@@ -154,9 +158,16 @@ export const Community: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecipe,
           <div className="text-center py-12">
             <Star className="w-16 h-16 text-amber-500/30 mx-auto mb-4" />
             <h3 className="text-lg font-bold text-theme-secondary mb-2">No Community Ratings Yet</h3>
-            <p className="text-theme-secondary opacity-60 text-sm">
-              Be the first to rate a recipe! Community ratings will appear here.
+            <p className="text-theme-secondary opacity-60 text-sm mb-4">
+              Be the first to rate a recipe! Save and rate recipes to see them here.
             </p>
+            <button
+              onClick={() => setActiveTab(Tab.RECIPES)}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--accent-color)] text-white text-sm font-semibold hover:opacity-90 transition-opacity"
+            >
+              <UtensilsCrossed className="w-4 h-4" />
+              Find &amp; Rate Recipes
+            </button>
           </div>
         ) : (
           <>

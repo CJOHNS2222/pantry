@@ -1,7 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Mic, MicOff, Camera, Search, Plus, X, Loader2 } from 'lucide-react';
+import { useIntl } from 'react-intl';
 import { useModalOpen } from '../utils/useModalOpen';
 import { useAndroidBack } from '../hooks/useAndroidBack';
+import { useAppActions } from '../contexts/AppActionsContext';
 
 interface QuickAddItem {
   name: string;
@@ -31,6 +33,8 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
 }) => {
   useModalOpen(isOpen);
   useAndroidBack(isOpen, onClose);
+  const intl = useIntl();
+  const { addToast } = useAppActions();
   const [input, setInput] = useState('');
   const [isListening, setIsListening] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
@@ -59,7 +63,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
         recognitionRef.current = new SpeechRecognition();
         recognitionRef.current.continuous = false;
         recognitionRef.current.interimResults = false;
-        recognitionRef.current.lang = 'en-US';
+        recognitionRef.current.lang = intl.locale || 'en-US'; // updated at start() time too
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         recognitionRef.current.onresult = (event: any) => {
@@ -68,9 +72,13 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
           setIsListening(false);
         };
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars
-        recognitionRef.current.onerror = (_ev: any) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        recognitionRef.current.onerror = (ev: any) => {
           setIsListening(false);
+          const errorCode: string = ev?.error || '';
+          if (errorCode !== 'no-speech' && errorCode !== 'aborted') {
+            addToast('Voice input failed. Please try again or type your item.', 'error');
+          }
         };
 
         recognitionRef.current.onend = () => {
@@ -134,6 +142,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
       setIsListening(false);
     } else {
       setIsListening(true);
+      recognitionRef.current.lang = intl.locale || 'en-US';
       recognitionRef.current.start();
     }
   };

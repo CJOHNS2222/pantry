@@ -679,6 +679,19 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Client-side validation: type and size before any processing
+    if (!file.type.startsWith('image/')) {
+      appActions.addToast('Only image files are supported. Please select a JPEG, PNG, or WebP file.', 'error');
+      e.target.value = '';
+      return;
+    }
+    const MAX_FILE_SIZE_MB = 10;
+    if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
+      appActions.addToast(`Image must be under ${MAX_FILE_SIZE_MB} MB. Please choose a smaller file.`, 'error');
+      e.target.value = '';
+      return;
+    }
+
     setLoadingState(LoadingState.IDLE);
     setMimeType(file.type);
 
@@ -696,6 +709,13 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
     if (!rawBase64) return;
 
     setLoadingState(LoadingState.LOADING);
+
+    console.log('[PantryScanner] handleAnalyze: starting', {
+      imageSizeKB: Math.round(rawBase64.length / 1024),
+      mimeType,
+      userId: user?.id ?? 'none',
+      isGuest: user?.isGuest ?? false,
+    });
 
     try {
       const processedItems = await PantryService.analyzePantryImage(rawBase64, mimeType, user ?? undefined);
@@ -721,6 +741,14 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
     }
   }, [rawBase64, mimeType, user]);
 
+  // Receipt processing chain: Tesseract OCR runs first as a diagnostic pre-step.
+  // If OCR extracts text lines, they are logged but cannot currently be passed to the
+  // Gemini API (which only accepts base64 image + mimeType). Both branches therefore
+  // fall through to PantryService.analyzeReceiptImage (Gemini vision), which parses
+  // the image directly. The OCR step is retained for future use: once the API supports
+  // text hints, OCR output can significantly reduce Gemini token usage.
+  // Error path: if Tesseract fails (WASM load failure, network, etc.), we skip straight
+  // to image-only Gemini analysis without surfacing the OCR error to the user.
   const processReceiptImage = useCallback(async (base64Data: string, mimeType: string) => {
     try {
       // Try Tesseract OCR first as a low-cost pre-processing step.
@@ -1255,12 +1283,18 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
               {item.expirationDate && (() => {
                 const daysRemaining = Math.ceil((new Date(item.expirationDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
                 const color = getExpirationColor(daysRemaining, item.expirationType);
+                const expiryLabel = daysRemaining <= 0
+                  ? `${item.item} has expired`
+                  : `${item.item} expires in ${daysRemaining} day${daysRemaining === 1 ? '' : 's'} — ${color === 'red' ? 'critical' : color === 'yellow' ? 'warning' : 'ok'}`;
                 return (
-                  <div className={`text-xs px-1 py-0.5 rounded font-medium ${
-                    color === 'red' ? 'bg-red-100 text-red-800' :
-                    color === 'yellow' ? 'bg-yellow-100 text-yellow-800' :
-                    'bg-green-100 text-green-800'
-                  }`}>
+                  <div
+                    className={`text-xs px-1 py-0.5 rounded font-medium ${
+                      color === 'red' ? 'bg-red-100 text-red-800' :
+                      color === 'yellow' ? 'bg-yellow-100 text-yellow-800' :
+                      'bg-green-100 text-green-800'
+                    }`}
+                    aria-label={expiryLabel}
+                  >
                     {daysRemaining}d
                   </div>
                 );
@@ -1400,12 +1434,18 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
               {item.expirationDate && (() => {
                 const daysRemaining = Math.ceil((new Date(item.expirationDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
                 const color = getExpirationColor(daysRemaining, item.expirationType);
+                const expiryLabel = daysRemaining <= 0
+                  ? `${item.item} has expired`
+                  : `${item.item} expires in ${daysRemaining} day${daysRemaining === 1 ? '' : 's'} — ${color === 'red' ? 'critical' : color === 'yellow' ? 'warning' : 'ok'}`;
                 return (
-                  <div className={`text-xs px-1 py-0.5 rounded font-medium ${
-                    color === 'red' ? 'bg-red-100 text-red-800' :
-                    color === 'yellow' ? 'bg-yellow-100 text-yellow-800' :
-                    'bg-green-100 text-green-800'
-                  }`}>
+                  <div
+                    className={`text-xs px-1 py-0.5 rounded font-medium ${
+                      color === 'red' ? 'bg-red-100 text-red-800' :
+                      color === 'yellow' ? 'bg-yellow-100 text-yellow-800' :
+                      'bg-green-100 text-green-800'
+                    }`}
+                    aria-label={expiryLabel}
+                  >
                     {daysRemaining}d
                   </div>
                 );
@@ -1491,15 +1531,24 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
             <div className="flex items-center gap-2">
               <div className="font-medium text-theme-primary">{item.item}</div>
               <div className="text-xs text-theme-secondary opacity-70 bg-theme-secondary px-1 py-0.5 rounded">Qty: {formatItemQuantity(item)}</div>
-              {typeof daysRemaining === 'number' && (
-                <div className={`text-xs px-1 py-0.5 rounded font-medium ${
-                  getExpirationColor(daysRemaining, item.expirationType) === 'red' ? 'bg-red-100 text-red-800' :
-                  getExpirationColor(daysRemaining, item.expirationType) === 'yellow' ? 'bg-yellow-100 text-yellow-800' :
-                  'bg-green-100 text-green-800'
-                }`}>
-                  {daysRemaining}d
-                </div>
-              )}
+              {typeof daysRemaining === 'number' && (() => {
+                const color = getExpirationColor(daysRemaining, item.expirationType);
+                const expiryLabel = daysRemaining <= 0
+                  ? `${item.item} has expired`
+                  : `${item.item} expires in ${daysRemaining} day${daysRemaining === 1 ? '' : 's'} — ${color === 'red' ? 'critical' : color === 'yellow' ? 'warning' : 'ok'}`;
+                return (
+                  <div
+                    className={`text-xs px-1 py-0.5 rounded font-medium ${
+                      color === 'red' ? 'bg-red-100 text-red-800' :
+                      color === 'yellow' ? 'bg-yellow-100 text-yellow-800' :
+                      'bg-green-100 text-green-800'
+                    }`}
+                    aria-label={expiryLabel}
+                  >
+                    {daysRemaining}d
+                  </div>
+                );
+              })()}
               {item.expiryAlertShown && (
                 <Clock className="w-4 h-4 text-orange-500" aria-label="Expires within 7 days" />
               )}
@@ -1556,12 +1605,18 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
               {item.expirationDate && (() => {
                 const daysRemaining = Math.ceil((new Date(item.expirationDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
                 const color = getExpirationColor(daysRemaining, item.expirationType);
+                const expiryLabel = daysRemaining <= 0
+                  ? `${item.item} has expired`
+                  : `${item.item} expires in ${daysRemaining} day${daysRemaining === 1 ? '' : 's'} — ${color === 'red' ? 'critical' : color === 'yellow' ? 'warning' : 'ok'}`;
                 return (
-                  <div className={`text-xs px-1 py-0.5 rounded font-medium ${
-                    color === 'red' ? 'bg-red-100 text-red-800' :
-                    color === 'yellow' ? 'bg-yellow-100 text-yellow-800' :
-                    'bg-green-100 text-green-800'
-                  }`}>
+                  <div
+                    className={`text-xs px-1 py-0.5 rounded font-medium ${
+                      color === 'red' ? 'bg-red-100 text-red-800' :
+                      color === 'yellow' ? 'bg-yellow-100 text-yellow-800' :
+                      'bg-green-100 text-green-800'
+                    }`}
+                    aria-label={expiryLabel}
+                  >
                     {daysRemaining}d
                   </div>
                 );
@@ -1632,6 +1687,33 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
         </button>
         <p className="text-xs text-theme-secondary opacity-60 mt-2">Get meal ideas from your pantry items</p>
       </div>
+
+      {/* Consumption Suggestions */}
+      {consumptionSuggestions.length > 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+          <h3 className="text-sm font-semibold text-blue-800 mb-2 flex items-center gap-2">
+            <ShoppingBasket className="w-4 h-4" />
+            Smart Shopping Suggestions
+          </h3>
+          <div className="space-y-2">
+            {consumptionSuggestions.slice(0, 3).map((suggestion, index) => (
+              <div key={index} className="flex items-center justify-between bg-white rounded p-3 border border-blue-100">
+                <div className="flex-1">
+                  <p className="text-sm text-blue-800 font-medium">{suggestion.item}</p>
+                  <p className="text-xs text-blue-600">{suggestion.reason}</p>
+                </div>
+                <button
+                  onClick={() => addToShoppingList([suggestion.item])}
+                  className="ml-3 px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors"
+                  aria-label={`Add ${suggestion.item} to shopping list`}
+                >
+                  Add to List
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {lastImportedBatch && (
         <div className="w-full bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4 flex items-center justify-between">
@@ -1900,20 +1982,33 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
           </div>
 
           {/* Filter Button */}
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            aria-label={showFilters ? 'Hide filters' : 'Show filters'}
-            aria-expanded={showFilters}
-            className={`p-2 rounded-lg border transition-colors ${
-              showFilters || Object.values(pantryFilter).some(v => 
-                Array.isArray(v) ? v.length > 0 : v !== defaultPantryFilter[v as keyof PantryFilter]
-              )
-                ? 'bg-[var(--accent-color)] text-white border-[var(--accent-color)]'
-                : 'bg-theme-primary border-theme text-theme-secondary hover:bg-theme-secondary'
-            }`}
-          >
-            <Filter className="w-4 h-4" />
-          </button>
+          {(() => {
+            const activeFilterCount =
+              (pantryFilter.categories.length > 0 ? 1 : 0) +
+              (pantryFilter.locations.length > 0 ? 1 : 0) +
+              (pantryFilter.expirationStatus !== 'all' ? 1 : 0) +
+              (pantryFilter.quantityStatus !== 'all' ? 1 : 0);
+            const isFilterActive = activeFilterCount > 0;
+            return (
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                aria-label={showFilters ? 'Hide filters' : `Show filters${isFilterActive ? `, ${activeFilterCount} active` : ''}`}
+                aria-expanded={showFilters}
+                className={`relative p-2 rounded-lg border transition-colors ${
+                  showFilters || isFilterActive
+                    ? 'bg-[var(--accent-color)] text-white border-[var(--accent-color)]'
+                    : 'bg-theme-primary border-theme text-theme-secondary hover:bg-theme-secondary'
+                }`}
+              >
+                <Filter className="w-4 h-4" />
+                {isFilterActive && (
+                  <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-0.5 rounded-full bg-white text-[var(--accent-color)] text-[10px] font-bold leading-4 flex items-center justify-center border border-[var(--accent-color)]">
+                    {activeFilterCount}
+                  </span>
+                )}
+              </button>
+            );
+          })()}
         </div>
 
         {/* Filter Options */}
@@ -2085,7 +2180,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                       <img src={imagePreview} alt="Preview" className="w-full h-full object-cover opacity-80" />
                       <GeminiLoadingOverlay
                         isActive={loadingState === LoadingState.LOADING}
-                        totalSeconds={30}
+                        totalSeconds={40}
                         stages={IMAGE_ANALYSIS_STAGES}
                         variant="overlay"
                       />
@@ -2445,33 +2540,6 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
         </div>
       )}
 
-      {/* Consumption Suggestions */}
-      {consumptionSuggestions.length > 0 && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-          <h3 className="text-sm font-semibold text-blue-800 mb-2 flex items-center gap-2">
-            <ShoppingBasket className="w-4 h-4" />
-            Smart Shopping Suggestions
-          </h3>
-          <div className="space-y-2">
-            {consumptionSuggestions.slice(0, 3).map((suggestion, index) => (
-              <div key={index} className="flex items-center justify-between bg-white rounded p-3 border border-blue-100">
-                <div className="flex-1">
-                  <p className="text-sm text-blue-800 font-medium">{suggestion.item}</p>
-                  <p className="text-xs text-blue-600">{suggestion.reason}</p>
-                </div>
-                <button
-                  onClick={() => addToShoppingList([suggestion.item])}
-                  className="ml-3 px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors"
-                  aria-label={`Add ${suggestion.item} to shopping list`}
-                >
-                  Add to List
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Expiration Alerts removed per UX request; keep recipe/use-soon recommendations below */}
 
       {/* Recipe Suggestions - Use Soon */}
@@ -2548,6 +2616,25 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
             : 'across 5 storage locations'
           }
         </div>
+        {user?.isGuest && (
+          <div className="mb-3 mx-1 p-2 rounded-lg bg-theme-secondary border border-theme text-xs">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-theme-secondary font-medium">
+                {inventory.length} / 20 items used
+              </span>
+              <span className="text-[var(--accent-color)] font-medium cursor-pointer hover:underline"
+                onClick={() => {/* sign-in prompt handled by parent */}}>
+                Sign in for unlimited
+              </span>
+            </div>
+            <div className="w-full bg-theme-primary/20 rounded-full h-1.5" role="progressbar" aria-valuenow={inventory.length} aria-valuemin={0} aria-valuemax={20} aria-label={`${inventory.length} of 20 guest pantry items used`}>
+              <div
+                className={`h-1.5 rounded-full transition-all ${inventory.length >= 18 ? 'bg-red-500' : inventory.length >= 14 ? 'bg-yellow-500' : 'bg-[var(--accent-color)]'}`}
+                style={{ width: `${Math.min(100, (inventory.length / 20) * 100)}%` }}
+              />
+            </div>
+          </div>
+        )}
 
         {/* Categories Grid - Only show in category view */}
         {viewMode === 'category' && (
@@ -2706,6 +2793,11 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
           </div>
 
 
+
+          {/* Screen reader announcement for loading state */}
+          <div aria-live="polite" aria-atomic="true" className="sr-only">
+            {isLoadingInventory ? 'Loading pantry items…' : `${inventory.length} pantry item${inventory.length === 1 ? '' : 's'} loaded`}
+          </div>
 
           {/* Render the appropriate view */}
           {isLoadingInventory ? (

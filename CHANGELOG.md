@@ -1,9 +1,26 @@
-# Changelog
+## [2.0.1] - 2026-05-17
 
-All notable changes to Stock & Spoon will be documented in this file.
+### Added
+- **Settings section icons** — Each settings section header now shows a colored accent icon (User, Bell, Gauge, ShieldCheck, Palette, etc.) for faster visual scanning
+- **Meal Prep button** — MealPrepPlanner is now accessible via a labeled "Meal Prep" button in the Meal Planner header (was hidden behind an unlabeled icon)
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [2.0.0] - 2026-05-06
+
+### Added
+- **Feature Discovery** — New feature discovery cards for AI scan, smart recipe search, leftover tracker, and meal planner
+- **Contextual Tutorials** — Tab-based contextual tips on first visit to each tab
+
+### Fixed
+- **Subscription Limits** — Fixed usage counters to sync with actual data instead of drift-prone increments; meal plan limits now count only current+future weeks
+- **Android App Icon** — Fixed blank white icon issue; now displays correct Stock & Spoon branding
+
+### Changed
+- **Version bump** — Major version to 2.0.0 for significant feature additions
+
+## [1.5.29] - 2026-04-18
+
+### Fixed
+- **Usage counter accuracy** — Gemini usage now only increments on successful searches/scans; saved recipe counter syncs to actual cached count instead of incrementing/decrementing
 
 ## [1.5.28] - 2026-04-18
 

@@ -1388,11 +1388,42 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
             }
         };
 
+        const DIETARY_BADGE_MAP: { keyword: string; label: string; color: string }[] = [
+            { keyword: 'vegan', label: 'Vegan', color: 'bg-green-100 text-green-800 border-green-200' },
+            { keyword: 'vegetarian', label: 'Veggie', color: 'bg-lime-100 text-lime-800 border-lime-200' },
+            { keyword: 'gluten-free', label: 'GF', color: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
+            { keyword: 'gluten free', label: 'GF', color: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
+            { keyword: 'dairy-free', label: 'DF', color: 'bg-sky-100 text-sky-800 border-sky-200' },
+            { keyword: 'dairy free', label: 'DF', color: 'bg-sky-100 text-sky-800 border-sky-200' },
+            { keyword: 'keto', label: 'Keto', color: 'bg-purple-100 text-purple-800 border-purple-200' },
+            { keyword: 'paleo', label: 'Paleo', color: 'bg-orange-100 text-orange-800 border-orange-200' },
+            { keyword: 'low-carb', label: 'Low-Carb', color: 'bg-rose-100 text-rose-800 border-rose-200' },
+        ];
+
+        const getDietaryBadges = (recipe: StructuredRecipe) => {
+            const haystack = [
+                (recipe.type || '').toLowerCase(),
+                (recipe.description || '').toLowerCase(),
+                ...(recipe.tags || []).map(t => t.toLowerCase()),
+            ].join(' ');
+            const badges: { label: string; color: string }[] = [];
+            const seen = new Set<string>();
+            for (const { keyword, label, color } of DIETARY_BADGE_MAP) {
+                if (!seen.has(label) && haystack.includes(keyword)) {
+                    badges.push({ label, color });
+                    seen.add(label);
+                }
+                if (badges.length >= 3) break;
+            }
+            return badges;
+        };
+
         const renderRecipeCard = (recipe: StructuredRecipe, isSavedView = false, isCompact = false) => {
             const ratingInfo = getRatingInfo(recipe.title);
             // eslint-disable-next-line @typescript-eslint/no-unused-vars
             const isSaved = savedRecipes.some(r => r.title === recipe.title);
             const titleKey = `${recipe.title || 'Untitled Recipe'}-${Math.random()}`;
+            const dietaryBadges = getDietaryBadges(recipe);
             
             // Filter out staple items from ingredient list
             const filteredIngredients = recipe.ingredients.filter(ing => {
@@ -1431,6 +1462,13 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                                     </>
                                 )}
                             </div>
+                            {dietaryBadges.length > 0 && (
+                                <div className="flex flex-wrap gap-1 mt-1.5">
+                                    {dietaryBadges.map(b => (
+                                        <span key={b.label} className={`text-[9px] font-semibold px-1.5 py-0.5 rounded border ${b.color}`}>{b.label}</span>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     </div>
                 );
@@ -1451,6 +1489,13 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                                 </span>
                             )}
                         </div>
+                        {dietaryBadges.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-2">
+                                {dietaryBadges.map(b => (
+                                    <span key={b.label} className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${b.color}`}>{b.label}</span>
+                                ))}
+                            </div>
+                        )}
                     </div>
 
                     <div className="p-4">
@@ -1586,6 +1631,19 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                                 {showImportModal && (
                                     <ImportModal open={showImportModal} onClose={() => setShowImportModal(false)} defaultTab="recipes" />
                                 )}
+                {recipeSaveLimitExceeded && (
+                    <div className="mb-3 p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center justify-between gap-2">
+                        <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">
+                            Save limit reached ({savedRecipes.length} saved) — upgrade to save more
+                        </p>
+                        <button
+                            onClick={() => setActiveTab(Tab.SETTINGS)}
+                            className="text-xs font-bold text-[var(--accent-color)] shrink-0 hover:opacity-80 transition-opacity"
+                        >
+                            Upgrade
+                        </button>
+                    </div>
+                )}
                 {isLoadingSavedRecipes ? (
                     <div className="grid grid-cols-3 gap-4">
                         {Array.from({ length: 8 }).map((_, index) => (

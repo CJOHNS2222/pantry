@@ -159,6 +159,26 @@ function createSavedRecipesListener(
   });
 }
 
+// Module-level cache for the rolling-window skeleton to avoid rebuilding on every Firestore snapshot.
+// Only regenerated when the calendar date crosses midnight (todayKey changes).
+const DAYS_OF_WEEK = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+let _mealPlanTemplateCacheKey = '';
+let _mealPlanTemplate: Array<{ date: string; dayName: string }> = [];
+
+function getMealPlanTemplate(todayISO: string): Array<{ date: string; dayName: string }> {
+  if (_mealPlanTemplateCacheKey === todayISO) return _mealPlanTemplate;
+  const today = new Date(todayISO + 'T12:00:00');
+  _mealPlanTemplate = [];
+  for (let i = -60; i < 60; i++) {
+    const d = new Date(today);
+    d.setDate(today.getDate() + i);
+    const iso = d.toISOString().slice(0, 10);
+    _mealPlanTemplate.push({ date: iso, dayName: DAYS_OF_WEEK[d.getDay()] });
+  }
+  _mealPlanTemplateCacheKey = todayISO;
+  return _mealPlanTemplate;
+}
+
 function createMealPlanListener(
   user: User,
   household: Household | null,
@@ -174,29 +194,14 @@ function createMealPlanListener(
     : `users/${user.id}/cache/mealPlan`;
 
   return DatabaseMonitoringService.onSnapshot(DatabaseMonitoringService.doc(cachePath), snap => {
-    // 1. Always generate the base plan structure first.
-    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    // 1. Build the base plan using the module-level cached template (rebuilt only when date changes).
     const today = new Date();
-    
-    // Generate a rolling 4-month window (60 days back + 60 days forward).
-    // Saves generating ~240 unused empty objects on every snapshot vs. the old 6-month window.
-    // Firestore data outside this window is still merged in below.
-    const daysBack = 60;
-    const daysForward = 60;
-    
+    const todayISO = today.toISOString().slice(0, 10);
+    const template = getMealPlanTemplate(todayISO);
+
     const basePlan = new Map<string, DayPlan>();
-    
-    for (let i = -daysBack; i < daysForward; i++) {
-      const d = new Date(today);
-      d.setDate(today.getDate() + i);
-      const iso = d.toISOString().slice(0, 10);
-      basePlan.set(iso, {
-        date: iso,
-        dayName: days[d.getDay()],
-        breakfast: [],
-        lunch: [],
-        dinner: []
-      });
+    for (const { date, dayName } of template) {
+      basePlan.set(date, { date, dayName, breakfast: [], lunch: [], dinner: [] });
     }
 
     // 2. If data exists in Firestore, merge it into the base plan.
@@ -210,7 +215,7 @@ function createMealPlanListener(
             const dayData = firestoreDays[date];
             basePlan.set(date, {
               date,
-              dayName: days[new Date(date + 'T12:00:00').getDay()],
+              dayName: DAYS_OF_WEEK[new Date(date + 'T12:00:00').getDay()],
               breakfast: Array.isArray(dayData.breakfast) ? dayData.breakfast : [],
               lunch: Array.isArray(dayData.lunch) ? dayData.lunch : [],
               dinner: Array.isArray(dayData.dinner) ? dayData.dinner : []
@@ -249,7 +254,7 @@ function createMealPlanListener(
 
 export function useDataManagement(
   user?: User | null,
-  addToast?: (message: string, type: 'success' | 'error' | 'info' | 'warning', duration?: number) => void,
+  addToast?: (message: string, type: 'success' | 'error' | 'info' | 'warning', duration?: number, actionLabel?: string, action?: () => void) => void,
   addToShoppingList?: (items: string[]) => void,
   updateSyncStatus?: (status: Partial<{ isOnline: boolean; isSyncing: boolean; lastSyncTime: Date | null; pendingOperations: number; syncError: string | null }>) => void,
   loggingOptions?: {
@@ -731,6 +736,34 @@ export function useDataManagement(
     }
   }, [user]);
 
+  // Keep recipes.used Firestore counter in sync with the actual saved-recipe count.
+  // Runs after every change so the Settings/SubscriptionManager displays are accurate.
+  useEffect(() => {
+    if (!user || isLoadingSavedRecipes) return;
+    UsageService.syncRecipeCount(user, savedRecipes.length).catch(err => {
+      log.warn('Failed to sync recipe count', { error: err }, 'DataManagement');
+    });
+    // Only re-run when the actual count changes or the user changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [savedRecipes.length, user?.id, isLoadingSavedRecipes]);
+
+  // Keep mealPlanning.weeklyUsed Firestore counter in sync with actual current/future entries.
+  // Past entries are excluded so they never count against the user's quota.
+  useEffect(() => {
+    if (!user || isLoadingMealPlan) return;
+    const now = new Date();
+    const weekStart = new Date(now);
+    weekStart.setDate(now.getDate() - now.getDay());
+    weekStart.setHours(0, 0, 0, 0);
+    const currentFutureCount = mealPlan
+      .filter(day => new Date(day.date) >= weekStart)
+      .reduce((count, day) => count + (day.breakfast?.length || 0) + (day.lunch?.length || 0) + (day.dinner?.length || 0), 0);
+    UsageService.syncMealPlanCount(user, currentFutureCount).catch(err => {
+      log.warn('Failed to sync meal plan count', { error: err }, 'DataManagement');
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mealPlan, user?.id, isLoadingMealPlan]);
+
 
   // Handlers
   const handleAddToPlan = async (recipe: StructuredRecipe | SavedRecipe, targetDayIndex?: number, targetMealType?: 'breakfast' | 'lunch' | 'dinner') => {
@@ -747,6 +780,26 @@ export function useDataManagement(
       addToast?.(ERROR_MESSAGES.PLANNING_LIMIT_REACHED, 'error');
       return;
     }
+
+    // Pre-calculate current+future count (before the add) for sync purposes.
+    // The mealPlan sync effect will also re-sync once state settles, but we
+    // call syncMealPlanCount here immediately so the counter is never stale.
+    const _syncNow = (addedDateStr: string) => {
+      if (!user) return;
+      const now = new Date();
+      const weekStart = new Date(now);
+      weekStart.setDate(now.getDate() - now.getDay());
+      weekStart.setHours(0, 0, 0, 0);
+      const isCurrentOrFuture = new Date(addedDateStr) >= weekStart;
+      const currentFutureCount = mealPlan
+        .filter(day => new Date(day.date) >= weekStart)
+        .reduce((count, day) => count + (day.breakfast?.length || 0) + (day.lunch?.length || 0) + (day.dinner?.length || 0), 0);
+      // +1 because mealPlan state hasn't updated yet (Firestore listener fires async)
+      const syncCount = isCurrentOrFuture ? currentFutureCount + 1 : currentFutureCount;
+      UsageService.syncMealPlanCount(user, syncCount).catch(err => {
+        log.warn('Failed to sync meal plan count after add', { error: err }, 'DataManagement');
+      });
+    };
 
     let dayIndex = targetDayIndex;
     const mealType = targetMealType || 'breakfast';
@@ -771,7 +824,7 @@ export function useDataManagement(
         };
         await addMealToPlan(dateStr, mealTypeToUse, newMeal);
         AnalyticsService.trackMealPlanAdd(recipe.id || recipe.title, recipe.title, mealTypeToUse, 0);
-        if (user) await UsageService.recordMealPlanAddition(user);
+        _syncNow(dateStr);
         return;
     }
 
@@ -785,7 +838,7 @@ export function useDataManagement(
     await addMealToPlan(targetDate, mealType, newMeal);
 
     AnalyticsService.trackMealPlanAdd(recipe.id || recipe.title, recipe.title, mealType, dayIndex);
-    if (user) await UsageService.recordMealPlanAddition(user);
+    _syncNow(targetDate);
   };
 
   const checkRecipeSaveLimit = async () => {
@@ -844,10 +897,10 @@ export function useDataManagement(
       };
 
       await RecipesCacheService.addRecipeToCache(savedRecipe, householdId, userId);
-      // Persist structured recipe into any existing rating documents for this recipe title
-      // No-op: rating docs include recipe data at submit time, no client-side attachment needed.
-      await UsageService.recordRecipeSave(user);
+      // Sync the recipe counter to match the actual count (current + 1 for the one just added)
+      await UsageService.syncRecipeCount(user, savedRecipes.length + 1);
 
+      HapticService.success();
       addToast?.(`Saved ${recipe.title} to your recipes!`, 'success');
     } catch (err) {
       log.error('Error saving recipe:', err, 'DataManagement');
@@ -863,8 +916,10 @@ export function useDataManagement(
       const userId = inHousehold ? undefined : user.id;
       
       await RecipesCacheService.removeRecipeFromCache(recipe.id, householdId, userId);
-      await UsageService.recordRecipeDelete(user);
+      // Sync the recipe counter to match the actual count (current - 1 for the one just removed)
+      await UsageService.syncRecipeCount(user, Math.max(0, savedRecipes.length - 1));
 
+      HapticService.light();
       addToast?.(`Removed ${recipe.title} from your saved recipes.`, 'success');
     } catch (err) {
       log.error('Error deleting recipe:', err, 'DataManagement');
@@ -1000,21 +1055,38 @@ export function useDataManagement(
 
     await recordUndo('delete_item', itemToDelete);
 
+    HapticService.medium();
     setInventory(prev => prev.filter((_, i) => i !== index));
 
     await InventoryCacheService.removeItemFromCache(itemToDelete.id, user?.householdId, user?.id);
+
+    addToast?.(
+      `"${itemToDelete.item}" removed from pantry.`,
+      'info',
+      6000,
+      'Undo',
+      () => { performUndo(); }
+    );
   };
 
   const addItem = async (item: PantryItem) => {
     const itemWithAlert = { ...item, expiryAlertShown: shouldShowExpiryAlert(item) };
 
     if (user?.isGuest) {
+      let atCap = false;
       setInventory(prev => {
-        if (prev.length >= GUEST_ITEM_CAP) return prev;
+        if (prev.length >= GUEST_ITEM_CAP) {
+          atCap = true;
+          return prev;
+        }
         const updated = [...prev, itemWithAlert];
         try { localStorage.setItem(GUEST_INVENTORY_KEY, JSON.stringify(updated)); } catch { /* storage full */ }
         return updated;
       });
+      if (atCap) {
+        addToast?.(`Guest pantry is full (${GUEST_ITEM_CAP} items). Sign in for unlimited items.`, 'warning');
+        return;
+      }
       HapticService.itemAdded();
       return;
     }
@@ -1034,14 +1106,19 @@ export function useDataManagement(
 
   const addItems = async (items: PantryItem[]) => {
     if (user?.isGuest) {
+      let cappedCount = 0;
       setInventory(prev => {
         const remaining = GUEST_ITEM_CAP - prev.length;
-        if (remaining <= 0) return prev;
+        if (remaining <= 0) { cappedCount = items.length; return prev; }
         const toAdd = items.slice(0, remaining);
+        if (toAdd.length < items.length) cappedCount = items.length - toAdd.length;
         const updated = [...prev, ...toAdd];
         try { localStorage.setItem(GUEST_INVENTORY_KEY, JSON.stringify(updated)); } catch { /* storage full */ }
         return updated;
       });
+      if (cappedCount > 0) {
+        addToast?.(`Guest pantry limit reached (${GUEST_ITEM_CAP} items). Sign in for unlimited items.`, 'warning');
+      }
       return;
     }
     await InventoryCacheService.addItemsToCache(items, user?.householdId, user?.id);
@@ -1051,12 +1128,16 @@ export function useDataManagement(
     if (!user?.id) return;
     const fullItem: ShoppingItem = { ...item, id: `shop-${Date.now()}`, addedAt: new Date() };
     if (user.isGuest) {
+      let atCap = false;
       setShoppingList(prev => {
-        if (prev.length >= GUEST_SHOPPING_CAP) return prev;
+        if (prev.length >= GUEST_SHOPPING_CAP) { atCap = true; return prev; }
         const updated = [...prev, fullItem];
         try { localStorage.setItem(GUEST_SHOPPING_KEY, JSON.stringify(updated)); } catch { /* storage full */ }
         return updated;
       });
+      if (atCap) {
+        addToast?.(`Guest shopping list is full (${GUEST_SHOPPING_CAP} items). Sign in for unlimited items.`, 'warning');
+      }
       return;
     }
     await ShoppingListCacheService.addItemToCache(fullItem, user?.householdId, user?.id);

@@ -19,11 +19,21 @@ export class PantryService {
     user?: Partial<User>
   ): Promise<PantryItem[]> {
     // Check if user has opted in to AI features
+    log.debug('PantryService.analyzePantryImage: entry', {
+      userId: user?.id ?? 'none',
+      isGuest: user?.isGuest ?? false,
+      imageSizeKB: Math.round(base64Data.length / 1024),
+      mimeType,
+      canUseGemini: canUseGemini(user?.id),
+    }, 'PantryService');
+
     if (!canUseGemini(user?.id)) {
       throw new Error('Please enable AI features in Settings to use image analysis.');
     }
 
     const items = await analyzePantryImage(base64Data, mimeType, user as any);
+    log.debug('PantryService.analyzePantryImage: Gemini returned items', { count: items.length }, 'PantryService');
+
     if (items.length === 0) {
       throw new Error('No items detected in the image.');
     }

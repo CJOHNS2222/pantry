@@ -8,6 +8,7 @@ import { inferCategoryFromItemName, isHouseholdMember } from '../utils/appUtils'
 import { log } from '../services/logService';
 import { validateItemName, validateQuantity } from '@/src/utils/validation';
 import { ShoppingListItemSkeleton } from './SkeletonLoader';
+import HapticService from '../services/hapticService';
 import { ShoppingListCacheService } from '../services/shoppingListCacheService';
 
 // Import new enhancement components
@@ -348,6 +349,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     if (!item.checked) {
       // Item is being checked (completed)
       AnalyticsService.trackShoppingListComplete(1, items.length);
+      HapticService.light();
     }
 
     // Simply toggle the checked state without opening purchase modal
@@ -392,12 +394,10 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     setUndoHistory(prev => prev.slice(0, -1));
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const selectAll = () => {
     setItems(prev => prev.map(i => ({ ...i, checked: true })));
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const deselectAll = () => {
     setItems(prev => prev.map(i => ({ ...i, checked: false })));
   };
@@ -448,7 +448,6 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     ));
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const deleteCheckedItems = async () => {
     const checkedItems = items.filter(i => i.checked);
     if (checkedItems.length === 0) return;
@@ -967,6 +966,40 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
             }
           }}
         />
+      )}
+
+      {/* Screen reader announcement for loading state */}
+      <div aria-live="polite" aria-atomic="true" className="sr-only">
+        {isLoadingShoppingList ? 'Loading shopping list…' : `${items.length} shopping item${items.length === 1 ? '' : 's'} loaded`}
+      </div>
+
+      {/* Mark-all / Clear-purchased action bar */}
+      {!isLoadingShoppingList && items.length > 0 && (
+        <div className="flex items-center justify-between gap-2 mb-1">
+          {items.some(i => !i.checked) ? (
+            <button
+              onClick={selectAll}
+              className="text-xs font-medium text-[var(--accent-color)] hover:opacity-80 transition-opacity py-1 px-2 rounded-md hover:bg-[var(--accent-color)]/10"
+            >
+              Mark all purchased
+            </button>
+          ) : (
+            <button
+              onClick={deselectAll}
+              className="text-xs font-medium text-theme-secondary hover:opacity-80 transition-opacity py-1 px-2 rounded-md hover:bg-theme-secondary/50"
+            >
+              Unmark all
+            </button>
+          )}
+          {items.some(i => i.checked) && (
+            <button
+              onClick={deleteCheckedItems}
+              className="text-xs font-medium text-red-500 hover:opacity-80 transition-opacity py-1 px-2 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20"
+            >
+              Clear purchased ({items.filter(i => i.checked).length})
+            </button>
+          )}
+        </div>
       )}
 
       <div className="space-y-2">

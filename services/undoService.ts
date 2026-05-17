@@ -15,7 +15,24 @@ const DB_NAME = 'SmartPantryUndo';
 const STORE_NAME = 'actions';
 
 // Number of undo actions to retain — read from RC so it can be tuned without a release.
-const getMaxActions = () => remoteConfig.getNumber('undo_max_actions');
+// Cache the value so remoteConfig.getNumber() is not called on every prune/get operation.
+const DEFAULT_MAX_ACTIONS = 20;
+let _cachedMaxActions: number = DEFAULT_MAX_ACTIONS;
+let _maxActionsFetched = false;
+
+const getMaxActions = (): number => {
+  if (!_maxActionsFetched) {
+    const val = remoteConfig.getNumber('undo_max_actions');
+    _cachedMaxActions = val > 0 ? val : DEFAULT_MAX_ACTIONS;
+    _maxActionsFetched = true;
+  }
+  return _cachedMaxActions;
+};
+
+/** Call this after a Remote Config fetch completes to refresh the cached cap. */
+export const refreshUndoMaxActions = (): void => {
+  _maxActionsFetched = false;
+};
 
 class UndoService {
   private db: IDBDatabase | null = null;

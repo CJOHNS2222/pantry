@@ -18,7 +18,7 @@ import { NotificationSettingsComponent } from './NotificationSettings';
 import { PendingNotifications } from './PendingNotifications';
 import { NotificationService, NotificationSettings } from '../services/notificationService';
 import { DayPlan } from '../types';
-import { Loader2, ChevronDown, ChevronRight, Heart, AlertTriangle, Edit2, X, Settings as SettingsIcon } from 'lucide-react';
+import { Loader2, ChevronDown, ChevronRight, Heart, AlertTriangle, Edit2, X, Settings as SettingsIcon, User as UserIcon, Users, BellRing, Gauge, SlidersHorizontal, ShieldCheck, Palette, Bell, Tag, ShoppingCart, BarChart2, MessageSquare, Star, Camera, HelpCircle, RefreshCw, RotateCcw, Bug, Lock } from 'lucide-react';
 import { userOptedInToGemini, setUserGeminiOptIn, getGeminiUsage } from '../services/featureFlags';
 import { VersionUpdate } from './VersionUpdate';
 
@@ -625,6 +625,7 @@ export const Settings: React.FC<SettingsProps> = ({
               ) : (
                 <ChevronRight className="w-5 h-5 text-theme-primary" />
               )}
+              <UserIcon className="w-5 h-5 text-[var(--accent-color)]" />
               <h3 className="font-semibold text-theme-primary">{intl.formatMessage({ id: 'settings.profile' })}</h3>
             </div>
           </div>
@@ -898,6 +899,7 @@ export const Settings: React.FC<SettingsProps> = ({
               ) : (
                 <ChevronRight className="w-5 h-5 text-theme-primary" />
               )}
+              <BellRing className="w-5 h-5 text-[var(--accent-color)]" />
               <h3 className="font-semibold text-theme-primary">{intl.formatMessage({ id: 'settings.pendingNotifications' })}</h3>
             </div>
           </div>
@@ -922,6 +924,7 @@ export const Settings: React.FC<SettingsProps> = ({
               ) : (
                 <ChevronRight className="w-5 h-5 text-theme-primary" />
               )}
+              <Gauge className="w-5 h-5 text-[var(--accent-color)]" />
               <h3 className="font-semibold text-theme-primary">{intl.formatMessage({ id: 'settings.usageLimits' })}</h3>
             </div>
             {!isPremium && !isFamily && (
@@ -1076,6 +1079,7 @@ export const Settings: React.FC<SettingsProps> = ({
               ) : (
                 <ChevronRight className="w-5 h-5 text-theme-primary" />
               )}
+              <Users className="w-5 h-5 text-[var(--accent-color)]" />
               <h3 className="font-semibold text-theme-primary">{intl.formatMessage({ id: 'settings.household' })}</h3>
             </div>
           </div>
@@ -1205,6 +1209,51 @@ export const Settings: React.FC<SettingsProps> = ({
 
       {activeSettingsTab === 'preferences' && <>
 
+      {/* Power Features — quick access to high-value settings */}
+      <div className="bg-theme-secondary rounded-xl border border-theme p-4">
+        <p className="text-xs font-semibold text-theme-secondary uppercase tracking-wide mb-3">Power Features</p>
+        <div className="grid grid-cols-2 gap-2">
+          {[
+            {
+              label: 'Custom Categories',
+              icon: '🏷️',
+              description: 'Organise your pantry your way',
+              action: () => { setActiveSettingsTab('organization'); setShowCategoryManager(true); },
+            },
+            {
+              label: 'Store Layout',
+              icon: '🛒',
+              description: 'Sort shopping by aisle',
+              action: () => setActiveSettingsTab('organization'),
+            },
+            {
+              label: 'Food Safety Mode',
+              icon: '🧊',
+              description: 'Leftover guidance level',
+              action: () => setExpandedSections(prev => new Set([...prev, 'FoodSafety'])),
+            },
+            {
+              label: 'Nutrition Data',
+              icon: '📊',
+              description: 'Toggle nutrition display',
+              action: () => setExpandedSections(prev => new Set([...prev, 'AppPreferences'])),
+            },
+          ].map(({ label, icon, description, action }) => (
+            <button
+              key={label}
+              onClick={action}
+              className="flex items-start gap-2 p-3 rounded-lg bg-theme-primary border border-theme hover:border-[var(--accent-color)] hover:bg-[var(--accent-color)]/5 transition-all text-left focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]"
+            >
+              <span className="text-lg flex-shrink-0" aria-hidden="true">{icon}</span>
+              <div className="min-w-0">
+                <div className="text-xs font-semibold text-theme-primary truncate">{label}</div>
+                <div className="text-[10px] text-theme-secondary leading-tight mt-0.5">{description}</div>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* App Preferences Section */}
       <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden">
         <div
@@ -1217,6 +1266,7 @@ export const Settings: React.FC<SettingsProps> = ({
             ) : (
               <ChevronRight className="w-5 h-5 text-theme-primary" />
             )}
+            <SlidersHorizontal className="w-5 h-5 text-[var(--accent-color)]" />
             <h3 className="font-semibold text-theme-primary">{intl.formatMessage({ id: 'settings.appPreferences' })}</h3>
           </div>
         </div>
@@ -1389,6 +1439,7 @@ export const Settings: React.FC<SettingsProps> = ({
             ) : (
               <ChevronRight className="w-5 h-5 text-theme-primary" />
             )}
+            <ShieldCheck className="w-5 h-5 text-[var(--accent-color)]" />
             <h3 className="font-semibold text-theme-primary">{intl.formatMessage({ id: 'settings.foodSafety' })}</h3>
           </div>
         </div>
@@ -1545,6 +1596,7 @@ export const Settings: React.FC<SettingsProps> = ({
             ) : (
               <ChevronRight className="w-5 h-5 text-theme-primary" />
             )}
+            <Palette className="w-5 h-5 text-[var(--accent-color)]" />
             <h3 className="font-semibold text-theme-primary">{intl.formatMessage({ id: 'settings.themeSettings' })}</h3>
           </div>
         </div>
@@ -1587,10 +1639,22 @@ export const Settings: React.FC<SettingsProps> = ({
               id="accentColor"
               name="accentColor"
               type="color"
+              list="accentColorPresets"
               value={settings.theme.accentColor}
               onChange={(e) => handleChange('theme', { accentColor: e.target.value })}
               className="border rounded w-8 h-8 ml-2"
             />
+            {/* Accessible palette — all colours pass WCAG AA on white text */}
+            <datalist id="accentColorPresets">
+              <option value="#0078d4" label="Blue" />
+              <option value="#4CAF50" label="Green" />
+              <option value="#e05c00" label="Orange" />
+              <option value="#c2185b" label="Pink" />
+              <option value="#7b1fa2" label="Purple" />
+              <option value="#00796b" label="Teal" />
+              <option value="#c62828" label="Red" />
+              <option value="#37474f" label="Slate" />
+            </datalist>
           </div>
 
           <div className="flex items-center justify-between">
@@ -1638,6 +1702,7 @@ export const Settings: React.FC<SettingsProps> = ({
             ) : (
               <ChevronRight className="w-5 h-5 text-theme-primary" />
             )}
+            <Bell className="w-5 h-5 text-[var(--accent-color)]" />
             <h3 className="font-semibold text-theme-primary">{intl.formatMessage({ id: 'settings.notifications' })}</h3>
           </div>
         </div>
@@ -1672,6 +1737,7 @@ export const Settings: React.FC<SettingsProps> = ({
               ) : (
                 <ChevronRight className="w-5 h-5 text-theme-primary" />
               )}
+              <Tag className="w-5 h-5 text-[var(--accent-color)]" />
               <h3 className="font-semibold text-theme-primary">{intl.formatMessage({ id: 'settings.categories' })}</h3>
             </div>
           </div>
@@ -1710,6 +1776,7 @@ export const Settings: React.FC<SettingsProps> = ({
               ) : (
                 <ChevronRight className="w-5 h-5 text-theme-primary" />
               )}
+              <ShoppingCart className="w-5 h-5 text-[var(--accent-color)]" />
               <h3 className="font-semibold text-theme-primary">{intl.formatMessage({ id: 'settings.storeLayout' })}</h3>
             </div>
           </div>
@@ -1744,6 +1811,7 @@ export const Settings: React.FC<SettingsProps> = ({
               ) : (
                 <ChevronRight className="w-5 h-5 text-theme-primary" />
               )}
+              <BarChart2 className="w-5 h-5 text-[var(--accent-color)]" />
               <h3 className="font-semibold text-theme-primary">{intl.formatMessage({ id: 'settings.leftoverAnalytics' })}</h3>
             </div>
           </div>
@@ -1772,6 +1840,7 @@ export const Settings: React.FC<SettingsProps> = ({
             ) : (
               <ChevronRight className="w-5 h-5 text-theme-primary" />
             )}
+            <MessageSquare className="w-5 h-5 text-[var(--accent-color)]" />
             <h3 className="font-semibold text-theme-primary">{intl.formatMessage({ id: 'settings.feedback' })}</h3>
           </div>
         </div>
@@ -1812,6 +1881,7 @@ export const Settings: React.FC<SettingsProps> = ({
               ) : (
                 <ChevronRight className="w-5 h-5 text-theme-primary" />
               )}
+              <Star className="w-5 h-5 text-[var(--accent-color)]" />
               <h3 className="font-semibold text-theme-primary">{intl.formatMessage({ id: 'settings.subscription' })}</h3>
             </div>
           </div>
@@ -1839,6 +1909,7 @@ export const Settings: React.FC<SettingsProps> = ({
               ) : (
                 <ChevronRight className="w-5 h-5 text-theme-primary" />
               )}
+              <Camera className="w-5 h-5 text-[var(--accent-color)]" />
               <h3 className="font-semibold text-theme-primary">{intl.formatMessage({ id: 'settings.pantryImages' })}</h3>
             </div>
           </div>
@@ -1897,6 +1968,7 @@ export const Settings: React.FC<SettingsProps> = ({
             ) : (
               <ChevronRight className="w-5 h-5 text-theme-primary" />
             )}
+            <HelpCircle className="w-5 h-5 text-[var(--accent-color)]" />
             <h3 className="font-semibold text-theme-primary">{intl.formatMessage({ id: 'settings.help' })}</h3>
           </div>
         </div>
@@ -1930,6 +2002,7 @@ export const Settings: React.FC<SettingsProps> = ({
             ) : (
               <ChevronRight className="w-5 h-5 text-theme-primary" />
             )}
+            <RefreshCw className="w-5 h-5 text-[var(--accent-color)]" />
             <h3 className="font-semibold text-theme-primary">{intl.formatMessage({ id: 'settings.appUpdates' })}</h3>
           </div>
         </div>
@@ -1953,6 +2026,7 @@ export const Settings: React.FC<SettingsProps> = ({
               ) : (
                 <ChevronRight className="w-5 h-5 text-theme-primary" />
               )}
+              <RotateCcw className="w-5 h-5 text-[var(--accent-color)]" />
               <h3 className="font-semibold text-theme-primary">Reset Usage Counters</h3>
             </div>
           </div>
@@ -1990,6 +2064,7 @@ export const Settings: React.FC<SettingsProps> = ({
               ) : (
                 <ChevronRight className="w-5 h-5 text-theme-primary" />
               )}
+              <Bug className="w-5 h-5 text-[var(--accent-color)]" />
               <h3 className="font-semibold text-theme-primary">Remote Config Debug</h3>
             </div>
           </div>
@@ -2248,6 +2323,7 @@ export const Settings: React.FC<SettingsProps> = ({
             ) : (
               <ChevronRight className="w-5 h-5 text-theme-primary" />
             )}
+            <Lock className="w-5 h-5 text-[var(--accent-color)]" />
             <h3 className="font-semibold text-theme-primary">{intl.formatMessage({ id: 'settings.privacy' })}</h3>
           </div>
         </div>

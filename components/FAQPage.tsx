@@ -258,6 +258,143 @@ const FAQ_DATA: FAQItem[] = [
     question: 'What should I do if the app is running slowly?',
     answer: 'Performance optimization:\n\n1. **Close Other Apps**: Free up device memory\n2. **Clear Cache**: Clear app cache in device settings\n3. **Update App**: Install latest version for performance improvements\n4. **Restart Device**: Sometimes a restart helps\n5. **Check Storage**: Ensure sufficient storage space\n6. **Reinstall**: As last resort, reinstall the app\n\nMost performance issues are resolved by clearing cache or updating the app.',
     keywords: ['slow', 'performance', 'cache', 'memory', 'storage', 'restart']
+  },
+
+  // Input Methods
+  {
+    id: 'input-1',
+    category: 'Input Methods',
+    question: 'How do I add items by voice?',
+    answer: 'Voice input lets you add pantry items hands-free:\n\n1. Tap the **+** button in the Pantry tab to open the Quick Add panel\n2. Tap the **microphone icon** — the app will ask for microphone permission the first time\n3. Speak the item name clearly (e.g. "two litres of whole milk" or "chicken breast")\n4. The app transcribes your words into the name field — review and tap **Add**\n\n**Tips for best results:**\n• Speak in a quiet environment\n• Use your device\'s display language — the app matches your locale automatically\n• Say the quantity first, then the item (e.g. "three cans of tomatoes")\n• If recognition fails you\'ll see a message — tap the mic again to retry or just type\n\nVoice input requires microphone permission and works on Android and modern browsers. It is not available when the device is offline.',
+    keywords: ['voice', 'microphone', 'speak', 'dictate', 'voice input', 'hands-free', 'mic', 'speech']
+  },
+  {
+    id: 'input-2',
+    category: 'Input Methods',
+    question: 'How do AI camera scans work — pantry photo vs receipt?',
+    answer: 'Stock & Spoon has two distinct AI scan modes:\n\n**Pantry / Shelf Photo Scan**\n• Tap the **camera icon** in the Pantry tab\n• Point at a shelf, fridge interior, or counter full of food\n• The AI detects individual items and adds them to a review list\n• Confirm, edit, or remove each detected item before saving\n• Works best with good lighting, items facing forward, and the label visible\n\n**Receipt Scan**\n• Tap **Scan Receipt** from the Pantry add menu\n• Photograph a printed or on-screen grocery receipt\n• The app uses OCR to extract item names and quantities\n• Falls back to AI analysis if OCR confidence is low\n• Works best on uncrumpled receipts with clear text in good light\n\nBoth modes count toward your weekly AI scan limit (5 scans/week on Free, 15 on Premium).',
+    keywords: ['camera', 'scan', 'receipt', 'photo', 'ai scan', 'shelf', 'fridge', 'ocr', 'barcode', 'image']
+  },
+  {
+    id: 'input-3',
+    category: 'Input Methods',
+    question: 'How do I import items from a CSV file?',
+    answer: 'CSV import lets you add many items at once:\n\n1. Go to **Pantry tab → + → Import from CSV**\n2. Prepare a CSV file with columns: `name`, `quantity`, `unit`, `category`, `expiry` (YYYY-MM-DD), `location`\n3. Only `name` is required — all other columns are optional\n4. Select your file in the Import dialog and tap **Import**\n5. Review the detected items before confirming\n\n**CSV example:**\n```\nname,quantity,unit,category,expiry\nWhole Milk,2,litres,Dairy,2026-06-01\nChicken Breast,500,g,Meat,2026-05-08\n```\n\nCommon import issues:\n• Dates must be YYYY-MM-DD format\n• Use commas as the delimiter (not semicolons)\n• Save the file as plain text / UTF-8, not Excel .xlsx format',
+    keywords: ['csv', 'import', 'bulk', 'file', 'upload', 'spreadsheet', 'columns', 'format']
+  },
+
+  // Pantry Management additions
+  {
+    id: 'pantry-8',
+    category: 'Pantry Management',
+    question: 'Can I undo a deletion or accidental edit?',
+    answer: 'Yes — Stock & Spoon supports undo for the most recent item actions:\n\n• When you **delete an item**, a toast notification appears at the bottom of the screen with an **Undo** button. Tap it within 6 seconds to restore the item.\n• Bulk deletes and item edits are also undoable from the same toast.\n• Up to 20 recent actions are stored. If you need to reverse something older, check if the item is still in a household member\'s cache under **Settings → Data → Clear Cache**.\n\nThe undo history is stored locally on your device and resets if you sign out.',
+    keywords: ['undo', 'delete', 'restore', 'accidental', 'reverse', 'toast', 'history', 'recover']
+  },
+  {
+    id: 'pantry-9',
+    category: 'Pantry Management',
+    question: 'How do I use the freezer portion tracker?',
+    answer: 'When you freeze items you often divide them into portions — the app tracks this separately:\n\n1. Tap any pantry item and change **Storage Location** to **Freezer**\n2. A freeze transition dialog appears — enter the **number of portions** and optionally a **freeze date**\n3. The app records each portion as a sub-quantity within the item\n4. When you defrost a portion, tap the item and use **Decrease Quantity** — the portion count decreases accordingly\n5. The expiry is automatically extended to USDA-recommended freezer shelf life (see "How does the app handle items I put in the freezer?" for exact timelines)\n\nFrozen items display a snowflake badge in the pantry list so they are easy to spot.',
+    keywords: ['freezer', 'portions', 'freeze', 'defrost', 'thaw', 'freeze date', 'portion count', 'snowflake']
+  },
+  {
+    id: 'pantry-10',
+    category: 'Pantry Management',
+    question: 'How does nutrition data work and how do I enable it?',
+    answer: 'Stock & Spoon can show nutritional facts for pantry items:\n\n**To enable:**\n1. Go to **Settings → Shopping**\n2. Toggle on **Show Nutrition Data**\n\n**What you see:**\nCalories, protein, carbohydrates, fat, fibre, and sugar — sourced from the USDA FoodData Central database.\n\n**How it works:**\n• Tap any item to open its detail screen, then expand the **Nutrition** section\n• Data is fetched by matching the item name against the USDA database\n• Results are cached on your device for 90 days — repeat lookups are instant and work offline\n• If no match is found the app says "No nutrition data found for this item"\n• The feature requires an active internet connection for the first lookup of each item\n\nNutrition data is provided for informational purposes. Actual values vary by brand and preparation.',
+    keywords: ['nutrition', 'calories', 'protein', 'carbs', 'fat', 'fibre', 'sugar', 'usda', 'food data', 'nutrition facts']
+  },
+  {
+    id: 'pantry-11',
+    category: 'Pantry Management',
+    question: 'What are custom categories and how do I create one?',
+    answer: 'Custom categories let you organise your pantry beyond the built-in groups (Produce, Dairy, Meat, etc.):\n\n1. Go to **Settings → Pantry → Manage Categories**\n2. Tap **+ New Category**\n3. Choose a name, icon, and colour\n4. Tap **Save**\n\nYour new category appears in the Pantry category filter and in the category picker when adding or editing items.\n\n**Plan limits:**\n• Free plan: 1 custom category\n• Premium: Unlimited custom categories\n• Family: Unlimited, shared across all household members\n\nCustom categories sync to the cloud and are available on all your devices.',
+    keywords: ['custom categories', 'category', 'organise', 'pantry', 'icon', 'colour', 'create category', 'manage categories']
+  },
+
+  // Leftovers
+  {
+    id: 'leftovers-1',
+    category: 'Leftovers',
+    question: 'How do I quickly log leftovers?',
+    answer: 'The Leftover Quick Capture button lets you log cooked food in seconds:\n\n1. Tap the **Leftovers** quick-action button in the Pantry tab (the pot icon)\n2. Type or speak what you cooked (e.g. "chicken stir-fry", "pasta bolognese")\n3. Set an approximate quantity and confirm\n4. The item is added to your pantry as a leftover with an expiry calculated from your **leftover persona** (see below)\n\n**Cooked rice** is treated specially: it is flagged with a stricter 4-hour room-temperature rule before refrigeration, in line with food safety guidance.\n\nLeftovers appear with a distinct badge so they are easy to spot and use up first.',
+    keywords: ['leftovers', 'quick capture', 'cooked', 'log', 'leftover', 'pot', 'rice', 'food safety', 'quick add']
+  },
+  {
+    id: 'leftovers-2',
+    category: 'Leftovers',
+    question: 'What are leftover personas and which one should I choose?',
+    answer: 'Your leftover persona controls how aggressively the app applies food-safety windows to leftovers:\n\n• **Relaxed** — follows the safe-but-lenient end of guidance. Cooked meats and casseroles get up to 5 days in the fridge before an alert appears. Good for households that reheat thoroughly and are not at elevated health risk.\n\n• **Normal** (default) — follows standard USDA/NHS guidance. Most cooked meals get 3–4 days. A balanced choice for most households.\n\n• **Strict** — shorter windows, earlier alerts. Cooked chicken or fish gets 2 days; most things 2–3 days. Recommended for households with young children, pregnant members, elderly, or immunocompromised individuals.\n\nTo change your persona: **Settings → Food Safety → Leftover Safety Persona**.\n\nThese personas only affect *leftover* items. Regular pantry items always use their printed best-by or use-by date.',
+    keywords: ['leftover persona', 'relaxed', 'normal', 'strict', 'food safety', 'expiry window', 'leftover settings', 'persona']
+  },
+
+  // Meal Planning additions
+  {
+    id: 'meal-planning-4',
+    category: 'Meal Planning',
+    question: 'What is the Meal Prep Planner and how does it work?',
+    answer: 'The Meal Prep Planner helps you batch-cook multiple recipes at once to save time:\n\n1. Open the **Meal Planner tab** and tap **Meal Prep**\n2. Select 2 or more recipes you want to prep together\n3. The planner calculates **ingredient overlap** — items shared across recipes so you only chop, measure, or cook once\n4. Choose a prep duration: **3-day**, **5-day**, or **7-day** plan\n5. The planner shows total cook time, combined difficulty, and a consolidated ingredient list\n6. Tap **Add to Meal Plan** to push all selected recipes to the calendar at once\n\n**Tips:**\n• Recipes with overlapping vegetables or proteins give the biggest time savings\n• The combined shopping list is generated automatically from the full ingredient set\n• Premium and Family plans support longer prep durations and more simultaneous recipes',
+    keywords: ['meal prep', 'batch cook', 'prep planner', 'ingredient overlap', 'cook time', 'difficulty', 'prep duration', '5 day', '7 day']
+  },
+  {
+    id: 'meal-planning-5',
+    category: 'Meal Planning',
+    question: 'How do AI recipe search tips work?',
+    answer: 'The Recipe Finder uses a combination of **Spoonacular** (a recipe database) and **Gemini AI** to find relevant recipes:\n\n**Getting better results:**\n• Toggle **"Use my pantry items"** — this sends your current inventory to the AI so it can suggest recipes you can actually make\n• Be specific: "quick 30-minute chicken pasta" returns better results than just "pasta"\n• Add dietary constraints in the search bar: "vegan high-protein breakfast"\n• Mentioning an ingredient you want to use up works well: "recipes with half a butternut squash"\n\n**Scan limits:**\n• Free: 5 AI recipe searches per week\n• Premium: 15 per week\n• Family: Unlimited\n\nResults from Spoonacular are cached so repeating a search does not count against your limit.',
+    keywords: ['recipe search', 'ai recipe', 'gemini', 'spoonacular', 'search tips', 'pantry items', 'use pantry', 'recipe finder', 'ai search']
+  },
+
+  // Community
+  {
+    id: 'community-1',
+    category: 'Community',
+    question: 'What is the Community tab?',
+    answer: 'The Community tab shows recipes that have been rated and reviewed by other Stock & Spoon users:\n\n• **Browse** top-rated community recipes with average star ratings\n• **Read comments** from users who have tried each recipe\n• **Rate a recipe yourself** — open a saved recipe, tap the star rating, and submit\n• **Save to your collection** — tap the bookmark icon to save a community recipe to your own library\n\nRecipes are ranked by average rating weighted by number of ratings, so heavily-reviewed recipes rise to the top over time.\n\nYour own ratings and comments are linked to your account and visible to other members. Only users who have saved a recipe can rate it.',
+    keywords: ['community', 'ratings', 'reviews', 'rate recipe', 'community tab', 'star rating', 'comments', 'browse recipes']
+  },
+
+  // Shopping additions
+  {
+    id: 'shopping-4',
+    category: 'Shopping Lists',
+    question: 'How do I set up a custom store layout for my shopping list?',
+    answer: 'The store layout editor lets you reorder shopping categories to match the physical layout of your regular grocery store:\n\n1. Go to **Settings → Shopping → Store Layout**\n2. Drag and drop the category rows into the order you walk through your store (e.g. Produce first, then Dairy, then Meat)\n3. Tap **Save Layout**\n\nThe Shopping tab will now present items grouped in your custom aisle order. If you shop at multiple stores, you can reset to the default at any time and re-arrange for whichever store you are visiting that day.\n\nCategories with no items in your current shopping list are hidden automatically so the list stays clean.',
+    keywords: ['store layout', 'aisle order', 'custom layout', 'store editor', 'shopping order', 'drag', 'reorder', 'grocery store']
+  },
+  {
+    id: 'shopping-5',
+    category: 'Shopping Lists',
+    question: 'How do price trends and the grocery cost estimator work?',
+    answer: 'Stock & Spoon includes two price-awareness tools:\n\n**Price Trends (per item)**\n• Tap any pantry item and scroll to the **Price Trends** section\n• The app shows a price history graph based on crowdsourced price reports and the Open Prices API\n• Enable or disable this in **Settings → Shopping → Show Price Data**\n\n**Grocery Cost Estimator (shopping list)**\n• Open your Shopping List and look for the **Estimated Total** bar at the top\n• The estimator uses recent regional prices to approximate your shopping trip cost\n• Free plan shows the first 5 ingredients; Premium and Family show the full list\n\nPrice data is sourced from community submissions and public price databases. Actual store prices may differ. Prices are refreshed periodically and cached locally.',
+    keywords: ['price', 'cost estimator', 'price trends', 'grocery cost', 'price history', 'open prices', 'shopping cost', 'estimate']
+  },
+
+  // Household additions
+  {
+    id: 'household-4',
+    category: 'Household & Sharing',
+    question: 'What is the household activity feed?',
+    answer: 'The activity feed shows a running log of actions taken by household members:\n\n• Items added, removed, or updated in the shared pantry\n• Shopping list items ticked off or added\n• Meal plan changes\n• New recipes saved to the household library\n\nTo view the feed: tap the **household icon** at the top of the Pantry tab or visit **Settings → Household → Activity Feed**.\n\nEach event shows the member\'s name, avatar, the action taken, and a timestamp. The feed is visible to all household members and is stored for the last 30 days.\n\nNotifications for household activity can be enabled or muted per-event-type in **Settings → Notifications → Household Activity**.',
+    keywords: ['activity feed', 'household feed', 'activity log', 'household activity', 'recent activity', 'timeline', 'household log']
+  },
+
+  // Settings additions
+  {
+    id: 'settings-4',
+    category: 'Settings & Preferences',
+    question: 'How do I turn AI features on or off?',
+    answer: 'You can opt in or out of all AI-powered features at any time:\n\n1. Go to **Settings → AI & Privacy**\n2. Toggle **Enable AI Features (Gemini)** on or off\n\n**What opting out does:**\n• Disables Gemini AI for pantry photo scans, receipt analysis, and recipe search\n• Barcode scanning, manual entry, and Spoonacular recipe search still work\n• Your weekly AI scan counter is paused (usage limits still track separately)\n• No data is sent to Google Gemini while opted out\n\n**To re-enable:** return to the same toggle and turn it back on. All previously cached AI results remain on your device.\n\nIf you are on the Free plan, your 5 weekly AI scans reset every Monday regardless of opt-in status.',
+    keywords: ['ai opt out', 'gemini', 'disable ai', 'privacy', 'ai features', 'opt in', 'opt out', 'turn off ai', 'ai toggle']
+  },
+
+  // Plans & Limits additions
+  {
+    id: 'plans-4',
+    category: 'Plans & Limits',
+    question: 'What are the limits for guest (not signed in) users?',
+    answer: 'You can use Stock & Spoon without creating an account, but with reduced limits:\n\n• **Pantry items**: Up to 20 items stored locally on your device\n• **Shopping list items**: Up to 30 items\n• **No cloud sync**: Data is only on the current device — if you uninstall or clear app storage, it is gone\n• **No household sharing**: Multi-device and family features require an account\n• **No undo history**: Undo is tied to your account\'s local storage\n\nWhen you reach the guest limit, the app will prompt you to create a free account to continue. Creating an account is free and all your existing guest data can be migrated across.\n\nSign up via **Settings → Account → Create Account**.',
+    keywords: ['guest', 'no account', 'not signed in', 'guest limits', 'offline user', 'without account', 'item limit', 'guest cap']
   }
 ];
 
@@ -357,6 +494,9 @@ export const FAQPage: React.FC<FAQPageProps> = ({ onBack }) => {
                       <button
                         onClick={() => toggleItem(item.id)}
                         className="w-full flex items-center justify-between p-6 text-left hover:bg-theme-primary/5 transition-colors"
+                        aria-expanded={expandedItems.has(item.id)}
+                        aria-controls={`faq-answer-${item.id}`}
+                        id={`faq-trigger-${item.id}`}
                       >
                         <span className="text-base font-semibold text-theme-primary pr-4 leading-relaxed">
                           {item.question}
@@ -368,7 +508,12 @@ export const FAQPage: React.FC<FAQPageProps> = ({ onBack }) => {
                         )}
                       </button>
                       {expandedItems.has(item.id) && (
-                        <div className="border-t border-theme px-6 py-5">
+                        <div
+                          id={`faq-answer-${item.id}`}
+                          role="region"
+                          aria-labelledby={`faq-trigger-${item.id}`}
+                          className="border-t border-theme px-6 py-5"
+                        >
                           <div className="text-sm text-theme-secondary whitespace-pre-line leading-relaxed">
                             {item.answer}
                           </div>

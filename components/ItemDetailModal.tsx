@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, Trash2, Edit3, ChevronDown, ChevronRight, Minus, Plus, CalendarClock } from 'lucide-react';
+import { X, Trash2, Edit3, ChevronDown, ChevronRight, Minus, Plus, CalendarClock, TrendingUp } from 'lucide-react';
 import { PantryItem, CustomCategory } from '../types';
+import { Tab } from '../types/app';
 import PriceTrends from './PriceTrends';
 import { getAllCategories, cleanItemNameForShopping, getFreezerShelfLifeDays, getOpenedShelfLifeDays, getItemImageCdnUrl, getPreferredItemDisplayImage } from '../utils/appUtils';
 import { getQuantityAmount, getQuantityUnit } from '../utils/quantityUtils';
@@ -56,7 +57,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   // Image upload state
   const intl = useIntl();
   const { household, user, settings } = useApp();
-  const { addToast } = useAppActions();
+  const { addToast, setActiveTab } = useAppActions();
   const showNutrition = settings?.shopping?.showNutrition ?? false;
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -641,7 +642,15 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
               {openSections.nutrition && (
                 <div className="px-4 pb-4">
                   {!showNutrition ? (
-                    <p className="text-sm text-theme-secondary py-2">Enable nutrition tracking in Settings to see data here.</p>
+                    <div className="py-3 flex flex-col items-start gap-2">
+                      <p className="text-sm text-theme-secondary">Nutrition data is disabled. Enable it in Settings to see calories, protein, carbs, and more for this item.</p>
+                      <button
+                        onClick={() => { onClose(); setActiveTab(Tab.SETTINGS); }}
+                        className="text-xs font-semibold text-[var(--accent-color)] hover:opacity-80 transition-opacity underline-offset-2 hover:underline"
+                      >
+                        Go to Settings → Shopping Preferences
+                      </button>
+                    </div>
                   ) : loadingNutrition ? (
                     <div className="flex items-center gap-2 text-sm text-theme-secondary py-2">
                       <div className="w-4 h-4 border-2 border-[var(--accent-color)] border-t-transparent rounded-full animate-spin" />
@@ -720,7 +729,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                       </p>
                     </div>
                   ) : (
-                    <p className="text-sm text-theme-secondary py-2">No nutrition data available.</p>
+                    <p className="text-sm text-theme-secondary py-2">Nutrition N/A</p>
                   )}
                 </div>
               )}
@@ -774,6 +783,17 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
 
           {/* Bottom padding for safe scrolling */}
           <div className="h-4" />
+
+          {/* Price Trends entry point */}
+          <div className="px-4 pb-4">
+            <button
+              onClick={() => setShowPriceTrends(true)}
+              className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-xl border border-theme text-sm font-medium text-theme-secondary hover:bg-theme-secondary transition-colors"
+            >
+              <TrendingUp className="w-4 h-4" aria-hidden="true" />
+              View Price Trends
+            </button>
+          </div>
         </div>
 
         {/* Price Trends Modal */}

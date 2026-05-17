@@ -178,6 +178,17 @@ const geminiBatcher = new GeminiRequestBatcher();
  */
 export const analyzePantryImage = async (base64Image: string, mimeType: string, user?: User): Promise<PantryItem[]> => {
   // Gate Gemini usage: ensure global enabled + user opt-in + usage cap
+  log.debug('analyzePantryImage: entry', {
+    userId: user?.id ?? 'none',
+    isGuest: user?.isGuest ?? false,
+    imageSizeKB: Math.round(base64Image.length / 1024),
+    mimeType,
+    apiKeyPresent: !!import.meta.env.VITE_GEMINI_API_KEY,
+    geminiGloballyEnabled: featureFlags.isGeminiGloballyEnabled(),
+    userOptedIn: user?.id ? featureFlags.userOptedInToGemini(user.id) : false,
+    visionModel: remoteConfig.getString('gemini_model_vision'),
+  }, 'GeminiService');
+
   if (!featureFlags.isGeminiGloballyEnabled()) {
     throw new Error('Gemini integration is disabled by configuration.');
   }
@@ -197,12 +208,14 @@ export const analyzePantryImage = async (base64Image: string, mimeType: string, 
 
   // Check Firebase usage limits
   if (!(await UsageService.canUseGemini(user))) {
+    log.debug('analyzePantryImage: usage limit gate failed', { userId: user?.id }, 'GeminiService');
     throw new Error('Gemini usage not permitted: weekly limit reached.');
   }
 
   // Create cache key based on image hash (simple hash for demo)
   const imageHash = btoa(base64Image).slice(0, 16);
   const requestId = `pantry_analysis_${user.id}_${imageHash}`;
+  log.debug('analyzePantryImage: gates passed, enqueueing', { requestId }, 'GeminiService');
 
   return geminiBatcher.enqueue(requestId, async () => {
     const perfTrace = performance ? trace(performance, 'analyze_pantry_image') : null;
@@ -234,7 +247,7 @@ export const analyzePantryImage = async (base64Image: string, mimeType: string, 
 
       // Add timeout to prevent hanging requests
       const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Image analysis timeout. Please try again.')), 30000); // 30 second timeout for image analysis
+        setTimeout(() => reject(new Error('Image analysis timeout. Please try again.')), 40000); // 40 second timeout for image analysis
       });
 
       const responsePromise = ai.models.generateContent({
@@ -313,6 +326,18 @@ export const analyzePantryImage = async (base64Image: string, mimeType: string, 
  */
 export const analyzeReceiptImage = async (base64Image: string, mimeType: string, user?: User): Promise<PantryItem[]> => {
   // Gate Gemini usage: ensure global enabled + user opt-in + usage cap
+  log.debug('analyzeReceiptImage: entry', {
+    userId: user?.id ?? 'none',
+    isGuest: user?.isGuest ?? false,
+    imageSizeKB: Math.round(base64Image.length / 1024),
+    mimeType,
+    apiKeyPresent: !!import.meta.env.VITE_GEMINI_API_KEY,
+    geminiGloballyEnabled: featureFlags.isGeminiGloballyEnabled(),
+    receiptScanKillSwitch: remoteConfig.getBoolean('kill_receiptScanning'),
+    userOptedIn: user?.id ? featureFlags.userOptedInToGemini(user.id) : false,
+    visionModel: remoteConfig.getString('gemini_model_vision'),
+  }, 'GeminiService');
+
   if (!featureFlags.isGeminiGloballyEnabled()) {
     throw new Error('Gemini integration is disabled by configuration.');
   }
@@ -336,12 +361,14 @@ export const analyzeReceiptImage = async (base64Image: string, mimeType: string,
 
   // Check Firebase usage limits
   if (!(await UsageService.canUseGemini(user))) {
+    log.debug('analyzeReceiptImage: usage limit gate failed', { userId: user?.id }, 'GeminiService');
     throw new Error('Gemini usage not permitted: weekly limit reached.');
   }
 
   // Create cache key based on image hash (simple hash for demo)
   const imageHash = btoa(base64Image).slice(0, 16);
   const requestId = `receipt_analysis_${user.id}_${imageHash}`;
+  log.debug('analyzeReceiptImage: gates passed, enqueueing', { requestId }, 'GeminiService');
 
   return geminiBatcher.enqueue(requestId, async () => {
     const perfTrace = performance ? trace(performance, 'analyze_receipt_image') : null;
@@ -381,7 +408,7 @@ export const analyzeReceiptImage = async (base64Image: string, mimeType: string,
 
       // Add timeout to prevent hanging requests
       const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Receipt analysis timeout. Please try again.')), 30000); // 30 second timeout for image analysis
+        setTimeout(() => reject(new Error('Receipt analysis timeout. Please try again.')), 40000); // 40 second timeout for image analysis
       });
 
       const responsePromise = ai.models.generateContent({
@@ -409,10 +436,28 @@ export const analyzeReceiptImage = async (base64Image: string, mimeType: string,
       const response = await Promise.race([responsePromise, timeoutPromise]) as { text: string };
 
       const jsonText = response.text;
-      if (!jsonText) throw new Error("No data returned from Gemini.");
+      console.log('✅ Receipt image analysis API call completed');
+      console.log('📄 Receipt response text length:', jsonText?.length || 0);
+
+      if (!jsonText) {
+        console.error('❌ No text in receipt Gemini response');
+        throw new Error("No data returned from Gemini.");
+      }
+
+      console.log('🔧 Receipt raw response text:', jsonText.substring(0, 200) + '...');
 
       const cleanJson = jsonText.replace(/^```json\s*/, "").replace(/\s*```$/, "");
-      const items = JSON.parse(cleanJson) as PantryItem[];
+      console.log('🧹 Receipt cleaned JSON length:', cleanJson.length);
+
+      let items;
+      try {
+        items = JSON.parse(cleanJson) as PantryItem[];
+        console.log('✅ Receipt successfully parsed', items.length, 'items');
+      } catch (parseError) {
+        console.error('❌ Receipt JSON parse error:', parseError);
+        console.error('❌ Receipt failed to parse:', cleanJson.substring(0, 500));
+        throw new Error(`Failed to parse Gemini response: ${parseError}`);
+      }
 
       // Add custom metrics (if performance available)
       if (perfTrace) {
@@ -513,58 +558,36 @@ const performSearch = async (params: RecipeSearchParams, user: User | undefined,
   // Get user nutrition targets if profile is available
   const macroTargets = params.userProfile ? getUserNutritionTargets(params.userProfile) : null;
 
+  // Use short keys to minimize output tokens. Map: t=title, d=description, i=ingredients, s=steps, c=cookTime
+  const jsonFormat = `{"r":[{"t":"title","d":"short desc","i":["qty ingredient"],"s":["step"],"c":"15 min"}]}`;
+
   if (params.query) {
-    // Mode 1: Specific Search - ultra-concise for cost efficiency
-    prompt = `3 recipes for "${params.query}"`;
-    if (params.restrictions) prompt += `. Restrictions: ${params.restrictions}`;
+    prompt = `2 recipes for "${params.query}". Reply JSON: ${jsonFormat}`;
+    if (params.restrictions) prompt += `. Diet: ${params.restrictions}`;
   } else {
-    // Mode 2: Generate from Pantry - ultra-concise
-    const limitedIngredients = params.ingredients.split(', ').slice(0, 25).join(', ');
-    prompt = `3 recipes using: ${limitedIngredients}`;
+    const limitedIngredients = params.ingredients.split(', ').slice(0, 20).join(', ');
+    prompt = `2 recipes from: ${limitedIngredients}. Reply JSON: ${jsonFormat}`;
 
     if (params.strictMode) {
-      prompt += `. Only these + basics (oil, salt, pepper, water)`;
-    } else {
-      prompt += `. Can add common items`;
+      prompt += `. Only these + basics`;
     }
 
-    if (params.restrictions) prompt += `. Restrictions: ${params.restrictions}`;
+    if (params.restrictions) prompt += `. Diet: ${params.restrictions}`;
     if (params.maxCookTime) prompt += `. Max ${params.maxCookTime}min`;
-    if (params.maxIngredients) prompt += `. Max ${params.maxIngredients} ingredients`;
+    if (params.maxIngredients) prompt += `. Max ${params.maxIngredients} ingr`;
   }
 
-  prompt += `. Use ${params.measurementSystem} units`;
+  prompt += `. ${params.measurementSystem}. Brief steps.`;
 
   // Apply personalized prompt modifications based on user profile
   if (params.userProfile) {
     prompt = generatePersonalizedSearchPrompt(prompt, params.userProfile, macroTargets || undefined);
   }
 
-  const recipeSchema: Schema = {
-    type: Type.OBJECT,
-    properties: {
-      recipes: {
-        type: Type.ARRAY,
-        items: {
-          type: Type.OBJECT,
-          properties: {
-            title: { type: Type.STRING },
-            description: { type: Type.STRING },
-            ingredients: { type: Type.ARRAY, items: { type: Type.STRING } },
-            instructions: { type: Type.ARRAY, items: { type: Type.STRING } },
-            cookTime: { type: Type.STRING },
-          },
-          required: ["title", "description", "ingredients", "instructions", "cookTime"],
-        },
-      },
-    },
-    required: ["recipes"],
-  };
-
   try {
     // Add timeout to prevent hanging requests
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Request timeout. Please try again.')), 35000); // 35 second timeout
+      setTimeout(() => reject(new Error('Request timeout. Please try again.')), 60000); // 60 second timeout
     });
 
     const responsePromise = ai.models.generateContent({
@@ -576,13 +599,15 @@ const performSearch = async (params: RecipeSearchParams, user: User | undefined,
       },
       config: {
         responseMimeType: "application/json",
-        responseSchema: recipeSchema,
-        maxOutputTokens: 800,
       },
     });
 
-const response = await Promise.race([responsePromise, timeoutPromise]) as { text: string; candidates?: Array<{ groundingMetadata?: { groundingChunks?: unknown[] } }> };
+const response = await Promise.race([responsePromise, timeoutPromise]) as { text: string; candidates?: Array<{ finishReason?: string; groundingMetadata?: { groundingChunks?: unknown[] } }> };
 
+    const finishReason = response.candidates?.[0]?.finishReason;
+    if (finishReason && finishReason !== 'STOP') {
+      console.warn(`Gemini finish_reason: ${finishReason} — response may be truncated`);
+    }
     const jsonText = response.text;
     let recipes: StructuredRecipe[] = [];
     
@@ -591,24 +616,34 @@ const response = await Promise.race([responsePromise, timeoutPromise]) as { text
       const cleanJson = jsonText.replace(/^```json\s*/, "").replace(/^```\s*/, "").replace(/\s*```$/, "").trim();
       
       try {
-        // First try to parse as JSON
         const parsed = JSON.parse(cleanJson);
-        recipes = parsed.recipes || [];
+        // Map short keys back to StructuredRecipe fields
+        const rawRecipes = parsed.r || parsed.recipes || [];
+        recipes = rawRecipes.map((r: Record<string, unknown>) => ({
+          title: r.t || r.title || '',
+          description: r.d || r.description || '',
+          ingredients: r.i || r.ingredients || [],
+          instructions: r.s || r.instructions || [],
+          cookTime: r.c || r.cookTime || '',
+        } as StructuredRecipe));
       } catch (jsonError) {
         console.warn("JSON Parse Error, attempting to extract JSON from text:", jsonError);
-        // console.log("Raw Text:", jsonText);
         
         // Try to extract JSON from the text response
         const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
           try {
-            const extractedJson = JSON.parse(jsonMatch[0]);
-            recipes = extractedJson.recipes || [];
-            // console.log("Successfully extracted JSON from text");
+            const parsed = JSON.parse(jsonMatch[0]);
+            const rawRecipes = parsed.r || parsed.recipes || [];
+            recipes = rawRecipes.map((r: Record<string, unknown>) => ({
+              title: r.t || r.title || '',
+              description: r.d || r.description || '',
+              ingredients: r.i || r.ingredients || [],
+              instructions: r.s || r.instructions || [],
+              cookTime: r.c || r.cookTime || '',
+            } as StructuredRecipe));
           } catch (extractError) {
             console.warn("Failed to extract JSON, falling back to text parsing:", extractError);
-            
-            // Last resort: try to parse natural language response
             recipes = parseNaturalLanguageRecipes(jsonText);
           }
         } else {
@@ -629,11 +664,13 @@ const response = await Promise.race([responsePromise, timeoutPromise]) as { text
       perfTrace.putAttribute('strict_mode', params.strictMode ? 'true' : 'false');
     }
 
-    // Record usage in Firebase
-    try {
-      await UsageService.recordGeminiUsage(user);
-    } catch (e) {
-      console.warn('Failed to record Gemini usage:', e);
+    // Record usage in Firebase only if we got actual results
+    if (recipes.length > 0) {
+      try {
+        await UsageService.recordGeminiUsage(user);
+      } catch (e) {
+        console.warn('Failed to record Gemini usage:', e);
+      }
     }
 
     return {

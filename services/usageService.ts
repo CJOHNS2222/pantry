@@ -253,26 +253,38 @@ class UsageService {
   }
 
   static async recordRecipeSave(user: User): Promise<void> {
+    // Deprecated — use syncRecipeCount instead
+  }
+
+  static async recordRecipeDelete(user: User): Promise<void> {
+    // Deprecated — use syncRecipeCount instead
+  }
+
+  /**
+   * Sync the recipes.used counter to match the actual number of saved recipes.
+   * This is the source-of-truth approach — avoids drift from increment/decrement.
+   */
+  static async syncRecipeCount(user: User, actualCount: number): Promise<void> {
     if (!user?.id) return;
     UsageService.limitsCache.delete(user.id);
     const usageRef = DatabaseMonitoringService.doc('users/' + user.id + '/usage/limits');
     await DatabaseMonitoringService.updateDoc(usageRef, {
-      'recipes.used': increment(1),
+      'recipes.used': Math.max(0, actualCount),
       lastUpdated: new Date()
     });
   }
 
-  static async recordRecipeDelete(user: User): Promise<void> {
+  /**
+   * Sync the mealPlanning.weeklyUsed counter to the actual number of meal plan
+   * entries in the current week and future weeks. Past entries are excluded so they
+   * never count against the user's quota.
+   */
+  static async syncMealPlanCount(user: User, actualCurrentFutureCount: number): Promise<void> {
     if (!user?.id) return;
     UsageService.limitsCache.delete(user.id);
     const usageRef = DatabaseMonitoringService.doc('users/' + user.id + '/usage/limits');
-    // Decrement but never go below 0
-    const usageDoc = await DatabaseMonitoringService.getDoc(usageRef);
-    if (!usageDoc.exists()) return;
-    const current = (usageDoc.data() as Record<string, unknown> | undefined)?.recipes as { used?: number } | undefined;
-    const currentUsed = current?.used || 0;
     await DatabaseMonitoringService.updateDoc(usageRef, {
-      'recipes.used': Math.max(0, currentUsed - 1),
+      'mealPlanning.weeklyUsed': Math.max(0, actualCurrentFutureCount),
       lastUpdated: new Date()
     });
   }

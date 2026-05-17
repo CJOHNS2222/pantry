@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, Suspense } from 'react';
+import React, { useState, useEffect, useRef, useMemo, Suspense } from 'react';
 import { serverTimestamp } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import DatabaseMonitoringService from './services/databaseMonitoringService';
@@ -37,6 +37,9 @@ import { AppProvider } from './contexts/AppContext';
 import { AppActionsProvider } from './contexts/AppActionsContext';
 import SafeAreaService from './services/safeAreaService';
 import { GlobalUpdatePrompt } from './components/GlobalUpdatePrompt';
+import { WhatsNewModal } from './components/WhatsNewModal';
+import { FeatureDiscoveryManager } from './components/FeatureDiscovery';
+import { ContextualTutorial, useContextualTips } from './components/ContextualTutorial';
 import { joinHousehold } from './services/householdService';
 import { setAppContext, trackNavigation, trackShoppingListAction } from './services/sentryService';
 import remoteConfig from './services/remoteConfigService';
@@ -69,6 +72,9 @@ const App: React.FC = () => {
   const intl = useIntl();
   const [activeTab, setActiveTab] = useState<Tab>(Tab.PANTRY); // Default to pantry
   const prevActiveTabRef = useRef<Tab>(activeTab);
+  const { tips: contextualTips, addTip: addContextualTip, dismissTip: dismissContextualTip } = useContextualTips();
+  // Track which tabs the user has already visited this session (for contextual tips)
+  const visitedTabsRef = useRef<Set<Tab>>(new Set<Tab>());
   const [persistedRecipeResult, setPersistedRecipeResult] = useState<RecipeSearchResult | null>(null);
   const [initialSearchQuery, setInitialSearchQuery] = useState<string>('');
 
@@ -95,6 +101,46 @@ const App: React.FC = () => {
     PerformanceMonitoringService.mark(`tab_switch_end_${tab}`);
     PerformanceMonitoringService.measure(`tab_switch_${tab}`, `tab_switch_start_${tab}`, `tab_switch_end_${tab}`);
   };
+
+  // Feature discovery cards — shown once per featureId via localStorage gate
+  const featureDiscoveries = useMemo(() => [
+    {
+      featureId: 'ai-scan',
+      title: 'AI-Powered Pantry Scan',
+      description: 'Tap the camera button to instantly identify and add multiple items to your pantry — quantities and expiry dates included.',
+      position: 'bottom-right' as const,
+      actionLabel: 'Open Pantry',
+      onAction: () => setActiveTab(Tab.PANTRY),
+      autoHideDelay: 10000,
+    },
+    {
+      featureId: 'smart-recipe-search',
+      title: 'Smart Recipe Search',
+      description: 'Search by ingredient or cuisine — or let AI suggest meals based on what\'s already in your pantry.',
+      position: 'bottom-right' as const,
+      actionLabel: 'Find Recipes',
+      onAction: () => setActiveTab(Tab.RECIPES),
+      autoHideDelay: 10000,
+    },
+    {
+      featureId: 'leftover-tracker',
+      title: 'Track Your Leftovers',
+      description: 'Log leftovers with a tap and get reminders before they expire — cut food waste without any effort.',
+      position: 'bottom-right' as const,
+      actionLabel: 'Add a Leftover',
+      onAction: () => setActiveTab(Tab.PANTRY),
+      autoHideDelay: 10000,
+    },
+    {
+      featureId: 'meal-planner',
+      title: 'Weekly Meal Planner',
+      description: 'Plan meals for the whole week and auto-generate a shopping list for any missing ingredients.',
+      position: 'bottom-right' as const,
+      actionLabel: 'Plan Meals',
+      onAction: () => setActiveTab(Tab.MEALS),
+      autoHideDelay: 10000,
+    },
+  ], [setActiveTab]);
 
   // UI States
   const [showHousehold, setShowHousehold] = useState(false);
@@ -157,6 +203,49 @@ const App: React.FC = () => {
     const ns = (user as User & { profile?: UserProfile & { notificationSettings?: NotificationSettings } })?.profile?.notificationSettings;
     if (ns) setNotificationSettings(ns as NotificationSettings);
   }, [user]);
+
+  // Contextual tutorial tips — shown once per tab on first visit (globally gated via localStorage)
+  useEffect(() => {
+    if (!user) return;
+    if (visitedTabsRef.current.has(activeTab)) return;
+    visitedTabsRef.current.add(activeTab);
+
+    const tipsByTab: Partial<Record<Tab, Parameters<typeof addContextualTip>[0]>> = {
+      [Tab.PANTRY]: {
+        id: 'tip-pantry-scan',
+        title: 'Scan Your Pantry',
+        description: 'Tap the camera button in the top bar to AI-scan multiple items at once — no barcode needed.',
+        position: 'bottom',
+        autoHideDelay: 10000,
+      },
+      [Tab.SHOPPING]: {
+        id: 'tip-shopping-recipe',
+        title: 'Add from Recipes',
+        description: 'Open any recipe and tap "Add to Shopping List" to automatically add missing ingredients.',
+        position: 'bottom',
+        autoHideDelay: 10000,
+      },
+      [Tab.RECIPES]: {
+        id: 'tip-recipes-pantry',
+        title: 'Recipes from Your Pantry',
+        description: 'Look for the "Can Make" badge — these recipes use ingredients you already have at home.',
+        position: 'bottom',
+        autoHideDelay: 10000,
+      },
+      [Tab.MEALS]: {
+        id: 'tip-meals-plan',
+        title: 'Build Your Meal Plan',
+        description: 'Save recipes you like, then tap any day on the calendar to assign them to your meal plan.',
+        position: 'bottom',
+        autoHideDelay: 10000,
+      },
+    };
+
+    const tip = tipsByTab[activeTab];
+    if (tip) addContextualTip(tip);
+    // addContextualTip is stable within a render cycle; visitedTabsRef prevents repeat calls
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, user]);
 
   // Function to add items to shopping list
   const addToShoppingList = async (items: string[], source: string = 'manual') => {
@@ -1449,6 +1538,17 @@ const App: React.FC = () => {
       </ErrorBoundary>
 
       <GlobalUpdatePrompt />
+      <WhatsNewModal />
+
+      {/* Feature Discovery — one-time "New Feature!" cards for logged-in users */}
+      {user && !showOnboarding && (
+        <FeatureDiscoveryManager discoveries={featureDiscoveries} />
+      )}
+
+      {/* Contextual Tutorial — per-tab hints shown once on first visit */}
+      {user && contextualTips.length > 0 && (
+        <ContextualTutorial tips={contextualTips} onTipDismiss={dismissContextualTip} />
+      )}
 
       {showExpiredItemsModal && (
         <ExpiredItemsModal

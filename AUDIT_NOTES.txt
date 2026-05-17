@@ -1,0 +1,501 @@
+================================================================================
+  STOCK & SPOON — COMPREHENSIVE APP AUDIT
+  Date: 2025-07-14
+  Version: 1.5.29
+  Stack: React 19 + TypeScript 6.0.3 + Vite 8.0.10 + Firebase + Capacitor Android
+================================================================================
+
+TABLE OF CONTENTS
+  1. FAQ / Help Content Gaps
+  2. UI/UX Improvement Opportunities
+  3. Missing or Underutilized Features
+  4. Code Quality & Logic Issues
+  5. Performance Observations
+  6. Security & Privacy Observations
+  7. Accessibility Gaps
+  8. Localization & i18n Issues
+  9. Quick-Win Suggestions
+ 10. Summary Priority List
+
+================================================================================
+1. FAQ / HELP CONTENT GAPS
+================================================================================
+
+The FAQPage.tsx currently covers 28 items across 10 categories. The following
+topics exist in the codebase but are NOT documented in any FAQ entry:
+
+CRITICAL MISSING — these are real features users will have questions about:
+
+[FAQ-1] ✅ DONE — VOICE INPUT FOR ADDING ITEMS
+  - Added FAQ entry (input-1) explaining the microphone button, how to activate
+    voice input, and the microphone permission requirement.
+
+[FAQ-2] ✅ DONE — AI CAMERA SCAN — PANTRY SCAN VS RECEIPT SCAN
+  - Added FAQ entries (input-2, input-3) covering pantry photo vs receipt scan,
+    image tips, fallback behavior, and per-scan item limits.
+
+[FAQ-3] ✅ DONE — UNDO FEATURE
+  - Undo toast with action button added to deleteItem() in useDataManagement.ts.
+  - FAQ entry added explaining the Undo affordance.
+
+[FAQ-4] ✅ DONE — NUTRITION FACTS
+  - FAQ entries added covering the nutrition toggle, USDA data source, and caching.
+  - ItemDetailModal now shows a descriptive message when API key is missing.
+
+[FAQ-5] ✅ DONE — PRICE TRENDS & GROCERY COST ESTIMATOR
+  - FAQ entry (shopping-4) added explaining price history, data sources, and
+    the cost estimator; references the showPriceData Settings toggle.
+
+[FAQ-6] ✅ DONE — LEFTOVER MANAGEMENT — QUICK CAPTURE & PERSONAS
+  - FAQ entries (leftovers-1, leftovers-2) added covering quick capture and
+    leftover persona meanings.
+  - LeftoverPersonaQuestionnaire now has an (i) info button with explanation panel.
+
+[FAQ-7] ✅ DONE — HOUSEHOLD ACTIVITY FEED
+  - FAQ entry (household-4) added explaining the shared activity feed.
+
+[FAQ-8] ✅ DONE — IMPORT / EXPORT
+  - FAQ entries added covering CSV format and import steps.
+  - "Download template" button added to ImportModal CSV tab.
+
+[FAQ-9] ✅ DONE — MEAL PREP PLANNER
+  - FAQ entry (meal-planning-4) added explaining batch meal prep planning.
+
+[FAQ-10] ✅ DONE — COMMUNITY TAB & RECIPE RATINGS
+  - FAQ entry (community-1) added covering the community tab and recipe ratings.
+
+[FAQ-11] ✅ DONE — STORE LAYOUT EDITOR
+  - FAQ entry (settings-4) added explaining the store layout editor.
+
+[FAQ-12] ✅ DONE — CUSTOM CATEGORIES
+  - FAQ entry (pantry-11) added covering custom category creation and assignment.
+
+[FAQ-13] ✅ DONE — AI RECIPE SEARCH TIPS
+  - FAQ entry (plans-4) added covering search limits and pantry-context toggle.
+
+[FAQ-14] ✅ DONE — FREEZER MANAGEMENT
+  - FAQ entry (pantry-8) added covering freeze date logging, portion tracking,
+    defrost marking, and freezer shelf-life calculation.
+
+[FAQ-15] ✅ DONE — COOKING MODE
+  - FAQ entry (meal-planning-5) added expanding on screen-on behavior,
+    ingredient checklist, and graceful exit.
+
+[FAQ-16] ✅ DONE — GUEST / OFFLINE USAGE LIMITS
+  - FAQ entry (plans-4) and guest progress bar (UX-5) added surfacing the
+    20-item pantry / 30-item shopping caps to signed-out users.
+
+[FAQ-17] ✅ DONE — AI OPT-IN / OPT-OUT
+  - FAQ entry (settings-4) added explaining the Gemini opt-out, its effects,
+    and how to re-enable AI features.
+
+
+================================================================================
+2. UI/UX IMPROVEMENT OPPORTUNITIES
+================================================================================
+
+[UX-1] ✅ DONE — PANTRY_CACHE_TEST tab confirmed hidden from non-admin users.
+
+[UX-2] ✅ DONE — Undo toast added to deleteItem() in useDataManagement.ts;
+  6-second "Undo" action button restores the deleted item.
+
+[UX-3] ✅ DONE — ItemDetailModal nutrition section now shows "Nutrition N/A" in
+  both states: when the setting is disabled and when enabled but no USDA data
+  is found. Removed the "Go to Settings" CTA (was appearing on every item
+  without data, even when nutrition was already enabled).
+
+[UX-4] ✅ CONFIRMED DONE — Community.tsx already shows a full empty state with
+  a Star icon, "No Community Ratings Yet" heading, and a "Find & Rate Recipes"
+  CTA button that calls setActiveTab(Tab.RECIPES). Already implemented.
+
+[UX-5] ✅ DONE — Guest item limit progress bar added to PantryScanner;
+  shows X/20 used with colour-coded bar and "Sign in for unlimited" prompt.
+
+[UX-6] ✅ DONE — Recipe save limit banner text fixed. Was displaying
+  `{savedRecipes.length}/{savedRecipes.length}` (duplicate count — copy-paste
+  bug). Now shows "Save limit reached (N saved) — upgrade to save more".
+
+[UX-7] ✅ DONE — QuickAddModal voice recognition now uses intl.locale
+  instead of hardcoded 'en-US'.
+
+[UX-8] ✅ CONFIRMED DONE — MealPlanner.tsx has a CalendarClock button in the
+  header (top-12 right-16) that calls setShowMealPrepPlanner(true). useAndroidBack
+  is wired for it. Entry point is in the Meals tab header, exactly as suggested.
+
+[UX-9] ✅ CONFIRMED WON'T FIX — LeftoverQuickCapture IS wired from MealPlanner
+  and RecipeModal (cooked meal flows). PRODUCTION_READINESS_AUDIT documents the
+  design decision: leftovers can only originate from a cooked meal, not individual
+  pantry items. This is intentional — accepted as design constraint.
+
+[UX-10] ✅ DONE — Added "View Price Trends" button at the bottom of ItemDetailModal so the
+  feature is always discoverable. TrendingUp icon + button calls setShowPriceTrends(true).
+  (PantryItem type doesn't include estimatedPrice, so per-row badge was not added.)
+
+[UX-11] ✅ CONFIRMED DONE — RecipeFinder has full recent searches:
+  recentRecipeSearches state loaded via getRecentSearchSuggestions('recipe', 5)
+  on mount, saved with saveSearchToHistory on each search, shown in the
+  autocomplete dropdown on focus when query is empty.
+
+[UX-12] ✅ CONFIRMED ALREADY DONE — ExpiredItemsModal already has full
+  Select All / Deselect All toggle, per-item checkboxes, "X of N selected"
+  counter, and "Remove Selected" batch action.
+
+[UX-13] ✅ DONE — "Power Features" quick-access 2×2 grid added to top of
+  Settings → Preferences tab; tiles navigate to Custom Categories, Store
+  Layout, Food Safety Mode, and Nutrition Data.
+
+[UX-14] ✅ DONE — "Download template" button added to ImportModal CSV tab;
+  generates and downloads a sample CSV with all supported headers.
+
+[UX-15] ✅ DONE — WhatsNewModal component created (components/WhatsNewModal.tsx);
+  auto-shows once per app version (localStorage-gated with 1.5s delay), shows
+  last 3 changelog entries, dismissed via "Got it".
+
+[UX-16] ✅ DONE — Dietary restriction badges (Vegan, Veggie, GF, DF, Keto,
+  Paleo, Low-Carb) added to both compact and full recipe cards in RecipeFinder;
+  sourced from recipe.type, recipe.tags, AND recipe.description so Gemini-
+  generated recipes with dietary keywords in their description also get badges.
+
+[UX-17] ✅ DONE — Haptic feedback added to three previously-missing actions:
+  deleteItem() → HapticService.medium() after undo record + filter;
+  handleSaveRecipe() → HapticService.success() after recipe cache write;
+  handleDeleteRecipe() → HapticService.light() after recipe cache removal.
+  Mark-as-purchased (ShoppingList) and tab navigation (App.tsx) were already
+  calling HapticService correctly.
+
+[UX-18] ✅ DONE — "Mark all purchased" / "Unmark all" button added above the
+  shopping list; shows "Clear purchased (N)" button when any items are checked;
+  reuses existing selectAll(), deselectAll(), and deleteCheckedItems() logic.
+  Fixed duplicate action bar that appeared twice due to a copy-paste regression.
+
+[UX-19] ✅ DONE — Pantry filter button now shows a numbered badge (e.g. ⁈1⁉)
+  when filters are active; badge counts active filter dimensions (categories,
+  locations, expirationStatus, quantityStatus); also fixed the broken
+  Object.values comparison that used value as key.
+
+[UX-20] ✅ CONFIRMED ALREADY DONE — Barcode not-found path sets newItemText to
+  `Scanned Item (${barcode})` and shows a warning toast "Product not found in
+  database. Please edit the name."; the add modal opens so user can complete entry.
+
+
+================================================================================
+3. MISSING OR UNDERUTILIZED FEATURES
+================================================================================
+
+[FEAT-1] ✅ DONE — calendarService.exportWeekAsICS() is already wired to the
+  "Export .ics" button in MealPlanner.tsx; native calendar events on mobile,
+  ICS file download on web.
+
+[FEAT-2] ✅ CONFIRMED ALREADY DONE — LeftoverAnalytics.tsx imports FoodWasteAnalyticsService
+  and displays thrown-away vs cooked/removed counts; rendered in Settings under
+  settings.leftoverAnalytics heading.
+
+[FEAT-3] ✅ CONFIRMED ALREADY DONE — RiskAssessmentQuestionnaire.tsx imports
+  RiskProfileService; the component is mounted in App.tsx and triggered for
+  new households.
+
+[FEAT-4] ✅ CONFIRMED DONE — Settings.tsx has openMemberPreferences(member) and
+  saveMemberPreferences() wired at line 1136, triggered from the Household section.
+  Full showMemberPreferencesModal modal at line 2080 covers dietary restrictions,
+  allergies, and cuisine preferences. Discoverable from Settings → Household.
+
+[FEAT-5] ✅ DONE — consumptionSuggestions moved to appear immediately after the
+  "What Can I Cook Tonight" button — the first content section after the header,
+  visible without scrolling. Previously rendered below the scan modal (line 2510).
+
+[FEAT-6] ✅ DONE — getMealPrepSuggestions() already wired to PantryScanner;
+  results panel at line ~1707 shows canMake flag, match %, recipe tiles.
+
+[FEAT-7] ✅ DONE — FEATURE DISCOVERY TOOLTIPS
+  - FeatureDiscoveryManager wired into App.tsx.
+  - Renders 4 one-time feature cards (ai-scan, smart-recipe-search,
+    leftover-tracker, meal-planner) gated by localStorage 'discovered-features'.
+  - Only shown to authenticated users, suppressed during onboarding flow.
+  - Each card has an actionLabel and onAction callback that navigates to
+    the relevant tab.
+
+[FEAT-8] ✅ DONE — CONTEXTUAL TUTORIAL
+  - useContextualTips + ContextualTutorial wired into App.tsx.
+  - Tab-change useEffect adds a per-tab tip (pantry, shopping, recipes, meals)
+    on first visit this session; already-dismissed tips skipped via localStorage.
+  - ContextualTutorial rendered with onTipDismiss={dismissContextualTip}.
+  - Only shown to authenticated users.
+
+[FEAT-9] ✅ CONFIRMED ACCEPTABLE — Push permission fires when user?.id first
+  exists (App.tsx line ~457), i.e., on authenticated foreground launch — not
+  on cold start before any auth. This is a reasonable deferral; changing to
+  expiry-settings-contextual is low-priority polish. Accepted as-is.
+
+[FEAT-10] ✅ CONFIRMED DONE — useDataManagement.ts line 695 calls
+  HouseholdPreferenceService.checkHouseholdInventoryForAllergies(household.id)
+  with a 5-minute throttle via lastAllergyCheckRef. The service checks all
+  inventory items against household member allergies and creates 'allergy_alert'
+  notifications. Fully wired end-to-end.
+
+[FEAT-11] PARTIAL — BatchOperations.tsx is integrated in ShoppingList.tsx
+  (Select All, Uncheck All, Delete Selected for ShoppingItem[]). NOT yet wired
+  into PantryScanner for pantry bulk operations (bulk delete, freeze, categorize,
+  add-to-shopping). Pantry batch ops would need a new PantryItem-typed component.
+
+[FEAT-12] ✅ CONFIRMED DONE — HOUSEHOLD INVITE FLOW
+  - HouseholdInviteModal is imported and fully wired in App.tsx:
+    showHouseholdInviteModal state, opened from notification/invite banner
+    (line ~887, 894), rendered conditionally (line ~1064), closed on
+    accept/decline (lines ~644, 681, 809). Flow complete.
+
+
+================================================================================
+4. CODE QUALITY & LOGIC ISSUES
+================================================================================
+
+[CODE-1] ✅ DONE — vite.config.ts updated: oxc:false + esbuild.drop=['console','debugger']
+  in production mode strips all console/debugger output from the release bundle.
+
+[CODE-2] ✅ CONFIRMED NOT A BUG — MealPrepPlanner createCustomPlan() was already
+  correctly implemented; return value is used in context.
+
+[CODE-3] ✅ CONFIRMED NOT A BUG — leftoverService useUserCache comparison is
+  intentional: householdId === createdBy is used for single-user households
+  where the creator owns the household document.
+
+[CODE-4] ✅ DONE — ItemDetailModal now distinguishes missing API key from
+  item-not-found: shows "Nutrition data unavailable — USDA API key not
+  configured" when key is absent.
+
+[CODE-5] USDA API KEY IN CLIENT BUNDLE (LOW / ACCEPTABLE)
+  - The USDA FoodData Central API key (VITE_USDA_API_KEY) is embedded in the
+    client-side bundle (VITE_ prefix = exposed to browser).
+  - The USDA API is free with generous rate limits, so the risk is low, but
+    it could be abused.
+  - Mitigation: Rate limit the nutrition lookup client-side (already cached
+    for 90 days) and monitor usage in USDA dashboard.
+
+[CODE-6] ✅ DONE — STAPLES const moved to module scope in Community.tsx.
+
+[CODE-7] ✅ DONE — undoService getMaxActions() now caches the remoteConfig value
+  in _cachedMaxActions; refreshUndoMaxActions() exported for RC fetch callbacks.
+
+[CODE-8] GUESTUSER CAP ENFORCEMENT — VERIFY (MEDIUM)
+  - GUEST_ITEM_CAP = 20 and GUEST_SHOPPING_CAP = 30 are defined in
+    useDataManagement.ts but need to be verified as actually enforced before
+    adding items (not just declared).
+  - If enforcement only happens silently with no error/warning, guest users
+    will be confused when items stop saving.
+
+[CODE-9] ✅ DONE — QuickAddModal voice error handler now shows toast for real
+  failures; ignores no-speech and aborted errors.
+
+[CODE-10] RECEIPT OCR — DUAL SERVICE RELATIONSHIP (MEDIUM)
+  - PantryScanner.tsx imports both receiptOcrService and pantryService
+    (analyzeReceiptImage from geminiService).
+  - It is not clear from the code which path is primary and which is fallback.
+  - receiptOcrService.ts comment says "OCR-first with Gemini fallback".
+  - Document this clearly or unify the call site so maintainers understand
+    the fallback chain without reading both services.
+
+
+================================================================================
+5. PERFORMANCE OBSERVATIONS
+================================================================================
+
+[PERF-1] PANTRY LIST VIRTUALIZATION THRESHOLD
+  - PantryScanner.tsx uses CATEGORY_VIRTUALIZE_THRESHOLD = 20 items before
+    enabling react-window virtualization.
+  - This is reasonable but consider whether grouped-by-category rendering
+    handles large lists correctly (100+ items across 8+ categories).
+  - Verify that react-window FixedSizeList is used per-category and not a
+    single global list (category grouping complicates standard virtualization).
+
+[PERF-2] ✅ DONE — getMealPlanTemplate() caches the 120-entry date/dayName array
+  at module scope; only rebuilds when today's ISO date changes.
+
+[PERF-3] NUTRITION CACHE IN LOCALSTORAGE
+  - nutritionService.ts stores all nutrition data in a single localStorage
+    key ('nutrition_cache') parsed as JSON on every read.
+  - For users with large pantries and showNutrition enabled, this object
+    could become large over time.
+  - Consider pruning expired cache entries (already 90-day TTL exists —
+    verify this prune actually happens on reads, not just on miss).
+
+[PERF-4] ✅ CONFIRMED OK — FIREBASE LIMITS CACHE — 30s TTL
+  - usageService.ts has a 30s in-memory cache for usage limits.
+  - This is appropriate. No change needed.
+
+[PERF-5] RECIPE SEARCH — BOTH SPOONACULAR AND GEMINI
+  - When a recipe search runs, both Spoonacular and Gemini may be queried.
+  - Gemini calls are batched (geminiService.ts with debounce and batch
+    processing). Ensure that if Spoonacular returns good results, Gemini
+    is not unnecessarily invoked for the same query.
+
+
+================================================================================
+6. SECURITY & PRIVACY OBSERVATIONS
+================================================================================
+
+[SEC-1] ✅ CONFIRMED DONE — FIRESTORE RULES ENFORCE HOUSEHOLD MEMBERSHIP
+  - firestore.rules verified: households/{householdId} requires
+    request.auth.uid in resource.data.memberIds for read/update/delete.
+  - All subcollections use get(households/householdId).data.memberIds check.
+  - Users/{userId} paths are UID-scoped. Household scoping is enforced at
+    the database layer, not just UX guards.
+
+[SEC-2] ✅ DONE — NO SECRETS IN LOGS / SENTRY PII SCRUBBING
+  - logService.ts is environment-gated; no email/UID logged at INFO level.
+  - sentryService.ts beforeSend updated: email is now stripped from
+    event.user context before the event is sent to Sentry (spread omits
+    the email field while preserving user id and household_id for
+    session-level debugging without exposing PII).
+
+[SEC-3] IMAGE UPLOAD — CONTENT TYPE ENFORCEMENT
+  - storage.rules enforces content-type = image/* and size limits (5-10MB).
+  - imageService.ts handles uploads. Confirm the client-side also validates
+    file type and size before upload to provide immediate user feedback and
+    reduce unnecessary network traffic.
+
+[SEC-4] VITE_USDA_API_KEY IN CLIENT BUNDLE
+  - See CODE-5 above. Acceptable risk level for a free API key with rate
+    limiting, but worth monitoring.
+
+[SEC-5] ✅ DONE — firebase-service-account.json confirmed NOT in git history;
+  properly gitignored. No rotation needed.
+
+[SEC-6] PAYMENT DATA — STRIPE INTEGRATION
+  - stripeService.ts handles payments. Confirm:
+      - No raw card numbers are ever logged or stored.
+      - Stripe Publishable Key (not Secret Key) is the only Stripe credential
+        in client-side code.
+      - Payment intent creation happens server-side (Firebase Functions),
+        not in the client.
+
+[SEC-7] ADMOB IN PRODUCTION
+  - AdMobBanner.tsx shows ads for free users.
+  - Confirm the AdMob app ID and ad unit IDs in capacitor.config.ts are
+    production IDs and that test IDs are not deployed to production.
+
+
+================================================================================
+7. ACCESSIBILITY GAPS
+================================================================================
+
+[A11Y-1] ✅ DONE — FAQ accordion buttons have aria-expanded, aria-controls, id;
+  answer panels have role=region and aria-labelledby.
+
+[A11Y-2] ✅ DONE — All key modals (ItemDetailModal, RecipeModal, QuickAddModal,
+  ExpiredItemsModal, HouseholdInviteModal, ImportModal, CategoryManager) confirmed
+  to have role=dialog, aria-modal=true, aria-label.
+
+[A11Y-3] ✅ DONE — ProgressiveImage uses alt on main img and aria-hidden on
+  placeholder blurs; all call sites pass recipe.title or item name as alt.
+
+[A11Y-4] ✅ DONE — Added <datalist id="accentColorPresets"> with 8 WCAG-AA
+  compliant swatches linked to the accent color picker via list="accentColorPresets".
+  Free-form entry still works but curated presets guide users to safe choices.
+
+[A11Y-5] ✅ DONE — All expiration badge divs in PantryScanner carry aria-label
+  with plain-English urgency (e.g. "Milk expires in 1 day — critical").
+
+[A11Y-6] ✅ DONE — aria-live="polite" sr-only announcements added to PantryScanner
+  and ShoppingList; announces load-start and item-count-loaded.
+
+
+================================================================================
+8. LOCALIZATION & i18n ISSUES
+================================================================================
+
+[I18N-1] ✅ DONE (via UX-7) — Voice recognition locale fixed to use intl.locale
+  from useIntl() instead of hardcoded 'en-US'.
+
+[I18N-2] FAQ CONTENT NOT TRANSLATED — ACCEPTED (DESIGN DECISION)
+  - FAQPage.tsx content is hardcoded English. This is accepted as a design
+    decision for the current release; FAQ translation is deferred.
+
+[I18N-3] ✅ CONFIRMED — DATE FORMAT USES BROWSER LOCALE
+  - All toLocaleDateString() calls use toLocaleDateString(undefined, ...)
+    which resolves to the user's browser/system locale — this IS the correct
+    Intl API behaviour. No change needed.
+
+[I18N-4] NOTIFICATION MESSAGES — ACCEPTED (DESIGN DECISION)
+  - notificationService.ts message strings are hardcoded English. Accepted
+    for current release; notification i18n is deferred.
+
+[I18N-5] ERROR MESSAGES — ACCEPTED (DESIGN DECISION)
+  - constants/errorMessages.ts strings are hardcoded English. Accepted;
+    error message i18n is deferred to a future internationalisation pass.
+
+
+================================================================================
+9. QUICK-WIN SUGGESTIONS (HIGH VALUE / LOW EFFORT)
+================================================================================
+
+[QUICK-1] ✅ DONE — PANTRY_CACHE_TEST tab confirmed already hidden from non-admin users.
+
+[QUICK-2] ✅ DONE — Undo toast added to deleteItem() in useDataManagement.ts (see UX-2).
+
+[QUICK-3] ✅ DONE — Confirmed not a bug; createCustomPlan() is correctly implemented.
+
+[QUICK-4] ✅ DONE — STAPLES moved to module scope in Community.tsx (see CODE-6).
+
+[QUICK-5] ✅ DONE — Voice recognition error toast added to QuickAddModal;
+  ignores no-speech and aborted events.
+
+[QUICK-6] ✅ DONE — 17 new FAQ entries added across Input Methods, Leftovers,
+  Community, Pantry Management, Meal Planning, Shopping Lists, Household &
+  Sharing, Settings, and Plans & Limits categories.
+
+[QUICK-7] ✅ DONE — oxc:false + esbuild.drop configured in vite.config.ts;
+  console/debugger stripped in production build.
+
+  - [QUICK-8] ✅ DONE — (i) info button added to LeftoverPersonaQuestionnaire header; clicking toggles a brief explanation panel describing how each persona level (Strict/Normal/Relaxed) affects leftover safety windows.
+
+[QUICK-9] ✅ DONE — firebase-service-account.json confirmed NOT in git history
+  and is properly gitignored.
+
+[QUICK-10] ✅ DONE — Guest item limit progress bar added to PantryScanner
+  (same as UX-5); see UX-5 above.
+
+
+================================================================================
+10. SUMMARY PRIORITY LIST
+================================================================================
+
+CRITICAL (Fix before next release):
+  - [UX-1]  ✅ DONE — PANTRY_CACHE_TEST tab was already hidden from users (only in Sentry/activity maps)
+  - [CODE-2] ✅ DONE — MealPrepPlanner createCustomPlan() was already correctly implemented (not a bug)
+  - [SEC-5]  ✅ DONE — firebase-service-account.json confirmed NOT in git history; properly gitignored
+  - [CODE-1]  ✅ DONE — vite.config.ts updated: oxc:false + esbuild drop in production mode
+
+HIGH (Address in next 1-2 releases):
+  - [UX-2]  ✅ DONE — Undo toast added to deleteItem() in useDataManagement.ts with 6s Undo action button
+  - [CODE-3]  ✅ CONFIRMED NOT A BUG — leftoverService useUserCache comparison is intentional design
+  - [CODE-4]  ✅ DONE — ItemDetailModal shows descriptive message when USDA API key is missing vs. item not found
+  - [CODE-9]  ✅ DONE — QuickAddModal voice error handler now shows toast; ignores no-speech and aborted errors
+  - [UX-7]   ✅ DONE — QuickAddModal voice recognition now uses intl.locale instead of hardcoded 'en-US'
+  - [FAQ-1 through FAQ-17]  ✅ DONE — All 17 missing FAQ entries added to FAQPage.tsx across new categories: Input Methods, Leftovers, Community, plus expansions to Pantry Management, Meal Planning, Shopping Lists, Household & Sharing, Settings, and Plans & Limits
+  - [FEAT-1]  ✅ DONE — calendarService.exportWeekAsICS() is already wired to the "Export .ics" button in MealPlanner.tsx (handleExportCalendar, line ~1735); native events on mobile, ICS download on web
+
+MEDIUM (Backlog / Polish):
+  - [CODE-6]  ✅ DONE — Moved STAPLES const to module scope in Community.tsx
+  - [UX-5]   ✅ DONE — Guest item limit progress bar added to PantryScanner; shows X/20 used with colour-coded bar and "Sign in for unlimited" prompt
+  - [UX-14]  ✅ DONE — "Download template" button added to ImportModal CSV tab; generates and downloads a sample CSV with all supported headers
+  - [UX-13]  ✅ DONE — "Power Features" quick-access grid added to top of Settings → Preferences tab; tiles for Custom Categories, Store Layout, Food Safety Mode, Nutrition Data
+  - [UX-15]  ✅ DONE — WhatsNewModal component created (components/WhatsNewModal.tsx); auto-shows once per app version (localStorage-gated), last 3 changelog entries, dismissed via "Got it"
+  - [FEAT-2]  ✅ CONFIRMED DONE — LeftoverAnalytics in Settings surfaces food waste data
+  - [UX-3]   ✅ DONE — ItemDetailModal nutrition disabled-state links to Settings → Shopping Preferences
+  - [UX-12]  ✅ CONFIRMED ALREADY DONE — ExpiredItemsModal already has Select All + Remove Selected
+  - [UX-18]  ✅ DONE — "Mark all purchased" + "Clear purchased (N)" action bar added to ShoppingList
+  - [UX-19]  ✅ DONE — Pantry filter badge shows active filter count; fixed broken active-check condition
+  - [FEAT-6]  ✅ CONFIRMED DONE — getMealPrepSuggestions() already wired to PantryScanner; results displayed at line ~1707 (suggestions panel with canMake flag, match %, recipe tiles)
+  - [UX-16]  ✅ DONE — Dietary restriction badges (Vegan, Veggie, GF, DF, Keto, Paleo, Low-Carb) added to both compact and full recipe cards in RecipeFinder; sourced from recipe.type and recipe.tags
+  - [A11Y-4] ✅ DONE — datalist with 8 WCAG-AA accent colour presets. [A11Y-1] ✅ DONE — FAQ accordion buttons now have aria-expanded, aria-controls, id; answer panels have role=region and aria-labelledby. [A11Y-2] ✅ DONE — All key modals (ItemDetailModal, RecipeModal, QuickAddModal, ExpiredItemsModal, HouseholdInviteModal, ImportModal, CategoryManager) already have role=dialog, aria-modal=true, aria-label. [A11Y-3] ✅ DONE — ProgressiveImage already uses alt on main img and aria-hidden on placeholders; all callers pass recipe.title. [A11Y-5] ✅ DONE — All expiration badge divs in PantryScanner now carry aria-label with plain-English urgency description (e.g. "Milk expires in 1 day — critical"). [A11Y-6] ✅ DONE — aria-live="polite" sr-only announcements added to PantryScanner and ShoppingList loading state transitions.
+  - [I18N-1 through I18N-5]  i18n completeness
+
+LOW (Nice to have):
+  - [PERF-2]  ✅ DONE — Rolling meal plan base window template is now cached at module scope (getMealPlanTemplate); only rebuilt when date changes, not on every Firestore snapshot
+  - [CODE-7]  ✅ DONE — undoService getMaxActions() now caches the remoteConfig value in _cachedMaxActions; refreshUndoMaxActions() exported for RC fetch callbacks
+  - [FAQ-7 through FAQ-17]  ✅ DONE — included in the FAQ batch above
+  - [UX-10]  ✅ DONE — "View Price Trends" button added to ItemDetailModal
+  - [UX-14]  ✅ DONE (see above)
+
+================================================================================
+END OF AUDIT
+================================================================================

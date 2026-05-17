@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { FormattedMessage, useIntl } from 'react-intl';
-import { ChefHat, Chrome, UserX } from 'lucide-react';
+import { ChefHat, LogIn, UserX } from 'lucide-react';
 import { User } from '../types';
 import { Capacitor } from '@capacitor/core';
 import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
@@ -389,7 +389,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
             className="flex items-center justify-center gap-2 bg-white text-gray-800 font-medium py-3 rounded-xl hover:bg-gray-50 transition-colors"
             data-testid="login-google"
           >
-            <Chrome className="w-5 h-5 text-red-500" />
+            <LogIn className="w-5 h-5 text-red-500" />
             Google
           </button>
           <button

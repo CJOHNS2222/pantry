@@ -157,7 +157,19 @@ const ImportModal: React.FC<ImportModalProps> = ({ open, onClose, defaultTab = '
           {tab === 'pantry' ? (
             <div className="space-y-2">
               <div className="text-sm text-theme-primary">Upload a CSV or plain-text list. CSV columns like <code>item,name,amount,quantity,storageLocation,expirationDate,category</code>. Preview shows parsed rows count.</div>
+              <div className="flex items-center gap-2">
                 <input type="file" accept=".csv,.txt,text/csv,text/plain" onChange={(e) => handleFile(e.target.files?.[0])} data-testid="import-file-input" />
+                <button
+                  onClick={() => handleExportFile(
+                    'item,quantity,unit,category,storageLocation,expirationDate\nApples,6,count,Produce,fridge,2026-05-20\nChicken Breast,500,g,Meat & Seafood,freezer,2026-06-01',
+                    'pantry-template.csv'
+                  )}
+                  className="px-2 py-1 bg-theme-secondary rounded text-xs text-theme-secondary hover:opacity-80 whitespace-nowrap"
+                  title="Download a sample CSV to see the required format"
+                >
+                  Download template
+                </button>
+              </div>
                 <textarea value={csvText} onChange={(e) => { setCsvText(e.target.value); const items = parseCsvToPantryItems(e.target.value); setPreviewCount(items.length); }} rows={8} className="w-full p-2 rounded border text-black" data-testid="import-csv-textarea" />
               <div className="flex items-center justify-between">
                 <div className="text-sm opacity-70">Parsed rows: {previewCount}</div>
