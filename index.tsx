@@ -4,6 +4,7 @@ import App from './App';
 import './src/index.css';
 import { initSentry, captureError } from './services/sentryService';
 import { log } from './services/logService';
+import crashlytics from './services/crashlyticsService';
 import { I18nProvider } from './src/components/I18nProvider';
 import { AppProvider } from './contexts/AppContext';
 import { AppActionsProvider } from './contexts/AppActionsContext';
@@ -24,11 +25,17 @@ if (import.meta.env.PROD && sentryDsn && sentryDsn !== 'https://your-sentry-dsn-
 window.addEventListener('error', (event) => {
   log.error('Global error caught:', { message: event.error?.message }, 'GlobalError');
   captureError(event.error);
+  const msg: string = event.error?.message ?? String(event.message);
+  crashlytics.log(`Global error: ${msg}`);
+  crashlytics.recordException(msg, [{ key: 'handler', value: 'global_error' }]);
 });
 
 window.addEventListener('unhandledrejection', (event) => {
   log.error('Unhandled promise rejection:', { reason: String(event.reason) }, 'GlobalError');
-  captureError(event.reason instanceof Error ? event.reason : new Error(String(event.reason)));
+  const err = event.reason instanceof Error ? event.reason : new Error(String(event.reason));
+  captureError(err);
+  crashlytics.log(`Unhandled rejection: ${err.message}`);
+  crashlytics.recordException(err.message, [{ key: 'handler', value: 'unhandled_rejection' }]);
 });
 
 // Cleanup service intervals on page unload to prevent memory leaks

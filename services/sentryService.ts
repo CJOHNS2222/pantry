@@ -1,4 +1,5 @@
 import * as Sentry from '@sentry/react';
+import crashlytics from './crashlyticsService';
 
 // Initialize Sentry
 export const initSentry = () => {
@@ -50,7 +51,7 @@ export const initSentry = () => {
     },
 
     // Enhanced breadcrumb capture
-    beforeBreadcrumb(breadcrumb, hint) {
+    beforeBreadcrumb(breadcrumb, _hint) {
       // Capture console errors in production
       if (breadcrumb.category === 'console' && breadcrumb.level === 'error') {
         return breadcrumb;
@@ -86,6 +87,13 @@ export const reportDatabaseError = (operation: string, collection: string, error
 
     Sentry.captureException(error);
   });
+
+  crashlytics.log(`DB ${operation} on ${collection}: ${error.message}`);
+  crashlytics.recordException(error.message, [
+    { key: 'component', value: 'database' },
+    { key: 'operation', value: operation },
+    { key: 'collection', value: collection },
+  ]);
 };
 
 // Report performance issues
@@ -120,6 +128,13 @@ export const reportSyncIssue = (operation: string, error: Error, retryCount: num
 
     Sentry.captureException(error);
   });
+
+  crashlytics.log(`Sync error [${operation}] retry=${retryCount}: ${error.message}`);
+  crashlytics.recordException(error.message, [
+    { key: 'component', value: 'sync' },
+    { key: 'operation', value: operation },
+    { key: 'retry_count', value: retryCount },
+  ]);
 };
 
 // Report heavy write patterns
@@ -292,6 +307,12 @@ export const setUserContext = (userId: string, email?: string, householdId?: str
   if (householdId) {
     Sentry.setTag('household_id', householdId);
   }
+
+  // Crashlytics user attribution (UID only — no email/PII)
+  crashlytics.setUserId(userId);
+  if (householdId) {
+    crashlytics.setCustomKey('household_id', householdId);
+  }
 };
 
 // Clear user context on logout
@@ -299,11 +320,81 @@ export const clearUserContext = () => {
   Sentry.setUser(null);
   Sentry.setTag('user_id', undefined);
   Sentry.setTag('household_id', undefined);
+
+  crashlytics.setUserId('');
 };
 
 // Capture an error exception
 export const captureError = (error: Error) => {
   Sentry.captureException(error);
+};
+
+// Report Gemini AI operation failures
+export const reportGeminiError = (
+  operation: 'pantry_image_scan' | 'receipt_image_scan' | 'recipe_search',
+  error: unknown,
+  context?: {
+    userId?: string;
+    model?: string;
+    imageSizeKb?: number;
+    query?: string;
+  }
+) => {
+  const err = error instanceof Error ? error : new Error(String(error));
+  const msg = err.message.toLowerCase();
+
+  // Skip expected gate/business-logic rejections — these are not bugs
+  if (
+    msg.includes('opt-in required') ||
+    msg.includes('weekly limit') ||
+    msg.includes('guest mode') ||
+    msg.includes('user authentication required') ||
+    msg.includes('disabled by configuration')
+  ) {
+    return;
+  }
+
+  const errorType =
+    msg.includes('429') || msg.includes('too many requests') || msg.includes('resource exhausted')
+      ? 'rate_limit'
+      : msg.includes('timeout')
+      ? 'timeout'
+      : msg.includes('json') || msg.includes('parse')
+      ? 'parse_error'
+      : msg.includes('api_key') || msg.includes('api key')
+      ? 'auth_error'
+      : msg.includes('quota')
+      ? 'quota_exceeded'
+      : msg.includes('network') || msg.includes('fetch')
+      ? 'network_error'
+      : 'unknown';
+
+  Sentry.withScope((scope) => {
+    scope.setTag('component', 'gemini');
+    scope.setTag('gemini_operation', operation);
+    scope.setTag('error_type', errorType);
+    // Rate limits / quota are expected under load — report as warning to reduce noise
+    scope.setLevel(errorType === 'rate_limit' || errorType === 'quota_exceeded' ? 'warning' : 'error');
+
+    scope.setContext('gemini_context', {
+      operation,
+      model: context?.model,
+      image_size_kb: context?.imageSizeKb,
+      query_length: context?.query?.length,
+      error_type: errorType,
+    });
+
+    Sentry.captureException(err);
+  });
+
+  crashlytics.log(`Gemini ${operation} [${errorType}]${context?.model ? ` model=${context.model}` : ''}${context?.imageSizeKb ? ` size=${context.imageSizeKb}KB` : ''}: ${err.message}`);
+  crashlytics.recordException(err.message, [
+    { key: 'component', value: 'gemini' },
+    { key: 'gemini_operation', value: operation },
+    { key: 'error_type', value: errorType },
+    ...(context?.model ? [{ key: 'model', value: context.model }] : []),
+    ...(context?.imageSizeKb ? [{ key: 'image_size_kb', value: context.imageSizeKb }] : []),
+  ]);
 };
 
 // Set app context

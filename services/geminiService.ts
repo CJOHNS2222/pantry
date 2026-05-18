@@ -6,6 +6,7 @@ import { UsageService } from './usageService';
 import { log } from './logService';
 import { getUserNutritionTargets, generatePersonalizedSearchPrompt } from '../utils/nutritionUtils';
 import remoteConfig from './remoteConfigService';
+import { reportGeminiError } from './sentryService';
 
 // Initialize Gemini Client
 const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
@@ -81,6 +82,7 @@ class GeminiRequestBatcher {
           log.debug(`Completed Gemini request: ${request.id}`, {}, 'GeminiBatcher');
         } catch (err: unknown) {
           log.error(`Failed Gemini request: ${request.id}`, err, 'GeminiBatcher');
+          request.reject(err);
         }
       });
 
@@ -314,6 +316,11 @@ export const analyzePantryImage = async (base64Image: string, mimeType: string, 
       return items;
     } catch (err: unknown) {
       console.error("Error analyzing pantry image:", err);
+      reportGeminiError('pantry_image_scan', err, {
+        userId: user?.id,
+        model: remoteConfig.getString('gemini_model_vision'),
+        imageSizeKb: Math.round(base64Image.length / 1024),
+      });
       throw err;
     } finally {
       perfTrace?.stop();
@@ -475,6 +482,11 @@ export const analyzeReceiptImage = async (base64Image: string, mimeType: string,
       return items;
     } catch (err: unknown) {
       console.error("Error analyzing receipt image:", err);
+      reportGeminiError('receipt_image_scan', err, {
+        userId: user?.id,
+        model: remoteConfig.getString('gemini_model_vision'),
+        imageSizeKb: Math.round(base64Image.length / 1024),
+      });
       throw err;
     } finally {
       perfTrace?.stop();
@@ -685,6 +697,11 @@ const response = await Promise.race([responsePromise, timeoutPromise]) as { text
   } catch (err: unknown) {
     const errMsg = err instanceof Error ? err.message : String(err);
     console.error("Error searching recipes:", err);
+    reportGeminiError('recipe_search', err, {
+      userId: user?.id,
+      model: remoteConfig.getString('gemini_model'),
+      query: params.query,
+    });
 
     // Provide more specific error messages
     if (errMsg.includes('API_KEY')) {

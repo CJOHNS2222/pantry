@@ -3,6 +3,7 @@ import AnalyticsService from '../services/analyticsService';
 import * as Sentry from '@sentry/react';
 import { trackErrorBoundary } from '../services/sentryService';
 import { log } from '../services/logService';
+import crashlytics from '../services/crashlyticsService';
 
 interface ErrorBoundaryState {
   hasError: boolean;
@@ -52,6 +53,13 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
     );
     // Track fatal crash for statistics
     AnalyticsService.trackAppCrash(error, this.constructor.name);
+
+    // Record in Crashlytics
+    crashlytics.log(`React ErrorBoundary caught: ${error.message}`);
+    crashlytics.recordException(error.message, [
+      { key: 'component', value: 'react_error_boundary' },
+      { key: 'error_type', value: 'react_error' },
+    ]);
   }
 
   render() {

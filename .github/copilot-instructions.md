@@ -54,7 +54,9 @@ Use this file as the authoritative project context. Keep changes minimal, typed,
 
 ## 7) Observability & Errors
 - Route telemetry through `services/analyticsService.ts`.
-- Use Sentry helpers in `services/sentryService.ts` for error reporting.
+- Use Sentry helpers in `services/sentryService.ts` for JS-layer error reporting (`reportDatabaseError`, `reportSyncIssue`, `reportGeminiError`, `setUserContext`).
+- Use `services/crashlyticsService.ts` for native Firebase Crashlytics reporting. **Never** call `@capacitor-firebase/crashlytics` directly — the wrapper handles `isNativePlatform()` guards and is a silent no-op on web.
+- `ErrorBoundary.tsx` and `ComponentErrorBoundary.tsx` report to both Sentry and Crashlytics; keep both paths intact.
 - Prefer centralized user-facing error messaging patterns already in the repo.
 
 ## 8) Build, Lint, and Test Commands
@@ -88,7 +90,7 @@ Use this file as the authoritative project context. Keep changes minimal, typed,
 - **Service testing**: Unit tests for business logic, mock external services.
 - **Error testing**: Test error boundaries and error handling with `AppError` class.
 
-## 11) Advanced Features & Patterns
+## 11) Directory Map
 - `components/` UI components
 - `hooks/` data/state hooks
 - `services/` domain logic + integrations
@@ -98,7 +100,7 @@ Use this file as the authoritative project context. Keep changes minimal, typed,
 - `constants/` app constants/messages
 - `functions/` backend/serverless scripts
 
-## 11) Advanced Features & Patterns
+## 12) Advanced Features & Patterns
 ### Item Management
 - **Batches**: Items support multiple `batches` with independent expirations (FEFO consumption).
 - **Opened tracking**: `isOpened`, `openedAt`, `openedExpiry` for items with different shelf lives post-opening.
@@ -121,10 +123,11 @@ Use this file as the authoritative project context. Keep changes minimal, typed,
 
 ### Performance & Monitoring
 - **Core Web Vitals**: LCP, FID, CLS tracking via `performanceMonitoringService.ts`.
-- **Error handling**: `AppError` class with codes/context, `ErrorBoundary.tsx` with Sentry integration.
+- **Error handling**: `AppError` class with codes/context; `ErrorBoundary.tsx` reports to Sentry + Crashlytics.
+- **Crashlytics**: Native-only via `services/crashlyticsService.ts`; no-op on web. Reports non-fatals from error boundaries, global handlers, and `sentryService.ts` domain helpers.
 - **Bundle optimization**: Manual chunks in `vite.config.ts`, PWA with auto-updates.
 
-## 12) Quick Directory Guide
+## 13) Quick Directory Guide
 ### Pantry changes
 1. Update `PantryItem` type.
 2. Update relevant logic in `services/pantryService.ts` and/or `hooks/useDataManagement.ts`.
@@ -141,8 +144,7 @@ Use this file as the authoritative project context. Keep changes minimal, typed,
 1. Implement/update in recipe services.
 2. Wire through existing recipe components and context flows.
 3. Preserve save/rating/meal-plan behaviors and limits.
- - `users/{uid}/...` for user-scoped data/cache.
-  - `households/{householdId}/...` for shared household data.
+
 ---
 
 If two rules conflict, prioritize:
@@ -150,21 +152,26 @@ If two rules conflict, prioritize:
 2) existing architecture boundaries,
 3) minimal, maintainable changes.
 
-## 12) Environment Setup & Pitfalls
+## 14) Environment Setup & Pitfalls
 - **Environment variables**: Use `VITE_` prefix (e.g., `VITE_GEMINI_API_KEY`). Web Firebase config in `VITE_firebaseConfig.ts`.
 - **Circular imports**: Avoid cycles, especially around `firebaseConfig.ts`. Use dynamic imports where needed.
 - **Household scoping**: Always check `isHouseholdMember()` and membership. Rules enforce strict scoping.
+  - `users/{uid}/...` for user-scoped data/cache.
+  - `households/{householdId}/...` for shared household data.
 - **Storage limits**: Images capped at 5-10MB, content-type `image/*` enforced.
 - **Platform guards**: Use `Capacitor.getPlatform()` for mobile-specific behavior.
 - **API limits**: Spoonacular has rate limits; cache via dedicated services.
-- **Error handling**: Use `AppError` class with codes/context. Route through `ErrorBoundary.tsx` to Sentry.
+- **Error handling**: Use `AppError` class with codes/context. Route through `ErrorBoundary.tsx` → Sentry + Crashlytics.
+- **npm install for `@capacitor-firebase/*`**: Always use `--legacy-peer-deps` due to peer dependency conflict with `@codetrix-studio/capacitor-google-auth`.
 
-## 13) Key Exemplar Files
+## 15) Key Exemplar Files
 - `firebaseConfig.ts`: Firebase initialization, platform handling, monitoring setup
 - `firestore.rules`: Access control patterns, household scoping, data validation
 - `storage.rules`: Image upload rules, size/content limits
 - `hooks/useDataManagement.ts`: Central data hook, service orchestration
 - `utils/appUtils.ts`: Core helpers (expiry alerts, member checks, parsing)
 - `utils/errorUtils.ts`: Error classes and standardized error handling
+- `services/sentryService.ts`: JS error reporting, domain-specific report helpers
+- `services/crashlyticsService.ts`: Native Crashlytics wrapper; no-op on web
 - `vite.config.ts`: Build configuration, PWA setup, bundle optimization
 - `capacitor.config.ts`: Mobile plugins and platform configuration

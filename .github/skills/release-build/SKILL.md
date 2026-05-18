@@ -26,6 +26,7 @@ Run `npx tsc --noemit`. Fix any type errors before proceeding — do not skip.
   ```
 - Pull entries from recent git commits if `changelogEntries` is not provided.
 - Ensure the new version header is the very first `##` heading — remove any duplicate old headers if present.
+- Add changes made to the "What's New" modal in the app, which pulls from the latest changelog entry. This is what users see in the update prompt (`GlobalUpdatePrompt`) when they next open the app after the new version is published to Firestore.
 
 ### 4. Production Build
 Run `npm run build`. Resolve any build errors before continuing.

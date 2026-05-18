@@ -1,7 +1,7 @@
 {
   "name": "stockandspoon",
   "private": true,
-  "version": "2.0.1",
+  "version": "2.0.2",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -42,6 +42,7 @@
   },
   "dependencies": {
     "@capacitor-community/speech-recognition": "^7.0.1",
+    "@capacitor-firebase/crashlytics": "^8.2.0",
     "@capacitor/android": "^8.3.1",
     "@capacitor/app": "^8.1.0",
     "@capacitor/browser": "^8.0.3",

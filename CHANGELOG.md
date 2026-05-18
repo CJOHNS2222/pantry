@@ -1,3 +1,12 @@
+## [2.0.2] - 2026-05-18
+
+### Added
+- **Sentry error reporting for Gemini** — All three Gemini operations (pantry image scan, receipt scan, AI recipe search) now report failures to Sentry with structured context (operation type, model, image size, error classification). Rate-limit and quota errors are tagged as warnings; auth/network/parse errors as errors.
+- **Firebase Crashlytics integration** — New `crashlyticsService.ts` wrapper provides native-safe access to Firebase Crashlytics (silent no-op on web). All major error paths now report to Crashlytics: domain errors via `sentryService.ts` helpers, React error boundaries (`ErrorBoundary`, `ComponentErrorBoundary`), and global unhandled error/rejection handlers in `index.tsx`.
+
+### Fixed
+- **Gemini batcher silent hang** — Requests queued in the `GeminiRequestBatcher` were never rejected on failure, causing promises to hang indefinitely. Now properly calls `reject(err)` in the catch path.
+
 ## [2.0.1] - 2026-05-17
 
 ### Added
