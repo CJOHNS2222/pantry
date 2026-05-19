@@ -29,8 +29,8 @@ export const MealPrepPlanner: React.FC<MealPrepPlannerProps> = ({
 
   // Calculate ingredient overlap between recipes
   const calculateIngredientOverlap = (recipe1: SavedRecipe, recipe2: SavedRecipe): string[] => {
-    const ingredients1 = recipe1.ingredients.map(ing => ing.toLowerCase());
-    const ingredients2 = recipe2.ingredients.map(ing => ing.toLowerCase());
+    const ingredients1 = (recipe1.ingredients || []).map(ing => (ing || '').toLowerCase());
+    const ingredients2 = (recipe2.ingredients || []).map(ing => (ing || '').toLowerCase());
 
     return ingredients1.filter(ing1 =>
       ingredients2.some(ing2 =>

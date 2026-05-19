@@ -2,14 +2,13 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Sun, Moon, Undo2, Bell } from 'lucide-react';
 import { User, Household, HouseholdActivity } from '../../types';
 import { log } from '../../services/logService';
-import { UsageIndicator } from '../UsageIndicator';
 import { HouseholdStatusIndicator } from '../HouseholdStatusIndicator';
 import { HouseholdActivityFeed } from '../HouseholdActivityFeed';
 import { SyncIndicator } from '../SyncIndicator';
 import { OnlineIndicator } from '../OnlineIndicator';
 import { SyncStatus } from '../../hooks/useOfflineStatus';
 import useUserNotifications from '../../hooks/useUserNotifications';
-import notificationsService, { markAllNotificationsRead, markNotificationRead, NotificationItem } from '../../services/notificationsService';
+import { markAllNotificationsRead, markNotificationRead, deleteNotification, NotificationItem } from '../../services/notificationsService';
 import { AppSettings } from '../../hooks/useSettings';
 import { UndoAction } from '../../services/undoService';
 
@@ -116,6 +115,15 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
     }
   };
 
+  const handleDismissNotification = async (notifId: string) => {
+    if (!user?.id) return;
+    try {
+      await deleteNotification(user.id, notifId);
+    } catch (err) {
+      log.error('Failed to dismiss notification', err instanceof Error ? { message: err.message } : { err }, 'AppHeader');
+    }
+  };
+
   const SWIPE_DISMISS_THRESHOLD = 80;
 
   const handleSwipeTouchStart = (e: React.TouchEvent, notifId: string) => {
@@ -148,7 +156,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 
   const handleSwipeTouchEnd = async (notifId: string) => {
     if (swipeX < -SWIPE_DISMISS_THRESHOLD) {
-      await handleMarkOneRead(notifId);
+      await handleDismissNotification(notifId);
     }
     setSwipingId(null);
     setSwipeX(0);
@@ -265,7 +273,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                       <button onClick={handleMarkAllRead} className="text-xs text-theme-secondary hover:underline">Mark all read</button>
                     </div>
                     <div className="space-y-1.5">
-                      {(items || []).slice().reverse().slice(0, visibleNotifCount).map((n: NotificationItem) => {
+                      {(items || []).filter(n => !n.read).slice().reverse().slice(0, visibleNotifCount).map((n: NotificationItem) => {
                         const isExpanded = expandedNotifId === n.id;
                         const bodyText = n.message || n.body;
                         const isSwiping = swipingId === n.id;
@@ -311,6 +319,12 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                                     title="Mark as read"
                                   >✓</button>
                                 )}
+                                <button
+                                  type="button"
+                                  onClick={e => { e.stopPropagation(); handleDismissNotification(n.id); }}
+                                  className="text-[10px] text-theme-secondary hover:text-red-400 transition-colors"
+                                  title="Dismiss notification"
+                                >✕</button>
                               </div>
                             </div>
 
@@ -350,13 +364,13 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                           </div>
                         );
                       })}
-                      {(items || []).length === 0 && <div className="text-xs text-theme-secondary py-2 text-center">No notifications</div>}
-                      {(items || []).length > visibleNotifCount && (
+                      {(items || []).filter(n => !n.read).length === 0 && <div className="text-xs text-theme-secondary py-2 text-center">No unread notifications</div>}
+                      {(items || []).filter(n => !n.read).length > visibleNotifCount && (
                         <button
                           onClick={() => setVisibleNotifCount(n => n + 50)}
                           className="w-full text-xs text-theme-secondary hover:text-theme-primary py-2 border-t border-theme/30 mt-1 transition-colors"
                         >
-                          Load more ({(items || []).length - visibleNotifCount} remaining)
+                          Load more ({(items || []).filter(n => !n.read).length - visibleNotifCount} remaining)
                         </button>
                       )}
                     </div>
@@ -368,7 +382,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         </div>
         <div className="flex flex-col items-center flex-1 min-w-0">
           <h1 
-            className="text-xl font-serif font-bold text-theme-primary whitespace-nowrap" 
+            className="text-3xl font-serif font-bold text-theme-primary whitespace-nowrap" 
             style={{color: 'var(--accent-color)'}}
             id="app-title"
           >

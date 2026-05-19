@@ -2180,7 +2180,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                       <img src={imagePreview} alt="Preview" className="w-full h-full object-cover opacity-80" />
                       <GeminiLoadingOverlay
                         isActive={loadingState === LoadingState.LOADING}
-                        totalSeconds={40}
+                        totalSeconds={60}
                         stages={IMAGE_ANALYSIS_STAGES}
                         variant="overlay"
                       />

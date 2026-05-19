@@ -43,10 +43,10 @@ export const PendingNotifications: React.FC<PendingNotificationsProps> = ({
       // Combine and deduplicate notifications
       const allNotifications = [...topLevelNotifications];
       
-      // Add cached notifications that aren't already in the top-level list
+      // Add cached notifications that aren't already in the top-level list (read or unread)
       /* eslint-disable @typescript-eslint/no-explicit-any */
       for (const cached of cachedNotifications) {
-        if (!cached.read && !allNotifications.find(n => n.id === cached.id)) {
+        if (!allNotifications.find(n => n.id === cached.id)) {
           // Convert cached notification format to NotificationItem format
           allNotifications.push({
             id: cached.id,

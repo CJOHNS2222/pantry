@@ -1,3 +1,18 @@
+## [2.1.0] - 2026-05-18
+
+### Added
+- **Star rating picker** — Recipe rating form now includes an interactive 1–5 star selector; star values are persisted to Firestore and reflected on community recipe cards
+
+### Fixed
+- **Gemini image scan never returning results** — `gemini-2.5-flash` thinking mode was enabled by default, causing pantry and receipt image analysis to exceed the 40-second timeout before responding; thinking is now disabled for image classification tasks and timeouts bumped to 60 seconds
+- **Community tab rating input** — Rating form now correctly appears when opening a recipe from the Community tab (`onRate` prop was missing from the `RecipeModal` call)
+- **Cook Tonight search re-running on tab switch** — Returning to the Recipes tab after a "What can I cook tonight?" search no longer re-fires the Gemini/Spoonacular search; results are preserved until intentionally refreshed
+- **Meal Prep button crash** — Recipes with missing `ingredients` data in Firestore no longer crash the Meal Prep Planner with a TypeError on mount
+- **Meal Prep `onAddToPlan` wrong prop** — Meal prep planner was receiving a 3-argument function where a 1-argument wrapper was expected, causing crashes when adding a recipe to the plan
+
+### Changed
+- **Header title size** — "Stock & Spoon" title in the app header enlarged for better visual presence
+
 ## [2.0.2] - 2026-05-18
 
 ### Added

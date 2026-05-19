@@ -348,6 +348,10 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
     // Stable ref so window event handler can call the latest openRecipeModal closure
     const openRecipeModalRef = useRef<((recipe: StructuredRecipe | SavedRecipe, isSavedView?: boolean) => void) | null>(null);
 
+    // When true, the next specificQuery change was caused by restoring initialSearchQuery on tab
+    // re-entry (results already exist) — skip the debounced auto-search that cycle.
+    const skipNextAutoSearchRef = useRef(false);
+
     // Keyboard navigation support
     useKeyboardNavigation({
       onEscape: () => {
@@ -362,6 +366,11 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
     // Set initial search query if provided
     useEffect(() => {
         if (initialSearchQuery && !specificQuery) {
+            // If we already have persisted results, this is a tab re-entry — just restore
+            // the query field without triggering a new search.
+            if (persistedResult) {
+                skipNextAutoSearchRef.current = true;
+            }
             setSpecificQuery(initialSearchQuery);
         }
     }, [initialSearchQuery]);
@@ -1024,6 +1033,10 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
 
   // Effect to trigger debounced search when query changes
   useEffect(() => {
+    if (skipNextAutoSearchRef.current) {
+      skipNextAutoSearchRef.current = false;
+      return; // Query was restored from initialSearchQuery with existing results — don't re-search
+    }
     if (specificQuery.trim() && specificQuery.trim().length >= 2) {
       debouncedSpecificSearch();
     }

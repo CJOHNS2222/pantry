@@ -249,7 +249,7 @@ export const analyzePantryImage = async (base64Image: string, mimeType: string, 
 
       // Add timeout to prevent hanging requests
       const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Image analysis timeout. Please try again.')), 40000); // 40 second timeout for image analysis
+        setTimeout(() => reject(new Error('Image analysis timeout. Please try again.')), 60000); // 60 second timeout for image analysis
       });
 
       const responsePromise = ai.models.generateContent({
@@ -271,6 +271,7 @@ export const analyzePantryImage = async (base64Image: string, mimeType: string, 
           responseMimeType: "application/json",
           responseSchema: schema,
           maxOutputTokens: 1200,
+          thinkingConfig: { thinkingBudget: 0 }, // disable thinking for fast image classification
         },
       });
 
@@ -415,7 +416,7 @@ export const analyzeReceiptImage = async (base64Image: string, mimeType: string,
 
       // Add timeout to prevent hanging requests
       const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Receipt analysis timeout. Please try again.')), 40000); // 40 second timeout for image analysis
+        setTimeout(() => reject(new Error('Receipt analysis timeout. Please try again.')), 60000); // 60 second timeout for image analysis
       });
 
       const responsePromise = ai.models.generateContent({
@@ -437,6 +438,7 @@ export const analyzeReceiptImage = async (base64Image: string, mimeType: string,
           responseMimeType: "application/json",
           responseSchema: schema,
           maxOutputTokens: 1500,
+          thinkingConfig: { thinkingBudget: 0 }, // disable thinking for fast image classification
         },
       });
 

@@ -30,6 +30,8 @@ export const RecipeRatingUI: React.FC<RecipeRatingUIProps> = ({
   const user = (typeof (window as any).TEST_USER !== 'undefined') ? (window as any).TEST_USER : (contextUser ?? undefined);
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [starRating, setStarRating] = useState<number>(0);
+  const [hoverStar, setHoverStar] = useState<number>(0);
   const [selectedVerdict, setSelectedVerdict] = useState<'make-again' | 'skip' | 'modify' | null>(null);
   const [selectedFeedback, setSelectedFeedback] = useState<Set<string>>(new Set());
   const [comment, setComment] = useState('');
@@ -55,6 +57,7 @@ export const RecipeRatingUI: React.FC<RecipeRatingUIProps> = ({
       if (rating) {
         setExistingRating(rating);
         setSelectedVerdict(rating.wouldMakeAgain ? 'make-again' : rating.wouldMakeAgain === false ? 'skip' : null);
+        setStarRating(rating.rating || 0);
         setSelectedFeedback(new Set(rating.feedback?.map(f => f.type) || []));
         setComment(rating.comment || '');
         setPhotos(rating.photos || []);
@@ -152,7 +155,7 @@ export const RecipeRatingUI: React.FC<RecipeRatingUIProps> = ({
       const rating: RecipeRating = {
         id: existingRating?.id || `${recipeTitle}_${user?.id || 'anon'}_${Date.now()}`,
         recipeTitle,
-        rating: selectedVerdict === 'make-again' ? 5 : selectedVerdict === 'modify' ? 3 : 1,
+        rating: starRating || (selectedVerdict === 'make-again' ? 5 : selectedVerdict === 'modify' ? 3 : 1),
         comment,
         userName: user?.name || 'Anonymous User',
         userAvatar: user?.avatar,
@@ -269,6 +272,31 @@ export const RecipeRatingUI: React.FC<RecipeRatingUIProps> = ({
       </h4>
 
       <form onSubmit={handleSubmit} onClick={(e) => e.stopPropagation()}>
+        {/* Star Rating */}
+        <div className="mb-4">
+          <div className="text-sm text-theme-secondary mb-2">Star rating:</div>
+          <div className="flex gap-1">
+            {[1, 2, 3, 4, 5].map(star => (
+              <button
+                key={star}
+                type="button"
+                onClick={() => setStarRating(star)}
+                onMouseEnter={() => setHoverStar(star)}
+                onMouseLeave={() => setHoverStar(0)}
+                className="p-1 transition-transform hover:scale-110"
+              >
+                <Star
+                  className={`w-7 h-7 transition-colors ${
+                    star <= (hoverStar || starRating)
+                      ? 'text-yellow-400 fill-yellow-400'
+                      : 'text-theme-secondary'
+                  }`}
+                />
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Verdict Selection */}
         <div className="mb-4">
           <div className="text-sm text-theme-secondary mb-2">Would you make this again?</div>

@@ -171,7 +171,7 @@ const App: React.FC = () => {
       system: true,
       allergy_alert: true,
       household_invite: true,
-      expired_items_check: false
+      expired_items_check: true
     }
   });
 
@@ -244,7 +244,6 @@ const App: React.FC = () => {
     const tip = tipsByTab[activeTab];
     if (tip) addContextualTip(tip);
     // addContextualTip is stable within a render cycle; visitedTabsRef prevents repeat calls
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, user]);
 
   // Function to add items to shopping list

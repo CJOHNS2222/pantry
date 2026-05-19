@@ -2,14 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { useApp } from '../contexts/AppContext';
 import { useAppActions } from '../contexts/AppActionsContext';
 import { Tab } from '../types/app';
-import { Star, Clock, ChefHat, Plus, X, UtensilsCrossed } from 'lucide-react';
+import { Star, Plus, UtensilsCrossed } from 'lucide-react';
 import { RecipeRating, StructuredRecipe } from '../types';
 import RecipeModal from './RecipeModal';
 import { getCachedCommunityRatedRecipes } from '../services/recipeService';
 import { log } from '../services/logService';
 
 // Staple items to ignore in ingredient display
-const STAPLES = ['salt', 'pepper', 'oil', 'water', 'flour', 'sugar', 'butter', 'vinegar', 'baking powder', 'baking soda', 'spices', 'seasoning', 'soy sauce', 'cornstarch', 'yeast'];
+const _STAPLES = ['salt', 'pepper', 'oil', 'water', 'flour', 'sugar', 'butter', 'vinegar', 'baking powder', 'baking soda', 'spices', 'seasoning', 'soy sauce', 'cornstarch', 'yeast'];
 
 interface CommunityProps {
   onAddToPlan: (recipe: StructuredRecipe) => void;
@@ -35,7 +35,7 @@ interface RecipeStats {
 export const Community: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecipe, user }) => {
   const app = useApp();
   const { isLoadingRatings, setLoadingRatingsComplete } = app;
-  const { setActiveTab } = useAppActions();
+  const { setActiveTab, onRateRecipe } = useAppActions();
   const [localLoading, setLocalLoading] = useState(false);
   const [ratingsState, setRatingsState] = useState<RecipeRating[]>([]);
   // Load community-rated cache once when the tab/component mounts (don't refresh on focus)
@@ -49,18 +49,21 @@ export const Community: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecipe,
 
         if (Array.isArray(cached) && cached.length > 0) {
           // If cached items look like RecipeRating (have recipeTitle), use directly
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const first = cached[0] as any;
           if (first && (first.recipeTitle || first.comment || first.userName)) {
             setRatingsState(cached as unknown as RecipeRating[]);
           } else {
             // Convert SavedRecipe[] into synthetic RecipeRating[] so existing UI logic works
-            const synthetic: RecipeRating[] = (cached as any[]).map((r: any, i: number) => ({
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const synthetic: RecipeRating[] = (cached as any[]).map((r: any, i: number) => ({
               id: r.id || `community_${i}`,
               recipeTitle: r.title || 'Untitled',
               rating: (typeof r.averageRating === 'number' ? Math.round(r.averageRating * 10) / 10 : 0),
               comment: r.description || '',
               userName: 'Community',
               date: r.lastUpdated || r.dateSaved || new Date().toISOString(),
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               recipe: r as any
             }));
             setRatingsState(synthetic);
@@ -127,7 +130,7 @@ export const Community: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecipe,
       ingredients: Array.isArray(r.ingredients) ? [...r.ingredients] : [],
       instructions: Array.isArray(r.instructions) ? [...r.instructions] : [],
       cookTime: r.cookTime || '',
-      image: (r as any).image
+      image: r.image
     };
 
     if (sanitized.ingredients.length === 1 && placeholderPattern.test(String(sanitized.ingredients[0]))) {
@@ -305,7 +308,8 @@ export const Community: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecipe,
             isOpen={showModal}
             onClose={() => setShowModal(false)}
             onAddToPlan={(r) => { onAddToPlan(r); }}
-              onSaveRecipe={(r) => onSaveRecipe?.(r)}
+            onSaveRecipe={(r) => onSaveRecipe?.(r)}
+            onRate={onRateRecipe}
             showSaveButton={true}
             showMarkAsMade={false}
             showAddToPlan={true}

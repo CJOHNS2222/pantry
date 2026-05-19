@@ -2004,7 +2004,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
         <MealPrepPlanner
           savedRecipes={savedRecipes}
           inventory={inventory}
-          onAddToPlan={onAddToPlan!}
+          onAddToPlan={handleAddToPlan}
           onClose={() => setShowMealPrepPlanner(false)}
         />
       )}
