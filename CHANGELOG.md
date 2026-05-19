@@ -1,3 +1,8 @@
+## [2.1.1] - 2026-05-19
+
+### Changed
+- **Android build toolchain** — Updated Android Gradle Plugin to 8.13.2, Kotlin to 2.0.21, Gradle wrapper to 8.13; enabled `android.newDsl` and disabled legacy Jetifier for cleaner builds
+
 ## [2.1.0] - 2026-05-18
 
 ### Added
