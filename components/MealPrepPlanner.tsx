@@ -27,6 +27,17 @@ export const MealPrepPlanner: React.FC<MealPrepPlannerProps> = ({
   const [selectedRecipes, setSelectedRecipes] = useState<SavedRecipe[]>([]);
   const [planDuration, setPlanDuration] = useState<3 | 5 | 7>(5); // days
 
+  const parseTimeToMinutes = (time: string | number): number => {
+    if (typeof time === 'number') return time;
+    const timeStr = (time || '').toString();
+    if (!timeStr) return 30;
+    const match = timeStr.match(/(\d+)\s*(min|minute|minutes|hour|hr|h)/i);
+    if (!match) return 30;
+    const value = parseInt(match[1]);
+    const unit = match[2].toLowerCase();
+    return unit.includes('h') ? value * 60 : value;
+  };
+
   // Calculate ingredient overlap between recipes
   const calculateIngredientOverlap = (recipe1: SavedRecipe, recipe2: SavedRecipe): string[] => {
     const ingredients1 = (recipe1.ingredients || []).map(ing => (ing || '').toLowerCase());
@@ -68,17 +79,6 @@ export const MealPrepPlanner: React.FC<MealPrepPlannerProps> = ({
 
     return suggestions.sort((a, b) => b.sharedIngredients.length - a.sharedIngredients.length);
   }, [savedRecipes]);
-
-  const parseTimeToMinutes = (time: string | number): number => {
-    if (typeof time === 'number') return time;
-    const timeStr = (time || '').toString();
-    if (!timeStr) return 30;
-    const match = timeStr.match(/(\d+)\s*(min|minute|minutes|hour|hr|h)/i);
-    if (!match) return 30;
-    const value = parseInt(match[1]);
-    const unit = match[2].toLowerCase();
-    return unit.includes('h') ? value * 60 : value;
-  };
 
   const toggleRecipeSelection = (recipe: SavedRecipe) => {
     setSelectedRecipes(prev =>

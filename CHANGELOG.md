@@ -1,3 +1,11 @@
+## [2.1.3] - 2026-05-19
+
+### Fixed
+- **Meal Prep Planner crash** — `parseTimeToMinutes` was declared after the `useMemo` that calls it, causing a Temporal Dead Zone `ReferenceError` in production builds whenever the Meal Prep button was tapped; moved declaration above the `useMemo`
+
+### Added
+- **Auto-generated "What's New" modal** — `scripts/generate-changelog.cjs` now parses `CHANGELOG.md` at build time and writes `constants/changelogEntries.ts`; `WhatsNewModal` imports from this file instead of a hand-maintained array. Runs automatically via `prebuild`/`predev` npm hooks — no manual updates needed on future releases
+
 ## [2.1.2] - 2026-05-19
 
 ### Added

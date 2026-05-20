@@ -1,43 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { X, Sparkles } from 'lucide-react';
+import { RECENT_CHANGES } from '../constants/changelogEntries';
 
 const STORAGE_KEY = 'whats_new_seen_version';
-const CURRENT_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.5.29';
+const CURRENT_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.1.2';
 
-interface ChangeEntry {
-  version: string;
-  date: string;
-  highlights: string[];
-}
-
-const RECENT_CHANGES: ChangeEntry[] = [
-  {
-    version: '1.5.29',
-    date: 'Apr 18, 2026',
-    highlights: [
-      'Usage counters now only increment on successful AI actions — no more phantom usage.',
-      'Saved recipe count syncs to the actual cache instead of drifting over time.',
-    ],
-  },
-  {
-    version: '1.5.28',
-    date: 'Apr 18, 2026',
-    highlights: [
-      'Code quality pass — removed unused imports and variables across all major screens.',
-      'Fixed a TypeScript error in Settings that could surface in some environments.',
-    ],
-  },
-  {
-    version: '1.5.27',
-    date: 'Apr 18, 2026',
-    highlights: [
-      'Fixed weekly usage counters resetting on every app open — should now only reset on Monday.',
-      'Recipe delete now correctly decrements your saved-recipe count.',
-      'Store brand prefixes (e.g. "GV", "CV") are stripped from scanned receipt items.',
-      'Added a manual Usage Reset panel in Settings → More for admins.',
-    ],
-  },
-];
+// RECENT_CHANGES is auto-generated from CHANGELOG.md by scripts/generate-changelog.cjs
+// Regenerates automatically on every `npm run build` and `npm run dev` via npm lifecycle hooks.
 
 export const WhatsNewModal: React.FC = () => {
   const [open, setOpen] = useState(false);
