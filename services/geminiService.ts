@@ -1,5 +1,6 @@
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { PantryItem, RecipeSearchResult, RecipeSearchParams, StructuredRecipe, User, GroundingChunk } from "../types";
+import { searchRecipesViaOpenRouter, analyzePantryImageViaOpenRouter, analyzeReceiptImageViaOpenRouter } from './openRouterService';
 import { getPerformance, trace, PerformanceTrace } from "firebase/performance";
 import featureFlags from './featureFlags';
 import { UsageService } from './usageService';
@@ -179,6 +180,12 @@ const geminiBatcher = new GeminiRequestBatcher();
  * Analyzes an image to identify pantry items.
  */
 export const analyzePantryImage = async (base64Image: string, mimeType: string, user?: User): Promise<PantryItem[]> => {
+  // Test override: bypass Gemini entirely and route to OpenRouter / Groq.
+  if (import.meta.env.VITE_GEMINI_DISABLED === 'true') {
+    log.info('VITE_GEMINI_DISABLED=true — routing analyzePantryImage to OpenRouter', {}, 'GeminiService');
+    return analyzePantryImageViaOpenRouter(base64Image, mimeType, user);
+  }
+
   // Gate Gemini usage: ensure global enabled + user opt-in + usage cap
   log.debug('analyzePantryImage: entry', {
     userId: user?.id ?? 'none',
@@ -333,6 +340,12 @@ export const analyzePantryImage = async (base64Image: string, mimeType: string, 
  * Analyzes a receipt image to extract grocery items and their details.
  */
 export const analyzeReceiptImage = async (base64Image: string, mimeType: string, user?: User): Promise<PantryItem[]> => {
+  // Test override: bypass Gemini entirely and route to OpenRouter / Groq.
+  if (import.meta.env.VITE_GEMINI_DISABLED === 'true') {
+    log.info('VITE_GEMINI_DISABLED=true — routing analyzeReceiptImage to OpenRouter', {}, 'GeminiService');
+    return analyzeReceiptImageViaOpenRouter(base64Image, mimeType, user);
+  }
+
   // Gate Gemini usage: ensure global enabled + user opt-in + usage cap
   log.debug('analyzeReceiptImage: entry', {
     userId: user?.id ?? 'none',
@@ -500,6 +513,13 @@ export const analyzeReceiptImage = async (base64Image: string, mimeType: string,
  * Searches for recipes using Google Search Grounding with enhanced filters and structured JSON output.
  */
 export const searchRecipes = async (params: RecipeSearchParams, user?: User): Promise<RecipeSearchResult> => {
+  // Test override: bypass Gemini entirely and route to OpenRouter / Groq.
+  // Enable by setting VITE_GEMINI_DISABLED=true in .env.local.
+  if (import.meta.env.VITE_GEMINI_DISABLED === 'true') {
+    log.info('VITE_GEMINI_DISABLED=true — routing searchRecipes to OpenRouter', {}, 'GeminiService');
+    return searchRecipesViaOpenRouter(params, user);
+  }
+
   const perfTrace = performance ? trace(performance, 'search_recipes') : null;
   perfTrace?.start();
 

@@ -1,3 +1,8 @@
+## [2.1.2] - 2026-05-19
+
+### Added
+- **OpenRouter / Groq AI provider** — New `openRouterService.ts` integrates the OpenAI-compatible OpenRouter API as an alternative to Gemini for all three AI features: recipe text search, pantry image scanning, and receipt scanning. Set `VITE_GEMINI_DISABLED=true` in `.env.local` to route all AI calls through OpenRouter instead of Gemini. Defaults to `baidu/cobuddy:free` for text search and `meta-llama/llama-4-maverick:free` for vision; both are confirmed free ($0/M tokens). Override per-feature via `VITE_OPENROUTER_MODEL` and `VITE_OPENROUTER_VISION_MODEL`. Compatible with Groq by setting `VITE_OPENROUTER_BASE_URL`.
+
 ## [2.1.1] - 2026-05-19
 
 ### Changed
