@@ -1,3 +1,16 @@
+## [2.1.4] - 2026-05-20
+
+### Fixed
+- **OpenRouter recipe search returning empty results** — default text model `baidu/cobuddy:free` was deprecated on OpenRouter; replaced with `meta-llama/llama-3.3-70b-instruct:free`
+- **OpenRouter pantry/receipt image scan hanging** — default vision model `meta-llama/llama-4-maverick:free` was unreliable on free tier; replaced with `qwen/qwen2.5-vl-72b-instruct:free`
+- **Image scan opening blank review modal** — `analyzePantryImageViaOpenRouter` and `analyzeReceiptImageViaOpenRouter` now throw a user-friendly error when the model responds but no items are parsed, instead of silently opening an empty review modal
+- **Meal Prep Planner modal header hidden behind app bar** — changed overlay from `items-center z-50` to `items-start z-[9999]` with `pt-[calc(var(--safe-area-top,0px)+72px)]` so the modal card starts below the fixed `AppHeader`
+- **GeminiLoadingOverlay hanging at 97%** — added `onTimeout` callback to the pantry scanner overlay so the loading state resets to error when the 60-second visual timer completes
+
+### Changed
+- **OpenRouter models now configurable via Remote Config** — `openrouter_model` and `openrouter_vision_model` keys added to `remoteConfigService` in-app defaults; set in Firebase Console to hot-swap models without a deploy. `VITE_OPENROUTER_MODEL` / `VITE_OPENROUTER_VISION_MODEL` env vars remain as local dev overrides (highest priority)
+- **Meal Prep Planner redesign** — Plan Duration selector now caps the number of suggested batch sessions (3 days → 3, 5 → 5, 7 → 7); suggestion cards reframed as "Cook together / Prep once, use in both" with estimated time savings; servings now summed from actual recipe data instead of hardcoded 8; custom plan builder shows shared-ingredient callout for selections of 2+ recipes
+
 ## [2.1.3] - 2026-05-19
 
 ### Fixed

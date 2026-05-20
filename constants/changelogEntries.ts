@@ -9,6 +9,16 @@ export interface ChangeEntry {
 
 export const RECENT_CHANGES: ChangeEntry[] = [
   {
+    "version": "2.1.4",
+    "date": "May 20, 2026",
+    "highlights": [
+      "OpenRouter recipe search returning empty results — default text model baidu/cobuddy:free was deprecated on OpenRouter;…",
+      "OpenRouter pantry/receipt image scan hanging — default vision model meta-llama/llama-4-maverick:free was unreliable on…",
+      "Image scan opening blank review modal — analyzePantryImageViaOpenRouter and analyzeReceiptImageViaOpenRouter now throw…",
+      "Meal Prep Planner modal header hidden behind app bar — changed overlay from items-center z-50 to items-start z-[9999]…"
+    ]
+  },
+  {
     "version": "2.1.3",
     "date": "May 19, 2026",
     "highlights": [
@@ -21,13 +31,6 @@ export const RECENT_CHANGES: ChangeEntry[] = [
     "date": "May 19, 2026",
     "highlights": [
       "OpenRouter / Groq AI provider — New openRouterService.ts integrates the OpenAI-compatible OpenRouter API as an…"
-    ]
-  },
-  {
-    "version": "2.1.1",
-    "date": "May 19, 2026",
-    "highlights": [
-      "Android build toolchain — Updated Android Gradle Plugin to 8.13.2, Kotlin to 2.0.21, Gradle wrapper to 8.13; enabled…"
     ]
   }
 ];

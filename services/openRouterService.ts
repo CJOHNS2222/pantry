@@ -21,13 +21,10 @@
 
 import { RecipeSearchParams, RecipeSearchResult, StructuredRecipe, User, PantryItem } from '../types';
 import { log } from './logService';
+import remoteConfig from './remoteConfigService';
 import { getUserNutritionTargets, generatePersonalizedSearchPrompt } from '../utils/nutritionUtils';
 
 const DEFAULT_BASE_URL = 'https://openrouter.ai/api/v1';
-
-// Free models available on OpenRouter.  Update VITE_OPENROUTER_MODEL to override.
-// Confirmed working: baidu/cobuddy:free, meta-llama/llama-4-maverick:free
-const DEFAULT_MODEL = 'baidu/cobuddy:free';
 
 // ---- Prompt builder (mirrors performSearch in geminiService.ts) ----------------
 
@@ -120,7 +117,9 @@ export async function searchRecipesViaOpenRouter(
   }
 
   const baseUrl = (import.meta.env.VITE_OPENROUTER_BASE_URL as string | undefined) ?? DEFAULT_BASE_URL;
-  const model   = (import.meta.env.VITE_OPENROUTER_MODEL   as string | undefined) ?? DEFAULT_MODEL;
+  // env var wins (local dev override); Remote Config provides production hot-swap
+  const model   = (import.meta.env.VITE_OPENROUTER_MODEL as string | undefined)
+                  || remoteConfig.getString('openrouter_model');
   const prompt  = buildPrompt(params);
 
   log.debug('OpenRouter recipe search', {
@@ -187,15 +186,13 @@ export async function searchRecipesViaOpenRouter(
 
   if (recipes.length === 0) {
     console.warn('[OpenRouter] Could not parse any recipes from response. Raw:', content.substring(0, 500));
+    throw new Error('AI returned a response that could not be parsed into recipes. Try rephrasing your search or adjusting your ingredients.');
   }
 
   return { recipes };
 }
 
 // ---- Vision: shared fetch helper -----------------------------------------------
-
-// Maverick is confirmed multimodal; CoBuddy is text-only — keep Maverick for vision
-const DEFAULT_VISION_MODEL = 'meta-llama/llama-4-maverick:free';
 
 async function callVisionModel(
   base64Image: string,
@@ -211,7 +208,9 @@ async function callVisionModel(
   }
 
   const baseUrl = (import.meta.env.VITE_OPENROUTER_BASE_URL as string | undefined) ?? DEFAULT_BASE_URL;
-  const model   = (import.meta.env.VITE_OPENROUTER_VISION_MODEL as string | undefined) ?? DEFAULT_VISION_MODEL;
+  // env var wins (local dev override); Remote Config provides production hot-swap
+  const model   = (import.meta.env.VITE_OPENROUTER_VISION_MODEL as string | undefined)
+                  || remoteConfig.getString('openrouter_vision_model');
 
   log.debug(`${logTag}: calling vision model`, {
     model, baseUrl, imageSizeKB: Math.round(base64Image.length / 1024), mimeType,
@@ -315,6 +314,7 @@ export async function analyzePantryImageViaOpenRouter(
 
   if (items.length === 0) {
     console.warn('[OpenRouter/analyzePantry] No items parsed. Raw:', text.substring(0, 500));
+    throw new Error('No pantry items could be identified from the image. Try a clearer photo with better lighting.');
   }
   console.log(`[OpenRouter/analyzePantry] Parsed ${items.length} items`);
 
@@ -343,6 +343,7 @@ export async function analyzeReceiptImageViaOpenRouter(
 
   if (items.length === 0) {
     console.warn('[OpenRouter/analyzeReceipt] No items parsed. Raw:', text.substring(0, 500));
+    throw new Error('No receipt items could be identified from the image. Try a clearer, well-lit photo of the receipt.');
   }
   console.log(`[OpenRouter/analyzeReceipt] Parsed ${items.length} items`);
 

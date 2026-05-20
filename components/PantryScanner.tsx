@@ -2183,6 +2183,11 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                         totalSeconds={60}
                         stages={IMAGE_ANALYSIS_STAGES}
                         variant="overlay"
+                        onTimeout={() => {
+                          setLoadingState(LoadingState.ERROR);
+                          setImageAnalyzeError('Image analysis timed out. Please try again with a clearer photo.');
+                          appActions.addToast('Image analysis timed out. Please try again.', 'error');
+                        }}
                       />
                     </div>
                   ) : (
