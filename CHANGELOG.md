@@ -1,3 +1,13 @@
+## [2.1.5] - 2026-05-23
+
+### Fixed
+- **Notification badge mismatch** — "Pending Notifications" in Settings now shows the same count as the header bell; previously read notifications were being merged into the pending list, inflating the badge
+- **Recipe ingredient units lost on purchase** — ingredients with a quantity string like "225 g" or "800 ml" now preserve the unit when moved to pantry; previously they always showed as "cnt"
+- **Bulk delete N+1 Firestore writes and toast flooding** — selecting and deleting multiple pantry items now performs a single cache write and shows a single summary toast instead of one write + one toast per item
+
+### Changed
+- **Remote Config cleaned up** — removed phantom `openrouter_model`, `openrouter_vision_model`, `gemini_max_batch_size`, and `gemini_debounce_delay_ms` entries that were appearing in the Remote Config debug view despite never being published; active Gemini model params (`gemini_model`, `gemini_model_vision`) remain
+
 ## [2.1.4] - 2026-05-20
 
 ### Fixed

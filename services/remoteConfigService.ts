@@ -112,12 +112,6 @@ const IN_APP_DEFAULTS: Record<string, string | number | boolean> = {
   // ── Gemini AI ─────────────────────────────────────────────────────────────
   gemini_model: 'gemini-2.5-flash',        // text / analysis requests
   gemini_model_vision: 'gemini-2.5-flash', // image / vision scan tasks
-  gemini_max_batch_size: 3,               // concurrent requests per batch
-  gemini_debounce_delay_ms: 500,          // ms before processing the request queue
-
-  // ── OpenRouter AI ─────────────────────────────────────────────────────────
-  openrouter_model: 'meta-llama/llama-3.3-70b-instruct:free',  // text / recipe search
-  openrouter_vision_model: 'qwen/qwen2.5-vl-72b-instruct:free', // image scan tasks
 
   // ── App version ───────────────────────────────────────────────────────────
   min_app_version: '1.0.0',  // minimum supported version (semver); older builds get update prompt

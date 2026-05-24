@@ -9,6 +9,16 @@ export interface ChangeEntry {
 
 export const RECENT_CHANGES: ChangeEntry[] = [
   {
+    "version": "2.1.5",
+    "date": "May 23, 2026",
+    "highlights": [
+      "Notification badge mismatch — \"Pending Notifications\" in Settings now shows the same count as the header bell;…",
+      "Recipe ingredient units lost on purchase — ingredients with a quantity string like \"225 g\" or \"800 ml\" now preserve the…",
+      "Bulk delete N+1 Firestore writes and toast flooding — selecting and deleting multiple pantry items now performs a…",
+      "Remote Config cleaned up — removed phantom openrouter_model, openrouter_vision_model, gemini_max_batch_size, and…"
+    ]
+  },
+  {
     "version": "2.1.4",
     "date": "May 20, 2026",
     "highlights": [
@@ -24,13 +34,6 @@ export const RECENT_CHANGES: ChangeEntry[] = [
     "highlights": [
       "Meal Prep Planner crash — parseTimeToMinutes was declared after the useMemo that calls it, causing a Temporal Dead Zone…",
       "Auto-generated \"What's New\" modal — scripts/generate-changelog.cjs now parses CHANGELOG.md at build time and writes…"
-    ]
-  },
-  {
-    "version": "2.1.2",
-    "date": "May 19, 2026",
-    "highlights": [
-      "OpenRouter / Groq AI provider — New openRouterService.ts integrates the OpenAI-compatible OpenRouter API as an…"
     ]
   }
 ];

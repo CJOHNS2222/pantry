@@ -860,35 +860,29 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   const bulkDelete = useCallback(async () => {
     if (selectedItems.size === 0) return;
     const count = selectedItems.size;
-    const indicesToDelete = Array.from(selectedItems).sort((a, b) => b - a);
+    const indicesToDelete = Array.from(selectedItems);
     setBulkProgress({ current: 0, total: count });
-    for (let i = 0; i < indicesToDelete.length; i++) {
-      await onDeleteItem(indicesToDelete[i]);
-      setBulkProgress({ current: i + 1, total: count });
-    }
+    await appActions.deleteItems(indicesToDelete);
     setBulkProgress(null);
     setSelectedItems(new Set());
     setBulkMode(false);
-    appActions.addToast(`Deleted ${count} item${count > 1 ? 's' : ''}`, 'success');
-  }, [selectedItems, onDeleteItem, setSelectedItems, setBulkMode, appActions]);
+    // deleteItems already shows a single toast — no extra toast needed here
+  }, [selectedItems, appActions, setSelectedItems, setBulkMode]);
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const bulkMoveToShoppingList = useCallback(async () => {
     if (selectedItems.size === 0) return;
 
-    const indicesToMove = Array.from(selectedItems).sort((a, b) => b - a); // Delete from highest index first
+    const indicesToMove = Array.from(selectedItems);
     const itemsToMove = PantryService.bulkMoveToShoppingList(inventory, indicesToMove);
     addToShoppingList(itemsToMove);
     setBulkProgress({ current: 0, total: indicesToMove.length });
-    for (let i = 0; i < indicesToMove.length; i++) {
-      await onDeleteItem(indicesToMove[i]);
-      setBulkProgress({ current: i + 1, total: indicesToMove.length });
-    }
+    await appActions.deleteItems(indicesToMove);
     setBulkProgress(null);
     setSelectedItems(new Set());
     setBulkMode(false);
     appActions.addToast(`Moved ${itemsToMove.length} item${itemsToMove.length > 1 ? 's' : ''} to shopping list`, 'success');
-  }, [selectedItems, inventory, addToShoppingList, onDeleteItem, setSelectedItems, setBulkMode, appActions]);
+  }, [selectedItems, inventory, addToShoppingList, appActions, setSelectedItems, setBulkMode]);
 
   const toggleCategory = useCallback((category: string) => {
     const newExpanded = new Set(expandedCategories);
@@ -931,16 +925,14 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const bulkAddToShoppingListWithRemove = useCallback(async () => {
     if (selectedItems.size === 0) return;
-    const indicesToMove = Array.from(selectedItems).sort((a, b) => b - a); // Delete from highest index first
+    const indicesToMove = Array.from(selectedItems);
     const itemsToMove = PantryService.bulkMoveToShoppingList(inventory, indicesToMove);
     addToShoppingList(itemsToMove);
-    for (const index of indicesToMove) {
-      await onDeleteItem(index);
-    }
+    await appActions.deleteItems(indicesToMove);
     setSelectedItems(new Set());
     setBulkMode(false);
     appActions.addToast(`Moved ${itemsToMove.length} item${itemsToMove.length > 1 ? 's' : ''} to shopping list`, 'success');
-  }, [selectedItems, inventory, addToShoppingList, onDeleteItem, setSelectedItems, setBulkMode, appActions]);
+  }, [selectedItems, inventory, addToShoppingList, appActions, setSelectedItems, setBulkMode]);
 
   const toggleStorageLocation = useCallback((location: string) => {
     // Bring clicked storage location section to the top

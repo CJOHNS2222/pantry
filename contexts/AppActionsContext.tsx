@@ -11,6 +11,7 @@ interface AppActionsContextValue {
   // Data operations
   updateItem: (index: number, updates: Partial<PantryItem>) => Promise<void>;
   deleteItem: (index: number) => Promise<void>;
+  deleteItems: (indices: number[]) => Promise<void>;
   addItem: (item: PantryItem) => Promise<void>;
   addItems: (items: PantryItem[]) => Promise<void>;
   setInventory: (inventory: PantryItem[]) => void;
@@ -60,10 +61,12 @@ interface AppActionsProviderProps {
 
 const noop = () => {};
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 const defaultAppActionsContextValue: AppActionsContextValue = {
   setActiveTab: noop as any,
   updateItem: async () => {},
   deleteItem: async () => {},
+  deleteItems: async () => {},
   addItem: async () => {},
   addItems: async () => {},
   setInventory: noop as any,
@@ -91,6 +94,7 @@ const defaultAppActionsContextValue: AppActionsContextValue = {
   checkMealPlanLimit: async () => false,
   refreshAllData: async () => {},
 };
+/* eslint-enable @typescript-eslint/no-explicit-any */
 
 export const AppActionsProvider: React.FC<AppActionsProviderProps> = ({ children, value }) => {
   const providerValue = value ?? defaultAppActionsContextValue;

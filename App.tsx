@@ -349,6 +349,7 @@ const App: React.FC = () => {
     handleMarkAsMade,
     updateItem,
     deleteItem,
+    deleteItems,
     addItem,
     addItems,
     recentActions,
@@ -808,6 +809,13 @@ const App: React.FC = () => {
   };
 
   const handleLogin = async (loggedInUser: User) => {
+    // Guest users have no Firebase Auth UID — skip all Firestore ops and onboarding
+    if (loggedInUser.isGuest) {
+      setUser({ ...loggedInUser, hasSeenTutorial: true });
+      AnalyticsService.trackLogin('guest');
+      return;
+    }
+
     const userRef = DatabaseMonitoringService.doc('users', loggedInUser.id);
     const userDoc = await DatabaseMonitoringService.getDoc(userRef);
 
@@ -1343,6 +1351,7 @@ const App: React.FC = () => {
               setActiveTab,
               updateItem,
               deleteItem,
+              deleteItems,
               addItem,
               addItems,
               setInventory,
@@ -1414,11 +1423,15 @@ const App: React.FC = () => {
                       purchaseDate: nowIso
                     });
                   } else {
-                    // Fallback: create a batch from the generic quantity field
+                    // Fallback: create a batch from the generic quantity field.
+                    // Preserve the unit if quantity is a string like "225 g" or "800 ml".
+                    const qStr = typeof i.quantity === 'string' ? i.quantity.trim() : '';
+                    const unitMatch = qStr.match(/^\d+(?:[./]\d+)?(?:\.\d+)?\s+(\S+)/);
+                    const fallbackUnit = unitMatch?.[1] ?? undefined;
                     batches.push({
                       batchId: Math.random().toString(36).substr(2,9),
                       quantity: Math.abs(addQty),
-                      unit: undefined,
+                      unit: fallbackUnit,
                       purchaseDate: nowIso
                     });
                   }

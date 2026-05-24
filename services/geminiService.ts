@@ -1,10 +1,8 @@
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { PantryItem, RecipeSearchResult, RecipeSearchParams, StructuredRecipe, User, GroundingChunk } from "../types";
-import { searchRecipesViaOpenRouter, analyzePantryImageViaOpenRouter, analyzeReceiptImageViaOpenRouter } from './openRouterService';
+// openRouterService removed — all AI calls go directly through Gemini
 import { getPerformance, trace, PerformanceTrace } from "firebase/performance";
-import featureFlags from './featureFlags';
 import { UsageService } from './usageService';
-import { log } from './logService';
 import { getUserNutritionTargets, generatePersonalizedSearchPrompt } from '../utils/nutritionUtils';
 import remoteConfig from './remoteConfigService';
 import { reportGeminiError } from './sentryService';
@@ -21,505 +19,163 @@ try {
   performance = null;
 }
 
-// Request batching and debouncing system
-interface QueuedRequest<T> {
-  id: string;
-  operation: () => Promise<T>;
-  resolve: (value: T) => void;
-  reject: (error: unknown) => void;
-  timestamp: number;
-  priority: number; // Higher priority = processed first
-}
-
-class GeminiRequestBatcher {
-  private queue: QueuedRequest<unknown>[] = [];
-  private isProcessing = false;
-  private debounceTimer: NodeJS.Timeout | null = null;
-  private get debounceDelay() { return remoteConfig.getNumber('gemini_debounce_delay_ms'); }
-  private get maxBatchSize() { return remoteConfig.getNumber('gemini_max_batch_size'); }
-  private readonly maxQueueSize = 10; // Maximum queue size
-  private requestCache = new Map<string, { result: unknown; timestamp: number }>();
-  private readonly cacheTTL = 5 * 60 * 1000; // 5 minutes cache
-  private readonly maxCacheSize = 100; // Maximum cache entries
-
-  // Debounced processing
-  private scheduleProcessing(): void {
-    if (this.debounceTimer) {
-      clearTimeout(this.debounceTimer);
-    }
-
-    this.debounceTimer = setTimeout(() => {
-      this.processQueue();
-    }, this.debounceDelay);
-  }
-
-  // Process queued requests
-  private async processQueue(): Promise<void> {
-    if (this.isProcessing || this.queue.length === 0) {
-      return;
-    }
-
-    this.isProcessing = true;
-
-    try {
-      // Sort by priority (higher first) then by timestamp (older first)
-      this.queue.sort((a, b) => {
-        if (a.priority !== b.priority) {
-          return b.priority - a.priority;
-        }
-        return a.timestamp - b.timestamp;
-      });
-
-      // Take up to maxBatchSize requests
-      const batch = this.queue.splice(0, this.maxBatchSize);
-
-      log.info(`Processing Gemini batch: ${batch.length} requests`, {}, 'GeminiBatcher');
-
-      // Process batch concurrently
-      const promises = batch.map(async (request) => {
-        try {
-          const result = await request.operation();
-          request.resolve(result);
-          log.debug(`Completed Gemini request: ${request.id}`, {}, 'GeminiBatcher');
-        } catch (err: unknown) {
-          log.error(`Failed Gemini request: ${request.id}`, err, 'GeminiBatcher');
-          request.reject(err);
-        }
-      });
-
-      await Promise.allSettled(promises);
-
-    } finally {
-      this.isProcessing = false;
-
-      // Process remaining items if any
-      if (this.queue.length > 0) {
-        this.scheduleProcessing();
-      }
-    }
-  }
-
-  // Add request to queue
-  async enqueue<T>(
-    id: string,
-    operation: () => Promise<T>,
-    priority: number = 1
-  ): Promise<T> {
-    // Check cache first
-    const cached = this.requestCache.get(id);
-    if (cached && (Date.now() - cached.timestamp) < this.cacheTTL) {
-      log.debug(`Using cached Gemini result for: ${id}`, {}, 'GeminiBatcher');
-      return cached.result as T;
-    }
-
-    return new Promise<T>((resolve, reject) => {
-      // Check queue size limit
-      if (this.queue.length >= this.maxQueueSize) {
-        reject(new Error('Gemini request queue is full. Please try again later.'));
-        return;
-      }
-
-      const request: QueuedRequest<T> = {
-        id,
-        operation,
-        resolve: (result) => {
-          // Cache successful results with eviction
-          this.setCacheEntry(id, result);
-          resolve(result);
-        },
-        reject,
-        timestamp: Date.now(),
-        priority
-      };
-
-      this.queue.push(request as QueuedRequest<unknown>);
-      log.debug(`Queued Gemini request: ${id} (priority: ${priority})`, {}, 'GeminiBatcher');
-
-      this.scheduleProcessing();
-    });
-  }
-
-  // Clear cache
-  clearCache(): void {
-    this.requestCache.clear();
-    log.info('Cleared Gemini request cache', {}, 'GeminiBatcher');
-  }
-
-  // Set cache entry with eviction
-  private setCacheEntry(id: string, result: unknown): void {
-    // Evict oldest entries if at max size
-    if (this.requestCache.size >= this.maxCacheSize) {
-      const entries = Array.from(this.requestCache.entries());
-      // Sort by timestamp (oldest first)
-      entries.sort((a, b) => a[1].timestamp - b[1].timestamp);
-      // Remove oldest 10% or at least 1 entry
-      const toRemove = Math.max(1, Math.floor(this.maxCacheSize * 0.1));
-      for (let i = 0; i < toRemove && entries.length > 0; i++) {
-        this.requestCache.delete(entries[i][0]);
-      }
-      log.debug(`Evicted ${toRemove} old cache entries`, {}, 'GeminiBatcher');
-    }
-
-    this.requestCache.set(id, { result, timestamp: Date.now() });
-  }
-
-  // Get queue status
-  getStatus() {
-    return {
-      queueLength: this.queue.length,
-      isProcessing: this.isProcessing,
-      cacheSize: this.requestCache.size
-    };
-  }
-}
-
-// Create singleton batcher
-const geminiBatcher = new GeminiRequestBatcher();
-
 /**
  * Analyzes an image to identify pantry items.
  */
 export const analyzePantryImage = async (base64Image: string, mimeType: string, user?: User): Promise<PantryItem[]> => {
-  // Test override: bypass Gemini entirely and route to OpenRouter / Groq.
-  if (import.meta.env.VITE_GEMINI_DISABLED === 'true') {
-    log.info('VITE_GEMINI_DISABLED=true — routing analyzePantryImage to OpenRouter', {}, 'GeminiService');
-    return analyzePantryImageViaOpenRouter(base64Image, mimeType, user);
+  if (!import.meta.env.VITE_GEMINI_API_KEY) {
+    throw new Error('Gemini API key not configured. Please check your environment variables.');
+  }
+  if (user?.isGuest) {
+    throw new Error('AI features are not available in guest mode. Please sign in to use image scanning.');
   }
 
-  // Gate Gemini usage: ensure global enabled + user opt-in + usage cap
-  log.debug('analyzePantryImage: entry', {
-    userId: user?.id ?? 'none',
-    isGuest: user?.isGuest ?? false,
-    imageSizeKB: Math.round(base64Image.length / 1024),
-    mimeType,
-    apiKeyPresent: !!import.meta.env.VITE_GEMINI_API_KEY,
-    geminiGloballyEnabled: featureFlags.isGeminiGloballyEnabled(),
-    userOptedIn: user?.id ? featureFlags.userOptedInToGemini(user.id) : false,
-    visionModel: remoteConfig.getString('gemini_model_vision'),
-  }, 'GeminiService');
+  const perfTrace = performance ? trace(performance, 'analyze_pantry_image') : null;
+  perfTrace?.start();
 
-  if (!featureFlags.isGeminiGloballyEnabled()) {
-    throw new Error('Gemini integration is disabled by configuration.');
-  }
-
-  if (!user?.id) {
-    throw new Error('User authentication required for Gemini usage.');
-  }
-
-  if (user.isGuest) {
-    throw new Error('AI features are not available in guest mode. Please sign up for a free account.');
-  }
-
-  // Note: we expect the caller to set user opt-in before invoking this in UI flows.
-  if (!featureFlags.userOptedInToGemini(user.id)) {
-    throw new Error('Gemini usage not permitted: opt-in required.');
-  }
-
-  // Check Firebase usage limits
-  if (!(await UsageService.canUseGemini(user))) {
-    log.debug('analyzePantryImage: usage limit gate failed', { userId: user?.id }, 'GeminiService');
-    throw new Error('Gemini usage not permitted: weekly limit reached.');
-  }
-
-  // Create cache key based on image hash (simple hash for demo)
-  const imageHash = btoa(base64Image).slice(0, 16);
-  const requestId = `pantry_analysis_${user.id}_${imageHash}`;
-  log.debug('analyzePantryImage: gates passed, enqueueing', { requestId }, 'GeminiService');
-
-  return geminiBatcher.enqueue(requestId, async () => {
-    const perfTrace = performance ? trace(performance, 'analyze_pantry_image') : null;
-    perfTrace?.start();
-
-    try {
-      // Check API key first
-      if (!import.meta.env.VITE_GEMINI_API_KEY) {
-        throw new Error('Gemini API key not configured. Please check your environment variables.');
-      }
-
-      console.log('🔍 Starting pantry image analysis with model:', remoteConfig.getString('gemini_model_vision'));
-      console.log('📊 Image size:', Math.round(base64Image.length / 1024), 'KB');
-
-      const modelId = remoteConfig.getString('gemini_model_vision');
-
-      const schema: Schema = {
-        type: Type.ARRAY,
-        items: {
-          type: Type.OBJECT,
-          properties: {
-            item: { type: Type.STRING },
-            category: { type: Type.STRING },
-            quantity_estimate: { type: Type.STRING },
-          },
-          required: ["item", "category", "quantity_estimate"],
+  try {
+    const schema: Schema = {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          item: { type: Type.STRING },
+          category: { type: Type.STRING },
+          quantity_estimate: { type: Type.STRING },
         },
-      };
+        required: ['item', 'category', 'quantity_estimate'],
+      },
+    };
 
-      // Add timeout to prevent hanging requests
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Image analysis timeout. Please try again.')), 60000); // 60 second timeout for image analysis
-      });
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Image analysis timed out. Please try again.')), 60000)
+    );
 
-      const responsePromise = ai.models.generateContent({
-        model: modelId,
-        contents: {
-          parts: [
-            {
-              inlineData: {
-                data: base64Image,
-                mimeType: mimeType,
-              },
-            },
-            {
-              text: `List all pantry items visible. Categories: Fruits & Vegetables, Dairy & Eggs, Meat & Poultry, Seafood, Grains & Bread, Canned Goods, Condiments & Sauces, Snacks, Beverages, Frozen Foods, Baking Supplies, Spices & Herbs, Breakfast Foods, Uncategorized.`,
-            },
-          ],
-        },
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: schema,
-          maxOutputTokens: 1200,
-          thinkingConfig: { thinkingBudget: 0 }, // disable thinking for fast image classification
-        },
-      });
+    const responsePromise = ai.models.generateContent({
+      model: remoteConfig.getString('gemini_model_vision'),
+      contents: {
+        parts: [
+          { inlineData: { data: base64Image, mimeType } },
+          { text: 'List every food or pantry item visible in this image. For each item provide its name, food category (e.g. Fruits & Vegetables, Dairy & Eggs, Meat & Poultry, Grains & Bread, Canned Goods, Snacks, Beverages, Spices & Herbs, Uncategorized), and estimated quantity.' },
+        ],
+      },
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: schema,
+        maxOutputTokens: 1000,
+        thinkingConfig: { thinkingBudget: 0 },
+      },
+    });
 
-      const response = await Promise.race([responsePromise, timeoutPromise]) as { text: string };
-      console.log('✅ Pantry image analysis API call completed');
+    const response = await Promise.race([responsePromise, timeoutPromise]) as { text: string };
+    const jsonText = response.text;
+    if (!jsonText) throw new Error('No data returned from Gemini.');
 
-      const jsonText = response.text;
-      console.log('📄 Pantry response text length:', jsonText?.length || 0);
-      
-      if (!jsonText) {
-        console.error('❌ No text in pantry Gemini response');
-        throw new Error("No data returned from Gemini.");
-      }
+    const items = JSON.parse(
+      jsonText.replace(/^```json\s*/i, '').replace(/\s*```$/, '').trim()
+    ) as PantryItem[];
 
-      console.log('🔧 Pantry raw response text:', jsonText.substring(0, 200) + '...');
-
-      const cleanJson = jsonText.replace(/^```json\s*/, "").replace(/\s*```$/, "");
-      console.log('🧹 Pantry cleaned JSON length:', cleanJson.length);
-      
-      let items;
-      try {
-        items = JSON.parse(cleanJson) as PantryItem[];
-        console.log('✅ Pantry successfully parsed', items.length, 'items');
-      } catch (parseError) {
-        console.error('❌ Pantry JSON parse error:', parseError);
-        console.error('❌ Pantry failed to parse:', cleanJson.substring(0, 500));
-        throw new Error(`Failed to parse Gemini response: ${parseError}`);
-      }
-
-      // Add custom metrics (if performance available)
-      if (perfTrace) {
-        perfTrace.putMetric('image_size_kb', Math.round(base64Image.length / 1024));
-        perfTrace.putMetric('items_detected', Number(items.length));
-      }
-
-      // Record usage in Firebase
-      try {
-        await UsageService.recordGeminiUsage(user);
-      } catch (e) {
-        console.warn('Failed to record Gemini usage:', e);
-      }
-
-      return items;
-    } catch (err: unknown) {
-      console.error("Error analyzing pantry image:", err);
-      reportGeminiError('pantry_image_scan', err, {
-        userId: user?.id,
-        model: remoteConfig.getString('gemini_model_vision'),
-        imageSizeKb: Math.round(base64Image.length / 1024),
-      });
-      throw err;
-    } finally {
-      perfTrace?.stop();
+    if (perfTrace) {
+      perfTrace.putMetric('image_size_kb', Math.round(base64Image.length / 1024));
+      perfTrace.putMetric('items_detected', items.length);
     }
-  }, 2); // Higher priority for image analysis
+    try { if (user) await UsageService.recordGeminiUsage(user); } catch { /* non-fatal */ }
+
+    return items;
+  } catch (err: unknown) {
+    reportGeminiError('pantry_image_scan', err, {
+      userId: user?.id,
+      model: remoteConfig.getString('gemini_model_vision'),
+      imageSizeKb: Math.round(base64Image.length / 1024),
+    });
+    throw err;
+  } finally {
+    perfTrace?.stop();
+  }
 };
 
 /**
- * Analyzes a receipt image to extract grocery items and their details.
+ * Analyzes a receipt image to extract grocery items.
  */
 export const analyzeReceiptImage = async (base64Image: string, mimeType: string, user?: User): Promise<PantryItem[]> => {
-  // Test override: bypass Gemini entirely and route to OpenRouter / Groq.
-  if (import.meta.env.VITE_GEMINI_DISABLED === 'true') {
-    log.info('VITE_GEMINI_DISABLED=true — routing analyzeReceiptImage to OpenRouter', {}, 'GeminiService');
-    return analyzeReceiptImageViaOpenRouter(base64Image, mimeType, user);
+  if (!import.meta.env.VITE_GEMINI_API_KEY) {
+    throw new Error('Gemini API key not configured. Please check your environment variables.');
   }
-
-  // Gate Gemini usage: ensure global enabled + user opt-in + usage cap
-  log.debug('analyzeReceiptImage: entry', {
-    userId: user?.id ?? 'none',
-    isGuest: user?.isGuest ?? false,
-    imageSizeKB: Math.round(base64Image.length / 1024),
-    mimeType,
-    apiKeyPresent: !!import.meta.env.VITE_GEMINI_API_KEY,
-    geminiGloballyEnabled: featureFlags.isGeminiGloballyEnabled(),
-    receiptScanKillSwitch: remoteConfig.getBoolean('kill_receiptScanning'),
-    userOptedIn: user?.id ? featureFlags.userOptedInToGemini(user.id) : false,
-    visionModel: remoteConfig.getString('gemini_model_vision'),
-  }, 'GeminiService');
-
-  if (!featureFlags.isGeminiGloballyEnabled()) {
-    throw new Error('Gemini integration is disabled by configuration.');
+  if (user?.isGuest) {
+    throw new Error('AI features are not available in guest mode. Please sign in to use receipt scanning.');
   }
-
   if (remoteConfig.getBoolean('kill_receiptScanning')) {
-    throw new Error('Receipt scanning is temporarily disabled by configuration.');
+    throw new Error('Receipt scanning is temporarily disabled.');
   }
 
-  if (!user?.id) {
-    throw new Error('User authentication required for Gemini usage.');
-  }
+  const perfTrace = performance ? trace(performance, 'analyze_receipt_image') : null;
+  perfTrace?.start();
 
-  if (user.isGuest) {
-    throw new Error('AI features are not available in guest mode. Please sign up for a free account.');
-  }
-
-  // Note: we expect the caller to set user opt-in before invoking this in UI flows.
-  if (!featureFlags.userOptedInToGemini(user.id)) {
-    throw new Error('Gemini usage not permitted: opt-in required.');
-  }
-
-  // Check Firebase usage limits
-  if (!(await UsageService.canUseGemini(user))) {
-    log.debug('analyzeReceiptImage: usage limit gate failed', { userId: user?.id }, 'GeminiService');
-    throw new Error('Gemini usage not permitted: weekly limit reached.');
-  }
-
-  // Create cache key based on image hash (simple hash for demo)
-  const imageHash = btoa(base64Image).slice(0, 16);
-  const requestId = `receipt_analysis_${user.id}_${imageHash}`;
-  log.debug('analyzeReceiptImage: gates passed, enqueueing', { requestId }, 'GeminiService');
-
-  return geminiBatcher.enqueue(requestId, async () => {
-    const perfTrace = performance ? trace(performance, 'analyze_receipt_image') : null;
-    perfTrace?.start();
-
-    try {
-      console.log('🔍 Starting receipt image analysis with model:', remoteConfig.getString('gemini_model_vision'));
-      console.log('📊 Image size:', Math.round(base64Image.length / 1024), 'KB');
-
-      const modelId = remoteConfig.getString('gemini_model_vision');
-
-      const schema: Schema = {
-        type: Type.ARRAY,
-        items: {
-          type: Type.OBJECT,
-          properties: {
-            item: { type: Type.STRING },
-            category: { type: Type.STRING },
-            quantity_estimate: { type: Type.STRING },
-            estimatedPrice: { type: Type.NUMBER },
-            priceOptions: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  amount: { type: Type.NUMBER },
-                  unit: { type: Type.STRING },
-                  price: { type: Type.NUMBER },
-                },
-                required: ["amount", "unit", "price"],
-              },
-            },
-          },
-          required: ["item", "category", "quantity_estimate"],
+  try {
+    const schema: Schema = {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          item: { type: Type.STRING },
+          category: { type: Type.STRING },
+          quantity_estimate: { type: Type.STRING },
         },
-      };
+        required: ['item', 'category', 'quantity_estimate'],
+      },
+    };
 
-      // Add timeout to prevent hanging requests
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Receipt analysis timeout. Please try again.')), 60000); // 60 second timeout for image analysis
-      });
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Receipt analysis timed out. Please try again.')), 60000)
+    );
 
-      const responsePromise = ai.models.generateContent({
-        model: modelId,
-        contents: {
-          parts: [
-            {
-              inlineData: {
-                data: base64Image,
-                mimeType: mimeType,
-              },
-            },
-            {
-              text: `Extract grocery items from this receipt. Include item name, price, and quantity. For same items with multiple sizes/prices, use separate priceOptions entries. Categories: Fruits & Vegetables, Dairy & Eggs, Meat & Poultry, Seafood, Grains & Bread, Canned Goods, Condiments & Sauces, Snacks, Beverages, Frozen Foods, Baking Supplies, Spices & Herbs, Breakfast Foods, Household, Uncategorized. Skip taxes, totals, and store info.`,
-            },
-          ],
-        },
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: schema,
-          maxOutputTokens: 1500,
-          thinkingConfig: { thinkingBudget: 0 }, // disable thinking for fast image classification
-        },
-      });
+    const responsePromise = ai.models.generateContent({
+      model: remoteConfig.getString('gemini_model_vision'),
+      contents: {
+        parts: [
+          { inlineData: { data: base64Image, mimeType } },
+          { text: 'Extract all grocery/food items from this receipt. For each item provide its name, food category (e.g. Fruits & Vegetables, Dairy & Eggs, Meat & Poultry, Grains & Bread, Canned Goods, Snacks, Beverages, Household, Uncategorized), and quantity. Skip taxes, totals, subtotals, and store information.' },
+        ],
+      },
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: schema,
+        maxOutputTokens: 1000,
+        thinkingConfig: { thinkingBudget: 0 },
+      },
+    });
 
-      const response = await Promise.race([responsePromise, timeoutPromise]) as { text: string };
+    const response = await Promise.race([responsePromise, timeoutPromise]) as { text: string };
+    const jsonText = response.text;
+    if (!jsonText) throw new Error('No data returned from Gemini.');
 
-      const jsonText = response.text;
-      console.log('✅ Receipt image analysis API call completed');
-      console.log('📄 Receipt response text length:', jsonText?.length || 0);
+    const items = JSON.parse(
+      jsonText.replace(/^```json\s*/i, '').replace(/\s*```$/, '').trim()
+    ) as PantryItem[];
 
-      if (!jsonText) {
-        console.error('❌ No text in receipt Gemini response');
-        throw new Error("No data returned from Gemini.");
-      }
-
-      console.log('🔧 Receipt raw response text:', jsonText.substring(0, 200) + '...');
-
-      const cleanJson = jsonText.replace(/^```json\s*/, "").replace(/\s*```$/, "");
-      console.log('🧹 Receipt cleaned JSON length:', cleanJson.length);
-
-      let items;
-      try {
-        items = JSON.parse(cleanJson) as PantryItem[];
-        console.log('✅ Receipt successfully parsed', items.length, 'items');
-      } catch (parseError) {
-        console.error('❌ Receipt JSON parse error:', parseError);
-        console.error('❌ Receipt failed to parse:', cleanJson.substring(0, 500));
-        throw new Error(`Failed to parse Gemini response: ${parseError}`);
-      }
-
-      // Add custom metrics (if performance available)
-      if (perfTrace) {
-        perfTrace.putMetric('image_size_kb', Math.round(base64Image.length / 1024));
-        perfTrace.putMetric('items_detected', Number(items.length));
-      }
-
-      // Record usage in Firebase
-      try {
-        await UsageService.recordGeminiUsage(user);
-      } catch (e) {
-        console.warn('Failed to record Gemini usage:', e);
-      }
-
-      return items;
-    } catch (err: unknown) {
-      console.error("Error analyzing receipt image:", err);
-      reportGeminiError('receipt_image_scan', err, {
-        userId: user?.id,
-        model: remoteConfig.getString('gemini_model_vision'),
-        imageSizeKb: Math.round(base64Image.length / 1024),
-      });
-      throw err;
-    } finally {
-      perfTrace?.stop();
+    if (perfTrace) {
+      perfTrace.putMetric('image_size_kb', Math.round(base64Image.length / 1024));
+      perfTrace.putMetric('items_detected', items.length);
     }
-  }, 2); // Higher priority for image analysis
+    try { if (user) await UsageService.recordGeminiUsage(user); } catch { /* non-fatal */ }
+
+    return items;
+  } catch (err: unknown) {
+    reportGeminiError('receipt_image_scan', err, {
+      userId: user?.id,
+      model: remoteConfig.getString('gemini_model_vision'),
+      imageSizeKb: Math.round(base64Image.length / 1024),
+    });
+    throw err;
+  } finally {
+    perfTrace?.stop();
+  }
 };
 
 /**
  * Searches for recipes using Google Search Grounding with enhanced filters and structured JSON output.
  */
 export const searchRecipes = async (params: RecipeSearchParams, user?: User): Promise<RecipeSearchResult> => {
-  // Test override: bypass Gemini entirely and route to OpenRouter / Groq.
-  // Enable by setting VITE_GEMINI_DISABLED=true in .env.local.
-  if (import.meta.env.VITE_GEMINI_DISABLED === 'true') {
-    log.info('VITE_GEMINI_DISABLED=true — routing searchRecipes to OpenRouter', {}, 'GeminiService');
-    return searchRecipesViaOpenRouter(params, user);
-  }
-
   const perfTrace = performance ? trace(performance, 'search_recipes') : null;
   perfTrace?.start();
 
@@ -558,27 +214,8 @@ export const searchRecipes = async (params: RecipeSearchParams, user?: User): Pr
 // Internal function to perform the actual search
 const performSearch = async (params: RecipeSearchParams, user: User | undefined, perfTrace: PerformanceTrace | null): Promise<RecipeSearchResult> => {
   try {
-    // Gate Gemini usage for recipe search as well
-    if (!featureFlags.isGeminiGloballyEnabled()) {
-      throw new Error('Gemini integration is disabled by configuration.');
-    }
-
-    if (!user?.id) {
-      throw new Error('User authentication required for Gemini usage.');
-    }
-
-    if (user.isGuest) {
-      throw new Error('AI features are not available in guest mode. Please sign up for a free account.');
-    }
-
-    // Note: we expect the caller to set user opt-in before invoking this in UI flows.
-    if (!featureFlags.userOptedInToGemini(user.id)) {
-      throw new Error('Gemini usage not permitted: opt-in required.');
-    }
-
-    // Check Firebase usage limits
-    if (!(await UsageService.canUseGemini(user))) {
-      throw new Error('Gemini usage not permitted: weekly limit reached.');
+    if (user?.isGuest) {
+      throw new Error('AI features are not available in guest mode. Please sign in to search recipes.');
     }
     const modelId = remoteConfig.getString('gemini_model');
   
@@ -699,7 +336,7 @@ const response = await Promise.race([responsePromise, timeoutPromise]) as { text
     }
 
     // Record usage in Firebase only if we got actual results
-    if (recipes.length > 0) {
+    if (recipes.length > 0 && user) {
       try {
         await UsageService.recordGeminiUsage(user);
       } catch (e) {

@@ -192,8 +192,23 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
       }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
-      log.error('Google login error', error, 'Login');
-      setError(<FormattedMessage id="auth.error.googleLoginFailed" values={{ message: error.message }} />);
+      log.error('Google login error', { code: error.code, message: error.message }, 'Login');
+      const friendlyMessage = (() => {
+        switch (error.code) {
+          case 'auth/unauthorized-domain':
+            return 'This domain is not authorized in Firebase. Add it under Authentication → Settings → Authorized Domains.';
+          case 'auth/popup-blocked':
+            return 'Popup was blocked by your browser. Please allow popups and try again.';
+          case 'auth/network-request-failed':
+            return 'Network error. Please check your connection and try again.';
+          case 'auth/cancelled-popup-request':
+          case 'auth/popup-closed-by-user':
+            return null; // user dismissed — show nothing
+          default:
+            return `${error.message}${error.code ? ` (${error.code})` : ''}`;
+        }
+      })();
+      if (friendlyMessage) setError(friendlyMessage);
     }
   };
 
@@ -225,7 +240,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
         log.warn('Redirect result error', { error: error.message, code: error.code }, 'Login');
         // Only show error if it's not a "no redirect result" scenario
         if (error.code !== 'auth/null-user' && error.code !== 'auth/user-cancelled') {
-          setError(<FormattedMessage id="auth.error.googleLoginFailed" values={{ message: error.message }} />);
+          setError(`${error.message}${error.code ? ` (${error.code})` : ''}`);
         }
       }
     };
@@ -395,15 +410,15 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
           <button
             type="button"
             onClick={handleGuestLogin}
-            className="flex items-center justify-center gap-2 bg-[#2A0A10] border border-red-900/40 text-red-200/70 font-medium py-3 rounded-xl hover:bg-red-900/20 transition-colors"
+            className="flex items-center justify-center gap-2 bg-transparent border border-amber-700/50 text-amber-200/80 font-medium py-3 rounded-xl hover:border-amber-500/70 hover:text-amber-100 hover:bg-amber-900/15 transition-colors"
             data-testid="login-guest"
           >
             <UserX className="w-5 h-5" />
             Continue as Guest
           </button>
         </div>
-        <p className="text-xs text-red-200/40 text-center mt-3">
-          Guest mode uses local storage only. Your data won't sync across devices.
+        <p className="text-xs text-amber-200/40 text-center mt-3">
+          Guest mode: local storage only, no cross-device sync.
         </p>
       </div>
     </div>

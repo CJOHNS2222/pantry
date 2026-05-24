@@ -744,7 +744,6 @@ export function useDataManagement(
       log.warn('Failed to sync recipe count', { error: err }, 'DataManagement');
     });
     // Only re-run when the actual count changes or the user changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [savedRecipes.length, user?.id, isLoadingSavedRecipes]);
 
   // Keep mealPlanning.weeklyUsed Firestore counter in sync with actual current/future entries.
@@ -761,7 +760,6 @@ export function useDataManagement(
     UsageService.syncMealPlanCount(user, currentFutureCount).catch(err => {
       log.warn('Failed to sync meal plan count', { error: err }, 'DataManagement');
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mealPlan, user?.id, isLoadingMealPlan]);
 
 
@@ -1066,6 +1064,46 @@ export function useDataManagement(
       6000,
       'Undo',
       () => { performUndo(); }
+    );
+  };
+
+  /**
+   * Bulk-delete multiple pantry items by index.
+   * Uses a single state update and a single cache write instead of N individual operations.
+   */
+  const deleteItems = async (indices: number[]) => {
+    if (indices.length === 0) return;
+
+    const indexSet = new Set(indices);
+    const itemsToDelete = indices
+      .map(i => inventory[i])
+      .filter((item): item is PantryItem => !!item);
+    if (itemsToDelete.length === 0) return;
+
+    if (loggingOptions?.updateActivityStatus) {
+      loggingOptions.updateActivityStatus('managing inventory');
+    }
+
+    if (user?.isGuest) {
+      setInventory(prev => {
+        const updated = prev.filter((_, i) => !indexSet.has(i));
+        try { localStorage.setItem(GUEST_INVENTORY_KEY, JSON.stringify(updated)); } catch { /* storage full */ }
+        return updated;
+      });
+      return;
+    }
+
+    HapticService.medium();
+    const updatedInventory = inventory.filter((_, i) => !indexSet.has(i));
+    setInventory(updatedInventory);
+
+    // Single cache write instead of N individual removeItemFromCache calls
+    await InventoryCacheService.bulkUpdateInventoryCache(updatedInventory, user?.householdId, user?.id);
+
+    addToast?.(
+      `${itemsToDelete.length} item${itemsToDelete.length > 1 ? 's' : ''} removed from pantry.`,
+      'info',
+      4000
     );
   };
 
@@ -1441,6 +1479,7 @@ export function useDataManagement(
     handleMarkAsMade,
     updateItem,
     deleteItem,
+    deleteItems,
     addItem,
     addItems,
     recentActions,
