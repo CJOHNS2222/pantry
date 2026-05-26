@@ -264,7 +264,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                 {/* Notification bell */}
                 {showNotifications && (
                   <div
-                    className="absolute left-0 mt-2 w-80 max-h-96 overflow-auto bg-theme-primary border border-theme rounded shadow-lg z-50 p-2"
+                    className="absolute left-0 mt-2 w-80 max-w-[calc(100vw-1rem)] max-h-96 overflow-auto bg-theme-primary border border-theme rounded shadow-lg z-50 p-2"
                     onMouseEnter={handleNotifPanelMouseEnter}
                     onMouseLeave={handleNotifPanelMouseLeave}
                   >
@@ -382,7 +382,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         </div>
         <div className="flex flex-col items-center flex-1 min-w-0">
           <h1 
-            className="text-3xl font-serif font-bold text-theme-primary whitespace-nowrap" 
+            className="text-2xl xs:text-3xl font-serif font-bold text-theme-primary whitespace-nowrap" 
             style={{color: 'var(--accent-color)'}}
             id="app-title"
           >
@@ -403,7 +403,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
               </button>
 
               {showActivityFeed && (
-                <div className="absolute left-1/2 -translate-x-1/2 mt-2 w-80 max-h-96 overflow-auto bg-theme-primary border border-theme rounded shadow-lg z-50 p-2">
+                <div className="absolute left-1/2 -translate-x-1/2 mt-2 w-80 max-w-[calc(100vw-2rem)] max-h-96 overflow-auto bg-theme-primary border border-theme rounded shadow-lg z-50 p-2">
                   <div className="flex items-center justify-between mb-2">
                     <div className="text-sm font-semibold">Household Activity</div>
                     <button

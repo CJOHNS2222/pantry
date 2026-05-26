@@ -1,8 +1,15 @@
 @import "tailwindcss";
 
-/* App layout heights – keep in sync with AppHeader paddingTop and AppNavigation height */
+@theme {
+  /* xs breakpoint for phones narrower than 360px (e.g. iPhone SE 1st gen, 320px Galaxy) */
+  --breakpoint-xs: 360px;
+}
+
+/* App layout heights – keep in sync with AppHeader paddingTop and AppNavigation height.
+   --app-header-h accounts for the device safe-area-inset-top (notch/dynamic island)
+   so that MainContent and .modal-safe-h always clear the fixed header. */
 :root {
-  --app-header-h: 120px;
+  --app-header-h: calc(max(12px, env(safe-area-inset-top, 0px)) + 90px);
   --app-nav-h: calc(5rem + max(0.5rem, var(--safe-area-inset-bottom, 0px)));
 }
 
