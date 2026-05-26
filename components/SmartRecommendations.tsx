@@ -4,6 +4,7 @@ import AnalyticsService from '../services/analyticsService';
 import { log } from '../services/logService';
 import { PantryItem, SavedRecipe, User } from '../types';
 import { Tab } from '../types/app';
+import { useSubscription } from '../hooks/useSubscription';
 
 /**
  * Interface for smart recommendation data
@@ -40,6 +41,7 @@ interface SmartRecommendationsProps {
 
 const SmartRecommendations: React.FC<SmartRecommendationsProps> = ({ inventory, savedRecipes, user, setActiveTab }) => {
   const [isCollapsed, setIsCollapsed] = useState(true);
+  const { isPremium } = useSubscription(user ?? null);
   const recommendations = useMemo((): SmartRecommendation[] => {
     const recs: SmartRecommendation[] = [];
 
@@ -114,8 +116,8 @@ const SmartRecommendations: React.FC<SmartRecommendationsProps> = ({ inventory, 
       }
     }
 
-    // Premium upgrade suggestion
-    if (user?.subscription?.tier !== 'premium') {
+    // Premium upgrade suggestion — only show if not already on a paid plan (own or inherited)
+    if (!isPremium) {
       recs.push({
         id: 'upgrade-premium',
         type: 'feature',
@@ -149,7 +151,7 @@ const SmartRecommendations: React.FC<SmartRecommendationsProps> = ({ inventory, 
       })
       .slice(0, 5);
 
-  }, [inventory, savedRecipes, user]);
+  }, [inventory, savedRecipes, user, isPremium]);
 
   const getImpactColor = (impact: string) => {
     switch (impact) {

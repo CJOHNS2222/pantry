@@ -25,6 +25,8 @@ export interface UsageLimits {
     used: number;
     resetDate: Date;
   };
+  /** Effective subscription tier after household inheritance is applied. */
+  resolvedTier: 'free' | 'premium' | 'family';
 }
 
 export interface PlanLimits {
@@ -164,7 +166,8 @@ class UsageService {
           weekly: planLimits.gemini.weekly,
           used: 0,
           resetDate: weekStart
-        }
+        },
+        resolvedTier: planTier as 'free' | 'premium' | 'family'
       };
 
       await DatabaseMonitoringService.setDoc(usageRef, {
@@ -241,7 +244,8 @@ class UsageService {
         weekly: planLimits.gemini.weekly,
         used: data.gemini?.used || 0,
         resetDate: this.toDate(data.gemini?.resetDate) || weekStart
-      }
+      },
+      resolvedTier: planTier as 'free' | 'premium' | 'family'
     };
     UsageService.limitsCache.set(user.id, { limits: result, fetchedAt: Date.now() });
     return result;

@@ -336,10 +336,11 @@ export async function canShowAds(user?: User | null): Promise<boolean> {
     if (remoteConfig.getBoolean('kill_ads')) return false;
     // Don't show ads on web
     if (Capacitor.getPlatform() === 'web') return false;
-    // Only consider free tier for ad display
-    if (user.subscription?.tier !== 'free') return false;
 
     const limits = await UsageService.getUsageLimits(user);
+
+    // Don't show ads to paid users (includes household-elevated members)
+    if (limits.resolvedTier !== 'free') return false;
 
     const underRecipeLimit = limits.recipes.max === -1 || (limits.recipes.used < limits.recipes.max);
     const underMealPlanLimit = limits.mealPlanning.weeklyRecipes === -1 || (limits.mealPlanning.weeklyUsed < limits.mealPlanning.weeklyRecipes);
@@ -1621,7 +1622,7 @@ export function generateRecipeSuggestions(inventory: PantryItem[]): RecipeSugges
  * @param expirationType Type of expiration date
  * @returns Color class name
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+ 
 export function getExpirationColor(daysOrDate: number | string, _expirationType: 'use-by' | 'best-by' = 'best-by'): string {
   // Accept either a precomputed daysRemaining number or an ISO date string.
   let daysRemaining: number;
