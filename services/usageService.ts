@@ -124,8 +124,9 @@ class UsageService {
           const hData = householdDoc.data();
           const members: Array<{ id: string; role: string }> = hData.members || [];
           const member = members.find(m => m.id === user.id);
-          if (member && member.role !== 'admin' && hData.ownerSubscriptionTier === 'family') {
-            planTier = 'family';
+          if (member && member.role !== 'admin' &&
+              (hData.ownerSubscriptionTier === 'family' || hData.ownerSubscriptionTier === 'premium')) {
+            planTier = hData.ownerSubscriptionTier as 'premium' | 'family';
           }
         }
       } catch {

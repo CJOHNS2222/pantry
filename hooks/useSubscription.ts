@@ -77,9 +77,10 @@ export function useSubscription(user: User | null) {
           // Admin always uses their own subscription — no elevation needed
           setHouseholdOwnerTier(null);
         } else {
-          // Non-admin member: inherit family tier from the household owner if applicable
+          // Non-admin member: inherit the owner's tier (premium or family) if it beats their own
           const ownerTier = data.ownerSubscriptionTier as 'free' | 'premium' | 'family' | undefined;
-          setHouseholdOwnerTier(ownerTier === 'family' ? 'family' : null);
+          const elevated = (ownerTier === 'family' || ownerTier === 'premium') ? ownerTier : null;
+          setHouseholdOwnerTier(elevated);
         }
       },
       (err: any) => {
