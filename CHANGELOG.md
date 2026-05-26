@@ -1,3 +1,14 @@
+## [Unreleased]
+
+### Fixed
+- **Camera scan timeout** — `handleTakePhoto` was setting the loading state to `LOADING` before the OS camera opened, causing `GeminiLoadingOverlay` to immediately start its 60-second countdown and time out before Gemini was ever called; loading state is now only set after the photo is captured
+
+### Changed
+- **`customCategories` consolidated onto user doc** — custom pantry categories are now stored as a field on `users/{uid}` instead of a separate `users/{uid}/cache/customCategories` subcollection document; `useAuth`'s existing `onSnapshot` delivers them for free, saving 1 Firestore read per cold start; existing users are migrated automatically on first load
+- **Stripe packages removed** — `stripe`, `@stripe/react-stripe-js`, and `@stripe/stripe-js` were unused and have been uninstalled
+- **Dependencies updated** — all patch/minor versions bumped (`@capacitor/*` 8.3.4, `firebase` 12.13.0, `react`/`react-dom` 19.2.6, `vite` 8.0.14, `@sentry/react` 10.53.1, `tailwindcss` 4.3.0, `date-fns` 4.3.0, `vitest` 4.1.7, `lucide-react` 1.16.0, and others); `@google/genai` bumped 1→2, `react-intl` 8→10, `lint-staged` 16→17, `@capacitor/local-notifications` 8.0→8.2
+- **Repository cleanup** — removed audit/planning docs (`AUDIT_NOTES.txt`, `FULL_APP_AUDIT.txt`, `PRODUCTION_READINESS_AUDIT.txt`, `IMPROVEMENTS_PLAN.md`), build artifacts (`app-debug.apk`, `smart-pantry-release.apk`, `sentry-wizard.exe`), stray screenshots from `public/` and `testlab/robo/`, duplicate root `manifest.json`, and `.github/issues/` planning files; moved `addTestData.cjs`, `clean_csv.cjs`, `parse_csv.cjs`, `migrate-firebase.js`, and `test-firebase.js` from root into `scripts/`
+
 ## [2.1.5] - 2026-05-23
 
 ### Fixed

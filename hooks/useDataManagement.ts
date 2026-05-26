@@ -479,6 +479,11 @@ export function useDataManagement(
     inventoryRef.current = inventory;
   }, [inventory]);
 
+  // Sync customCategories state from user doc (delivered via useAuth onSnapshot — no separate listener needed)
+  useEffect(() => {
+    setCustomCategories(user?.customCategories || []);
+  }, [user?.customCategories]);
+
   // Firestore synchronization effects
   useEffect(() => {
     if (!user?.id) {
@@ -601,11 +606,8 @@ export function useDataManagement(
     unsubs.push(createMealPlanListener(user, household, inHousehold, setMealPlan, setIsLoadingMealPlan, prevMealPlanRef));
     // Do not attach continuous community ratings listener here; refresh on demand when tab is activated
     
-    unsubs.push(DatabaseMonitoringService.onSnapshot(DatabaseMonitoringService.doc(`users/${user.id}/cache/customCategories`), snap => {
-      setCustomCategories(snap.exists() ? (snap.data()?.categories || []) : []);
-    }, err => {
-      log.error('Custom categories listener failed', err, 'DataManagement');
-    }));
+    // customCategories are now stored on the user doc and synced via useAuth's onSnapshot.
+    // The useEffect below keeps local state in sync whenever user.customCategories changes.
 
     return () => {
       unsubs.forEach(unsub => unsub());
@@ -952,7 +954,7 @@ export function useDataManagement(
       const newCategory = createCustomCategory(name, icon, color, user.id);
       const updatedCategories = [...customCategories, newCategory];
           
-      await DatabaseMonitoringService.updateDoc(DatabaseMonitoringService.doc(`users/${user.id}/cache/customCategories`), { categories: updatedCategories });
+      await DatabaseMonitoringService.updateDoc(DatabaseMonitoringService.doc(`users/${user.id}`), { customCategories: updatedCategories });
 
       addToast?.(`Created category "${name}"!`, 'success');
     } catch (err) {

@@ -484,8 +484,6 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   // Use Capacitor Camera for mobile
   const handleTakePhoto = useCallback(async () => {
     try {
-      // Track feature adoption
-      setLoadingState(LoadingState.LOADING);
       AnalyticsService.trackFeatureUsage('pantry_scanner', { success: true, itemsScanned: 0, itemsAdded: 0 });
       
       const photo = await CapacitorCamera.getPhoto({
@@ -499,6 +497,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
         setRawBase64(base64Data);
         setMimeType(photo.format ? `image/${photo.format}` : 'image/jpeg');
       }
+      setLoadingState(LoadingState.IDLE);
     } catch (err: unknown) {
       setLoadingState(LoadingState.IDLE);
       const errMsg = err instanceof Error ? err.message : '';

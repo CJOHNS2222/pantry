@@ -93,6 +93,24 @@ export function useAuth() {
           }
         }
 
+        // One-time migration: move customCategories from old subcollection cache to user doc.
+        // After migration the user doc update triggers this listener again with the field present.
+        let customCategories = userData?.customCategories;
+        if (!customCategories) {
+          try {
+            const oldCacheRef = DatabaseMonitoringService.doc(`users/${fbUser.uid}/cache/customCategories`);
+            const oldCacheSnap = await DatabaseMonitoringService.getDoc(oldCacheRef);
+            if (oldCacheSnap.exists()) {
+              const legacyCategories = oldCacheSnap.data()?.categories || [];
+              await DatabaseMonitoringService.updateDoc(userDocRef, { customCategories: legacyCategories });
+              return; // Listener will refire with the new field set
+            }
+          } catch (err: unknown) {
+            log.warn('Could not migrate customCategories from cache', { error: (err as Error)?.message }, 'useAuth');
+          }
+          customCategories = [];
+        }
+
         setUser({
           id: fbUser.uid,
           name: userData?.name || fbUser.displayName || (fbUser.email ? fbUser.email.split('@')[0] : 'User'),
@@ -102,7 +120,8 @@ export function useAuth() {
           hasSeenTutorial: userData?.hasSeenTutorial ?? false,
           subscription: userData?.subscription,
           profile: userData?.profile,
-          householdId: householdId
+          householdId: householdId,
+          customCategories,
         });
 
         setUserContext(fbUser.uid, fbUser.email || undefined, householdId);
