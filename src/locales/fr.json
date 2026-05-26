@@ -277,5 +277,84 @@
     "notFound": "Article introuvable.",
     "validationError": "Veuillez vérifier votre saisie et réessayer.",
     "failedToUploadImage": "Échec du téléversement de l'image. Veuillez réessayer."
+  },
+  "gemini": {
+    "poweredBy": "Gemini AI",
+    "imageStages": {
+      "uploading": "Envoi de l'image à l'IA…",
+      "analyzing": "Analyse du contenu de l'image…",
+      "identifying": "Identification des articles et quantités…",
+      "finishing": "Presque fini…"
+    },
+    "recipeStages": {
+      "sending": "Envoi des ingrédients à l'IA…",
+      "finding": "Recherche de recettes correspondantes…",
+      "filtering": "Filtrage selon votre garde-manger…"
+    },
+    "countdown": "~{remaining}s restantes",
+    "finalizing": "Finalisation…"
+  },
+  "freezer": {
+    "title": "Mettre au congélateur",
+    "subtitle": "Définissez la durée de conservation au congélateur et les détails de stockage optionnels.",
+    "usdaDefault": "Défaut USDA pour « {itemName} » : {days} jours",
+    "daysLabel": "Jours au congélateur",
+    "days": "jours",
+    "zone": "Zone du congélateur",
+    "zones": {
+      "top": "Étagère du haut",
+      "middle": "Étagère du milieu",
+      "bottom": "Étagère du bas",
+      "door": "Porte",
+      "drawer": "Tiroir / bac",
+      "other": "Autre"
+    },
+    "portionCount": "Nombre de portions",
+    "labelPhotoUrl": "URL photo de l'étiquette",
+    "optional": "(optionnel)",
+    "confirm": "Mettre au congélateur",
+    "confirming": "Déplacement…",
+    "error": "Impossible de déplacer vers le congélateur"
+  },
+  "update": {
+    "title": "Mise à jour disponible",
+    "description": "La version {version} est disponible ! Mettez à jour maintenant pour les dernières fonctionnalités et améliorations.",
+    "whatsNew": "Nouveautés :",
+    "later": "Plus tard",
+    "updateNow": "Mettre à jour"
+  },
+  "whatsNew": {
+    "title": "Nouveautés",
+    "dismissLabel": "Fermer les nouveautés",
+    "gotIt": "Compris"
+  },
+  "import": {
+    "title": "Importer",
+    "pantryCsvTab": "CSV du garde-manger",
+    "recipeUrlTab": "URL de recette",
+    "csvDescription": "Téléversez un CSV ou une liste texte. Colonnes : item, nom, quantité, storageLocation, expirationDate, catégorie.",
+    "downloadTemplate": "Télécharger le modèle",
+    "parsedRows": "Lignes analysées : {count}",
+    "saveToDevice": "Enregistrer sur l'appareil",
+    "importPantry": "Importer le garde-manger",
+    "recipeDescription": "Collez une URL de recette pour importer son titre, ses ingrédients et ses instructions.",
+    "urlPlaceholder": "https://exemple.com/recette",
+    "preview": "Aperçu",
+    "importRecipe": "Importer la recette",
+    "importing": "Importation…"
+  },
+  "cookingMode": {
+    "header": "Mode cuisine",
+    "noInstructions": "Aucune instruction étape par étape disponible pour cette recette.",
+    "exitButton": "Quitter le mode cuisine",
+    "ingredients": "Ingrédients",
+    "backToSteps": "Retour aux étapes",
+    "stepCounter": "Étape {current} / {total}",
+    "prev": "Précédent",
+    "done": "Terminé !",
+    "showIngredients": "Afficher les ingrédients",
+    "backToStepsAria": "Retour aux étapes",
+    "exitAria": "Quitter le mode cuisine",
+    "goToStep": "Aller à l'étape {n}"
   }
 }

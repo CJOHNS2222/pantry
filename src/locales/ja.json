@@ -277,5 +277,84 @@
     "notFound": "見つかりません。",
     "validationError": "入力を確認して再度お試しください。",
     "failedToUploadImage": "画像のアップロードに失敗しました。もう一度お試しください。"
+  },
+  "gemini": {
+    "poweredBy": "Gemini AI",
+    "imageStages": {
+      "uploading": "AIに画像をアップロード中…",
+      "analyzing": "画像の内容を分析中…",
+      "identifying": "アイテムと数量を特定中…",
+      "finishing": "もうすぐ完了…"
+    },
+    "recipeStages": {
+      "sending": "AIに食材を送信中…",
+      "finding": "一致するレシピを検索中…",
+      "filtering": "パントリーでフィルタリング中…"
+    },
+    "countdown": "残り約{remaining}秒",
+    "finalizing": "最終処理中…"
+  },
+  "freezer": {
+    "title": "冷凍庫へ移動",
+    "subtitle": "冷凍保存期間とオプションの保存詳細を設定してください。",
+    "usdaDefault": "「{itemName}」のUSDAデフォルト：{days}日",
+    "daysLabel": "冷凍日数",
+    "days": "日",
+    "zone": "冷凍庫ゾーン",
+    "zones": {
+      "top": "上段",
+      "middle": "中段",
+      "bottom": "下段",
+      "door": "ドア",
+      "drawer": "引き出し / ビン",
+      "other": "その他"
+    },
+    "portionCount": "分量数",
+    "labelPhotoUrl": "ラベル写真URL",
+    "optional": "（任意）",
+    "confirm": "冷凍庫へ移動",
+    "confirming": "移動中…",
+    "error": "冷凍庫への移動に失敗しました"
+  },
+  "update": {
+    "title": "アップデートあり",
+    "description": "バージョン{version}が利用可能です！最新機能と改善のために今すぐ更新してください。",
+    "whatsNew": "新機能：",
+    "later": "後で",
+    "updateNow": "今すぐ更新"
+  },
+  "whatsNew": {
+    "title": "新着情報",
+    "dismissLabel": "新着情報を閉じる",
+    "gotIt": "わかりました"
+  },
+  "import": {
+    "title": "インポート",
+    "pantryCsvTab": "パントリーCSV",
+    "recipeUrlTab": "レシピURL",
+    "csvDescription": "CSVまたはテキストリストをアップロードします。列：item、名前、数量、storageLocation、expirationDate、カテゴリ。",
+    "downloadTemplate": "テンプレートをダウンロード",
+    "parsedRows": "解析済み行：{count}",
+    "saveToDevice": "デバイスに保存",
+    "importPantry": "パントリーをインポート",
+    "recipeDescription": "レシピURLを貼り付けてタイトル、食材、手順をインポートします。",
+    "urlPlaceholder": "https://example.com/recipe",
+    "preview": "プレビュー",
+    "importRecipe": "レシピをインポート",
+    "importing": "インポート中…"
+  },
+  "cookingMode": {
+    "header": "料理モード",
+    "noInstructions": "このレシピにはステップバイステップの手順がありません。",
+    "exitButton": "料理モードを終了",
+    "ingredients": "食材",
+    "backToSteps": "手順に戻る",
+    "stepCounter": "ステップ {current} / {total}",
+    "prev": "前へ",
+    "done": "完了！",
+    "showIngredients": "食材を表示",
+    "backToStepsAria": "手順に戻る",
+    "exitAria": "料理モードを終了",
+    "goToStep": "ステップ {n} へ"
   }
 }

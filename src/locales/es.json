@@ -277,5 +277,84 @@
     "notFound": "Artículo no encontrado.",
     "validationError": "Por favor verifica tu entrada e intenta de nuevo.",
     "failedToUploadImage": "Error al subir la imagen. Por favor intenta de nuevo."
+  },
+  "gemini": {
+    "poweredBy": "Gemini AI",
+    "imageStages": {
+      "uploading": "Subiendo imagen a la IA…",
+      "analyzing": "Analizando contenido de la imagen…",
+      "identifying": "Identificando artículos y cantidades…",
+      "finishing": "Ya casi, finalizando…"
+    },
+    "recipeStages": {
+      "sending": "Enviando ingredientes a la IA…",
+      "finding": "Buscando recetas coincidentes…",
+      "filtering": "Filtrando según tu despensa…"
+    },
+    "countdown": "~{remaining}s restantes",
+    "finalizing": "Finalizando…"
+  },
+  "freezer": {
+    "title": "Mover al congelador",
+    "subtitle": "Establece la vida útil en el congelador y detalles de almacenamiento opcionales.",
+    "usdaDefault": "Valor predeterminado USDA para \"{itemName}\": {days} días",
+    "daysLabel": "Días en el congelador",
+    "days": "días",
+    "zone": "Zona del congelador",
+    "zones": {
+      "top": "Estante superior",
+      "middle": "Estante central",
+      "bottom": "Estante inferior",
+      "door": "Puerta",
+      "drawer": "Cajón / bandeja",
+      "other": "Otro"
+    },
+    "portionCount": "Número de porciones",
+    "labelPhotoUrl": "URL de foto de etiqueta",
+    "optional": "(opcional)",
+    "confirm": "Mover al congelador",
+    "confirming": "Moviendo…",
+    "error": "No se pudo mover al congelador"
+  },
+  "update": {
+    "title": "Actualización disponible",
+    "description": "¡La versión {version} está disponible! Actualiza ahora para obtener las últimas funciones y mejoras.",
+    "whatsNew": "Novedades:",
+    "later": "Más tarde",
+    "updateNow": "Actualizar ahora"
+  },
+  "whatsNew": {
+    "title": "Novedades",
+    "dismissLabel": "Cerrar novedades",
+    "gotIt": "Entendido"
+  },
+  "import": {
+    "title": "Importar",
+    "pantryCsvTab": "CSV de despensa",
+    "recipeUrlTab": "URL de receta",
+    "csvDescription": "Sube un CSV o lista de texto. Columnas: item, nombre, cantidad, storageLocation, expirationDate, categoría.",
+    "downloadTemplate": "Descargar plantilla",
+    "parsedRows": "Filas analizadas: {count}",
+    "saveToDevice": "Guardar en dispositivo",
+    "importPantry": "Importar despensa",
+    "recipeDescription": "Pega una URL de receta para importar título, ingredientes e instrucciones.",
+    "urlPlaceholder": "https://ejemplo.com/receta",
+    "preview": "Vista previa",
+    "importRecipe": "Importar receta",
+    "importing": "Importando…"
+  },
+  "cookingMode": {
+    "header": "Modo cocina",
+    "noInstructions": "No hay instrucciones paso a paso disponibles para esta receta.",
+    "exitButton": "Salir del modo cocina",
+    "ingredients": "Ingredientes",
+    "backToSteps": "Volver a los pasos",
+    "stepCounter": "Paso {current} / {total}",
+    "prev": "Ant.",
+    "done": "¡Listo!",
+    "showIngredients": "Mostrar ingredientes",
+    "backToStepsAria": "Volver a los pasos",
+    "exitAria": "Salir del modo cocina",
+    "goToStep": "Ir al paso {n}"
   }
 }

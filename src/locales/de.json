@@ -277,5 +277,84 @@
     "notFound": "Eintrag nicht gefunden.",
     "validationError": "Bitte überprüfen Sie Ihre Eingaben und versuchen Sie es erneut.",
     "failedToUploadImage": "Bild konnte nicht hochgeladen werden. Bitte versuchen Sie es erneut."
+  },
+  "gemini": {
+    "poweredBy": "Gemini AI",
+    "imageStages": {
+      "uploading": "Bild wird an KI gesendet…",
+      "analyzing": "Bildinhalt wird analysiert…",
+      "identifying": "Artikel und Mengen werden erkannt…",
+      "finishing": "Fast fertig…"
+    },
+    "recipeStages": {
+      "sending": "Zutaten werden an KI gesendet…",
+      "finding": "Passende Rezepte werden gesucht…",
+      "filtering": "Nach deiner Vorratskammer filtern…"
+    },
+    "countdown": "~{remaining}s verbleibend",
+    "finalizing": "Wird abgeschlossen…"
+  },
+  "freezer": {
+    "title": "In den Gefrierschrank",
+    "subtitle": "Lege die Gefrierdauer und optionale Lagerdetails fest.",
+    "usdaDefault": "USDA-Standard für \"{itemName}\": {days} Tage",
+    "daysLabel": "Tage im Gefrierschrank",
+    "days": "Tage",
+    "zone": "Gefrierzone",
+    "zones": {
+      "top": "Oberes Regal",
+      "middle": "Mittleres Regal",
+      "bottom": "Unteres Regal",
+      "door": "Tür",
+      "drawer": "Schublade / Fach",
+      "other": "Andere"
+    },
+    "portionCount": "Portionsanzahl",
+    "labelPhotoUrl": "Etikettenfoto-URL",
+    "optional": "(optional)",
+    "confirm": "In den Gefrierschrank",
+    "confirming": "Wird verschoben…",
+    "error": "Fehler beim Verschieben in den Gefrierschrank"
+  },
+  "update": {
+    "title": "Update verfügbar",
+    "description": "Version {version} ist verfügbar! Jetzt aktualisieren für neueste Funktionen und Verbesserungen.",
+    "whatsNew": "Neuigkeiten:",
+    "later": "Später",
+    "updateNow": "Jetzt aktualisieren"
+  },
+  "whatsNew": {
+    "title": "Neuigkeiten",
+    "dismissLabel": "Neuigkeiten schließen",
+    "gotIt": "Verstanden"
+  },
+  "import": {
+    "title": "Importieren",
+    "pantryCsvTab": "Vorratskammer CSV",
+    "recipeUrlTab": "Rezept-URL",
+    "csvDescription": "Lade eine CSV- oder Textliste hoch. Spalten: item, Name, Menge, storageLocation, expirationDate, Kategorie.",
+    "downloadTemplate": "Vorlage herunterladen",
+    "parsedRows": "Analysierte Zeilen: {count}",
+    "saveToDevice": "Auf Gerät speichern",
+    "importPantry": "Vorratskammer importieren",
+    "recipeDescription": "Füge eine Rezept-URL ein, um Titel, Zutaten und Anweisungen zu importieren.",
+    "urlPlaceholder": "https://beispiel.de/rezept",
+    "preview": "Vorschau",
+    "importRecipe": "Rezept importieren",
+    "importing": "Wird importiert…"
+  },
+  "cookingMode": {
+    "header": "Kochmodus",
+    "noInstructions": "Keine Schritt-für-Schritt-Anweisungen für dieses Rezept verfügbar.",
+    "exitButton": "Kochmodus beenden",
+    "ingredients": "Zutaten",
+    "backToSteps": "Zurück zu den Schritten",
+    "stepCounter": "Schritt {current} / {total}",
+    "prev": "Zurück",
+    "done": "Fertig!",
+    "showIngredients": "Zutaten anzeigen",
+    "backToStepsAria": "Zurück zu den Schritten",
+    "exitAria": "Kochmodus beenden",
+    "goToStep": "Zu Schritt {n}"
   }
 }

@@ -280,5 +280,84 @@
     "notFound": "Item not found.",
     "validationError": "Please check your input and try again.",
     "failedToUploadImage": "Failed to upload image. Please try again."
+  },
+  "gemini": {
+    "poweredBy": "Gemini AI",
+    "imageStages": {
+      "uploading": "Uploading image to AI…",
+      "analyzing": "Analyzing image contents…",
+      "identifying": "Identifying items and quantities…",
+      "finishing": "Almost there, finishing up…"
+    },
+    "recipeStages": {
+      "sending": "Sending ingredients to AI…",
+      "finding": "Finding matching recipes…",
+      "filtering": "Filtering by your pantry…"
+    },
+    "countdown": "~{remaining}s remaining",
+    "finalizing": "Finalizing…"
+  },
+  "freezer": {
+    "title": "Move to Freezer",
+    "subtitle": "Set the freezer shelf life and optional storage details.",
+    "usdaDefault": "USDA default for \"{itemName}\": {days} days",
+    "daysLabel": "Days in freezer",
+    "days": "days",
+    "zone": "Freezer zone",
+    "zones": {
+      "top": "Top shelf",
+      "middle": "Middle shelf",
+      "bottom": "Bottom shelf",
+      "door": "Door",
+      "drawer": "Drawer / bin",
+      "other": "Other"
+    },
+    "portionCount": "Portion count",
+    "labelPhotoUrl": "Label photo URL",
+    "optional": "(optional)",
+    "confirm": "Move to Freezer",
+    "confirming": "Moving…",
+    "error": "Failed to move to freezer"
+  },
+  "update": {
+    "title": "Update Available",
+    "description": "Version {version} is available! Update now for the latest features and improvements.",
+    "whatsNew": "What's new:",
+    "later": "Later",
+    "updateNow": "Update Now"
+  },
+  "whatsNew": {
+    "title": "What's New",
+    "dismissLabel": "Dismiss What's New",
+    "gotIt": "Got it"
+  },
+  "import": {
+    "title": "Import",
+    "pantryCsvTab": "Pantry CSV",
+    "recipeUrlTab": "Recipe URL",
+    "csvDescription": "Upload a CSV or plain-text list. Columns: item, name, amount, quantity, storageLocation, expirationDate, category.",
+    "downloadTemplate": "Download template",
+    "parsedRows": "Parsed rows: {count}",
+    "saveToDevice": "Save to Device",
+    "importPantry": "Import Pantry",
+    "recipeDescription": "Paste a recipe URL to import its title, ingredients and instructions.",
+    "urlPlaceholder": "https://example.com/recipe",
+    "preview": "Preview",
+    "importRecipe": "Import Recipe",
+    "importing": "Importing…"
+  },
+  "cookingMode": {
+    "header": "Cooking Mode",
+    "noInstructions": "No step-by-step instructions available for this recipe.",
+    "exitButton": "Exit Cooking Mode",
+    "ingredients": "Ingredients",
+    "backToSteps": "Back to Steps",
+    "stepCounter": "Step {current} / {total}",
+    "prev": "Prev",
+    "done": "Done!",
+    "showIngredients": "Show ingredients",
+    "backToStepsAria": "Back to steps",
+    "exitAria": "Exit cooking mode",
+    "goToStep": "Go to step {n}"
   }
 }

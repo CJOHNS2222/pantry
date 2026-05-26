@@ -277,5 +277,84 @@
     "notFound": "Не найдено.",
     "validationError": "Пожалуйста, проверьте ввод и попробуйте снова.",
     "failedToUploadImage": "Не удалось загрузить изображение. Пожалуйста, попробуйте снова."
+  },
+  "gemini": {
+    "poweredBy": "Gemini AI",
+    "imageStages": {
+      "uploading": "Загрузка изображения в ИИ…",
+      "analyzing": "Анализ содержимого изображения…",
+      "identifying": "Определение товаров и количеств…",
+      "finishing": "Почти готово, завершаем…"
+    },
+    "recipeStages": {
+      "sending": "Отправка ингредиентов в ИИ…",
+      "finding": "Поиск подходящих рецептов…",
+      "filtering": "Фильтрация по вашей кладовой…"
+    },
+    "countdown": "~{remaining}с осталось",
+    "finalizing": "Завершение…"
+  },
+  "freezer": {
+    "title": "Переместить в морозилку",
+    "subtitle": "Укажите срок хранения в морозилке и необязательные детали хранения.",
+    "usdaDefault": "Стандарт USDA для «{itemName}»: {days} дней",
+    "daysLabel": "Дней в морозилке",
+    "days": "дней",
+    "zone": "Зона морозилки",
+    "zones": {
+      "top": "Верхняя полка",
+      "middle": "Средняя полка",
+      "bottom": "Нижняя полка",
+      "door": "Дверь",
+      "drawer": "Ящик / корзина",
+      "other": "Другое"
+    },
+    "portionCount": "Количество порций",
+    "labelPhotoUrl": "URL фото этикетки",
+    "optional": "(необязательно)",
+    "confirm": "Переместить в морозилку",
+    "confirming": "Перемещение…",
+    "error": "Не удалось переместить в морозилку"
+  },
+  "update": {
+    "title": "Доступно обновление",
+    "description": "Версия {version} доступна! Обновите сейчас для новых функций и улучшений.",
+    "whatsNew": "Что нового:",
+    "later": "Позже",
+    "updateNow": "Обновить сейчас"
+  },
+  "whatsNew": {
+    "title": "Что нового",
+    "dismissLabel": "Закрыть раздел «Что нового»",
+    "gotIt": "Понятно"
+  },
+  "import": {
+    "title": "Импорт",
+    "pantryCsvTab": "CSV кладовой",
+    "recipeUrlTab": "URL рецепта",
+    "csvDescription": "Загрузите CSV или текстовый список. Столбцы: item, название, количество, storageLocation, expirationDate, категория.",
+    "downloadTemplate": "Скачать шаблон",
+    "parsedRows": "Обработано строк: {count}",
+    "saveToDevice": "Сохранить на устройство",
+    "importPantry": "Импорт кладовой",
+    "recipeDescription": "Вставьте URL рецепта для импорта названия, ингредиентов и инструкций.",
+    "urlPlaceholder": "https://example.com/recipe",
+    "preview": "Предпросмотр",
+    "importRecipe": "Импорт рецепта",
+    "importing": "Импортирование…"
+  },
+  "cookingMode": {
+    "header": "Режим готовки",
+    "noInstructions": "Пошаговые инструкции для этого рецепта недоступны.",
+    "exitButton": "Выйти из режима готовки",
+    "ingredients": "Ингредиенты",
+    "backToSteps": "К шагам",
+    "stepCounter": "Шаг {current} / {total}",
+    "prev": "Назад",
+    "done": "Готово!",
+    "showIngredients": "Показать ингредиенты",
+    "backToStepsAria": "К шагам",
+    "exitAria": "Выйти из режима готовки",
+    "goToStep": "Перейти к шагу {n}"
   }
 }

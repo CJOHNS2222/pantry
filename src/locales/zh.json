@@ -277,5 +277,84 @@
     "notFound": "未找到。",
     "validationError": "请检查输入并重试。",
     "failedToUploadImage": "图片上传失败。请重试。"
+  },
+  "gemini": {
+    "poweredBy": "Gemini AI",
+    "imageStages": {
+      "uploading": "正在上传图像到AI…",
+      "analyzing": "正在分析图像内容…",
+      "identifying": "正在识别物品和数量…",
+      "finishing": "即将完成…"
+    },
+    "recipeStages": {
+      "sending": "正在发送食材到AI…",
+      "finding": "正在查找匹配食谱…",
+      "filtering": "正在按您的食材库筛选…"
+    },
+    "countdown": "约{remaining}秒剩余",
+    "finalizing": "最终处理中…"
+  },
+  "freezer": {
+    "title": "移至冷冻",
+    "subtitle": "设置冷冻保存时间和可选储存详情。",
+    "usdaDefault": "\"{itemName}\"的USDA默认值：{days}天",
+    "daysLabel": "冷冻天数",
+    "days": "天",
+    "zone": "冷冻区域",
+    "zones": {
+      "top": "上层",
+      "middle": "中层",
+      "bottom": "下层",
+      "door": "门架",
+      "drawer": "抽屉 / 储物盒",
+      "other": "其他"
+    },
+    "portionCount": "份数",
+    "labelPhotoUrl": "标签照片URL",
+    "optional": "（可选）",
+    "confirm": "移至冷冻",
+    "confirming": "移动中…",
+    "error": "移至冷冻失败"
+  },
+  "update": {
+    "title": "有可用更新",
+    "description": "版本{version}已可用！立即更新以获取最新功能和改进。",
+    "whatsNew": "新内容：",
+    "later": "稍后",
+    "updateNow": "立即更新"
+  },
+  "whatsNew": {
+    "title": "新功能",
+    "dismissLabel": "关闭新功能",
+    "gotIt": "知道了"
+  },
+  "import": {
+    "title": "导入",
+    "pantryCsvTab": "食材库CSV",
+    "recipeUrlTab": "食谱URL",
+    "csvDescription": "上传CSV或纯文本列表。列：item、名称、数量、storageLocation、expirationDate、类别。",
+    "downloadTemplate": "下载模板",
+    "parsedRows": "已解析行：{count}",
+    "saveToDevice": "保存到设备",
+    "importPantry": "导入食材库",
+    "recipeDescription": "粘贴食谱URL以导入标题、食材和步骤。",
+    "urlPlaceholder": "https://example.com/recipe",
+    "preview": "预览",
+    "importRecipe": "导入食谱",
+    "importing": "导入中…"
+  },
+  "cookingMode": {
+    "header": "烹饪模式",
+    "noInstructions": "此食谱没有可用的分步说明。",
+    "exitButton": "退出烹饪模式",
+    "ingredients": "食材",
+    "backToSteps": "返回步骤",
+    "stepCounter": "步骤 {current} / {total}",
+    "prev": "上一步",
+    "done": "完成！",
+    "showIngredients": "显示食材",
+    "backToStepsAria": "返回步骤",
+    "exitAria": "退出烹饪模式",
+    "goToStep": "跳至步骤 {n}"
   }
 }
