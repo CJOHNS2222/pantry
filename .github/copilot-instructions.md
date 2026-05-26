@@ -115,9 +115,8 @@ Use this file as the authoritative project context. Keep changes minimal, typed,
 - **Undo system**: `undoService.ts` for reversible actions.
 
 ### Integrations
-- **AI**: Gemini integration via `geminiService.ts` for recipe suggestions.
-- **Recipes**: Spoonacular API client with caching and rate limiting.
-- **Payments**: Stripe integration via `stripeService.ts`.
+- **AI**: Gemini via `geminiService.ts`; OpenRouter/Groq fallback via `openRouterService.ts` (set `VITE_GEMINI_DISABLED=true` to route all AI through OpenRouter).
+- **Recipes**: Spoonacular REST API via `spoonacularRecipeClient.ts` with caching and rate limiting; `typescript/dist/index.ts` is a shim that stubs the client when the generated SDK is absent.
 - **Analytics**: Firebase Analytics + Sentry for errors/performance monitoring.
 - **Notifications**: Push notifications, in-app alerts, haptic feedback.
 

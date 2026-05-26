@@ -14,7 +14,6 @@ export default defineConfig([
       "ios/**",
       "build/**",
       "coverage/**",
-      "spoonacular-api-clients/**",
       "capacitor-cordova-android-plugins/**",
       "testlab/**",
       "scripts/**",

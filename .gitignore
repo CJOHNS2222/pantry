@@ -48,3 +48,20 @@ scripts/ornate-compass-478504-e1-firebase-adminsdk-fbsvc-b421e3c5e1.json
 /typescript/node_modules/
 /typescript/package-lock.json
 public/images/Screenshot_*.jpg
+
+# Build artifacts — should never be committed
+*.apk
+*.aab
+manifest.json
+extracted_recipes.json
+
+# Audit and planning docs
+AUDIT_NOTES.txt
+FULL_APP_AUDIT.txt
+PRODUCTION_READINESS_AUDIT.txt
+IMPROVEMENTS_PLAN.md
+
+# Screenshots dropped into project root or public/
+public/Screenshot*.png
+public/Screenshot*.jpg
+testlab/robo/Screenshot*.png
