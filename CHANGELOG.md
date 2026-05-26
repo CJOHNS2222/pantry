@@ -1,4 +1,4 @@
-## [Unreleased]
+## [2.1.6] - 2026-05-26
 
 ### Fixed
 - **Camera scan timeout** — `handleTakePhoto` was setting the loading state to `LOADING` before the OS camera opened, causing `GeminiLoadingOverlay` to immediately start its 60-second countdown and time out before Gemini was ever called; loading state is now only set after the photo is captured

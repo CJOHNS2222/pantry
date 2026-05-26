@@ -9,6 +9,16 @@ export interface ChangeEntry {
 
 export const RECENT_CHANGES: ChangeEntry[] = [
   {
+    "version": "2.1.6",
+    "date": "May 26, 2026",
+    "highlights": [
+      "Camera scan timeout — handleTakePhoto was setting the loading state to LOADING before the OS camera opened, causing…",
+      "`customCategories` consolidated onto user doc — custom pantry categories are now stored as a field on users/{uid}…",
+      "Stripe packages removed — stripe, @stripe/react-stripe-js, and @stripe/stripe-js were unused and have been uninstalled",
+      "Dependencies updated — all patch/minor versions bumped (@capacitor/* 8.3.4, firebase 12.13.0, react/react-dom 19.2.6,…"
+    ]
+  },
+  {
     "version": "2.1.5",
     "date": "May 23, 2026",
     "highlights": [
@@ -26,14 +36,6 @@ export const RECENT_CHANGES: ChangeEntry[] = [
       "OpenRouter pantry/receipt image scan hanging — default vision model meta-llama/llama-4-maverick:free was unreliable on…",
       "Image scan opening blank review modal — analyzePantryImageViaOpenRouter and analyzeReceiptImageViaOpenRouter now throw…",
       "Meal Prep Planner modal header hidden behind app bar — changed overlay from items-center z-50 to items-start z-[9999]…"
-    ]
-  },
-  {
-    "version": "2.1.3",
-    "date": "May 19, 2026",
-    "highlights": [
-      "Meal Prep Planner crash — parseTimeToMinutes was declared after the useMemo that calls it, causing a Temporal Dead Zone…",
-      "Auto-generated \"What's New\" modal — scripts/generate-changelog.cjs now parses CHANGELOG.md at build time and writes…"
     ]
   }
 ];
