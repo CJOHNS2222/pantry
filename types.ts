@@ -379,6 +379,12 @@ export interface Household {
   memberIds: string[]; // For querying households by user ID
   /** Live presence map written by householdActivityService — keyed by userId */
   memberActivity?: Record<string, { isOnline?: boolean; lastSeen?: { toDate(): Date } | string; currentActivity?: string }>;
+  /**
+   * The household owner/admin's current subscription tier, synced by the owner's
+   * session via useSubscription.  Non-admin members inherit 'family' features while
+   * this equals 'family' and they remain active members of the household.
+   */
+  ownerSubscriptionTier?: 'free' | 'premium' | 'family';
 }
 
 export interface Member {

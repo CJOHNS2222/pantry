@@ -112,9 +112,28 @@ class UsageService {
       return cached.limits;
     }
 
-    // Determine user's plan tier
-    const planTier = user.subscription?.tier || 'free';
-    const planLimits = this.buildPlanLimits()[planTier];
+    // Determine effective plan tier.
+    // Free members of a family-plan household inherit the family tier for limits.
+    let planTier = user.subscription?.tier || 'free';
+    if (planTier === 'free' && user.householdId) {
+      try {
+        const householdDoc = await DatabaseMonitoringService.getDoc(
+          DatabaseMonitoringService.doc('households/' + user.householdId)
+        );
+        if (householdDoc.exists()) {
+          const hData = householdDoc.data();
+          const members: Array<{ id: string; role: string }> = hData.members || [];
+          const member = members.find(m => m.id === user.id);
+          if (member && member.role !== 'admin' && hData.ownerSubscriptionTier === 'family') {
+            planTier = 'family';
+          }
+        }
+      } catch {
+        // Access revoked or network error — fall back to own tier
+      }
+    }
+
+    const planLimits = this.buildPlanLimits()[planTier as keyof PlanLimits] ?? this.buildPlanLimits().free;
 
     const usageRef = DatabaseMonitoringService.doc('users/' + user.id + '/usage/limits');
     const usageDoc = await DatabaseMonitoringService.getDoc(usageRef);
@@ -252,11 +271,11 @@ class UsageService {
     return limits.mealPlanning.weeklyRecipes === -1 || currentWeeklyCount < limits.mealPlanning.weeklyRecipes;
   }
 
-  static async recordRecipeSave(user: User): Promise<void> {
+  static async recordRecipeSave(_user: User): Promise<void> {
     // Deprecated — use syncRecipeCount instead
   }
 
-  static async recordRecipeDelete(user: User): Promise<void> {
+  static async recordRecipeDelete(_user: User): Promise<void> {
     // Deprecated — use syncRecipeCount instead
   }
 
