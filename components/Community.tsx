@@ -231,6 +231,32 @@ export const Community: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecipe,
                         </div>
                     )}
                     
+                    {/* Quick inline star rating */}
+                    <div className="flex items-center gap-1 mb-3" onClick={(e) => e.stopPropagation()}>
+                      <span className="text-xs text-theme-secondary opacity-60 mr-1">Rate:</span>
+                      {[1,2,3,4,5].map((star) => (
+                        <button
+                          key={star}
+                          aria-label={`Rate ${star} star${star !== 1 ? 's' : ''}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onRateRecipe({
+                              id: Date.now().toString(),
+                              recipeTitle: stat.title,
+                              rating: star,
+                              comment: '',
+                              userName: user?.name || 'User',
+                              userAvatar: user?.avatar,
+                              recipe: fullRecipe ?? undefined
+                            });
+                          }}
+                          className="text-amber-400 hover:text-amber-500 transition-colors"
+                        >
+                          <Star className="w-4 h-4 fill-current" />
+                        </button>
+                      ))}
+                    </div>
+
                     <div className="flex gap-2">
                       <button
                         onClick={(e) => {

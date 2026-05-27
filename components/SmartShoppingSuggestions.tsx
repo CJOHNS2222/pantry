@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Lightbulb, TrendingUp, Package, Clock, Plus } from 'lucide-react';
 
 interface ShoppingSuggestion {
@@ -40,7 +40,13 @@ export const SmartShoppingSuggestions: React.FC<SmartShoppingSuggestionsProps> =
   onAddSuggestion,
   onDismissSuggestion
 }) => {
-  const [dismissedSuggestions, setDismissedSuggestions] = useState<Set<string>>(new Set());
+  const DISMISSED_KEY = 'shop_dismissed_suggestions';
+  const [dismissedSuggestions, setDismissedSuggestions] = useState<Set<string>>(() => {
+    try {
+      const stored = localStorage.getItem('shop_dismissed_suggestions');
+      return stored ? new Set<string>(JSON.parse(stored) as string[]) : new Set<string>();
+    } catch { return new Set<string>(); }
+  });
   const [expanded, setExpanded] = useState(false);
 
   const suggestions = useMemo(() => {
@@ -130,7 +136,7 @@ export const SmartShoppingSuggestions: React.FC<SmartShoppingSuggestionsProps> =
       10: ['cranberries', 'sweet potatoes', 'squash'] // November
     };
 
-    const currentSeasonalItems = (seasonalItems as any)[currentMonth] || [];
+    const currentSeasonalItems = (seasonalItems as Record<number, string[]>)[currentMonth] || [];
     currentSeasonalItems.forEach((item: string) => {
       const hasInPantry = pantryItems.some(p => p.name.toLowerCase().includes(item.toLowerCase()));
       if (!hasInPantry) {
@@ -202,11 +208,15 @@ export const SmartShoppingSuggestions: React.FC<SmartShoppingSuggestionsProps> =
 
   const handleAddSuggestion = (suggestion: ShoppingSuggestion) => {
     onAddSuggestion(suggestion);
-    setDismissedSuggestions(prev => new Set([...prev, suggestion.id]));
+    const next = new Set([...dismissedSuggestions, suggestion.id]);
+    setDismissedSuggestions(next);
+    try { localStorage.setItem(DISMISSED_KEY, JSON.stringify([...next])); } catch { /* storage unavailable */ }
   };
 
   const handleDismiss = (suggestionId: string) => {
-    setDismissedSuggestions(prev => new Set([...prev, suggestionId]));
+    const next = new Set([...dismissedSuggestions, suggestionId]);
+    setDismissedSuggestions(next);
+    try { localStorage.setItem(DISMISSED_KEY, JSON.stringify([...next])); } catch { /* storage unavailable */ }
     onDismissSuggestion(suggestionId);
   };
 

@@ -64,7 +64,13 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
   onDismissSuggestion
 }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [dismissedSuggestions, setDismissedSuggestions] = useState<Set<string>>(new Set());
+  const DISMISSED_KEY = 'shop_dismissed_suggestions';
+  const [dismissedSuggestions, setDismissedSuggestions] = useState<Set<string>>(() => {
+    try {
+      const stored = localStorage.getItem('shop_dismissed_suggestions');
+      return stored ? new Set<string>(JSON.parse(stored) as string[]) : new Set<string>();
+    } catch { return new Set<string>(); }
+  });
   const [expanded, setExpanded] = useState(false);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
@@ -233,11 +239,15 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
 
   const handleAddSuggestion = (suggestion: ShoppingSuggestion) => {
     onAddSuggestion(suggestion);
-    setDismissedSuggestions(prev => new Set([...prev, suggestion.id]));
+    const next = new Set([...dismissedSuggestions, suggestion.id]);
+    setDismissedSuggestions(next);
+    try { localStorage.setItem(DISMISSED_KEY, JSON.stringify([...next])); } catch { /* storage unavailable */ }
   };
 
   const handleDismiss = (suggestionId: string) => {
-    setDismissedSuggestions(prev => new Set([...prev, suggestionId]));
+    const next = new Set([...dismissedSuggestions, suggestionId]);
+    setDismissedSuggestions(next);
+    try { localStorage.setItem(DISMISSED_KEY, JSON.stringify([...next])); } catch { /* storage unavailable */ }
     onDismissSuggestion(suggestionId);
   };
 

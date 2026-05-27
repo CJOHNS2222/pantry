@@ -733,7 +733,6 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
         recentPurchases={recentPurchases}
         onAddSuggestion={handleAddSuggestion}
         onDismissSuggestion={(id) => {
-          // TODO: Implement suggestion dismissal persistence
           log.debug('Dismiss suggestion:', { id }, 'ShoppingList');
         }}
       />

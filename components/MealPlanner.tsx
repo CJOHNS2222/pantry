@@ -16,6 +16,8 @@ import { useIntl } from 'react-intl';
 import { useApp } from '../contexts/AppContext';
 import { useAppActions } from '../contexts/AppActionsContext';
 import { useSubscription } from '../hooks/useSubscription';
+import { UsageService } from '../services/usageService';
+import type { UsageLimits } from '../services/usageService';
 import { searchRecipes } from '../utils/searchUtils';
 import { debounce } from '../utils/debounceUtils';
 import { log } from '../services/logService';
@@ -528,6 +530,12 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
   const intl = useIntl();
   const { household } = useApp();
   const { isPremium, isFamily } = useSubscription(user);
+  const [usageLimits, setUsageLimits] = useState<UsageLimits | null>(null);
+  useEffect(() => {
+    if (!user) return;
+    UsageService.getUsageLimits(user).then(setUsageLimits).catch(() => {});
+  }, [user?.id]);
+  const canUseTwoWeekPlanning = usageLimits?.mealPlanning.twoWeekPlanning ?? (isPremium || isFamily);
     // List of staple items to ignore (unless user wants them included)
     const STAPLES = ['salt', 'pepper', 'oil', 'water', 'flour', 'sugar', 'butter', 'vinegar', 'baking powder', 'baking soda', 'spices', 'seasoning', 'soy sauce', 'cornstarch', 'yeast'];
     const includeStaples = settings?.shopping?.includeStaples || false;
@@ -1508,7 +1516,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
               >
                 This Week
               </button>
-              {isPremium || isFamily ? (
+              {canUseTwoWeekPlanning ? (
               <button
                 onClick={() => setIsCalendarExpanded(true)}
                 className={`px-3 py-1 text-xs font-medium rounded-lg transition-colors ${
@@ -1776,10 +1784,10 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
 
               <button
                 onClick={() => setCurrentDayIndex(Math.min(displayPlan.length - 1, currentDayIndex + 1))}
-                disabled={currentDayIndex === displayPlan.length - 1 || (!isPremium && !isFamily && currentDayIndex >= 6)}
+                disabled={currentDayIndex === displayPlan.length - 1 || (!canUseTwoWeekPlanning && currentDayIndex >= 6)}
                 className="p-2 rounded-lg hover:bg-theme-primary/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 aria-label="Next day"
-                title={(!isPremium && !isFamily && currentDayIndex >= 6) ? 'Upgrade to plan beyond the current week' : undefined}
+                title={(!canUseTwoWeekPlanning && currentDayIndex >= 6) ? 'Upgrade to plan beyond the current week' : undefined}
               >
                 <svg className="w-6 h-6 text-theme-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />

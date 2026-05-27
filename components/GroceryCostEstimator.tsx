@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { DollarSign, Calculator, TrendingUp, Users, RefreshCw } from 'lucide-react';
+import { DollarSign, Calculator, TrendingUp, Users, RefreshCw, Lock } from 'lucide-react';
 import { DayPlan, PantryItem } from '../types';
+import { Tab } from '../types/app';
 import { groceryPriceService, PriceData } from '../services/groceryPriceService';
 import { parseIngredientForShoppingList } from '../utils/appUtils';
 import { useAppActions } from '../contexts/AppActionsContext';
@@ -24,7 +25,7 @@ interface IngredientCost {
 }
 
 export const GroceryCostEstimator: React.FC<GroceryCostEstimatorProps> = ({ mealPlan, inventory, onEstimatorToggle, freeItemLimit }) => {
-  const { addToast } = useAppActions();
+  const { addToast, setActiveTab } = useAppActions();
   const { user } = useApp();
   const [showEstimator, setShowEstimator] = useState(false);
   const [customPrices, setCustomPrices] = useState<Record<string, number>>({});
@@ -401,7 +402,7 @@ export const GroceryCostEstimator: React.FC<GroceryCostEstimatorProps> = ({ meal
           </div>
           <div className="text-sm text-theme-secondary">
             Estimated cost for {includeAllIngredients ? 'all' : 'missing'} ingredients
-            {lockedCount > 0 && <span className="ml-1 text-amber-600">(first {freeItemLimit} shown — upgrade for full estimate)</span>}
+            {lockedCount > 0 && <button onClick={() => setActiveTab(Tab.SETTINGS)} className="ml-1 inline-flex items-center gap-1 text-amber-600 hover:text-amber-700 underline text-xs"><Lock className="w-3 h-3" />first {freeItemLimit} shown — upgrade for full estimate</button>}
           </div>
         </div>
 
