@@ -89,7 +89,7 @@ class UsageService {
         recipes: { max: remoteConfig.getNumber('limit_premium_recipes_max') },
         mealPlanning: {
           weeklyRecipes: remoteConfig.getNumber('limit_premium_mealplanning_weekly'),
-          twoWeekPlanning: false
+          twoWeekPlanning: true
         },
         gemini: { weekly: remoteConfig.getNumber('limit_premium_gemini_weekly') }
       },

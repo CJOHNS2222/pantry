@@ -13,13 +13,10 @@ if (!admin.apps?.length) {
 
 // Core invite logic as a function so it can be used by both callable and HTTP handlers
 async function inviteMemberCore(inviterUid: string, email: string, householdId: string) {
-  console.log('inviteMemberCore called with:', { inviterUid, email, householdId });
   const db = getFirestore();
 
   const householdRef = db.collection("households").doc(householdId);
-  console.log('Household ref path:', householdRef.path);
   const householdDoc = await householdRef.get();
-  console.log('Household doc exists:', householdDoc.exists);
   if (!householdDoc.exists) {
     throw new HttpsError("not-found", "The specified household does not exist.");
   }
@@ -108,7 +105,7 @@ async function inviteMemberCore(inviterUid: string, email: string, householdId: 
   if (memberIdToStore && memberIdToStore !== email) {
     try {
       await admin.auth().setCustomUserClaims(memberIdToStore, { householdId });
-      console.log(`Custom claim 'householdId' set for user ${memberIdToStore} to ${householdId}`);
+      // Custom claim set successfully
     } catch (err: any) {
       console.error('Error setting custom claims:', err);
       // Don't fail the invite if claim setting fails

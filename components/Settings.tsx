@@ -4,6 +4,7 @@ import DatabaseMonitoringService from '../services/databaseMonitoringService';
 import { SubscriptionManager } from './SubscriptionManager';
 import { CategoryManager } from './CategoryManager';
 import { StoreLayoutEditor } from './StoreLayoutEditor';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { log } from '../services/logService';
 import { useIntl } from 'react-intl';
 import AnalyticsService from '../services/analyticsService';
@@ -144,11 +145,33 @@ export const Settings: React.FC<SettingsProps> = ({
   // FAQ modal state
   const [showFAQModal, setShowFAQModal] = useState(false);
 
+  // Delete account state
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+
   // Android back-button registration for Settings modals
   useAndroidBack(showAvatarSelection, () => setShowAvatarSelection(false));
   useAndroidBack(showCategoryManager, () => setShowCategoryManager(false));
   useAndroidBack(showMemberPreferencesModal, () => setShowMemberPreferencesModal(false));
   useAndroidBack(showFAQModal, () => setShowFAQModal(false));
+
+  const handleDeleteAccount = async () => {
+    if (!user) return;
+    setIsDeletingAccount(true);
+    try {
+      const fns = getFunctions();
+      const deleteAccountFn = httpsCallable(fns, 'deleteAccount');
+      await deleteAccountFn();
+      // Auth user was deleted server-side; sign out locally
+      onLogout?.();
+    } catch (err: unknown) {
+      log.error('Account deletion failed', err instanceof Error ? err : new Error(String(err)));
+      addToast?.('Failed to delete account. Please try again or contact support.', 'error');
+    } finally {
+      setIsDeletingAccount(false);
+      setShowDeleteConfirm(false);
+    }
+  };
 
   // Household creation state
   const [householdName, setHouseholdName] = useState('');
@@ -350,7 +373,7 @@ export const Settings: React.FC<SettingsProps> = ({
     }
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+   
   const _handleNotifChange = (key: string, value: unknown) => {
     setPendingNotifications(prev => ({
       ...prev,
@@ -359,7 +382,7 @@ export const Settings: React.FC<SettingsProps> = ({
     setNotifChanged(false);
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+   
   const _confirmNotifChanges = () => {
     setSettings(prev => ({
       ...prev,
@@ -2353,25 +2376,14 @@ export const Settings: React.FC<SettingsProps> = ({
               >
                 Copy URL
               </button>
-              <button
-                onClick={() => {
-                  const delUrl = (window as Window & { DELETE_ACCOUNT_URL?: string }).DELETE_ACCOUNT_URL || 'https://smartpantrymobile.page.gd/delete-account.html';
-                  window.open(delUrl, '_blank');
-                }}
-                className="bg-red-500 text-white px-3 py-1 rounded-lg font-medium text-sm hover:bg-red-600 transition-colors"
-              >
-                Delete Account
-              </button>
-              <button
-                onClick={() => {
-                  const delUrl = (window as Window & { DELETE_ACCOUNT_URL?: string }).DELETE_ACCOUNT_URL || 'https://smartpantrymobile.page.gd/delete-account.html';
-                  if (navigator.clipboard) navigator.clipboard.writeText(delUrl);
-                  addToast?.('Account deletion URL copied to clipboard', 'success');
-                }}
-                className="bg-theme-primary text-theme-secondary px-3 py-1 rounded-lg text-sm hover:bg-theme-secondary transition-colors"
-              >
-                Copy Link
-              </button>
+              {user && !user.isGuest && (
+                <button
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="bg-red-500 text-white px-3 py-1 rounded-lg font-medium text-sm hover:bg-red-600 transition-colors"
+                >
+                  Delete Account
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -2399,6 +2411,37 @@ export const Settings: React.FC<SettingsProps> = ({
 
           <div className="flex-1 p-6 overflow-y-auto min-h-0">
             <FAQPage onBack={() => setShowFAQModal(false)} />
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* Delete Account Confirmation Modal */}
+    {showDeleteConfirm && (
+      <div className="fixed inset-0 bg-black/60 z-[110] flex items-center justify-center p-4">
+        <div className="bg-theme-primary rounded-2xl shadow-2xl max-w-sm w-full p-6 flex flex-col gap-4">
+          <div className="flex items-center gap-3">
+            <AlertTriangle className="w-6 h-6 text-red-500 flex-shrink-0" />
+            <h2 className="font-serif font-bold text-theme-primary text-lg">Delete Account</h2>
+          </div>
+          <p className="text-sm text-theme-secondary leading-relaxed">
+            This will <strong>permanently delete</strong> your account, all pantry data, meal plans, saved recipes, and remove you from any households. This action cannot be undone.
+          </p>
+          <div className="flex gap-3 mt-2">
+            <button
+              onClick={() => setShowDeleteConfirm(false)}
+              disabled={isDeletingAccount}
+              className="flex-1 bg-theme-secondary text-theme-primary py-2 px-4 rounded-lg font-medium text-sm transition-colors hover:bg-theme-primary disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleDeleteAccount}
+              disabled={isDeletingAccount}
+              className="flex-1 bg-red-500 text-white py-2 px-4 rounded-lg font-medium text-sm transition-colors hover:bg-red-600 disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {isDeletingAccount ? <><Loader2 className="w-4 h-4 animate-spin" /> Deleting…</> : 'Delete My Account'}
+            </button>
           </div>
         </div>
       </div>

@@ -32,7 +32,7 @@ const IN_APP_DEFAULTS: Record<string, string | number | boolean> = {
   // ── Feature flags — enabled ───────────────────────────────────────────────
   flag_geminiIntegration_enabled: true,
   flag_smartRecommendations_enabled: true,
-  flag_offlineMode_enabled: false,
+  flag_offlineMode_enabled: true,
   flag_advancedAnalytics_enabled: true,
   flag_mealPlanning_enabled: true,
   flag_householdSharing_enabled: true,
@@ -40,12 +40,12 @@ const IN_APP_DEFAULTS: Record<string, string | number | boolean> = {
   flag_priceTracking_enabled: true,
   flag_darkMode_enabled: true,
   flag_notifications_enabled: true,
-  flag_newTutorial_enabled: false,
+  flag_newTutorial_enabled: true,
 
   // ── Feature flags — rollout percentage (0–100) ───────────────────────────
   flag_geminiIntegration_rollout: 100,
   flag_smartRecommendations_rollout: 100,
-  flag_offlineMode_rollout: 0,
+  flag_offlineMode_rollout: 100,
   flag_advancedAnalytics_rollout: 50,
   flag_mealPlanning_rollout: 100,
   flag_householdSharing_rollout: 100,
@@ -53,7 +53,7 @@ const IN_APP_DEFAULTS: Record<string, string | number | boolean> = {
   flag_priceTracking_rollout: 75,
   flag_darkMode_rollout: 100,
   flag_notifications_rollout: 100,
-  flag_newTutorial_rollout: 0,
+  flag_newTutorial_rollout: 100,
 
   // ── Kill switches (true = feature killed; set false to restore normally) ──
   kill_geminiIntegration: false,

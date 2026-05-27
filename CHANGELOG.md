@@ -1,3 +1,26 @@
+## [Unreleased]
+
+### Added
+- **In-app account deletion** — Settings › Privacy & Legal now has a proper "Delete Account" button that opens a confirmation modal; permanently deletes all Firestore user data, removes the user from their household (or transfers ownership to the next member), and deletes the Firebase Auth account via a new `deleteAccount` Cloud Function — satisfies Play Store / App Store in-app deletion policy
+- **AdMob banner ads re-enabled** — installed `@capacitor-community/admob`, restored the `showBanner`/`hideBanner` implementation in `AdMobBanner.tsx`; set `VITE_ADMOB_ENABLED=true` in your release build env to activate (uses the production unit `ca-app-pub-5084706792909644/2077776375`; override with `VITE_ADMOB_USE_TEST=true` for development)
+- **Offline mode feature flag enabled** — `flag_offlineMode_enabled` default is now `true`/100% rollout in both `featureFlags.ts` and `remoteconfig.template.json` (Firebase SDK has always provided native offline persistence; flag now reflects reality)
+- **Contextual tutorial flag enabled** — `flag_newTutorial_enabled` default is now `true`/100% rollout; per-tab tips were already always showing but the Remote Config template had the flag set to `false`
+
+### Changed
+- **`autoReaddStaples` setting wired** — consuming a staple item to zero now checks `settings.shopping.autoReaddStaples` before adding to the shopping list; the previous code ignored the user setting and always re-added
+- **Calendar service console.warn → log** — replaced bare `console.warn`/`console.error` calls in `calendarService.ts` with structured `log.warn`/`log.error`; updated `capacitor.config.ts` comment to accurately state the plugin is not installed (ICS file download works; native calendar push does not)
+
+### Fixed
+- **PII leak in `inviteMemberCore`** — removed `console.log` that was printing `{ inviterUid, email, householdId }` and the UID claim-set confirmation to Cloud Logging plaintext
+- **Recipe recommendations ingredient matching** — `RecipeRatingService.getPersonalizedRecommendations` now loads the recipe cache to get full recipe objects for household-loved entries (was previously `{ title }` only) and implements the pantry ingredient matching step (returns up to 3 `similar-ingredients` recommendations based on token overlap with `pantryItems`)
+- **Upgrade CTA missing for AdMob** — documented `VITE_ADMOB_ENABLED` and `VITE_ADMOB_USE_TEST` in `.env.example`
+
+### Added
+### Changed
+### Fixed
+
+---
+
 ## [2.1.6] - 2026-05-26
 
 ### Fixed

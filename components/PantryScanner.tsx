@@ -104,7 +104,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   const appActions = useAppActions();
 
   // Destructure needed values
-  const { household, savedRecipes, recipeSaveLimitExceeded } = appState;
+  const { household, savedRecipes, recipeSaveLimitExceeded, settings } = appState;
   const { onSaveRecipe, onRateRecipe } = appActions;
 
   const [canShowAdBanner, setCanShowAdBanner] = React.useState<boolean>(false);
@@ -296,9 +296,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
 
     // Check if this is a staple and quantity reached 0, auto-readd to shopping list
     const newQuantity = getQuantityAmount(updatedItem.quantity ?? updatedItem.quantity_estimate);
-    if (original.isStaple && newQuantity <= 0) {
-      // TODO: Check settings for autoReaddStaples
-      // For now, assume enabled
+    if (original.isStaple && newQuantity <= 0 && (settings.shopping?.autoReaddStaples !== false)) {
       addToShoppingList([original.item]);
       appActions.addToast(`${original.item} auto-added to shopping list (staple)`, 'info');
     }

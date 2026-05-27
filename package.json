@@ -44,6 +44,7 @@
     ]
   },
   "dependencies": {
+    "@capacitor-community/admob": "^8.0.0",
     "@capacitor-community/speech-recognition": "^7.0.1",
     "@capacitor-firebase/crashlytics": "^8.2.0",
     "@capacitor/android": "^8.3.1",

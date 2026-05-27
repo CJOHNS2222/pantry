@@ -8,7 +8,8 @@ import {
   RecipeFeedback
 } from '../types';
 import { log } from './logService';
-import { upsertCommunityRatedRecipeByTitle, saveRecipeToFirestore } from './recipeService';
+import { upsertCommunityRatedRecipeByTitle, saveRecipeToFirestore, getCachedRecipesCache } from './recipeService';
+import type { RecipeRecommendation } from './recipeRecommendationService';
 
 // Recursively remove undefined properties (preserve Timestamp and other non-plain values)
 const sanitizeForFirestore = (obj: any): any => {
@@ -218,7 +219,7 @@ export class RecipeRatingService {
   /**
    * Update community statistics after a rating is submitted
    */
-  private static async updateCommunityStats(recipeTitle: string, householdId?: string): Promise<void> {
+  private static async updateCommunityStats(recipeTitle: string, _householdId?: string): Promise<void> {
     try {
       const ratingsQuery = DatabaseMonitoringService.query(
         DatabaseMonitoringService.collection(this.RATINGS_COLLECTION),
@@ -400,7 +401,7 @@ export class RecipeRatingService {
     householdId?: string,
     pantryItems: string[] = [],
     limitCount: number = 5
-  ): Promise<any[]> { // TODO: Define proper recommendation type
+  ): Promise<RecipeRecommendation[]> {
     try {
       // Get user's rating history
       const userRatingsQuery = DatabaseMonitoringService.query(
@@ -426,7 +427,11 @@ export class RecipeRatingService {
       }
 
       // Simple recommendation logic (can be enhanced with ML)
-      const recommendations: any[] = [];
+      const recommendations: RecipeRecommendation[] = [];
+
+      // Load full recipe objects from the shared cache for title lookup and ingredient matching
+      const allCachedRecipes = await getCachedRecipesCache();
+      const recipeByTitle = new Map(allCachedRecipes.map(r => [r.title.toLowerCase(), r]));
 
       // Household-loved recipes that user hasn't rated
       if (householdRatings.length > 0) {
@@ -444,17 +449,43 @@ export class RecipeRatingService {
               .slice(0, 2)
               .forEach(([recipeTitle, count]: [string, number]) => {
                 const c = Number(count || 0);
+                const fullRecipe = recipeByTitle.get(recipeTitle.toLowerCase());
+                if (!fullRecipe) return; // skip titles not found in cache
                 recommendations.push({
-                  recipe: { title: recipeTitle }, // TODO: Get full recipe data
-                  reason: `${c} household members loved this`,
+                  recipe: fullRecipe,
+                  reason: `${c} household member${c === 1 ? '' : 's'} loved this`,
                   confidence: Math.min(0.9, c / 5),
                   type: 'household-loved'
                 });
               });
       }
 
-      // Recipes with similar ingredients to pantry
-      // TODO: Implement ingredient matching logic
+      // Pantry-ingredient matching: recipes whose ingredients overlap with pantry items
+      if (pantryItems.length > 0) {
+        const pantryTokens = pantryItems.map(p => p.toLowerCase().trim());
+        const usedTitles = new Set(recommendations.map(r => r.recipe.title.toLowerCase()));
+
+        const scored = allCachedRecipes
+          .filter(r => !usedTitles.has(r.title.toLowerCase()))
+          .map(r => ({
+            recipe: r,
+            matchCount: pantryTokens.filter(token =>
+              r.ingredients.join(' ').toLowerCase().includes(token)
+            ).length
+          }))
+          .filter(({ matchCount }) => matchCount > 0)
+          .sort((a, b) => b.matchCount - a.matchCount)
+          .slice(0, 3);
+
+        scored.forEach(({ recipe, matchCount }) => {
+          recommendations.push({
+            recipe,
+            reason: `Uses ${matchCount} item${matchCount === 1 ? '' : 's'} from your pantry`,
+            confidence: Math.min(0.9, 0.3 + matchCount / Math.max(pantryTokens.length, 1)),
+            type: 'similar-ingredients'
+          });
+        });
+      }
 
       return recommendations.slice(0, limitCount);
     } catch (err: any) {

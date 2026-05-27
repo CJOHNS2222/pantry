@@ -1,5 +1,6 @@
 import { Capacitor } from '@capacitor/core';
 import { DayPlan } from '../types';
+import { log } from './logService';
 
 /**
  * CalendarEvent interface for Capacitor Calendar plugin
@@ -41,7 +42,7 @@ class CalendarService {
    */
   async requestPermissions(): Promise<boolean> {
     if (!this.isAvailable()) {
-      console.warn('Calendar plugin not available');
+      log.warn('Calendar plugin not available', {}, 'CalendarService');
       return false;
     }
 
@@ -50,7 +51,7 @@ class CalendarService {
       // Permissions are handled automatically by the native platforms
       return true;
     } catch (err: any) {
-      console.error('Error requesting calendar permissions:', err);
+      log.error('Error requesting calendar permissions', err, 'CalendarService');
       return false;
     }
   }
@@ -70,7 +71,7 @@ class CalendarService {
       // We'll assume permissions are granted if the plugin is available
       return true;
     } catch (err: any) {
-      console.error('Error checking calendar permissions:', err);
+      log.error('Error checking calendar permissions', err, 'CalendarService');
       return false;
     }
   }
@@ -83,7 +84,7 @@ class CalendarService {
    */
   async createMealPlanEvent(dayPlan: DayPlan, date: Date): Promise<boolean> {
     if (!this.isAvailable()) {
-      console.warn('Calendar plugin not available');
+      log.warn('Calendar plugin not available', {}, 'CalendarService');
       return false;
     }
 
@@ -102,7 +103,7 @@ class CalendarService {
         .join('\n');
 
       if (!mealTitles) {
-        console.warn('No meals with recipes found in day plan');
+        log.warn('No meals with recipes found in day plan', {}, 'CalendarService');
         return false;
       }
 
@@ -120,11 +121,11 @@ class CalendarService {
       } else if ((Capacitor as any).createEvent) {
         await (Capacitor as any).createEvent(event);
       } else {
-        console.warn('CapacitorCalendar plugin not available to create event');
+        log.warn('CapacitorCalendar plugin not available to create event', {}, 'CalendarService');
       }
       return true;
     } catch (err: any) {
-      console.error('Error creating calendar event:', err);
+      log.error('Error creating calendar event', err, 'CalendarService');
       return false;
     }
   }
@@ -137,7 +138,7 @@ class CalendarService {
    */
   async createCookingReminder(recipeTitle: string, scheduledTime: Date): Promise<boolean> {
     if (!this.isAvailable()) {
-      console.warn('Calendar plugin not available');
+      log.warn('Calendar plugin not available', {}, 'CalendarService');
       return false;
     }
 
@@ -164,11 +165,11 @@ class CalendarService {
       } else if ((Capacitor as any).createEvent) {
         await (Capacitor as any).createEvent(event);
       } else {
-        console.warn('CapacitorCalendar plugin not available to create event');
+        log.warn('CapacitorCalendar plugin not available to create event', {}, 'CalendarService');
       }
       return true;
     } catch (err: any) {
-      console.error('Error creating cooking reminder:', err);
+      log.error('Error creating cooking reminder', err, 'CalendarService');
       return false;
     }
   }
@@ -180,7 +181,7 @@ class CalendarService {
    */
   async openCalendarAtDate(date: Date): Promise<void> {
     if (!this.isAvailable()) {
-      console.warn('Calendar plugin not available');
+      log.warn('Calendar plugin not available', {}, 'CalendarService');
       return;
     }
 
@@ -191,10 +192,10 @@ class CalendarService {
       } else if ((Capacitor as any).openCalendar) {
         await (Capacitor as any).openCalendar({ date: date.getTime() });
       } else {
-        console.warn('CapacitorCalendar plugin not available to open calendar');
+        log.warn('CapacitorCalendar plugin not available to open calendar', {}, 'CalendarService');
       }
     } catch (err: any) {
-      console.error('Error opening calendar:', err);
+      log.error('Error opening calendar', err, 'CalendarService');
     }
   }
 

@@ -1,9 +1,9 @@
 // Comprehensive feature flag system with gradual rollout, A/B testing, and kill switches
-import { UsageService } from './usageService';
+import { UsageService as _UsageService } from './usageService';
 import { log } from './logService';
 import remoteConfig from './remoteConfigService';
 
-const GEMINI_ENABLED_ENV = typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_ENABLE_GEMINI === 'true';
+const _GEMINI_ENABLED_ENV = typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_ENABLE_GEMINI === 'true';
 
 // Feature flag configuration
 interface FeatureFlag {
@@ -34,8 +34,8 @@ const DEFAULT_FEATURE_FLAGS: Record<string, FeatureFlag> = {
   },
   offlineMode: {
     name: 'offlineMode',
-    enabled: false,
-    rolloutPercentage: 0,
+    enabled: true,
+    rolloutPercentage: 100,
     description: 'Offline pantry management capabilities',
     lastModified: new Date(),
   },
@@ -89,11 +89,10 @@ const DEFAULT_FEATURE_FLAGS: Record<string, FeatureFlag> = {
     lastModified: new Date(),
   }
   ,
-  // New interactive tutorial feature flag (off by default for staged rollout)
   newTutorial: {
     name: 'newTutorial',
-    enabled: false,
-    rolloutPercentage: 0,
+    enabled: true,
+    rolloutPercentage: 100,
     description: 'Interactive first-time tutorial with task-driven steps',
     lastModified: new Date(),
   }
@@ -323,7 +322,7 @@ export function userOptedInToGemini(userId?: string): boolean {
     const raw = localStorage.getItem(key);
     if (raw === null) return false;
     return raw === 'true';
-  } catch (e) {
+  } catch (_e) {
     return false;
   }
 }
@@ -332,17 +331,17 @@ export function setUserGeminiOptIn(userId: string | undefined, value: boolean) {
   try {
     const key = userId ? `gemini_opt_in_${userId}` : `gemini_opt_in_global`;
     localStorage.setItem(key, value ? 'true' : 'false');
-  } catch (e) {
+  } catch (_e) {
     // ignore
   }
 }
 
-export function getGeminiUsage(userId?: string): number {
+export function getGeminiUsage(_userId?: string): number {
   // Deprecated: Usage tracking moved to Firebase
   return 0;
 }
 
-export function incrementGeminiUsage(userId: string | undefined, inc = 1) {
+export function incrementGeminiUsage(_userId: string | undefined, _inc = 1) {
   // Deprecated: Usage tracking moved to Firebase
   return 0;
 }

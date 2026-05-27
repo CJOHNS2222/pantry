@@ -20,7 +20,10 @@ const config: CapacitorConfig = {
       presentationOptions: ["badge", "sound", "alert"],
     },
     // Calendar: {
-    //   // Calendar plugin configuration - temporarily disabled due to build compatibility
+    //   // capacitor-calendar plugin is NOT installed.
+    //   // ICS file export (exportWeekAsICS) works without it.
+    //   // To restore native calendar push, install @howljs/capacitor-calendar
+    //   // (Capacitor 8 compatible) and uncomment this block.
     // },
     SafeArea: {
       // Safe area plugin configuration

@@ -181,14 +181,14 @@
         },
         "flag_offlineMode_enabled": {
           "defaultValue": {
-            "value": "false"
+            "value": "true"
           },
           "description": "Enable/disable offline pantry management capabilities",
           "valueType": "BOOLEAN"
         },
         "flag_offlineMode_rollout": {
           "defaultValue": {
-            "value": "0"
+            "value": "100"
           },
           "description": "Rollout percentage for offline mode (0-100)",
           "valueType": "NUMBER"
@@ -293,14 +293,14 @@
         },
         "flag_newTutorial_enabled": {
           "defaultValue": {
-            "value": "false"
+            "value": "true"
           },
           "description": "Enable/disable interactive first-time tutorial",
           "valueType": "BOOLEAN"
         },
         "flag_newTutorial_rollout": {
           "defaultValue": {
-            "value": "0"
+            "value": "100"
           },
           "description": "Rollout percentage for new tutorial (0-100)",
           "valueType": "NUMBER"
