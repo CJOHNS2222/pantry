@@ -9,6 +9,16 @@ export interface ChangeEntry {
 
 export const RECENT_CHANGES: ChangeEntry[] = [
   {
+    "version": "2.2.0",
+    "date": "May 26, 2026",
+    "highlights": [
+      "Shopping item assignment",
+      "Shopping item notes",
+      "Multi-store layout profiles",
+      "In-app account deletion"
+    ]
+  },
+  {
     "version": "2.1.6",
     "date": "May 26, 2026",
     "highlights": [
@@ -16,26 +26,6 @@ export const RECENT_CHANGES: ChangeEntry[] = [
       "`customCategories` consolidated onto user doc — custom pantry categories are now stored as a field on users/{uid}…",
       "Stripe packages removed — stripe, @stripe/react-stripe-js, and @stripe/stripe-js were unused and have been uninstalled",
       "Dependencies updated — all patch/minor versions bumped (@capacitor/* 8.3.4, firebase 12.13.0, react/react-dom 19.2.6,…"
-    ]
-  },
-  {
-    "version": "2.1.5",
-    "date": "May 23, 2026",
-    "highlights": [
-      "Notification badge mismatch — \"Pending Notifications\" in Settings now shows the same count as the header bell;…",
-      "Recipe ingredient units lost on purchase — ingredients with a quantity string like \"225 g\" or \"800 ml\" now preserve the…",
-      "Bulk delete N+1 Firestore writes and toast flooding — selecting and deleting multiple pantry items now performs a…",
-      "Remote Config cleaned up — removed phantom openrouter_model, openrouter_vision_model, gemini_max_batch_size, and…"
-    ]
-  },
-  {
-    "version": "2.1.4",
-    "date": "May 20, 2026",
-    "highlights": [
-      "OpenRouter recipe search returning empty results — default text model baidu/cobuddy:free was deprecated on OpenRouter;…",
-      "OpenRouter pantry/receipt image scan hanging — default vision model meta-llama/llama-4-maverick:free was unreliable on…",
-      "Image scan opening blank review modal — analyzePantryImageViaOpenRouter and analyzeReceiptImageViaOpenRouter now throw…",
-      "Meal Prep Planner modal header hidden behind app bar — changed overlay from items-center z-50 to items-start z-[9999]…"
     ]
   }
 ];

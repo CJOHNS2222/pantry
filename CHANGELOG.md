@@ -1,34 +1,35 @@
 ## [Unreleased]
 
+---
+
+## [2.2.0] - 2026-05-26
+
 ### Added
-- **Shopping item assignment** — `assignedTo` field added to `ShoppingItem`; tapping the person icon on any item opens an inline chip picker of household members; the assigned member's name is shown as a badge; persisted to the shopping list cache
-- **Shopping item notes** — `notes` field added to `ShoppingItem`; tapping the message icon opens an inline textarea; note text is shown as an italic preview on the item row; persisted to the shopping list cache
-- **Multi-store layout profiles** — `storeProfiles` and `activeStoreProfile` added to `Settings.shopping`; the Store Layout editor now has a store dropdown with an "Add store…" option, letting users create named profiles (e.g. Whole Foods, Costco) each with an independent drag-and-drop aisle order; a store picker `<select>` on the shopping list screen lets users switch active store while shopping; active selection persisted to `localStorage`
-- **In-app account deletion** — Settings › Privacy & Legal now has a proper "Delete Account" button that opens a confirmation modal; permanently deletes all Firestore user data, removes the user from their household (or transfers ownership to the next member), and deletes the Firebase Auth account via a new `deleteAccount` Cloud Function — satisfies Play Store / App Store in-app deletion policy
-- **AdMob banner ads re-enabled** — installed `@capacitor-community/admob`, restored the `showBanner`/`hideBanner` implementation in `AdMobBanner.tsx`; set `VITE_ADMOB_ENABLED=true` in your release build env to activate (uses the production unit `ca-app-pub-5084706792909644/2077776375`; override with `VITE_ADMOB_USE_TEST=true` for development)
-- **Offline mode feature flag enabled** — `flag_offlineMode_enabled` default is now `true`/100% rollout in both `featureFlags.ts` and `remoteconfig.template.json` (Firebase SDK has always provided native offline persistence; flag now reflects reality)
-- **Contextual tutorial flag enabled** — `flag_newTutorial_enabled` default is now `true`/100% rollout; per-tab tips were already always showing but the Remote Config template had the flag set to `false`
-- **Community inline star rating** — each Community card now has a 5-star quick-rate row; tapping a star submits the rating via `onRateRecipe` without opening the full modal (the modal remains available for comments/details)
-- **Unit tests: `useSubscription` household elevation** — `src/test/hooks/useSubscription.test.ts` covers non-admin member elevated by household ownerSubscriptionTier, admin not elevated, and free-owner baseline
-- **Unit tests: `usageService` household tier** — `Household tier elevation` describe block added to `usageService.test.ts`; verifies free member in a family household gets family-tier limits, and standalone free user is unchanged
-- **Unit tests: `canShowAds`** — `src/test/utils/canShowAds.test.ts` added; tests native/web guard, null-user guard, premium/family tier suppression, and usage-limit suppression
+- **Shopping item assignment** - assign household members to shopping items via an inline picker; assigned member shown as a badge; persisted to cache
+- **Shopping item notes** - add inline notes to shopping items; italic preview on the item row; persisted to cache
+- **Multi-store layout profiles** - named store profiles (e.g. Whole Foods, Costco) each with independent aisle ordering; store picker on shopping list screen
+- **In-app account deletion** - confirmation modal permanently deletes Firestore user data and Firebase Auth account via new `deleteAccount` Cloud Function
+- **AdMob banner ads** - `@capacitor-community/admob` wired; set `VITE_ADMOB_ENABLED=true` in release env to activate
+- **Community inline star rating** - quick 5-star row on Community cards; submits rating without opening modal
+- **Leftover persona in onboarding** - Food Safety step (Strict / Normal / Relaxed) added to `ModernOnboarding`; writes `profile.leftoverPersona` to Firestore
+- **Recipe recommendations improved** - full recipe objects fetched from cache; pantry ingredient token-overlap scoring for `similar-ingredients` results
 
 ### Changed
-- **`autoReaddStaples` setting wired** — consuming a staple item to zero now checks `settings.shopping.autoReaddStaples` before adding to the shopping list; the previous code ignored the user setting and always re-added
-- **Calendar service console.warn → log** — replaced bare `console.warn`/`console.error` calls in `calendarService.ts` with structured `log.warn`/`log.error`; updated `capacitor.config.ts` comment to accurately state the plugin is not installed (ICS file download works; native calendar push does not)
-- **MealPlanner two-week gate via `UsageLimits`** — now reads `UsageService.getUsageLimits(user)` and derives `canUseTwoWeekPlanning` from `limits.mealPlanning.twoWeekPlanning`; falls back to `isPremium || isFamily` if limits haven't loaded yet
-- **Shopping suggestion dismissal persisted** — `SmartShoppingSuggestions` and `QuickAdd` now initialise dismissed-suggestion state from `localStorage` (key `shop_dismissed_suggestions`) and write back on every dismiss/add; dismissals survive page reload and are shared between both components
-- **GroceryCostEstimator upgrade CTA** — replaced the plain-text "(first N shown — upgrade for full estimate)" with a clickable button (with lock icon) that navigates to Settings/Subscriptions so free users have a one-tap upgrade path
-- **FAQ updated for assignment, notes, and multi-store** — `household-2` now describes assignment and notes; `shopping-3` now describes multi-store profiles
-- **Console.log cleanup** — replaced all `console.*` calls in 9 service files with the structured `log` service (`log.debug/info/warn/error`): `householdActivityService`, `householdPreferenceService`, `groceryPriceService`, `geminiService`, `householdService`, `importService`, `leftoverNotificationService`, `leftoverImageService`, `foodWasteAnalyticsService`
-- **Cloud Function logging** — all `console.*` calls in `functions/src/inviteMember.ts` replaced with `firebase-functions/v2` structured `logger.log/warn/error`
-- **Barcode scan button hidden on web** — `PantryScanner`'s barcode/scan button is now wrapped in `Capacitor.isNativePlatform()` so it does not appear in the PWA/web build where device camera scanning is unavailable
+- **`autoReaddStaples` setting wired** - staple re-add now respects `settings.shopping.autoReaddStaples` (opt-out, default true)
+- **MealPlanner two-week gate** - uses `UsageService.getUsageLimits()` to derive `canUseTwoWeekPlanning`; falls back to `isPremium || isFamily`  if not loaded
+- **Shopping suggestion dismissals persisted** - via `localStorage` key `shop_dismissed_suggestions`; shared between `SmartShoppingSuggestions` and `QuickAdd`; survives reload
+- **GroceryCostEstimator upgrade CTA** - free-user truncation is now a clickable button with lock icon that navigates to Settings/Subscriptions
+- **Console.log cleanup** - all `console.*` in 9 service files migrated to the structured `log` service (`householdActivityService`, `householdPreferenceService`, `groceryPriceService`, `geminiService`, `householdService`, `importService`, `leftoverNotificationService`, `leftoverImageService`, `foodWasteAnalyticsService`)
+- **Cloud Function logging** - `inviteMember.ts` now uses `firebase-functions/v2` `logger`; eliminates PII in Cloud Logging
+- **Barcode scan button hidden on web** - wrapped in `Capacitor.isNativePlatform()`; does not render in the PWA/browser build
+- **Upgrade prompts** - MealPlanner disabled-month span and navigation arrow show actionable toasts with an `Upgrade` button
 
 ### Fixed
-- **PII leak in `inviteMemberCore`** — removed `console.log` that was printing `{ inviterUid, email, householdId }` and the UID claim-set confirmation to Cloud Logging plaintext
-- **Recipe recommendations ingredient matching** — `RecipeRatingService.getPersonalizedRecommendations` now loads the recipe cache to get full recipe objects for household-loved entries (was previously `{ title }` only) and implements the pantry ingredient matching step (returns up to 3 `similar-ingredients` recommendations based on token overlap with `pantryItems`)
-- **Upgrade CTA missing for AdMob** — documented `VITE_ADMOB_ENABLED` and `VITE_ADMOB_USE_TEST` in `.env.example`
-- **Nutrition fetch correctly gated** — confirmed `ItemDetailModal` already guards `getNutritionFactsWithFallback` behind the `settings.shopping.showNutrition` flag; no fetch fires when the setting is off
+- **PII leak in `inviteMemberCore`** - removed `console.log` printing `{ inviterUid, email, householdId }` to Cloud Logging
+- **Undo toast TTL** - confirmed all undo toasts use 5 000 ms; FAQ updated from "6 seconds" to "5 seconds"
+- **Household invite feedback** - `Household.tsx` distinguishes pending vs existing-account invite with separate toast messages
+
+---
 
 ---
 
