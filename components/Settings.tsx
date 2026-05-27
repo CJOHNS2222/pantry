@@ -73,6 +73,8 @@ const defaultSettings = {
     includeStaples: false,
     autoReaddStaples: true,
     storeLayout: defaultStoreLayout,
+    storeProfiles: {} as Record<string, string[]>,
+    activeStoreProfile: undefined as string | undefined,
     showNutrition: false,
     showPriceData: false,
   },
@@ -1813,6 +1815,16 @@ export const Settings: React.FC<SettingsProps> = ({
                   shopping: {
                     ...prev.shopping,
                     storeLayout: newLayout
+                  }
+                }))}
+                storeProfiles={settings.shopping?.storeProfiles ?? {}}
+                activeStoreProfile={settings.shopping?.activeStoreProfile}
+                onStoreProfilesChange={(profiles, active) => setSettings(prev => ({
+                  ...prev,
+                  shopping: {
+                    ...prev.shopping,
+                    storeProfiles: profiles,
+                    activeStoreProfile: active,
                   }
                 }))}
               />

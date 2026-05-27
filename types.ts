@@ -123,6 +123,8 @@ export interface ShoppingItem {
     price: number;
     store?: string;
   }[]; // Multiple price options for comparison
+  assignedTo?: string; // Household member name the item is assigned to
+  notes?: string; // Per-item note visible to all household members
 }
 
 export interface GroundingChunk {
@@ -429,7 +431,9 @@ export interface Settings {
   shopping?: {
     includeStaples?: boolean;
     autoReaddStaples?: boolean;
-    storeLayout?: string[]; // Custom order of store aisles
+    storeLayout?: string[]; // Custom order of store aisles (legacy – used when no storeProfiles)
+    storeProfiles?: Record<string, string[]>; // Named per-store aisle orderings
+    activeStoreProfile?: string; // Currently selected store profile name
     showNutrition?: boolean;
     showPriceData?: boolean;
   };

@@ -125,7 +125,7 @@ const FAQ_DATA: FAQItem[] = [
     id: 'shopping-3',
     category: 'Shopping Lists',
     question: 'How do I organize my shopping list by store layout?',
-    answer: 'Shopping lists are automatically organized by store aisle:\n\n1. **Default Layout**: Uses standard grocery store organization\n2. **Custom Layout**: Customize aisle names in Settings > Store Layout\n3. **Drag & Drop**: Reorder items within aisles as needed\n4. **Check Off**: Mark items as you shop to track progress\n\nThis saves time by grouping similar items together during shopping. One layout applies across all stores.',
+    answer: 'Shopping lists are automatically organized by store aisle:\n\n1. **Default Layout**: Uses standard grocery store organization\n2. **Custom Layout**: Customize aisle names in Settings > Store Layout\n3. **Multiple Stores**: Add named store profiles (e.g. Whole Foods, Costco) with independent aisle orders — switch between them using the store picker on the shopping list screen\n4. **Drag & Drop**: Reorder aisles within each store profile\n5. **Check Off**: Mark items as you shop to track progress\n\nThis saves time by grouping similar items together during shopping.',
     keywords: ['store layout', 'aisle', 'organize', 'custom', 'drag drop', 'check off']
   },
 
@@ -187,7 +187,7 @@ const FAQ_DATA: FAQItem[] = [
     id: 'household-2',
     category: 'Household & Sharing',
     question: 'How do I share shopping lists with my household?',
-    answer: 'Sharing shopping lists:\n\n1. **Automatic Sharing**: Lists created in a household are automatically shared\n2. **Real-time Updates**: See changes as other members add/remove items\n3. **Check-off**: Mark items as purchased in real-time\n4. **History**: View past shopping lists and purchases\n\nCollaborative shopping made easy for busy households.',
+    answer: 'Sharing shopping lists:\n\n1. **Automatic Sharing**: Lists created in a household are automatically shared\n2. **Real-time Updates**: See changes as other members add/remove items\n3. **Assignment**: Tap the person icon on any item to assign it to a household member\n4. **Notes**: Tap the message icon on any item to add a note visible to all members (e.g. "low fat" or "organic only")\n5. **Check-off**: Mark items as purchased in real-time\n6. **History**: View past shopping lists and purchases\n\nCollaborative shopping made easy for busy households.',
     keywords: ['shopping lists', 'sharing', 'real-time', 'assignment', 'check-off', 'comments']
   },
   {

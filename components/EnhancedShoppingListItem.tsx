@@ -1,7 +1,13 @@
 import React, { useState, useRef } from 'react';
-import { Check, Trash2, Calculator } from 'lucide-react';
+import { Check, Trash2, Calculator, MessageSquare, UserCheck, X } from 'lucide-react';
 import { ShoppingItem } from '../types';
 import { comparePriceOptions, formatPricePerUnit, getPriceComparisonSummary } from '../utils/priceCalculator';
+
+interface HouseholdMember {
+  id: string;
+  name: string;
+  avatar?: string;
+}
 
 interface ShoppingListItemProps {
   item: ShoppingItem;
@@ -9,6 +15,8 @@ interface ShoppingListItemProps {
   onRemove: (id: string) => void;
   onQuantityChange?: (id: string, quantity: string) => void;
   onLongPress?: (id: string) => void;
+  onUpdateItem?: (id: string, updates: Partial<ShoppingItem>) => void;
+  householdMembers?: HouseholdMember[];
   isSelected?: boolean;
   isOffline?: boolean;
   lastSynced?: Date;
@@ -21,6 +29,8 @@ export const EnhancedShoppingListItem: React.FC<ShoppingListItemProps> = ({
   onRemove,
   onQuantityChange,
   onLongPress,
+  onUpdateItem,
+  householdMembers,
   isSelected = false,
   isOffline = false,
   lastSynced,
@@ -30,6 +40,9 @@ export const EnhancedShoppingListItem: React.FC<ShoppingListItemProps> = ({
   const [isSwiping, setIsSwiping] = useState(false);
   const [startX, setStartX] = useState(0);
   const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
+  const [showAssignPicker, setShowAssignPicker] = useState(false);
+  const [showNotes, setShowNotes] = useState(false);
+  const [noteText, setNoteText] = useState(item.notes ?? '');
   const itemRef = useRef<HTMLDivElement>(null);
 
   const SWIPE_THRESHOLD = 80;
@@ -170,6 +183,18 @@ export const EnhancedShoppingListItem: React.FC<ShoppingListItemProps> = ({
             {item.purchasedBatch && (
               <div className="text-xs text-green-600 opacity-90 mt-1">Purchased: {item.purchasedBatch.amount} {item.purchasedBatch.unit || ''} {item.purchasedBatch.expires ? `— expires ${item.purchasedBatch.expires}` : ''}</div>
             )}
+            {item.assignedTo && (
+              <div className="flex items-center gap-1 mt-1">
+                <span className="text-xs bg-[var(--accent-color)]/15 text-[var(--accent-color)] px-2 py-0.5 rounded-full font-medium">
+                  👤 {item.assignedTo}
+                </span>
+              </div>
+            )}
+            {item.notes && !showNotes && (
+              <div className="text-xs text-theme-secondary opacity-70 mt-1 italic truncate max-w-[180px]">
+                📝 {item.notes}
+              </div>
+            )}
             {isOffline && lastSynced && (
               <div className="text-xs text-orange-600 opacity-70 mt-1">
                 ⚠️ Offline - Last synced: {lastSynced.toLocaleTimeString()}
@@ -179,6 +204,49 @@ export const EnhancedShoppingListItem: React.FC<ShoppingListItemProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Assign Button */}
+          {onUpdateItem && householdMembers && householdMembers.length > 0 && (
+            <div className="relative">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowAssignPicker(!showAssignPicker);
+                  setShowNotes(false);
+                }}
+                className={`p-2 min-w-[44px] min-h-[44px] flex items-center justify-center transition-opacity ${
+                  item.assignedTo
+                    ? 'text-[var(--accent-color)] opacity-90 hover:opacity-100'
+                    : 'text-theme-secondary opacity-40 hover:opacity-80'
+                }`}
+                title={item.assignedTo ? `Assigned to ${item.assignedTo}` : 'Assign to member'}
+                aria-label="Assign item"
+              >
+                <UserCheck className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
+          {/* Notes Button */}
+          {onUpdateItem && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowNotes(!showNotes);
+                setShowAssignPicker(false);
+                if (!showNotes) setNoteText(item.notes ?? '');
+              }}
+              className={`p-2 min-w-[44px] min-h-[44px] flex items-center justify-center transition-opacity ${
+                item.notes
+                  ? 'text-[var(--accent-color)] opacity-90 hover:opacity-100'
+                  : 'text-theme-secondary opacity-40 hover:opacity-80'
+              }`}
+              title={item.notes ? 'Edit note' : 'Add note'}
+              aria-label="Toggle notes"
+            >
+              <MessageSquare className="w-4 h-4" />
+            </button>
+          )}
+
           {onQuantityChange && (
             <input
               type="text"
@@ -223,6 +291,60 @@ export const EnhancedShoppingListItem: React.FC<ShoppingListItemProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Assignment Picker */}
+      {showAssignPicker && onUpdateItem && householdMembers && householdMembers.length > 0 && (
+        <div className="mt-1 p-2 bg-theme-secondary border border-theme rounded-lg">
+          <div className="text-xs font-medium text-theme-secondary mb-2">Assign to:</div>
+          <div className="flex flex-wrap gap-2">
+            {householdMembers.map((member) => (
+              <button
+                key={member.id}
+                onClick={() => {
+                  onUpdateItem(item.id, { assignedTo: item.assignedTo === member.name ? undefined : member.name });
+                  setShowAssignPicker(false);
+                }}
+                className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
+                  item.assignedTo === member.name
+                    ? 'bg-[var(--accent-color)] text-white border-[var(--accent-color)]'
+                    : 'bg-theme text-theme-primary border-theme hover:border-[var(--accent-color)]'
+                }`}
+              >
+                {member.name}
+              </button>
+            ))}
+            {item.assignedTo && (
+              <button
+                onClick={() => {
+                  onUpdateItem(item.id, { assignedTo: undefined });
+                  setShowAssignPicker(false);
+                }}
+                className="text-xs px-3 py-1.5 rounded-full border border-theme text-red-500 hover:bg-red-50 transition-colors flex items-center gap-1"
+              >
+                <X className="w-3 h-3" /> Unassign
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Notes Editor */}
+      {showNotes && onUpdateItem && (
+        <div className="mt-1 p-2 bg-theme-secondary border border-theme rounded-lg">
+          <div className="text-xs font-medium text-theme-secondary mb-1">Note:</div>
+          <textarea
+            value={noteText}
+            onChange={(e) => setNoteText(e.target.value)}
+            onBlur={() => {
+              onUpdateItem(item.id, { notes: noteText.trim() || undefined });
+            }}
+            onClick={(e) => e.stopPropagation()}
+            rows={2}
+            placeholder="Add a note (e.g. low fat, organic brand)…"
+            className="w-full text-xs px-2 py-1.5 bg-theme border border-theme rounded focus:outline-none focus:ring-1 focus:ring-[var(--accent-color)] text-theme-primary resize-none"
+          />
+        </div>
+      )}
 
       {/* Price Comparison Details */}
       {showPriceData && showPriceComparison && item.priceOptions && item.priceOptions.length > 1 && (

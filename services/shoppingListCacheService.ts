@@ -1,7 +1,6 @@
 import DatabaseMonitoringService from './databaseMonitoringService';
 import { increment, deleteField } from 'firebase/firestore';
 import { ShoppingItem } from '../types';
-import { priceCacheService } from './priceCacheService';
 import { log } from './logService';
 
 export interface CachedShoppingListData {
@@ -58,20 +57,16 @@ const shoppingItemToObject = (item: ShoppingItem): CachedShoppingListData[string
       lastUpdated: item.priceData.lastUpdated instanceof Date ? item.priceData.lastUpdated.toISOString() : new Date().toISOString(),
     };
   }
+  if (item.assignedTo) obj.assignedTo = item.assignedTo;
+  if (item.notes) obj.notes = item.notes;
   return obj;
 };
 
-const objectToShoppingItem = (itemId: string, itemObject: CachedShoppingListData[string], householdId?: string, userId?: string): ShoppingItem => {
+const objectToShoppingItem = (itemId: string, itemObject: CachedShoppingListData[string], _householdId?: string, _userId?: string): ShoppingItem => {
   const priceData = itemObject.priceData ? {
     ...itemObject.priceData,
     lastUpdated: new Date(itemObject.priceData.lastUpdated)
   } : undefined;
-
-  if (priceData) {
-    // Do not persist price data back to the global price cache when merely loading
-    // cached shopping list items. Writing here causes a write storm on app load.
-    // If callers need to persist updates, call `priceCacheService.setPriceData` explicitly.
-  }
 
   return {
     id: itemId,
@@ -83,7 +78,9 @@ const objectToShoppingItem = (itemId: string, itemObject: CachedShoppingListData
     addedAt: new Date(0), // Using a static date as it's no longer persisted
     estimatedPrice: itemObject.estimatedPrice,
     completedAt: undefined,
-    priceData
+    priceData,
+    assignedTo: (itemObject as any).assignedTo,
+    notes: (itemObject as any).notes,
   };
 };
 

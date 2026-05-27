@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { useIntl } from 'react-intl';
-import { ShoppingBasket, Archive, Plus, X, Share2, Copy, Download, MessageSquare, Calendar, Undo2 } from 'lucide-react';
+import { ShoppingBasket, Archive, Plus, X, Share2, Copy, Download, MessageSquare, Calendar, Undo2, Store } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { Share } from '@capacitor/share';
 import { ShoppingItem, User, Household, Settings } from '../types';
@@ -108,6 +108,26 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
 
   // New state for enhanced features
   const [viewMode, setViewMode] = useState<'list' | 'organized'>('list');
+
+  // Active store profile picker — seeded from settings, persisted to localStorage
+  const [activeStoreProfile, setActiveStoreProfileState] = useState<string>(() => {
+    try {
+      return localStorage.getItem('activeStoreProfile') ?? settings?.shopping?.activeStoreProfile ?? '__default__';
+    } catch (_e) {
+      return settings?.shopping?.activeStoreProfile ?? '__default__';
+    }
+  });
+  const setActiveStoreProfile = (name: string) => {
+    setActiveStoreProfileState(name);
+    try { localStorage.setItem('activeStoreProfile', name); } catch (_e) { /* ignore */ }
+  };
+
+  const storeProfiles = settings?.shopping?.storeProfiles ?? {};
+  const storeProfileNames = Object.keys(storeProfiles);
+  const activeStoreLayout =
+    activeStoreProfile !== '__default__' && storeProfiles[activeStoreProfile]
+      ? storeProfiles[activeStoreProfile]
+      : settings?.shopping?.storeLayout;
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [undoHistory, setUndoHistory] = useState<Array<{item: ShoppingItem, timestamp: Date}>>([])
   // Pending deletes for undo-on-swipe: map of id -> { item, timerId }
@@ -448,6 +468,20 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     ));
   };
 
+  const handleUpdateItem = async (id: string, updates: Partial<ShoppingItem>) => {
+    setItems(prev => prev.map(item =>
+      item.id === id ? { ...item, ...updates } : item
+    ));
+    const inHousehold = household?.id && user ? isHouseholdMember(household, user) : false;
+    const householdId = inHousehold ? household?.id : undefined;
+    const userId = inHousehold ? undefined : user?.id;
+    try {
+      await ShoppingListCacheService.updateItem(id, updates, householdId, userId);
+    } catch (_e) {
+      // best-effort; local state already updated
+    }
+  };
+
   const deleteCheckedItems = async () => {
     const checkedItems = items.filter(i => i.checked);
     if (checkedItems.length === 0) return;
@@ -739,7 +773,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
 
       {/* View Mode Toggle */}
       {items.length > 0 && (
-        <div className="flex items-center justify-center gap-2 mb-4">
+        <div className="flex items-center justify-center gap-2 mb-4 flex-wrap">
           <button
             onClick={() => setViewMode('list')}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
@@ -760,6 +794,23 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
           >
             Store Order
           </button>
+          {/* Store profile picker — only when multiple store profiles exist */}
+          {storeProfileNames.length > 0 && (
+            <div className="relative">
+              <select
+                value={activeStoreProfile}
+                onChange={(e) => setActiveStoreProfile(e.target.value)}
+                className="flex items-center gap-1 pl-8 pr-3 py-2 rounded-lg text-sm font-medium bg-theme-secondary text-theme-primary border border-theme hover:border-[var(--accent-color)] transition-colors appearance-none cursor-pointer"
+                title="Switch store profile"
+              >
+                <option value="__default__">Default layout</option>
+                {storeProfileNames.map(name => (
+                  <option key={name} value={name}>{name}</option>
+                ))}
+              </select>
+              <Store className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-theme-secondary pointer-events-none" />
+            </div>
+          )}
         </div>
       )}
 
@@ -1014,9 +1065,11 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
             onToggleCheck={handleItemToggle}
             onRemove={remove}
             onQuantityChange={handleQuantityChange}
+            onUpdateItem={handleUpdateItem}
+            householdMembers={householdMembers.map(m => ({ id: m.id, name: m.name, avatar: m.avatar }))}
             isSelected={(id) => items.some(it => it.id === id && it.checked)}
             onLongPress={undefined}
-            storeLayout={settings?.shopping?.storeLayout}
+            storeLayout={activeStoreLayout}
           />
         ) : (
           // Regular list view with enhanced items
@@ -1027,6 +1080,8 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
               onToggleCheck={handleItemToggle}
               onRemove={remove}
               onQuantityChange={handleQuantityChange}
+              onUpdateItem={handleUpdateItem}
+              householdMembers={householdMembers.map(m => ({ id: m.id, name: m.name, avatar: m.avatar }))}
               isOffline={!isOnline}
               isSelected={item.checked}
               onLongPress={undefined}

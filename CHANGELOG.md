@@ -1,6 +1,9 @@
 ## [Unreleased]
 
 ### Added
+- **Shopping item assignment** — `assignedTo` field added to `ShoppingItem`; tapping the person icon on any item opens an inline chip picker of household members; the assigned member's name is shown as a badge; persisted to the shopping list cache
+- **Shopping item notes** — `notes` field added to `ShoppingItem`; tapping the message icon opens an inline textarea; note text is shown as an italic preview on the item row; persisted to the shopping list cache
+- **Multi-store layout profiles** — `storeProfiles` and `activeStoreProfile` added to `Settings.shopping`; the Store Layout editor now has a store dropdown with an "Add store…" option, letting users create named profiles (e.g. Whole Foods, Costco) each with an independent drag-and-drop aisle order; a store picker `<select>` on the shopping list screen lets users switch active store while shopping; active selection persisted to `localStorage`
 - **In-app account deletion** — Settings › Privacy & Legal now has a proper "Delete Account" button that opens a confirmation modal; permanently deletes all Firestore user data, removes the user from their household (or transfers ownership to the next member), and deletes the Firebase Auth account via a new `deleteAccount` Cloud Function — satisfies Play Store / App Store in-app deletion policy
 - **AdMob banner ads re-enabled** — installed `@capacitor-community/admob`, restored the `showBanner`/`hideBanner` implementation in `AdMobBanner.tsx`; set `VITE_ADMOB_ENABLED=true` in your release build env to activate (uses the production unit `ca-app-pub-5084706792909644/2077776375`; override with `VITE_ADMOB_USE_TEST=true` for development)
 - **Offline mode feature flag enabled** — `flag_offlineMode_enabled` default is now `true`/100% rollout in both `featureFlags.ts` and `remoteconfig.template.json` (Firebase SDK has always provided native offline persistence; flag now reflects reality)
@@ -13,7 +16,7 @@
 - **MealPlanner two-week gate via `UsageLimits`** — now reads `UsageService.getUsageLimits(user)` and derives `canUseTwoWeekPlanning` from `limits.mealPlanning.twoWeekPlanning`; falls back to `isPremium || isFamily` if limits haven't loaded yet
 - **Shopping suggestion dismissal persisted** — `SmartShoppingSuggestions` and `QuickAdd` now initialise dismissed-suggestion state from `localStorage` (key `shop_dismissed_suggestions`) and write back on every dismiss/add; dismissals survive page reload and are shared between both components
 - **GroceryCostEstimator upgrade CTA** — replaced the plain-text "(first N shown — upgrade for full estimate)" with a clickable button (with lock icon) that navigates to Settings/Subscriptions so free users have a one-tap upgrade path
-- **FAQ accuracy fixes** — removed unimplemented "Assignment" and "Comments" claims from the household shopping-list FAQ entry; corrected store-layout FAQ to state one layout applies to all stores
+- **FAQ updated for assignment, notes, and multi-store** — `household-2` now describes assignment and notes; `shopping-3` now describes multi-store profiles
 
 ### Fixed
 - **PII leak in `inviteMemberCore`** — removed `console.log` that was printing `{ inviterUid, email, householdId }` and the UID claim-set confirmation to Cloud Logging plaintext
