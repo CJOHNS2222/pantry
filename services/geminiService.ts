@@ -6,6 +6,7 @@ import { UsageService } from './usageService';
 import { getUserNutritionTargets, generatePersonalizedSearchPrompt } from '../utils/nutritionUtils';
 import remoteConfig from './remoteConfigService';
 import { reportGeminiError } from './sentryService';
+import { log } from './logService';
 
 // Initialize Gemini Client
 const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
@@ -188,7 +189,7 @@ export const searchRecipes = async (params: RecipeSearchParams, user?: User): Pr
       // Wait with exponential backoff on retries
       if (attempt > 0) {
         const delay = Math.min(1000 * Math.pow(2, attempt - 1), 10000); // Max 10 seconds
-        console.log(`Retrying Gemini request in ${delay}ms (attempt ${attempt}/${maxRetries})`);
+        log.debug(`Retrying Gemini request in ${delay}ms (attempt ${attempt}/${maxRetries})`, {}, 'GeminiService');
         await new Promise(resolve => setTimeout(resolve, delay));
       }
 
@@ -199,7 +200,7 @@ export const searchRecipes = async (params: RecipeSearchParams, user?: User): Pr
       // Only retry on 429/rate limit errors
       const errMsg = lastError.message;
       if (attempt < maxRetries && (errMsg.includes('429') || errMsg.includes('Too Many Requests') || errMsg.includes('Resource exhausted'))) {
-        console.warn(`Gemini rate limit hit, retrying (attempt ${attempt + 1}/${maxRetries}):`, errMsg);
+        log.warn(`Gemini rate limit hit, retrying (attempt ${attempt + 1}/${maxRetries}):`, { errMsg }, 'GeminiService');
         continue;
       }
 
@@ -277,7 +278,7 @@ const response = await Promise.race([responsePromise, timeoutPromise]) as { text
 
     const finishReason = response.candidates?.[0]?.finishReason;
     if (finishReason && finishReason !== 'STOP') {
-      console.warn(`Gemini finish_reason: ${finishReason} — response may be truncated`);
+      log.warn(`Gemini finish_reason: ${finishReason} — response may be truncated`, {}, 'GeminiService');
     }
     const jsonText = response.text;
     let recipes: StructuredRecipe[] = [];
@@ -298,7 +299,7 @@ const response = await Promise.race([responsePromise, timeoutPromise]) as { text
           cookTime: r.c || r.cookTime || '',
         } as StructuredRecipe));
       } catch (jsonError) {
-        console.warn("JSON Parse Error, attempting to extract JSON from text:", jsonError);
+        log.warn('JSON Parse Error, attempting to extract JSON from text:', { jsonError }, 'GeminiService');
         
         // Try to extract JSON from the text response
         const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
@@ -314,16 +315,16 @@ const response = await Promise.race([responsePromise, timeoutPromise]) as { text
               cookTime: r.c || r.cookTime || '',
             } as StructuredRecipe));
           } catch (extractError) {
-            console.warn("Failed to extract JSON, falling back to text parsing:", extractError);
+            log.warn('Failed to extract JSON, falling back to text parsing:', { extractError }, 'GeminiService');
             recipes = parseNaturalLanguageRecipes(jsonText);
           }
         } else {
-          console.warn("No JSON found in response, falling back to text parsing");
+          log.warn('No JSON found in response, falling back to text parsing', {}, 'GeminiService');
           recipes = parseNaturalLanguageRecipes(jsonText);
         }
       }
     } else {
-      console.warn('Gemini returned no text for recipe search.');
+      log.warn('Gemini returned no text for recipe search.', {}, 'GeminiService');
     }
 
     // Add custom metrics (if performance available)
@@ -340,7 +341,7 @@ const response = await Promise.race([responsePromise, timeoutPromise]) as { text
       try {
         await UsageService.recordGeminiUsage(user);
       } catch (e) {
-        console.warn('Failed to record Gemini usage:', e);
+        log.warn('Failed to record Gemini usage:', { e }, 'GeminiService');
       }
     }
 
@@ -349,13 +350,13 @@ const response = await Promise.race([responsePromise, timeoutPromise]) as { text
       groundingChunks: response.candidates?.[0]?.groundingMetadata?.groundingChunks as GroundingChunk[] | undefined,
     };
   } catch (timeoutError) {
-    console.error("Request timeout or API error:", timeoutError);
+    log.error('Request timeout or API error:', { timeoutError }, 'GeminiService');
     throw timeoutError;
   }
 
   } catch (err: unknown) {
     const errMsg = err instanceof Error ? err.message : String(err);
-    console.error("Error searching recipes:", err);
+    log.error('Error searching recipes:', { err }, 'GeminiService');
     reportGeminiError('recipe_search', err, {
       userId: user?.id,
       model: remoteConfig.getString('gemini_model'),
@@ -451,7 +452,7 @@ function parseNaturalLanguageRecipes(text: string): StructuredRecipe[] {
     }
     
   } catch (err: unknown) {
-    console.error("Error parsing natural language recipes:", err);
+    log.error('Error parsing natural language recipes:', { err }, 'GeminiService');
     // Return a basic fallback recipe
     recipes.push({
       title: "Search Error",

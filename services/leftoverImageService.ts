@@ -1,6 +1,7 @@
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '../firebaseConfig';
 import DatabaseMonitoringService from './databaseMonitoringService';
+import { log } from './logService';
 
 /**
  * Upload a File or Blob to Firebase Storage under pantry_images/leftovers and return its download URL.
@@ -52,7 +53,7 @@ export async function uploadItemImage(
           await DatabaseMonitoringService.setDoc(cacheRef, data);
         } else if (cacheScope === 'user') {
           if (!userId) {
-            console.warn('userId required for user-scoped image cache; skipping cache write');
+            log.warn('userId required for user-scoped image cache; skipping cache write', {}, 'LeftoverImageService');
           } else {
             // Use a single image_cache document keyed by user to ensure an even-numbered
             // document reference (collection + doc).
@@ -72,13 +73,13 @@ export async function uploadItemImage(
         }
       } catch (err: any) {
         // Non-fatal: caching is optional
-        console.warn('Failed to write to image cache:', err?.message || err);
+        log.warn('Failed to write to image cache:', { err: err?.message || err }, 'LeftoverImageService');
       }
     }
 
     return downloadUrl;
   } catch (err: any) {
-    console.error('Failed to upload leftover image:', err);
+    log.error('Failed to upload leftover image:', { err }, 'LeftoverImageService');
     throw err;
   }
 }

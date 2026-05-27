@@ -82,7 +82,18 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
       await auth.currentUser?.getIdToken(true);
 
       setInviteEmail('');
-      log.info('Invitation sent and member added as pending', { email: inviteEmail, householdId: household.id }, 'Household');
+      // If the Cloud Function couldn't resolve the email to an existing UID, it stores the email
+      // itself as the member ID (pending member). Surface this to the inviter.
+      const hasPendingAccount = newMember.id === inviteEmail;
+      if (hasPendingAccount) {
+        addToast(
+          `Invitation sent! No account found for ${inviteEmail} — they will be added automatically once they sign up.`,
+          'info'
+        );
+      } else {
+        addToast(`Invitation sent! ${newMember.name || inviteEmail} has been added to your household.`, 'info');
+      }
+      log.info('Invitation sent', { email: inviteEmail, householdId: household.id, pending: hasPendingAccount }, 'Household');
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {

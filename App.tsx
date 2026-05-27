@@ -1136,6 +1136,16 @@ const App: React.FC = () => {
                 log.error('Failed to mark onboarding complete', { error }, 'App');
               }
             }}
+            onPersonaSelected={async (persona) => {
+              try {
+                if (user?.id) {
+                  const userRef = DatabaseMonitoringService.doc('users', user.id);
+                  await DatabaseMonitoringService.updateDoc(userRef, { 'profile.leftoverPersona': persona });
+                }
+              } catch (error) {
+                log.error('Failed to save leftover persona from onboarding', { error }, 'App');
+              }
+            }}
             onOpenHousehold={() => { setShowOnboarding(false); setShowHousehold(true); }}
             onSkip={() => setShowOnboarding(false)}
           />

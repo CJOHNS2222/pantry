@@ -8,6 +8,7 @@ import { serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 import { User, Household } from '../types';
 import { Tab } from '../types/app';
+import { log } from './logService';
 
 export class HouseholdActivityService {
   // Throttle logActivity writes: at most one write per user per household per 30 seconds
@@ -26,7 +27,7 @@ export class HouseholdActivityService {
         [memberPath + '.isOnline']: true
       });
     } catch (err: any) {
-      console.error('Error updating member activity:', err);
+      log.error('Error updating member activity:', { err }, 'HouseholdActivityService');
     }
   }
 
@@ -42,7 +43,7 @@ export class HouseholdActivityService {
         [memberPath + '.isOnline']: false
       });
     } catch (err: any) {
-      console.error('Error marking member offline:', err);
+      log.error('Error marking member offline:', { err }, 'HouseholdActivityService');
     }
   }
 
@@ -80,7 +81,7 @@ export class HouseholdActivityService {
       const activityCollection = DatabaseMonitoringService.collection(`households/${householdId}/activity`);
       await DatabaseMonitoringService.addDoc(activityCollection, activityData);
     } catch (err: any) {
-      console.error('Error logging activity:', err);
+      log.error('Error logging activity:', { err }, 'HouseholdActivityService');
     }
   }
 
@@ -105,7 +106,7 @@ export class HouseholdActivityService {
         };
       });
     } catch (err: any) {
-      console.error('Error getting recent activities:', err);
+      log.error('Error getting recent activities:', { err }, 'HouseholdActivityService');
       return [];
     }
   }

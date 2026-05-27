@@ -6,13 +6,15 @@ interface ModernOnboardingFlowProps {
   onComplete: () => void;
   onSkip: () => void;
   onOpenHousehold?: () => void;
+  onPersonaSelected?: (persona: 'relaxed' | 'normal' | 'strict') => void;
 }
 
 export const ModernOnboardingFlow: React.FC<ModernOnboardingFlowProps> = ({
   user: _user,
   onComplete,
   onSkip,
-  onOpenHousehold
+  onOpenHousehold,
+  onPersonaSelected,
 }) => {
   return (
     <ModernOnboarding
@@ -20,6 +22,7 @@ export const ModernOnboardingFlow: React.FC<ModernOnboardingFlowProps> = ({
       onComplete={() => onComplete()}
       onSkip={onSkip}
       onOpenHousehold={onOpenHousehold}
+      onPersonaSelected={onPersonaSelected}
     />
   );
 };

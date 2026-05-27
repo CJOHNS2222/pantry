@@ -9,6 +9,9 @@
 - **Offline mode feature flag enabled** — `flag_offlineMode_enabled` default is now `true`/100% rollout in both `featureFlags.ts` and `remoteconfig.template.json` (Firebase SDK has always provided native offline persistence; flag now reflects reality)
 - **Contextual tutorial flag enabled** — `flag_newTutorial_enabled` default is now `true`/100% rollout; per-tab tips were already always showing but the Remote Config template had the flag set to `false`
 - **Community inline star rating** — each Community card now has a 5-star quick-rate row; tapping a star submits the rating via `onRateRecipe` without opening the full modal (the modal remains available for comments/details)
+- **Unit tests: `useSubscription` household elevation** — `src/test/hooks/useSubscription.test.ts` covers non-admin member elevated by household ownerSubscriptionTier, admin not elevated, and free-owner baseline
+- **Unit tests: `usageService` household tier** — `Household tier elevation` describe block added to `usageService.test.ts`; verifies free member in a family household gets family-tier limits, and standalone free user is unchanged
+- **Unit tests: `canShowAds`** — `src/test/utils/canShowAds.test.ts` added; tests native/web guard, null-user guard, premium/family tier suppression, and usage-limit suppression
 
 ### Changed
 - **`autoReaddStaples` setting wired** — consuming a staple item to zero now checks `settings.shopping.autoReaddStaples` before adding to the shopping list; the previous code ignored the user setting and always re-added
@@ -17,6 +20,9 @@
 - **Shopping suggestion dismissal persisted** — `SmartShoppingSuggestions` and `QuickAdd` now initialise dismissed-suggestion state from `localStorage` (key `shop_dismissed_suggestions`) and write back on every dismiss/add; dismissals survive page reload and are shared between both components
 - **GroceryCostEstimator upgrade CTA** — replaced the plain-text "(first N shown — upgrade for full estimate)" with a clickable button (with lock icon) that navigates to Settings/Subscriptions so free users have a one-tap upgrade path
 - **FAQ updated for assignment, notes, and multi-store** — `household-2` now describes assignment and notes; `shopping-3` now describes multi-store profiles
+- **Console.log cleanup** — replaced all `console.*` calls in 9 service files with the structured `log` service (`log.debug/info/warn/error`): `householdActivityService`, `householdPreferenceService`, `groceryPriceService`, `geminiService`, `householdService`, `importService`, `leftoverNotificationService`, `leftoverImageService`, `foodWasteAnalyticsService`
+- **Cloud Function logging** — all `console.*` calls in `functions/src/inviteMember.ts` replaced with `firebase-functions/v2` structured `logger.log/warn/error`
+- **Barcode scan button hidden on web** — `PantryScanner`'s barcode/scan button is now wrapped in `Capacitor.isNativePlatform()` so it does not appear in the PWA/web build where device camera scanning is unavailable
 
 ### Fixed
 - **PII leak in `inviteMemberCore`** — removed `console.log` that was printing `{ inviterUid, email, householdId }` and the UID claim-set confirmation to Cloud Logging plaintext

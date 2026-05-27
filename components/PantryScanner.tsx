@@ -2235,6 +2235,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                     Gallery
                   </button>
                   
+                {Capacitor.isNativePlatform() && (
                   <button
                     onClick={handleScanBarcode}
                     data-testid="pantry-barcode-button"
@@ -2246,6 +2247,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                     <Barcode className="w-4 h-4" aria-hidden="true" />
                     Barcode
                   </button>
+                )}
                 </div>
 
                 {/* Action Buttons — Row 2: receipt & import */}

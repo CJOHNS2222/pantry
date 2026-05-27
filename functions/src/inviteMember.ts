@@ -1,5 +1,6 @@
 
 import {onCall, onRequest, HttpsError} from "firebase-functions/v2/https";
+import {logger} from "firebase-functions/v2";
 import admin from 'firebase-admin';
 import {getFirestore, FieldValue} from "firebase-admin/firestore";
 import { getAuth } from 'firebase-admin/auth';
@@ -60,7 +61,7 @@ async function inviteMemberCore(inviterUid: string, email: string, householdId: 
       // Note: photoURL is not available in Firebase Functions for security reasons
     }
   } catch (err) {
-    console.warn('Unable to resolve invited email to UID:', err);
+    logger.warn('Unable to resolve invited email to UID:', err);
   }
 
   const newMember: any = { 
@@ -107,7 +108,7 @@ async function inviteMemberCore(inviterUid: string, email: string, householdId: 
       await admin.auth().setCustomUserClaims(memberIdToStore, { householdId });
       // Custom claim set successfully
     } catch (err: any) {
-      console.error('Error setting custom claims:', err);
+      logger.error('Error setting custom claims:', err);
       // Don't fail the invite if claim setting fails
     }
   }
@@ -151,7 +152,7 @@ async function inviteMemberCore(inviterUid: string, email: string, householdId: 
       await db.collection('notifications').add(notificationPayload);
     }
   } catch (err) {
-    console.error('Failed to create household invite notification:', err);
+    logger.error('Failed to create household invite notification:', err);
     throw new HttpsError("internal", "Failed to send invitation notification.");
   }
 
@@ -190,7 +191,7 @@ export const inviteMemberHttp = onRequest(async (req, res) => {
     res.json({ success: true });
     return;
   } catch (err: any) {
-    console.error('inviteMemberHttp error:', err);
+    logger.error('inviteMemberHttp error:', err);
     res.status(500).json({ error: err?.message || 'internal' });
     return;
   }
@@ -260,7 +261,7 @@ export const leaveHousehold = onCall(async (request) => {
           });
           
           await batch.commit();
-          console.log(`Copied ${inventorySnapshot.size} inventory items to user ${userId}`);
+          logger.log(`Copied ${inventorySnapshot.size} inventory items to user ${userId}`);
         }
 
         // Copy household meal plan
@@ -278,7 +279,7 @@ export const leaveHousehold = onCall(async (request) => {
           });
           
           await batch.commit();
-          console.log(`Copied ${mealPlanSnapshot.size} meal plan items to user ${userId}`);
+          logger.log(`Copied ${mealPlanSnapshot.size} meal plan items to user ${userId}`);
         }
 
         // Copy household shopping list
@@ -296,7 +297,7 @@ export const leaveHousehold = onCall(async (request) => {
           });
           
           await batch.commit();
-          console.log(`Copied ${shoppingListSnapshot.size} shopping list items to user ${userId}`);
+          logger.log(`Copied ${shoppingListSnapshot.size} shopping list items to user ${userId}`);
         }
 
         // Copy household saved recipes
@@ -314,17 +315,17 @@ export const leaveHousehold = onCall(async (request) => {
           });
           
           await batch.commit();
-          console.log(`Copied ${savedRecipesSnapshot.size} saved recipes to user ${userId}`);
+          logger.log(`Copied ${savedRecipesSnapshot.size} saved recipes to user ${userId}`);
         }
 
       } catch (copyError) {
-        console.error('Error copying household data to user:', copyError);
+        logger.error('Error copying household data to user:', copyError);
         // Continue with household deletion even if copying fails
       }
 
       // Delete the household
       await householdRef.delete();
-      console.log(`Deleted household ${householdId} as it had fewer than 2 remaining members`);
+      logger.log(`Deleted household ${householdId} as it had fewer than 2 remaining members`);
     }
 
     return { success: true };
@@ -386,7 +387,7 @@ export const leaveHouseholdHttp = onRequest(
             });
             
             await batch.commit();
-            console.log(`Copied ${inventorySnapshot.size} inventory items to user ${userId}`);
+            logger.log(`Copied ${inventorySnapshot.size} inventory items to user ${userId}`);
           }
 
           // Copy household meal plan
@@ -404,7 +405,7 @@ export const leaveHouseholdHttp = onRequest(
             });
             
             await batch.commit();
-            console.log(`Copied ${mealPlanSnapshot.size} meal plan items to user ${userId}`);
+            logger.log(`Copied ${mealPlanSnapshot.size} meal plan items to user ${userId}`);
           }
 
           // Copy household shopping list
@@ -422,7 +423,7 @@ export const leaveHouseholdHttp = onRequest(
             });
             
             await batch.commit();
-            console.log(`Copied ${shoppingListSnapshot.size} shopping list items to user ${userId}`);
+            logger.log(`Copied ${shoppingListSnapshot.size} shopping list items to user ${userId}`);
           }
 
           // Copy household saved recipes
@@ -440,23 +441,23 @@ export const leaveHouseholdHttp = onRequest(
             });
             
             await batch.commit();
-            console.log(`Copied ${savedRecipesSnapshot.size} saved recipes to user ${userId}`);
+            logger.log(`Copied ${savedRecipesSnapshot.size} saved recipes to user ${userId}`);
           }
 
         } catch (copyError) {
-          console.error('Error copying household data to user:', copyError);
+          logger.error('Error copying household data to user:', copyError);
           // Continue with household deletion even if copying fails
         }
 
         // Delete the household
         await householdRef.delete();
-        console.log(`Deleted household ${householdId} as it had fewer than 2 remaining members`);
+        logger.log(`Deleted household ${householdId} as it had fewer than 2 remaining members`);
       }
 
       res.json({ success: true });
       return;
     } catch (err: any) {
-      console.error('leaveHouseholdHttp error:', err);
+      logger.error('leaveHouseholdHttp error:', err);
       res.status(500).json({ error: err?.message || 'internal' });
       return;
     }

@@ -11,6 +11,7 @@ import {
 } from 'firebase/firestore';
 import { Household, Member, User } from '../types';
 import { getPerformance, trace } from "firebase/performance";
+import { log } from './logService';
 
 const performance = getPerformance();
 
@@ -56,7 +57,7 @@ export const getOrCreateHousehold = async (user: User): Promise<Household | null
 
     return newHousehold;
   } catch (err: any) {
-    console.error('Error getting/creating household:', err);
+    log.error('Error getting/creating household:', { err }, 'HouseholdService');
     return null;
   } finally {
     perfTrace.stop();
@@ -176,7 +177,7 @@ export const updateMemberStatus = async (
 
     await DatabaseMonitoringService.updateDoc(householdRef, updatePayload);
   } catch (err: any) {
-    console.error('Unable to join 10: Error updating member status:', err);
+    log.error('Unable to join 10: Error updating member status:', { err }, 'HouseholdService');
     throw err;
   }
 };
@@ -236,7 +237,7 @@ export const removeMemberFromHousehold = async (
       await DatabaseMonitoringService.deleteDoc(householdRef);
     }
   } catch (err: any) {
-    console.error('Error removing member from household:', err);
+    log.error('Error removing member from household:', { err }, 'HouseholdService');
     throw err;
   }
 };
@@ -297,7 +298,7 @@ export const findHouseholdByInvite = async (
       memberIds: householdData.memberIds || []
     } as Household;
   } catch (err: any) {
-    console.error('Unable to join 5: Error finding household by invite:', err);
+    log.error('Unable to join 5: Error finding household by invite:', { err }, 'HouseholdService');
     return null;
   }
 };
@@ -370,7 +371,7 @@ export const joinHousehold = async (
       ),
     };
   } catch (err: any) {
-    console.error('Unable to join 7: Error joining household:', err);
+    log.error('Unable to join 7: Error joining household:', { err }, 'HouseholdService');
     throw err;
   } finally {
     perfTrace.stop();
@@ -397,7 +398,7 @@ export const getUserHouseholds = async (userEmail: string): Promise<Household[]>
       } as Household;
     });
   } catch (err: any) {
-    console.error('Error getting user households:', err);
+    log.error('Error getting user households:', { err }, 'HouseholdService');
     return [];
   }
 };

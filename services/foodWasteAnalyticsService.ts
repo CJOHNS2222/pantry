@@ -1,5 +1,6 @@
 import { collection, doc, setDoc, getDoc, updateDoc, arrayUnion, Timestamp } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
+import { log } from './logService';
 
 export interface DisposalRecord {
   id: string;
@@ -98,7 +99,7 @@ class FoodWasteAnalyticsService {
       });
 
     } catch (error) {
-      console.error('Failed to record disposal analytics:', error);
+      log.error('Failed to record disposal analytics:', { error }, 'FoodWasteAnalyticsService');
       throw error;
     }
   }
@@ -130,7 +131,7 @@ class FoodWasteAnalyticsService {
       } as FoodWasteAnalytics;
 
     } catch (error) {
-      console.error('Failed to get food waste analytics:', error);
+      log.error('Failed to get food waste analytics:', { error }, 'FoodWasteAnalyticsService');
       return null;
     }
   }
@@ -152,7 +153,7 @@ class FoodWasteAnalyticsService {
         record.disposalDate >= startDate && record.disposalDate <= endDate
       );
     } catch (error) {
-      console.error('Failed to get disposals in range:', error);
+      log.error('Failed to get disposals in range:', { error }, 'FoodWasteAnalyticsService');
       return [];
     }
   }

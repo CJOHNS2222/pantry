@@ -2,6 +2,7 @@ import { LeftoverService } from './leftoverService'
 import { NotificationService } from './notificationService'
 import { PantryItem } from '../types'
 import AnalyticsService from './analyticsService'
+import { log } from './logService'
 
 export class LeftoverNotificationService {
   /**
@@ -64,7 +65,7 @@ export class LeftoverNotificationService {
       }
 
     } catch (error) {
-      console.error('Failed to check leftovers for notifications:', error)
+      log.error('Failed to check leftovers for notifications:', { error }, 'LeftoverNotificationService')
     }
   }
 

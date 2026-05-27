@@ -1,6 +1,7 @@
 import { PantryItem, StructuredRecipe } from '../types';
 import { InventoryCacheService } from './inventoryCacheService';
 import DatabaseMonitoringService from './databaseMonitoringService';
+import { log } from './logService';
 
 /**
  * Minimal CSV parser for pantry imports. Expects header row containing columns like:
@@ -125,7 +126,7 @@ export async function fetchRecipeFromUrl(url: string): Promise<StructuredRecipe 
 
     return recipe;
   } catch (err) {
-    console.warn('Failed to fetch/parse recipe URL', err);
+    log.warn('Failed to fetch/parse recipe URL', { err }, 'ImportService');
     return null;
   }
 }

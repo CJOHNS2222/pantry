@@ -1528,9 +1528,14 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
                 This Month
               </button>
               ) : (
-              <span className="px-3 py-1 text-xs font-medium rounded-lg text-theme-secondary opacity-40 cursor-default" title="Upgrade for monthly view">
+              <button
+                onClick={() => {
+                  addToast('Monthly planning is a premium feature.', 'info', 5000, 'Upgrade', () => setActiveTab(Tab.SETTINGS));
+                }}
+                className="px-3 py-1 text-xs font-medium rounded-lg text-theme-secondary hover:bg-theme-primary/20 transition-colors flex items-center gap-1"
+              >
                 This Month 🔒
-              </span>
+              </button>
               )}
             </div>
             <div className="flex items-center gap-2 text-xs">
@@ -1783,11 +1788,16 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
               </div>
 
               <button
-                onClick={() => setCurrentDayIndex(Math.min(displayPlan.length - 1, currentDayIndex + 1))}
-                disabled={currentDayIndex === displayPlan.length - 1 || (!canUseTwoWeekPlanning && currentDayIndex >= 6)}
+                onClick={() => {
+                  if (!canUseTwoWeekPlanning && currentDayIndex >= 6) {
+                    addToast('Two-week planning is a premium feature.', 'info', 5000, 'Upgrade', () => setActiveTab(Tab.SETTINGS));
+                    return;
+                  }
+                  setCurrentDayIndex(Math.min(displayPlan.length - 1, currentDayIndex + 1));
+                }}
+                disabled={currentDayIndex === displayPlan.length - 1}
                 className="p-2 rounded-lg hover:bg-theme-primary/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 aria-label="Next day"
-                title={(!canUseTwoWeekPlanning && currentDayIndex >= 6) ? 'Upgrade to plan beyond the current week' : undefined}
               >
                 <svg className="w-6 h-6 text-theme-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />

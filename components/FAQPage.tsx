@@ -288,7 +288,7 @@ const FAQ_DATA: FAQItem[] = [
     id: 'pantry-8',
     category: 'Pantry Management',
     question: 'Can I undo a deletion or accidental edit?',
-    answer: 'Yes — Stock & Spoon supports undo for the most recent item actions:\n\n• When you **delete an item**, a toast notification appears at the bottom of the screen with an **Undo** button. Tap it within 6 seconds to restore the item.\n• Bulk deletes and item edits are also undoable from the same toast.\n• Up to 20 recent actions are stored. If you need to reverse something older, check if the item is still in a household member\'s cache under **Settings → Data → Clear Cache**.\n\nThe undo history is stored locally on your device and resets if you sign out.',
+    answer: 'Yes — Stock & Spoon supports undo for the most recent item actions:\n\n• When you **delete an item**, a toast notification appears at the bottom of the screen with an **Undo** button. Tap it within 5 seconds to restore the item.\n• Bulk deletes and item edits are also undoable from the same toast.\n• Up to 20 recent actions are stored. If you need to reverse something older, check if the item is still in a household member\'s cache under **Settings → Data → Clear Cache**.\n\nThe undo history is stored locally on your device and resets if you sign out.',
     keywords: ['undo', 'delete', 'restore', 'accidental', 'reverse', 'toast', 'history', 'recover']
   },
   {
