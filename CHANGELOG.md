@@ -1,4 +1,33 @@
-## [Unreleased]
+## [2.3.0] - 2026-05-29
+
+### Added
+- **Meal Prep Planner — household size + batch scaling** — new "Household size" picker (1/2/4/6 people) beside the day-range selector; each suggested batch session now shows a ×N multiplier badge and adjusted serving count so quantities reflect your actual household and duration (e.g. ×4 batches for 7 days, 2 people on a 4-serving recipe)
+- **Local grocery price defaults** — 29 real local-area prices seeded into the pricing fallback (butter, bacon, pork chops, deli turkey, cream cheese, Greek yogurt, OJ, strawberries, shredded cheddar, olive oil, peanut butter, marinara, canned tomatoes/beans, frozen veg/pizza, ice cream, cereal, soda, and more); plural item name variants added so Quick Add chip lookups always resolve
+
+### Changed
+- **Quick Add chips (Shopping list)** — complete rewrite: single `onClick` handler, `useRef` scroll container, green checkmark flash on tap, scroll-snap, left/right arrow buttons; chips now reliably add items on first tap
+- **Recipe Finder — preference warnings** — per-card allergen (red shield) and dislike/restriction (amber warning) badges replace the previous batch toast; Gemini search prompt trimmed to reduce token usage
+- **Grocery price defaults updated** — eggs corrected to per-dozen pricing; apples, lemons, bell peppers, broccoli, onions, lettuce, tomatoes, flour, rice, and pasta updated to current local averages
+
+---
+
+## [2.2.1] - 2026-05-27
+
+### Fixed
+- **Feedback form** — "Failed to send feedback" error resolved; field name mismatch (`text` → `message`) now matches Firestore security rule
+- **QuickAdd suggestion chips** — multiple taps required on mobile to register resolved; added `touch-action: manipulation`, `onTouchEnd` with `preventDefault`, and removed pointer-event interference from scroll arrow overlays
+
+### Changed
+- **Meal Prep button** — now uses accent colour fill (`bg-[var(--accent-color)]` with white text) for better visual prominence in the Meal Planner toolbar
+- **Meal Planner** — removed redundant "Search" shortcut button from the planner header
+- **Free plan calendar limit** — forward-navigation arrow in Meal Planner is now disabled after day 7 for free users, with a tooltip prompting upgrade to Premium
+
+### Added (Help & FAQ)
+- New FAQ entry: **Recipes (Chef) tab** — covers Smart Recommendations, Recipe Finder, saved recipes, and Cooking Mode
+- New FAQ entry: **Copy / Clear / Export week** — documents Clear week, Copy to next week, and Export .ics meal plan actions
+- New FAQ entry: **Imperial vs Metric units** — Settings → Account → Measurement System
+- New FAQ entry: **Hide/show navigation tabs** — Settings → Preferences → Navigation Tabs
+- Updated **tabs overview** FAQ entry to include the Recipes (Chef) tab
 
 ---
 

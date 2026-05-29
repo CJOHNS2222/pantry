@@ -26,12 +26,17 @@ export const MealPrepPlanner: React.FC<MealPrepPlannerProps> = ({
 }) => {
   const [selectedRecipes, setSelectedRecipes] = useState<SavedRecipe[]>([]);
   const [planDuration, setPlanDuration] = useState<3 | 5 | 7>(5);
+  const [householdSize, setHouseholdSize] = useState(2);
   const [maxCookTime, setMaxCookTime] = useState<number | null>(null); // null = any
   const [onlyMakeable, setOnlyMakeable] = useState(false);
   const [expiringFirst, setExpiringFirst] = useState(false);
   const [customEntries, setCustomEntries] = useState<SavedRecipe[]>([]);
   const [customTitle, setCustomTitle] = useState('');
   const [customIngredients, setCustomIngredients] = useState('');
+
+  /** How many times a recipe needs to be made to feed householdSize people for planDuration days (1 dinner/day). */
+  const batchesNeeded = (recipeServings: number) =>
+    Math.max(1, Math.ceil((planDuration * householdSize) / Math.max(1, recipeServings)));
 
   const parseTimeToMinutes = (time: string | number): number => {
     if (typeof time === 'number') return time;
@@ -256,26 +261,49 @@ export const MealPrepPlanner: React.FC<MealPrepPlannerProps> = ({
           </p>
         </div>
 
-        {/* Plan Duration */}
-        <div className="mb-4">
-          <p className="text-sm font-medium text-theme-primary mb-2">
-            How many days are you planning for?
-          </p>
-          <div className="flex gap-2">
-            {([3, 5, 7] as const).map(days => (
-              <button
-                key={days}
-                data-testid={`mealprep-duration-${days}`}
-                onClick={() => setPlanDuration(days)}
-                className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  planDuration === days
-                    ? 'bg-[var(--accent-color)] text-white'
-                    : 'bg-theme-secondary/20 text-theme-primary hover:bg-theme-secondary/30'
-                }`}
-              >
-                {days} days
-              </button>
-            ))}
+        {/* Plan Duration + Household Size */}
+        <div className="mb-4 flex gap-4">
+          <div className="flex-1">
+            <p className="text-sm font-medium text-theme-primary mb-2">
+              Planning for how many days?
+            </p>
+            <div className="flex gap-2">
+              {([3, 5, 7] as const).map(days => (
+                <button
+                  key={days}
+                  data-testid={`mealprep-duration-${days}`}
+                  onClick={() => setPlanDuration(days)}
+                  className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    planDuration === days
+                      ? 'bg-[var(--accent-color)] text-white'
+                      : 'bg-theme-secondary/20 text-theme-primary hover:bg-theme-secondary/30'
+                  }`}
+                >
+                  {days} days
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-medium text-theme-primary mb-2">
+              Household size
+            </p>
+            <div className="flex gap-2">
+              {([1, 2, 4, 6] as const).map(n => (
+                <button
+                  key={n}
+                  data-testid={`mealprep-people-${n}`}
+                  onClick={() => setHouseholdSize(n)}
+                  className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    householdSize === n
+                      ? 'bg-[var(--accent-color)] text-white'
+                      : 'bg-theme-secondary/20 text-theme-primary hover:bg-theme-secondary/30'
+                  }`}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -346,20 +374,35 @@ export const MealPrepPlanner: React.FC<MealPrepPlannerProps> = ({
             <div className="flex flex-col gap-3">
               {mealPrepSuggestions.map((plan, index) => {
                 const savedMins = Math.max(5, Math.round(plan.sharedIngredients.length * 4));
+                const planServings = plan.recipes.reduce((s, r) => s + (r.servings || 4), 0);
+                const batches = batchesNeeded(planServings);
+                const scaledServings = planServings * batches;
                 return (
                   <div key={index} className="border border-theme-secondary/20 rounded-lg p-4">
                     {/* Recipe names */}
                     <div className="flex items-start justify-between gap-2 mb-3">
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs font-semibold text-[var(--accent-color)] uppercase tracking-wide mb-0.5">
-                          Cook together
-                        </p>
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <p className="text-xs font-semibold text-[var(--accent-color)] uppercase tracking-wide">
+                            Cook together
+                          </p>
+                          {batches > 1 && (
+                            <span className="text-xs font-bold text-white bg-[var(--accent-color)] px-1.5 py-0.5 rounded-full">
+                              ×{batches}
+                            </span>
+                          )}
+                        </div>
                         <p className="text-sm font-semibold text-theme-primary leading-snug">
                           {plan.recipes[0].title}
                         </p>
                         <p className="text-sm text-theme-secondary leading-snug">
                           + {plan.recipes[1].title}
                         </p>
+                        {batches > 1 && (
+                          <p className="text-xs text-theme-secondary/70 mt-1">
+                            Make each recipe ×{batches} — yields ~{scaledServings} servings for {planDuration} days
+                          </p>
+                        )}
                       </div>
                       <button
                         onClick={() => addPlanToMealPlan(plan)}
@@ -400,7 +443,7 @@ export const MealPrepPlanner: React.FC<MealPrepPlannerProps> = ({
                       </span>
                       <span className="flex items-center gap-1">
                         <Users className="w-3.5 h-3.5" />
-                        ~{plan.servings} servings
+                        ~{scaledServings} servings
                       </span>
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                         plan.difficulty === 'Easy'

@@ -8,7 +8,7 @@ buildscript {
     }
     dependencies {
         // Use AGP version from libs.versions.toml
-        classpath 'com.android.tools.build:gradle:8.13.2'
+        classpath 'com.android.tools.build:gradle:8.7.2'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:2.0.21"
 
         // NOTE: Do not place your application dependencies here; they belong
@@ -22,6 +22,7 @@ plugins {
     alias(libs.plugins.firebase.appdistribution) apply false
     alias(libs.plugins.firebase.crashlytics) apply false
     alias(libs.plugins.firebase.perf) apply false
+    alias(libs.plugins.sentry) apply false
 }
 
 apply from: "variables.gradle"
@@ -45,10 +46,15 @@ allprojects {
         }
     }
     configurations.all {
-        resolutionStrategy.eachDependency { DependencyResolveDetails details ->
-            if (details.requested.group == 'org.jetbrains.kotlin' && details.requested.name.startsWith('kotlin-stdlib')) {
-                details.useVersion '2.0.21'
+        resolutionStrategy {
+            eachDependency { DependencyResolveDetails details ->
+                if (details.requested.group == 'org.jetbrains.kotlin' && details.requested.name.startsWith('kotlin-stdlib')) {
+                    details.useVersion '2.0.21'
+                }
             }
+            force 'androidx.core:core:1.15.0'
+            force 'androidx.core:core-ktx:1.15.0'
+            force 'androidx.browser:browser:1.8.0'
         }
     }
 }

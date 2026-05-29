@@ -77,8 +77,8 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   user,
   household,
   isLoadingShoppingList = false,
-  pantryItems = [],
-  recentPurchases = [],
+  pantryItems: _pantryItems = [],
+  recentPurchases: _recentPurchases = [],
   householdMembers = [],
   onHouseholdMessage,
   settings
@@ -271,11 +271,15 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const processQueue = () => offlineQueue.processQueue();
 
-  // Suggested items for quick adding
-  const suggestedItems = [
-    'Milk', 'Bread', 'Eggs', 'Cheese', 'Bananas', 'Apples', 'Chicken', 'Pasta', 
-    'Rice', 'Tomatoes', 'Lettuce', 'Onions', 'Potatoes', 'Carrots', 'Butter', 'Yogurt'
-  ];
+  // Suggested items for quick adding — filter out what's already in the list
+  const suggestedItems = useMemo(() => {
+    const inList = new Set(items.map(i => i.item.toLowerCase()));
+    return [
+      'Milk', 'Bread', 'Eggs', 'Cheese', 'Bananas', 'Apples', 'Chicken', 'Pasta',
+      'Rice', 'Tomatoes', 'Lettuce', 'Onions', 'Potatoes', 'Carrots', 'Butter', 'Yogurt',
+      'Orange Juice', 'Coffee', 'Cereal', 'Garlic', 'Ground Beef', 'Salmon', 'Broccoli', 'Spinach'
+    ].filter(name => !inList.has(name.toLowerCase()));
+  }, [items]);
 
   // Memoized expensive computations for sharing/exporting
   const uncheckedItemsText = useMemo(() => 
@@ -299,34 +303,33 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     [uncheckedItemsText]
   );
 
-  // Memoize recent items to prevent infinite re-renders in QuickAddModal
-  const recentItems = useMemo(() => 
-    items.map(i => i.item),
-    [items]
-  );
-
   const addSuggestedItem = async (itemName: string) => {
-    // Check if item already exists
-    const exists = items.some(item => item.item.toLowerCase() === itemName.toLowerCase());
-    if (exists) {
-      addToast(intl.formatMessage({ id: 'shoppingList.alreadyInList' }, { name: itemName }), 'info');
-      return;
+    try {
+      // Check if item already exists
+      const exists = items.some(item => item.item.toLowerCase() === itemName.toLowerCase());
+      if (exists) {
+        addToast(intl.formatMessage({ id: 'shoppingList.alreadyInList' }, { name: itemName }), 'info');
+        return;
+      }
+
+      // Estimate price for the item
+      const { price: estimatedPrice, priceData } = await estimateItemPrice(itemName, '1');
+
+      // Add directly to database to avoid sync read
+      await addShoppingListItem({
+        item: itemName,
+        category: inferCategoryFromItemName(itemName),
+        checked: false,
+        quantity: '1',
+        source: 'suggested',
+        addedAt: new Date(),
+        estimatedPrice,
+        priceData
+      });
+    } catch (error) {
+      log.error('Failed to add suggested item', { itemName, error }, 'ShoppingList');
+      addToast(`Failed to add ${itemName}. Please try again.`, 'error');
     }
-
-    // Estimate price for the item
-    const { price: estimatedPrice, priceData } = await estimateItemPrice(itemName, '1');
-
-    // Add directly to database to avoid sync read
-    await addShoppingListItem({
-      item: itemName,
-      category: inferCategoryFromItemName(itemName),
-      checked: false,
-      quantity: '1',
-      source: 'suggested',
-      addedAt: new Date(),
-      estimatedPrice,
-      priceData
-    });
   };
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -556,52 +559,6 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   };
 
   // Enhanced add item from QuickAdd component
-  const handleQuickAdd = async (quickAddItem: { name: string; category?: string; quantity?: string; unit?: string }) => {
-    const exists = items.some(item => item.item.toLowerCase() === quickAddItem.name.toLowerCase());
-    if (exists) {
-      addToast(intl.formatMessage({ id: 'shoppingList.alreadyInList' }, { name: quickAddItem.name }), 'info');
-      return;
-    }
-
-    // Estimate price for the item
-    const { price: estimatedPrice, priceData } = await estimateItemPrice(quickAddItem.name, quickAddItem.quantity || '1');
-
-    const newShoppingItem: ShoppingItem = {
-      id: Math.random().toString(36).substr(2, 9),
-      item: quickAddItem.name,
-      category: quickAddItem.category || inferCategoryFromItemName(quickAddItem.name),
-      checked: false,
-      quantity: quickAddItem.quantity || '1',
-      source: 'quick-add',
-      addedAt: new Date(),
-      estimatedPrice,
-      priceData
-    };
-
-    setItems(prev => [...prev, newShoppingItem]);
-
-    // Track shopping list item addition
-    AnalyticsService.trackShoppingListAdd(quickAddItem.name, newShoppingItem.category);
-
-    // Offline queue for sync
-    if (!isOnline) {
-      addToQueue({
-        type: 'add',
-        collection: 'shoppingList',
-        data: newShoppingItem
-      });
-    }
-  };
-
-  // Handle smart suggestions
-  const handleAddSuggestion = (suggestion: { itemName: string; estimatedQuantity?: string; category?: string }) => {
-    handleQuickAdd({
-      name: suggestion.itemName,
-      quantity: suggestion.estimatedQuantity,
-      category: suggestion.category
-    });
-  };
-
   // Batch operations
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleBatchOperation = (category: string, operation: 'check' | 'uncheck') => {
@@ -747,28 +704,8 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
 
       {/* Quick Add Component */}
       <QuickAdd
-        onAddItem={handleQuickAdd}
-        onScanBarcode={async () => {
-          // Desktop-friendly fallback: prompt for item name to simulate a scan
-          const scanned = prompt('Simulate barcode scan: enter item name');
-          if (!scanned) return null;
-          return { name: scanned, category: inferCategoryFromItemName(scanned), quantity: '1' };
-        }}
-        onVoiceInput={async () => {
-          // Simple fallback for voice input: prompt for text
-          const spoken = prompt('Simulate voice input: say item name');
-          return spoken || null;
-        }}
-        isOnline={isOnline}
-        recentItems={recentItems}
         suggestedItems={suggestedItems}
-        onAddSuggestedItem={addSuggestedItem}
-        pantryItems={pantryItems}
-        recentPurchases={recentPurchases}
-        onAddSuggestion={handleAddSuggestion}
-        onDismissSuggestion={(id) => {
-          log.debug('Dismiss suggestion:', { id }, 'ShoppingList');
-        }}
+        onAddItem={addSuggestedItem}
       />
 
       {/* View Mode Toggle */}

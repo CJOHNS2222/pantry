@@ -3,7 +3,7 @@ import { PantryItem, RecipeSearchResult, RecipeSearchParams, StructuredRecipe, U
 // openRouterService removed — all AI calls go directly through Gemini
 import { getPerformance, trace, PerformanceTrace } from "firebase/performance";
 import { UsageService } from './usageService';
-import { getUserNutritionTargets, generatePersonalizedSearchPrompt } from '../utils/nutritionUtils';
+
 import remoteConfig from './remoteConfigService';
 import { reportGeminiError } from './sentryService';
 import { log } from './logService';
@@ -227,9 +227,6 @@ const performSearch = async (params: RecipeSearchParams, user: User | undefined,
   
   let prompt = "";
 
-  // Get user nutrition targets if profile is available
-  const macroTargets = params.userProfile ? getUserNutritionTargets(params.userProfile) : null;
-
   // Use short keys to minimize output tokens. Map: t=title, d=description, i=ingredients, s=steps, c=cookTime
   const jsonFormat = `{"r":[{"t":"title","d":"short desc","i":["qty ingredient"],"s":["step"],"c":"15 min"}]}`;
 
@@ -250,11 +247,6 @@ const performSearch = async (params: RecipeSearchParams, user: User | undefined,
   }
 
   prompt += `. ${params.measurementSystem}. Brief steps.`;
-
-  // Apply personalized prompt modifications based on user profile
-  if (params.userProfile) {
-    prompt = generatePersonalizedSearchPrompt(prompt, params.userProfile, macroTargets || undefined);
-  }
 
   try {
     // Add timeout to prevent hanging requests

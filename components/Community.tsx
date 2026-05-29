@@ -7,6 +7,7 @@ import { RecipeRating, StructuredRecipe } from '../types';
 import RecipeModal from './RecipeModal';
 import { getCachedCommunityRatedRecipes } from '../services/recipeService';
 import { log } from '../services/logService';
+import { useAndroidBack } from '../hooks/useAndroidBack';
 
 // Staple items to ignore in ingredient display
 const _STAPLES = ['salt', 'pepper', 'oil', 'water', 'flour', 'sugar', 'butter', 'vinegar', 'baking powder', 'baking soda', 'spices', 'seasoning', 'soy sauce', 'cornstarch', 'yeast'];
@@ -84,6 +85,7 @@ export const Community: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecipe,
   }, []);
   const [showModal, setShowModal] = useState(false);
   const [selectedRecipe, setSelectedRecipe] = useState<{ title: string, comments: RecipeRating[] } | null>(null);
+  useAndroidBack(showModal, () => setShowModal(false));
   
   // Group ratings by recipe title and calculate average
   const recipeStats = ratingsState.reduce((acc, curr) => {

@@ -5,11 +5,8 @@
  */
 
 import DatabaseMonitoringService from './databaseMonitoringService';
-import { serverTimestamp, Timestamp } from 'firebase/firestore';
-import { User } from '../types';
-import { pushNotificationService } from './pushNotificationService';
-import { appendNotificationToUser, markNotificationRead, snoozeNotificationInCache, updateNotificationInCache } from './notificationsService';
-import { auth } from '../firebaseConfig';
+import { Timestamp } from 'firebase/firestore';
+import { appendNotificationToUser, snoozeNotificationInCache, updateNotificationInCache } from './notificationsService';
 import { formatDangerSummary, DangerItem } from './notificationHelpers';
 import { getFoodRiskLevel, generateExpirationMessage, getNotificationTone, generateNotificationStackMessage, generateWasteNotificationMessage } from '../utils/foodRiskClassification';
 
@@ -468,7 +465,7 @@ export class NotificationService {
   /**
    * Get unread notifications for user
    */
-  static async getUnreadNotifications(userId: string, userEmail?: string): Promise<NotificationItem[]> {
+  static async getUnreadNotifications(userId: string, _userEmail?: string): Promise<NotificationItem[]> {
     try {
       // Read from per-user cache document instead of querying root collection
       const cacheRef = DatabaseMonitoringService.doc(`users/${userId}/cache/notifications`);
@@ -523,6 +520,51 @@ export class NotificationService {
       console.error('Error getting unread notifications:', err);
       // Return empty array instead of throwing to prevent UI crashes
       return [];
+    }
+  }
+
+  /**
+   * Migrate pre-registration invite notifications from the root /notifications/ collection
+   * into the per-user cache. The Cloud Function writes there when the invitee has no UID yet,
+   * storing userId as the email address. On login we move them to the user's own cache doc
+   * so they surface through the normal notification flow.
+   */
+  static async migrateRootInviteNotifications(userId: string, userEmail: string): Promise<void> {
+    if (!userId || !userEmail) return;
+    try {
+      const q = DatabaseMonitoringService.query(
+        DatabaseMonitoringService.collection('notifications'),
+        DatabaseMonitoringService.where('userId', '==', userEmail)
+      );
+      const snap = await DatabaseMonitoringService.getDocs(q);
+      if (snap.empty) return;
+
+      for (const d of snap.docs) {
+        const raw = d.data() as any;
+        // Normalise createdAt – server timestamps arrive as Timestamp objects
+        let createdAt: string = new Date().toISOString();
+        if (raw.createdAt) {
+          if (typeof raw.createdAt === 'string') {
+            createdAt = raw.createdAt;
+          } else if (typeof raw.createdAt.toDate === 'function') {
+            createdAt = raw.createdAt.toDate().toISOString();
+          }
+        }
+        const migrated: NotificationItem = {
+          ...raw,
+          id: d.id,
+          userId, // rewrite to actual UID
+          createdAt,
+        } as NotificationItem;
+
+        await appendNotificationToUser(userId, migrated);
+        // Delete the root doc so it isn't processed again
+        const docRef = DatabaseMonitoringService.doc(`notifications/${d.id}`);
+        await DatabaseMonitoringService.deleteDoc(docRef);
+      }
+    } catch (err: any) {
+      // Non-fatal – log and continue so the rest of login flow is unaffected
+      console.warn('migrateRootInviteNotifications failed silently:', err?.message);
     }
   }
 

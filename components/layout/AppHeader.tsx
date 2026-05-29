@@ -73,12 +73,23 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
     };
   }, [showNotifications]);
 
+  const resetNotifTimer = (delayMs = 15000) => {
+    if (notifTimerRef.current) clearTimeout(notifTimerRef.current);
+    notifTimerRef.current = setTimeout(() => setShowNotifications(false), delayMs);
+  };
+
   const handleNotifPanelMouseEnter = () => {
     if (notifTimerRef.current) clearTimeout(notifTimerRef.current);
   };
 
   const handleNotifPanelMouseLeave = () => {
-    notifTimerRef.current = setTimeout(() => setShowNotifications(false), 5000);
+    resetNotifTimer(5000);
+  };
+
+  const handleNotifPanelTouchStart = () => {
+    // Reset auto-close timer on any touch within the panel so it never
+    // closes while the user is actively interacting on mobile.
+    if (notifTimerRef.current) clearTimeout(notifTimerRef.current);
   };
 
   const handleToggleNotifications = () => {
@@ -172,9 +183,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 
   const handleToggleExpand = (notifId: string) => {
     setExpandedNotifId(prev => prev === notifId ? null : notifId);
-    // Reset auto-close timer when user interacts with a notification
-    if (notifTimerRef.current) clearTimeout(notifTimerRef.current);
-    notifTimerRef.current = setTimeout(() => setShowNotifications(false), 10000);
+    resetNotifTimer(10000);
   };
 
   const getNotifTimeAgo = (ts: unknown): string => {
@@ -267,6 +276,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                     className="absolute left-0 mt-2 w-80 max-w-[calc(100vw-1rem)] max-h-96 overflow-auto bg-theme-primary border border-theme rounded shadow-lg z-50 p-2"
                     onMouseEnter={handleNotifPanelMouseEnter}
                     onMouseLeave={handleNotifPanelMouseLeave}
+                    onTouchStart={handleNotifPanelTouchStart}
                   >
                     <div className="flex items-center justify-between mb-2">
                       <div className="text-sm font-semibold">Notifications</div>
@@ -314,16 +324,22 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                                 {!n.read && (
                                   <button
                                     type="button"
+                                    onTouchStart={e => e.stopPropagation()}
+                                    onTouchEnd={e => { e.stopPropagation(); e.preventDefault(); handleMarkOneRead(n.id); }}
                                     onClick={e => { e.stopPropagation(); handleMarkOneRead(n.id); }}
-                                    className="text-[10px] text-theme-secondary hover:text-green-400 transition-colors"
+                                    className="flex items-center justify-center min-w-[28px] min-h-[28px] text-xs text-theme-secondary hover:text-green-400 active:text-green-400 transition-colors rounded"
                                     title="Mark as read"
+                                    aria-label="Mark notification as read"
                                   >✓</button>
                                 )}
                                 <button
                                   type="button"
+                                  onTouchStart={e => e.stopPropagation()}
+                                  onTouchEnd={e => { e.stopPropagation(); e.preventDefault(); handleDismissNotification(n.id); }}
                                   onClick={e => { e.stopPropagation(); handleDismissNotification(n.id); }}
-                                  className="text-[10px] text-theme-secondary hover:text-red-400 transition-colors"
+                                  className="flex items-center justify-center min-w-[28px] min-h-[28px] text-xs text-theme-secondary hover:text-red-400 active:text-red-400 transition-colors rounded"
                                   title="Dismiss notification"
+                                  aria-label="Dismiss notification"
                                 >✕</button>
                               </div>
                             </div>

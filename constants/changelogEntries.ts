@@ -9,6 +9,26 @@ export interface ChangeEntry {
 
 export const RECENT_CHANGES: ChangeEntry[] = [
   {
+    "version": "2.3.0",
+    "date": "May 29, 2026",
+    "highlights": [
+      "Meal Prep Planner — household size + batch scaling — new \"Household size\" picker (1/2/4/6 people) beside the day-range…",
+      "Local grocery price defaults — 29 real local-area prices seeded into the pricing fallback (butter, bacon, pork chops,…",
+      "Quick Add chips (Shopping list) — complete rewrite: single onClick handler, useRef scroll container, green checkmark…",
+      "Recipe Finder — preference warnings — per-card allergen (red shield) and dislike/restriction (amber warning) badges…"
+    ]
+  },
+  {
+    "version": "2.2.1",
+    "date": "May 27, 2026",
+    "highlights": [
+      "Feedback form — \"Failed to send feedback\" error resolved; field name mismatch (text → message) now matches Firestore…",
+      "QuickAdd suggestion chips — multiple taps required on mobile to register resolved; added touch-action: manipulation,…",
+      "Meal Prep button — now uses accent colour fill (bg-[var(--accent-color)] with white text) for better visual prominence…",
+      "Meal Planner — removed redundant \"Search\" shortcut button from the planner header"
+    ]
+  },
+  {
     "version": "2.2.0",
     "date": "May 26, 2026",
     "highlights": [
@@ -16,16 +36,6 @@ export const RECENT_CHANGES: ChangeEntry[] = [
       "Shopping item notes",
       "Multi-store layout profiles",
       "In-app account deletion"
-    ]
-  },
-  {
-    "version": "2.1.6",
-    "date": "May 26, 2026",
-    "highlights": [
-      "Camera scan timeout — handleTakePhoto was setting the loading state to LOADING before the OS camera opened, causing…",
-      "`customCategories` consolidated onto user doc — custom pantry categories are now stored as a field on users/{uid}…",
-      "Stripe packages removed — stripe, @stripe/react-stripe-js, and @stripe/stripe-js were unused and have been uninstalled",
-      "Dependencies updated — all patch/minor versions bumped (@capacitor/* 8.3.4, firebase 12.13.0, react/react-dom 19.2.6,…"
     ]
   }
 ];

@@ -1,5 +1,5 @@
 import DatabaseMonitoringService from './databaseMonitoringService';
-import { collection as firestoreCollection, query as firestoreQuery, where as firestoreWhere, orderBy as firestoreOrderBy, limit as firestoreLimit } from 'firebase/firestore';
+import { collection as firestoreCollection, query as firestoreQuery, where as firestoreWhere, orderBy as firestoreOrderBy } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 import { PriceTrend } from '../types/app';
 import { priceCacheService } from './priceCacheService';
@@ -60,47 +60,95 @@ class GroceryPriceService {
   private readonly COLLECTION_NAME = 'groceryPrices';
   private readonly PRICE_HISTORY_COLLECTION = 'priceHistory';
 
-  // Default prices (fallback when no data available)
+  // Default prices — local area averages used as fallback when no crowdsourced/API data is available.
+  // Keys must match normalizeIngredientName() output (lowercase + trim).
+  // Both singular and plural variants are included so suggestion-chip lookups resolve correctly.
   private defaultPrices: Record<string, { price: number; unit: string }> = {
-    // Proteins
+    // === PROTEINS ===
     'chicken': { price: 3.99, unit: 'lb' },
+    'ground beef': { price: 5.99, unit: 'lb' },
     'beef': { price: 5.99, unit: 'lb' },
-    'pork': { price: 4.49, unit: 'lb' },
+    'pork': { price: 4.40, unit: 'lb' },
+    'pork chops': { price: 4.40, unit: 'lb' },
     'fish': { price: 8.99, unit: 'lb' },
     'salmon': { price: 12.99, unit: 'lb' },
-    'eggs': { price: 0.25, unit: 'each' },
+    'bacon': { price: 6.95, unit: 'lb' },
+    'deli turkey': { price: 9.50, unit: 'lb' },
+
+    // === DAIRY ===
+    'eggs': { price: 3.49, unit: 'dozen' },
     'milk': { price: 3.99, unit: 'gallon' },
-    'cheese': { price: 4.99, unit: 'lb' },
-    'yogurt': { price: 0.69, unit: 'cup' },
-    'butter': { price: 4.99, unit: 'lb' },
+    'cheese': { price: 5.50, unit: 'lb' },
+    'shredded cheddar': { price: 2.75, unit: '8 oz bag' },
+    'cheddar cheese': { price: 2.75, unit: '8 oz bag' },
+    'cream cheese': { price: 3.10, unit: '8 oz' },
+    'yogurt': { price: 5.45, unit: '32 oz tub' },
+    'greek yogurt': { price: 5.45, unit: '32 oz tub' },
+    'butter': { price: 4.85, unit: 'lb' },
 
-    // Produce
-    'onion': { price: 1.29, unit: 'lb' },
-    'garlic': { price: 0.79, unit: 'head' },
-    'tomato': { price: 2.49, unit: 'lb' },
-    'lettuce': { price: 1.99, unit: 'head' },
-    'carrot': { price: 1.49, unit: 'lb' },
-    'potato': { price: 0.89, unit: 'lb' },
-    'apple': { price: 2.49, unit: 'lb' },
+    // === PRODUCE ===
+    'apple': { price: 1.98, unit: 'lb' },
+    'apples': { price: 1.98, unit: 'lb' },
     'banana': { price: 0.79, unit: 'lb' },
-    'lemon': { price: 1.29, unit: 'each' },
+    'bananas': { price: 0.79, unit: 'lb' },
+    'strawberries': { price: 3.65, unit: 'lb' },
+    'lemon': { price: 0.65, unit: 'each' },
+    'lemons': { price: 0.65, unit: 'each' },
     'lime': { price: 0.89, unit: 'each' },
-    'broccoli': { price: 2.99, unit: 'head' },
-    'spinach': { price: 3.99, unit: 'bag' },
-    'bell pepper': { price: 1.99, unit: 'each' },
+    'onion': { price: 1.08, unit: 'lb' },
+    'onions': { price: 1.08, unit: 'lb' },
+    'yellow onions': { price: 3.25, unit: '3 lb bag' },
+    'tomato': { price: 2.45, unit: 'lb' },
+    'tomatoes': { price: 2.45, unit: 'lb' },
+    'fresh tomatoes': { price: 2.45, unit: 'lb' },
+    'bell pepper': { price: 0.85, unit: 'each' },
+    'bell peppers': { price: 0.85, unit: 'each' },
+    'broccoli': { price: 2.20, unit: 'lb' },
+    'broccoli crowns': { price: 2.20, unit: 'lb' },
+    'lettuce': { price: 1.95, unit: 'head' },
+    'iceberg lettuce': { price: 1.95, unit: 'head' },
+    'garlic': { price: 0.79, unit: 'head' },
+    'carrot': { price: 1.49, unit: 'lb' },
+    'carrots': { price: 1.49, unit: 'lb' },
+    'potato': { price: 0.89, unit: 'lb' },
+    'potatoes': { price: 0.89, unit: 'lb' },
     'cucumber': { price: 1.49, unit: 'each' },
+    'spinach': { price: 3.99, unit: 'bag' },
 
-    // Pantry staples
-    'flour': { price: 3.49, unit: 'lb' },
+    // === BEVERAGES ===
+    'orange juice': { price: 4.95, unit: '52 oz carton' },
+    'coffee': { price: 8.99, unit: 'lb' },
+    'soda': { price: 8.50, unit: '12-pack' },
+
+    // === PANTRY STAPLES ===
+    'flour': { price: 3.95, unit: '5 lb bag' },
+    'all-purpose flour': { price: 3.95, unit: '5 lb bag' },
     'sugar': { price: 2.49, unit: 'lb' },
-    'rice': { price: 2.99, unit: 'lb' },
-    'pasta': { price: 1.49, unit: 'lb' },
+    'rice': { price: 4.15, unit: '5 lb bag' },
+    'white rice': { price: 4.15, unit: '5 lb bag' },
+    'pasta': { price: 1.45, unit: 'box' },
+    'dry pasta': { price: 1.45, unit: 'box' },
     'bread': { price: 3.49, unit: 'loaf' },
+    'olive oil': { price: 10.50, unit: '16.9 oz bottle' },
     'oil': { price: 5.99, unit: 'bottle' },
     'salt': { price: 1.49, unit: 'container' },
     'pepper': { price: 2.99, unit: 'container' },
+    'peanut butter': { price: 2.95, unit: 'jar' },
+    'marinara sauce': { price: 3.15, unit: 'jar' },
+    'tomato sauce': { price: 3.15, unit: 'jar' },
+    'canned tomatoes': { price: 1.25, unit: 'can' },
+    'diced tomatoes': { price: 1.25, unit: 'can' },
+    'canned beans': { price: 1.15, unit: 'can' },
+    'black beans': { price: 1.15, unit: 'can' },
+    'pinto beans': { price: 1.15, unit: 'can' },
 
-    // Spices & seasonings
+    // === FROZEN & SNACKS ===
+    'frozen vegetables': { price: 1.65, unit: 'bag' },
+    'frozen pizza': { price: 6.25, unit: 'pizza' },
+    'ice cream': { price: 5.50, unit: '1.5 qt tub' },
+    'cereal': { price: 4.80, unit: 'box' },
+
+    // === SPICES & SEASONINGS ===
     'cumin': { price: 4.99, unit: 'oz' },
     'paprika': { price: 3.99, unit: 'oz' },
     'oregano': { price: 3.49, unit: 'oz' },
@@ -492,7 +540,7 @@ class GroceryPriceService {
   /**
    * Fetch historical prices from Open Prices API for trend analysis
    */
-  private async fetchOpenPricesHistory(ingredient: string, days: number = 90, location?: string): Promise<OpenPricesPrice[]> {
+  private async fetchOpenPricesHistory(ingredient: string, days: number = 90, _location?: string): Promise<OpenPricesPrice[]> {
     try {
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - days);

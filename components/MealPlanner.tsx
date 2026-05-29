@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { CalendarClock, Plus, ShoppingBasket, Trash2, HelpCircle, Search, Copy, Download, ChevronDown, ChevronRight } from 'lucide-react';
+import { CalendarClock, Plus, ShoppingBasket, Trash2, HelpCircle, Copy, Download, ChevronDown, ChevronRight } from 'lucide-react';
 import { DayPlan, MealPlanItem, PantryItem, StructuredRecipe, User, SavedRecipe, ShoppingItem } from '../types';
 import RecipeModal from './RecipeModal';
 import LeftoverQuickCapture from './LeftoverQuickCapture';
@@ -1259,7 +1259,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
           <div className="flex-1 flex items-center justify-end gap-1">
             <button
               onClick={() => setShowMealPrepPlanner(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-theme-secondary/20 hover:bg-theme-secondary/30 text-theme-secondary text-sm font-medium transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--accent-color)] hover:bg-[var(--accent-color)]/90 active:bg-[var(--accent-color)]/80 text-white text-sm font-medium transition-colors shadow-sm"
               title="Smart Meal Prep Planner"
               aria-label="Open meal prep planner"
             >
@@ -1333,17 +1333,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
               />
             </div>
           )}
-          {!isEstimatorOpen && (
-            <div className="flex-1">
-              <button
-                onClick={() => setActiveTab(Tab.RECIPES)}
-                className="w-full flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-              >
-                <Search className="w-4 h-4" />
-                Search
-              </button>
-            </div>
-          )}
+
         </div>
 
         {/* Today's Meals Highlight */}
@@ -1790,14 +1780,15 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
               <button
                 onClick={() => {
                   if (!canUseTwoWeekPlanning && currentDayIndex >= 6) {
-                    addToast('Two-week planning is a premium feature.', 'info', 5000, 'Upgrade', () => setActiveTab(Tab.SETTINGS));
+                    addToast('Planning beyond 7 days requires Premium.', 'info', 5000, 'Upgrade', () => setActiveTab(Tab.SETTINGS));
                     return;
                   }
                   setCurrentDayIndex(Math.min(displayPlan.length - 1, currentDayIndex + 1));
                 }}
-                disabled={currentDayIndex === displayPlan.length - 1}
+                disabled={currentDayIndex === displayPlan.length - 1 || (!canUseTwoWeekPlanning && currentDayIndex >= 6)}
                 className="p-2 rounded-lg hover:bg-theme-primary/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 aria-label="Next day"
+                title={!canUseTwoWeekPlanning && currentDayIndex >= 6 ? 'Upgrade to Premium to plan beyond 7 days' : undefined}
               >
                 <svg className="w-6 h-6 text-theme-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />

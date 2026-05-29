@@ -57,6 +57,14 @@ const FAQ_DATA: FAQItem[] = [
     keywords: ['tabs', 'navigation', 'pantry', 'shopping', 'meal planner', 'community', 'settings']
   },
 
+  {
+    id: 'getting-started-4',
+    category: 'Getting Started',
+    question: 'What is the Recipes (Chef) tab?',
+    answer: 'The Recipes tab — labelled **Chef** in the bottom navigation — is your recipe hub:\n\n• **Smart Recommendations** (collapsed card at the top) — personalised suggestions based on your current pantry inventory, expiring items, and time of day. Tap to expand and see which saved recipes you can cook right now.\n• **Recipe Finder** — search for new recipes by keyword, dietary tag, or cuisine. Toggle **"Use pantry items"** to restrict results to what you already have at home.\n• **Saved Recipes** — all recipes you have bookmarked appear here. Tap the heart/bookmark icon on any recipe to save it.\n• **Add to Meal Plan** — tap any recipe and choose **Add to Plan** to push it straight into the Meal Planner calendar.\n\nRecipes found here can also be opened in **Cooking Mode** for step-by-step distraction-free guidance.',
+    keywords: ['recipes tab', 'chef tab', 'recipe finder', 'smart recommendations', 'saved recipes', 'browse recipes', 'recipe search', 'pantry items']
+  },
+
   // Pantry Management
   {
     id: 'pantry-1',
@@ -345,6 +353,14 @@ const FAQ_DATA: FAQItem[] = [
     keywords: ['recipe search', 'ai recipe', 'gemini', 'spoonacular', 'search tips', 'pantry items', 'use pantry', 'recipe finder', 'ai search']
   },
 
+  {
+    id: 'meal-planning-6',
+    category: 'Meal Planning',
+    question: 'How do I copy, clear, or export my weekly meal plan?',
+    answer: 'Three week-level actions are available in the Meal Planner toolbar, just above the day detail card:\n\n• **Clear week** (trash icon) — removes all meals from the currently displayed 7-day window. You will be asked to confirm before anything is deleted.\n\n• **Copy to next week** (copy icon) — duplicates all meals from the current week into the same days in the following week. Useful for meal-prepping routines you repeat regularly.\n\n• **Export .ics** (download icon) — downloads a standard calendar file containing all planned meals for the week. You can import this file into Google Calendar, Apple Calendar, Outlook, or any calendar app that supports the .ics format. Only days that have at least one meal scheduled are included in the export.\n\nAll three actions apply only to the week you are currently viewing. Navigate to a different week first if you want to act on a different period.',
+    keywords: ['copy week', 'clear week', 'export calendar', 'ics', 'meal plan export', 'copy meals', 'delete week', 'calendar file', 'repeat meals', 'next week']
+  },
+
   // Community
   {
     id: 'community-1',
@@ -386,6 +402,21 @@ const FAQ_DATA: FAQItem[] = [
     question: 'How do I turn AI features on or off?',
     answer: 'You can opt in or out of all AI-powered features at any time:\n\n1. Go to **Settings → AI & Privacy**\n2. Toggle **Enable AI Features (Gemini)** on or off\n\n**What opting out does:**\n• Disables Gemini AI for pantry photo scans, receipt analysis, and recipe search\n• Barcode scanning, manual entry, and Spoonacular recipe search still work\n• Your weekly AI scan counter is paused (usage limits still track separately)\n• No data is sent to Google Gemini while opted out\n\n**To re-enable:** return to the same toggle and turn it back on. All previously cached AI results remain on your device.\n\nIf you are on the Free plan, your 5 weekly AI scans reset every Monday regardless of opt-in status.',
     keywords: ['ai opt out', 'gemini', 'disable ai', 'privacy', 'ai features', 'opt in', 'opt out', 'turn off ai', 'ai toggle']
+  },
+
+  {
+    id: 'settings-5',
+    category: 'Settings & Preferences',
+    question: 'How do I switch between imperial and metric units?',
+    answer: 'Stock & Spoon can display quantities in either **Imperial** (cups, oz, lb, fl oz) or **Metric** (grams, ml, kg, litres) units:\n\n1. Go to **Settings** and open the **Account** tab\n2. Scroll to **Measurement System**\n3. Tap **Imperial** or **Metric**\n\nThe setting is saved to your profile and applied across the whole app — recipe ingredient quantities, pantry item weights, and the grocery cost estimator will all reflect your choice. It also affects how voice input interprets spoken quantities.',
+    keywords: ['imperial', 'metric', 'units', 'measurement system', 'grams', 'cups', 'ounces', 'pounds', 'kilograms', 'litres', 'oz', 'lbs']
+  },
+  {
+    id: 'settings-6',
+    category: 'Settings & Preferences',
+    question: 'How do I hide or rearrange the bottom navigation tabs?',
+    answer: 'You can declutter the bottom bar by hiding tabs you do not use:\n\n1. Go to **Settings** and open the **Preferences** tab\n2. Scroll to the **Navigation Tabs** section\n3. Toggle off any tab you want to hide — **Shopping, Meal Planner, Recipes, Community,** or **Analytics**\n\n**Pantry** and **Settings** are always visible and cannot be hidden.\n\nHiding a tab does not delete any data — you can re-enable it at any time from the same screen. If you are on a hidden tab when you disable it, the app automatically redirects you to Pantry.',
+    keywords: ['hide tab', 'navigation tabs', 'bottom bar', 'show tabs', 'hide navigation', 'tab visibility', 'remove tab', 'customize navigation']
   },
 
   // Plans & Limits additions

@@ -12,6 +12,7 @@ import { generateConsumptionSuggestions, generateExpirationAlerts, generateRecip
 import { offlineQueue } from '../services/offlineQueueService';
 import { undoService, UndoAction } from '../services/undoService';
 import { NotificationService } from '../services/notificationService';
+import { pruneNotificationsForDeletedItems } from '../services/notificationsService';
 import { LeftoverNotificationService } from '../services/leftoverNotificationService';
 import { auth } from '../firebaseConfig';
 import RiskProfileService from '../services/riskProfileService';
@@ -1060,6 +1061,11 @@ export function useDataManagement(
 
     await InventoryCacheService.removeItemFromCache(itemToDelete.id, user?.householdId, user?.id);
 
+    // Dismiss any notifications that only reference this item
+    if (user?.id) {
+      pruneNotificationsForDeletedItems(user.id, [itemToDelete.id]).catch(() => {});
+    }
+
     addToast?.(
       `"${itemToDelete.item}" removed from pantry.`,
       'info',
@@ -1101,6 +1107,11 @@ export function useDataManagement(
 
     // Single cache write instead of N individual removeItemFromCache calls
     await InventoryCacheService.bulkUpdateInventoryCache(updatedInventory, user?.householdId, user?.id);
+
+    // Dismiss any notifications that only reference the deleted items
+    if (user?.id) {
+      pruneNotificationsForDeletedItems(user.id, itemsToDelete.map(i => i.id)).catch(() => {});
+    }
 
     addToast?.(
       `${itemsToDelete.length} item${itemsToDelete.length > 1 ? 's' : ''} removed from pantry.`,

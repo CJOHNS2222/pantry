@@ -55,6 +55,7 @@ import ExpiredItemsModal from './components/ExpiredItemsModal';
 import ItemDetailModal from './components/ItemDetailModal';
 import { InventoryCacheService } from './services/inventoryCacheService';
 import { useIntl } from 'react-intl';
+import { useAndroidBack, closeTopAndroidModal } from './hooks/useAndroidBack';
 
 // Lazy load monitoring components
 const DatabaseAnalytics = React.lazy(() => import('./components/DatabaseAnalytics').then(module => ({ default: module.default })));
@@ -72,6 +73,8 @@ const App: React.FC = () => {
   const intl = useIntl();
   const [activeTab, setActiveTab] = useState<Tab>(Tab.PANTRY); // Default to pantry
   const prevActiveTabRef = useRef<Tab>(activeTab);
+  // Stack of previously-visited tabs used by the hardware back button to navigate backwards.
+  const tabHistoryRef = useRef<Tab[]>([]);
   const { tips: contextualTips, addTip: addContextualTip, dismissTip: dismissContextualTip } = useContextualTips();
   // Track which tabs the user has already visited this session (for contextual tips)
   const visitedTabsRef = useRef<Set<Tab>>(new Set<Tab>());
@@ -95,6 +98,9 @@ const App: React.FC = () => {
     
     trackNavigation(tabNames[activeTab] || 'unknown', tabNames[tab] || 'unknown');
     HapticService.light();
+    // Record the current tab in the back-navigation history before switching.
+    // Keep a cap of 20 entries so it never grows unbounded.
+    tabHistoryRef.current = [...tabHistoryRef.current.slice(-19), activeTab];
     setActiveTab(tab);
     window.scrollTo(0, 0);
     
@@ -183,6 +189,16 @@ const App: React.FC = () => {
   const { addToast, toasts, setToasts } = useToasts();
   const { syncStatus, syncNow, updateSyncStatus } = useOfflineStatus();
   const { isAdmin } = useIsAdmin(user?.id);
+
+  // Register all App-level modals on the shared LIFO back-button stack so every
+  // modal (App-level and sub-component) is handled through the same mechanism.
+  useAndroidBack(showOnboarding, () => setShowOnboarding(false));
+  useAndroidBack(showAddToPlanDialog, () => setShowAddToPlanDialog(false));
+  useAndroidBack(notificationViewItem !== null, () => setNotificationViewItem(null));
+  useAndroidBack(showNotificationsModal, () => setShowNotificationsModal(false));
+  useAndroidBack(showHouseholdInviteModal, () => setShowHouseholdInviteModal(false));
+  useAndroidBack(showExpiredItemsModal, () => setShowExpiredItemsModal(false));
+  useAndroidBack(showHousehold, () => setShowHousehold(false));
   const maintenanceInfo = remoteConfig.getMaintenanceInfo();
   const announcementInfo = remoteConfig.getAnnouncementInfo();
 
@@ -369,7 +385,6 @@ const App: React.FC = () => {
     updateShoppingListItems,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     removeShoppingListItem,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     removeShoppingListItems,
     isLoadingInventory,
     isLoadingShoppingList,
@@ -421,6 +436,14 @@ const App: React.FC = () => {
     // Community component handles its own data loading
     prevActiveTabRef.current = activeTab;
   }, [activeTab]);
+
+  // If the user hides the currently-active tab, fall back to PANTRY
+  useEffect(() => {
+    const hidden = settings.navigation?.hiddenTabs ?? [];
+    if (hidden.includes(activeTab)) {
+      setActiveTab(Tab.PANTRY);
+    }
+  }, [settings.navigation?.hiddenTabs]);
 
   useEffect(() => {
     if (user?.id && household?.id) {
@@ -890,28 +913,16 @@ const App: React.FC = () => {
   const [lastBackPress, setLastBackPress] = useState<number>(0);
   useEffect(() => {
     const handleBackButton = () => {
-      if (showNotificationsModal) {
-        setShowNotificationsModal(false);
-        return;
-      }
+      // Delegate to the shared LIFO modal stack first.
+      // All App-level and sub-component modals register themselves via
+      // useAndroidBack, so this single call handles every open modal.
+      if (closeTopAndroidModal()) return;
 
-      if (showHousehold) {
-        setShowHousehold(false);
-        return;
-      }
-
-      if (showHouseholdInviteModal) {
-        setShowHouseholdInviteModal(false);
-        return;
-      }
-
-      if (showExpiredItemsModal) {
-        setShowExpiredItemsModal(false);
-        return;
-      }
-
-      if (activeTab !== Tab.PANTRY) {
-        setActiveTab(Tab.PANTRY);
+      // Navigate back through tab history
+      if (tabHistoryRef.current.length > 0) {
+        const prev = tabHistoryRef.current[tabHistoryRef.current.length - 1];
+        tabHistoryRef.current = tabHistoryRef.current.slice(0, -1);
+        setActiveTab(prev);
         return;
       }
 
@@ -957,7 +968,7 @@ const App: React.FC = () => {
         appUrlOpenListenerRef.current = null;
       }
     };
-  }, [showNotificationsModal, showHousehold, showHouseholdInviteModal, showExpiredItemsModal, showOnboarding, activeTab, lastBackPress, addToast]);
+  }, [activeTab, lastBackPress, addToast]);
 
   const [previousTab, setPreviousTab] = useState<Tab>(Tab.PANTRY);
   useEffect(() => {
@@ -970,8 +981,19 @@ const App: React.FC = () => {
   // Check for household invites when user logs in
   useEffect(() => {
     const checkHouseholdInvites = async () => {
-      if (user && !user.householdId) {
-        log.debug('Checking household invites for user', { userId: user.id });
+      if (!user) return;
+
+      log.debug('Checking household invites for user', { userId: user.id });
+
+      // Always migrate any pre-registration email-addressed invites from the root
+      // /notifications/ collection into the per-user cache, regardless of whether
+      // the user already belongs to a household.
+      if (user.email) {
+        await NotificationService.migrateRootInviteNotifications(user.id, user.email);
+      }
+
+      // Only surface the invite modal when the user isn't yet in a household
+      if (!user.householdId) {
         try {
           const unreadNotifications = await NotificationService.getUnreadNotifications(user.id, user.email);
           log.debug('Unread notifications count:', unreadNotifications.length);
@@ -993,8 +1015,12 @@ const App: React.FC = () => {
           log.error('Error checking household invites', { error }, 'App');
         }
       } else {
-        log.debug('Skipping household invite check - user has householdId or no user');
+        log.debug('Skipping invite modal - user already has a household');
       }
+
+      // Clear the 5-minute banner throttle so any cached notifications surface
+      // immediately after login rather than being silently blocked.
+      localStorage.removeItem('lastNotificationShown');
     };
 
     checkHouseholdInvites();
@@ -1464,6 +1490,7 @@ const App: React.FC = () => {
                 const addedItems = await addItems(Object.values(processedItems));
 
                 setShoppingList(prev => prev.filter(item => !items.find(moved => moved.id === item.id)));
+                await removeShoppingListItems(items.map(i => i.id));
                 
                 setTimeout(() => {
                   syncNow();
@@ -1500,7 +1527,7 @@ const App: React.FC = () => {
             <MainContent />
           </AppActionsProvider>
         </AppProvider>
-        <AppNavigation activeTab={activeTab} setActiveTab={switchTab} />
+        <AppNavigation activeTab={activeTab} setActiveTab={switchTab} hiddenTabs={settings.navigation?.hiddenTabs} />
         
         {showHousehold && (
           <HouseholdManager

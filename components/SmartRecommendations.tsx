@@ -220,7 +220,7 @@ const SmartRecommendations: React.FC<SmartRecommendationsProps> = ({ inventory, 
     <div className="bg-white rounded-lg shadow-sm border mb-3">
       <button
         onClick={() => setIsCollapsed(c => !c)}
-        className="w-full p-4 border-b flex items-center justify-between text-left hover:bg-gray-50 transition-colors"
+        className="w-full px-4 py-3 border-b flex items-center justify-between text-left hover:bg-gray-50 transition-colors"
         aria-expanded={!isCollapsed}
       >
         <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
@@ -237,29 +237,29 @@ const SmartRecommendations: React.FC<SmartRecommendationsProps> = ({ inventory, 
         <>
         <div className="divide-y">
           {recommendations.map((rec) => (
-          <div key={rec.id} className="p-6 hover:bg-gray-50 transition-colors">
-            <div className="flex items-start gap-4">
+          <div key={rec.id} className="px-4 py-3 hover:bg-gray-50 transition-colors">
+            <div className="flex items-start gap-3">
               <div className="flex-shrink-0">
-                <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center text-blue-600">
+                <div className="w-7 h-7 bg-blue-50 rounded-md flex items-center justify-center text-blue-600">
                   {rec.icon}
                 </div>
               </div>
 
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-2">
-                  <h3 className="text-lg font-medium text-gray-900">{rec.title}</h3>
-                  <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getImpactColor(rec.impact)}`}>
-                    {getImpactIcon(rec.impact)} {rec.impact.toUpperCase()} IMPACT
+                <div className="flex items-center gap-2 mb-0.5">
+                  <h3 className="text-sm font-medium text-gray-900 leading-snug">{rec.title}</h3>
+                  <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium border ${getImpactColor(rec.impact)}`}>
+                    {getImpactIcon(rec.impact)} {rec.impact.toUpperCase()}
                   </span>
                 </div>
 
-                <p className="text-gray-600 mb-3">{rec.description}</p>
+                <p className="text-xs text-gray-600 mb-1.5 leading-snug">{rec.description}</p>
 
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-500">{rec.category}</span>
+                  <span className="text-xs text-gray-500">{rec.category}</span>
                   <button 
                     onClick={() => handleRecommendationAction(rec)}
-                    className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                    className="inline-flex items-center px-3 py-1 bg-blue-600 text-white text-xs font-medium rounded-md hover:bg-blue-700 transition-colors"
                   >
                     {rec.actionText}
                   </button>

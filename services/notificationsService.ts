@@ -1,5 +1,5 @@
 import { db } from '../firebaseConfig';
-import { doc, runTransaction, serverTimestamp, onSnapshot, DocumentReference, updateDoc, deleteDoc } from 'firebase/firestore';
+import { doc, runTransaction, onSnapshot, DocumentReference } from 'firebase/firestore';
 import remoteConfig from './remoteConfigService';
 
 export interface NotificationItem {
@@ -163,7 +163,7 @@ export async function getNotificationsOnce(uid: string): Promise<NotificationIte
       return Array.isArray(data.items) ? (data.items as NotificationItem[]) : [];
     });
     return result;
-  } catch (err) {
+  } catch (_err) {
     // best-effort fallback: return empty
     return [];
   }
@@ -226,5 +226,45 @@ export async function markAllNotificationsRead(uid: string) {
     const items = Array.isArray(data.items) ? data.items as NotificationItem[] : [];
     const updated = items.map(i => ({ ...i, read: true }));
     tx.set(ref as any, { items: updated }, { merge: true });
+  });
+}
+
+/**
+ * Remove notifications that reference only deleted pantry items.
+ * - Multi-item notifications (actionData.items[]) are removed only when ALL
+ *   referenced item IDs have been deleted.
+ * - Single-item notifications (actionData.itemId) are removed when that item
+ *   has been deleted.
+ * Notifications with no item references are left untouched.
+ */
+export async function pruneNotificationsForDeletedItems(uid: string, deletedItemIds: string[]): Promise<void> {
+  if (!uid || deletedItemIds.length === 0) return;
+  const deletedSet = new Set(deletedItemIds);
+  const ref = getNotificationsDocRef(uid);
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref as any);
+    if (!snap.exists()) return;
+    const data = snap.data() as any;
+    const items = Array.isArray(data.items) ? data.items as NotificationItem[] : [];
+
+    const kept = items.filter(n => {
+      // Multi-item notification: actionData.items[].itemId
+      if (Array.isArray(n.actionData?.items) && n.actionData.items.length > 0) {
+        const referencedIds: string[] = n.actionData.items
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .map((i: any) => i.itemId)
+          .filter(Boolean);
+        // Keep if at least one referenced item is NOT deleted
+        return referencedIds.length === 0 || !referencedIds.every(id => deletedSet.has(id));
+      }
+      // Single-item notification: actionData.itemId
+      if (n.actionData?.itemId) {
+        return !deletedSet.has(n.actionData.itemId);
+      }
+      return true; // no item reference — keep
+    });
+
+    if (kept.length === items.length) return; // nothing changed, skip write
+    tx.set(ref as any, { items: kept }, { merge: true });
   });
 }

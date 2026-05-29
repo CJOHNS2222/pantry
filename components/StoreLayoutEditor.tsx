@@ -17,6 +17,7 @@ export const StoreLayoutEditor: React.FC<StoreLayoutEditorProps> = ({
   onStoreProfilesChange,
 }) => {
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);
   const [selectedStore, setSelectedStore] = useState<string>(activeStoreProfile ?? '__default__');
   const [showStoreDropdown, setShowStoreDropdown] = useState(false);
 
@@ -36,16 +37,28 @@ export const StoreLayoutEditor: React.FC<StoreLayoutEditorProps> = ({
 
   const handleDragStart = (e: React.DragEvent, index: number) => {
     setDraggedIndex(index);
+    setDropTargetIndex(null);
     e.dataTransfer.effectAllowed = 'move';
   };
 
-  const handleDragOver = (e: React.DragEvent) => {
+  const handleDragOver = (e: React.DragEvent, index: number) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
+    if (draggedIndex !== null && draggedIndex !== index) {
+      setDropTargetIndex(index);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    // Only clear when leaving the row entirely (not entering a child element)
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setDropTargetIndex(null);
+    }
   };
 
   const handleDrop = (e: React.DragEvent, dropIndex: number) => {
     e.preventDefault();
+    setDropTargetIndex(null);
     if (draggedIndex === null || draggedIndex === dropIndex) return;
 
     const newLayout = [...currentLayout];
@@ -58,6 +71,7 @@ export const StoreLayoutEditor: React.FC<StoreLayoutEditorProps> = ({
 
   const handleDragEnd = () => {
     setDraggedIndex(null);
+    setDropTargetIndex(null);
   };
 
   const removeAisle = (index: number) => {
@@ -162,28 +176,44 @@ export const StoreLayoutEditor: React.FC<StoreLayoutEditorProps> = ({
         Drag and drop to reorder aisles for <strong>{displayName}</strong>. The shopping list will follow this order when organized view is active.
       </p>
 
-      <div className="space-y-2">
+      <div className="space-y-1">
         {currentLayout.map((aisle, index) => (
-          <div
-            key={aisle}
-            draggable
-            onDragStart={(e) => handleDragStart(e, index)}
-            onDragOver={handleDragOver}
-            onDrop={(e) => handleDrop(e, index)}
-            onDragEnd={handleDragEnd}
-            className={`flex items-center gap-3 p-3 bg-theme-secondary rounded-lg border border-theme cursor-move hover:bg-theme-primary transition-colors ${
-              draggedIndex === index ? 'opacity-50' : ''
-            }`}
-          >
-            <GripVertical className="w-4 h-4 text-theme-secondary flex-shrink-0" />
-            <span className="text-sm text-theme-primary flex-1">{aisle}</span>
-            <button
-              onClick={() => removeAisle(index)}
-              className="text-theme-secondary hover:text-red-500 transition-colors p-1"
-              title="Remove aisle"
+          <div key={aisle}>
+            {/* Drop indicator — shown ABOVE the row when dragging over it */}
+            {dropTargetIndex === index && draggedIndex !== null && draggedIndex !== index && (
+              <div className="h-1 rounded-full bg-[var(--accent-color)] shadow-[0_0_6px_var(--accent-color)] mx-2 mb-1 transition-all" />
+            )}
+            <div
+              draggable
+              onDragStart={(e) => handleDragStart(e, index)}
+              onDragOver={(e) => handleDragOver(e, index)}
+              onDragLeave={handleDragLeave}
+              onDrop={(e) => handleDrop(e, index)}
+              onDragEnd={handleDragEnd}
+              className={`flex items-center gap-3 px-3 py-4 rounded-lg border-2 cursor-move transition-all select-none ${
+                draggedIndex === index
+                  ? 'opacity-40 border-dashed border-theme bg-theme-primary'
+                  : dropTargetIndex === index
+                    ? 'border-[var(--accent-color)] bg-[var(--accent-color)]/10 shadow-md'
+                    : 'border-theme bg-theme-secondary hover:bg-theme-primary hover:border-[var(--accent-color)]/40'
+              }`}
             >
-              <X className="w-4 h-4" />
-            </button>
+              {/* Larger grip zone */}
+              <div className="flex items-center gap-1 pr-1 text-theme-secondary">
+                <GripVertical className="w-5 h-5" />
+              </div>
+              <span className="text-sm text-theme-primary flex-1 font-medium">{aisle}</span>
+              {dropTargetIndex === index && draggedIndex !== null && draggedIndex !== index && (
+                <span className="text-xs text-[var(--accent-color)] font-semibold shrink-0">Drop here</span>
+              )}
+              <button
+                onClick={() => removeAisle(index)}
+                className="text-theme-secondary hover:text-red-500 transition-colors p-2 -mr-1 rounded-lg hover:bg-red-50/20"
+                title="Remove aisle"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         ))}
       </div>

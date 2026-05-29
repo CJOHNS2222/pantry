@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Search, Loader2, Sparkles, Plus, Clock, List, ChefHat, Star, Bookmark, Zap, Mic } from 'lucide-react';
+import { Search, Loader2, Sparkles, Plus, Clock, List, ChefHat, Star, Bookmark, Zap, Mic, AlertTriangle, ShieldAlert } from 'lucide-react';
 import { searchRecipes } from '../services/geminiService';
 import { setUserGeminiOptIn } from '../services/featureFlags';
 import { getCachedPopularRecipes, submitRecipeForReview } from '../services/recipeService';
@@ -20,7 +20,7 @@ import { UsageService } from '../services/usageService';
 import { saveSearchToHistory, getRecentSearchSuggestions } from '../utils/searchUtils';
 import { useKeyboardNavigation } from '../hooks/useKeyboardNavigation';
 import { debounce } from '../utils/debounceUtils';
-import { filterRecipesByHouseholdPreferences, filterRecipesByUserProfile } from '../utils/preferenceUtils';
+import { filterRecipesByHouseholdPreferences, checkRecipeAgainstPreferences } from '../utils/preferenceUtils';
 import { getUserMeasurementSystem } from '../utils/measurementUtils';
 import { useIntl } from 'react-intl';
 import { Capacitor } from '@capacitor/core';
@@ -158,6 +158,8 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
     
     // Search state
     const [result, setResult] = useState<RecipeSearchResult | null>(persistedResult || null);
+    // Map of recipe title -> warning strings for post-fetch preference checking
+    const [recipeWarnings, setRecipeWarnings] = useState<Map<string, { warnings: string[], isAllergen: boolean }>>(new Map());
     const [loadingState, setLoadingState] = useState<LoadingState>(LoadingState.IDLE);
     const [searchError, setSearchError] = useState<string | null>(null);
     const [isResultFromCache, setIsResultFromCache] = useState(false);
@@ -1139,6 +1141,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
 
         setLoadingState(LoadingState.LOADING);
         setResult(null);
+        setRecipeWarnings(new Map());
         setIsResultFromCache(false);
         setSearchError(null);
         if (setPersistedResult) setPersistedResult(null);
@@ -1193,47 +1196,53 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                 });
             }
 
-            // Filter recipes based on household member preferences
+            // Build per-recipe warnings from household members and the user's own profile
+            const warningsMap = new Map<string, { warnings: string[], isAllergen: boolean }>();
+
+            // Check household member preferences
             if (household?.members && Array.isArray(household.members) && household.members.length > 0) {
                 const { safeRecipes, riskyRecipes } = filterRecipesByHouseholdPreferences(
                     filteredRecipes,
                     household.members,
-                    false // Allow recipes with restrictions/dislikes but no allergies
+                    false
                 );
-
-                // Show warning for risky recipes if any exist
-                if (riskyRecipes.length > 0 && addToast) {
-                    const totalIssues = riskyRecipes.reduce((sum, r) => sum + r.violations.length, 0);
-                    addToast(
-                        `${riskyRecipes.length} recipes may not suit all household members (${totalIssues} issues found). Check recipe details for warnings.`,
-                        'info',
-                        5000
-                    );
-                }
-
-                // Use safe recipes, but include risky ones with warnings
                 filteredRecipes = [...safeRecipes, ...riskyRecipes.map(r => r.recipe)];
-            }
 
-            // Apply individual user profile filtering and scoring
-            if (user?.profile) {
-                const profileFiltered = filterRecipesByUserProfile(filteredRecipes, user.profile);
-
-                // Sort by profile score (recommended recipes first)
-                filteredRecipes = profileFiltered
-                    .sort((a, b) => b.score - a.score)
-                    .map(item => item.recipe);
-
-                // Show toast for highly recommended recipes
-                const highlyRecommended = profileFiltered.filter(item => item.isRecommended && item.score >= 80);
-                if (highlyRecommended.length > 0 && addToast) {
-                    addToast(
-                        `${highlyRecommended.length} recipes perfectly match your profile! Check the top recommendations.`,
-                        'success',
-                        4000
-                    );
+                // Attach per-card warnings for risky recipes
+                for (const { recipe: rr, violations } of riskyRecipes) {
+                    const allWarnings = violations.flatMap(v => v.result.warnings.map(w => `${v.member.name}: ${w}`));
+                    const hasAllergen = violations.some(v => v.result.violations.allergies.length > 0);
+                    warningsMap.set(rr.title, { warnings: allWarnings, isAllergen: hasAllergen });
                 }
             }
+
+            // Check the individual user's own allergens / dislikes
+            if (user?.profile) {
+                const userAsMember = {
+                    id: user.id ?? '',
+                    name: user.name ?? 'You',
+                    email: '',
+                    role: 'member' as const,
+                    status: 'active' as const,
+                    joinedAt: '',
+                    allergies: user.profile.allergies,
+                    dietaryRestrictions: user.profile.dietaryRestrictions,
+                    dislikedIngredients: user.profile.dislikedIngredients,
+                };
+
+                for (const recipe of filteredRecipes) {
+                    if (warningsMap.has(recipe.title)) continue; // already has household warnings
+                    const check = checkRecipeAgainstPreferences(recipe, userAsMember);
+                    if (check.warnings.length > 0) {
+                        warningsMap.set(recipe.title, {
+                            warnings: check.warnings,
+                            isAllergen: check.violations.allergies.length > 0,
+                        });
+                    }
+                }
+            }
+
+            setRecipeWarnings(warningsMap);
 
             setResult({ ...data, recipes: filteredRecipes });
             setIsResultFromCache(false);
@@ -1437,6 +1446,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
             const isSaved = savedRecipes.some(r => r.title === recipe.title);
             const titleKey = `${recipe.title || 'Untitled Recipe'}-${Math.random()}`;
             const dietaryBadges = getDietaryBadges(recipe);
+            const cardWarning = recipeWarnings.get(recipe.title);
             
             // Filter out staple items from ingredient list
             const filteredIngredients = recipe.ingredients.filter(ing => {
@@ -1467,6 +1477,12 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                         
                         <div className="p-3">
                             <h4 className="font-bold text-sm mb-2 line-clamp-2">{recipe.title}</h4>
+                            {cardWarning && (
+                                <div className={`flex items-start gap-1 text-[10px] rounded px-1.5 py-1 mb-1.5 ${cardWarning.isAllergen ? 'bg-red-100 text-red-700' : 'bg-yellow-50 text-yellow-700'}`}>
+                                    {cardWarning.isAllergen ? <ShieldAlert className="w-3 h-3 shrink-0 mt-0.5" /> : <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" />}
+                                    <span className="leading-tight">{cardWarning.warnings[0]}</span>
+                                </div>
+                            )}
                             <div className="flex items-center gap-2 text-xs opacity-70">
                                 <Clock className="w-3 h-3" /> {recipe.cookTime}
                                 {ratingInfo && (
@@ -1492,6 +1508,14 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                     {/* Recipe Header */}
                     <div className="bg-gradient-to-r from-theme-primary to-theme-primary/80 p-4 border-b border-theme">
                         <h4 className="text-lg font-serif font-bold mb-2">{recipe.title}</h4>
+                        {cardWarning && (
+                            <div className={`flex items-start gap-2 text-xs rounded-lg px-3 py-2 mb-2 ${cardWarning.isAllergen ? 'bg-red-100 text-red-700' : 'bg-yellow-50 text-yellow-700'}`}>
+                                {cardWarning.isAllergen ? <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" /> : <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />}
+                                <div>
+                                    {cardWarning.warnings.map((w, i) => <div key={i}>{w}</div>)}
+                                </div>
+                            </div>
+                        )}
                         <div className="flex items-center gap-3 text-xs font-medium opacity-90">
                             <span className="flex items-center gap-1">
                                 <Clock className="w-3 h-3 text-[var(--accent-color)]" /> {recipe.cookTime}

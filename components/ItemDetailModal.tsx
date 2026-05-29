@@ -6,6 +6,7 @@ import PriceTrends from './PriceTrends';
 import { getAllCategories, cleanItemNameForShopping, getFreezerShelfLifeDays, getOpenedShelfLifeDays, getItemImageCdnUrl, getPreferredItemDisplayImage } from '../utils/appUtils';
 import { getQuantityAmount, getQuantityUnit } from '../utils/quantityUtils';
 import { getNutritionFactsWithFallback, NutritionFacts } from '../services/nutritionService';
+import { getItemTips } from '../data/itemTips';
 import { useKeyboardNavigation } from '../hooks/useKeyboardNavigation';
 import QuantityUnitPicker from './QuantityUnitPicker';
 import { useFocusTrap } from '../hooks/useFocusTrap';
@@ -734,6 +735,40 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                 </div>
               )}
             </div>
+
+          {/* Tips Section */}
+          {(() => {
+            const itemTips = getItemTips(item.item);
+            if (!itemTips) return null;
+            return (
+              <div className="border-b border-theme">
+                <button
+                  onClick={() => toggleSection('tips')}
+                  className="w-full flex items-center justify-between px-4 py-4 text-left"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-base font-semibold text-theme-primary">Tips</span>
+                    <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-[var(--accent-color)]/15 text-[var(--accent-color)]">Did you know?</span>
+                  </div>
+                  {openSections.tips ? <ChevronDown className="w-5 h-5 text-theme-secondary" /> : <ChevronRight className="w-5 h-5 text-theme-secondary" />}
+                </button>
+                {openSections.tips && (
+                  <div className="px-4 pb-5 space-y-4">
+                    {itemTips.sections.map((section) => (
+                      <div key={section.title}>
+                        <div className="text-xs font-semibold uppercase tracking-wide text-[var(--accent-color)] mb-1.5">
+                          {section.title}
+                        </div>
+                        <p className="text-sm text-theme-primary leading-relaxed">
+                          {section.content}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* History Section */}
           <div className="border-b border-theme">

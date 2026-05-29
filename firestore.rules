@@ -100,10 +100,17 @@ service cloud.firestore {
     }
 
     // Notifications collection: users can only access their own notifications
+    // userId may be a UID or an email address (pre-registration invites)
     match /notifications/{notificationId} {
       allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
-      allow read: if request.auth != null && request.auth.uid == resource.data.userId;
-      allow update, delete: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow read: if request.auth != null && (
+        request.auth.uid == resource.data.userId ||
+        request.auth.token.email == resource.data.userId
+      );
+      allow update, delete: if request.auth != null && (
+        request.auth.uid == resource.data.userId ||
+        request.auth.token.email == resource.data.userId
+      );
     }
 
     // App versions collection: allow read for all authenticated users, write only for admins

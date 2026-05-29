@@ -437,6 +437,9 @@ export interface Settings {
     showNutrition?: boolean;
     showPriceData?: boolean;
   };
+  navigation?: {
+    hiddenTabs?: string[]; // Tab enum values that are hidden from the bottom nav
+  };
 }
 
 export interface HouseholdActivity {

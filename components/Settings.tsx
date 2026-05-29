@@ -13,13 +13,14 @@ import { useNotifications } from '../hooks/useNotifications';
 import { FAQPage } from './FAQPage';
 import { User, UserProfile, CustomCategory, Member } from '../types';
 import type { Settings as AppSettings } from '../types';
+import { Tab } from '../types/app';
 
 type MemberPreferences = Pick<Member, 'dietaryRestrictions' | 'allergies' | 'dietGoal' | 'favoriteCuisines' | 'specialNeeds' | 'preferredProteins' | 'dislikedIngredients'>;
 import { NotificationSettingsComponent } from './NotificationSettings';
 import { PendingNotifications } from './PendingNotifications';
 import { NotificationService, NotificationSettings } from '../services/notificationService';
 import { DayPlan } from '../types';
-import { Loader2, ChevronDown, ChevronRight, Heart, AlertTriangle, Edit2, X, Settings as SettingsIcon, User as UserIcon, Users, BellRing, Gauge, SlidersHorizontal, ShieldCheck, Palette, Bell, Tag, ShoppingCart, BarChart2, MessageSquare, Star, Camera, HelpCircle, RefreshCw, RotateCcw, Bug, Lock } from 'lucide-react';
+import { Loader2, ChevronDown, ChevronRight, Heart, AlertTriangle, Edit2, X, Settings as SettingsIcon, User as UserIcon, Users, BellRing, Gauge, SlidersHorizontal, ShieldCheck, Palette, Bell, Tag, ShoppingCart, BarChart2, MessageSquare, Star, Camera, HelpCircle, RefreshCw, RotateCcw, Bug, Lock, LayoutDashboard } from 'lucide-react';
 import { userOptedInToGemini, setUserGeminiOptIn, getGeminiUsage } from '../services/featureFlags';
 import { VersionUpdate } from './VersionUpdate';
 
@@ -77,6 +78,9 @@ const defaultSettings = {
     activeStoreProfile: undefined as string | undefined,
     showNutrition: false,
     showPriceData: false,
+  },
+  navigation: {
+    hiddenTabs: [] as string[],
   },
 };
 
@@ -561,7 +565,7 @@ export const Settings: React.FC<SettingsProps> = ({
     setSending(true);
     try {
       await DatabaseMonitoringService.addDoc(DatabaseMonitoringService.collection('feedback'), {
-        text: feedback,
+        message: feedback,
         createdAt: Timestamp.now(),
         user: user ? {
           id: user.id,
@@ -726,7 +730,7 @@ export const Settings: React.FC<SettingsProps> = ({
                 id="userName"
                 name="userName"
                 type="text"
-                value={userProfile?.name || user.name || ''}
+                value={userProfile?.name ?? user.name ?? ''}
                 onChange={(e) => handleProfileChange('name', e.target.value)}
                 placeholder="Enter your display name"
                 className="w-full px-3 py-2 border border-theme rounded-lg bg-theme-primary text-theme-secondary placeholder-theme-secondary/50 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:border-transparent"
@@ -958,6 +962,26 @@ export const Settings: React.FC<SettingsProps> = ({
           </div>
           {expandedSections.has('UsageLimits') && (
             <div className="border-t border-theme p-4 space-y-4">
+              {/* Current plan badge */}
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-theme-primary border border-theme">
+                <span className="text-lg" aria-hidden="true">
+                  {isFamily ? '👨‍👩‍👧‍👦' : isPremium ? '⭐' : '🆓'}
+                </span>
+                <div>
+                  <p className="text-xs text-theme-secondary uppercase tracking-wide font-semibold">Current Plan</p>
+                  <p className="text-sm font-bold text-theme-primary">
+                    {isFamily ? 'Family' : isPremium ? 'Premium' : 'Free'}
+                  </p>
+                </div>
+                {!isPremium && !isFamily && (
+                  <button
+                    onClick={() => setActiveSettingsTab('more')}
+                    className="ml-auto text-xs text-[var(--accent-color)] font-semibold hover:underline"
+                  >
+                    Upgrade →
+                  </button>
+                )}
+              </div>
               {usageLimits ? (
                 <>
                   <div className="space-y-3">
@@ -1448,6 +1472,65 @@ export const Settings: React.FC<SettingsProps> = ({
               </label>
             </div>
 
+          </div>
+        )}
+      </div>
+
+      {/* Tab Visibility Section */}
+      <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden">
+        <div
+          onClick={() => toggleSection('TabVisibility')}
+          className="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-theme-primary transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            {expandedSections.has('TabVisibility') ? (
+              <ChevronDown className="w-5 h-5 text-theme-primary" />
+            ) : (
+              <ChevronRight className="w-5 h-5 text-theme-primary" />
+            )}
+            <LayoutDashboard className="w-5 h-5 text-[var(--accent-color)]" />
+            <h3 className="font-semibold text-theme-primary">Navigation Tabs</h3>
+          </div>
+        </div>
+
+        {expandedSections.has('TabVisibility') && (
+          <div className="border-t border-theme px-4 divide-y divide-theme">
+            <p className="text-xs text-theme-secondary py-3">Choose which tabs appear in the bottom navigation. Pantry and Settings are always visible.</p>
+            {([
+              { tab: Tab.SHOPPING, label: 'Shopping', description: 'Shopping list and grocery management' },
+              { tab: Tab.MEALS, label: 'Meal Planner', description: 'Plan your meals for the week' },
+              { tab: Tab.RECIPES, label: 'Recipes', description: 'Browse and search recipes' },
+              { tab: Tab.COMMUNITY, label: 'Community', description: 'Connect with other users' },
+              { tab: Tab.ANALYTICS, label: 'Analytics', description: 'Pantry usage and waste stats' },
+            ] as { tab: Tab; label: string; description: string }[]).map(({ tab, label, description }) => {
+              const isVisible = !(settings.navigation?.hiddenTabs?.includes(tab) ?? false);
+              return (
+                <div key={tab} className="flex items-center justify-between py-3">
+                  <div className="flex-1 pr-4">
+                    <p className="text-sm font-medium text-theme-primary">{label}</p>
+                    <p className="text-xs text-theme-secondary mt-0.5">{description}</p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                    <input
+                      type="checkbox"
+                      checked={isVisible}
+                      onChange={e => {
+                        const hidden = settings.navigation?.hiddenTabs ?? [];
+                        const newHidden = e.target.checked
+                          ? hidden.filter((t: string) => t !== tab)
+                          : [...hidden, tab];
+                        setSettings(prev => ({
+                          ...prev,
+                          navigation: { ...prev.navigation, hiddenTabs: newHidden },
+                        }));
+                      }}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-gray-400 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[var(--accent-color)]"></div>
+                  </label>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

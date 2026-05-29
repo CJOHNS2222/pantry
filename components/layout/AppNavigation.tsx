@@ -5,10 +5,11 @@ import { Tab } from '../../types/app';
 interface AppNavigationProps {
   activeTab: Tab;
   setActiveTab: (tab: Tab) => void;
+  hiddenTabs?: string[];
 }
 
-export const AppNavigation: React.FC<AppNavigationProps> = ({ activeTab, setActiveTab }) => {
-  const tabs = [
+export const AppNavigation: React.FC<AppNavigationProps> = ({ activeTab, setActiveTab, hiddenTabs }) => {
+  const allTabs = [
     { id: Tab.PANTRY, icon: ChefHat, label: 'Pantry' },
     { id: Tab.SHOPPING, icon: ShoppingBasket, label: 'Shop' },
     { id: Tab.MEALS, icon: CalendarDays, label: 'Plan' },
@@ -16,6 +17,12 @@ export const AppNavigation: React.FC<AppNavigationProps> = ({ activeTab, setActi
     { id: Tab.COMMUNITY, icon: Users, label: 'Social' },
     { id: Tab.SETTINGS, icon: Sun, label: 'Settings' },
   ];
+
+  // PANTRY and SETTINGS are always visible regardless of the user's preference
+  const alwaysVisible = new Set([Tab.PANTRY, Tab.SETTINGS]);
+  const tabs = hiddenTabs?.length
+    ? allTabs.filter(t => alwaysVisible.has(t.id) || !hiddenTabs.includes(t.id))
+    : allTabs;
 
   return (
     <nav 
