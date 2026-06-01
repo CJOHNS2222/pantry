@@ -5,6 +5,7 @@ import { useApp } from '../contexts/AppContext'
 import { uploadLeftoverImage } from '../services/leftoverImageService'
 import { LeftoverService, LeftoverCreateData } from '../services/leftoverService'
 import AnalyticsService from '../services/analyticsService'
+import { log } from '../services/logService'
 
 interface LeftoverQuickCaptureProps {
   createdBy: string
@@ -80,7 +81,7 @@ export default function LeftoverQuickCapture({
     } catch (err: any) {
       setLoading(false)
       setError(err?.message || 'Failed to save leftover')
-      console.error('Leftover save failed', err)
+      log.error('Leftover save failed', { error: err }, 'LeftoverQuickCapture')
     }
   }
 

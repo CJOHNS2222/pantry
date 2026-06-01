@@ -106,7 +106,16 @@ export const UsageIndicator: React.FC<UsageIndicatorProps> = ({
       {/* Collapsed header — always visible */}
       <div
         role="button"
+        tabIndex={0}
+        aria-expanded={isExpanded}
+        aria-label="Toggle free plan usage details"
         onClick={() => setIsExpanded(prev => !prev)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setIsExpanded(prev => !prev);
+          }
+        }}
         className="flex items-center justify-between px-4 py-2.5 bg-blue-500 dark:bg-blue-600 text-white cursor-pointer select-none"
       >
         <div className="flex items-center gap-2">

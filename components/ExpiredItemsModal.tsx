@@ -202,11 +202,11 @@ const ExpiredItemsModal: React.FC<ExpiredItemsModalProps> = ({
               <div className="flex items-center justify-between mb-4">
                 <button
                   onClick={handleSelectAll}
-                  className="text-sm text-[var(--accent-color)] hover:underline"
+                  className="text-sm font-medium text-[var(--accent-color)] hover:underline"
                 >
                   {selectedItems.size === expiredItems.length ? 'Deselect All' : 'Select All'}
                 </button>
-                <span className="text-xs text-theme-secondary">
+                <span className="text-sm text-theme-secondary">
                   {selectedItems.size} of {expiredItems.length} selected
                 </span>
               </div>
@@ -226,6 +226,15 @@ const ExpiredItemsModal: React.FC<ExpiredItemsModalProps> = ({
                           : 'bg-theme-secondary/50 border-theme hover:bg-theme-secondary'
                       }`}
                       onClick={() => handleSelectItem(item.id)}
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`Toggle expired item ${item.item}`}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          handleSelectItem(item.id);
+                        }
+                      }}
                     >
                       <input
                         type="checkbox"
@@ -239,11 +248,11 @@ const ExpiredItemsModal: React.FC<ExpiredItemsModalProps> = ({
                           <span className="font-medium text-theme-primary truncate">
                             {item.item}
                           </span>
-                          <span className="text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded-full font-medium">
+                          <span className="text-sm bg-red-100 text-red-800 px-2 py-0.5 rounded-full font-medium">
                             {daysExpired} day{daysExpired !== 1 ? 's' : ''} expired
                           </span>
                         </div>
-                        <div className="flex items-center gap-2 text-xs text-theme-secondary">
+                        <div className="flex items-center gap-2 text-sm text-theme-secondary">
                           <span>Qty: {getQuantityAmount(item.quantity)}</span>
                           {item.category && <span>• {item.category}</span>}
                           {item.storageLocation && <span>• {item.storageLocation}</span>}
@@ -251,7 +260,7 @@ const ExpiredItemsModal: React.FC<ExpiredItemsModalProps> = ({
                       </div>
 
                       <div className="text-right">
-                        <div className="text-xs text-red-500 font-medium">
+                        <div className="text-sm text-red-500 font-medium">
                           Expired {new Date(item.expirationDate!).toLocaleDateString()}
                         </div>
                       </div>
@@ -263,7 +272,7 @@ const ExpiredItemsModal: React.FC<ExpiredItemsModalProps> = ({
               {/* Disposal Reason */}
               {selectedItems.size > 0 && (
                 <div className="mt-6 p-4 bg-theme-secondary/30 rounded-lg border border-theme">
-                  <h3 className="text-sm font-medium text-theme-primary mb-3">What happened to these items?</h3>
+                  <h3 className="text-sm font-semibold text-theme-primary mb-3">What happened to these items?</h3>
                   <div className="space-y-2">
                     <label className="flex items-center gap-2">
                       <input

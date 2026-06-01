@@ -208,8 +208,11 @@ const SmartRecommendations: React.FC<SmartRecommendationsProps> = ({ inventory, 
         <div className="text-center py-8">
           <Lightbulb className="w-12 h-12 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">No Recommendations Yet</h3>
-          <p className="text-gray-600">
+          <p className="text-sm text-gray-600">
             Start using the app to get personalized recommendations based on your behavior and preferences.
+          </p>
+          <p className="text-sm text-gray-500 mt-2">
+            Add items, plan meals, or rate recipes to unlock smarter suggestions.
           </p>
         </div>
       </div>
@@ -227,7 +230,7 @@ const SmartRecommendations: React.FC<SmartRecommendationsProps> = ({ inventory, 
           <Lightbulb className="w-5 h-5 text-blue-600 flex-shrink-0" />
           Smart Recommendations
           {isCollapsed && recommendations.length > 0 && (
-            <span className="text-xs font-normal text-gray-500 ml-1">({recommendations.length})</span>
+            <span className="text-sm font-normal text-gray-500 ml-1">({recommendations.length})</span>
           )}
         </h2>
         {isCollapsed ? <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" /> : <ChevronUp className="w-4 h-4 text-gray-400 flex-shrink-0" />}
@@ -253,13 +256,13 @@ const SmartRecommendations: React.FC<SmartRecommendationsProps> = ({ inventory, 
                   </span>
                 </div>
 
-                <p className="text-xs text-gray-600 mb-1.5 leading-snug">{rec.description}</p>
+                <p className="text-sm text-gray-600 mb-1.5 leading-snug">{rec.description}</p>
 
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-gray-500">{rec.category}</span>
+                  <span className="text-sm text-gray-500">{rec.category}</span>
                   <button 
                     onClick={() => handleRecommendationAction(rec)}
-                    className="inline-flex items-center px-3 py-1 bg-blue-600 text-white text-xs font-medium rounded-md hover:bg-blue-700 transition-colors"
+                    className="inline-flex items-center px-3 py-1 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
                   >
                     {rec.actionText}
                   </button>

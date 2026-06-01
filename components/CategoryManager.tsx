@@ -118,10 +118,10 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({
               <span className="text-amber-500 text-lg flex-shrink-0">🔒</span>
               <div>
                 <p className="text-sm font-semibold text-amber-800">Free plan limit reached</p>
-                <p className="text-xs text-amber-700 mt-0.5">
+                <p className="text-sm text-amber-700 mt-0.5">
                   You've used your 1 free custom category. Upgrade to <strong>Premium</strong> or <strong>Family</strong> for unlimited categories — starting at $4.99/mo.
                 </p>
-                <p className="text-xs text-amber-600 mt-1">Go to Settings → More → Subscription to upgrade.</p>
+                <p className="text-sm text-amber-600 mt-1">Go to Settings → More → Subscription to upgrade.</p>
               </div>
             </div>
           )}
@@ -243,8 +243,8 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({
               {!isAdding && !editingId && (
                 maxCategories !== undefined && customCategories.length >= maxCategories ? (
                   <div className="flex flex-col items-end gap-1">
-                    <span className="text-xs text-amber-600 font-medium">Free plan: 1 category limit</span>
-                    <span className="text-xs text-theme-secondary opacity-60">Upgrade for unlimited</span>
+                    <span className="text-sm text-amber-600 font-medium">Free plan: 1 category limit</span>
+                    <span className="text-sm text-theme-secondary opacity-60">Upgrade for unlimited categories</span>
                   </div>
                 ) : (
                 <button
@@ -262,7 +262,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({
             {customCategories.length === 0 ? (
               <div className="text-center py-8 text-theme-secondary">
                 <p>No custom categories yet.</p>
-                <p className="text-sm mt-1">Create your first category to get started!</p>
+                <p className="text-sm mt-1">Create a category to keep pantry items organized and easier to scan.</p>
               </div>
             ) : (
               <div className="grid gap-3">

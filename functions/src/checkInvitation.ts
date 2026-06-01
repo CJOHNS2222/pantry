@@ -1,4 +1,5 @@
 import {onCall, HttpsError} from "firebase-functions/v2/https";
+import {logger} from "firebase-functions/v2";
 import admin from 'firebase-admin';
 
 // Ensure the Admin SDK is initialized
@@ -60,7 +61,7 @@ export const checkInvitation = onCall(
           members = [];
         }
       } catch (membersError) {
-        console.error('Error processing members:', membersError);
+        logger.error('Error processing members', membersError);
         throw new HttpsError("internal", "Unable to join 4: Failed to process household members data.");
       }
 
@@ -71,13 +72,13 @@ export const checkInvitation = onCall(
           (m: any) => m.email?.toLowerCase() === email?.toLowerCase() && m.status === 'pending'
         ) || false;
       } catch (checkError) {
-        console.error('Error checking invitation status:', checkError);
+        logger.error('Error checking invitation status', checkError);
         throw new HttpsError("internal", "Unable to join 4: Failed to check invitation status.");
       }
       
       return { isInvited, household: isInvited ? household : null };
     } catch (err: any) {
-      console.error('Error checking invitation:', err);
+      logger.error('Error checking invitation', err);
       throw new HttpsError("internal", "Unable to join 4: Failed to check invitation.");
     }
   }

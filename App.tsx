@@ -52,6 +52,7 @@ import { RecipesCacheService } from './services/recipesCacheService';
 import { groceryPriceService } from './services/groceryPriceService';
 import { PriceDataCacheService } from './services/priceDataCacheService'; // Import the service
 import ExpiredItemsModal from './components/ExpiredItemsModal';
+import ExpiredItemsLaunchSheet, { getExpiredLaunchEnabled } from './components/ExpiredItemsLaunchSheet';
 import ItemDetailModal from './components/ItemDetailModal';
 import { InventoryCacheService } from './services/inventoryCacheService';
 import { useIntl } from 'react-intl';
@@ -155,6 +156,9 @@ const App: React.FC = () => {
   const [showHouseholdInviteModal, setShowHouseholdInviteModal] = useState(false);
   const [showExpiredItemsModal, setShowExpiredItemsModal] = useState(false);
   const [expiredItemsModalSpecificItems, setExpiredItemsModalSpecificItems] = useState<PantryItem[] | undefined>(undefined);
+  const [showExpiredLaunchSheet, setShowExpiredLaunchSheet] = useState(false);
+  const [expiredLaunchItems, setExpiredLaunchItems] = useState<PantryItem[]>([]);
+  const hasShownExpiredLaunchRef = useRef(false);
   const [notificationViewItem, setNotificationViewItem] = useState<{ item: PantryItem; index: number } | null>(null);
   const [showAddToPlanDialog, setShowAddToPlanDialog] = useState(false);
   const [pendingRecipeForPlan, setPendingRecipeForPlan] = useState<StructuredRecipe | null>(null);
@@ -198,6 +202,7 @@ const App: React.FC = () => {
   useAndroidBack(showNotificationsModal, () => setShowNotificationsModal(false));
   useAndroidBack(showHouseholdInviteModal, () => setShowHouseholdInviteModal(false));
   useAndroidBack(showExpiredItemsModal, () => setShowExpiredItemsModal(false));
+  useAndroidBack(showExpiredLaunchSheet, () => setShowExpiredLaunchSheet(false));
   useAndroidBack(showHousehold, () => setShowHousehold(false));
   const maintenanceInfo = remoteConfig.getMaintenanceInfo();
   const announcementInfo = remoteConfig.getAnnouncementInfo();
@@ -1059,31 +1064,31 @@ const App: React.FC = () => {
     }
   }, [user?.id, user?.householdId]);
 
-  // Check for expired items when user logs in and has opted in
+  // Show expired items launch sheet once per session when the user has opted in
   useEffect(() => {
-    const checkExpiredItems = async () => {
-      if (user && notificationSettings.types.expired_items_check && inventory.length > 0) {
-        const today = new Date().toISOString().slice(0, 10);
-        const expiredItems = inventory.filter(item => {
-          if (!item.expirationDate || item.is_immortal) return false;
-          // Frozen items use freezerExpiry; skip items with only a stale fridge-date
-          if (item.is_frozen || item.storageLocation === 'freezer') {
-            const ref = item.freezerExpiry || item.expirationDate;
-            return ref <= today;
-          }
-          return item.expirationDate <= today;
-        });
+    if (hasShownExpiredLaunchRef.current) return;
+    if (!user || inventory.length === 0) return;
+    if (!getExpiredLaunchEnabled()) return;
 
-        if (expiredItems.length > 0) {
-          setShowExpiredItemsModal(true);
+    const timer = setTimeout(() => {
+      if (hasShownExpiredLaunchRef.current) return;
+      const today = new Date().toISOString().slice(0, 10);
+      const expired = inventory.filter(item => {
+        if (!item.expirationDate || item.is_immortal) return false;
+        if (item.is_frozen || item.storageLocation === 'freezer') {
+          const ref = item.freezerExpiry || item.expirationDate;
+          return ref <= today;
         }
+        return item.expirationDate <= today;
+      });
+      if (expired.length > 0) {
+        hasShownExpiredLaunchRef.current = true;
+        setExpiredLaunchItems(expired);
+        setShowExpiredLaunchSheet(true);
       }
-    };
-
-    // Delay check to allow inventory to load
-    const timer = setTimeout(checkExpiredItems, 2000);
+    }, 1500);
     return () => clearTimeout(timer);
-  }, [user, notificationSettings.types.expired_items_check, inventory]);
+  }, [user, inventory]);
 
   // Show a loading spinner while waiting for auth to be ready
   if (!isAuthReady) {
@@ -1612,6 +1617,18 @@ const App: React.FC = () => {
           userId={user?.id}
           userName={user?.name}
           specificItems={expiredItemsModalSpecificItems}
+        />
+      )}
+
+      {/* Launch-time expired items bottom sheet */}
+      {showExpiredLaunchSheet && (
+        <ExpiredItemsLaunchSheet
+          isOpen={showExpiredLaunchSheet}
+          onClose={() => setShowExpiredLaunchSheet(false)}
+          expiredItems={expiredLaunchItems}
+          onRemoveItems={async (ids) => {
+            await handleRemoveExpiredItems(ids);
+          }}
         />
       )}
 

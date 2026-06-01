@@ -1,4 +1,5 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import {logger} from "firebase-functions/v2";
 import admin from 'firebase-admin';
 import { getFirestore } from "firebase-admin/firestore";
 import { getAuth } from 'firebase-admin/auth';
@@ -51,7 +52,7 @@ export const deleteAccount = onCall(async (request) => {
     }
   } catch (err: any) {
     // Non-fatal: continue with deletion even if household cleanup fails
-    console.error('deleteAccount: household cleanup error', { uid: uid.substring(0, 8) });
+    logger.error('deleteAccount household cleanup error', { uid: uid.substring(0, 8), err });
   }
 
   // 2. Delete user subcollections in batches

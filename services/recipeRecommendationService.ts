@@ -1,6 +1,7 @@
-import { SavedRecipe, StructuredRecipe } from '../types';
+import { SavedRecipe, StructuredRecipe, UserProfile } from '../types';
 import { getCachedRecipesCache } from './recipeService';
 import { log } from './logService';
+import { scoreRecipeForPreferences } from '../utils/preferenceUtils';
 
 export interface RecipeRecommendation {
   recipe: StructuredRecipe;
@@ -53,7 +54,8 @@ export class RecipeRecommendationService {
     householdId?: string,
     pantryItems: string[] = [],
     dietaryRestrictions: string[] = [],
-    limitCount: number = 5
+    limitCount: number = 5,
+    userProfile?: UserProfile
   ): Promise<RecipeRecommendation[]> {
     try {
       const allRecipes = await loadRecipeCache();
@@ -76,7 +78,14 @@ export class RecipeRecommendationService {
       recommendations.push(...filler);
 
       return recommendations
-        .sort((a, b) => b.confidence - a.confidence)
+        .sort((a, b) => {
+          const aPreference = scoreRecipeForPreferences(a.recipe, [], userProfile);
+          const bPreference = scoreRecipeForPreferences(b.recipe, [], userProfile);
+          const aRank = a.confidence + (aPreference * 0.01);
+          const bRank = b.confidence + (bPreference * 0.01);
+          if (bRank !== aRank) return bRank - aRank;
+          return b.confidence - a.confidence;
+        })
         .slice(0, limitCount);
 
     } catch (err: unknown) {

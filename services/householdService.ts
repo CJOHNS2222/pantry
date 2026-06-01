@@ -12,6 +12,10 @@ import {
 import { Household, Member, User } from '../types';
 import { getPerformance, trace } from "firebase/performance";
 import { log } from './logService';
+import {
+  migrateUserCacheToHousehold,
+  copyHouseholdCacheToUser,
+} from './householdDataMigrationService';
 
 const performance = getPerformance();
 
@@ -232,6 +236,14 @@ export const removeMemberFromHousehold = async (
 
     await DatabaseMonitoringService.updateDoc(householdRef, updatePayload);
 
+    // Copy the household caches to the departing member's personal cache
+    // so they don't lose their pantry/shopping/meal-plan/recipe data.
+    // Use the member's User shape from what we have available.
+    const departingUser: User = { id: memberId } as User;
+    copyHouseholdCacheToUser(departingUser, householdId).catch(err =>
+      log.error('Cache copy failed after removing member', { err }, 'HouseholdService')
+    );
+
     // If this was the last member besides the admin, delete the household
     if (updatedMembers.length === 1) {
       await DatabaseMonitoringService.deleteDoc(householdRef);
@@ -362,6 +374,12 @@ export const joinHousehold = async (
       householdId: householdId,
       updatedAt: serverTimestamp(),
     });
+
+    // Merge the user's personal caches into the household caches (deduplicating).
+    // Fire-and-forget: non-fatal if it fails, user is already joined.
+    migrateUserCacheToHousehold(user, householdId).catch(err =>
+      log.error('Cache migration failed after joining household', { err }, 'HouseholdService')
+    );
 
     // Return updated household
     return {

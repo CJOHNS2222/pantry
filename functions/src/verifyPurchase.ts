@@ -17,6 +17,7 @@
  */
 
 import {onCall, HttpsError} from "firebase-functions/v2/https";
+import {logger} from "firebase-functions/v2";
 import admin from "firebase-admin";
 import {getFirestore, Timestamp} from "firebase-admin/firestore";
 import {google} from "googleapis";
@@ -103,7 +104,7 @@ export const verifyPurchase = onCall(async (request) => {
 
     // Play API not accessible — likely missing IAM permissions.
     // Log the config error but do NOT fall back to trusting the client.
-    console.error(`[verifyPurchase] Android Publisher API call failed: ${err.message}`);
+    logger.error('Android Publisher API call failed', { message: err.message });
     throw new HttpsError(
       "internal",
       `Play verification failed: ${err.message}. ` +
@@ -129,7 +130,7 @@ export const verifyPurchase = onCall(async (request) => {
       },
     });
 
-  console.log(`[verifyPurchase] Subscription granted: uid=${uid} tier=${tier} status=${status}`);
+  logger.info('Subscription granted', { uid, tier, status });
 
   return {ok: true, tier, status, expiryMs};
 });

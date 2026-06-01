@@ -118,7 +118,7 @@ export const MainContent: React.FC = () => {
     updateMealPlan(newMealPlan);
   };
   return (
-    <main className="overflow-y-auto overflow-x-hidden pb-safe px-4 scrollbar-hide bg-theme-primary" style={{ paddingTop: 'var(--app-header-h)', height: 'calc(100vh - 5rem - max(0.5rem, var(--safe-area-inset-bottom, 0px)))', WebkitOverflowScrolling: 'touch', touchAction: 'auto' }}>
+    <main className="overflow-y-auto overflow-x-hidden pb-safe px-4 scrollbar-hide bg-theme-primary" style={{ paddingTop: 'var(--app-header-h)', height: 'calc(100dvh - 5rem - max(0.5rem, var(--safe-area-inset-bottom, 0px)))', WebkitOverflowScrolling: 'touch', touchAction: 'auto' }}>
       {/* Usage Indicator - Show for free users */}
       <UsageIndicator
         user={user || undefined}

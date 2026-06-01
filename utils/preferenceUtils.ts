@@ -261,6 +261,107 @@ export function filterRecipesByHouseholdPreferences(
   return { safeRecipes, riskyRecipes };
 }
 
+export type CacheMealTypeFilter = '' | 'breakfast' | 'lunch' | 'dinner';
+
+function getRecipeMealType(recipe: StructuredRecipe | SavedRecipe): string {
+  const normalizedMealType = normalizeIngredient(((recipe as StructuredRecipe & { mealType?: string }).mealType || ''));
+  if (normalizedMealType === 'breakfast' || normalizedMealType === 'lunch' || normalizedMealType === 'dinner') {
+    return normalizedMealType;
+  }
+
+  const normalizedType = normalizeIngredient(recipe.type || '');
+  if (normalizedType.includes('breakfast') || normalizedType.includes('brunch') || normalizedType.includes('morning')) {
+    return 'breakfast';
+  }
+  if (normalizedType.includes('lunch')) {
+    return 'lunch';
+  }
+  return 'dinner';
+}
+
+function getRecipeCuisine(recipe: StructuredRecipe | SavedRecipe): string {
+  const labeledCuisine = (recipe as StructuredRecipe & { cuisine?: string }).cuisine;
+  return normalizeIngredient(labeledCuisine || 'other');
+}
+
+/**
+ * Apply standardized cache recipe filters used across app searches.
+ */
+export function recipeMatchesCacheFilters(
+  recipe: StructuredRecipe | SavedRecipe,
+  filters: { mealType?: CacheMealTypeFilter; cuisine?: string }
+): boolean {
+  const mealTypeFilter = normalizeIngredient(filters.mealType || '');
+  if (mealTypeFilter && getRecipeMealType(recipe) !== mealTypeFilter) {
+    return false;
+  }
+
+  const cuisineFilter = normalizeIngredient(filters.cuisine || '');
+  if (cuisineFilter && getRecipeCuisine(recipe) !== cuisineFilter) {
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Score a recipe by household/user likes/dislikes so callers can rank matches.
+ */
+export function scoreRecipeForPreferences(
+  recipe: StructuredRecipe | SavedRecipe,
+  householdMembers: Member[] = [],
+  userProfile?: UserProfile
+): number {
+  const text = normalizeIngredient([
+    recipe.title || '',
+    recipe.description || '',
+    recipe.type || '',
+    getRecipeCuisine(recipe),
+    Array.isArray(recipe.ingredients) ? recipe.ingredients.join(' ') : ''
+  ].join(' '));
+
+  let score = 0;
+
+  const scoreMember = (member: Pick<Member, 'favoriteCuisines' | 'preferredProteins' | 'dislikedIngredients'>) => {
+    for (const cuisine of member.favoriteCuisines || []) {
+      if (text.includes(normalizeIngredient(cuisine))) score += 6;
+    }
+    for (const protein of member.preferredProteins || []) {
+      if (text.includes(normalizeIngredient(protein))) score += 4;
+    }
+    for (const dislike of member.dislikedIngredients || []) {
+      if (text.includes(normalizeIngredient(dislike))) score -= 8;
+    }
+  };
+
+  for (const member of householdMembers) {
+    scoreMember(member);
+  }
+
+  if (userProfile) {
+    scoreMember({
+      favoriteCuisines: userProfile.favoriteCuisines,
+      preferredProteins: userProfile.preferredProteins,
+      dislikedIngredients: userProfile.dislikedIngredients
+    });
+  }
+
+  return score;
+}
+
+export function rankCachedRecipesByPreferences<T extends StructuredRecipe | SavedRecipe>(
+  recipes: T[],
+  householdMembers: Member[] = [],
+  userProfile?: UserProfile
+): T[] {
+  return [...recipes].sort((a, b) => {
+    const bScore = scoreRecipeForPreferences(b, householdMembers, userProfile);
+    const aScore = scoreRecipeForPreferences(a, householdMembers, userProfile);
+    if (bScore !== aScore) return bScore - aScore;
+    return (a.title || '').localeCompare(b.title || '');
+  });
+}
+
 /**
  * Check if a recipe fits a user's individual profile preferences
  */

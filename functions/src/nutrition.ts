@@ -1,4 +1,5 @@
 import {onCall, HttpsError} from "firebase-functions/v2/https";
+import {logger} from "firebase-functions/v2";
 import * as admin from 'firebase-admin';
 
 // Ensure the Admin SDK is initialized
@@ -31,7 +32,7 @@ export const getNutritionData = onCall(async (request) => {
       });
 
       if (!response.ok) {
-        console.error('USDA API detail error:', response.status, response.statusText);
+        logger.error('USDA API detail error', { status: response.status, statusText: response.statusText });
         throw new HttpsError('unavailable', `USDA API returned ${response.status}: ${response.statusText}`);
       }
 
@@ -60,7 +61,7 @@ export const getNutritionData = onCall(async (request) => {
     });
 
     if (!response.ok) {
-      console.error('USDA API error:', response.status, response.statusText);
+      logger.error('USDA API error', { status: response.status, statusText: response.statusText });
       throw new HttpsError('unavailable', `USDA API returned ${response.status}: ${response.statusText}`);
     }
 
@@ -69,7 +70,7 @@ export const getNutritionData = onCall(async (request) => {
     return data;
 
   } catch (err: any) {
-    console.error('Error in getNutritionData function:', err);
+    logger.error('Error in getNutritionData function', err);
 
     if (err instanceof HttpsError) {
       throw err;

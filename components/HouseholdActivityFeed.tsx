@@ -1,9 +1,10 @@
 import React from 'react';
 import { HouseholdActivityService } from '../services/householdActivityService';
 import { Clock, User, Package, ShoppingCart, ChefHat, Heart } from 'lucide-react';
+import type { HouseholdActivity } from '../types';
 
 interface HouseholdActivityFeedProps {
-  activities: any[];
+  activities: HouseholdActivity[];
   isLoading: boolean;
   maxItems?: number;
 }
@@ -35,7 +36,8 @@ export const HouseholdActivityFeed: React.FC<HouseholdActivityFeedProps> = ({
         <h3 className="text-sm font-bold text-amber-500 uppercase mb-3">Recent Activity</h3>
         <div className="text-center py-4">
           <Package className="w-8 h-8 text-red-200/30 mx-auto mb-2" />
-          <p className="text-xs text-red-200/50">No recent activity</p>
+          <p className="text-sm text-red-200/50">No recent activity yet</p>
+          <p className="text-sm text-red-200/40 mt-1">Add pantry items or update your shopping list to see updates here.</p>
         </div>
       </div>
     );
@@ -81,7 +83,7 @@ export const HouseholdActivityFeed: React.FC<HouseholdActivityFeedProps> = ({
               </p>
               <div className="flex items-center gap-1 mt-1">
                 <Clock className="w-3 h-3 text-red-200/50" />
-                <span className="text-xs text-red-200/50">
+                <span className="text-sm text-red-200/50">
                   {HouseholdActivityService.getRelativeTime(activity.timestamp)}
                 </span>
               </div>
@@ -92,7 +94,7 @@ export const HouseholdActivityFeed: React.FC<HouseholdActivityFeedProps> = ({
 
       {activities.length > maxItems && (
         <div className="mt-3 pt-3 border-t border-red-900/30">
-          <p className="text-xs text-red-200/50 text-center">
+          <p className="text-sm text-red-200/50 text-center">
             +{activities.length - maxItems} more activities
           </p>
         </div>

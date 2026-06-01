@@ -1,32 +1,23 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Timestamp } from 'firebase/firestore';
 import DatabaseMonitoringService from '../services/databaseMonitoringService';
-import { SubscriptionManager } from './SubscriptionManager';
 import { CategoryManager } from './CategoryManager';
-import { StoreLayoutEditor } from './StoreLayoutEditor';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { log } from '../services/logService';
 import { useIntl } from 'react-intl';
 import AnalyticsService from '../services/analyticsService';
-import { LanguageSelector } from '../src/components/LanguageSelector';
 import { useNotifications } from '../hooks/useNotifications';
 import { FAQPage } from './FAQPage';
 import { User, UserProfile, CustomCategory, Member } from '../types';
 import type { Settings as AppSettings } from '../types';
-import { Tab } from '../types/app';
 
 type MemberPreferences = Pick<Member, 'dietaryRestrictions' | 'allergies' | 'dietGoal' | 'favoriteCuisines' | 'specialNeeds' | 'preferredProteins' | 'dislikedIngredients'>;
-import { NotificationSettingsComponent } from './NotificationSettings';
-import { PendingNotifications } from './PendingNotifications';
 import { NotificationService, NotificationSettings } from '../services/notificationService';
 import { DayPlan } from '../types';
-import { Loader2, ChevronDown, ChevronRight, Heart, AlertTriangle, Edit2, X, Settings as SettingsIcon, User as UserIcon, Users, BellRing, Gauge, SlidersHorizontal, ShieldCheck, Palette, Bell, Tag, ShoppingCart, BarChart2, MessageSquare, Star, Camera, HelpCircle, RefreshCw, RotateCcw, Bug, Lock, LayoutDashboard } from 'lucide-react';
+import { Loader2, ChevronDown, ChevronRight, Heart, AlertTriangle, X, Settings as SettingsIcon, User as UserIcon } from 'lucide-react';
 import { userOptedInToGemini, setUserGeminiOptIn, getGeminiUsage } from '../services/featureFlags';
-import { VersionUpdate } from './VersionUpdate';
 
 import { Household } from '../types';
-import LeftoverPersonaQuestionnaire from './LeftoverPersonaQuestionnaire';
-import { LeftoverAnalytics } from './LeftoverAnalytics';
 import { serverTimestamp } from 'firebase/firestore';
 import { InventoryCacheService } from '../services/inventoryCacheService';
 import { MealPlanCacheService } from '../services/MealPlanCacheService';
@@ -38,7 +29,28 @@ import { ShoppingListCacheService } from '../services/shoppingListCacheService';
 import { setDoc } from 'firebase/firestore';
 import { useIsAdmin } from '../hooks/useIsAdmin';
 import { useAndroidBack } from '../hooks/useAndroidBack';
-import { RemoteConfigDebugPanel } from './RemoteConfigDebugPanel';
+import { SettingsFeedbackSection } from './settings/SettingsFeedbackSection';
+import { SettingsAppUpdatesSection } from './settings/SettingsAppUpdatesSection';
+import { SettingsHelpSection } from './settings/SettingsHelpSection';
+import { SettingsAppPreferencesSection } from './settings/SettingsAppPreferencesSection';
+import { SettingsCategoriesSection } from './settings/SettingsCategoriesSection';
+import { SettingsFoodSafetySection } from './settings/SettingsFoodSafetySection';
+import { SettingsGuestBanner } from './settings/SettingsGuestBanner';
+import { SettingsHouseholdSection } from './settings/SettingsHouseholdSection';
+import { SettingsLeftoverAnalyticsSection } from './settings/SettingsLeftoverAnalyticsSection';
+import { SettingsNotificationsSection } from './settings/SettingsNotificationsSection';
+import { SettingsPantryImagesSection } from './settings/SettingsPantryImagesSection';
+import { SettingsPendingNotificationsSection } from './settings/SettingsPendingNotificationsSection';
+import { SettingsPrivacyLegalSection } from './settings/SettingsPrivacyLegalSection';
+import { SettingsRemoteConfigDebugSection } from './settings/SettingsRemoteConfigDebugSection';
+import { SettingsResetUsageSection } from './settings/SettingsResetUsageSection';
+import { SettingsPowerFeaturesSection } from './settings/SettingsPowerFeaturesSection';
+import { SettingsStoreLayoutSection } from './settings/SettingsStoreLayoutSection';
+import { SettingsSubscriptionSection } from './settings/SettingsSubscriptionSection';
+import { SettingsTabPills } from './settings/SettingsTabPills';
+import { SettingsThemeSection } from './settings/SettingsThemeSection';
+import { SettingsUsageLimitsSection } from './settings/SettingsUsageLimitsSection';
+import { SettingsTabVisibilitySection } from './settings/SettingsTabVisibilitySection';
 
 const defaultStoreLayout = [
   'Produce',
@@ -582,64 +594,57 @@ export const Settings: React.FC<SettingsProps> = ({
     setSending(false);
   };
 
+  const handleBulkImageUpdate = async () => {
+    if (!user) return;
+    setUpdatingBulkImages(true);
+    try {
+      const { BulkImageUpdateService } = await import('../services/bulkImageUpdateService');
+      const result = await BulkImageUpdateService.updateAllPantryItemImages(user, (completed, total) => {
+        log.info(`Updated ${completed}/${total} items`, { completed, total }, 'Settings');
+      });
+
+      addToast?.(
+        `Updated ${result.updatedItems} items${result.failedItems > 0 ? ` (${result.failedItems} failed)` : ''}`,
+        result.failedItems > 0 ? 'warning' : 'success'
+      );
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      const stack = error instanceof Error ? error.stack : undefined;
+      log.error('Failed bulk image update', { message: msg, stack }, 'Settings');
+      addToast?.('Failed to update images. Please try again.', 'error');
+    } finally {
+      setUpdatingBulkImages(false);
+    }
+  };
+
+  const handleResetUsageCounters = async () => {
+    if (!user) return;
+    try {
+      await UsageService.resetUsage(user);
+      UsageService.getUsageLimits(user).then(limits => setUsageLimits(limits)).catch(() => {});
+      addToast?.('Usage counters reset successfully.', 'success');
+    } catch {
+      addToast?.('Failed to reset usage counters.', 'error');
+    }
+  };
+
   return (
     <>
 
       <div className="pb-24 max-w-md mx-auto">
-
-      {/* Settings Tab Pills */}
-      <div className="sticky top-0 z-10 bg-theme-primary border-b border-theme px-4 py-3">
-        <div className="flex gap-1 bg-theme-secondary rounded-xl p-1">
-          {(['account', 'preferences', 'organization', 'more'] as const).map((tab) => {
-            const labels: Record<string, string> = { account: 'Account', preferences: 'Prefs', organization: 'Organize', more: 'More' };
-            return (
-              <button
-                key={tab}
-                data-settings-tab={tab}
-                onClick={() => setActiveSettingsTab(tab)}
-                className={`flex-1 py-2 px-1 rounded-lg text-sm font-medium text-center transition-colors ${
-                  activeSettingsTab === tab
-                    ? 'bg-[var(--accent-color)] text-white shadow-sm'
-                    : 'text-theme-secondary hover:text-theme-primary'
-                }`}
-              >
-                {labels[tab]}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+      <SettingsTabPills
+        activeTab={activeSettingsTab}
+        onTabChange={setActiveSettingsTab}
+      />
 
       <div className="pt-2 pb-6 px-6 space-y-6">
 
       {activeSettingsTab === 'account' && <>
 
-      {/* Guest upgrade banner */}
-      {user?.isGuest && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-3">
-          <div className="flex items-center gap-2">
-            <span className="text-amber-600 text-lg">👤</span>
-            <h3 className="font-semibold text-amber-800">You're browsing as a Guest</h3>
-          </div>
-          <p className="text-sm text-amber-700">
-            Your data is stored on this device only. Sign up for free to sync across devices, access AI features, and more.
-          </p>
-          <div className="flex gap-2">
-            <button
-              onClick={onLogout}
-              className="flex-1 bg-amber-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-amber-700 transition-colors"
-            >
-              Sign Up (Free)
-            </button>
-            <button
-              onClick={onLogout}
-              className="flex-1 border border-amber-600 text-amber-700 py-2 rounded-lg text-sm font-medium hover:bg-amber-50 transition-colors"
-            >
-              Log In
-            </button>
-          </div>
-        </div>
-      )}
+      <SettingsGuestBanner
+        isGuest={!!user?.isGuest}
+        onLogout={onLogout}
+      />
 
       {/* Profile Section */}
       {user && onLogout && !user.isGuest && (
@@ -915,1285 +920,246 @@ export const Settings: React.FC<SettingsProps> = ({
         </div>
       )}
 
-      {/* Pending Notifications Section */}
-      {user && (
-        <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden" data-section="pending-notifications">
-          <div
-            onClick={() => toggleSection('PendingNotifications')}
-            className="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-theme-primary transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              {expandedSections.has('PendingNotifications') ? (
-                <ChevronDown className="w-5 h-5 text-theme-primary" />
-              ) : (
-                <ChevronRight className="w-5 h-5 text-theme-primary" />
-              )}
-              <BellRing className="w-5 h-5 text-[var(--accent-color)]" />
-              <h3 className="font-semibold text-theme-primary">{intl.formatMessage({ id: 'settings.pendingNotifications' })}</h3>
-            </div>
-          </div>
-          {expandedSections.has('PendingNotifications') && (
-            <div className="border-t border-theme p-4">
-              <PendingNotifications user={user} />
-            </div>
-          )}
-        </div>
-      )}
+      <SettingsPendingNotificationsSection
+        user={user}
+        expanded={expandedSections.has('PendingNotifications')}
+        onToggle={() => toggleSection('PendingNotifications')}
+        title={intl.formatMessage({ id: 'settings.pendingNotifications' })}
+      />
 
-      {/* Usage & Limits Section */}
-      {user && (
-        <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden" data-section="usage-limits">
-          <div
-            onClick={() => toggleSection('UsageLimits')}
-            className="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-theme-primary transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              {expandedSections.has('UsageLimits') ? (
-                <ChevronDown className="w-5 h-5 text-theme-primary" />
-              ) : (
-                <ChevronRight className="w-5 h-5 text-theme-primary" />
-              )}
-              <Gauge className="w-5 h-5 text-[var(--accent-color)]" />
-              <h3 className="font-semibold text-theme-primary">{intl.formatMessage({ id: 'settings.usageLimits' })}</h3>
-            </div>
-            {!isPremium && !isFamily && (
-              <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">Free Plan</span>
-            )}
-          </div>
-          {expandedSections.has('UsageLimits') && (
-            <div className="border-t border-theme p-4 space-y-4">
-              {/* Current plan badge */}
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-theme-primary border border-theme">
-                <span className="text-lg" aria-hidden="true">
-                  {isFamily ? '👨‍👩‍👧‍👦' : isPremium ? '⭐' : '🆓'}
-                </span>
-                <div>
-                  <p className="text-xs text-theme-secondary uppercase tracking-wide font-semibold">Current Plan</p>
-                  <p className="text-sm font-bold text-theme-primary">
-                    {isFamily ? 'Family' : isPremium ? 'Premium' : 'Free'}
-                  </p>
-                </div>
-                {!isPremium && !isFamily && (
-                  <button
-                    onClick={() => setActiveSettingsTab('more')}
-                    className="ml-auto text-xs text-[var(--accent-color)] font-semibold hover:underline"
-                  >
-                    Upgrade →
-                  </button>
-                )}
-              </div>
-              {usageLimits ? (
-                <>
-                  <div className="space-y-3">
-                    {/* AI Scans */}
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm text-theme-secondary">AI Scans (weekly)</span>
-                        <span className={`text-sm font-semibold ${
-                          usageLimits.gemini.weekly !== -1 && usageLimits.gemini.used >= usageLimits.gemini.weekly
-                            ? 'text-red-500' : 'text-theme-primary'
-                        }`}>
-                          {usageLimits.gemini.used} / {usageLimits.gemini.weekly === -1 ? '∞' : usageLimits.gemini.weekly}
-                        </span>
-                      </div>
-                      {usageLimits.gemini.weekly !== -1 && (
-                        <div className="w-full bg-theme-primary/20 rounded-full h-1.5">
-                          <div
-                            className={`h-1.5 rounded-full ${
-                              usageLimits.gemini.used >= usageLimits.gemini.weekly ? 'bg-red-500' : 'bg-[var(--accent-color)]'
-                            }`}
-                            style={{ width: `${Math.min(100, (usageLimits.gemini.used / usageLimits.gemini.weekly) * 100)}%` }}
-                          />
-                        </div>
-                      )}
-                      {usageLimits.gemini.weekly !== -1 && usageLimits.gemini.used >= usageLimits.gemini.weekly && (
-                        <p className="text-xs text-red-500 mt-1">⚠️ Weekly limit reached — upgrade to continue scanning</p>
-                      )}
-                    </div>
+      <SettingsUsageLimitsSection
+        userExists={!!user}
+        expanded={expandedSections.has('UsageLimits')}
+        onToggle={() => toggleSection('UsageLimits')}
+        title={intl.formatMessage({ id: 'settings.usageLimits' })}
+        isPremium={isPremium}
+        isFamily={isFamily}
+        usageLimits={usageLimits}
+        onOpenUpgrade={() => setActiveSettingsTab('more')}
+      />
 
-                    {/* Saved Recipes */}
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm text-theme-secondary">Saved Recipes</span>
-                        <span className={`text-sm font-semibold ${
-                          usageLimits.recipes.max !== -1 && usageLimits.recipes.used >= usageLimits.recipes.max
-                            ? 'text-red-500' : 'text-theme-primary'
-                        }`}>
-                          {usageLimits.recipes.used} / {usageLimits.recipes.max === -1 ? '∞' : usageLimits.recipes.max}
-                        </span>
-                      </div>
-                      {usageLimits.recipes.max !== -1 && (
-                        <div className="w-full bg-theme-primary/20 rounded-full h-1.5">
-                          <div
-                            className={`h-1.5 rounded-full ${
-                              usageLimits.recipes.used >= usageLimits.recipes.max ? 'bg-red-500' : 'bg-[var(--accent-color)]'
-                            }`}
-                            style={{ width: `${Math.min(100, (usageLimits.recipes.used / usageLimits.recipes.max) * 100)}%` }}
-                          />
-                        </div>
-                      )}
-                      {usageLimits.recipes.max !== -1 && usageLimits.recipes.used >= usageLimits.recipes.max && (
-                        <p className="text-xs text-red-500 mt-1">⚠️ Recipe limit reached — upgrade to save more</p>
-                      )}
-                    </div>
-
-                    {/* Meal Plan Additions */}
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm text-theme-secondary">Meal Plan Additions (weekly)</span>
-                        <span className={`text-sm font-semibold ${
-                          usageLimits.mealPlanning.weeklyRecipes !== -1 && usageLimits.mealPlanning.weeklyUsed >= usageLimits.mealPlanning.weeklyRecipes
-                            ? 'text-red-500' : 'text-theme-primary'
-                        }`}>
-                          {usageLimits.mealPlanning.weeklyUsed} / {usageLimits.mealPlanning.weeklyRecipes === -1 ? '∞' : usageLimits.mealPlanning.weeklyRecipes}
-                        </span>
-                      </div>
-                      {usageLimits.mealPlanning.weeklyRecipes !== -1 && (
-                        <div className="w-full bg-theme-primary/20 rounded-full h-1.5">
-                          <div
-                            className={`h-1.5 rounded-full ${
-                              usageLimits.mealPlanning.weeklyUsed >= usageLimits.mealPlanning.weeklyRecipes ? 'bg-red-500' : 'bg-[var(--accent-color)]'
-                            }`}
-                            style={{ width: `${Math.min(100, (usageLimits.mealPlanning.weeklyUsed / usageLimits.mealPlanning.weeklyRecipes) * 100)}%` }}
-                          />
-                        </div>
-                      )}
-                      {usageLimits.mealPlanning.weeklyRecipes !== -1 && usageLimits.mealPlanning.weeklyUsed >= usageLimits.mealPlanning.weeklyRecipes && (
-                        <p className="text-xs text-red-500 mt-1">⚠️ Weekly meal plan limit reached — upgrade to add more</p>
-                      )}
-                    </div>
-
-                    {/* Custom Categories */}
-                    {!isPremium && !isFamily && (
-                      <div className="flex items-center justify-between py-1">
-                        <span className="text-sm text-theme-secondary">Custom Categories</span>
-                        <span className="text-sm font-semibold text-theme-primary">
-                          Free: 1 category max
-                        </span>
-                      </div>
-                    )}
-
-                    {/* Grocery Estimator */}
-                    {!isPremium && !isFamily && (
-                      <div className="flex items-center justify-between py-1">
-                        <span className="text-sm text-theme-secondary">Grocery Cost Estimator</span>
-                        <span className="text-sm font-semibold text-theme-primary">
-                          Free: 5 ingredients shown
-                        </span>
-                      </div>
-                    )}
-
-                    {/* Meal Plan View */}
-                    {!isPremium && !isFamily && (
-                      <div className="flex items-center justify-between py-1">
-                        <span className="text-sm text-theme-secondary">Meal Plan View</span>
-                        <span className="text-sm font-semibold text-theme-primary">
-                          Free: current week only
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  {!isPremium && !isFamily && (
-                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm">
-                      <p className="text-amber-800 font-medium mb-1">🔓 Unlock more with Premium or Family</p>
-                      <ul className="text-amber-700 text-xs space-y-0.5">
-                        <li>• Unlimited AI scans, recipe saves &amp; meal plan entries</li>
-                        <li>• Unlimited custom categories</li>
-                        <li>• Full grocery cost estimates</li>
-                        <li>• Monthly meal plan view</li>
-                      </ul>
-                      <p className="text-amber-600 text-xs mt-2">Upgrade via Settings → More → Subscription</p>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <p className="text-sm text-theme-secondary opacity-60">Loading usage data…</p>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Household Members Section */}
-      {user && (
-        <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden" data-section="household">
-          <div
-            onClick={() => toggleSection('Household')}
-            className="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-theme-primary transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              {expandedSections.has('Household') ? (
-                <ChevronDown className="w-5 h-5 text-theme-primary" />
-              ) : (
-                <ChevronRight className="w-5 h-5 text-theme-primary" />
-              )}
-              <Users className="w-5 h-5 text-[var(--accent-color)]" />
-              <h3 className="font-semibold text-theme-primary">{intl.formatMessage({ id: 'settings.household' })}</h3>
-            </div>
-          </div>
-
-          {expandedSections.has('Household') && (
-            <div className="border-t border-theme p-4">
-              {household ? (
-                <>
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <p className="text-sm font-medium text-theme-primary">{household.name}</p>
-                      <p className="text-xs text-theme-secondary">
-                        {household.members && Array.isArray(household.members) ? household.members.length : 0} member{household.members && Array.isArray(household.members) && household.members.length === 1 ? '' : 's'}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => onShowHousehold?.()}
-                      className="px-3 py-2 bg-[var(--accent-color)] text-white rounded-lg hover:bg-[var(--accent-color)]/80 transition-colors text-sm font-medium"
-                    >
-                      {intl.formatMessage({ id: 'settings.manageHousehold' })}
-                    </button>
-                  </div>
-
-                  {/* Member List */}
-                  <div className="space-y-3 mb-4">
-                    {household.members && Array.isArray(household.members) && household.members.map((member) => {
-                      const isCurrentUser = member.id === user.id;
-                      const isAdmin = member.role === 'admin';
-                      const currentUserIsAdmin = household.members.find(m => m.id === user.id)?.role === 'admin';
-                      
-                      return (
-                        <div key={member.id} className="bg-theme-secondary/50 rounded-lg p-3 border border-theme">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 bg-theme-primary rounded-full flex items-center justify-center text-sm font-medium text-theme-secondary">
-                                {member.name.charAt(0).toUpperCase()}
-                              </div>
-                              <div>
-                                <div className="flex items-center gap-2">
-                                  <p className="text-sm font-medium text-theme-primary">{member.name}</p>
-                                  {isAdmin && (
-                                    <span className="px-2 py-0.5 bg-[var(--accent-color)] text-white text-xs rounded-full">
-                                      Admin
-                                    </span>
-                                  )}
-                                  {isCurrentUser && (
-                                    <span className="px-2 py-0.5 bg-blue-500 text-white text-xs rounded-full">
-                                      You
-                                    </span>
-                                  )}
-                                </div>
-                                <p className="text-xs text-theme-secondary">{member.email}</p>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {(currentUserIsAdmin || isCurrentUser) && (
-                              <button
-                                onClick={() => openMemberPreferences(member)}
-                                className="flex items-center gap-2 px-3 py-1 bg-theme-primary hover:bg-theme-secondary text-theme-secondary hover:text-theme-primary rounded-lg text-sm transition-colors"
-                              >
-                                <Edit2 className="w-4 h-4" />
-                                {currentUserIsAdmin && !isCurrentUser ? 'Edit' : 'My Prefs'}
-                              </button>
-                              )}
-                              {currentUserIsAdmin && !isCurrentUser && (
-                                <button
-                                  onClick={() => removeMemberFromHousehold(member)}
-                                  className="flex items-center gap-2 px-3 py-1 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm transition-colors"
-                                >
-                                  <X className="w-4 h-4" />
-                                  Remove
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {/* Member Preferences Form - Now handled in modal */}
-
-
-                  <p className="text-sm text-theme-secondary">
-                    Customize preferences for each household member to get personalized recipe recommendations and shopping suggestions.
-                  </p>
-                </>
-              ) : (
-                <div className="space-y-4">
-                  <p className="text-sm text-theme-secondary">
-                    Create a household to share your pantry with family members.
-                  </p>
-                  
-                  <div className="space-y-3">
-                    <div>
-                      <label htmlFor="householdName" className="block text-sm font-medium text-theme-primary mb-1">
-                        Household Name
-                      </label>
-                      <input
-                        id="householdName"
-                        type="text"
-                        value={householdName}
-                        onChange={(e) => setHouseholdName(e.target.value)}
-                        placeholder="e.g., Smith Family"
-                        className="w-full px-3 py-2 border border-theme rounded-lg bg-theme-primary text-theme-secondary placeholder-theme-secondary/50 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:border-transparent"
-                        disabled={isCreatingHousehold}
-                      />
-                    </div>
-                    
-                    <button
-                      onClick={createHousehold}
-                      disabled={!householdName.trim() || isCreatingHousehold}
-                      className="w-full bg-[var(--accent-color)] text-white px-4 py-2 rounded-lg font-medium hover:bg-[var(--accent-color)]/80 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors"
-                    >
-                      {isCreatingHousehold && <Loader2 className="w-4 h-4 animate-spin" />}
-                      {isCreatingHousehold ? 'Creating...' : 'Create Household'}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
+      <SettingsHouseholdSection
+        user={user}
+        household={household}
+        expanded={expandedSections.has('Household')}
+        onToggle={() => toggleSection('Household')}
+        title={intl.formatMessage({ id: 'settings.household' })}
+        onShowHousehold={onShowHousehold}
+        openMemberPreferences={openMemberPreferences}
+        removeMemberFromHousehold={removeMemberFromHousehold}
+        householdName={householdName}
+        setHouseholdName={setHouseholdName}
+        isCreatingHousehold={isCreatingHousehold}
+        createHousehold={createHousehold}
+        manageHouseholdLabel={intl.formatMessage({ id: 'settings.manageHousehold' })}
+      />
 
       </>}
 
       {activeSettingsTab === 'preferences' && <>
 
-      {/* Power Features — quick access to high-value settings */}
-      <div className="bg-theme-secondary rounded-xl border border-theme p-4">
-        <p className="text-xs font-semibold text-theme-secondary uppercase tracking-wide mb-3">Power Features</p>
-        <div className="grid grid-cols-2 gap-2">
-          {[
-            {
-              label: 'Custom Categories',
-              icon: '🏷️',
-              description: 'Organise your pantry your way',
-              action: () => { setActiveSettingsTab('organization'); setShowCategoryManager(true); },
+      <SettingsPowerFeaturesSection
+        onOpenCategories={() => {
+          setActiveSettingsTab('organization');
+          setShowCategoryManager(true);
+        }}
+        onOpenStoreLayout={() => setActiveSettingsTab('organization')}
+        onOpenFoodSafety={() => setExpandedSections((previous) => new Set([...previous, 'FoodSafety']))}
+        onOpenAppPreferences={() => setExpandedSections((previous) => new Set([...previous, 'AppPreferences']))}
+      />
+
+      <SettingsAppPreferencesSection
+        expanded={expandedSections.has('AppPreferences')}
+        onToggle={() => toggleSection('AppPreferences')}
+        title={intl.formatMessage({ id: 'settings.appPreferences' })}
+        settings={settings}
+        setSettings={setSettings}
+        userProfile={userProfile}
+        onMeasurementSystemChange={(value) => handleProfileChange('measurementSystem', value)}
+        geminiOptedIn={geminiOptedIn}
+        onGeminiOptInChange={handleGeminiOptIn}
+        labels={{
+          enableNotifications: intl.formatMessage({ id: 'settings.enableNotifications' }),
+          measurementSystem: intl.formatMessage({ id: 'settings.measurementSystem' }),
+          enableAiFeatures: intl.formatMessage({ id: 'settings.enableAiFeatures' }),
+          includeStaples: intl.formatMessage({ id: 'settings.includeStaples' }),
+          autoRestockStaples: intl.formatMessage({ id: 'settings.autoRestockStaples' }),
+          showNutrition: intl.formatMessage({ id: 'settings.showNutrition' }),
+          showPriceData: intl.formatMessage({ id: 'settings.showPriceData' }),
+        }}
+      />
+
+      <SettingsTabVisibilitySection
+        expanded={expandedSections.has('TabVisibility')}
+        onToggle={() => toggleSection('TabVisibility')}
+        hiddenTabs={settings.navigation?.hiddenTabs}
+        onTabVisibilityChange={(tab, isVisible) => {
+          const hidden = settings.navigation?.hiddenTabs ?? [];
+          const newHidden = isVisible ? hidden.filter((currentTab: string) => currentTab !== tab) : [...hidden, tab];
+          setSettings((previous) => ({
+            ...previous,
+            navigation: { ...previous.navigation, hiddenTabs: newHidden },
+          }));
+        }}
+      />
+
+      <SettingsFoodSafetySection
+        expanded={expandedSections.has('FoodSafety')}
+        onToggle={() => toggleSection('FoodSafety')}
+        title={intl.formatMessage({ id: 'settings.foodSafety' })}
+        user={user}
+        userProfile={userProfile}
+        setUserProfile={setUserProfile}
+        debouncedSaveProfile={debouncedSaveProfile}
+        saveProfileData={saveProfileData}
+      />
+
+      <SettingsThemeSection
+        expanded={expandedSections.has('Theme')}
+        onToggle={() => toggleSection('Theme')}
+        title={intl.formatMessage({ id: 'settings.themeSettings' })}
+        settings={settings}
+        onResetTheme={() => {
+          setSettings((previous) => ({
+            ...previous,
+            theme: {
+              mode: 'dark',
+              accentColor: '#4CAF50',
+              backgroundColor: undefined,
+              textColor: undefined,
             },
-            {
-              label: 'Store Layout',
-              icon: '🛒',
-              description: 'Sort shopping by aisle',
-              action: () => setActiveSettingsTab('organization'),
-            },
-            {
-              label: 'Food Safety Mode',
-              icon: '🧊',
-              description: 'Leftover guidance level',
-              action: () => setExpandedSections(prev => new Set([...prev, 'FoodSafety'])),
-            },
-            {
-              label: 'Nutrition Data',
-              icon: '📊',
-              description: 'Toggle nutrition display',
-              action: () => setExpandedSections(prev => new Set([...prev, 'AppPreferences'])),
-            },
-          ].map(({ label, icon, description, action }) => (
-            <button
-              key={label}
-              onClick={action}
-              className="flex items-start gap-2 p-3 rounded-lg bg-theme-primary border border-theme hover:border-[var(--accent-color)] hover:bg-[var(--accent-color)]/5 transition-all text-left focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]"
-            >
-              <span className="text-lg flex-shrink-0" aria-hidden="true">{icon}</span>
-              <div className="min-w-0">
-                <div className="text-xs font-semibold text-theme-primary truncate">{label}</div>
-                <div className="text-[10px] text-theme-secondary leading-tight mt-0.5">{description}</div>
-              </div>
-            </button>
-          ))}
-        </div>
-      </div>
+          }));
+        }}
+        onThemeModeChange={(mode) => handleChange('theme', { mode })}
+        onAccentColorChange={(accentColor) => handleChange('theme', { accentColor })}
+        onBackgroundColorChange={(backgroundColor) => handleChange('theme', { backgroundColor })}
+        onTextColorChange={(textColor) => handleChange('theme', { textColor })}
+        labels={{
+          theme: intl.formatMessage({ id: 'settings.theme' }),
+          accent: intl.formatMessage({ id: 'settings.accent' }),
+          background: intl.formatMessage({ id: 'settings.background' }),
+          textColor: intl.formatMessage({ id: 'settings.textColor' }),
+          language: intl.formatMessage({ id: 'settings.language' }),
+          dark: intl.formatMessage({ id: 'settings.themes.dark' }),
+          light: intl.formatMessage({ id: 'settings.themes.light' }),
+        }}
+      />
 
-      {/* App Preferences Section */}
-      <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden">
-        <div
-          onClick={() => toggleSection('AppPreferences')}
-          className="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-theme-primary transition-colors"
-        >
-          <div className="flex items-center gap-3">
-            {expandedSections.has('AppPreferences') ? (
-              <ChevronDown className="w-5 h-5 text-theme-primary" />
-            ) : (
-              <ChevronRight className="w-5 h-5 text-theme-primary" />
-            )}
-            <SlidersHorizontal className="w-5 h-5 text-[var(--accent-color)]" />
-            <h3 className="font-semibold text-theme-primary">{intl.formatMessage({ id: 'settings.appPreferences' })}</h3>
-          </div>
-        </div>
-
-        {expandedSections.has('AppPreferences') && (
-          <div className="border-t border-theme px-4 divide-y divide-theme">
-
-            {/* Enable Notifications */}
-            <div className="flex items-center justify-between py-3">
-              <div className="flex-1 pr-4">
-                <p className="text-sm font-medium text-theme-primary">{intl.formatMessage({ id: 'settings.enableNotifications' })}</p>
-                <p className="text-xs text-theme-secondary mt-0.5">Receive alerts for expiring items, meal plans, and shopping reminders</p>
-              </div>
-              <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
-                <input
-                  type="checkbox"
-                  checked={settings.notifications.enabled}
-                  onChange={e => setSettings(prev => ({
-                    ...prev,
-                    notifications: { ...prev.notifications, enabled: e.target.checked }
-                  }))}
-                  className="sr-only peer"
-                />
-                <div className="w-11 h-6 bg-gray-400 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[var(--accent-color)]"></div>
-              </label>
-            </div>
-
-            {/* Measurement System */}
-            <div className="flex items-center justify-between py-3">
-              <div className="flex-1 pr-4">
-                <p className="text-sm font-medium text-theme-primary">{intl.formatMessage({ id: 'settings.measurementSystem' })}</p>
-                <p className="text-xs text-theme-secondary mt-0.5">Choose between imperial and metric units throughout the app</p>
-              </div>
-              <div className="flex bg-theme-primary rounded-lg p-0.5 border border-theme flex-shrink-0">
-                <button
-                  type="button"
-                  onClick={() => handleProfileChange('measurementSystem', 'Standard')}
-                  className={`px-3 py-1 text-xs font-medium rounded transition-all ${
-                    userProfile?.measurementSystem !== 'Metric'
-                      ? 'bg-[var(--accent-color)] text-white shadow-sm'
-                      : 'text-theme-secondary'
-                  }`}
-                >
-                  Imperial
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleProfileChange('measurementSystem', 'Metric')}
-                  className={`px-3 py-1 text-xs font-medium rounded transition-all ${
-                    userProfile?.measurementSystem === 'Metric'
-                      ? 'bg-[var(--accent-color)] text-white shadow-sm'
-                      : 'text-theme-secondary'
-                  }`}
-                >
-                  Metric
-                </button>
-              </div>
-            </div>
-
-            {/* Enable AI Features */}
-            <div className="flex items-center justify-between py-3">
-              <div className="flex-1 pr-4">
-                <p className="text-sm font-medium text-theme-primary">{intl.formatMessage({ id: 'settings.enableAiFeatures' })}</p>
-                <p className="text-xs text-theme-secondary mt-0.5">Use AI for recipe suggestions, smart shopping tips, and meal planning assistance</p>
-              </div>
-              <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
-                <input
-                  type="checkbox"
-                  checked={geminiOptedIn}
-                  onChange={e => handleGeminiOptIn(e.target.checked)}
-                  className="sr-only peer"
-                />
-                <div className="w-11 h-6 bg-gray-400 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[var(--accent-color)]"></div>
-              </label>
-            </div>
-
-            {/* Include Staples in Shopping List */}
-            <div className="flex items-center justify-between py-3">
-              <div className="flex-1 pr-4">
-                <p className="text-sm font-medium text-theme-primary">{intl.formatMessage({ id: 'settings.includeStaples' })}</p>
-                <p className="text-xs text-theme-secondary mt-0.5">Automatically suggest common pantry staples when building a shopping list</p>
-              </div>
-              <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
-                <input
-                  type="checkbox"
-                  checked={settings.shopping?.includeStaples || false}
-                  onChange={e => setSettings(prev => ({
-                    ...prev,
-                    shopping: { ...prev.shopping, includeStaples: e.target.checked }
-                  }))}
-                  className="sr-only peer"
-                />
-                <div className="w-11 h-6 bg-gray-400 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[var(--accent-color)]"></div>
-              </label>
-            </div>
-
-            {/* Auto-restock Staples */}
-            <div className="flex items-center justify-between py-3">
-              <div className="flex-1 pr-4">
-                <p className="text-sm font-medium text-theme-primary">{intl.formatMessage({ id: 'settings.autoRestockStaples' })}</p>
-                <p className="text-xs text-theme-secondary mt-0.5">Automatically add staple items back to your shopping list when they run low or run out</p>
-              </div>
-              <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
-                <input
-                  type="checkbox"
-                  checked={settings.shopping?.autoReaddStaples ?? true}
-                  onChange={e => setSettings(prev => ({
-                    ...prev,
-                    shopping: { ...prev.shopping, autoReaddStaples: e.target.checked }
-                  }))}
-                  className="sr-only peer"
-                />
-                <div className="w-11 h-6 bg-gray-400 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[var(--accent-color)]"></div>
-              </label>
-            </div>
-
-            {/* Show Nutrition Information */}
-            <div className="flex items-center justify-between py-3">
-              <div className="flex-1 pr-4">
-                <p className="text-sm font-medium text-theme-primary">{intl.formatMessage({ id: 'settings.showNutrition' })}</p>
-                <p className="text-xs text-theme-secondary mt-0.5">Display calories, protein, and macros on recipes and pantry items</p>
-              </div>
-              <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
-                <input
-                  type="checkbox"
-                  checked={settings.shopping?.showNutrition ?? true}
-                  onChange={e => setSettings(prev => ({
-                    ...prev,
-                    shopping: { ...prev.shopping, showNutrition: e.target.checked }
-                  }))}
-                  className="sr-only peer"
-                />
-                <div className="w-11 h-6 bg-gray-400 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[var(--accent-color)]"></div>
-              </label>
-            </div>
-
-            {/* Show Price Data */}
-            <div className="flex items-center justify-between py-3">
-              <div className="flex-1 pr-4">
-                <p className="text-sm font-medium text-theme-primary">{intl.formatMessage({ id: 'settings.showPriceData' })}</p>
-                <p className="text-xs text-theme-secondary mt-0.5">Display estimated grocery prices on shopping list items and pantry ingredients</p>
-              </div>
-              <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
-                <input
-                  type="checkbox"
-                  checked={settings.shopping?.showPriceData ?? false}
-                  onChange={e => setSettings(prev => ({
-                    ...prev,
-                    shopping: { ...prev.shopping, showPriceData: e.target.checked }
-                  }))}
-                  className="sr-only peer"
-                />
-                <div className="w-11 h-6 bg-gray-400 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[var(--accent-color)]"></div>
-              </label>
-            </div>
-
-          </div>
-        )}
-      </div>
-
-      {/* Tab Visibility Section */}
-      <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden">
-        <div
-          onClick={() => toggleSection('TabVisibility')}
-          className="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-theme-primary transition-colors"
-        >
-          <div className="flex items-center gap-3">
-            {expandedSections.has('TabVisibility') ? (
-              <ChevronDown className="w-5 h-5 text-theme-primary" />
-            ) : (
-              <ChevronRight className="w-5 h-5 text-theme-primary" />
-            )}
-            <LayoutDashboard className="w-5 h-5 text-[var(--accent-color)]" />
-            <h3 className="font-semibold text-theme-primary">Navigation Tabs</h3>
-          </div>
-        </div>
-
-        {expandedSections.has('TabVisibility') && (
-          <div className="border-t border-theme px-4 divide-y divide-theme">
-            <p className="text-xs text-theme-secondary py-3">Choose which tabs appear in the bottom navigation. Pantry and Settings are always visible.</p>
-            {([
-              { tab: Tab.SHOPPING, label: 'Shopping', description: 'Shopping list and grocery management' },
-              { tab: Tab.MEALS, label: 'Meal Planner', description: 'Plan your meals for the week' },
-              { tab: Tab.RECIPES, label: 'Recipes', description: 'Browse and search recipes' },
-              { tab: Tab.COMMUNITY, label: 'Community', description: 'Connect with other users' },
-              { tab: Tab.ANALYTICS, label: 'Analytics', description: 'Pantry usage and waste stats' },
-            ] as { tab: Tab; label: string; description: string }[]).map(({ tab, label, description }) => {
-              const isVisible = !(settings.navigation?.hiddenTabs?.includes(tab) ?? false);
-              return (
-                <div key={tab} className="flex items-center justify-between py-3">
-                  <div className="flex-1 pr-4">
-                    <p className="text-sm font-medium text-theme-primary">{label}</p>
-                    <p className="text-xs text-theme-secondary mt-0.5">{description}</p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
-                    <input
-                      type="checkbox"
-                      checked={isVisible}
-                      onChange={e => {
-                        const hidden = settings.navigation?.hiddenTabs ?? [];
-                        const newHidden = e.target.checked
-                          ? hidden.filter((t: string) => t !== tab)
-                          : [...hidden, tab];
-                        setSettings(prev => ({
-                          ...prev,
-                          navigation: { ...prev.navigation, hiddenTabs: newHidden },
-                        }));
-                      }}
-                      className="sr-only peer"
-                    />
-                    <div className="w-11 h-6 bg-gray-400 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[var(--accent-color)]"></div>
-                  </label>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Food Safety Section */}
-      <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden">
-        <div
-          onClick={() => toggleSection('FoodSafety')}
-          className="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-theme-primary transition-colors"
-        >
-          <div className="flex items-center gap-3">
-            {expandedSections.has('FoodSafety') ? (
-              <ChevronDown className="w-5 h-5 text-theme-primary" />
-            ) : (
-              <ChevronRight className="w-5 h-5 text-theme-primary" />
-            )}
-            <ShieldCheck className="w-5 h-5 text-[var(--accent-color)]" />
-            <h3 className="font-semibold text-theme-primary">{intl.formatMessage({ id: 'settings.foodSafety' })}</h3>
-          </div>
-        </div>
-
-        {expandedSections.has('FoodSafety') && (
-          <div className="border-t border-theme p-4 space-y-5">
-
-            {/* Dietary Restrictions */}
-            <div>
-              <label className="block text-sm font-medium text-theme-primary mb-3 flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4" />
-                Dietary Restrictions
-              </label>
-              <p className="text-xs text-theme-secondary mb-3">Select all that apply — these will affect recipe recommendations and meal planning</p>
-              <div className="grid grid-cols-2 gap-3">
-                {['Vegetarian', 'Vegan', 'Gluten-Free', 'Dairy-Free', 'Keto', 'Paleo', 'Low-Carb', 'Halal', 'Kosher'].map((restriction) => (
-                  <label key={restriction} className="flex items-center gap-2 text-sm cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={userProfile?.dietaryRestrictions?.includes(restriction) || false}
-                      onChange={(e) => {
-                        const current = userProfile?.dietaryRestrictions || [];
-                        const newRestrictions = e.target.checked
-                          ? [...current, restriction]
-                          : current.filter(r => r !== restriction);
-                        const newProfile = { ...userProfile, dietaryRestrictions: newRestrictions };
-                        setUserProfile(newProfile);
-                        debouncedSaveProfile(newProfile);
-                      }}
-                      className="rounded border-theme text-theme-primary focus:border-theme-primary"
-                    />
-                    <span className="text-theme-primary">{restriction}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            {/* Favorite Cuisines */}
-            <div>
-              <label className="block text-sm font-medium text-theme-primary mb-3 flex items-center gap-2">
-                <Heart className="w-4 h-4" />
-                Favorite Cuisines
-              </label>
-              <p className="text-xs text-theme-secondary mb-3">Select cuisines you enjoy — these will influence recipe suggestions</p>
-              <div className="grid grid-cols-2 gap-3">
-                {['Italian', 'Mexican', 'Chinese', 'Japanese', 'Indian', 'Thai', 'French', 'Mediterranean', 'American', 'Korean'].map((cuisine) => (
-                  <label key={cuisine} className="flex items-center gap-2 text-sm cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={userProfile?.favoriteCuisines?.includes(cuisine) || false}
-                      onChange={(e) => {
-                        const current = userProfile?.favoriteCuisines || [];
-                        const newCuisines = e.target.checked
-                          ? [...current, cuisine]
-                          : current.filter(c => c !== cuisine);
-                        const newProfile = { ...userProfile, favoriteCuisines: newCuisines };
-                        setUserProfile(newProfile);
-                        debouncedSaveProfile(newProfile);
-                      }}
-                      className="rounded border-theme text-theme-primary focus:border-theme-primary"
-                    />
-                    <span className="text-theme-primary">{cuisine}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            {/* Preferred Proteins */}
-            <div>
-              <label className="block text-sm font-medium text-theme-primary mb-3">Preferred Proteins</label>
-              <p className="text-xs text-theme-secondary mb-3">Select proteins you prefer — these will be prioritized in meal suggestions</p>
-              <div className="grid grid-cols-2 gap-3">
-                {['Chicken', 'Beef', 'Pork', 'Fish', 'Tofu', 'Beans', 'Eggs', 'Turkey', 'Lamb', 'Shrimp'].map((protein) => (
-                  <label key={protein} className="flex items-center gap-2 text-sm cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={userProfile?.preferredProteins?.includes(protein) || false}
-                      onChange={(e) => {
-                        const current = userProfile?.preferredProteins || [];
-                        const newProteins = e.target.checked
-                          ? [...current, protein]
-                          : current.filter(p => p !== protein);
-                        const newProfile = { ...userProfile, preferredProteins: newProteins };
-                        setUserProfile(newProfile);
-                        debouncedSaveProfile(newProfile);
-                      }}
-                      className="rounded border-theme text-theme-primary focus:border-theme-primary"
-                    />
-                    <span className="text-theme-primary">{protein}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            {/* Disliked Ingredients */}
-            <div>
-              <label className="block text-sm font-medium text-theme-primary mb-3">Disliked Ingredients</label>
-              <p className="text-xs text-theme-secondary mb-2">Ingredients you don't like — these will be avoided in suggestions</p>
-              <input
-                type="text"
-                value={userProfile?.dislikedIngredients?.join(', ') || ''}
-                onChange={(e) => {
-                  const newIngredients = e.target.value ? e.target.value.split(',').map(s => s.trim()).filter(s => s.length > 0) : undefined;
-                  const newProfile = { ...userProfile, dislikedIngredients: newIngredients };
-                  setUserProfile(newProfile);
-                  debouncedSaveProfile(newProfile);
-                }}
-                placeholder="e.g., mushrooms, olives, cilantro"
-                className="w-full px-3 py-2 text-sm border border-theme rounded-lg bg-white text-black focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]"
-              />
-            </div>
-
-            {/* Special Dietary Needs */}
-            <div>
-              <label className="block text-sm font-medium text-theme-primary mb-3">Special Dietary Needs</label>
-              <p className="text-xs text-theme-secondary mb-2">Any additional dietary requirements or preferences</p>
-              <textarea
-                value={userProfile?.specialNeeds || ''}
-                onChange={(e) => {
-                  const newProfile = { ...userProfile, specialNeeds: e.target.value || undefined };
-                  setUserProfile(newProfile);
-                  debouncedSaveProfile(newProfile);
-                }}
-                placeholder="e.g., low sodium, diabetic friendly, etc."
-                className="w-full px-3 py-2 text-sm border border-theme rounded-lg bg-white text-black focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] resize-none"
-                rows={2}
-              />
-            </div>
-
-            {/* Leftover Persona */}
-            <LeftoverPersonaQuestionnaire
-              user={user}
-              userProfile={userProfile}
-              onChange={(persona) => {
-                const newProfile = { ...userProfile, leftoverPersona: persona };
-                setUserProfile(newProfile);
-                saveProfileData(newProfile, true);
-              }}
-            />
-
-          </div>
-        )}
-      </div>
-
-      {/* Theme Settings Section */}
-      <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden">
-        <div
-          onClick={() => toggleSection('Theme')}
-          className="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-theme-primary transition-colors"
-        >
-          <div className="flex items-center gap-3">
-            {expandedSections.has('Theme') ? (
-              <ChevronDown className="w-5 h-5 text-theme-primary" />
-            ) : (
-              <ChevronRight className="w-5 h-5 text-theme-primary" />
-            )}
-            <Palette className="w-5 h-5 text-[var(--accent-color)]" />
-            <h3 className="font-semibold text-theme-primary">{intl.formatMessage({ id: 'settings.themeSettings' })}</h3>
-          </div>
-        </div>
-
-        {expandedSections.has('Theme') && (
-          <div className="border-t border-theme p-4">
-          <div className="flex items-center justify-between mb-3">
-          <button
-            onClick={() => {
-              setSettings(prev => ({
-                ...prev,
-                theme: {
-                  mode: 'dark',
-                  accentColor: '#4CAF50',
-                  backgroundColor: undefined,
-                  textColor: undefined,
-                }
-              }));
-            }}
-            className="text-xs px-3 py-1 bg-theme-primary border border-theme rounded hover:bg-theme-secondary transition-colors text-theme-primary"
-          >
-            Reset to Default
-          </button>
-          </div>
-          <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-theme-primary">{intl.formatMessage({ id: 'settings.theme' })}</span>
-            <select
-              id="themeMode"
-              name="themeMode"
-              value={settings.theme.mode}
-              onChange={(e) => handleChange('theme', { mode: e.target.value })}
-              className="border rounded px-2 py-1 text-black bg-white text-sm"
-            >
-              <option value="dark">{intl.formatMessage({ id: 'settings.themes.dark' })}</option>
-              <option value="light">{intl.formatMessage({ id: 'settings.themes.light' })}</option>
-            </select>
-            <span className="text-sm text-theme-primary ml-4">{intl.formatMessage({ id: 'settings.accent' })}</span>
-            <input
-              id="accentColor"
-              name="accentColor"
-              type="color"
-              list="accentColorPresets"
-              value={settings.theme.accentColor}
-              onChange={(e) => handleChange('theme', { accentColor: e.target.value })}
-              className="border rounded w-8 h-8 ml-2"
-            />
-            {/* Accessible palette — all colours pass WCAG AA on white text */}
-            <datalist id="accentColorPresets">
-              <option value="#0078d4" label="Blue" />
-              <option value="#4CAF50" label="Green" />
-              <option value="#e05c00" label="Orange" />
-              <option value="#c2185b" label="Pink" />
-              <option value="#7b1fa2" label="Purple" />
-              <option value="#00796b" label="Teal" />
-              <option value="#c62828" label="Red" />
-              <option value="#37474f" label="Slate" />
-            </datalist>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-theme-primary">{intl.formatMessage({ id: 'settings.background' })}</span>
-            <input
-              id="backgroundColor"
-              name="backgroundColor"
-              type="color"
-              value={settings.theme.backgroundColor || '#ffffff'}
-              onChange={(e) => handleChange('theme', { backgroundColor: e.target.value })}
-              className="border rounded w-8 h-8"
-            />
-            <span className="text-sm text-theme-primary ml-4">{intl.formatMessage({ id: 'settings.textColor' })}</span>
-            <input
-              id="textColor"
-              name="textColor"
-              type="color"
-              value={settings.theme.textColor || '#000000'}
-              onChange={(e) => handleChange('theme', { textColor: e.target.value })}
-              className="border rounded w-8 h-8 ml-2"
-            />
-          </div>
-        </div>
-
-        {/* Language Selector */}
-        <div className="mt-4 pt-3 border-t border-theme">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-theme-primary">{intl.formatMessage({ id: 'settings.language' })}</span>
-            <LanguageSelector />
-          </div>
-        </div>
-          </div>
-        )}
-      </div>
-
-      {/* Notifications Section */}
-      <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden" data-section="notifications">
-        <div
-          onClick={() => toggleSection('Notifications')}
-          className="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-theme-primary transition-colors"
-        >
-          <div className="flex items-center gap-3">
-            {expandedSections.has('Notifications') ? (
-              <ChevronDown className="w-5 h-5 text-theme-primary" />
-            ) : (
-              <ChevronRight className="w-5 h-5 text-theme-primary" />
-            )}
-            <Bell className="w-5 h-5 text-[var(--accent-color)]" />
-            <h3 className="font-semibold text-theme-primary">{intl.formatMessage({ id: 'settings.notifications' })}</h3>
-          </div>
-        </div>
-
-        {expandedSections.has('Notifications') && (
-          <div className="border-t border-theme p-4">
-            {user && (
-              <NotificationSettingsComponent
-                user={user}
-                currentSettings={notificationSettings}
-                onSettingsChange={setNotificationSettings}
-              />
-            )}
-          </div>
-        )}
-      </div>
+      <SettingsNotificationsSection
+        expanded={expandedSections.has('Notifications')}
+        onToggle={() => toggleSection('Notifications')}
+        title={intl.formatMessage({ id: 'settings.notifications' })}
+        user={user}
+        notificationSettings={notificationSettings}
+        setNotificationSettings={setNotificationSettings}
+      />
 
       </>}
 
       {activeSettingsTab === 'organization' && <>
 
-      {/* Categories Section */}
-      {user && (
-        <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden">
-          <div
-            onClick={() => toggleSection('Categories')}
-            className="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-theme-primary transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              {expandedSections.has('Categories') ? (
-                <ChevronDown className="w-5 h-5 text-theme-primary" />
-              ) : (
-                <ChevronRight className="w-5 h-5 text-theme-primary" />
-              )}
-              <Tag className="w-5 h-5 text-[var(--accent-color)]" />
-              <h3 className="font-semibold text-theme-primary">{intl.formatMessage({ id: 'settings.categories' })}</h3>
-            </div>
-          </div>
+      <SettingsCategoriesSection
+        userExists={!!user}
+        expanded={expandedSections.has('Categories')}
+        onToggle={() => toggleSection('Categories')}
+        title={intl.formatMessage({ id: 'settings.categories' })}
+        customCategoryCount={customCategories.length}
+        onManageCategories={() => setShowCategoryManager(true)}
+      />
 
-          {expandedSections.has('Categories') && (
-            <div className="border-t border-theme p-4">
-              <div className="space-y-3">
-                <p className="text-sm text-theme-secondary">
-                  Create custom categories to better organize your pantry items.
-                </p>
-                <button
-                  onClick={() => setShowCategoryManager(true)}
-                  className="bg-[var(--accent-color)] text-white px-4 py-2 rounded font-medium text-sm hover:bg-opacity-90 transition-colors"
-                >
-                  Manage Categories
-                </button>
-                <div className="text-xs text-theme-secondary">
-                  {customCategories.length} custom categor{customCategories.length === 1 ? 'y' : 'ies'}
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+      <SettingsStoreLayoutSection
+        userExists={!!user}
+        expanded={expandedSections.has('Store Layout')}
+        onToggle={() => toggleSection('Store Layout')}
+        title={intl.formatMessage({ id: 'settings.storeLayout' })}
+        storeLayout={settings.shopping?.storeLayout || defaultStoreLayout}
+        onStoreLayoutChange={(newLayout) => setSettings((previous) => ({
+          ...previous,
+          shopping: {
+            ...previous.shopping,
+            storeLayout: newLayout,
+          },
+        }))}
+        storeProfiles={settings.shopping?.storeProfiles ?? {}}
+        activeStoreProfile={settings.shopping?.activeStoreProfile}
+        onStoreProfilesChange={(profiles, active) => setSettings((previous) => ({
+          ...previous,
+          shopping: {
+            ...previous.shopping,
+            storeProfiles: profiles,
+            activeStoreProfile: active,
+          },
+        }))}
+      />
 
-      {/* Store Layout Section */}
-      {user && (
-        <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden">
-          <div
-            onClick={() => toggleSection('Store Layout')}
-            className="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-theme-primary transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              {expandedSections.has('Store Layout') ? (
-                <ChevronDown className="w-5 h-5 text-theme-primary" />
-              ) : (
-                <ChevronRight className="w-5 h-5 text-theme-primary" />
-              )}
-              <ShoppingCart className="w-5 h-5 text-[var(--accent-color)]" />
-              <h3 className="font-semibold text-theme-primary">{intl.formatMessage({ id: 'settings.storeLayout' })}</h3>
-            </div>
-          </div>
-
-          {expandedSections.has('Store Layout') && (
-            <div className="border-t border-theme p-4">
-              <StoreLayoutEditor
-                storeLayout={settings.shopping?.storeLayout || defaultStoreLayout}
-                onStoreLayoutChange={(newLayout: string[]) => setSettings(prev => ({
-                  ...prev,
-                  shopping: {
-                    ...prev.shopping,
-                    storeLayout: newLayout
-                  }
-                }))}
-                storeProfiles={settings.shopping?.storeProfiles ?? {}}
-                activeStoreProfile={settings.shopping?.activeStoreProfile}
-                onStoreProfilesChange={(profiles, active) => setSettings(prev => ({
-                  ...prev,
-                  shopping: {
-                    ...prev.shopping,
-                    storeProfiles: profiles,
-                    activeStoreProfile: active,
-                  }
-                }))}
-              />
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Leftover Analytics Section */}
-      {user && (
-        <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden">
-          <div
-            onClick={() => toggleSection('Leftover Analytics')}
-            className="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-theme-primary transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              {expandedSections.has('Leftover Analytics') ? (
-                <ChevronDown className="w-5 h-5 text-theme-primary" />
-              ) : (
-                <ChevronRight className="w-5 h-5 text-theme-primary" />
-              )}
-              <BarChart2 className="w-5 h-5 text-[var(--accent-color)]" />
-              <h3 className="font-semibold text-theme-primary">{intl.formatMessage({ id: 'settings.leftoverAnalytics' })}</h3>
-            </div>
-          </div>
-
-          {expandedSections.has('Leftover Analytics') && (
-            <div className="border-t border-theme p-4">
-              <LeftoverAnalytics householdId={household?.id} userId={user.id} />
-            </div>
-          )}
-        </div>
-      )}
+      <SettingsLeftoverAnalyticsSection
+        userId={user?.id}
+        householdId={household?.id}
+        expanded={expandedSections.has('Leftover Analytics')}
+        onToggle={() => toggleSection('Leftover Analytics')}
+        title={intl.formatMessage({ id: 'settings.leftoverAnalytics' })}
+      />
 
       </>}
 
       {activeSettingsTab === 'more' && <>
 
-      {/* Feedback Section */}
-      <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden">
-        <div
-          onClick={() => toggleSection('Feedback')}
-          className="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-theme-primary transition-colors"
-        >
-          <div className="flex items-center gap-3">
-            {expandedSections.has('Feedback') ? (
-              <ChevronDown className="w-5 h-5 text-theme-primary" />
-            ) : (
-              <ChevronRight className="w-5 h-5 text-theme-primary" />
-            )}
-            <MessageSquare className="w-5 h-5 text-[var(--accent-color)]" />
-            <h3 className="font-semibold text-theme-primary">{intl.formatMessage({ id: 'settings.feedback' })}</h3>
-          </div>
-        </div>
+      <SettingsFeedbackSection
+        expanded={expandedSections.has('Feedback')}
+        onToggle={() => toggleSection('Feedback')}
+        title={intl.formatMessage({ id: 'settings.feedback' })}
+        feedback={feedback}
+        setFeedback={setFeedback}
+        sending={sending}
+        onSubmit={handleFeedbackSubmit}
+      />
 
-        {expandedSections.has('Feedback') && (
-          <div className="border-t border-theme p-4">
-        <form onSubmit={handleFeedbackSubmit} className="space-y-3">
-          <textarea
-            value={feedback}
-            onChange={e => setFeedback(e.target.value)}
-            placeholder="Let us know your thoughts..."
-            className="w-full p-3 border rounded resize-none text-black bg-white text-sm"
-            rows={3}
-            disabled={sending}
-          />
-          <button
-            type="submit"
-            disabled={sending || !feedback.trim()}
-            className="bg-[var(--accent-color)] text-white px-4 py-2 rounded font-medium text-sm w-full hover:bg-opacity-90 transition-colors"
-          >
-            {sending ? 'Sending...' : 'Send Feedback'}
-          </button>
-        </form>
-          </div>
-        )}
-      </div>
-
-      {/* Subscription Section */}
-      {user && (
-        <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden">
-          <div
-            onClick={() => toggleSection('Subscription')}
-            className="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-theme-primary transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              {expandedSections.has('Subscription') ? (
-                <ChevronDown className="w-5 h-5 text-theme-primary" />
-              ) : (
-                <ChevronRight className="w-5 h-5 text-theme-primary" />
-              )}
-              <Star className="w-5 h-5 text-[var(--accent-color)]" />
-              <h3 className="font-semibold text-theme-primary">{intl.formatMessage({ id: 'settings.subscription' })}</h3>
-            </div>
-          </div>
-
-          {expandedSections.has('Subscription') && (
-            <div className="border-t border-theme p-4">
-              <SubscriptionManager user={user} />
-            </div>
-          )}
-        </div>
-      )}
+      <SettingsSubscriptionSection
+        user={user}
+        expanded={expandedSections.has('Subscription')}
+        onToggle={() => toggleSection('Subscription')}
+        title={intl.formatMessage({ id: 'settings.subscription' })}
+      />
 
 
 
-      {/* Bulk Image Update Section */}
-      {user && (
-        <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden">
-          <div
-            onClick={() => toggleSection('Pantry Images')}
-            className="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-theme-primary transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              {expandedSections.has('Pantry Images') ? (
-                <ChevronDown className="w-5 h-5 text-theme-primary" />
-              ) : (
-                <ChevronRight className="w-5 h-5 text-theme-primary" />
-              )}
-              <Camera className="w-5 h-5 text-[var(--accent-color)]" />
-              <h3 className="font-semibold text-theme-primary">{intl.formatMessage({ id: 'settings.pantryImages' })}</h3>
-            </div>
-          </div>
+      <SettingsPantryImagesSection
+        user={user}
+        expanded={expandedSections.has('Pantry Images')}
+        onToggle={() => toggleSection('Pantry Images')}
+        title={intl.formatMessage({ id: 'settings.pantryImages' })}
+        updatingBulkImages={updatingBulkImages}
+        onBulkUpdate={handleBulkImageUpdate}
+      />
 
-          {expandedSections.has('Pantry Images') && (
-            <div className="border-t border-theme p-4">
-          <div className="space-y-3">
-            <p className="text-sm text-theme-secondary">
-              Automatically fetch better images for pantry items that currently have placeholder images.
-              This will scan your inventory and update items with images from food databases and stock photos.
-              Images are cached locally for faster loading and offline access.
-            </p>
-            <button
-              onClick={async () => {
-                setUpdatingBulkImages(true);
-                try {
-                  const { BulkImageUpdateService } = await import('../services/bulkImageUpdateService');
-                  const result = await BulkImageUpdateService.updateAllPantryItemImages(user, (completed, total) => {
-                    log.info(`Updated ${completed}/${total} items`, { completed, total }, 'Settings');
-                  });
+      <SettingsHelpSection
+        expanded={expandedSections.has('Help & Support')}
+        onToggle={() => toggleSection('Help & Support')}
+        title={intl.formatMessage({ id: 'settings.help' })}
+        description="Need help? Check out our FAQ or contact our support team for assistance."
+        onOpenFAQ={() => setShowFAQModal(true)}
+        buttonLabel="View FAQ & Help"
+      />
 
-                  addToast?.(`Updated ${result.updatedItems} items${result.failedItems > 0 ? ` (${result.failedItems} failed)` : ''}`, result.failedItems > 0 ? 'warning' : 'success');
-                } catch (error) {
-                  const msg = error instanceof Error ? error.message : String(error);
-                  const stack = error instanceof Error ? error.stack : undefined;
-                  log.error('Failed bulk image update', { message: msg, stack }, 'Settings');
-                  addToast?.('Failed to update images. Please try again.', 'error');
-                } finally {
-                  setUpdatingBulkImages(false);
-                }
-              }}
-              disabled={updatingBulkImages}
-              className="bg-blue-500 text-white px-4 py-2 rounded font-medium text-sm hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              {updatingBulkImages && <Loader2 className="w-4 h-4 animate-spin" />}
-              {updatingBulkImages ? 'Updating Images...' : 'Update Pantry Images'}
-            </button>
-            <div className="text-xs text-theme-secondary">
-              This feature uses external APIs and may take time for large inventories.
-            </div>
-          </div>
-            </div>
-          )}
-        </div>
-      )}
+      <SettingsAppUpdatesSection
+        expanded={expandedSections.has('App Updates')}
+        onToggle={() => toggleSection('App Updates')}
+        title={intl.formatMessage({ id: 'settings.appUpdates' })}
+      />
 
-      {/* Help & Support Section */}
-      <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden">
-        <div
-          onClick={() => toggleSection('Help & Support')}
-          className="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-theme-primary transition-colors"
-        >
-          <div className="flex items-center gap-3">
-            {expandedSections.has('Help & Support') ? (
-              <ChevronDown className="w-5 h-5 text-theme-primary" />
-            ) : (
-              <ChevronRight className="w-5 h-5 text-theme-primary" />
-            )}
-            <HelpCircle className="w-5 h-5 text-[var(--accent-color)]" />
-            <h3 className="font-semibold text-theme-primary">{intl.formatMessage({ id: 'settings.help' })}</h3>
-          </div>
-        </div>
+      <SettingsResetUsageSection
+        isAdmin={isAdmin}
+        expanded={expandedSections.has('Reset Usage')}
+        onToggle={() => toggleSection('Reset Usage')}
+        onReset={handleResetUsageCounters}
+      />
 
-        {expandedSections.has('Help & Support') && (
-          <div className="border-t border-theme p-4">
-        <div className="space-y-3">
-          <p className="text-sm text-theme-secondary">
-            Need help? Check out our FAQ or contact our support team for assistance.
-          </p>
-          <button
-            onClick={() => setShowFAQModal(true)}
-            className="bg-[var(--accent-color)] text-white px-4 py-2 rounded font-medium text-sm hover:bg-opacity-90 transition-colors"
-          >
-            View FAQ & Help
-          </button>
-        </div>
-          </div>
-        )}
-      </div>
-
-      {/* App Updates Section */}
-      <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden">
-        <div
-          onClick={() => toggleSection('App Updates')}
-          className="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-theme-primary transition-colors"
-        >
-          <div className="flex items-center gap-3">
-            {expandedSections.has('App Updates') ? (
-              <ChevronDown className="w-5 h-5 text-theme-primary" />
-            ) : (
-              <ChevronRight className="w-5 h-5 text-theme-primary" />
-            )}
-            <RefreshCw className="w-5 h-5 text-[var(--accent-color)]" />
-            <h3 className="font-semibold text-theme-primary">{intl.formatMessage({ id: 'settings.appUpdates' })}</h3>
-          </div>
-        </div>
-
-        {expandedSections.has('App Updates') && (
-          <div className="border-t border-theme p-4">
-            <VersionUpdate autoCheck={true} />
-          </div>
-        )}
-      </div>
-
-      {isAdmin && (
-        <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden">
-          <div
-            onClick={() => toggleSection('Reset Usage')}
-            className="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-theme-primary transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              {expandedSections.has('Reset Usage') ? (
-                <ChevronDown className="w-5 h-5 text-theme-primary" />
-              ) : (
-                <ChevronRight className="w-5 h-5 text-theme-primary" />
-              )}
-              <RotateCcw className="w-5 h-5 text-[var(--accent-color)]" />
-              <h3 className="font-semibold text-theme-primary">Reset Usage Counters</h3>
-            </div>
-          </div>
-          {expandedSections.has('Reset Usage') && (
-            <div className="border-t border-theme p-4 space-y-3">
-              <p className="text-sm text-theme-secondary">Resets all usage counters (searches, AI scans, meal plan, saved recipes) to 0 for the current user. Use after fixing the reset bug so counts start fresh.</p>
-              <button
-                onClick={async () => {
-                  if (!user) return;
-                  try {
-                    await UsageService.resetUsage(user);
-                    UsageService.getUsageLimits(user).then(limits => setUsageLimits(limits)).catch(() => {});
-                    addToast?.('Usage counters reset successfully.', 'success');
-                  } catch {
-                    addToast?.('Failed to reset usage counters.', 'error');
-                  }
-                }}
-                className="px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600 transition-colors"
-              >
-                Reset My Usage Counters
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-
-      {isAdmin && (
-        <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden">
-          <div
-            onClick={() => toggleSection('Remote Config Debug')}
-          >
-            <div className="flex items-center gap-3">
-              {expandedSections.has('Remote Config Debug') ? (
-                <ChevronDown className="w-5 h-5 text-theme-primary" />
-              ) : (
-                <ChevronRight className="w-5 h-5 text-theme-primary" />
-              )}
-              <Bug className="w-5 h-5 text-[var(--accent-color)]" />
-              <h3 className="font-semibold text-theme-primary">Remote Config Debug</h3>
-            </div>
-          </div>
-
-          {expandedSections.has('Remote Config Debug') && (
-            <div className="border-t border-theme p-4">
-              <RemoteConfigDebugPanel addToast={addToast} />
-            </div>
-          )}
-        </div>
-      )}
+      <SettingsRemoteConfigDebugSection
+        isAdmin={isAdmin}
+        expanded={expandedSections.has('Remote Config Debug')}
+        onToggle={() => toggleSection('Remote Config Debug')}
+        addToast={addToast}
+      />
 
       </>}
 
@@ -2429,60 +1395,22 @@ export const Settings: React.FC<SettingsProps> = ({
 
       {activeSettingsTab === 'more' && <>
 
-      {/* Privacy & Legal Section - MOVED FROM ACCOUNT TAB */}
-      <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden">
-        <div
-          onClick={() => toggleSection('Privacy & Legal')}
-          className="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-theme-primary transition-colors"
-        >
-          <div className="flex items-center gap-3">
-            {expandedSections.has('Privacy & Legal') ? (
-              <ChevronDown className="w-5 h-5 text-theme-primary" />
-            ) : (
-              <ChevronRight className="w-5 h-5 text-theme-primary" />
-            )}
-            <Lock className="w-5 h-5 text-[var(--accent-color)]" />
-            <h3 className="font-semibold text-theme-primary">{intl.formatMessage({ id: 'settings.privacy' })}</h3>
-          </div>
-        </div>
-
-        {expandedSections.has('Privacy & Legal') && (
-          <div className="border-t border-theme p-4">
-            <p className="text-sm text-theme-secondary">
-              We use the device camera to scan barcodes and take pantry item photos. Review our privacy policy for details about data collection and storage.
-            </p>
-            <div className="flex flex-wrap gap-2 mt-3">
-              <button
-                onClick={() => {
-                  const privacyUrl = (window as Window & { PRIVACY_POLICY_URL?: string }).PRIVACY_POLICY_URL || 'https://smartpantrymobile.page.gd/privacy.html';
-                  window.open(privacyUrl, '_blank');
-                }}
-                className="bg-[var(--accent-color)] text-white px-3 py-1 rounded-lg font-medium text-sm hover:bg-opacity-90 transition-colors"
-              >
-                View Privacy Policy
-              </button>
-              <button
-                onClick={() => {
-                  const privacyUrl = (window as Window & { PRIVACY_POLICY_URL?: string }).PRIVACY_POLICY_URL || 'https://smartpantrymobile.page.gd/privacy.html';
-                  if (navigator.clipboard) navigator.clipboard.writeText(privacyUrl);
-                  addToast?.('Privacy policy URL copied to clipboard', 'success');
-                }}
-                className="bg-theme-primary text-theme-secondary px-3 py-1 rounded-lg text-sm hover:bg-theme-secondary transition-colors"
-              >
-                Copy URL
-              </button>
-              {user && !user.isGuest && (
-                <button
-                  onClick={() => setShowDeleteConfirm(true)}
-                  className="bg-red-500 text-white px-3 py-1 rounded-lg font-medium text-sm hover:bg-red-600 transition-colors"
-                >
-                  Delete Account
-                </button>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
+      <SettingsPrivacyLegalSection
+        expanded={expandedSections.has('Privacy & Legal')}
+        onToggle={() => toggleSection('Privacy & Legal')}
+        title={intl.formatMessage({ id: 'settings.privacy' })}
+        onViewPrivacyPolicy={() => {
+          const privacyUrl = (window as Window & { PRIVACY_POLICY_URL?: string }).PRIVACY_POLICY_URL || 'https://smartpantrymobile.page.gd/privacy.html';
+          window.open(privacyUrl, '_blank');
+        }}
+        onCopyPrivacyUrl={() => {
+          const privacyUrl = (window as Window & { PRIVACY_POLICY_URL?: string }).PRIVACY_POLICY_URL || 'https://smartpantrymobile.page.gd/privacy.html';
+          if (navigator.clipboard) navigator.clipboard.writeText(privacyUrl);
+          addToast?.('Privacy policy URL copied to clipboard', 'success');
+        }}
+        canDeleteAccount={!!user && !user.isGuest}
+        onDeleteAccount={() => setShowDeleteConfirm(true)}
+      />
 
       </>}
 

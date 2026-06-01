@@ -1218,15 +1218,20 @@ export const ITEM_TIPS: ItemTips[] = [
 
 /**
  * Look up tips for a given item name. Returns null if no tips are available.
- * Matching is case-insensitive and partial (any match term appearing in the
- * item name, or the item name appearing in a match term, counts as a hit).
+ * Matching is case-insensitive: a match term must appear as a whole word or
+ * phrase within the normalised item name (not merely as a substring of another
+ * word). For example, "steak" does NOT match the "tea" entry, and "rice" does
+ * NOT match the "rice flour" term inside the flour entry.
  */
 export function getItemTips(itemName: string): ItemTips | null {
   if (!itemName) return null;
   const lower = itemName.toLowerCase().trim();
   return (
     ITEM_TIPS.find(tip =>
-      tip.matches.some(m => lower.includes(m) || m.includes(lower))
+      tip.matches.some(m => {
+        const escaped = m.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        return new RegExp(`(?:^|[^a-z])${escaped}(?:[^a-z]|$)`).test(lower);
+      })
     ) ?? null
   );
 }

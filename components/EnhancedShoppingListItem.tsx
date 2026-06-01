@@ -147,7 +147,7 @@ export const EnhancedShoppingListItem: React.FC<ShoppingListItemProps> = ({
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         onClick={handleClick}
-        className={`flex items-center justify-between p-3 bg-theme-secondary border border-theme rounded-xl transition-all cursor-pointer group relative ${
+        className={`flex items-start justify-between gap-3 p-4 bg-theme-secondary border border-theme rounded-xl transition-all cursor-pointer group relative ${
           isSelected
             ? 'bg-[var(--accent-color)]/10 border-[var(--accent-color)]/30'
             : 'hover:border-[var(--accent-color)]/50'
@@ -157,18 +157,18 @@ export const EnhancedShoppingListItem: React.FC<ShoppingListItemProps> = ({
           transition: isSwiping ? 'none' : 'all 0.3s ease'
         }}
       >
-        <div className="flex items-center gap-3 flex-1">
-          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
+        <div className="flex items-start gap-3 flex-1 min-w-0">
+          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all mt-0.5 flex-shrink-0 ${
             isSelected ? 'bg-[var(--accent-color)] border-[var(--accent-color)]' : 'border-theme'
           }`}>
             {isSelected && <Check className="w-3 h-3 text-white" />}
           </div>
-          <div className="flex-1">
-            <span className="font-medium text-theme-primary">
+          <div className="flex-1 min-w-0 space-y-1">
+            <span className="block text-base font-semibold text-theme-primary leading-snug">
               {item.item}
             </span>
             {item.source && (
-              <div className="text-xs text-theme-secondary opacity-60 mt-1">
+              <div className="inline-flex items-center rounded-full border border-theme bg-theme-primary/50 px-2.5 py-1 text-xs font-medium text-theme-secondary">
                 {item.source === 'suggested' && '💡 Suggested item'}
                 {item.source === 'manual' && '✏️ Manually added'}
                 {item.source === 'meal planner' && '📅 From meal planner'}
@@ -178,25 +178,25 @@ export const EnhancedShoppingListItem: React.FC<ShoppingListItemProps> = ({
               </div>
             )}
             {item.quantity && item.quantity !== '1' && (
-              <div className="text-xs text-theme-secondary opacity-70">Needed: {item.quantity}</div>
+              <div className="text-sm text-theme-secondary opacity-80">Needed: {item.quantity}</div>
             )}
             {item.purchasedBatch && (
-              <div className="text-xs text-green-600 opacity-90 mt-1">Purchased: {item.purchasedBatch.amount} {item.purchasedBatch.unit || ''} {item.purchasedBatch.expires ? `— expires ${item.purchasedBatch.expires}` : ''}</div>
+              <div className="text-sm text-green-600 opacity-90">Purchased: {item.purchasedBatch.amount} {item.purchasedBatch.unit || ''} {item.purchasedBatch.expires ? `— expires ${item.purchasedBatch.expires}` : ''}</div>
             )}
             {item.assignedTo && (
               <div className="flex items-center gap-1 mt-1">
-                <span className="text-xs bg-[var(--accent-color)]/15 text-[var(--accent-color)] px-2 py-0.5 rounded-full font-medium">
+                <span className="text-sm bg-[var(--accent-color)]/15 text-[var(--accent-color)] px-2 py-0.5 rounded-full font-medium">
                   👤 {item.assignedTo}
                 </span>
               </div>
             )}
             {item.notes && !showNotes && (
-              <div className="text-xs text-theme-secondary opacity-70 mt-1 italic truncate max-w-[180px]">
+              <div className="text-sm text-theme-secondary opacity-70 italic truncate max-w-[180px]">
                 📝 {item.notes}
               </div>
             )}
             {isOffline && lastSynced && (
-              <div className="text-xs text-orange-600 opacity-70 mt-1">
+              <div className="text-sm text-orange-600 opacity-80">
                 ⚠️ Offline - Last synced: {lastSynced.toLocaleTimeString()}
               </div>
             )}
@@ -253,12 +253,12 @@ export const EnhancedShoppingListItem: React.FC<ShoppingListItemProps> = ({
               value={item.quantity || ''}
               onChange={(e) => onQuantityChange(item.id, e.target.value)}
               onClick={(e) => e.stopPropagation()}
-              className="w-16 px-2 py-1 text-xs border border-theme rounded bg-theme-primary text-theme-primary focus:outline-none focus:ring-1 focus:ring-[var(--accent-color)]"
+              className="w-16 px-2 py-1 text-sm border border-theme rounded bg-theme-primary text-theme-primary focus:outline-none focus:ring-1 focus:ring-[var(--accent-color)]"
               placeholder="qty"
             />
           )}
           {showPriceData && item.estimatedPrice && item.estimatedPrice > 0 && (
-            <div className="text-xs font-medium text-green-600 opacity-70 bg-green-50 px-2 py-1 rounded border border-green-200">
+            <div className="text-sm font-medium text-green-600 opacity-80 bg-green-50 px-2 py-1 rounded border border-green-200">
               ~${item.estimatedPrice.toFixed(2)}
             </div>
           )}

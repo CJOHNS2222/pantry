@@ -114,7 +114,7 @@ export const PantryAnalytics: React.FC<PantryAnalyticsProps> = ({ inventory }) =
         <div className="bg-theme-secondary p-4 rounded-lg border border-theme">
           <div className="flex items-center gap-2 mb-2">
             <Package className="w-4 h-4 text-[var(--accent-color)]" />
-            <span className="text-xs font-semibold text-theme-primary opacity-70 uppercase">Total Items</span>
+            <span className="text-sm font-semibold text-theme-primary opacity-70 uppercase">Total Items</span>
           </div>
           <div className="text-2xl font-bold text-[var(--accent-color)]">{stats.total}</div>
         </div>
@@ -122,7 +122,7 @@ export const PantryAnalytics: React.FC<PantryAnalyticsProps> = ({ inventory }) =
         <div className="bg-theme-secondary p-4 rounded-lg border border-theme">
           <div className="flex items-center gap-2 mb-2">
             <AlertTriangle className="w-4 h-4 text-red-500" />
-            <span className="text-xs font-semibold text-theme-primary opacity-70 uppercase">Expired</span>
+            <span className="text-sm font-semibold text-theme-primary opacity-70 uppercase">Expired</span>
           </div>
           <div className="text-2xl font-bold text-red-500">{stats.expired}</div>
         </div>
@@ -130,7 +130,7 @@ export const PantryAnalytics: React.FC<PantryAnalyticsProps> = ({ inventory }) =
         <div className="bg-theme-secondary p-4 rounded-lg border border-theme">
           <div className="flex items-center gap-2 mb-2">
             <Flame className="w-4 h-4 text-orange-500" />
-            <span className="text-xs font-semibold text-theme-primary opacity-70 uppercase">Expiring Soon</span>
+            <span className="text-sm font-semibold text-theme-primary opacity-70 uppercase">Expiring Soon</span>
           </div>
           <div className="text-2xl font-bold text-orange-500">{stats.expiringSoon}</div>
         </div>
@@ -138,7 +138,7 @@ export const PantryAnalytics: React.FC<PantryAnalyticsProps> = ({ inventory }) =
         <div className="bg-theme-secondary p-4 rounded-lg border border-theme">
           <div className="flex items-center gap-2 mb-2">
             <TrendingUp className="w-4 h-4 text-green-500" />
-            <span className="text-xs font-semibold text-theme-primary opacity-70 uppercase">No Expiry</span>
+            <span className="text-sm font-semibold text-theme-primary opacity-70 uppercase">No Expiry</span>
           </div>
           <div className="text-2xl font-bold text-green-500">{stats.noExpiry}</div>
         </div>
@@ -250,7 +250,7 @@ export const PantryAnalytics: React.FC<PantryAnalyticsProps> = ({ inventory }) =
                 const percentage = maxQty > 0 ? (item.quantity / maxQty) * 100 : 0;
                 return (
                   <div key={idx} className="space-y-1">
-                    <div className="flex justify-between text-xs">
+                    <div className="flex justify-between text-sm">
                       <span className="text-theme-primary font-medium truncate" title={item.fullName}>{item.name}</span>
                       <span className="text-theme-secondary opacity-70 ml-2 flex-shrink-0">{typeof item.rawQuantity === 'number' ? item.rawQuantity : (item.rawQuantity && (item.rawQuantity.amount ? `${item.rawQuantity.amount} ${item.rawQuantity.unit}` : String(item.rawQuantity)))}</span>
                     </div>
@@ -297,7 +297,7 @@ export const PantryAnalytics: React.FC<PantryAnalyticsProps> = ({ inventory }) =
             </p>
           )}
           {inventory.length === 0 && (
-            <p className="text-theme-secondary opacity-70">No items in pantry yet. Start adding items to see analytics!</p>
+            <p className="text-theme-secondary opacity-70">No items in pantry yet. Add a few items to unlock category, storage, and expiry insights.</p>
           )}
         </div>
       </div>

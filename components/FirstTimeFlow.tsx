@@ -108,7 +108,7 @@ export const FirstTimeFlow: React.FC<FirstTimeFlowProps> = ({
               style={{ width: `${progressPercentage}%` }}
             />
           </div>
-          <p className="text-xs text-theme-secondary/70">
+          <p className="text-sm text-theme-secondary/70">
             {completedCount} of {steps.length} steps completed
           </p>
         </div>
@@ -126,6 +126,15 @@ export const FirstTimeFlow: React.FC<FirstTimeFlowProps> = ({
                   : 'bg-theme/5 border-theme hover:bg-theme/10'
               }`}
               onClick={() => handleStepClick(step)}
+              role="button"
+              tabIndex={0}
+              aria-label={`Open onboarding step: ${step.title}`}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  handleStepClick(step);
+                }
+              }}
             >
               <div className="flex items-start gap-3">
                 <div className={`flex-shrink-0 ${step.completed ? 'text-green-500' : ''}`}>
@@ -164,7 +173,7 @@ export const FirstTimeFlow: React.FC<FirstTimeFlowProps> = ({
             </button>
           </div>
 
-          <p className="text-xs text-theme-secondary/60 text-center mt-3">
+          <p className="text-sm text-theme-secondary/60 text-center mt-3">
             You can always change these settings later in your account preferences.
           </p>
         </div>

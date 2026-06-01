@@ -11,6 +11,7 @@ import { useKeyboardNavigation } from '../hooks/useKeyboardNavigation';
 import QuantityUnitPicker from './QuantityUnitPicker';
 import { useFocusTrap } from '../hooks/useFocusTrap';
 import { useModalOpen } from '../utils/useModalOpen';
+import { useAndroidBack } from '../hooks/useAndroidBack';
 import { useApp } from '../contexts/AppContext';
 import { useAppActions } from '../contexts/AppActionsContext';
 import { useIntl } from 'react-intl';
@@ -256,6 +257,10 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
 
     onClose();
   };
+
+  // Android hardware-back support (nested modal closes first, then detail modal)
+  useAndroidBack(showPriceTrends, () => setShowPriceTrends(false));
+  useAndroidBack(true, handleCloseAndPersist);
 
   // Keyboard navigation support — defined here because handleCloseAndPersist must be initialized first
   useKeyboardNavigation({

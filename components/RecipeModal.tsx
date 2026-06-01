@@ -1,11 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Plus, Heart, Trash2, Minus, CheckCircle2, Play, Pause, RotateCcw, AlertCircle, X, UtensilsCrossed } from 'lucide-react';
+import { X } from 'lucide-react';
 import { StructuredRecipe, RecipeRating, SavedRecipe, PantryItem, Household } from '../types';
-import LeftoverQuickCapture from './LeftoverQuickCapture';
 import { CookingMode } from './CookingMode';
-import { RecipeRatingUI } from './RecipeRating';
-import { ProgressiveImage } from './ProgressiveImage';
-import { generateBlurDataURL } from '../utils/appUtils';
 import { useKeyboardNavigation } from '../hooks/useKeyboardNavigation';
 import { useFocusTrap } from '../hooks/useFocusTrap';
 import { useModalOpen } from '../utils/useModalOpen';
@@ -13,6 +9,12 @@ import { useAndroidBack } from '../hooks/useAndroidBack';
 import { scaleRecipeIngredients, calculatePortionScaling } from '../utils/portionUtils';
 import { useAppActions } from '../contexts/AppActionsContext';
 import AnalyticsService from '../services/analyticsService';
+import { RecipeModalActionSection } from './recipe-modal/RecipeModalActionSection';
+import { RecipeModalDetailsSection } from './recipe-modal/RecipeModalDetailsSection';
+import { RecipeModalImageSection } from './recipe-modal/RecipeModalImageSection';
+import { RecipeModalLeftoverOverlay } from './recipe-modal/RecipeModalLeftoverOverlay';
+import { RecipeModalRatingModal } from './recipe-modal/RecipeModalRatingModal';
+import { RecipeModalTimerSubstitutionsSection } from './recipe-modal/RecipeModalTimerSubstitutionsSection';
 
 interface RecipeModalProps {
   recipe: StructuredRecipe | SavedRecipe;
@@ -685,7 +687,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
     }, 100);
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+   
   const handleLeftoverSaved = (_id?: string) => {
     setShowLeftoverCapture(false);
     setTimeout(() => setShowRatingModal(true), 100);
@@ -707,23 +709,95 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
     return <CookingMode recipe={recipe} onExit={() => setShowCookingMode(false)} />;
   }
 
+  const handleStartCookingMode = () => {
+    AnalyticsService.trackFeatureUsage('cooking_mode', {
+      recipe_id: recipe.id || recipe.title,
+      recipe_name: recipe.title,
+    });
+    setShowCookingMode(true);
+  };
+
+  const handleEditableSave = async () => {
+    if (isSaving) return;
+    setIsSaving(true);
+    try {
+      const built: StructuredRecipe & { __imageFile?: File; __submitForInclusion?: boolean } = {
+        title: editTitle.trim(),
+        description: editDescription.trim(),
+        ingredients: editIngredientsText.split('\n').map(s => s.trim()).filter(Boolean),
+        instructions: editInstructionsText.split('\n').map(s => s.trim()).filter(Boolean),
+        cookTime: editCookTime.trim(),
+        type: editType,
+        image: imagePreview || ''
+      };
+
+      if (imageFile) built.__imageFile = imageFile;
+      if (submitForInclusion) built.__submitForInclusion = true;
+
+      if (onSaveRecipe) {
+        await onSaveRecipe(built as StructuredRecipe);
+      }
+      AnalyticsService.trackRecipeSave((built as StructuredRecipe).id || built.title, built.title);
+      onClose();
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleNonEditableSave = async () => {
+    if (isSaving || !onSaveRecipe) return;
+    setIsSaving(true);
+    try {
+      const sanitized: StructuredRecipe = {
+        title: recipe.title || '',
+        description: recipe.description || '',
+        ingredients: Array.isArray(recipe.ingredients) ? [...recipe.ingredients] : [],
+        instructions: Array.isArray(recipe.instructions) ? [...recipe.instructions] : [],
+        cookTime: recipe.cookTime || '',
+        image: recipe.image
+      };
+
+      const placeholderPattern = /Full recipe not available in this rating/i;
+      if (sanitized.ingredients.length === 1 && placeholderPattern.test(String(sanitized.ingredients[0]))) {
+        sanitized.ingredients = [];
+      }
+      if (sanitized.instructions.length === 1 && placeholderPattern.test(String(sanitized.instructions[0]))) {
+        sanitized.instructions = [];
+      }
+
+      await onSaveRecipe(sanitized as StructuredRecipe);
+      AnalyticsService.trackRecipeSave(sanitized.id || sanitized.title, sanitized.title);
+      onClose();
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDetailsRatingSubmitted = (rating: RecipeRating) => {
+    AnalyticsService.trackRecipeRating(
+      recipe.id || recipe.title,
+      recipe.title,
+      rating.rating
+    );
+    if (onRate) onRate(rating);
+    setShowReviewPrompt(false);
+    setTimeout(() => onClose(), 300);
+  };
+
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center px-4 pt-[var(--safe-area-inset-top,0px)] pb-[var(--safe-area-inset-bottom,0px)]" onClick={onClose}>
-      {/* Top-level leftover quick-capture overlay so it renders above other modals */}
-      {showLeftoverCapture && user && (
-        <div onClick={(e) => e.stopPropagation()} style={{ zIndex: 99999 }} className="fixed inset-0 flex items-center justify-center bg-black/40 p-4">
-          <div onClick={(e) => e.stopPropagation()} className="bg-theme-secondary rounded-lg p-4">
-            <LeftoverQuickCapture
-              createdBy={user.id}
-              initialServings={servings}
-              recipeImageUrl={recipe.image}
-              initialNotes={`Leftovers from ${recipe.title}`}
-              onSaved={(id) => handleLeftoverSaved(id)}
-              onClose={() => { setShowLeftoverCapture(false); handleLeftoverSaved(); }}
-            />
-          </div>
-        </div>
-      )}
+      <RecipeModalLeftoverOverlay
+        showLeftoverCapture={showLeftoverCapture}
+        user={user}
+        servings={servings}
+        recipeImageUrl={recipe.image}
+        recipeTitle={recipe.title}
+        onSaved={(id) => handleLeftoverSaved(id)}
+        onClose={() => {
+          setShowLeftoverCapture(false);
+          handleLeftoverSaved();
+        }}
+      />
       <div ref={modalRef} role="dialog" aria-modal="true" aria-label={recipe.title} className="bg-theme-primary rounded-2xl shadow-2xl max-w-lg w-full relative flex flex-col h-full overflow-hidden" onClick={e => e.stopPropagation()}>
         {/* Fixed Header */}
         <div className="flex items-center justify-between p-4 pb-3 border-b border-theme flex-shrink-0 rounded-t-2xl">
@@ -810,551 +884,93 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
             </>
           )}
 
-          {/* Recipe Image */}
-          {editable ? (
-            <div className="mb-4">
-              <label className="block text-xs font-semibold mb-2">Photo</label>
-              <div className="flex items-center gap-3">
-                <input type="file" accept="image/*" onChange={(e) => {
-                  const f = e.target.files && e.target.files[0];
-                  if (f) {
-                    setImageFile(f);
-                    setImagePreview(URL.createObjectURL(f));
-                  }
-                }} />
-                {imagePreview && <img src={imagePreview} alt="preview" className="w-24 h-24 object-cover rounded" />}
-              </div>
-            </div>
-          ) : (
-            recipe.image && (
-              <div className="mb-6 rounded-lg overflow-hidden border border-theme">
-                <ProgressiveImage
-                  src={recipe.image}
-                  alt={recipe.title}
-                  className="w-full h-48"
-                  blurDataURL={generateBlurDataURL(400, 192)}
-                  placeholderSrc="/images/placeholder.svg"
-                />
-              </div>
-            )
-          )}
+          <RecipeModalImageSection
+            editable={editable}
+            imagePreview={imagePreview}
+            recipeImage={recipe.image}
+            recipeTitle={recipe.title}
+            setImageFile={setImageFile}
+            setImagePreview={setImagePreview}
+          />
 
-          {/* Enhanced Cooking Timer Section */}
-          {(recipe as StructuredRecipe).cookTime && (
-            <div className="mb-6 p-4 bg-theme-secondary/10 rounded-lg border border-[var(--accent-color)]/20">
-              <div className="flex items-center justify-between mb-3">
-                <h4 className="text-xs font-bold text-[var(--accent-color)] uppercase">{timerLabel}</h4>
-                <span className="text-xs text-theme-secondary opacity-70">
-                  {timerActive ? formatTime(timeRemaining) : (recipe as StructuredRecipe).cookTime}
-                </span>
-              </div>
+          <RecipeModalTimerSubstitutionsSection
+            recipe={recipe}
+            timerLabel={timerLabel}
+            timerActive={timerActive}
+            timeRemaining={timeRemaining}
+            totalTime={totalTime}
+            customTime={customTime}
+            showCustomTimer={showCustomTimer}
+            setCustomTime={setCustomTime}
+            setShowCustomTimer={setShowCustomTimer}
+            setTimerActive={setTimerActive}
+            setTimeRemaining={setTimeRemaining}
+            setTotalTime={setTotalTime}
+            startTimer={startTimer}
+            startQuickTimer={startQuickTimer}
+            formatTime={formatTime}
+            findSubstitutions={findSubstitutions}
+            showSubstitutions={showSubstitutions}
+            setShowSubstitutions={setShowSubstitutions}
+            ingredientSubstitutions={ingredientSubstitutions}
+          />
 
-              {showCustomTimer ? (
-                <div className="space-y-3">
-                  <div className="flex gap-2">
-                    <input
-                      type="number"
-                      min="1"
-                      max="180"
-                      value={customTime}
-                      onChange={(e) => setCustomTime(parseInt(e.target.value) || 0)}
-                      placeholder="Minutes"
-                      className="flex-1 px-3 py-2 bg-theme-secondary/20 border border-[var(--accent-color)]/20 rounded-lg text-theme-primary text-sm"
-                    />
-                    <button
-                      onClick={() => startTimer(true)}
-                      disabled={customTime <= 0}
-                      className="px-4 py-2 bg-[var(--accent-color)] hover:bg-[var(--accent-color)]/90 disabled:bg-theme-secondary/50 text-white rounded-lg text-sm font-medium"
-                    >
-                      Start
-                    </button>
-                  </div>
-                  <div className="flex gap-2">
-                    <button onClick={() => startQuickTimer(5)} className="flex-1 py-1 px-2 bg-theme-secondary/20 hover:bg-theme-secondary/30 rounded text-xs">5 min</button>
-                    <button onClick={() => startQuickTimer(10)} className="flex-1 py-1 px-2 bg-theme-secondary/20 hover:bg-theme-secondary/30 rounded text-xs">10 min</button>
-                    <button onClick={() => startQuickTimer(15)} className="flex-1 py-1 px-2 bg-theme-secondary/20 hover:bg-theme-secondary/30 rounded text-xs">15 min</button>
-                    <button onClick={() => startQuickTimer(30)} className="flex-1 py-1 px-2 bg-theme-secondary/20 hover:bg-theme-secondary/30 rounded text-xs">30 min</button>
-                  </div>
-                  <button
-                    onClick={() => setShowCustomTimer(false)}
-                    className="w-full py-1 px-2 bg-theme-secondary/10 hover:bg-theme-secondary/20 rounded text-xs text-theme-secondary"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              ) : timerActive ? (
-                <div className="text-center">
-                  <div className="text-5xl font-bold font-mono text-[var(--accent-color)] mb-3 tracking-wider">
-                    {formatTime(timeRemaining)}
-                  </div>
-                  <div className="w-full bg-theme-secondary/20 rounded-full h-2 mb-4 overflow-hidden">
-                    <div
-                      className="h-full bg-[var(--accent-color)] transition-all duration-300"
-                      style={{width: totalTime > 0 ? `${(timeRemaining / totalTime) * 100}%` : '0%'}}
-                    />
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setTimerActive(!timerActive)}
-                      className="flex-1 py-2 px-3 bg-theme-secondary hover:bg-theme-secondary/80 text-theme-primary rounded-lg flex items-center justify-center gap-2 text-sm font-medium"
-                    >
-                      {timerActive ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-                      {timerActive ? 'Pause' : 'Resume'}
-                    </button>
-                    <button
-                      onClick={() => { setTimerActive(false); setTimeRemaining(0); setTotalTime(0); }}
-                      className="flex-1 py-2 px-3 bg-theme-secondary hover:bg-theme-secondary/80 text-theme-primary rounded-lg flex items-center justify-center gap-2 text-sm font-medium"
-                    >
-                      <RotateCcw className="w-4 h-4" /> Reset
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <button
-                    onClick={() => startTimer(false)}
-                    className="w-full py-2 px-4 bg-[var(--accent-color)] hover:bg-[var(--accent-color)]/90 text-white rounded-lg flex items-center justify-center gap-2 font-medium"
-                  >
-                    <Play className="w-4 h-4" /> Start Recipe Timer
-                  </button>
-                  <button
-                    onClick={() => setShowCustomTimer(true)}
-                    className="w-full py-2 px-4 bg-theme-secondary/20 hover:bg-theme-secondary/30 border border-[var(--accent-color)]/20 rounded-lg flex items-center justify-center gap-2 text-sm font-medium text-theme-primary"
-                  >
-                    ⏱️ Custom Timer
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Smart Substitutions Button */}
-          <div className="mb-4">
-            <button
-              onClick={findSubstitutions}
-              className="w-full py-2 px-4 bg-theme-secondary/20 hover:bg-theme-secondary/30 border border-[var(--accent-color)]/20 rounded-lg flex items-center justify-center gap-2 text-sm font-medium text-theme-primary transition-colors"
-            >
-              <AlertCircle className="w-4 h-4" /> Ingredient Substitutions
-            </button>
-          </div>
-
-          {/* Substitutions Modal */}
-          {showSubstitutions && (
-            <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4" onClick={() => setShowSubstitutions(false)}>
-              <div className="bg-theme-primary rounded-xl max-w-md w-full p-6 max-h-[80vh] overflow-y-auto shadow-2xl" onClick={e => e.stopPropagation()}>
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-bold text-[var(--accent-color)]">Ingredient Substitutions</h3>
-                  <button
-                    onClick={() => setShowSubstitutions(false)}
-                    className="text-theme-secondary opacity-50 hover:opacity-100"
-                  >
-                    &times;
-                  </button>
-                </div>
-
-                {ingredientSubstitutions.length === 0 ? (
-                  <p className="text-sm text-theme-secondary opacity-70 text-center py-6">No substitutions found for these ingredients.</p>
-                ) : (
-                  <div className="space-y-4">
-                    {ingredientSubstitutions.map((item, idx) => (
-                      <div key={idx} className="border-l-4 border-[var(--accent-color)]/50 pl-3">
-                        <p className="text-sm font-semibold text-theme-primary mb-2">{item.ingredient}</p>
-                        <div className="space-y-2">
-                          {item.substitutes.map((sub, sidx) => (
-                            <div key={sidx} className="bg-theme-secondary/10 rounded-lg px-3 py-2">
-                              <p className="text-sm font-medium text-[var(--accent-color)]">{sub.name}</p>
-                              <p className="text-xs text-theme-secondary opacity-80">{sub.ratio}</p>
-                              {sub.notes && <p className="text-xs text-theme-secondary opacity-60 mt-0.5 italic">{sub.notes}</p>}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <button
-                  onClick={() => setShowSubstitutions(false)}
-                  className="w-full mt-6 py-2 px-4 bg-[var(--accent-color)] hover:bg-[var(--accent-color)]/90 text-white rounded-lg font-medium"
-                >
-                  Got it
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Servings Control */}
-          {!editable && (
-            <div className="mb-4">
-              <div className="flex items-center justify-between mb-2">
-                <h4 className="text-sm font-bold text-[var(--accent-color)] uppercase">Servings</h4>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setServings(Math.max(1, servings - 1))}
-                    className="w-8 h-8 rounded-full bg-theme-secondary/20 hover:bg-theme-secondary/30 flex items-center justify-center text-theme-primary font-bold"
-                    aria-label="Decrease servings"
-                  >
-                    <Minus className="w-4 h-4" />
-                  </button>
-                  <span className="text-lg font-semibold text-theme-primary min-w-[2rem] text-center">{servings}</span>
-                  <button
-                    onClick={() => setServings(servings + 1)}
-                    className="w-8 h-8 rounded-full bg-theme-secondary/20 hover:bg-theme-secondary/30 flex items-center justify-center text-theme-primary font-bold"
-                    aria-label="Increase servings"
-                  >
-                    <Plus className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-              <p className="text-xs text-theme-secondary opacity-70">
-                Adjust servings to scale ingredients proportionally (recipes assume 4 servings)
-              </p>
-            </div>
-          )}
-
-          {/* Ingredients Section */}
-          <div className="mb-6">
-            <div className="flex items-center justify-between mb-3">
-              <h4 className="text-sm font-bold text-[var(--accent-color)] uppercase">Ingredients</h4>
-            </div>
-            
-            {editable ? (
-              <div className="space-y-2">
-                {editIngredientsText.split('\n').concat(['', '', '', '']).slice(0, Math.max(4, editIngredientsText.split('\n').length)).map((ingredient, index) => (
-                  <input
-                    key={index}
-                    value={ingredient}
-                    onChange={e => {
-                      const lines = editIngredientsText.split('\n');
-                      if (index < lines.length) {
-                        lines[index] = e.target.value;
-                      } else {
-                        lines.push(e.target.value);
-                      }
-                      setEditIngredientsText(lines.join('\n'));
-                    }}
-                    placeholder={`Ingredient ${index + 1}`}
-                    className="w-full px-3 py-2 border border-theme rounded-lg bg-theme-primary text-theme-primary focus:border-[var(--accent-color)] focus:outline-none"
-                  />
-                ))}
-              </div>
-            ) : (
-              <ul className="list-disc list-inside text-theme-secondary opacity-80">
-                {Array.isArray(scaledIngredients) && scaledIngredients.length > 0 ? (
-                  scaledIngredients.map((ing, i) => <li key={i}>{ing}</li>)
-                ) : (
-                  <li>No ingredients available</li>
-                )}
-              </ul>
-            )}
-          </div>
-
-          {/* Instructions Section */}
-          <div className="mb-6">
-            <div className="flex items-center justify-between mb-3">
-              <h4 className="text-sm font-bold text-[var(--accent-color)] uppercase">Instructions</h4>
-            </div>
-            
-            {editable ? (
-              <div className="space-y-2">
-                {editInstructionsText.split('\n').concat(['', '', '', '']).slice(0, Math.max(4, editInstructionsText.split('\n').length)).map((instruction, index) => (
-                  <div key={index} className="flex items-start gap-2">
-                    <span className="text-sm font-medium text-theme-secondary mt-2 min-w-[20px]">{index + 1}.</span>
-                    <input
-                      value={instruction}
-                      onChange={e => {
-                        const lines = editInstructionsText.split('\n');
-                        if (index < lines.length) {
-                          lines[index] = e.target.value;
-                        } else {
-                          lines.push(e.target.value);
-                        }
-                        setEditInstructionsText(lines.join('\n'));
-                      }}
-                      placeholder={`Step ${index + 1}`}
-                      className="flex-1 px-3 py-2 border border-theme rounded-lg bg-theme-primary text-theme-primary focus:border-[var(--accent-color)] focus:outline-none"
-                    />
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <ol className="list-decimal list-inside text-theme-secondary opacity-80 space-y-1">
-              {(() => {
-                // Process instructions - some recipes have them as arrays with concatenated steps
-                const processedSteps: string[] = [];
-
-                if (Array.isArray(recipe.instructions) && recipe.instructions.length > 0) {
-                  recipe.instructions.forEach(instruction => {
-                    // Split by "step X", "X.", or numbered patterns to separate individual steps
-                    const steps = instruction.split(/(?=step \d+|STEP \d+|\d+\.)/i).filter(step => step.trim());
-                    processedSteps.push(...steps);
-                  });
-                }
-
-                return processedSteps.length > 0 ? (
-                  processedSteps.map((step, i) => {
-                    // Clean up step text by removing "step X", "X.", prefixes and extra whitespace
-                    const cleanStep = step
-                      .replace(/^step\s+\d+\s*[-.]?\s*/i, '') // Remove "step 1", "step 1 -", etc.
-                      .replace(/^STEP\s+\d+\s*[-.]?\s*/i, '') // Remove "STEP 1", etc.
-                      .replace(/^\d+\.\s*/, '') // Remove "1.", "2.", etc.
-                      .trim();
-                    return <li key={i}>{cleanStep}</li>;
-                  })
-                ) : (
-                  <li>No instructions available</li>
-                );
-              })()}
-              </ol>
-            )}
-          </div>
-          {onRate && (
-            <div className={`mt-6 pt-4 border-t border-theme ${showReviewPrompt ? 'bg-[var(--accent-color)]/10 p-4 rounded-lg' : ''}`} ref={ratingRef}>
-            <RecipeRatingUI
-             recipeTitle={recipe.title}
-             recipe={recipe}
-             onRatingSubmitted={(rating) => {
-              // Track recipe rating
-              AnalyticsService.trackRecipeRating(
-                recipe.id || recipe.title,
-                recipe.title,
-                rating.rating
-              );
-              if (onRate) onRate(rating);
-              setShowReviewPrompt(false);
-              setTimeout(() => onClose(), 300); // Close modal after submitting a rating
-            }}
-            householdId={household?.id || user?.id}
+          <RecipeModalDetailsSection
+            editable={editable}
+            servings={servings}
+            setServings={setServings}
+            editIngredientsText={editIngredientsText}
+            setEditIngredientsText={setEditIngredientsText}
+            editInstructionsText={editInstructionsText}
+            setEditInstructionsText={setEditInstructionsText}
+            scaledIngredients={scaledIngredients}
+            recipe={recipe}
+            onRate={onRate}
+            showReviewPrompt={showReviewPrompt}
+            setShowReviewPrompt={setShowReviewPrompt}
+            onRatingSubmitted={handleDetailsRatingSubmitted}
+            household={household}
+            user={user}
+            ratingRef={ratingRef}
           />
         </div>
-      )}
-        </div>
-        <div className="sticky bottom-0 z-20 w-full bg-theme-primary rounded-b-2xl px-4 pt-2 pb-2">
-          {/* Primary action buttons - Only show Save when editable */}
-          {editable ? (
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <input 
-                  type="checkbox" 
-                  id="submitForInclusion" 
-                  checked={submitForInclusion} 
-                  onChange={e => setSubmitForInclusion(e.target.checked)} 
-                  className="rounded border-theme"
-                />
-                <label htmlFor="submitForInclusion" className="text-sm text-theme-primary">
-                  Submit recipe for public sharing (makes it available to other users)
-                </label>
-              </div>
-              
-              {recipeSavedCount !== undefined && (
-                <p className="text-xs text-theme-secondary text-center mb-1">
-                  {recipeSaveLimitExceeded
-                    ? 'Recipe limit reached — upgrade to save more'
-                    : `${recipeSavedCount} saved`}
-                </p>
-              )}
-              <button
-                onClick={async () => {
-                  if (isSaving) return;
-                  setIsSaving(true);
-                  try {
-                    // Build StructuredRecipe from editable fields
-                    const built: StructuredRecipe & { __imageFile?: File; __submitForInclusion?: boolean } = {
-                      title: editTitle.trim(),
-                      description: editDescription.trim(),
-                      ingredients: editIngredientsText.split('\n').map(s => s.trim()).filter(Boolean),
-                      instructions: editInstructionsText.split('\n').map(s => s.trim()).filter(Boolean),
-                      cookTime: editCookTime.trim(),
-                      type: editType,
-                      image: imagePreview || ''
-                    };
-
-                    // Attach helper metadata for parent handler
-                    if (imageFile) built.__imageFile = imageFile;
-                    if (submitForInclusion) built.__submitForInclusion = true;
-
-                    if (onSaveRecipe) {
-                      await onSaveRecipe(built as StructuredRecipe);
-                    }
-                    // Track recipe save
-                    AnalyticsService.trackRecipeSave((built as StructuredRecipe).id || built.title, built.title);
-                    onClose();
-                  } finally {
-                    setIsSaving(false);
-                  }
-                }}
-                disabled={recipeSaveLimitExceeded || isSaving}
-                className={`w-full py-2 font-bold border rounded-lg flex items-center justify-center gap-2 ${
-                  recipeSaveLimitExceeded || isSaving
-                    ? 'border-gray-400 text-gray-400 cursor-not-allowed opacity-50'
-                    : 'border-[var(--accent-color)] hover:bg-[var(--accent-color)] hover:text-white'
-                }`}
-              >
-                <Heart className="w-4 h-4" /> {isSaving ? 'Saving...' : recipeSaveLimitExceeded ? 'Limit Reached' : 'Save Recipe'}
-              </button>
-            </div>
-          ) : (
-            <>
-              {/* Content for non-editable mode */}
-            </>
-          )}
-        </div>
-
-        {/* Fixed Action Buttons */}
-        <div className="flex-shrink-0 border-t border-theme bg-theme-primary px-4 pt-2 pb-3 rounded-b-2xl space-y-2">
-          {/* Primary action buttons - Add to Plan, Rate, Mark as Made */}
-          {(showMarkAsMade && onMarkAsMade) || (showAddToPlan && onAddToPlan) ? (
-            <div className="grid grid-cols-2 gap-2">
-              {showMarkAsMade && onMarkAsMade && (
-                <button onClick={handleMarkAsMadeClick} className="py-2 font-bold bg-[var(--accent-color)] text-white rounded-lg flex items-center justify-center gap-2">
-                  <CheckCircle2 className="w-4 h-4" /> Mark as Made
-                </button>
-              )}
-              {showAddToPlan && onAddToPlan && (
-                <button
-                  onClick={() => {
-                    onAddToPlan(recipe);
-                    onClose();
-                  }}
-                  disabled={mealPlanLimitExceeded}
-                  className={`py-2 font-bold rounded-lg flex items-center justify-center gap-2 ${
-                    mealPlanLimitExceeded
-                      ? 'bg-gray-400 text-gray-600 cursor-not-allowed opacity-50'
-                      : 'bg-[var(--accent-color)] text-white'
-                  }`}
-                >
-                  <Plus className="w-4 h-4" /> {mealPlanLimitExceeded ? 'Limit Reached' : 'Add to Schedule'}
-                </button>
-              )}
-            </div>
-          ) : null}
-
-          {/* Cooking Mode button */}
-          {!editable && Array.isArray(recipe.instructions) && recipe.instructions.some(s => s.trim()) && (
-            <button
-              onClick={() => {
-                // Track cooking mode start
-                AnalyticsService.trackFeatureUsage('cooking_mode', {
-                  recipe_id: recipe.id || recipe.title,
-                  recipe_name: recipe.title
-                });
-                setShowCookingMode(true);
-              }}
-              className="w-full py-2.5 font-bold bg-[var(--accent-color)] text-white rounded-lg flex items-center justify-center gap-2 mb-1"
-            >
-              <UtensilsCrossed className="w-4 h-4" /> Start Cooking
-            </button>
-          )}
-
-          {/* Secondary action buttons - Save, Delete, Close */}
-          <div className="flex flex-col gap-1">
-          <div className="flex items-stretch gap-2">
-            <button className="flex-1 py-2 font-bold border border-[var(--accent-color)] rounded-lg flex items-center justify-center gap-2" onClick={onClose}>CLOSE</button>
-            {isFromMealPlan && (
-              <button onClick={() => setShowLeftoverCapture(true)} className="flex-1 py-2 font-bold bg-yellow-500 text-black rounded-lg flex items-center justify-center gap-2">
-                <RotateCcw className="w-4 h-4" /> Save Leftovers
-              </button>
-            )}
-            {showDeleteButton && onDeleteRecipe && (
-              <button onClick={() => { onDeleteRecipe(recipe as SavedRecipe); onClose(); }} className="flex-1 py-2 font-bold bg-red-500 text-white rounded-lg flex items-center justify-center gap-2">
-                <Trash2 className="w-4 h-4" /> Delete
-              </button>
-            )}
-            {showSaveButton && onSaveRecipe && (
-              <button
-                onClick={async () => { 
-                  if (isSaving) return; // Prevent double-clicks
-                  setIsSaving(true);
-                  try {
-                    // Sanitize placeholder recipe text so we don't persist UI-only messages
-                    const sanitized: StructuredRecipe = {
-                      title: recipe.title || '',
-                      description: recipe.description || '',
-                      ingredients: Array.isArray(recipe.ingredients) ? [...recipe.ingredients] : [],
-                      instructions: Array.isArray(recipe.instructions) ? [...recipe.instructions] : [],
-                      cookTime: recipe.cookTime || '',
-                      image: recipe.image
-                    };
-
-                    const placeholderPattern = /Full recipe not available in this rating/i;
-                    // Remove placeholder entries if present
-                    if (sanitized.ingredients.length === 1 && placeholderPattern.test(String(sanitized.ingredients[0]))) {
-                      sanitized.ingredients = [];
-                    }
-                    if (sanitized.instructions.length === 1 && placeholderPattern.test(String(sanitized.instructions[0]))) {
-                      sanitized.instructions = [];
-                    }
-
-                    await onSaveRecipe(sanitized as StructuredRecipe);
-                    // Track recipe save
-                    AnalyticsService.trackRecipeSave(sanitized.id || sanitized.title, sanitized.title);
-                    onClose();
-                  } finally {
-                    setIsSaving(false);
-                  }
-                }}
-                disabled={recipeSaveLimitExceeded || isSaving}
-                className={`flex-1 py-2 font-bold border rounded-lg flex items-center justify-center gap-2 ${
-                  /* non-editable save button — limit hint shown inline in button label */
-                  recipeSaveLimitExceeded || isSaving
-                    ? 'border-gray-400 text-gray-400 cursor-not-allowed opacity-50'
-                    : 'border-[var(--accent-color)] hover:bg-[var(--accent-color)] hover:text-white'
-                }`}
-              >
-                <Heart className="w-4 h-4" /> {isSaving ? 'Saving...' : recipeSaveLimitExceeded ? 'Limit Reached' : 'Save Recipe'}
-              </button>
-            )}
-          </div>
-          {showSaveButton && onSaveRecipe && recipeSavedCount !== undefined && (
-            <p className="text-xs text-theme-secondary text-center">
-              {recipeSaveLimitExceeded
-                ? 'Limit reached — upgrade to save more'
-                : `${recipeSavedCount} saved`}
-            </p>
-          )}
-          </div>
-        </div>
+        <RecipeModalActionSection
+          editable={editable}
+          submitForInclusion={submitForInclusion}
+          setSubmitForInclusion={setSubmitForInclusion}
+          recipeSavedCount={recipeSavedCount}
+          recipeSaveLimitExceeded={recipeSaveLimitExceeded}
+          isSaving={isSaving}
+          onSaveEditable={handleEditableSave}
+          showMarkAsMade={showMarkAsMade}
+          onMarkAsMade={onMarkAsMade}
+          onMarkAsMadeClick={handleMarkAsMadeClick}
+          showAddToPlan={showAddToPlan}
+          onAddToPlan={onAddToPlan}
+          recipe={recipe}
+          onClose={onClose}
+          mealPlanLimitExceeded={mealPlanLimitExceeded}
+          canStartCooking={!editable && Array.isArray(recipe.instructions) && recipe.instructions.some(s => s.trim())}
+          onStartCooking={handleStartCookingMode}
+          isFromMealPlan={isFromMealPlan}
+          onShowLeftovers={() => setShowLeftoverCapture(true)}
+          showDeleteButton={showDeleteButton}
+          onDeleteRecipe={onDeleteRecipe}
+          showSaveButton={showSaveButton}
+          onSaveRecipe={onSaveRecipe}
+          onSaveNonEditable={handleNonEditableSave}
+        />
       </div>
 
-      {/* Rating Modal */}
-      {showRatingModal && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
-          onClick={() => setShowRatingModal(false)}
-        >
-          <div
-            className="bg-theme-primary rounded-2xl p-6 max-w-md w-full mx-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 className="text-xl font-bold text-theme-text mb-4 text-center">
-              Rate "{recipe.title}"
-            </h3>
-            <div className="mb-6">
-              <RecipeRatingUI
-                recipeTitle={recipe.title}
-                recipe={recipe}
-                onRatingSubmitted={(rating) => {
-                  if (onRate) onRate(rating);
-                  setShowRatingModal(false);
-                  setTimeout(() => onClose(), 300); // Close main modal after submitting a rating
-                }}
-                householdId={household?.id || user?.id}
-              />
-            </div>
-            <div className="flex justify-center">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowRatingModal(false);
-                }}
-                className="py-2 px-6 font-bold border border-theme rounded-lg hover:bg-theme-secondary transition-colors"
-              >
-                Skip for Now
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <RecipeModalRatingModal
+        showRatingModal={showRatingModal}
+        setShowRatingModal={setShowRatingModal}
+        recipe={recipe}
+        onRate={onRate}
+        onClose={onClose}
+        household={household}
+        user={user}
+      />
     </div>
   );
 };

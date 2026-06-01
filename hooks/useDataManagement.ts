@@ -279,6 +279,9 @@ export function useDataManagement(
   const [inventory, setInventory] = useState<PantryItem[]>([]);
   const [shoppingList, setShoppingList] = useState<ShoppingItem[]>([]);
   const [savedRecipes, setSavedRecipes] = useState<SavedRecipe[]>([]);
+  // Count of recipes the current user has personally saved. Used for usage limits/sync so
+  // other household members' recipes don't inflate the user's own quota.
+  const [personalRecipeCount, setPersonalRecipeCount] = useState(0);
   const [customCategories, setCustomCategories] = useState<CustomCategory[]>([]);
 
   // Usage limit states
@@ -605,6 +608,30 @@ export function useDataManagement(
     unsubs.push(createShoppingListListener(user, household, inHousehold, setShoppingList, setIsLoadingShoppingList, prevShoppingListRef));
     unsubs.push(createSavedRecipesListener(user, household, inHousehold, setSavedRecipes, setIsLoadingSavedRecipes, prevSavedRecipesRef));
     unsubs.push(createMealPlanListener(user, household, inHousehold, setMealPlan, setIsLoadingMealPlan, prevMealPlanRef));
+
+    // When in a household, also listen to the user's personal recipe cache so we have
+    // an accurate personal count for usage limits (household view shows all members' recipes).
+    if (inHousehold) {
+      const personalRecipePath = `users/${user.id}/cache/savedRecipes`;
+      unsubs.push(DatabaseMonitoringService.onSnapshot(DatabaseMonitoringService.doc(personalRecipePath), snap => {
+        if (snap.exists()) {
+          const data = snap.data() as CachedRecipesData & RecipesCacheMetadata;
+          if (data.version === RecipesCacheService.CACHE_VERSION) {
+            const count = Object.keys(data).filter(
+              k => k !== 'lastUpdated' && k !== 'version' && k !== 'totalRecipes'
+            ).length;
+            setPersonalRecipeCount(count);
+          } else {
+            setPersonalRecipeCount(0);
+          }
+        } else {
+          setPersonalRecipeCount(0);
+        }
+      }, () => { /* permission errors are non-fatal here */ }));
+    } else {
+      // Solo user: personal count mirrors the main savedRecipes state
+      setPersonalRecipeCount(0); // will be set via savedRecipes.length in the effect below
+    }
     // Do not attach continuous community ratings listener here; refresh on demand when tab is activated
     
     // customCategories are now stored on the user doc and synced via useAuth's onSnapshot.
@@ -740,14 +767,16 @@ export function useDataManagement(
   }, [user]);
 
   // Keep recipes.used Firestore counter in sync with the actual saved-recipe count.
-  // Runs after every change so the Settings/SubscriptionManager displays are accurate.
+  // When in a household the displayed list contains all members' recipes, so we sync
+  // against the personal count only — other members' recipes must not inflate the quota.
   useEffect(() => {
     if (!user || isLoadingSavedRecipes) return;
-    UsageService.syncRecipeCount(user, savedRecipes.length).catch(err => {
+    const inHousehold = !!(user.householdId);
+    const countToSync = inHousehold ? personalRecipeCount : savedRecipes.length;
+    UsageService.syncRecipeCount(user, countToSync).catch(err => {
       log.warn('Failed to sync recipe count', { error: err }, 'DataManagement');
     });
-    // Only re-run when the actual count changes or the user changes.
-  }, [savedRecipes.length, user?.id, isLoadingSavedRecipes]);
+  }, [savedRecipes.length, personalRecipeCount, user?.id, user?.householdId, isLoadingSavedRecipes]);
 
   // Keep mealPlanning.weeklyUsed Firestore counter in sync with actual current/future entries.
   // Past entries are excluded so they never count against the user's quota.
@@ -845,7 +874,10 @@ export function useDataManagement(
   const checkRecipeSaveLimit = async () => {
     if (!user) return false;
     try {
-      const canSave = await UsageService.canSaveRecipe(user, savedRecipes.length);
+      // Use personal count when in a household so members don't share quota.
+      const inHousehold = !!(user.householdId);
+      const countForLimit = inHousehold ? personalRecipeCount : savedRecipes.length;
+      const canSave = await UsageService.canSaveRecipe(user, countForLimit);
       setRecipeSaveLimitExceeded(!canSave);
       return canSave;
     } catch (err) {
@@ -889,7 +921,6 @@ export function useDataManagement(
     try {
       const inHousehold = isHouseholdMember(household, user) && household?.id;
       const householdId = inHousehold ? household.id : undefined;
-      const userId = inHousehold ? undefined : user.id;
 
       const savedRecipe: SavedRecipe = {
         id: `recipe-${Date.now()}`,
@@ -897,9 +928,18 @@ export function useDataManagement(
         dateSaved: new Date().toISOString()
       };
 
-      await RecipesCacheService.addRecipeToCache(savedRecipe, householdId, userId);
-      // Sync the recipe counter to match the actual count (current + 1 for the one just added)
-      await UsageService.syncRecipeCount(user, savedRecipes.length + 1);
+      // Always write to the user's personal cache so their own recipe list is
+      // maintained independently of any household they join or leave.
+      await RecipesCacheService.addRecipeToCache(savedRecipe, undefined, user.id);
+
+      // When in a household also write to the household cache so all members
+      // see the combined list in a single Firestore read.
+      if (inHousehold && householdId) {
+        await RecipesCacheService.addRecipeToCache(savedRecipe, householdId, undefined);
+      }
+
+      // Sync personal count only
+      await UsageService.syncRecipeCount(user, personalRecipeCount + 1);
 
       HapticService.success();
       addToast?.(`Saved ${recipe.title} to your recipes!`, 'success');
@@ -914,11 +954,17 @@ export function useDataManagement(
     try {
       const inHousehold = isHouseholdMember(household, user) && household?.id;
       const householdId = inHousehold ? household.id : undefined;
-      const userId = inHousehold ? undefined : user.id;
-      
-      await RecipesCacheService.removeRecipeFromCache(recipe.id, householdId, userId);
-      // Sync the recipe counter to match the actual count (current - 1 for the one just removed)
-      await UsageService.syncRecipeCount(user, Math.max(0, savedRecipes.length - 1));
+
+      // Remove from user's personal cache (may be a no-op if it was saved by another member).
+      await RecipesCacheService.removeRecipeFromCache(recipe.id, undefined, user.id);
+
+      // Remove from household shared cache so all members see it gone.
+      if (inHousehold && householdId) {
+        await RecipesCacheService.removeRecipeFromCache(recipe.id, householdId, undefined);
+      }
+
+      // Sync personal count only
+      await UsageService.syncRecipeCount(user, Math.max(0, personalRecipeCount - 1));
 
       HapticService.light();
       addToast?.(`Removed ${recipe.title} from your saved recipes.`, 'success');

@@ -2,7 +2,7 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { useModalOpen } from '../utils/useModalOpen';
 import { useAndroidBack } from '../hooks/useAndroidBack';
 import { Camera as CapacitorCamera, CameraResultType, CameraSource } from '@capacitor/camera';
-import { Camera, Upload, Loader2, Plus, Trash2, CheckCircle2, ShoppingBasket, X, Barcode, ChevronDown, ChevronRight, ChevronUp, Image, ChefHat, TrendingUp, Search, Filter, Clock, Tag, FilePlus, Receipt } from 'lucide-react';
+import { Camera, Upload, Loader2, Plus, Trash2, CheckCircle2, ShoppingBasket, X, Barcode, ChevronDown, ChevronRight, ChevronUp, Image, ChefHat, TrendingUp, Search, Filter, Clock, Tag, FilePlus, Receipt, LayoutGrid, LayoutList } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { FixedSizeList as List } from 'react-window';
 import { extractReceiptItems } from '../services/receiptOcrService';
@@ -203,6 +203,17 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   const [bulkQuantityEditItems, setBulkQuantityEditItems] = useState<PantryItem[]>([]);
   const [showBulkQuantityEdit, setShowBulkQuantityEdit] = useState(false);
   const [showUseSoon, setShowUseSoon] = useState(false);
+  const [displayLayout, setDisplayLayout] = useState<'list' | 'grid'>(() => {
+    try { return (localStorage.getItem('pantry_display_layout') as 'list' | 'grid') || 'list'; } catch { return 'list'; }
+  });
+
+  const toggleDisplayLayout = () => {
+    setDisplayLayout(prev => {
+      const next = prev === 'list' ? 'grid' : 'list';
+      try { localStorage.setItem('pantry_display_layout', next); } catch { /* ignore */ }
+      return next;
+    });
+  };
 
   // Hide header/nav when any internal overlay is open
   useModalOpen(isAddModalOpen || showScanReviewModal || showBulkQuantityEdit);
@@ -707,12 +718,12 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
 
     setLoadingState(LoadingState.LOADING);
 
-    console.log('[PantryScanner] handleAnalyze: starting', {
+    log.debug('PantryScanner handleAnalyze starting', {
       imageSizeKB: Math.round(rawBase64.length / 1024),
       mimeType,
       userId: user?.id ?? 'none',
       isGuest: user?.isGuest ?? false,
-    });
+    }, 'PantryScanner');
 
     try {
       const processedItems = await PantryService.analyzePantryImage(rawBase64, mimeType, user ?? undefined);
@@ -1139,7 +1150,9 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
 
         {expandedCategories.has(category) && (
           <div className="border-t border-theme">
-            {items.length > CATEGORY_VIRTUALIZE_THRESHOLD ? (
+            {displayLayout === 'grid' ? (
+              <div className="grid grid-cols-3 gap-2 p-2">{items.map(renderTileItem)}</div>
+            ) : items.length > CATEGORY_VIRTUALIZE_THRESHOLD ? (
               <List
                 height={Math.min(400, items.length * 64)}
                 itemCount={items.length}
@@ -1181,6 +1194,8 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
             <div className="p-4 text-center text-theme-secondary opacity-50 text-sm">
               No items in {locationLabel.toLowerCase()}
             </div>
+          ) : displayLayout === 'grid' ? (
+            <div className="grid grid-cols-3 gap-2 p-2">{items.map(renderTileItem)}</div>
           ) : items.length > CATEGORY_VIRTUALIZE_THRESHOLD ? (
             <List
               height={Math.min(400, items.length * 64)}
@@ -1560,6 +1575,116 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
     );
   }
 
+  function renderTileItem(item: DisplayedPantryItem) {
+    const daysRemaining = item.expirationDate
+      ? Math.ceil((new Date(item.expirationDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+      : undefined;
+    const primaryIndex = item.originalIndices ? item.originalIndices[0] : item.originalIndex;
+    const isSelected = item.originalIndices
+      ? item.originalIndices.some((idx: number) => selectedItems.has(idx))
+      : selectedItems.has(primaryIndex);
+    const expiryColor = typeof daysRemaining === 'number' ? getExpirationColor(daysRemaining, item.expirationType) : null;
+
+    const toggleSelect = (e?: React.MouseEvent) => {
+      e?.stopPropagation();
+      if (item.originalIndices) {
+        const allSelected = item.originalIndices.every((idx: number) => selectedItems.has(idx));
+        if (allSelected) {
+          item.originalIndices.forEach((idx: number) => selectedItems.delete(idx));
+        } else {
+          item.originalIndices.forEach((idx: number) => selectedItems.add(idx));
+        }
+        setSelectedItems(new Set(selectedItems));
+      } else {
+        toggleItemSelection(primaryIndex);
+      }
+    };
+
+    return (
+      <div
+        key={primaryIndex}
+        className={`bg-theme-secondary rounded-xl border overflow-hidden flex flex-col transition-all cursor-pointer ${
+          isSelected && bulkMode ? 'border-[var(--accent-color)] ring-2 ring-[var(--accent-color)]/30' : 'border-theme'
+        }`}
+        onClick={() => {
+          if (bulkMode) { toggleSelect(); } else { setSelectedItemIndex(primaryIndex); }
+        }}
+      >
+        {/* Image area */}
+        <div className="relative aspect-square bg-theme-primary">
+          <img
+            src={getPreferredItemDisplayImage(item.item, item.category, item.image)}
+            alt={item.item}
+            className="w-full h-full object-contain p-1"
+            onError={(e) => { (e.target as HTMLImageElement).src = '/images/placeholder.svg'; }}
+          />
+
+          {/* Expiry badge — top left */}
+          {typeof daysRemaining === 'number' && (
+            <div className={`absolute top-1.5 left-1.5 flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+              expiryColor === 'red' ? 'bg-red-600/90 text-white' :
+              expiryColor === 'yellow' ? 'bg-yellow-500/90 text-white' :
+              'bg-green-600/90 text-white'
+            }`}>
+              <Clock className="w-2.5 h-2.5" />
+              {Math.abs(daysRemaining)}d
+            </div>
+          )}
+
+          {/* Checkbox — top right */}
+          <button
+            onClick={(e) => toggleSelect(e)}
+            className={`absolute top-1.5 right-1.5 w-6 h-6 rounded flex items-center justify-center border-2 transition-colors ${
+              isSelected
+                ? 'bg-[var(--accent-color)] border-[var(--accent-color)]'
+                : 'bg-black/30 border-white/60'
+            }`}
+            aria-label={isSelected ? `Deselect ${item.item}` : `Select ${item.item}`}
+          >
+            {isSelected && (
+              <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="none">
+                <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            )}
+          </button>
+
+          {/* Detail shortcut — bottom right */}
+          <button
+            onClick={(e) => { e.stopPropagation(); setSelectedItemIndex(primaryIndex); }}
+            className="absolute bottom-1.5 right-1.5 w-8 h-8 rounded-full bg-white/90 dark:bg-gray-800/90 flex items-center justify-center shadow-md hover:scale-105 transition-transform"
+            aria-label={`View details for ${item.item}`}
+          >
+            <ChefHat className="w-4 h-4 text-theme-primary" />
+          </button>
+        </div>
+
+        {/* Item name */}
+        <div className="px-2 pt-1.5 pb-0.5">
+          <p className="text-xs font-medium text-theme-primary truncate leading-tight">{item.item}</p>
+        </div>
+
+        {/* Actions row */}
+        <div className="flex items-center justify-between px-2 pb-2 mt-auto">
+          <button
+            onClick={(e) => { e.stopPropagation(); onDeleteItem(primaryIndex); }}
+            className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
+            aria-label={`Delete ${item.item}`}
+          >
+            <Trash2 className="w-3.5 h-3.5 text-theme-secondary" />
+          </button>
+          <span className="text-[11px] text-theme-secondary text-center leading-none">{formatItemQuantity(item) || '—'}</span>
+          <button
+            onClick={(e) => { e.stopPropagation(); setSelectedItemIndex(primaryIndex); }}
+            className="w-7 h-7 flex items-center justify-center rounded-full border border-theme hover:bg-theme-primary transition-colors"
+            aria-label={`Edit quantity for ${item.item}`}
+          >
+            <Plus className="w-3.5 h-3.5 text-theme-secondary" />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const renderRow = ({ index, style }: { index: number; style: React.CSSProperties }) => {
     const item = sortedInventory[index];
     if (!item) return null;
@@ -1571,11 +1696,26 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
     }
 
     return (
-      <div style={style} key={item.originalIndex} className={`flex items-center justify-between px-2 py-1 border-b border-theme last:border-b-0 transition-all cursor-pointer ${expirationBorderClass(daysRemaining)} ${
+      <div
+        style={style}
+        key={item.originalIndex}
+        className={`flex items-center justify-between px-2 py-1 border-b border-theme last:border-b-0 transition-all cursor-pointer ${expirationBorderClass(daysRemaining)} ${
         bulkMode && selectedItems.has(item.originalIndex)
           ? 'bg-[var(--accent-color)]/10 border-[var(--accent-color)]/30'
           : 'hover:bg-theme-primary/50'
-      }`} onClick={() => !bulkMode && setSelectedItemIndex(item.originalIndex)}>
+      }`}
+        onClick={() => !bulkMode && setSelectedItemIndex(item.originalIndex)}
+        role={!bulkMode ? 'button' : undefined}
+        tabIndex={!bulkMode ? 0 : -1}
+        aria-label={!bulkMode ? `Open details for ${item.item}` : undefined}
+        onKeyDown={(e) => {
+          if (bulkMode) return;
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setSelectedItemIndex(item.originalIndex);
+          }
+        }}
+      >
         {bulkMode && (
           <input
             type="checkbox"
@@ -2785,6 +2925,14 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
               >
                 {bulkMode ? 'Cancel' : 'Select Multiple'}
               </button>
+              <button
+                onClick={toggleDisplayLayout}
+                className="w-8 h-8 flex items-center justify-center rounded-lg bg-theme-secondary text-theme-primary hover:bg-theme-primary transition-colors border border-theme"
+                aria-label={displayLayout === 'list' ? 'Switch to grid view' : 'Switch to list view'}
+                title={displayLayout === 'list' ? 'Grid view' : 'List view'}
+              >
+                {displayLayout === 'list' ? <LayoutGrid className="w-4 h-4" /> : <LayoutList className="w-4 h-4" />}
+              </button>
             </div>
           </div>
 
@@ -2834,7 +2982,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                 </div>
               </div>
             </div>
-          ) : inventory.length > VIRTUALIZE_THRESHOLD ? (
+          ) : inventory.length > VIRTUALIZE_THRESHOLD && displayLayout === 'list' ? (
             <div className="bg-theme-secondary rounded-lg border border-theme overflow-hidden">
               <List
                 height={Math.min(600, window.innerHeight - 300)}

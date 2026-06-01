@@ -5,6 +5,7 @@ import { RecipeRatingService } from '../services/recipeRatingService';
 import DatabaseMonitoringService from '../services/databaseMonitoringService';
 import { useAuth } from '../hooks/useAuth';
 import { useToasts } from '../hooks/useToasts';
+import { log } from '../services/logService';
 
 interface RecipeCommunityInsightsProps {
   recipeTitle: string;
@@ -31,14 +32,14 @@ export const RecipeCommunityInsights: React.FC<RecipeCommunityInsightsProps> = (
     try {
       const statsRef = DatabaseMonitoringService.doc('recipeCommunityStats', recipeTitle);
       unsubscribeStats = DatabaseMonitoringService.onSnapshot(statsRef, (snap) => {
-        console.debug('RecipeCommunityInsights: realtime stats snapshot', recipeTitle, snap.exists());
+        log.debug('RecipeCommunityInsights realtime stats snapshot', { recipeTitle, exists: snap.exists() }, 'RecipeCommunityInsights');
         if (snap.exists()) {
           const data = snap.data();
           setStats({ ...data } as RecipeCommunityStats);
         }
       });
     } catch (e) {
-      console.debug('RecipeCommunityInsights: realtime subscribe failed', e);
+      log.debug('RecipeCommunityInsights realtime subscribe failed', { error: e }, 'RecipeCommunityInsights');
     }
 
     return () => {
@@ -53,22 +54,22 @@ export const RecipeCommunityInsights: React.FC<RecipeCommunityInsightsProps> = (
 
       // Load community stats
       const communityStats = await RecipeRatingService.getCommunityStats(recipeTitle, householdId);
-      console.debug('RecipeCommunityInsights: fetched communityStats', recipeTitle, communityStats);
+      log.debug('RecipeCommunityInsights fetched communityStats', { recipeTitle, hasStats: Boolean(communityStats) }, 'RecipeCommunityInsights');
       setStats(communityStats);
 
       // Load top modifications
       const modifications = await RecipeRatingService.getTopModifications(recipeTitle, 5);
-      console.debug('RecipeCommunityInsights: fetched modifications', modifications);
+      log.debug('RecipeCommunityInsights fetched modifications', { count: modifications.length }, 'RecipeCommunityInsights');
       setTopModifications(modifications);
 
       // Load household ratings
       if (householdId) {
         const householdRatingsData = await RecipeRatingService.getHouseholdRatings(recipeTitle, householdId);
-        console.debug('RecipeCommunityInsights: fetched householdRatings', householdRatingsData);
+        log.debug('RecipeCommunityInsights fetched household ratings', { count: householdRatingsData.length }, 'RecipeCommunityInsights');
         setHouseholdRatings(householdRatingsData);
       }
     } catch (err) {
-      console.error('Failed to load community data:', err);
+      log.error('Failed to load community data', { error: err }, 'RecipeCommunityInsights');
       setError('Failed to load community insights');
       addToast('Failed to load community insights', 'error');
     } finally {
@@ -86,7 +87,7 @@ export const RecipeCommunityInsights: React.FC<RecipeCommunityInsightsProps> = (
       setTopModifications(modifications);
       addToast('Thanks for your feedback!', 'success');
     } catch (err) {
-      console.error('Failed to mark modification as helpful:', err);
+      log.error('Failed to mark modification as helpful', { error: err }, 'RecipeCommunityInsights');
       addToast('Failed to mark as helpful', 'error');
     }
   };

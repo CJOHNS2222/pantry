@@ -1,82 +1,181 @@
 import React from 'react';
+import { ArrowRight, Camera, ChefHat, ClipboardList, LayoutDashboard, ScanSearch, Sparkles, Users } from 'lucide-react';
+import { AppBadge } from '../../components/AppBadge';
+
+const features = [
+  {
+    icon: ScanSearch,
+    title: 'Pantry Capture',
+    description: 'Scan shelves, receipts, or barcodes and turn them into structured pantry items without manual cleanup.',
+  },
+  {
+    icon: ChefHat,
+    title: 'Recipe Discovery',
+    description: 'Generate ideas from what you actually have, then filter them through dietary preferences and household context.',
+  },
+  {
+    icon: ClipboardList,
+    title: 'Shopping Intelligence',
+    description: 'Build lists from gaps in your pantry, meal plans, and staple rules instead of starting from a blank page.',
+  },
+  {
+    icon: LayoutDashboard,
+    title: 'Weekly Planning',
+    description: 'Schedule meals, balance leftovers, and keep the whole week visible from one focused planning surface.',
+  },
+  {
+    icon: Users,
+    title: 'Household Coordination',
+    description: 'Keep pantry, recipes, and shopping aligned for everyone sharing the same kitchen.',
+  },
+  {
+    icon: Camera,
+    title: 'Less Waste, More Signal',
+    description: 'Surface expiring items early and keep your next meal grounded in what needs using first.',
+  },
+];
+
+const proofPoints = [
+  'Pantry-first recipe suggestions',
+  'Household-aware planning',
+  'Shared shopping workflows',
+];
 
 const LandingPage: React.FC = () => {
   return (
-    <div className="font-inter leading-relaxed text-gray-800 bg-gradient-to-br from-red-950 to-red-900 min-h-screen">
-      <header className="bg-white/95 backdrop-blur-[10px] border-b border-white/20 fixed top-0 left-0 right-0 z-[1000] py-4">
-        <nav className="max-w-7xl mx-auto px-5 flex justify-between items-center">
-          <a href="/" className="font-playfair text-3xl font-bold text-red-950 no-underline">Stock & Spoon</a>
-          <div className="flex gap-8 items-center">
-            <a href="#features" className="text-red-950 no-underline font-medium">Features</a>
-            <a href="#screenshots" className="text-red-950 no-underline font-medium">Screenshots</a>
-            <a href="/app" className="bg-gradient-to-br from-red-700 to-red-950 text-white px-6 py-2 rounded-full no-underline font-semibold">Try It Now</a>
+    <div className="min-h-screen bg-theme-primary text-theme-primary">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-[36rem] bg-[radial-gradient(circle_at_top,_rgba(76,175,80,0.18),_transparent_58%)]" />
+
+      <header className="sticky top-0 z-40 border-b border-theme bg-theme-primary/90 backdrop-blur-xl">
+        <nav className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4">
+          <a href="/" className="font-serif text-2xl font-bold text-theme-primary no-underline">Stock & Spoon</a>
+          <div className="hidden items-center gap-6 md:flex">
+            <a href="#features" className="text-sm font-medium text-theme-secondary no-underline hover:text-theme-primary">Features</a>
+            <a href="#screenshots" className="text-sm font-medium text-theme-secondary no-underline hover:text-theme-primary">Why It Feels Different</a>
+            <a href="/app" className="rounded-full bg-[var(--accent-color)] px-5 py-2 text-sm font-semibold text-white no-underline transition-colors hover:bg-[var(--accent-color)]/90">
+              Open App
+            </a>
           </div>
         </nav>
       </header>
 
-      <main>
-        <section className="py-30 pb-20 text-center text-white">
-          <div className="max-w-7xl mx-auto px-5">
-            <h1 className="font-playfair text-6xl font-bold mb-4 bg-gradient-to-br from-yellow-400 to-orange-500 bg-clip-text text-transparent">Stock & Spoon</h1>
-            <p className="text-xl mb-8 opacity-90 max-w-2xl mx-auto">AI-powered kitchen assistant that helps you manage your pantry, plan meals, and discover delicious recipes. Never waste food again!</p>
-            <div className="flex gap-4 justify-center flex-wrap">
-              <a href="/app" className="bg-gradient-to-br from-red-700 to-red-950 text-white px-8 py-4 rounded-full no-underline font-semibold text-lg">🚀 Launch App</a>
-              <a href="#features" className="bg-white/20 text-white px-8 py-4 rounded-full no-underline font-semibold border-2 border-white/30">Learn More</a>
+      <main className="relative">
+        <section className="mx-auto grid max-w-7xl gap-12 px-5 pb-20 pt-16 lg:grid-cols-[1.2fr_0.8fr] lg:items-center lg:pt-24">
+          <div className="space-y-6">
+            <div className="flex flex-wrap gap-2">
+              <AppBadge variant="success" size="sm">Pantry-first planning</AppBadge>
+              <AppBadge variant="info" size="sm">AI recipe discovery</AppBadge>
+              <AppBadge variant="warning" size="sm">Household-ready lists</AppBadge>
+            </div>
+            <div className="space-y-4">
+              <h1 className="max-w-4xl font-serif text-5xl font-bold tracking-tight text-theme-primary md:text-6xl">
+                A calmer kitchen starts with one shared source of truth.
+              </h1>
+              <p className="max-w-2xl text-lg text-theme-secondary">
+                Stock & Spoon turns pantry inventory, weekly planning, and recipe discovery into one connected workflow so you stop re-entering the same kitchen context in five different places.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <a href="/app" className="inline-flex items-center gap-2 rounded-full bg-[var(--accent-color)] px-6 py-3 text-base font-semibold text-white no-underline transition-colors hover:bg-[var(--accent-color)]/90">
+                Launch the app
+                <ArrowRight className="h-4 w-4" />
+              </a>
+              <a href="#features" className="inline-flex items-center gap-2 rounded-full border border-theme bg-theme-secondary px-6 py-3 text-base font-semibold text-theme-primary no-underline transition-colors hover:border-[var(--accent-color)] hover:text-[var(--accent-color)]">
+                Explore the workflow
+              </a>
+            </div>
+          </div>
+
+          <div className="rounded-[2rem] border border-theme bg-theme-secondary p-5 shadow-2xl">
+            <div className="rounded-[1.5rem] border border-theme bg-theme-primary p-5">
+              <div className="flex items-center justify-between border-b border-theme pb-4">
+                <div>
+                  <p className="text-sm font-semibold text-theme-primary">Today’s kitchen snapshot</p>
+                  <p className="text-sm text-theme-secondary">What needs attention next, without jumping screens.</p>
+                </div>
+                <Sparkles className="h-5 w-5 text-[var(--accent-color)]" />
+              </div>
+              <div className="grid gap-3 pt-4">
+                {proofPoints.map((point) => (
+                  <div key={point} className="rounded-2xl border border-theme bg-theme-secondary/70 p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--accent-color)]/12 text-[var(--accent-color)]">
+                        <Sparkles className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-theme-primary">{point}</p>
+                        <p className="text-sm text-theme-secondary">Designed to reduce switching cost between inventory, planning, and action.</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </section>
 
-        <section id="features" className="py-20 bg-white/5">
-          <div className="max-w-7xl mx-auto px-5">
-            <h2 className="text-center font-playfair text-5xl text-white mb-12">Powerful Features</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              <div className="bg-white/10 backdrop-blur-[10px] rounded-3xl p-8 text-center border border-white/20">
-                <div className="w-20 h-20 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-4 text-4xl">📱</div>
-                <h3 className="text-white text-2xl mb-4">Smart Pantry Scanner</h3>
-                <p className="text-white/80">Scan your pantry items with your camera. AI recognizes ingredients and automatically adds them to your inventory.</p>
+        <section id="features" className="border-y border-theme bg-theme-secondary/50 py-20">
+          <div className="mx-auto max-w-7xl px-5">
+            <div className="mb-12 max-w-3xl space-y-3">
+              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[var(--accent-color)]">Core Workflow</p>
+              <h2 className="font-serif text-4xl font-bold text-theme-primary md:text-5xl">The app is built around connected kitchen decisions, not isolated tools.</h2>
+              <p className="text-lg text-theme-secondary">Each surface uses the same tone, spacing, and semantic accents as the in-app product so the marketing promise matches the actual experience.</p>
+            </div>
+            <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+              {features.map(({ icon: Icon, title, description }) => (
+                <article key={title} className="rounded-[1.75rem] border border-theme bg-theme-primary p-6 shadow-lg transition-transform hover:-translate-y-1 hover:border-[var(--accent-color)]/50">
+                  <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--accent-color)]/12 text-[var(--accent-color)]">
+                    <Icon className="h-6 w-6" />
+                  </div>
+                  <h3 className="mb-3 text-2xl font-semibold text-theme-primary">{title}</h3>
+                  <p className="text-base leading-7 text-theme-secondary">{description}</p>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section id="screenshots" className="py-20">
+          <div className="mx-auto max-w-7xl px-5">
+            <div className="grid gap-8 lg:grid-cols-3">
+              <div className="rounded-[1.75rem] border border-theme bg-theme-secondary p-6">
+                <AppBadge variant="neutral" size="sm">Pantry</AppBadge>
+                <h3 className="mt-4 font-serif text-3xl font-bold text-theme-primary">Capture once, use everywhere.</h3>
+                <p className="mt-3 text-base text-theme-secondary">Inventory feeds recipe discovery, shopping, and planning so pantry data keeps paying off instead of going stale.</p>
               </div>
-              <div className="bg-white/10 backdrop-blur-[10px] rounded-3xl p-8 text-center border border-white/20">
-                <div className="w-20 h-20 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-4 text-4xl">🍽️</div>
-                <h3 className="text-white text-2xl mb-4">AI Meal Planning</h3>
-                <p className="text-white/80">Get personalized meal suggestions based on your available ingredients and dietary preferences.</p>
+              <div className="rounded-[1.75rem] border border-theme bg-theme-primary p-6 shadow-lg">
+                <AppBadge variant="success" size="sm">Planning</AppBadge>
+                <h3 className="mt-4 font-serif text-3xl font-bold text-theme-primary">See the week, not just the next task.</h3>
+                <p className="mt-3 text-base text-theme-secondary">Meal plans, leftovers, and shopping state stay linked so the app can suggest the next action instead of another blank form.</p>
               </div>
-              <div className="bg-white/10 backdrop-blur-[10px] rounded-3xl p-8 text-center border border-white/20">
-                <div className="w-20 h-20 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-4 text-4xl">🛒</div>
-                <h3 className="text-white text-2xl mb-4">Smart Shopping Lists</h3>
-                <p className="text-white/80">Automatically generate shopping lists based on your meal plans and current pantry stock.</p>
-              </div>
-              <div className="bg-white/10 backdrop-blur-[10px] rounded-3xl p-8 text-center border border-white/20">
-                <div className="w-20 h-20 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-4 text-4xl">📅</div>
-                <h3 className="text-white text-2xl mb-4">Weekly Meal Planner</h3>
-                <p className="text-white/80">Plan your meals for the entire week with drag-and-drop simplicity and nutritional insights.</p>
-              </div>
-              <div className="bg-white/10 backdrop-blur-[10px] rounded-3xl p-8 text-center border border-white/20">
-                <div className="w-20 h-20 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-4 text-4xl">🤖</div>
-                <h3 className="text-white text-2xl mb-4">AI Recipe Generator</h3>
-                <p className="text-white/80">Discover new recipes using your available ingredients. Powered by advanced AI for creative cooking.</p>
-              </div>
-              <div className="bg-white/10 backdrop-blur-[10px] rounded-3xl p-8 text-center border border-white/20">
-                <div className="w-20 h-20 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-4 text-4xl">👥</div>
-                <h3 className="text-white text-2xl mb-4">Household Sharing</h3>
-                <p className="text-white/80">Share your pantry and meal plans with family members. Perfect for households and roommates.</p>
+              <div className="rounded-[1.75rem] border border-theme bg-theme-secondary p-6">
+                <AppBadge variant="info" size="sm">Discovery</AppBadge>
+                <h3 className="mt-4 font-serif text-3xl font-bold text-theme-primary">Recommendations with context.</h3>
+                <p className="mt-3 text-base text-theme-secondary">Recipe suggestions carry preference signals, pantry constraints, and quick actions without switching to a separate recommendation mindset.</p>
               </div>
             </div>
           </div>
         </section>
 
-        <section className="py-20 text-center bg-gradient-to-br from-red-700/80 to-red-950/80">
-          <div className="max-w-7xl mx-auto px-5">
-            <h2 className="font-playfair text-5xl text-white mb-4">Ready to Revolutionize Your Kitchen?</h2>
-            <p className="text-lg text-white/90 mb-8 max-w-2xl mx-auto">Join thousands of users who have transformed their cooking experience with Stock & Spoon.</p>
-            <a href="/app" className="bg-gradient-to-br from-yellow-400 to-orange-500 text-red-950 px-8 py-4 rounded-full no-underline font-semibold text-lg inline-block">🍳 Start Cooking Smarter Today</a>
+        <section className="pb-20">
+          <div className="mx-auto max-w-5xl px-5">
+            <div className="rounded-[2rem] border border-theme bg-theme-secondary px-8 py-10 text-center shadow-xl">
+              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[var(--accent-color)]">Ready</p>
+              <h2 className="mt-3 font-serif text-4xl font-bold text-theme-primary md:text-5xl">Bring pantry, planning, and recipes back into one place.</h2>
+              <p className="mx-auto mt-4 max-w-2xl text-lg text-theme-secondary">
+                Start with the ingredients you already own, then let Stock & Spoon carry that context through the rest of the week.
+              </p>
+              <a href="/app" className="mt-8 inline-flex items-center gap-2 rounded-full bg-[var(--accent-color)] px-7 py-3 text-base font-semibold text-white no-underline transition-colors hover:bg-[var(--accent-color)]/90">
+                Open Stock & Spoon
+                <ArrowRight className="h-4 w-4" />
+              </a>
+            </div>
           </div>
         </section>
       </main>
 
-      <footer className="py-10 bg-black/30 text-center text-white/70">
-        <div className="max-w-7xl mx-auto px-5">
-          <p>&copy; 2026 Stock & Spoon. All rights reserved.</p>
-        </div>
+      <footer className="border-t border-theme bg-theme-primary/90 py-8 text-center text-sm text-theme-secondary">
+        <div className="mx-auto max-w-7xl px-5">© 2026 Stock & Spoon. Pantry, planning, and recipe discovery in one workflow.</div>
       </footer>
     </div>
   );

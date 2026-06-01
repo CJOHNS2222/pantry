@@ -1,3 +1,22 @@
+## [2.3.1] - 2026-06-01
+
+### Fixed
+- **Recipe Finder — search-on-keystroke removed** — Gemini/Spoonacular search no longer fires after every character typed; search only triggers when the user presses the **Search** button or hits Enter
+- **Recipe Finder search button** — replaced the hidden inline search icon (only shown when input was non-empty) with a persistent accent-coloured **Search** button beside the input field; pressing Enter in the input also triggers search
+
+### Added
+- **Chef tab cache filters** — added meal-type chips (`All Meals`, `breakfast`, `lunch`, `dinner`) plus cuisine dropdown filters above Popular Recipes; filters now apply to cache-backed popular results and cached text-query matches
+- **Preference-aware cache ranking** — added shared cache ranking/filter helpers in `utils/preferenceUtils.ts` so cache recipe matches are boosted by favorite cuisines/proteins and down-ranked for disliked ingredients
+- **Recommendation explainability badges** — recommendation cards now show compact preference signals (favorite cuisine/protein matches and disliked-ingredient warnings) so users can see why recipes were ranked
+
+### Changed
+- **Recipe cache labelling script** — `scripts/label-recipe-cache.js` rewritten to use local Ollama (default `gemma3:1b`) with batched classification, model preflight checks, robust JSON extraction, timeout handling, and fallback labels; supports `--dry-run`, `--force`, and `--model`
+- **Chef cache search ordering** — cached search results in Recipe Finder now pass through shared mealType/cuisine filtering and household/user preference ranking before display
+- **Meal Planner cache search ordering** — recipe search modal in Meal Planner now applies meal-type filter plus the same household/user preference ranking used by Recipe Finder
+- **Recommendation ranking consistency** — `RecipeRecommendationService` now incorporates user profile preference scoring in final sort order so cache-backed recommendations align with cache search behavior
+
+---
+
 ## [2.3.0] - 2026-05-29
 
 ### Added

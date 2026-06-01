@@ -1,27 +1,26 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { useIntl } from 'react-intl';
-import { ShoppingBasket, Archive, Plus, X, Share2, Copy, Download, MessageSquare, Calendar, Undo2, Store } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { Share } from '@capacitor/share';
 import { ShoppingItem, User, Household, Settings } from '../types';
-import { inferCategoryFromItemName, isHouseholdMember } from '../utils/appUtils';
-import { log } from '../services/logService';
-import { validateItemName, validateQuantity } from '@/src/utils/validation';
-import { ShoppingListItemSkeleton } from './SkeletonLoader';
 import HapticService from '../services/hapticService';
 import { ShoppingListCacheService } from '../services/shoppingListCacheService';
 
 // Import new enhancement components
-import { EnhancedShoppingListItem } from './EnhancedShoppingListItem';
-import { SmartShoppingListOrganizer } from './SmartShoppingListOrganizer';
 import { BatchOperations } from './BatchOperations';
 import { HouseholdShoppingShare } from './HouseholdShoppingShare';
 import { QuickAdd } from './QuickAdd';
 import { ShoppingListAnalytics } from './ShoppingListAnalytics';
-import QuantityUnitPicker from './QuantityUnitPicker';
-import VisualQuantitySelector from './VisualQuantitySelector';
 import { AdMobBanner } from './AdMobBanner';
 import { canShowAds } from '../utils/appUtils';
+import { ShoppingListViewModeToggle } from './shopping-list/ShoppingListViewModeToggle';
+import { ShoppingListPurchaseModal } from './shopping-list/ShoppingListPurchaseModal';
+import { ShoppingListAddItemModal } from './shopping-list/ShoppingListAddItemModal';
+import { ShoppingListItemsSection } from './shopping-list/ShoppingListItemsSection';
+import { ShoppingListFooterActions } from './shopping-list/ShoppingListFooterActions';
+import { ShoppingListActionBars } from './shopping-list/ShoppingListActionBars';
+import { ShoppingListAddFab } from './shopping-list/ShoppingListAddFab';
+import { ShoppingListUndoBanners } from './shopping-list/ShoppingListUndoBanners';
 
 // Import hooks and services
 import { useOfflineStatus } from '../hooks/useOfflineStatus';
@@ -156,7 +155,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   // (selection model simplified) — rely on `checked` on items instead of separate selected state
 
   // Session tracking for analytics
-  const [currentSessionId] = useState(() => `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
+  const [currentSessionId] = useState(() => `session_${crypto.randomUUID()}`);
   const [previousSessions, setPreviousSessions] = useState<Array<{
     sessionId: string;
     items: ShoppingItem[];
@@ -352,7 +351,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     const { price: estimatedPrice, priceData } = await estimateItemPrice(itemName, requiredQuantity);
 
     setItems(prev => [...prev, {
-      id: Math.random().toString(36).substr(2, 9),
+      id: crypto.randomUUID(),
       item: itemName,
       category: inferCategoryFromItemName(itemName),
       checked: false,
@@ -527,7 +526,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     const { price: estimatedPrice, priceData } = await estimateItemPrice(newItem, newQty);
 
     const newShoppingItem: ShoppingItem = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: crypto.randomUUID(),
       item: newItem,
       category: inferCategoryFromItemName(newItem),
       checked: false,
@@ -708,221 +707,58 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
         onAddItem={addSuggestedItem}
       />
 
-      {/* View Mode Toggle */}
-      {items.length > 0 && (
-        <div className="flex items-center justify-center gap-2 mb-4 flex-wrap">
-          <button
-            onClick={() => setViewMode('list')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              viewMode === 'list'
-                ? 'bg-[var(--accent-color)] text-white'
-                : 'bg-theme-secondary text-theme-primary hover:bg-theme-primary'
-            }`}
-          >
-            List View
-          </button>
-          <button
-            onClick={() => setViewMode('organized')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              viewMode === 'organized'
-                ? 'bg-[var(--accent-color)] text-white'
-                : 'bg-theme-secondary text-theme-primary hover:bg-theme-primary'
-            }`}
-          >
-            Store Order
-          </button>
-          {/* Store profile picker — only when multiple store profiles exist */}
-          {storeProfileNames.length > 0 && (
-            <div className="relative">
-              <select
-                value={activeStoreProfile}
-                onChange={(e) => setActiveStoreProfile(e.target.value)}
-                className="flex items-center gap-1 pl-8 pr-3 py-2 rounded-lg text-sm font-medium bg-theme-secondary text-theme-primary border border-theme hover:border-[var(--accent-color)] transition-colors appearance-none cursor-pointer"
-                title="Switch store profile"
-              >
-                <option value="__default__">Default layout</option>
-                {storeProfileNames.map(name => (
-                  <option key={name} value={name}>{name}</option>
-                ))}
-              </select>
-              <Store className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-theme-secondary pointer-events-none" />
-            </div>
-          )}
-        </div>
-      )}
+      <ShoppingListViewModeToggle
+        show={items.length > 0}
+        viewMode={viewMode}
+        setViewMode={setViewMode}
+        storeProfileNames={storeProfileNames}
+        activeStoreProfile={activeStoreProfile}
+        setActiveStoreProfile={setActiveStoreProfile}
+      />
 
-      {/* Purchase modal when checking an item */}
-      {purchaseModalOpen && purchaseTargetItem && (
-        <div className="fixed inset-0 z-[9999] bg-black/40 flex items-center justify-center p-4">
-          <div className="bg-theme-primary rounded-lg p-6 max-w-md w-full shadow-xl">
-            <h3 className="text-lg font-bold mb-3">Add purchase for "{purchaseTargetItem.item}"</h3>
-            <div className="space-y-3">
-              <div>
-                <label className="text-sm text-theme-secondary">{intl.formatMessage({ id: 'shoppingList.quantityPurchased' })}</label>
-                <div className="mt-2">
-                  <VisualQuantitySelector
-                    value={purchaseQty}
-                    onChange={(v) => setPurchaseQty(v)}
-                    itemName={purchaseTargetItem.item}
-                    unit={purchaseUnit}
-                    step={0.25}
-                    minValue={0.25}
-                    showTypicalAmounts={false}
-                    className="w-full"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="text-sm text-theme-secondary">{intl.formatMessage({ id: 'shoppingList.unit' })}</label>
-                <select value={purchaseUnit} onChange={(e) => setPurchaseUnit(e.target.value)} className="w-full mt-1 p-2 rounded border text-black">
-                  <option value="count">count</option>
-                  <option value="lb">lb</option>
-                  <option value="oz">oz</option>
-                  <option value="kg">kg</option>
-                  <option value="g">g</option>
-                  <option value="pack">pack</option>
-                  <option value="bag">bag</option>
-                  <option value="bunch">bunch</option>
-                  <option value="dozen">dozen</option>
-                  <option value="can">can</option>
-                  <option value="piece">piece</option>
-                </select>
-              </div>
-              <div>
-                <label className="text-sm text-theme-secondary">Expiration date (optional)</label>
-                <div className="flex items-center gap-2 mt-1">
-                  <button
-                    type="button"
-                    onClick={() => document.getElementById('purchase-expires')?.click()}
-                    className="p-2 bg-theme-secondary rounded-md hover:bg-theme-primary transition-colors"
-                    aria-label="Pick expiration date"
-                  >
-                    <Calendar className="w-5 h-5 text-theme-primary" />
-                  </button>
-                  <input
-                    id="purchase-expires"
-                    type="date"
-                    value={purchaseExpires || ''}
-                    onChange={(e) => setPurchaseExpires(e.target.value || undefined)}
-                    className="p-2 rounded border text-black w-36"
-                  />
-                </div>
-              </div>
-            </div>
-            <div className="flex gap-2 justify-end mt-6">
-              <button onClick={closePurchaseModal} className="px-4 py-2 rounded bg-theme-secondary">Cancel</button>
-              <button onClick={() => confirmPurchaseForItem(purchaseTargetItem.id)} className="px-4 py-2 rounded bg-[var(--accent-color)] text-white">Confirm</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ShoppingListPurchaseModal
+        purchaseModalOpen={purchaseModalOpen}
+        purchaseTargetItem={purchaseTargetItem}
+        purchaseQty={purchaseQty}
+        setPurchaseQty={setPurchaseQty}
+        purchaseUnit={purchaseUnit}
+        setPurchaseUnit={setPurchaseUnit}
+        purchaseExpires={purchaseExpires}
+        setPurchaseExpires={setPurchaseExpires}
+        closePurchaseModal={closePurchaseModal}
+        onConfirmPurchase={confirmPurchaseForItem}
+      />
 
-      {/* Floating Action Button */}
-      <button
-        onClick={() => setIsAddModalOpen(true)}
-        className="fixed bottom-28 right-6 z-50 bg-[var(--accent-color)] text-white p-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110"
-        style={{ bottom: 'calc(7rem + 15px)' }}
-        aria-label="Add items to shopping list"
-      >
-        <Plus className="w-6 h-6" />
-      </button>
+      <ShoppingListAddFab onOpenAddModal={() => setIsAddModalOpen(true)} />
 
-      {/* Add Items Modal */}
-      {isAddModalOpen && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-theme-primary rounded-t-3xl max-w-md w-full modal-safe-h overflow-y-auto shadow-xl animate-slide-up">
-            <div className="p-6 pb-2.5">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-bold text-theme-secondary">{intl.formatMessage({ id: 'shoppingList.addToList' })}</h3>
-                <button
-                  onClick={closeModal}
-                  className="p-2 hover:bg-theme-secondary rounded-full transition-colors"
-                >
-                  <X className="w-5 h-5 text-theme-secondary" />
-                </button>
-              </div>
+      <ShoppingListAddItemModal
+        isOpen={isAddModalOpen}
+        closeModal={closeModal}
+        addItem={addItem}
+        newItem={newItem}
+        setNewItem={setNewItem}
+        newQty={newQty}
+        setNewQty={setNewQty}
+        newUnit={newUnit}
+        setNewUnit={setNewUnit}
+        validationErrors={validationErrors}
+      />
 
-              <form onSubmit={addItem} className="space-y-4">
-                <div className="space-y-4">
-                  <div>
-                    <input 
-                      id="newItem"
-                      name="newItem"
-                      type="text"
-                      value={newItem}
-                      onChange={(e) => setNewItem(e.target.value)}
-                      placeholder="Enter item name..."
-                      className={`w-full bg-theme-secondary border rounded-lg px-4 py-3 text-theme-primary shadow-sm outline-none focus:border-[var(--accent-color)] ${validationErrors.item ? 'border-red-500' : 'border-theme'}`}
-                      autoFocus
-                    />
-                    {validationErrors.item && (
-                      <p className="text-red-500 text-xs mt-1" aria-live="polite">{validationErrors.item}</p>
-                    )}
-                  </div>
-                  <QuantityUnitPicker
-                    quantity={parseFloat(newQty) || 1}
-                    unit={newUnit}
-                    onQuantityChange={(qty) => setNewQty(qty.toString())}
-                    onUnitChange={setNewUnit}
-                    itemName={newItem}
-                    showControls={true}
-                    maxQuantity={999}
-                  />
-                </div>
-                <button 
-                  type="submit" 
-                  className="w-full py-3 rounded-lg font-bold text-sm uppercase tracking-wider flex items-center justify-center gap-2 bg-[var(--accent-color)] text-white shadow-lg hover:bg-[var(--accent-color)]/90 transition-colors"
-                >
-                  <Plus className="w-4 h-4" />
-                  Add Item
-                </button>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
+      <ShoppingListUndoBanners pendingDeleteCount={pendingDeleteCount} onUndoDelete={undoDelete} />
 
-      {/* Undo delete banner — shown for 5 seconds after any swipe-to-delete */}
-      {pendingDeleteCount > 0 && (
-        <div className="flex items-center justify-between bg-gray-800 text-white rounded-lg px-3 py-2 text-sm shadow-lg animate-fade-in">
-          <span>Item deleted</span>
-          <button
-            onClick={undoDelete}
-            className="flex items-center gap-1 ml-4 px-2 py-1 bg-white text-gray-800 rounded text-xs font-bold hover:bg-gray-100 transition-colors"
-          >
-            <Undo2 className="w-3 h-3" /> Undo
-          </button>
-        </div>
-      )}
-
-      {items.length > 0 && (
-          <div className="flex gap-2 justify-between items-center">
-              {undoHistory.length > 0 && (
-                <button
-                  onClick={undoLastCheck}
-                  className="flex items-center gap-1 px-2 py-1 bg-orange-500 text-white rounded text-xs hover:bg-orange-600 transition-colors"
-                  title={`Undo last check (${undoHistory.length} available)`}
-                >
-                  <X className="w-3 h-3" />
-                  Undo ({undoHistory.length})
-                </button>
-              )}
-
-              <div className="flex gap-2">
-                <button 
-                  onClick={handleCheckout}
-                  disabled={!items.some(i => i.checked)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${
-                      items.some(i => i.checked)
-                      ? 'bg-[var(--accent-color)] text-white shadow-lg' 
-                      : 'bg-theme-secondary text-theme-secondary opacity-50 cursor-not-allowed'
-                  }`}
-                >
-                    <Archive className="w-4 h-4" /> Move Checked to Pantry
-                </button>
-              </div>
-          </div>
-      )}
+      <ShoppingListActionBars
+        hasItems={items.length > 0}
+        isLoadingShoppingList={isLoadingShoppingList}
+        undoHistoryCount={undoHistory.length}
+        hasCheckedItems={items.some(i => i.checked)}
+        hasUncheckedItems={items.some(i => !i.checked)}
+        checkedItemsCount={items.filter(i => i.checked).length}
+        onUndoLastCheck={undoLastCheck}
+        onCheckout={handleCheckout}
+        onSelectAll={selectAll}
+        onDeselectAll={deselectAll}
+        onDeleteCheckedItems={deleteCheckedItems}
+      />
 
       {/* Multi-selection controls removed — using checked state only */}
 
@@ -960,95 +796,21 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
         {isLoadingShoppingList ? 'Loading shopping list…' : `${items.length} shopping item${items.length === 1 ? '' : 's'} loaded`}
       </div>
 
-      {/* Mark-all / Clear-purchased action bar */}
-      {!isLoadingShoppingList && items.length > 0 && (
-        <div className="flex items-center justify-between gap-2 mb-1">
-          {items.some(i => !i.checked) ? (
-            <button
-              onClick={selectAll}
-              className="text-xs font-medium text-[var(--accent-color)] hover:opacity-80 transition-opacity py-1 px-2 rounded-md hover:bg-[var(--accent-color)]/10"
-            >
-              Mark all purchased
-            </button>
-          ) : (
-            <button
-              onClick={deselectAll}
-              className="text-xs font-medium text-theme-secondary hover:opacity-80 transition-opacity py-1 px-2 rounded-md hover:bg-theme-secondary/50"
-            >
-              Unmark all
-            </button>
-          )}
-          {items.some(i => i.checked) && (
-            <button
-              onClick={deleteCheckedItems}
-              className="text-xs font-medium text-red-500 hover:opacity-80 transition-opacity py-1 px-2 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20"
-            >
-              Clear purchased ({items.filter(i => i.checked).length})
-            </button>
-          )}
-        </div>
-      )}
-
-      <div className="space-y-2">
-        {isLoadingShoppingList ? (
-          // Show skeleton loading items
-          Array.from({ length: 5 }).map((_, index) => (
-            <ShoppingListItemSkeleton key={`loading-${index}`} />
-          ))
-        ) : viewMode === 'organized' ? (
-          // Organized by store layout
-          <SmartShoppingListOrganizer
-            items={items}
-            onToggleCheck={handleItemToggle}
-            onRemove={remove}
-            onQuantityChange={handleQuantityChange}
-            onUpdateItem={handleUpdateItem}
-            householdMembers={householdMembers.map(m => ({ id: m.id, name: m.name, avatar: m.avatar }))}
-            isSelected={(id) => items.some(it => it.id === id && it.checked)}
-            onLongPress={undefined}
-            storeLayout={activeStoreLayout}
-          />
-        ) : (
-          // Regular list view with enhanced items
-          items.map((item) => (
-            <EnhancedShoppingListItem
-              key={item.id}
-              item={item}
-              onToggleCheck={handleItemToggle}
-              onRemove={remove}
-              onQuantityChange={handleQuantityChange}
-              onUpdateItem={handleUpdateItem}
-              householdMembers={householdMembers.map(m => ({ id: m.id, name: m.name, avatar: m.avatar }))}
-              isOffline={!isOnline}
-              isSelected={item.checked}
-              onLongPress={undefined}
-              showPriceData={settings?.shopping?.showPriceData ?? false}
-            />
-          ))
-        )}
-        {items.length === 0 && !isLoadingShoppingList && (
-             <div className="text-center py-12 opacity-60 flex flex-col items-center">
-                <ShoppingBasket className="w-12 h-12 mb-4 text-theme-secondary/50" />
-                <h3 className="text-lg font-semibold text-theme-primary mb-2">{intl.formatMessage({ id: 'shoppingList.empty' })}</h3>
-                <p className="text-theme-secondary opacity-70 mb-4">{intl.formatMessage({ id: 'shoppingList.addItems' })}</p>
-                <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                    <button 
-                        onClick={() => setIsAddModalOpen(true)}
-                        className="px-4 py-2 bg-[var(--accent-color)] text-white rounded-lg hover:bg-[var(--accent-color)]/90 transition-colors flex items-center gap-2"
-                    >
-                        <Plus className="w-4 h-4" />
-                        Add Items
-                    </button>
-                    <button 
-                      onClick={() => log.debug('Navigate to recipes')}
-                      className="px-4 py-2 border border-theme rounded-lg hover:bg-theme-secondary/50 transition-colors"
-                    >
-                      Browse Recipes
-                    </button>
-                </div>
-             </div>
-        )}
-      </div>
+      <ShoppingListItemsSection
+        isLoadingShoppingList={isLoadingShoppingList}
+        viewMode={viewMode}
+        items={items}
+        activeStoreLayout={activeStoreLayout}
+        householdMembers={householdMembers.map(m => ({ id: m.id, name: m.name, avatar: m.avatar }))}
+        isOffline={!isOnline}
+        showPriceData={settings?.shopping?.showPriceData ?? false}
+        onToggleCheck={handleItemToggle}
+        onRemove={remove}
+        onQuantityChange={handleQuantityChange}
+        onUpdateItem={handleUpdateItem}
+        onOpenAddItems={() => setIsAddModalOpen(true)}
+        onBrowseRecipes={() => log.debug('Navigate to recipes')}
+      />
 
       {/* Analytics Section */}
       {showAnalytics && items.length > 0 && (
@@ -1076,75 +838,18 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
         />
       )}
 
-      {/* Toggle Analytics Button */}
-      {items.length > 0 && (
-        <div className="flex justify-center mt-4">
-          <button
-            onClick={() => setShowAnalytics(!showAnalytics)}
-            className="px-4 py-2 bg-theme-secondary text-theme-primary rounded-lg hover:bg-theme-primary transition-colors text-sm"
-          >
-            {showAnalytics ? 'Hide Analytics' : 'Show Analytics'}
-          </button>
-        </div>
-      )}
-
-      {/* Export/Share Buttons */}
-      {items.length > 0 && (
-        <div className="flex justify-center gap-2 mt-6 flex-wrap">
-          <button
-            onClick={handleCopyToClipboard}
-            className="flex items-center gap-2 px-3 py-2 bg-theme-secondary text-theme-primary rounded-lg border border-theme hover:bg-theme-primary transition-colors text-sm"
-            title="Copy to clipboard"
-          >
-            <Copy className="w-4 h-4" />
-            Copy
-          </button>
-          <button
-            onClick={handleShare}
-            className="flex items-center gap-2 px-3 py-2 bg-theme-secondary text-theme-primary rounded-lg border border-theme hover:bg-theme-primary transition-colors text-sm"
-            title="Share shopping list"
-          >
-            <Share2 className="w-4 h-4" />
-            Share
-          </button>
-          <button
-            onClick={handleShareViaSMS}
-            className="flex items-center gap-2 px-3 py-2 bg-theme-secondary text-theme-primary rounded-lg border border-theme hover:bg-theme-primary transition-colors text-sm"
-            title="Send via text message"
-          >
-            <MessageSquare className="w-4 h-4" />
-            SMS
-          </button>
-          <button
-            onClick={handleExport}
-            className="flex items-center gap-2 px-3 py-2 bg-theme-secondary text-theme-primary rounded-lg border border-theme hover:bg-theme-primary transition-colors text-sm"
-            title="Download as text file"
-          >
-            <Download className="w-4 h-4" />
-            Export
-          </button>
-        </div>
-      )}
+      <ShoppingListFooterActions
+        hasItems={items.length > 0}
+        showAnalytics={showAnalytics}
+        onToggleAnalytics={() => setShowAnalytics(!showAnalytics)}
+        onCopyToClipboard={handleCopyToClipboard}
+        onShare={handleShare}
+        onShareViaSMS={handleShareViaSMS}
+        onExport={handleExport}
+      />
 
       {canShowAdBanner && <AdMobBanner />}
 
-      {/* Undo banner for swipe-to-delete */}
-      {pendingDeleteCount > 0 && (
-        <div className="fixed bottom-20 left-0 right-0 flex justify-center px-4 z-50 pointer-events-none">
-          <div className="bg-theme-secondary border border-theme shadow-lg rounded-xl px-4 py-3 flex items-center gap-3 pointer-events-auto">
-            <span className="text-sm text-theme-primary">
-              {pendingDeleteCount === 1 ? '1 item removed' : `${pendingDeleteCount} items removed`}
-            </span>
-            <button
-              onClick={undoDelete}
-              className="text-[var(--accent-color)] font-semibold text-sm flex items-center gap-1 hover:opacity-80 transition-opacity"
-            >
-              <Undo2 className="w-4 h-4" />
-              Undo
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

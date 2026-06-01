@@ -9,6 +9,16 @@ export interface ChangeEntry {
 
 export const RECENT_CHANGES: ChangeEntry[] = [
   {
+    "version": "2.3.1",
+    "date": "Jun 1, 2026",
+    "highlights": [
+      "Chef tab cache filters — added meal-type chips (All Meals, breakfast, lunch, dinner) plus cuisine dropdown filters…",
+      "Preference-aware cache ranking — added shared cache ranking/filter helpers in utils/preferenceUtils.ts so cache recipe…",
+      "Recommendation explainability badges — recommendation cards now show compact preference signals (favorite…",
+      "Recipe cache labelling script — scripts/label-recipe-cache.js rewritten to use local Ollama (default gemma3:1b) with…"
+    ]
+  },
+  {
     "version": "2.3.0",
     "date": "May 29, 2026",
     "highlights": [
@@ -26,16 +36,6 @@ export const RECENT_CHANGES: ChangeEntry[] = [
       "QuickAdd suggestion chips — multiple taps required on mobile to register resolved; added touch-action: manipulation,…",
       "Meal Prep button — now uses accent colour fill (bg-[var(--accent-color)] with white text) for better visual prominence…",
       "Meal Planner — removed redundant \"Search\" shortcut button from the planner header"
-    ]
-  },
-  {
-    "version": "2.2.0",
-    "date": "May 26, 2026",
-    "highlights": [
-      "Shopping item assignment",
-      "Shopping item notes",
-      "Multi-store layout profiles",
-      "In-app account deletion"
     ]
   }
 ];

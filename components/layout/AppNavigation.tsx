@@ -37,6 +37,7 @@ export const AppNavigation: React.FC<AppNavigationProps> = ({ activeTab, setActi
           return (
             <button
               key={tab.id}
+              type="button"
               data-tutorial={tutorialIds[index]}
               onClick={() => setActiveTab(tab.id)}
               className={`flex flex-col items-center justify-center flex-1 py-2 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:ring-offset-2 focus:ring-offset-theme-secondary ${
@@ -44,8 +45,6 @@ export const AppNavigation: React.FC<AppNavigationProps> = ({ activeTab, setActi
               }`}
               aria-label={`${tab.label} ${isActive ? '(current page)' : ''}`}
               aria-current={isActive ? 'page' : undefined}
-              role="tab"
-              tabIndex={0}
             >
               <div className={`p-1.5 rounded-full mb-0.5 transition-all ${
                 isActive ? 'bg-theme-primary shadow-lg border border-theme' : ''

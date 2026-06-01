@@ -166,6 +166,9 @@ export const Community: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecipe,
             <p className="text-theme-secondary opacity-60 text-sm mb-4">
               Be the first to rate a recipe! Save and rate recipes to see them here.
             </p>
+            <p className="text-sm text-theme-secondary opacity-70 mb-4">
+              Start by opening Chef and rating one of your saved recipes.
+            </p>
             <button
               onClick={() => setActiveTab(Tab.RECIPES)}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--accent-color)] text-white text-sm font-semibold hover:opacity-90 transition-opacity"
@@ -186,6 +189,16 @@ export const Community: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecipe,
                key={idx} 
                className="bg-theme-secondary rounded-xl border border-theme shadow-lg overflow-hidden group hover:shadow-xl transition-all cursor-pointer"
                onClick={() => { setSelectedRecipe(stat); setShowModal(true); }}
+               role="button"
+               tabIndex={0}
+               aria-label={`Open community ratings for ${stat.title}`}
+               onKeyDown={(e) => {
+                 if (e.key === 'Enter' || e.key === ' ') {
+                   e.preventDefault();
+                   setSelectedRecipe(stat);
+                   setShowModal(true);
+                 }
+               }}
              >
                 {/* Recipe Image Header */}
                 <div className="h-32 bg-gray-200 relative overflow-hidden">
@@ -217,7 +230,7 @@ export const Community: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecipe,
                         <div className="flex items-center gap-1 bg-amber-100 dark:bg-amber-900/30 px-2 py-1 rounded text-amber-600 dark:text-amber-400">
                              <Star className="w-4 h-4 fill-current" />
                              <span className="font-bold text-sm">{avg}</span>
-                             <span className="text-[10px] opacity-70">({stat.count})</span>
+                              <span className="text-xs opacity-70">({stat.count})</span>
                         </div>
                     </div>
 
@@ -227,15 +240,15 @@ export const Community: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecipe,
                                 <div className="w-4 h-4 rounded-full bg-[var(--accent-color)] text-[8px] text-white flex items-center justify-center">
                                   {(latestComment && latestComment.userName) ? String(latestComment.userName).charAt(0) : '?'}
                                 </div>
-                                <span className="text-xs font-bold text-theme-secondary opacity-80">{latestComment.userName}</span>
+                                <span className="text-sm font-bold text-theme-secondary opacity-80">{latestComment.userName}</span>
                             </div>
-                            <p className="text-xs text-theme-secondary italic line-clamp-2">"{latestComment.comment}"</p>
+                              <p className="text-sm text-theme-secondary italic line-clamp-2">"{latestComment.comment}"</p>
                         </div>
                     )}
                     
                     {/* Quick inline star rating */}
                     <div className="flex items-center gap-1 mb-3" onClick={(e) => e.stopPropagation()}>
-                      <span className="text-xs text-theme-secondary opacity-60 mr-1">Rate:</span>
+                      <span className="text-sm text-theme-secondary opacity-60 mr-1">Rate:</span>
                       {[1,2,3,4,5].map((star) => (
                         <button
                           key={star}

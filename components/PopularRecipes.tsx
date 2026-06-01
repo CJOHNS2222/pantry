@@ -1,19 +1,19 @@
 import React, { useEffect, useState } from 'react';
-import { SavedRecipe, User, Household } from '../types';
+import { Household, StructuredRecipe, User } from '../types';
 import { getCachedPopularRecipes } from '../services/recipeService';
 import { ProgressiveImage } from './ProgressiveImage';
 
 interface Props {
-  openRecipeModal: (recipe: SavedRecipe, isSavedView: boolean) => void;
+  openRecipeModal: (recipe: StructuredRecipe, isSavedView: boolean) => void;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onAddToPlan?: (r: any) => void;
   user?: User | null;
   household?: Household | null;
-  recipes?: SavedRecipe[]; // Optional prop to avoid duplicate loading
+  recipes?: StructuredRecipe[]; // Optional prop to avoid duplicate loading
 }
 
 export const PopularRecipes: React.FC<Props> = ({ openRecipeModal, onAddToPlan: _onAddToPlan, user, recipes: propRecipes }) => {
-  const [recipes, setRecipes] = useState<SavedRecipe[]>(propRecipes || []);
+  const [recipes, setRecipes] = useState<StructuredRecipe[]>(propRecipes || []);
   const [loading, setLoading] = useState(!propRecipes); // Only load if recipes not provided
   const [visible, setVisible] = useState(25);
 
@@ -59,7 +59,20 @@ export const PopularRecipes: React.FC<Props> = ({ openRecipeModal, onAddToPlan: 
     <div>
       <div className="grid grid-cols-3 gap-4">
         {recipes.slice(0, visible).map((recipe, i) => (
-          <div key={recipe.id || i} className="bg-theme-secondary rounded-lg overflow-hidden cursor-pointer hover:shadow-xl transition-all duration-200" onClick={() => openRecipeModal(recipe, false)}>
+          <div
+            key={recipe.id || i}
+            className="bg-theme-secondary rounded-lg overflow-hidden cursor-pointer hover:shadow-xl transition-all duration-200"
+            onClick={() => openRecipeModal(recipe, false)}
+            role="button"
+            tabIndex={0}
+            aria-label={`Open recipe ${recipe.title}`}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                openRecipeModal(recipe, false);
+              }
+            }}
+          >
             <div className="aspect-square bg-theme-primary/20 relative overflow-hidden">
               {recipe.image ? (
                 <ProgressiveImage src={recipe.image} alt={recipe.title} className="w-full h-full" lazy />

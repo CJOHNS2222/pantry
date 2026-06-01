@@ -10,6 +10,7 @@ import { Timestamp } from 'firebase/firestore';
 import { useApp } from '../contexts/AppContext';
 import { useAppActions } from '../contexts/AppActionsContext';
 import { Tab } from '../types/app';
+import { log } from '../services/logService';
 
 interface PendingNotificationsProps {
   user: User;
@@ -80,7 +81,7 @@ export const PendingNotifications: React.FC<PendingNotificationsProps> = ({
       
       setNotifications(sorted);
     } catch (error) {
-      console.error('Error loading notifications:', error);
+      log.error('Error loading notifications', { error }, 'PendingNotifications');
     } finally {
       setLoading(false);
     }
@@ -168,7 +169,7 @@ export const PendingNotifications: React.FC<PendingNotificationsProps> = ({
               }
               
             } catch (error) {
-              console.error('Error joining household:', error);
+              log.error('Error joining household', { error }, 'PendingNotifications');
               throw error;
             }
           }
@@ -185,7 +186,7 @@ export const PendingNotifications: React.FC<PendingNotificationsProps> = ({
       
       await loadNotifications(); // Refresh the list
     } catch (error) {
-      console.error('Error accepting notification:', error);
+      log.error('Error accepting notification', { error }, 'PendingNotifications');
     } finally {
       setProcessing(null);
     }
@@ -199,7 +200,7 @@ export const PendingNotifications: React.FC<PendingNotificationsProps> = ({
       }
       await loadNotifications(); // Refresh the list
     } catch (error) {
-      console.error('Error snoozing notification:', error);
+      log.error('Error snoozing notification', { error }, 'PendingNotifications');
     } finally {
       setProcessing(null);
     }
@@ -217,7 +218,7 @@ export const PendingNotifications: React.FC<PendingNotificationsProps> = ({
       }
       await loadNotifications(); // Refresh the list
     } catch (error) {
-      console.error('Error dismissing notification:', error);
+      log.error('Error dismissing notification', { error }, 'PendingNotifications');
     } finally {
       setProcessing(null);
     }

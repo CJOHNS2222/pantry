@@ -176,7 +176,7 @@ export const RecipeRatingUI: React.FC<RecipeRatingUIProps> = ({
       onRatingSubmitted?.(rating);
       addToast('Rating submitted successfully!', 'info');
     } catch (error) {
-      console.error('Failed to submit rating:', error);
+      log.error('Failed to submit rating', { error }, 'RecipeRatingUI');
       addToast('Failed to submit rating. Please try again.', 'error');
     } finally {
       setIsSubmitting(false);
@@ -201,7 +201,7 @@ export const RecipeRatingUI: React.FC<RecipeRatingUIProps> = ({
       setShowModificationForm(false);
       addToast('Modification suggestion added!', 'info');
     } catch (error) {
-      console.error('Failed to add modification:', error);
+      log.error('Failed to add modification', { error }, 'RecipeRatingUI');
       addToast('Failed to add modification. Please try again.', 'error');
     }
   };

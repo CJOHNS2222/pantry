@@ -4,6 +4,7 @@ import { useIntl } from 'react-intl';
 import { useModalOpen } from '../utils/useModalOpen';
 import { useAndroidBack } from '../hooks/useAndroidBack';
 import { useAppActions } from '../contexts/AppActionsContext';
+import { log } from '../services/logService';
 
 interface QuickAddItem {
   name: string;
@@ -129,7 +130,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
             setInput(result);
           }
         } catch (error) {
-          console.error('Voice input failed:', error);
+          log.error('Voice input failed', { error }, 'QuickAddModal');
         } finally {
           setIsListening(false);
         }
@@ -158,7 +159,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
         onClose();
       }
     } catch (error) {
-      console.error('Barcode scan failed:', error);
+      log.error('Barcode scan failed', { error }, 'QuickAddModal');
     } finally {
       setIsScanning(false);
     }

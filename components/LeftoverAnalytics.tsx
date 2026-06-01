@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { LeftoverService } from '../services/leftoverService';
-import { InventoryCacheService } from '../services/inventoryCacheService';
 import FoodWasteAnalyticsService, { FoodWasteAnalytics } from '../services/foodWasteAnalyticsService';
-import { PantryItem } from '../types';
-import { TrendingUp, TrendingDown, DollarSign, AlertTriangle, Trash2, ChefHat, X } from 'lucide-react';
+import { TrendingUp, TrendingDown, DollarSign, AlertTriangle, Trash2 } from 'lucide-react';
+import { log } from '../services/logService';
 
 interface LeftoverAnalyticsProps {
   householdId?: string;
@@ -45,7 +44,7 @@ export const LeftoverAnalytics: React.FC<LeftoverAnalyticsProps> = ({ householdI
         // Calculate leftover analytics (keeping existing logic for now)
         await calculateLeftoverAnalytics();
       } catch (err) {
-        console.error('Error fetching analytics:', err);
+        log.error('Error fetching analytics', { error: err }, 'LeftoverAnalytics');
         setError('Failed to load analytics data');
       } finally {
         setLoading(false);

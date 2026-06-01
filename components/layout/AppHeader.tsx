@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Sun, Moon, Undo2, Bell } from 'lucide-react';
 import { User, Household, HouseholdActivity } from '../../types';
 import { log } from '../../services/logService';
@@ -60,45 +60,78 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   const touchStartY = useRef(0);
   const swipeLocked = useRef<'h' | 'v' | null>(null);
   const notifTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const notifPanelActiveRef = useRef(false);
   const throttleMs = 5000; // UI update throttle for notifications
   const { items } = useUserNotifications(user?.id, throttleMs);
   const unreadNotificationsCount = (items || []).filter(i => !i.read).length;
 
-  useEffect(() => {
-    if (showNotifications) {
-      notifTimerRef.current = setTimeout(() => setShowNotifications(false), 15000);
+  const clearNotifTimer = () => {
+    if (notifTimerRef.current) {
+      clearTimeout(notifTimerRef.current);
+      notifTimerRef.current = null;
     }
-    return () => {
-      if (notifTimerRef.current) clearTimeout(notifTimerRef.current);
-    };
-  }, [showNotifications]);
+  };
 
-  const resetNotifTimer = (delayMs = 15000) => {
-    if (notifTimerRef.current) clearTimeout(notifTimerRef.current);
+  const closeNotifications = useCallback(() => {
+    notifPanelActiveRef.current = false;
+    clearNotifTimer();
+    setShowNotifications(false);
+    setExpandedNotifId(null);
+  }, []);
+
+  const closeActivityFeed = useCallback(() => {
+    setShowActivityFeed(false);
+  }, []);
+
+  const scheduleNotifTimer = (delayMs = 15000) => {
+    clearNotifTimer();
+    if (!showNotifications || notifPanelActiveRef.current) return;
     notifTimerRef.current = setTimeout(() => setShowNotifications(false), delayMs);
   };
 
+  useEffect(() => {
+    if (showNotifications) {
+      scheduleNotifTimer(15000);
+      return clearNotifTimer;
+    }
+
+    notifPanelActiveRef.current = false;
+    clearNotifTimer();
+    return undefined;
+  }, [showNotifications]);
+
   const handleNotifPanelMouseEnter = () => {
-    if (notifTimerRef.current) clearTimeout(notifTimerRef.current);
+    notifPanelActiveRef.current = true;
+    clearNotifTimer();
   };
 
   const handleNotifPanelMouseLeave = () => {
-    resetNotifTimer(5000);
+    notifPanelActiveRef.current = false;
+    scheduleNotifTimer(5000);
   };
 
   const handleNotifPanelTouchStart = () => {
-    // Reset auto-close timer on any touch within the panel so it never
-    // closes while the user is actively interacting on mobile.
-    if (notifTimerRef.current) clearTimeout(notifTimerRef.current);
+    notifPanelActiveRef.current = true;
+    clearNotifTimer();
+  };
+
+  const handleNotifPanelTouchEnd = () => {
+    notifPanelActiveRef.current = false;
+    scheduleNotifTimer(5000);
   };
 
   const handleToggleNotifications = () => {
     setShowActivityFeed(false);
-    setShowNotifications(prev => !prev);
+    setShowNotifications(prev => {
+      if (prev) {
+        closeNotifications();
+      }
+      return !prev;
+    });
   };
 
   const handleToggleActivityFeed = () => {
-    setShowNotifications(false);
+    closeNotifications();
     setShowActivityFeed(prev => !prev);
   };
 
@@ -176,15 +209,28 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 
   const handleNotifActionClick = (e: React.MouseEvent, n: NotificationItem) => {
     e.stopPropagation();
-    setShowNotifications(false);
-    setExpandedNotifId(null);
+    closeNotifications();
     onNotificationAction?.(n);
   };
 
   const handleToggleExpand = (notifId: string) => {
     setExpandedNotifId(prev => prev === notifId ? null : notifId);
-    resetNotifTimer(10000);
+    scheduleNotifTimer(10000);
   };
+
+  useEffect(() => {
+    if (!showNotifications && !showActivityFeed) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        closeNotifications();
+        closeActivityFeed();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showNotifications, showActivityFeed, closeNotifications, closeActivityFeed]);
 
   const getNotifTimeAgo = (ts: unknown): string => {
     if (!ts) return '';
@@ -224,7 +270,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
       <div className="flex justify-between items-center">
         <div className="flex flex-col items-start min-w-0 flex-shrink">
           <div className="w-full mb-1">
-            <div className="text-[11px] font-medium text-theme-primary opacity-80 text-center" id="user-email">
+            <div className="text-xs font-medium text-theme-primary opacity-80 text-center" id="user-email">
               <span className="block">{greeting},</span>
               <span className="block">{(user.profile?.name || user.name || user.email.split('@')[0]).split(' ')[0]}!</span>
             </div>
@@ -277,10 +323,22 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                     onMouseEnter={handleNotifPanelMouseEnter}
                     onMouseLeave={handleNotifPanelMouseLeave}
                     onTouchStart={handleNotifPanelTouchStart}
+                    onTouchEnd={handleNotifPanelTouchEnd}
+                    onFocusCapture={handleNotifPanelMouseEnter}
+                    onBlurCapture={(e) => {
+                      if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+                        handleNotifPanelMouseLeave();
+                      }
+                    }}
                   >
                     <div className="flex items-center justify-between mb-2">
                       <div className="text-sm font-semibold">Notifications</div>
-                      <button onClick={handleMarkAllRead} className="text-xs text-theme-secondary hover:underline">Mark all read</button>
+                      <div className="flex items-center gap-2">
+                        <button onClick={handleMarkAllRead} className="text-xs text-theme-secondary hover:underline">Mark all read</button>
+                        <button onClick={closeNotifications} className="text-xs text-theme-secondary hover:text-theme-primary transition-colors px-1" aria-label="Close notifications">
+                          ✕
+                        </button>
+                      </div>
                     </div>
                     <div className="space-y-1.5">
                       {(items || []).filter(n => !n.read).slice().reverse().slice(0, visibleNotifCount).map((n: NotificationItem) => {
@@ -423,7 +481,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                   <div className="flex items-center justify-between mb-2">
                     <div className="text-sm font-semibold">Household Activity</div>
                     <button
-                      onClick={() => setShowActivityFeed(false)}
+                      onClick={closeActivityFeed}
                       className="text-xs text-theme-secondary hover:text-theme-primary transition-colors px-1"
                       aria-label="Close activity feed"
                     >✕</button>

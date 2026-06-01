@@ -289,11 +289,11 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
         </div>
 
         <form onSubmit={handleEmailAuth} className="space-y-4">
-          {error && <div className="text-red-400 text-xs mb-2" aria-live="polite">{error}</div>}
-          {success && <div className="text-green-400 text-xs mb-2">{success}</div>}
+          {error && <div className="text-red-400 text-sm mb-2" aria-live="polite">{error}</div>}
+          {success && <div className="text-green-400 text-sm mb-2">{success}</div>}
           {isSignup && (
             <div>
-              <label htmlFor="name" className="block text-xs font-bold text-amber-500 uppercase mb-1 ml-1">
+              <label htmlFor="name" className="block text-sm font-bold text-amber-500 uppercase mb-1 ml-1">
                 <FormattedMessage id="auth.name" />
               </label>
               <input
@@ -311,7 +311,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
             </div>
           )}
           <div>
-            <label htmlFor="email" className="block text-xs font-bold text-amber-500 uppercase mb-1 ml-1">
+            <label htmlFor="email" className="block text-sm font-bold text-amber-500 uppercase mb-1 ml-1">
               <FormattedMessage id="auth.email" />
             </label>
             <input
@@ -328,7 +328,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
             />
           </div>
           <div>
-            <label htmlFor="password" className="block text-xs font-bold text-amber-500 uppercase mb-1 ml-1">
+            <label htmlFor="password" className="block text-sm font-bold text-amber-500 uppercase mb-1 ml-1">
               <FormattedMessage id="auth.password" />
             </label>
             <input
@@ -347,7 +347,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
                <button
                  type="button"
                  onClick={handleForgotPassword}
-                 className="w-full mt-2 text-amber-400 underline text-xs text-left hover:text-amber-500"
+                 className="w-full mt-2 text-amber-400 underline text-sm text-left hover:text-amber-500"
                  data-testid="login-forgot-password"
                >
                  <FormattedMessage id="auth.forgotPassword" />
@@ -356,7 +356,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
           </div>
           {isSignup && (
             <div>
-              <label htmlFor="confirmPassword" className="block text-xs font-bold text-amber-500 uppercase mb-1 ml-1">
+              <label htmlFor="confirmPassword" className="block text-sm font-bold text-amber-500 uppercase mb-1 ml-1">
                 <FormattedMessage id="auth.confirmPassword" />
               </label>
               <input
@@ -417,7 +417,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
             Continue as Guest
           </button>
         </div>
-        <p className="text-xs text-amber-200/40 text-center mt-3">
+        <p className="text-sm text-amber-200/40 text-center mt-3">
           Guest mode: local storage only, no cross-device sync.
         </p>
       </div>
