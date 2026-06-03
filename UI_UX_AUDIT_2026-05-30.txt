@@ -246,5 +246,7 @@ IMPLEMENTATION STATUS (updated 2026-05-30)
 - In Progress (#4): RecipeModal decomposition further advanced with extracted enhanced timer and substitutions UI into dedicated RecipeModalTimerSubstitutionsSection slice
 - In Progress (#4): RecipeModal decomposition further advanced with extracted editable/non-editable recipe image block into dedicated RecipeModalImageSection slice
 - In Progress (#4): Remaining god-component decomposition still pending for PantryScanner, Settings, RecipeModal, and deeper RecipeFinder/ShoppingList orchestration and state-management slices
+- Completed (#13): RecipeModalLeftoverOverlay inline style zIndex replaced with Tailwind z-[99999] class, consistent with ImportModal pattern
+- Completed (#18): Progressive onboarding milestones implemented — onboardingMilestoneService.ts tracks first-pantry-item, first-shopping-item, first-meal-planned, and onboarding-completed; FeatureDiscoveryManager now gates each discovery tip behind its requiredMilestone so all four feature tips are not shown at once after sign-up
 
 End of audit.

@@ -28,7 +28,7 @@ export const RecipeModalLeftoverOverlay: React.FC<RecipeModalLeftoverOverlayProp
   if (!showLeftoverCapture || !user) return null;
 
   return (
-    <div onClick={(e) => e.stopPropagation()} style={{ zIndex: 99999 }} className="fixed inset-0 flex items-center justify-center bg-black/40 p-4">
+    <div onClick={(e) => e.stopPropagation()} className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/40 p-4">
       <div onClick={(e) => e.stopPropagation()} className="bg-theme-secondary rounded-lg p-4">
         <LeftoverQuickCapture
           createdBy={user.id}

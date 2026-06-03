@@ -55,6 +55,7 @@ import ExpiredItemsModal from './components/ExpiredItemsModal';
 import ExpiredItemsLaunchSheet, { getExpiredLaunchEnabled } from './components/ExpiredItemsLaunchSheet';
 import ItemDetailModal from './components/ItemDetailModal';
 import { InventoryCacheService } from './services/inventoryCacheService';
+import { recordMilestone } from './services/onboardingMilestoneService';
 import { useIntl } from 'react-intl';
 import { useAndroidBack, closeTopAndroidModal } from './hooks/useAndroidBack';
 
@@ -109,7 +110,9 @@ const App: React.FC = () => {
     PerformanceMonitoringService.measure(`tab_switch_${tab}`, `tab_switch_start_${tab}`, `tab_switch_end_${tab}`);
   };
 
-  // Feature discovery cards — shown once per featureId via localStorage gate
+  // Feature discovery cards — shown once per featureId via localStorage gate,
+  // and only after the user has reached the associated behaviour milestone to
+  // avoid cognitive overload right after sign-up (audit item #18).
   const featureDiscoveries = useMemo(() => [
     {
       featureId: 'ai-scan',
@@ -119,6 +122,8 @@ const App: React.FC = () => {
       actionLabel: 'Open Pantry',
       onAction: () => setActiveTab(Tab.PANTRY),
       autoHideDelay: 10000,
+      // Show right after onboarding — no pantry items required yet
+      requiredMilestone: 'onboarding-completed' as const,
     },
     {
       featureId: 'smart-recipe-search',
@@ -128,6 +133,8 @@ const App: React.FC = () => {
       actionLabel: 'Find Recipes',
       onAction: () => setActiveTab(Tab.RECIPES),
       autoHideDelay: 10000,
+      // Only relevant once the user has pantry items to search against
+      requiredMilestone: 'first-pantry-item' as const,
     },
     {
       featureId: 'leftover-tracker',
@@ -137,6 +144,8 @@ const App: React.FC = () => {
       actionLabel: 'Add a Leftover',
       onAction: () => setActiveTab(Tab.PANTRY),
       autoHideDelay: 10000,
+      // Surfaces naturally once the user is actively managing their pantry
+      requiredMilestone: 'first-pantry-item' as const,
     },
     {
       featureId: 'meal-planner',
@@ -146,6 +155,8 @@ const App: React.FC = () => {
       actionLabel: 'Plan Meals',
       onAction: () => setActiveTab(Tab.MEALS),
       autoHideDelay: 10000,
+      // Most useful once the user is tracking their shopping
+      requiredMilestone: 'first-shopping-item' as const,
     },
   ], [setActiveTab]);
 
@@ -427,6 +438,22 @@ const App: React.FC = () => {
   useEffect(() => {
     setActivityHousehold(household ?? null);
   }, [household]);
+
+  // Record behaviour milestones used to gate progressive feature-discovery tips
+  // (audit item #18 — trigger by milestone rather than showing all tips at once).
+  useEffect(() => {
+    if (inventory.length > 0) recordMilestone('first-pantry-item');
+  }, [inventory.length]);
+
+  useEffect(() => {
+    if (shoppingList.length > 0) recordMilestone('first-shopping-item');
+  }, [shoppingList.length]);
+
+  useEffect(() => {
+    if (mealPlan && mealPlan.some(day => day.breakfast.length > 0 || day.lunch.length > 0 || day.dinner.length > 0)) {
+      recordMilestone('first-meal-planned');
+    }
+  }, [mealPlan]);
 
   // Confirm add to plan from dialog
   const confirmAddToPlan = (dayIndex: number, mealType: 'breakfast' | 'lunch' | 'dinner') => {
@@ -1158,6 +1185,7 @@ const App: React.FC = () => {
               try {
                 // Mark onboarding as completed in localStorage and Firestore
                 localStorage.setItem('onboarding-completed', 'true');
+                recordMilestone('onboarding-completed');
                 if (user?.id) {
                   const userRef = DatabaseMonitoringService.doc('users', user.id);
                   await DatabaseMonitoringService.updateDoc(userRef, { hasSeenTutorial: true });
@@ -1178,7 +1206,7 @@ const App: React.FC = () => {
               }
             }}
             onOpenHousehold={() => { setShowOnboarding(false); setShowHousehold(true); }}
-            onSkip={() => setShowOnboarding(false)}
+            onSkip={() => { recordMilestone('onboarding-completed'); setShowOnboarding(false); }}
           />
         )}
 
