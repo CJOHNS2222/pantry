@@ -27,9 +27,12 @@ export function hasDeepChanged<T extends Record<string, any>>(arr1: T[] | null, 
     const item2 = arr2[idx];
     if (item === item2) return true; // Same reference
 
+    // Guard against unexpected undefined/null
+    if (!item2 || typeof item2 !== 'object') return false;
+
     // Compare primitive fields and nested objects
-    const keys1 = Object.keys(item);
-    const keys2 = Object.keys(item2);
+    const keys1 = Object.keys(item || {});
+    const keys2 = Object.keys(item2 || {});
 
     if (keys1.length !== keys2.length) return false;
 

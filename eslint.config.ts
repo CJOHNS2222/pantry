@@ -6,7 +6,20 @@ import { defineConfig } from "eslint/config";
 
 export default defineConfig([
   {
-    ignores: ["dist/**", "node_modules/**", "functions/lib/**", "android/**", "build/**"],
+    ignores: [
+      "dist/**",
+      "node_modules/**",
+      "functions/**",
+      "android/**",
+      "ios/**",
+      "build/**",
+      "coverage/**",
+      "capacitor-cordova-android-plugins/**",
+      "testlab/**",
+      "scripts/**",
+      "*.cjs",
+      "*.mjs",
+    ],
   },
   { files: ["**/*.{js,mjs,cjs,ts,mts,cts,jsx,tsx}"], plugins: { js }, extends: ["js/recommended"], languageOptions: { globals: globals.browser } },
   tseslint.configs.recommended,
@@ -18,9 +31,15 @@ export default defineConfig([
       },
     },
     rules: {
-      "@typescript-eslint/no-unused-vars": "warn", // Reduce noise, warn instead of error
-      "@typescript-eslint/no-explicit-any": "off", // Disable noisy any type warnings
+      "@typescript-eslint/no-unused-vars": ["error", {
+        "varsIgnorePattern": "^_",
+        "argsIgnorePattern": "^_",
+        "caughtErrorsIgnorePattern": "^_",
+        "destructuredArrayIgnorePattern": "^_"
+      }],
+      "@typescript-eslint/no-explicit-any": "error",
       "react/no-unescaped-entities": "off", // Disable quote escaping warnings
+      "react/prop-types": "off", // TypeScript handles prop validation
       "@typescript-eslint/no-require-imports": "off", // Allow require in scripts
       "no-undef": "off", // Allow globals like process in scripts
       "no-useless-escape": "off", // Disable unnecessary escape warnings
@@ -34,6 +53,33 @@ export default defineConfig([
     files: ["src/test/**/*.tsx"],
     rules: {
       "react/react-in-jsx-scope": "off", // Test files don't need React import with JSX transform
+    },
+  },
+  // Service, hook, and util files deal with Firebase dynamic types — relax no-explicit-any
+  {
+    files: [
+      "services/**/*.ts",
+      "hooks/**/*.ts",
+      "utils/**/*.ts",
+      "utils/shared/**/*.ts",
+    ],
+    rules: {
+      "@typescript-eslint/no-explicit-any": "warn",
+    },
+  },
+  // Test files — relax unused-vars and no-explicit-any (test infrastructure patterns)
+  {
+    files: [
+      "**/*.test.ts",
+      "**/*.test.tsx",
+      "**/*.spec.ts",
+      "**/*.spec.tsx",
+      "src/test/**",
+      "tests/**",
+    ],
+    rules: {
+      "@typescript-eslint/no-explicit-any": "warn",
+      "@typescript-eslint/no-unused-vars": "warn",
     },
   },
 ]);

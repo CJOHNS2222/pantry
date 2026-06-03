@@ -1,52 +1,52 @@
 plugins {
-    id 'com.android.application'
-    id 'com.google.gms.google-services'
-    id 'com.google.firebase.appdistribution'
-    id 'com.google.firebase.crashlytics'
-    id 'com.google.firebase.firebase-perf'
+    alias libs.plugins.android.application
+    alias libs.plugins.google.services
+    alias libs.plugins.firebase.appdistribution
+    alias libs.plugins.firebase.crashlytics
+    alias libs.plugins.firebase.perf
 
-    id 'io.sentry.android.gradle' version '5.12.2'
+    alias libs.plugins.sentry
 }
 
 
 android {
     namespace "com.smart.pantry"
-    compileSdk rootProject.ext.compileSdkVersion
+    compileSdk libs.versions.compileSdk.get().toInteger()
     defaultConfig {
         applicationId "com.smart.pantry"
-        minSdkVersion rootProject.ext.minSdkVersion
-        targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 3
-        versionName "1.2.0"
+        minSdk 24
+        targetSdk 35
+        versionCode 58
+        versionName "2.3.1"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
-        aaptOptions {
-             // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
-             // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
-            ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        
+        buildFeatures {
+            resValues = true
         }
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_21
         targetCompatibility JavaVersion.VERSION_21
     }
-    java {
-        toolchain {
-            languageVersion = JavaLanguageVersion.of(21)
-        }
-    }
     signingConfigs {
         release {
-            storeFile file('pantry-release.keystore')
-            storePassword '63789632aA!'
-            keyAlias 'pantry-key'
-            keyPassword '63789632aA!'
+            def keystoreFile = file('pantry-release-new.keystore')
+            def storePasswordVal = 'pantry123'
+            def keyAliasVal = 'pantry-key'
+            def keyPasswordVal = 'pantry123'
+
+            storeFile keystoreFile
+            storePassword storePasswordVal
+            keyAlias keyAliasVal
+            keyPassword keyPasswordVal
         }
     }
     buildTypes {
         release {
-            minifyEnabled false
+            minifyEnabled true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             signingConfig signingConfigs.release
+            
             firebaseAppDistribution {
                 artifactType="APK"
                 releaseNotesFile="${rootDir}/release-notes.txt"
@@ -54,42 +54,28 @@ android {
             }
         }
     }
-    }
+}
 
 
 dependencies {
-  // Import the Firebase BoM
-  implementation platform('com.google.firebase:firebase-bom:34.7.0')
-
-  // Add the dependencies for the Crashlytics and Analytics libraries
-  implementation 'com.google.firebase:firebase-crashlytics'
-  implementation 'com.google.firebase:firebase-analytics'
-
-  // Add the dependency for the Performance Monitoring library
-  implementation 'com.google.firebase:firebase-perf'
-
-
-  // TODO: Add the dependencies for Firebase products you want to use
-  // When using the BoM, don't specify versions in Firebase dependencies
-  implementation 'com.google.firebase:firebase-auth'
-  implementation 'com.google.firebase:firebase-firestore'
-  implementation 'com.google.firebase:firebase-functions'
-  implementation 'com.google.firebase:firebase-storage'
-  // End of Firebase dependencies
-  // Add the dependencies for any other desired Firebase products
-  // https://firebase.google.com/docs/android/setup#available-libraries
+  implementation platform(libs.firebase.bom)
+  implementation libs.firebase.analytics
+  implementation libs.firebase.crashlytics
+  implementation libs.firebase.perf
+  implementation libs.firebase.auth
+  implementation libs.firebase.firestore
+  implementation libs.firebase.functions
+  implementation libs.firebase.storage
 
   implementation fileTree(include: ['*.jar'], dir: 'libs')
-  implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
-  implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
-  implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+  implementation libs.androidx.appcompat
+  implementation libs.androidx.coordinatorlayout
+  implementation libs.androidx.core.splashscreen
   implementation project(':capacitor-android')
-  testImplementation "junit:junit:$junitVersion"
-  androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
-  androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
+  testImplementation libs.junit
+  androidTestImplementation libs.androidx.junit
+  androidTestImplementation libs.androidx.espresso.core
   implementation project(':capacitor-cordova-android-plugins')
-
-
 }
 
 apply from: 'capacitor.build.gradle'
@@ -103,12 +89,9 @@ try {
     logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
 }
 
-
 sentry {
     org = "smart-pantry"
     projectName = "smartpantry"
-
-    // this will upload your source code to Sentry to show it as part of the stack traces
-    // disable if you don't want to expose your sources
     includeSourceContext = false
+    includeDependenciesReport = false
 }

@@ -1,7 +1,7 @@
 import DatabaseMonitoringService from './databaseMonitoringService';
 import { increment, deleteField } from 'firebase/firestore';
 import { ShoppingItem } from '../types';
-import { priceCacheService } from './priceCacheService';
+import { log } from './logService';
 
 export interface CachedShoppingListData {
   [itemId: string]: {
@@ -57,30 +57,30 @@ const shoppingItemToObject = (item: ShoppingItem): CachedShoppingListData[string
       lastUpdated: item.priceData.lastUpdated instanceof Date ? item.priceData.lastUpdated.toISOString() : new Date().toISOString(),
     };
   }
+  if (item.assignedTo) obj.assignedTo = item.assignedTo;
+  if (item.notes) obj.notes = item.notes;
   return obj;
 };
 
-const objectToShoppingItem = (itemId: string, itemObject: CachedShoppingListData[string], householdId?: string, userId?: string): ShoppingItem => {
+const objectToShoppingItem = (itemId: string, itemObject: CachedShoppingListData[string], _householdId?: string, _userId?: string): ShoppingItem => {
   const priceData = itemObject.priceData ? {
     ...itemObject.priceData,
     lastUpdated: new Date(itemObject.priceData.lastUpdated)
   } : undefined;
 
-  if (priceData) {
-    priceCacheService.setPriceData(itemObject.item, priceData, householdId, userId);
-  }
-
   return {
     id: itemId,
     item: itemObject.item,
     quantity: itemObject.quantity,
-    category: itemObject.category,
+    category: itemObject.category || '',
     checked: false,
     source: itemObject.source,
     addedAt: new Date(0), // Using a static date as it's no longer persisted
     estimatedPrice: itemObject.estimatedPrice,
     completedAt: undefined,
-    priceData
+    priceData,
+    assignedTo: (itemObject as any).assignedTo,
+    notes: (itemObject as any).notes,
   };
 };
 
@@ -90,24 +90,24 @@ const getCachedShoppingList = async (householdId?: string, userId?: string): Pro
     const cacheRef = DatabaseMonitoringService.doc(cachePath);
     const docSnap = await DatabaseMonitoringService.getDoc(cacheRef);
 
-    if (docSnap.exists()) {
-      const data = docSnap.data() as ShoppingListCache;
+    if (docSnap && docSnap.exists && (typeof (docSnap as any).exists === 'function' ? (docSnap as any).exists() : (docSnap as any).exists)) {
+      const data = (docSnap as any).data() as ShoppingListCache;
       // V2.1 cache structure
       if (data.metadata && data.metadata.version >= CACHE_VERSION) {
         const items: ShoppingItem[] = Object.entries(data.items).map(([itemId, itemObject]) => 
           objectToShoppingItem(itemId, itemObject as CachedShoppingListData[string], householdId, userId)
         );
-        console.log(`✅ Loaded ${items.length} cached shopping list items from v2.1 cache (1 database read)`);
+        // Loaded cached shopping list items from v2.1 cache
         // Sort alphabetically as addedAt is no longer reliable
         return items.sort((a, b) => a.item.localeCompare(b.item));
       }
     }
 
-    console.log('📭 No valid shopping list cache found.');
+    // No valid shopping list cache found
     return [];
   } catch (err: any) {
     if (!err.message.includes('Missing or insufficient permissions')) {
-      console.warn('Failed to load shopping list cache:', err);
+      log.error('Failed to load shopping list cache', { err });
     }
     return [];
   }
@@ -129,9 +129,9 @@ const setCache = async (items: ShoppingItem[], householdId?: string, userId?: st
       }, {} as CachedShoppingListData)
     };
     await DatabaseMonitoringService.setDoc(cacheRef, newCache);
-    console.log(`📝 Set shopping list cache with ${items.length} items using v2.1 format.`);
+    // Set shopping list cache with items using v2.1 format
   } catch (err: any) {
-    console.error('Failed to set shopping list cache:', err);
+    log.error('Failed to set shopping list cache', { err });
   }
 };
 
@@ -144,13 +144,13 @@ const addItemToCache = async (item: ShoppingItem, householdId?: string, userId?:
       'metadata.lastUpdated': new Date(),
       'metadata.totalItems': increment(1)
     });
-    console.log(`➕ Added shopping list item to cache: ${item.item}`);
+    // Added shopping list item to cache
   } catch(e: any) {
       if (e.code === 'not-found' || e.message.includes('No document to update')) {
-          console.log('Cache document not found. Creating a new one.');
+          // Cache document not found. Creating a new one.
           await setCache([item], householdId, userId);
       } else {
-          console.error('Failed to add shopping list item:', e);
+          log.error('Failed to add shopping list item', { e });
           throw e;
       }
   }
@@ -170,13 +170,13 @@ const addItemsToCache = async (items: ShoppingItem[], householdId?: string, user
       'metadata.lastUpdated': new Date(),
       'metadata.totalItems': increment(items.length),
     });
-    console.log(`➕ Added ${items.length} shopping list items to cache`);
+    // Added shopping list items to cache
   } catch(e: any) {
     if (e.code === 'not-found' || e.message.includes('No document to update')) {
-        console.log('Cache document not found. Creating a new one.');
+        // Cache document not found. Creating a new one.
         await setCache(items, householdId, userId);
     } else {
-        console.error('Failed to add shopping list items:', e);
+        log.error('Failed to add shopping list items', { e });
         throw e;
     }
   }
@@ -200,9 +200,9 @@ const updateItem = async (itemId: string, updates: Partial<ShoppingItem>, househ
   }
   try {
     await DatabaseMonitoringService.updateDoc(cacheRef, updateData);
-    console.log(`🔄 Updated shopping list item in cache: ${itemId}`);
+    // Updated shopping list item in cache
   } catch (err: any) {
-    console.error('Failed to update shopping list item in cache:', err);
+    log.error('Failed to update shopping list item in cache', { err });
   }
 };
 
@@ -226,9 +226,9 @@ const updateItemsInCache = async (itemsToUpdate: { id: string, updates: Partial<
 
   try {
     await DatabaseMonitoringService.updateDoc(cacheRef, updateData);
-    console.log(`🔄 Updated ${itemsToUpdate.length} shopping list items in cache`);
+    // Updated shopping list items in cache
   } catch(e: any) {
-    console.error('Failed to update shopping list items:', e);
+    log.error('Failed to update shopping list items', { e });
   }
 };
 
@@ -241,9 +241,9 @@ const removeItem = async (itemId: string, householdId?: string, userId?: string)
       'metadata.lastUpdated': new Date(),
       'metadata.totalItems': increment(-1)
     });
-    console.log(`🗑️ Removed shopping list item from cache: ${itemId}`);
+    // Removed shopping list item from cache
   } catch (err: any) {
-    console.error('Failed to remove shopping list item from cache:', err);
+    log.error('Failed to remove shopping list item from cache', { err });
   }
 };
 
@@ -260,9 +260,9 @@ const removeItemsFromCache = async (itemIds: string[], householdId?: string, use
 
   try {
     await DatabaseMonitoringService.updateDoc(cacheRef, updateData);
-    console.log(`🗑️ Removed ${itemIds.length} shopping list items from cache`);
+    // Removed shopping list items from cache
   } catch(e: any) {
-    console.error('Failed to remove shopping list items:', e);
+    log.error('Failed to remove shopping list items', { e });
   }
 };
 
@@ -271,9 +271,9 @@ const clearCache = async (householdId?: string, userId?: string): Promise<void> 
     const cachePath = getCachePath(householdId, userId);
     const cacheRef = DatabaseMonitoringService.doc(cachePath);
     await DatabaseMonitoringService.deleteDoc(cacheRef);
-    console.log('🧹 Cleared shopping list cache');
+    // Cleared shopping list cache
   } catch (err: any) {
-    console.error('Failed to clear shopping list cache:', err);
+    log.error('Failed to clear shopping list cache', { err });
   }
 };
 

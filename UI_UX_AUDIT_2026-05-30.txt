@@ -1,0 +1,252 @@
+Stock & Spoon UI/UX/Usability/Layout/Functionality Audit
+Date: 2026-05-30
+Scope: Static audit across UI surface files (components/**/*.tsx, pages/**/*.tsx, src/components/**/*.tsx) with deep review of core user flows: Pantry, Shopping, Meal Planner, Recipe Finder, App shell/navigation/header, Login, Recommendations.
+
+Method
+- Full file sweep over UI folders to locate interaction, accessibility, visual, and maintainability risks.
+- Pattern scans for keyboard/a11y semantics, tiny text usage, console/debug traces, and interaction anti-patterns.
+- Targeted manual review of high-traffic screens and containers.
+
+================================================================================
+HIGH PRIORITY FINDINGS (fix first)
+================================================================================
+
+1) Unstable React keys can cause remounts and state loss in recipe cards
+- Evidence: components/RecipeFinder.tsx:1456 uses titleKey with Math.random() in render path.
+- Why this matters: Random keys break React reconciliation, can reset child component state (ratings/animations/focus), and degrade scroll/render performance.
+- Recommendation: Use stable IDs (recipe.id || recipe.title) and avoid any randomization in key generation.
+
+2) Collapsible header in UsageIndicator is mouse-only clickable div
+- Evidence: components/UsageIndicator.tsx:108 uses role="button" on a div with onClick, but no keyboard handler.
+- Why this matters: Keyboard and assistive tech users may not reliably trigger expand/collapse.
+- Recommendation: Use a real button element or add Enter/Space handling and tab semantics.
+
+3) Main content uses hardcoded viewport-height calculation that can break on mobile browsers
+- Evidence: components/layout/MainContent.tsx:121 has inline height calc with 100vh and fixed subtraction.
+- Why this matters: Dynamic browser chrome and virtual keyboard can create clipped content, double scroll, or hidden controls on iOS/Android.
+- Recommendation: Use dynamic viewport units (dvh/svh), remove fixed subtraction where possible, and rely on flex layout with min-h + safe-area padding.
+
+4) Very large “god components” create high regression risk and slower UX iteration
+- Evidence:
+  - components/PantryScanner.tsx (2993 lines)
+  - components/Settings.tsx (2385 lines)
+  - components/RecipeFinder.tsx (2122 lines)
+  - components/MealPlanner.tsx (2033 lines)
+  - components/RecipeModal.tsx (1309 lines)
+  - components/ShoppingList.tsx (1047 lines)
+- Why this matters: Hard to reason about state flows, more bugs, harder accessibility consistency, slower PR review and QA.
+- Recommendation: Extract by feature slices (filters, lists, cards, modals, toolbars, hooks) and add Storybook-like isolated rendering/tests for each slice.
+
+5) Core inventory list row click target is non-semantic for keyboard use
+- Evidence: components/PantryScanner.tsx:1703 row div handles onClick to open detail.
+- Why this matters: Keyboard users may not discover or activate row actions consistently.
+- Recommendation: Make row a button/anchor or provide explicit primary action button with proper tab order.
+
+================================================================================
+MEDIUM PRIORITY FINDINGS
+================================================================================
+
+6) Excessive tiny text across major flows hurts readability/accessibility
+- Evidence (sample):
+  - components/EnhancedShoppingListItem.tsx:171+
+  - components/ItemDetailModal.tsx:372+
+  - components/MealPlanner.tsx:342+
+  - components/layout/AppHeader.tsx:267+
+  - components/Login.tsx:292+
+- Why this matters: Small text (< 12px equivalent) is difficult for low-vision users and on small screens.
+- Recommendation: Raise floor typography for body/meta text; reserve tiny text for secondary badges only.
+
+7) Legacy console logging still present in production UI components
+- Evidence:
+  - components/PendingNotifications.tsx:83,171,188,202,220
+  - components/PantryScanner.tsx:721
+  - components/QuickAddModal.tsx:132,161
+  - components/LeftoverQuickCapture.tsx:83
+  - components/RecipeCommunityInsights.tsx:71,89
+  - components/LeftoverAnalytics.tsx:48
+  - components/RecipeRating.tsx:179,204
+  - components/RecipeFinder.tsx:1361,1371,1379
+- Why this matters: Noisy logs, potential PII leakage risk over time, inconsistent error handling UX.
+- Recommendation: Replace with structured log service + user-safe toasts; remove debug console statements from shipped UI.
+
+8) Notification panel and activity overlays rely on timed auto-close patterns
+- Evidence: components/layout/AppHeader.tsx has timer-driven notification panel behavior.
+- Why this matters: Auto-dismiss can interrupt reading or interacting, especially on accessibility devices.
+- Recommendation: Keep auto-close optional, pause when focused/hovered/touched (partially done), and offer explicit persistent mode.
+
+9) Modal stack complexity in MealPlanner can create interaction collisions
+- Evidence:
+  - components/MealPlanner.tsx:1946,2036,2071 multiple fixed overlays
+  - components/MealPlanner.tsx:2054/2055 nested stopPropagation modal wrappers
+- Why this matters: Overlapping z-index/focus traps can break back button expectations and escape behavior.
+- Recommendation: Centralize modal layer manager with consistent focus trap + escape + backdrop close policy.
+
+10) RecipeFinder mixes multiple visual card patterns for similar entities
+- Evidence: components/RecipeFinder.tsx has compact card, full card, tile card with differing affordances.
+- Why this matters: Inconsistent mental model and action discoverability.
+- Recommendation: Standardize one primary card pattern + variant tokens; keep action placement consistent.
+
+11) Landing page visual system diverges significantly from app theme tokens
+- Evidence: src/components/LandingPage.tsx uses custom color/font stack and heavy emoji icon cards.
+- Why this matters: Brand continuity gap between marketing and in-app product can reduce trust and polish.
+- Recommendation: Align with shared design tokens or intentionally define a documented marketing theme system.
+
+12) Some clickable containers are still div-based with cursor-pointer patterns
+- Evidence (sample): components/RecipeFinder.tsx:1468,1516 and other card containers.
+- Why this matters: Increases chance of missed keyboard semantics and inconsistent focus rings.
+- Recommendation: Prefer semantic buttons/links for primary click actions.
+
+13) Repeated inline style/z-index values reduce maintainability
+- Evidence:
+  - components/MealPlanner.tsx:2054 style zIndex 99999
+  - components/RecipeModal.tsx:714 style zIndex 99999
+- Why this matters: Hard to reason about stacking context and modal layering.
+- Recommendation: Centralize z-index scale in theme constants/classes.
+
+14) AppNavigation uses tab semantics without a matching tabpanel pattern
+- Evidence: components/layout/AppNavigation.tsx uses role="tab" for nav buttons.
+- Why this matters: ARIA mismatch can confuse assistive technologies if not implemented with full tablist/tab/tabpanel semantics.
+- Recommendation: Use nav/links semantics for app navigation or implement full WAI-ARIA tab pattern.
+
+15) Recommendation and search badges are improving but not yet systematized
+- Evidence: recent additions in RecipeRecommendations and RecipeFinder are component-local.
+- Why this matters: Badge meaning/colors may drift across screens.
+- Recommendation: Create shared badge component + semantic variants (positive/warning/critical/info).
+
+================================================================================
+LOW PRIORITY / POLISH OPPORTUNITIES
+================================================================================
+
+16) Loading states vary heavily by screen
+- Evidence: custom loaders in MainContent, RecipeFinder, PantryScanner, etc.
+- Improvement: Standardize skeleton/loading components and loading copy tone.
+
+17) Empty-state guidance quality is inconsistent
+- Evidence: good examples exist (RecipeFinder suggestions), but other screens use generic “No data” text.
+- Improvement: Add contextual CTA in each empty state (what to do next).
+
+18) Onboarding and tutorial experiences are broad but could be progressive
+- Evidence: ModernOnboarding + contextual tips + feature discovery coexist.
+- Improvement: Trigger based on behavior milestones to reduce cognitive load.
+
+19) Notification action density can overwhelm on small screens
+- Evidence: AppHeader notification row includes multiple small action icons/buttons.
+- Improvement: Move secondary actions into overflow menu per notification.
+
+20) Shopping and meal planning cards could use stronger visual hierarchy
+- Evidence: heavy metadata in small text with similar color/weight.
+- Improvement: Increase contrast and reserve accent color for highest-priority decision info.
+
+================================================================================
+FUNCTIONALITY/UX RISK NOTES
+================================================================================
+
+21) Potential duplicate IDs generated from Math.random in lists/services can collide in extreme cases
+- Evidence: components/ShoppingList.tsx:355,530.
+- Recommendation: Use deterministic UUID helper (crypto.randomUUID where available) or backend-generated IDs.
+
+22) Search, filter, and preference logic now exists in multiple places
+- Evidence: RecipeFinder + MealPlanner + Recommendation service.
+- Recommendation: Continue consolidation into shared utility/hook to prevent future behavior drift.
+
+23) Multiple independent state machines in large components increase subtle bug risk
+- Evidence: PantryScanner/MealPlanner/RecipeFinder each contain many modals and UX modes.
+- Recommendation: Introduce reducer/statechart for modal and mode transitions in each major screen.
+
+================================================================================
+CROSS-CUTTING UPGRADE PLAN (high ROI)
+================================================================================
+
+A) Accessibility Pass (1-2 sprints)
+- Convert clickable div containers to semantic controls.
+- Normalize keyboard handlers/focus management for all modals/menus.
+- Replace tiny metadata text with tokenized minimum size.
+
+B) Design System Pass (1 sprint)
+- Create shared primitives: Card, Badge, EmptyState, LoadingState, ModalShell, ActionBar.
+- Define typography scale floor and spacing tokens for mobile readability.
+
+C) Architecture Pass (2-4 sprints incremental)
+- Split top 5 largest components into feature subcomponents + hooks.
+- Add test harness per subcomponent (render + interaction + a11y smoke).
+
+D) Reliability Pass (1 sprint)
+- Remove residual console.* usage from UI.
+- Centralize z-index and modal stack behavior.
+- Replace random-key patterns and random ID generation in render paths.
+
+================================================================================
+QUICK WINS (can do immediately)
+================================================================================
+
+1. Replace random key in components/RecipeFinder.tsx:1456 with stable key.
+2. Change UsageIndicator collapsed header div to button in components/UsageIndicator.tsx:108.
+3. Convert primary Pantry row click target to semantic button/link in components/PantryScanner.tsx:1703.
+4. Swap MainContent fixed 100vh calc for dvh/flex-safe layout in components/layout/MainContent.tsx:121.
+5. Remove remaining console.* from UI components listed above.
+
+IMPLEMENTATION STATUS (updated 2026-05-30)
+================================================================================
+
+- Completed: Quick Win #1 (stable key in RecipeFinder)
+- Completed: Quick Win #2 (keyboard + aria semantics added for collapsed UsageIndicator header)
+- Completed: Quick Win #3 (Pantry row now keyboard-accessible with role, tab focus, Enter/Space support)
+- Completed: Quick Win #4 (MainContent now uses dynamic viewport unit calc with 100dvh)
+- Completed: Quick Win #5 (console logging removed/replaced with structured log service in audited components)
+- Completed: Additional a11y hardening for clickable RecipeFinder cards (compact + full card keyboard support)
+- Completed: Additional a11y hardening for PopularRecipes and RecipeRecommendations cards
+- Completed: AppNavigation tab-semantic mismatch removed in favor of plain navigation button semantics
+- Completed: Login screen minimum readable text size raised for labels, feedback, and helper copy
+- Completed: Shopping list metadata readability improved in EnhancedShoppingListItem
+- Completed: Household sharing/activity text readability improved in HouseholdShoppingShare
+- Completed: Community cards, onboarding steps, and expired-item rows now support keyboard activation
+- Completed: AppHeader notification panel now stays open while focused and greeting text is slightly more readable
+- Completed: Community empty state, onboarding copy, expired-items copy, and household activity empty state are more readable and actionable
+- Completed: Smart recommendations, performance dashboard, pantry analytics, and category manager empty states are more actionable
+- Completed: Remaining recommendation, performance dashboard, pantry analytics, and category manager labels were raised for readability
+- Completed: Notification panel auto-close now pauses during hover, focus, and touch interaction
+- Completed: Shopping list session and item IDs now use crypto.randomUUID instead of Math.random
+- Completed: Remaining legacy console logging was removed from audited UI components and Cloud Functions
+- Completed: Shopping and meal planning cards now have clearer visual hierarchy and stronger action affordances
+- Completed: Notification and activity overlays now have explicit close buttons and Escape-key support
+- Completed: MealPlanner modal stack now closes predictably via backdrop clicks and top-of-stack Escape handling
+- Completed: RecipeFinder card variants now share tighter visual tokens, metadata structure, and semantic badges across full, compact, and tile layouts
+- Completed: Landing page visual system now aligns with app theme tokens and product messaging instead of a divergent standalone marketing palette
+- In Progress (#15): Shared semantic badge component introduced and applied across RecipeFinder and RecipeRecommendations preference/dietary signals
+- In Progress (#16): RecipeFinder loading experience standardized around a shared state panel and duplicate loading branch removed
+- In Progress (#17): RecipeFinder empty-state guidance upgraded with clearer next-step suggestions and shared state treatment
+- Completed: MealPlanner decomposition finalized with extracted header/help, modal-stack hook, premium-content section, drag-trash target, recipe search modal/overlay, current-day meals section, leftover flow modals, add-meal dialog, calendar/navigation section, and highlights/suggestions section
+- In Progress (#4): RecipeFinder decomposition advanced with extracted saved-view panel and popular-recipes filter section; ShoppingList decomposition advanced with extracted view-mode toggle, purchase modal, and add-item modal
+- In Progress (#4): RecipeFinder decomposition further advanced with extracted search/generate controls panel; ShoppingList decomposition further advanced with extracted item-list/empty-state section
+- In Progress (#4): RecipeFinder decomposition further advanced with extracted loading/error/results/empty-state rendering into dedicated RecipeFinderResultStates slice
+- In Progress (#4): RecipeFinder decomposition further advanced with extracted recipe card and tile rendering into dedicated RecipeFinderCards slice
+- In Progress (#4): ShoppingList decomposition further advanced with extracted analytics toggle and export/share footer controls into dedicated ShoppingListFooterActions slice
+- In Progress (#4): ShoppingList decomposition further advanced with extracted checkout/undo and mark-all/clear action bars into dedicated ShoppingListActionBars slice
+- In Progress (#4): ShoppingList decomposition further advanced with extracted floating add FAB and swipe-delete undo banners into dedicated ShoppingListAddFab and ShoppingListUndoBanners slices
+- In Progress (#4): RecipeFinder decomposition further advanced with extracted tab switcher header and modal section into dedicated RecipeFinderTabs and RecipeFinderModalSection slices
+- In Progress (#4): RecipeModal decomposition advanced with extracted action-button area and rating dialog into dedicated recipe-modal slices
+- In Progress (#4): RecipeModal decomposition further advanced with extracted leftover quick-capture overlay into a dedicated recipe-modal slice
+- In Progress (#4): RecipeModal decomposition further advanced with extracted servings/ingredients/instructions/rating details block into dedicated RecipeModalDetailsSection slice
+- In Progress (#4): Settings decomposition started with extracted Feedback and Subscription accordion sections into dedicated settings slices
+- In Progress (#4): Settings decomposition further advanced with extracted Notifications and Pantry Images accordion sections into dedicated settings slices
+- In Progress (#4): Settings decomposition further advanced with extracted Help & Support accordion section into dedicated settings slice
+- In Progress (#4): Settings decomposition further advanced with extracted App Updates accordion section into dedicated settings slice
+- In Progress (#4): Settings decomposition further advanced with extracted admin Reset Usage and Remote Config Debug accordion sections into dedicated settings slices
+- In Progress (#4): Settings decomposition further advanced with extracted top tab-pill navigation and guest-upgrade banner into dedicated settings slices
+- In Progress (#4): Settings decomposition further advanced with extracted Pending Notifications accordion into dedicated settings slice
+- In Progress (#4): Settings decomposition further advanced with extracted Preferences power-features quick-action card into dedicated settings slice
+- In Progress (#4): Settings decomposition further advanced with extracted Usage & Limits accordion into dedicated settings slice
+- In Progress (#4): Settings decomposition further advanced with extracted Household members accordion into dedicated settings slice
+- In Progress (#4): Settings decomposition further advanced with extracted Navigation tabs visibility accordion into dedicated settings slice
+- In Progress (#4): Settings decomposition further advanced with extracted App Preferences accordion into dedicated settings slice
+- In Progress (#4): Settings decomposition further advanced with extracted Theme settings accordion into dedicated settings slice
+- In Progress (#4): Settings decomposition further advanced with extracted Categories, Store Layout, and Leftover Analytics organization accordions into dedicated settings slices
+- In Progress (#4): Settings decomposition further advanced with extracted Privacy & Legal accordion into dedicated settings slice
+- In Progress (#4): Settings decomposition further advanced with extracted Food Safety preferences accordion into dedicated settings slice
+- In Progress (#4): RecipeModal decomposition further advanced with extracted enhanced timer and substitutions UI into dedicated RecipeModalTimerSubstitutionsSection slice
+- In Progress (#4): RecipeModal decomposition further advanced with extracted editable/non-editable recipe image block into dedicated RecipeModalImageSection slice
+- In Progress (#4): Remaining god-component decomposition still pending for PantryScanner, Settings, RecipeModal, and deeper RecipeFinder/ShoppingList orchestration and state-management slices
+- Completed (#13): RecipeModalLeftoverOverlay inline style zIndex replaced with Tailwind z-[99999] class, consistent with ImportModal pattern
+- Completed (#18): Progressive onboarding milestones implemented — onboardingMilestoneService.ts tracks first-pantry-item, first-shopping-item, first-meal-planned, and onboarding-completed; FeatureDiscoveryManager now gates each discovery tip behind its requiredMilestone so all four feature tips are not shown at once after sign-up
+
+End of audit.

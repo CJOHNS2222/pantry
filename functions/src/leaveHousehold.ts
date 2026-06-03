@@ -1,4 +1,5 @@
 import {onCall, onRequest, HttpsError} from "firebase-functions/v2/https";
+import {logger} from "firebase-functions/v2";
 import admin from 'firebase-admin';
 import {getFirestore, FieldValue} from "firebase-admin/firestore";
 import { getAuth } from 'firebase-admin/auth';
@@ -85,9 +86,9 @@ export const leaveHousehold = onCall(async (request) => {
     // Remove custom claim for the leaving user
     try {
       await admin.auth().setCustomUserClaims(userId, { householdId: null });
-      console.log(`Custom claim 'householdId' removed for user ${userId}`);
+      logger.info('Custom claim householdId removed for user', { userId });
     } catch (err: any) {
-      console.error('Error removing custom claims:', error);
+      logger.error('Error removing custom claims', err);
       // Don't fail the leave process if claim removal fails
     }
 
@@ -100,8 +101,8 @@ export const leaveHousehold = onCall(async (request) => {
     return { success: true, message: 'Successfully left household' };
 
   } catch (err: any) {
-    console.error('Error leaving household:', error);
-    throw error;
+    logger.error('Error leaving household', err);
+    throw err;
   }
 });
 
@@ -196,9 +197,9 @@ export const leaveHouseholdHttp = onRequest(async (req, res) => {
     // Remove custom claim for the leaving user
     try {
       await admin.auth().setCustomUserClaims(userId, { householdId: null });
-      console.log(`Custom claim 'householdId' removed for user ${userId}`);
+      logger.info('Custom claim householdId removed for user', { userId });
     } catch (err: any) {
-      console.error('Error removing custom claims:', error);
+      logger.error('Error removing custom claims', err);
       // Don't fail the leave process if claim removal fails
     }
 
@@ -211,7 +212,7 @@ export const leaveHouseholdHttp = onRequest(async (req, res) => {
     res.json({ success: true, message: 'Successfully left household' });
 
   } catch (error: any) {
-    console.error('leaveHouseholdHttp error:', error);
+    logger.error('leaveHouseholdHttp error', error);
     res.status(500).json({ error: error?.message || 'Failed to leave household' });
   }
 });

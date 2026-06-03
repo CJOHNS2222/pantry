@@ -1,8 +1,8 @@
-# Smart Pantry Chef - Website Deployment Guide
+# Stock & Spoon - Website Deployment Guide
 
 ## Overview
 
-Smart Pantry Chef now includes a beautiful marketing website alongside the PWA app. The website serves as a landing page to showcase the app's features and drive user acquisition.
+Stock & Spoon now includes a beautiful marketing website alongside the PWA app. The website serves as a landing page to showcase the app's features and drive user acquisition.
 
 ## Architecture
 

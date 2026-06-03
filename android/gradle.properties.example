@@ -1,0 +1,14 @@
+# Copy this file to android/gradle.properties (do NOT commit your real secrets)
+# and fill in the signing values for local release builds.
+
+# Keystore file path (relative to android/ directory). Example: pantry-release.keystore
+RELEASE_STORE_FILE=pantry-release.keystore
+
+# Keystore password
+RELEASE_STORE_PASSWORD=
+
+# Key alias
+RELEASE_KEY_ALIAS=pantry-key
+
+# Key password
+RELEASE_KEY_PASSWORD=

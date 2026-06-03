@@ -1,17 +1,777 @@
-# Changelog
+## [2.3.1] - 2026-06-01
 
-All notable changes to Smart Pantry Chef will be documented in this file.
+### Fixed
+- **Recipe Finder — search-on-keystroke removed** — Gemini/Spoonacular search no longer fires after every character typed; search only triggers when the user presses the **Search** button or hits Enter
+- **Recipe Finder search button** — replaced the hidden inline search icon (only shown when input was non-empty) with a persistent accent-coloured **Search** button beside the input field; pressing Enter in the input also triggers search
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+### Added
+- **Chef tab cache filters** — added meal-type chips (`All Meals`, `breakfast`, `lunch`, `dinner`) plus cuisine dropdown filters above Popular Recipes; filters now apply to cache-backed popular results and cached text-query matches
+- **Preference-aware cache ranking** — added shared cache ranking/filter helpers in `utils/preferenceUtils.ts` so cache recipe matches are boosted by favorite cuisines/proteins and down-ranked for disliked ingredients
+- **Recommendation explainability badges** — recommendation cards now show compact preference signals (favorite cuisine/protein matches and disliked-ingredient warnings) so users can see why recipes were ranked
+
+### Changed
+- **Recipe cache labelling script** — `scripts/label-recipe-cache.js` rewritten to use local Ollama (default `gemma3:1b`) with batched classification, model preflight checks, robust JSON extraction, timeout handling, and fallback labels; supports `--dry-run`, `--force`, and `--model`
+- **Chef cache search ordering** — cached search results in Recipe Finder now pass through shared mealType/cuisine filtering and household/user preference ranking before display
+- **Meal Planner cache search ordering** — recipe search modal in Meal Planner now applies meal-type filter plus the same household/user preference ranking used by Recipe Finder
+- **Recommendation ranking consistency** — `RecipeRecommendationService` now incorporates user profile preference scoring in final sort order so cache-backed recommendations align with cache search behavior
+
+---
+
+## [2.3.0] - 2026-05-29
+
+### Added
+- **Meal Prep Planner — household size + batch scaling** — new "Household size" picker (1/2/4/6 people) beside the day-range selector; each suggested batch session now shows a ×N multiplier badge and adjusted serving count so quantities reflect your actual household and duration (e.g. ×4 batches for 7 days, 2 people on a 4-serving recipe)
+- **Local grocery price defaults** — 29 real local-area prices seeded into the pricing fallback (butter, bacon, pork chops, deli turkey, cream cheese, Greek yogurt, OJ, strawberries, shredded cheddar, olive oil, peanut butter, marinara, canned tomatoes/beans, frozen veg/pizza, ice cream, cereal, soda, and more); plural item name variants added so Quick Add chip lookups always resolve
+
+### Changed
+- **Quick Add chips (Shopping list)** — complete rewrite: single `onClick` handler, `useRef` scroll container, green checkmark flash on tap, scroll-snap, left/right arrow buttons; chips now reliably add items on first tap
+- **Recipe Finder — preference warnings** — per-card allergen (red shield) and dislike/restriction (amber warning) badges replace the previous batch toast; Gemini search prompt trimmed to reduce token usage
+- **Grocery price defaults updated** — eggs corrected to per-dozen pricing; apples, lemons, bell peppers, broccoli, onions, lettuce, tomatoes, flour, rice, and pasta updated to current local averages
+
+---
+
+## [2.2.1] - 2026-05-27
+
+### Fixed
+- **Feedback form** — "Failed to send feedback" error resolved; field name mismatch (`text` → `message`) now matches Firestore security rule
+- **QuickAdd suggestion chips** — multiple taps required on mobile to register resolved; added `touch-action: manipulation`, `onTouchEnd` with `preventDefault`, and removed pointer-event interference from scroll arrow overlays
+
+### Changed
+- **Meal Prep button** — now uses accent colour fill (`bg-[var(--accent-color)]` with white text) for better visual prominence in the Meal Planner toolbar
+- **Meal Planner** — removed redundant "Search" shortcut button from the planner header
+- **Free plan calendar limit** — forward-navigation arrow in Meal Planner is now disabled after day 7 for free users, with a tooltip prompting upgrade to Premium
+
+### Added (Help & FAQ)
+- New FAQ entry: **Recipes (Chef) tab** — covers Smart Recommendations, Recipe Finder, saved recipes, and Cooking Mode
+- New FAQ entry: **Copy / Clear / Export week** — documents Clear week, Copy to next week, and Export .ics meal plan actions
+- New FAQ entry: **Imperial vs Metric units** — Settings → Account → Measurement System
+- New FAQ entry: **Hide/show navigation tabs** — Settings → Preferences → Navigation Tabs
+- Updated **tabs overview** FAQ entry to include the Recipes (Chef) tab
+
+---
+
+## [2.2.0] - 2026-05-26
+
+### Added
+- **Shopping item assignment** - assign household members to shopping items via an inline picker; assigned member shown as a badge; persisted to cache
+- **Shopping item notes** - add inline notes to shopping items; italic preview on the item row; persisted to cache
+- **Multi-store layout profiles** - named store profiles (e.g. Whole Foods, Costco) each with independent aisle ordering; store picker on shopping list screen
+- **In-app account deletion** - confirmation modal permanently deletes Firestore user data and Firebase Auth account via new `deleteAccount` Cloud Function
+- **AdMob banner ads** - `@capacitor-community/admob` wired; set `VITE_ADMOB_ENABLED=true` in release env to activate
+- **Community inline star rating** - quick 5-star row on Community cards; submits rating without opening modal
+- **Leftover persona in onboarding** - Food Safety step (Strict / Normal / Relaxed) added to `ModernOnboarding`; writes `profile.leftoverPersona` to Firestore
+- **Recipe recommendations improved** - full recipe objects fetched from cache; pantry ingredient token-overlap scoring for `similar-ingredients` results
+
+### Changed
+- **`autoReaddStaples` setting wired** - staple re-add now respects `settings.shopping.autoReaddStaples` (opt-out, default true)
+- **MealPlanner two-week gate** - uses `UsageService.getUsageLimits()` to derive `canUseTwoWeekPlanning`; falls back to `isPremium || isFamily`  if not loaded
+- **Shopping suggestion dismissals persisted** - via `localStorage` key `shop_dismissed_suggestions`; shared between `SmartShoppingSuggestions` and `QuickAdd`; survives reload
+- **GroceryCostEstimator upgrade CTA** - free-user truncation is now a clickable button with lock icon that navigates to Settings/Subscriptions
+- **Console.log cleanup** - all `console.*` in 9 service files migrated to the structured `log` service (`householdActivityService`, `householdPreferenceService`, `groceryPriceService`, `geminiService`, `householdService`, `importService`, `leftoverNotificationService`, `leftoverImageService`, `foodWasteAnalyticsService`)
+- **Cloud Function logging** - `inviteMember.ts` now uses `firebase-functions/v2` `logger`; eliminates PII in Cloud Logging
+- **Barcode scan button hidden on web** - wrapped in `Capacitor.isNativePlatform()`; does not render in the PWA/browser build
+- **Upgrade prompts** - MealPlanner disabled-month span and navigation arrow show actionable toasts with an `Upgrade` button
+
+### Fixed
+- **PII leak in `inviteMemberCore`** - removed `console.log` printing `{ inviterUid, email, householdId }` to Cloud Logging
+- **Undo toast TTL** - confirmed all undo toasts use 5 000 ms; FAQ updated from "6 seconds" to "5 seconds"
+- **Household invite feedback** - `Household.tsx` distinguishes pending vs existing-account invite with separate toast messages
+
+---
+
+---
+
+## [2.1.6] - 2026-05-26
+
+### Fixed
+- **Camera scan timeout** — `handleTakePhoto` was setting the loading state to `LOADING` before the OS camera opened, causing `GeminiLoadingOverlay` to immediately start its 60-second countdown and time out before Gemini was ever called; loading state is now only set after the photo is captured
+
+### Changed
+- **`customCategories` consolidated onto user doc** — custom pantry categories are now stored as a field on `users/{uid}` instead of a separate `users/{uid}/cache/customCategories` subcollection document; `useAuth`'s existing `onSnapshot` delivers them for free, saving 1 Firestore read per cold start; existing users are migrated automatically on first load
+- **Stripe packages removed** — `stripe`, `@stripe/react-stripe-js`, and `@stripe/stripe-js` were unused and have been uninstalled
+- **Dependencies updated** — all patch/minor versions bumped (`@capacitor/*` 8.3.4, `firebase` 12.13.0, `react`/`react-dom` 19.2.6, `vite` 8.0.14, `@sentry/react` 10.53.1, `tailwindcss` 4.3.0, `date-fns` 4.3.0, `vitest` 4.1.7, `lucide-react` 1.16.0, and others); `@google/genai` bumped 1→2, `react-intl` 8→10, `lint-staged` 16→17, `@capacitor/local-notifications` 8.0→8.2
+- **Repository cleanup** — removed audit/planning docs (`AUDIT_NOTES.txt`, `FULL_APP_AUDIT.txt`, `PRODUCTION_READINESS_AUDIT.txt`, `IMPROVEMENTS_PLAN.md`), build artifacts (`app-debug.apk`, `smart-pantry-release.apk`, `sentry-wizard.exe`), stray screenshots from `public/` and `testlab/robo/`, duplicate root `manifest.json`, and `.github/issues/` planning files; moved `addTestData.cjs`, `clean_csv.cjs`, `parse_csv.cjs`, `migrate-firebase.js`, and `test-firebase.js` from root into `scripts/`
+
+## [2.1.5] - 2026-05-23
+
+### Fixed
+- **Notification badge mismatch** — "Pending Notifications" in Settings now shows the same count as the header bell; previously read notifications were being merged into the pending list, inflating the badge
+- **Recipe ingredient units lost on purchase** — ingredients with a quantity string like "225 g" or "800 ml" now preserve the unit when moved to pantry; previously they always showed as "cnt"
+- **Bulk delete N+1 Firestore writes and toast flooding** — selecting and deleting multiple pantry items now performs a single cache write and shows a single summary toast instead of one write + one toast per item
+
+### Changed
+- **Remote Config cleaned up** — removed phantom `openrouter_model`, `openrouter_vision_model`, `gemini_max_batch_size`, and `gemini_debounce_delay_ms` entries that were appearing in the Remote Config debug view despite never being published; active Gemini model params (`gemini_model`, `gemini_model_vision`) remain
+
+## [2.1.4] - 2026-05-20
+
+### Fixed
+- **OpenRouter recipe search returning empty results** — default text model `baidu/cobuddy:free` was deprecated on OpenRouter; replaced with `meta-llama/llama-3.3-70b-instruct:free`
+- **OpenRouter pantry/receipt image scan hanging** — default vision model `meta-llama/llama-4-maverick:free` was unreliable on free tier; replaced with `qwen/qwen2.5-vl-72b-instruct:free`
+- **Image scan opening blank review modal** — `analyzePantryImageViaOpenRouter` and `analyzeReceiptImageViaOpenRouter` now throw a user-friendly error when the model responds but no items are parsed, instead of silently opening an empty review modal
+- **Meal Prep Planner modal header hidden behind app bar** — changed overlay from `items-center z-50` to `items-start z-[9999]` with `pt-[calc(var(--safe-area-top,0px)+72px)]` so the modal card starts below the fixed `AppHeader`
+- **GeminiLoadingOverlay hanging at 97%** — added `onTimeout` callback to the pantry scanner overlay so the loading state resets to error when the 60-second visual timer completes
+
+### Changed
+- **OpenRouter models now configurable via Remote Config** — `openrouter_model` and `openrouter_vision_model` keys added to `remoteConfigService` in-app defaults; set in Firebase Console to hot-swap models without a deploy. `VITE_OPENROUTER_MODEL` / `VITE_OPENROUTER_VISION_MODEL` env vars remain as local dev overrides (highest priority)
+- **Meal Prep Planner redesign** — Plan Duration selector now caps the number of suggested batch sessions (3 days → 3, 5 → 5, 7 → 7); suggestion cards reframed as "Cook together / Prep once, use in both" with estimated time savings; servings now summed from actual recipe data instead of hardcoded 8; custom plan builder shows shared-ingredient callout for selections of 2+ recipes
+
+## [2.1.3] - 2026-05-19
+
+### Fixed
+- **Meal Prep Planner crash** — `parseTimeToMinutes` was declared after the `useMemo` that calls it, causing a Temporal Dead Zone `ReferenceError` in production builds whenever the Meal Prep button was tapped; moved declaration above the `useMemo`
+
+### Added
+- **Auto-generated "What's New" modal** — `scripts/generate-changelog.cjs` now parses `CHANGELOG.md` at build time and writes `constants/changelogEntries.ts`; `WhatsNewModal` imports from this file instead of a hand-maintained array. Runs automatically via `prebuild`/`predev` npm hooks — no manual updates needed on future releases
+
+## [2.1.2] - 2026-05-19
+
+### Added
+- **OpenRouter / Groq AI provider** — New `openRouterService.ts` integrates the OpenAI-compatible OpenRouter API as an alternative to Gemini for all three AI features: recipe text search, pantry image scanning, and receipt scanning. Set `VITE_GEMINI_DISABLED=true` in `.env.local` to route all AI calls through OpenRouter instead of Gemini. Defaults to `baidu/cobuddy:free` for text search and `meta-llama/llama-4-maverick:free` for vision; both are confirmed free ($0/M tokens). Override per-feature via `VITE_OPENROUTER_MODEL` and `VITE_OPENROUTER_VISION_MODEL`. Compatible with Groq by setting `VITE_OPENROUTER_BASE_URL`.
+
+## [2.1.1] - 2026-05-19
+
+### Changed
+- **Android build toolchain** — Updated Android Gradle Plugin to 8.13.2, Kotlin to 2.0.21, Gradle wrapper to 8.13; enabled `android.newDsl` and disabled legacy Jetifier for cleaner builds
+
+## [2.1.0] - 2026-05-18
+
+### Added
+- **Star rating picker** — Recipe rating form now includes an interactive 1–5 star selector; star values are persisted to Firestore and reflected on community recipe cards
+
+### Fixed
+- **Gemini image scan never returning results** — `gemini-2.5-flash` thinking mode was enabled by default, causing pantry and receipt image analysis to exceed the 40-second timeout before responding; thinking is now disabled for image classification tasks and timeouts bumped to 60 seconds
+- **Community tab rating input** — Rating form now correctly appears when opening a recipe from the Community tab (`onRate` prop was missing from the `RecipeModal` call)
+- **Cook Tonight search re-running on tab switch** — Returning to the Recipes tab after a "What can I cook tonight?" search no longer re-fires the Gemini/Spoonacular search; results are preserved until intentionally refreshed
+- **Meal Prep button crash** — Recipes with missing `ingredients` data in Firestore no longer crash the Meal Prep Planner with a TypeError on mount
+- **Meal Prep `onAddToPlan` wrong prop** — Meal prep planner was receiving a 3-argument function where a 1-argument wrapper was expected, causing crashes when adding a recipe to the plan
+
+### Changed
+- **Header title size** — "Stock & Spoon" title in the app header enlarged for better visual presence
+
+## [2.0.2] - 2026-05-18
+
+### Added
+- **Sentry error reporting for Gemini** — All three Gemini operations (pantry image scan, receipt scan, AI recipe search) now report failures to Sentry with structured context (operation type, model, image size, error classification). Rate-limit and quota errors are tagged as warnings; auth/network/parse errors as errors.
+- **Firebase Crashlytics integration** — New `crashlyticsService.ts` wrapper provides native-safe access to Firebase Crashlytics (silent no-op on web). All major error paths now report to Crashlytics: domain errors via `sentryService.ts` helpers, React error boundaries (`ErrorBoundary`, `ComponentErrorBoundary`), and global unhandled error/rejection handlers in `index.tsx`.
+
+### Fixed
+- **Gemini batcher silent hang** — Requests queued in the `GeminiRequestBatcher` were never rejected on failure, causing promises to hang indefinitely. Now properly calls `reject(err)` in the catch path.
+
+## [2.0.1] - 2026-05-17
+
+### Added
+- **Settings section icons** — Each settings section header now shows a colored accent icon (User, Bell, Gauge, ShieldCheck, Palette, etc.) for faster visual scanning
+- **Meal Prep button** — MealPrepPlanner is now accessible via a labeled "Meal Prep" button in the Meal Planner header (was hidden behind an unlabeled icon)
+
+### Fixed
+- **ESLint cleanup (round 2)** — Removed unused imports (`useEffect`, lucide icons, unused types) and renamed unused catch/destructured vars across 20+ components; updated `eslint.config.ts` with `argsIgnorePattern`/`varsIgnorePattern` for `_`-prefixed vars and added per-directory rule overrides so service/hook/util files and test files no longer error on `no-explicit-any`
+
+## [2.0.0] - 2026-05-06
+
+### Added
+- **Feature Discovery** — New feature discovery cards for AI scan, smart recipe search, leftover tracker, and meal planner
+- **Contextual Tutorials** — Tab-based contextual tips on first visit to each tab
+
+### Fixed
+- **Subscription Limits** — Fixed usage counters to sync with actual data instead of drift-prone increments; meal plan limits now count only current+future weeks
+- **Android App Icon** — Fixed blank white icon issue; now displays correct Stock & Spoon branding
+
+### Changed
+- **Version bump** — Major version to 2.0.0 for significant feature additions
+
+## [1.5.29] - 2026-04-18
+
+### Fixed
+- **Usage counter accuracy** — Gemini usage now only increments on successful searches/scans; saved recipe counter syncs to actual cached count instead of incrementing/decrementing
+
+## [1.5.28] - 2026-04-18
+
+### Fixed
+- **ESLint cleanup** — removed unused imports, variables, and destructured assignments across all major components (App.tsx, ItemDetailModal, QuickAddModal, ShoppingList, MainContent, MealPlanner, PantryScanner, RecipeFinder, Settings, and 9 others); 0 lint errors remaining
+- **Settings.tsx type error** — fixed `TS2352` double-cast (`prev as unknown as Record<string, unknown>`) in `handleChange` to satisfy TypeScript's type overlap check
+
+## [1.5.27] - 2026-04-18
+
+### Fixed
+- **Usage counter reset bug** — weekly counters (`searches`, `mealPlanning`, `gemini`) were resetting to 0 on every `getUsageLimits` call due to incorrect `now > earliestResetDate` condition; changed to `weekStart > earliestResetDate` so reset only fires when a new week begins
+- **Recipe count drift** — `handleDeleteRecipe` never decremented `recipes.used`; added `recordRecipeDelete()` that reads and decrements with a floor of 0
+- **Android back button** — wired `useAndroidBack` to all remaining modal states across MealPlanner (7), RecipeModal sub-modals (6), ShoppingList (3), and Settings (4)
+- **Store brand prefix stripping** — receipt-scanned item names now strip leading "CV" (Clover Valley) and "GV" (Great Value) prefixes in `parseItemText` and `cleanItemNameForShopping`
+
+### Added
+- **Admin usage reset** — `UsageService.resetUsage(user)` and a "Reset Usage Counters" panel in Settings → More tab for per-user manual resets
+
+## [1.5.26] - 2026-04-17
+
+### Added
+- **Ingredient Substitutions panel** in `RecipeModal` — "Ingredient Substitutions" button scans the recipe's ingredient list against a built-in lookup table (~95 common ingredients) and shows substitutes with usage ratio and a practical note, all client-side with no API calls
+- **Substitution lookup table** covers dairy, baking staples, sauces & condiments, nut butters, spices & aromatics, acids, proteins, nuts, and miscellaneous pantry items; longest key matched first to prevent false matches (e.g. "buttermilk" before "butter")
+- **Recipe database** — 943 recipes now in Firestore sourced from TheMealDB (all categories + areas), up from 436
+
+### Changed
+- **`scripts/bulk-upload-recipes.js`** — switched to Firebase Admin SDK auth; replaced Spoonacular query loop with TheMealDB full-browse (all categories + areas); instruction parser now splits "step N …" strings into proper arrays
+- **`scripts/rebuild-recipes-cache.js`** — added `CHUNK_SIZE = 400` chunking across `recipes_cache_1`, `_2`, `_3` … to stay within Firestore's 1 MB document limit
+- **`services/recipeService.ts` `getCachedRecipesCache`** — reads all `_1.._N` chunks automatically and merges into a single array
+- **`RecipeModal` substitution feature** — replaced old hardcoded 5-category pantry-match lookup with the new full ingredient substitution panel; works on any recipe regardless of pantry contents
+
+### Fixed
+- **TS errors in `useDataManagement.ts`** — fixed `d.id` accessed on `unknown` in both `getRatingsForRecipe` and `refreshCommunityRatings` map callbacks; changed to `doc.id` (the correctly typed `as any` alias)
+
+## [Unreleased] - 2026-04-17
+
+### Added
+- **Ingredient Substitutions panel** in `RecipeModal` — an "Ingredient Substitutions" button scans the recipe's ingredient list against a built-in lookup table (~95 common ingredients) and shows substitutes with usage ratio and a practical note, all client-side with no API calls
+- **Substitution lookup table** covers dairy, baking staples, sauces & condiments, nut butters, spices & aromatics, acids, proteins, nuts, and miscellaneous pantry items; longest key matched first to avoid false matches (e.g. "buttermilk" before "butter")
+- **Recipe database seeded** — 943 recipes now in Firestore sourced from TheMealDB (all categories + areas), up from 436
+- **Recipe cache chunking** — `rebuild-recipes-cache.js` now splits large recipe collections across multiple Firestore documents (`recipes_cache_1..N`, 400 per chunk) to stay under the 1 MB document limit; `getCachedRecipesCache` in `recipeService.ts` reads all chunks automatically
+- **`scripts/fix-recipe-instructions.js`** — one-time migration script that reformatted "step 1 … step 2 …" raw strings into proper `string[]` arrays for 274 recipes; already executed
+
+### Changed
+- **`scripts/bulk-upload-recipes.js`** — switched auth from anonymous signIn (disabled in project) to Firebase Admin SDK; replaced Spoonacular search-query loop with `fetchAllMealDBRecipes` (browses all TheMealDB categories + areas); instruction parser splits on `/step\s+\d+/i` regex into proper arrays
+- **`scripts/rebuild-recipes-cache.js`** — added `CHUNK_SIZE = 400` chunking; writes `recipes_cache_1`, `_2`, `_3` … instead of a single document
+- **`services/recipeService.ts` `getCachedRecipesCache`** — iterates `_1.._N` chunk documents until an empty chunk is found (up to 20), merges all into a single array
+- **`RecipeModal` substitution feature** — replaced the old hardcoded 5-category pantry-match lookup (only showed missing items) with the new full ingredient substitution panel available on any recipe regardless of pantry contents
+
+## [1.5.25] - 2026-04-17
+
+### Fixed
+- **Android crash (NPE)**: Added `RuntimeVisibleAnnotations` ProGuard keep rule so R8 doesn't strip `@CapacitorPlugin`/`@Permission` annotation data in release builds, which caused `Bridge.getPermissionStates()` to NPE
+- **Android crash (NPE)**: Added `requestPermissionsWithRetry()` to `pushNotificationService` — retries up to 3× with exponential back-off to survive transient Bridge NPE on cold start
+- **POST_NOTIFICATIONS**: Added explicit `<uses-permission>` to `AndroidManifest.xml` for Android 13+ (API 33+)
+- **Offline mode**: Restored real network detection in `useOfflineStatus` — uses Capacitor `@capacitor/network` on Android/iOS and `window` online/offline events on web; was previously hardcoded to `isOnline: true`
+- **Offline reconnect toast**: Re-enabled `offlineQueue.processQueue()` on reconnect using `addToastRef` to prevent stale-closure repeated-toast crash
+- **Offline queue dead code**: Removed `if (false) {}` wrapper from `performWrite` in `useDataManagement`
+- **Notification date crash**: Fixed `.toDate()` calls on `createdAt` and `snoozedUntil` fields which can be ISO strings or Firestore Timestamps — now handles both types
+- **Notification action label**: Fixed missing `actionLabel` after `generateExpirationMessage` return-type was simplified; label is now set inline in the caller
+
+### Added
+- Analytics tracking for category create/update/delete events (`CategoryManager`)
+- Analytics tracking for grocery cost estimator open and price submit events (`GroceryCostEstimator`)
+- Analytics tracking for pantry import and recipe import events (`ImportModal`)
+- Analytics tracking for recipe view, timer start, completion, save, rate, leftover capture, and cooking mode start events (`RecipeModal`)
+- Analytics tracking for shopping list item add and check-off events (`ShoppingList`)
+- `specificItems` prop on `ExpiredItemsModal` to support notification-driven expired-item flows
+
+### Changed
+- `generateExpirationMessage` return type simplified — removed `actionLabel` from return value; callers now determine the label contextually
+
+## [1.5.24] - 2026-04-12
+
+### Fixed
+- Fatal `NullPointerException` crash in `PushNotificationsPlugin.requestPermissions` on Android cold start — `Bridge.getPermissionStates` called `getActivity()` before the Capacitor activity was fully initialized; fix defers permission request until `App.getState()` confirms the app is in the foreground
+
+## [1.5.23] - 2026-04-12
+
+### Fixed
+- Rapid backButton listener add/remove cycling on startup caused by `addToast` missing `useCallback` — every render re-ran the backButton effect, skipping 30–54 frames and causing severe main thread jank on Android
+- `appUrlOpen` Capacitor listener leak — was never cleaned up on effect re-runs, causing listeners to accumulate with each render cycle
+
+## [1.5.22] - 2026-04-12
+
+### Fixed
+- **App crash on startup**: Fully stubbed out `useOfflineStatus` hook — disabled IndexedDB queue init, connectivity fetch (which triggered a 5-second `AbortSignal` timeout crash on Android WebView), and auto-sync logic. Firebase SDK handles offline writes natively. Also removed a dead duplicate `useDataManagement` call in `LeftoverQuickCapture` that was spawning extra Firestore listeners.
+
+## [1.5.21] - 2026-04-12
+
+### Fixed
+- **Offline sync toast flood**: Disabled the offline queue processing effect that was causing the app to show dozens of "Offline changes synced." toasts on startup, locking up and crashing the Android app. Firebase's built-in offline persistence handles connectivity transparently in the meantime.
+
+## [1.5.20] - 2026-04-11
+
+### Added
+- Comprehensive Google Analytics tracking across all major app features including recipe interactions, shopping list usage, household management, authentication flows, cost estimation, category management, and data imports for improved user behavior analysis and app insights.
+
+## [1.5.19] - 2026-04-11
+
+### Changed
+- Enabled code minification for Android release builds to reduce app size and prepare for deobfuscation mapping.
+
+### Fixed
+- **Repeated offline sync toasts** (audit 1F): Fixed useEffect in `useDataManagement.ts` that was triggering "offline changes synced" toast multiple times on app load by using a ref for `addToast` to avoid dependency array issues causing repeated effect execution.
+- **Notification timestamp errors** (audit 1G): Fixed `TypeError: n.createdAt.toDate is not a function` in `notificationService.ts` by handling both Firestore Timestamp objects and ISO date strings for `createdAt`, `snoozedUntil`, and `expiresAt` fields in notification filtering, sorting, and cleanup methods.
+- **Database monitoring logging** (audit 1H): Fixed incorrect subscription path logging in `databaseMonitoringService.ts` that was showing parent collection paths instead of document paths, making it appear that multiple subscriptions were to the same document when they were actually to different cache documents.
+
+## [1.5.18] - 2026-04-11
+
+### Added
+- Admin-only Remote Config debug screen in Settings for viewing live resolved values
+- Database Analytics visibility gated to admin users only
+
+### Fixed
+- Enforce remote-config receipt scanning kill switch
+
+## [1.5.17] - 2026-04-10
+
+### Fixed
+- **Landing page styles** (audit 7D): Converted LandingPage.tsx from extensive inline style objects to Tailwind CSS utility classes for consistency with the rest of the application. Added custom font families (Inter, Playfair Display) to Tailwind config.
+- **Memory leak cleanup** (audit 1A): Wired `pagehide` event in `index.tsx` to call `cleanupCacheService()`, `DatabaseMonitoringService.cleanupMonitoring()`, and `offlineDataCache.destroy()` — prevents orphaned intervals and listeners on page unload.
+- **Cache eviction** (audit 1B): Added LRU eviction to `imageCacheService.ts` (`MAX_MEMORY_CACHE_SIZE = 300`, evicts oldest 10% on overflow) — prevents unbounded memory growth from cached image URLs.
+- **Race conditions** (audit 1D): Added `isSyncingRef`/`isOnlineRef` refs to `useOfflineStatus.ts` so `syncNow` reads from refs instead of stale closure state, eliminating the risk of concurrent sync execution.
+- **Stale closures** (audit 1E): Added `inventoryRef` in `useDataManagement.ts` to give Firestore snapshot listeners stable access to current inventory without re-subscription; added missing `addToast` to a `useEffect` dependency array.
+- **Escape key handling** (audit 4B): Added Escape key handling to `CategoryManager` (via `useKeyboardNavigation`) and `ExpirationDatePicker` (via `useEffect` keydown listener).
+- **Accessibility aria-labels** (audit 4A): Added `aria-label` attributes to icon-only buttons across `EnhancedShoppingListItem`, `QuantityUnitPicker`, `MealPlanner`, `RecipeFinder`, and `PantryScanner`.
+- **Icon path casing** (audit 11A): Renamed `public/icons/icon.PNG` → `icon.png` and updated `index.html`, `android/capacitor.config.json`, and `public/manifest.webmanifest` for Linux/case-sensitive server compatibility.
+- **TypeScript errors**: Fixed `maxLength` prop type in `Household.tsx` (`string` → `number`), narrowed `unknown` catch in `recipeService.ts`, and fixed undefined variable reference in `recipeService.ts`.
+- **Offline queue logging**: Replaced remaining `console.error` in `offlineQueueService.ts` with `log.error`.
+
+### Changed
+- **ESLint ignores** (audit 11C): Added `ios/**` and `coverage/**` to ignore list in `eslint.config.ts`.
+- **Vitest config** (audit 11B): Added explanatory comment to `watch: false` in `vitest.config.ts`.
+
+## [1.5.16] - 2026-04-10
+
+### Fixed
+- **Form validation** (audit 7C): Added input validation constraints to prevent invalid data entry:
+  - CategoryManager: maxLength="50" on category name inputs
+  - FreezeTransitionModal: max="730" on freezer shelf-life input
+  - GroceryCostEstimator: min="0.01" on price inputs
+  - PantryScanner: min="0" on quantity inputs
+  - Household: maxLength="50" on household name inputs
+  - Settings: min="0" on weight and age inputs
+  - RecipeFinder: min="0" on prep time, servings, cook time, and ingredients inputs
+
+## [1.5.15] - 2026-04-10
+
+### Fixed
+- **Bundle optimization** (audit 2A): Removed `firebase-admin` from web dependencies — this Node.js-only library was bloating the production bundle unnecessarily.
+- **Security fix** (audit 3A): Fixed Firebase Storage rules for pantry images — delete permissions now restricted to the original uploader only (previously any authenticated user could delete any image).
+- **Build config** (audit 8C): Reduced Vite `chunkSizeWarningLimit` from 1000KB to 600KB to encourage smaller bundle chunks and better performance monitoring.
+- **Config cleanup** (audit 2C): Removed duplicate `capacitor.config.json` file, keeping only the TypeScript config for consistency.
+
+### Changed
+- **Environment setup** (audit 8D): Verified `.env.example` exists with all required VITE_ variables (Firebase config, Gemini API key, etc.) for easier developer onboarding.
+
+## [1.5.14] - 2026-04-10
+
+### Changed
+- **Recipe recommendations now use the app recipe cache** (audit D): `recipeRecommendationService` completely rewritten. All mock data and per-call Firestore rating queries removed. Recommendations are now generated entirely from `recipe_caches/recipes_cache_1` (400+ recipes) which is loaded once and cached in memory for 30 minutes.
+  - **Pantry-match** (`similar-ingredients`): scores every cached recipe by ingredient overlap with the user's current pantry items; returns top 5 by match count with dynamic confidence scoring.
+  - **Seasonal** (`seasonal`): keyword-matches recipe titles, descriptions, and tags against a season table (winter/spring/summer/fall keyword sets) to return contextually relevant picks.
+  - **Trending** (`trending`): deterministic pseudo-shuffle of remaining cache entries for diversity without repeating pantry or seasonal results.
+  - `getSimilarRecipes()` also uses the cache, scoring by shared ingredient count with the base recipe.
+  - Net Firestore reads per recommendation call: **1** (cache load, then 0 for 30 min). Previously fired 3 queries (up to 120 docs) on every render, returning mock results.
+
+## [1.5.13] - 2026-04-10
+
+### Added
+- **`getOpenedShelfLifeDays(itemName, category)`** (audit U): New USDA/FDA-based helper in `utils/appUtils.ts` covering dairy, deli/meat, canned goods, condiments, bread, nut butters, produce, and beverages. Returns `undefined` for unknown categories so no spurious `openedExpiry` is set.
+- **FreezeTransitionModal USDA pre-fill** (audit S): Modal now accepts an `itemName` prop and initialises the freezer-days input via `getFreezerShelfLifeDays(itemName)` — e.g. chicken defaults to 270 days, salmon to 90 days. The subtitle shows the USDA source value so users know where the default came from.
+- **Batch FEFO read-time derivation** (audit W): Inventory cache listener in `useDataManagement.ts` now sets `item.expirationDate` to the earliest `batch.expires` value when batches are present. Read-time only; Firestore data is unchanged.
+
+### Fixed
+- **Frozen items in ExpiredItems modal** (audit R): `ExpiredItemsModal.tsx` and `App.tsx` expiry filters now use `freezerExpiry` as the reference date for frozen items, preventing false "expired" alerts for items safely stored in the freezer.
+- **ItemDetailModal opened expiry coverage** (audit U): All supported categories now receive an accurate `openedExpiry` date when an item is marked opened — not just Canned Goods and Condiments.
+- **FreezeTransitionModal Tailwind restyle** (audit X): Fully ported from raw HTML with inline `style={{}}` objects to Tailwind + theme CSS vars, matching the visual style of ItemDetailModal and ExpiredItemsModal. Added Snowflake lucide icon, fixed `catch (e: any)` → `catch (e: unknown)`.
+
+## [1.5.12] - 2026-04-10
+
+### Fixed
+- **GroceryCostEstimator anonymous_user** (audit CC): Replaced hardcoded `'anonymous_user'` string with real authenticated user ID via `useApp()`. Previously every price submission silently failed at the Firestore rule layer (rule requires `userId == auth.uid`), causing a confusing double-toast and leaving no price data in the database.
+- **Expiry filter blind to frozen items** (audit DD): The "expiring-soon" filter in `filterPantryItems` now mirrors `generateExpirationAlerts` logic — frozen items (`is_frozen` or `storageLocation === 'freezer'`) use `freezerExpiry` as the reference date and a 30-day threshold, preventing pre-freeze fridge dates from triggering false "expiring soon" classifications.
+- **offlineQueueService `catch (err: any)`** (audit EE): Changed to `catch (err: unknown)` consistent with project-wide `no-explicit-any` ESLint rule.
+- **usageService PLAN_LIMITS missing `free:` key**: Restored missing `free:` key in `PLAN_LIMITS` object literal that caused TypeScript parse errors across the entire service file.
+- **geminiService type errors**: Added missing `GroundingChunk` import; fixed queue `push` covariance and request cache result cast to resolve TypeScript strictness errors introduced during prior `any` cleanup.
+- **recipeService `FirestoreDocLike` missing `exists`**: Added optional `exists` property to the local `FirestoreDocLike` type used for Firestore document existence checks.
+
+
+### Added
+- **Freezer-aware shelf life** (audit Q foundation): `getFreezerShelfLifeDays(itemName)` in `appUtils.ts` returns USDA-based freezer durations by food type — ground/hamburger meat 4 months, chicken/turkey 9 months, beef/pork steaks 9 months, sausage/bacon/ham 6 months, lean fish 6 months, fatty fish (salmon/tuna) 3 months, shrimp/shellfish 4 months, deli meats 2 months, bread/baked goods 3 months, butter 1 year, unrecognised items 4 months.
+- **`getAutoExpirationDate` freezer branch** (audit Q foundation): New optional third param `storageLocation?`. When `'freezer'` is passed the function returns the USDA freezer shelf-life date instead of fridge/pantry durations. Dry goods still return `undefined` (no auto-expiry) regardless of location.
+- **Auto-extend expiry on freezer move**: When a user changes a pantry item's storage location to Freezer in `ItemDetailModal` and saves, the app automatically sets `is_frozen`, `frozenAt`, `freezerExpiry`, and `expirationDate` to the USDA-derived date. Moving back out of the freezer clears all frozen-state fields.
+- **Frozen items skip fridge-style alerts**: `shouldShowExpiryAlert` and `generateExpirationAlerts` in `appUtils.ts` now detect frozen items (`is_frozen` or `storageLocation === 'freezer'`) and use `freezerExpiry` as the reference date. Frozen items only surface alerts within 30 days (vs 7 days for fridge items) and display gentler language — "best used within N days (frozen)" rather than urgent expiry warnings. Overdue frozen items show "past its freezer date" rather than "expired".
+- **pantryService freezer-pass-through**: All three `getAutoExpirationDate` call sites in `pantryService.ts` now pass `inferStorageLocationFromItemName(name)` as the third arg, so a scanned "frozen chicken breast" gets a 9-month expiry automatically at item creation time.
+
+### Fixed
+- **TypeScript `any` cleanup — three major service files** (audit N complete):
+  - `services/recipeService.ts`: Added typed interfaces `AnalyzedInstruction`, `ExtendedIngredient`, `WinePairing`, and local `FirestoreDocLike`. Eliminated all 28 explicit `any` annotations including `catch (err: any)` → `catch (err: unknown)` and cast-free Firestore snapshot handling.
+  - `services/geminiService.ts`: Imported `PerformanceTrace` from `firebase/performance`. Typed `QueuedRequest.reject` as `(error: unknown) => void`, queue as `QueuedRequest<unknown>[]`, request cache as `Map<string, { result: unknown; timestamp: number }>`, and `performSearch` perfTrace param. All 26 explicit `any` eliminated.
+  - `services/groceryPriceService.ts`: Replaced all verbose `(DatabaseMonitoringService as any)` defensive runtime-check cascades (`getIngredientPrice`, `getPriceTrends`, `saveGroceryPrice`) with direct typed method calls. All 26 explicit `any` eliminated.
+- **ESLint `no-explicit-any` rule re-enabled**: `eslint.config.ts` changed from `"off"` to `"error"`. Lint passes with 0 errors across all three cleaned files.
+
+## [1.5.10] - 2026-04-10
+
+### Added
+- **Notifications load-more** (audit I): AppHeader notification dropdown now shows 50 at a time. A "Load more (N remaining)" button appears at the bottom of the list and loads 50 more per tap — purely display-side, no extra Firestore reads.
+- **Bulk ops contextual tip** (audit J): First time a user enters bulk select mode in PantryScanner a small inline hint bar appears: "Tap items to select them, then delete, move to shopping list, or change storage location." Auto-hides after 6 seconds; ✕ to dismiss early. Shown once per device via localStorage.
+- **Household onboarding wired** (audit K): `ModernOnboardingFlow` now accepts and passes through `onOpenHousehold`. App.tsx passes a handler that closes onboarding and opens the Household panel, so new users can set up household sharing from the first-run flow.
+- **Bulk ops progress bar** (audit L): `bulkDelete` and `bulkMoveToShoppingList` in PantryScanner now show an animated progress bar (`Processing… X / Y`) above the item list while operations run. Bar clears automatically on completion.
+
+### Won't Fix
+- **LeftoverQuickCapture in ItemDetailModal** (audit H): Leftovers can only originate from a cooked meal — not individual pantry items.
+- **Recipe modal jump-to-section** (audit M): Most recipes fit on one screen without scrolling; not worth adding navigation anchors.
+
+## [1.5.9] - 2026-04-10
+
+### Added
+- **Household activity feed re-enabled**: The `HouseholdActivityFeed` lives in the `AppHeader` dropdown (accessible from any tab), so the subscription now activates as soon as the household is loaded — no tab gating. The `activityHousehold` state in `App.tsx` syncs from `useDataManagement`'s `household` value after load, resolving the circular hook dependency that kept the subscription permanently disabled.
+- **Write throttle on activity logging**: `HouseholdActivityService.logActivity` is now throttled to at most one write per user per household every 30 seconds, preventing write storms from rapid item operations.
+- **Household state sync**: Added `activityHousehold` state in `App.tsx` that syncs from `useDataManagement`'s `household` value after load, resolving the circular hook dependency that kept the subscription permanently disabled.
+
+### Fixed
+- **Audit items A + B (stale)**: Verified `MealPlanner.displayPlan` is already memoized over a 7-day window and `PantryScanner.processedInventory` is already memoized — both audit items were describing superseded code.
+
+## [1.5.8] - 2026-04-10
+
+### Added
+- **Calendar export (.ics)**: MealPlanner week toolbar now has an "Export .ics" button. On web it downloads a standards-compliant `.ics` file; on mobile it adds native calendar events via CapacitorCalendar. `calendarService.ts` now has `exportWeekAsICS(days)`.
+- **Shopping list delete undo toast**: A floating "X item removed · Undo" banner now appears above the bottom nav whenever a swipe-delete is pending. Tapping Undo cancels the 5-second timer and restores the item instantly.
+
+### Fixed
+- **MealPrepPlanner entry point** (audit F): Button in MealPlanner header (`CalendarClock` icon, top-right) was already present and functional — confirmed wired to `showMealPrepPlanner` state; audit item closed.
+
+## [1.5.7] - 2026-04-09
+
+### Fixed
+- **Notification action buttons**: `view_item`, `view_recipe`, `add_to_shopping` actions in both `AppHeader` notification panel and `PendingNotifications` (Settings) were non-functional stubs — now fully wired with inventory lookup, tab navigation, and toast feedback
+- **Notification panel auto-close**: Panel now stays open for 15 s (was 6 s); hovering pauses the timer, leaving resumes a 5 s countdown
+- **`add_to_shopping` stacked notifications**: Now handles `actionData.items` array for batched alerts in addition to single `itemName`
+- **Shopping list `confirm()` dialogs**: Replaced native `confirm()` / `alert()` calls in checkout flow and clipboard share with `addToast()`
+- **All `alert()` / `confirm()` native dialogs removed** across every component — replaced with `addToast()` from `AppActionsContext`:
+  - `MealPlanner`, `BatchOperations`, `ItemDetailModal`, `Household`, `PantryScanner` (bulk delete, receipt error, manual add error, move-to-shopping, defrost)
+  - `Settings` (remove member, remove avatar, bulk image scan)
+  - `ShoppingList` (duplicate item, SMS clipboard)
+  - `GroceryCostEstimator`, `ImportModal`, `RecipeModal`, `RecipeFinder`
+- **Login debug timer**: Removed `setInterval` that fired every 1 s during the entire Login component lifetime
+- **AdMob gate**: `ADMOB_ENABLED` now reads `import.meta.env.VITE_ADMOB_ENABLED === 'true'` instead of hardcoded `false`
+- **Offline queue ID**: Replaced `${Date.now()}_${Date.now()}` with `crypto.randomUUID()` for guaranteed uniqueness
+- **Gemini timeout failsafe**: `GeminiLoadingOverlay` now accepts `onTimeout` prop; `useGeminiProgress` fires it when the countdown reaches zero
+- **Image upload validation**: `ItemDetailModal` now rejects files that are not `image/*` or exceed 10 MB before uploading to Firebase Storage
+- **PII removed from error logs**: `notificationService.ts` error log no longer includes `authUid` or `targetUid`
+- **Source maps disabled in production**: `vite.config.ts` now sets `sourcemap: mode !== 'production'`
+- **Console logs stripped from production bundle**: Added `esbuild: { drop: ['console','debugger'] }` for production builds
+- **Safe area / notch support**: `index.html` viewport meta updated to `viewport-fit=cover`; `pt-safe` CSS class added; `AppHeader` uses `env(safe-area-inset-top)` for top padding
+- **Barcode scan web fallback**: Shows informative toast on web/desktop instead of silently failing with a Capacitor error
+- **Household member count**: Badge showing "N members" now visible next to household name in the household manager header
+- **TypeScript `any` cleanup in core hooks**: `useDataManagement.ts` — `recentActions` typed as `UndoAction[]`, `handleAddToPlan` typed as `StructuredRecipe | SavedRecipe`, `recordUndo` data typed as `unknown`; `AppContext.tsx` — replaced two `as any` stubs with proper `React.Dispatch` types
+
+### Removed
+- `functions/src/paypal.ts`, `functions/lib/stripe.js`, `functions/lib/stripe.js.map` — dead payment code deleted
+- `GEMINI_LEFTOVERS_NOTES.txt`, `GEMINI_SUGGESTIONS.txt`, `listing.txt`, `readme/consolelog.txt` — stale dev notes deleted
+
+## [1.5.6] - 2026-03-24
+
+### Added
+- Performance optimizations for database operations and notification handling
+
+### Fixed
+- Various bug fixes and improvements
+
+## [1.5.5] - 2026-03-23
+
+### Added
+- **Activity Feed in header**: Household activity feed is now accessible via the household members status indicator in the app header (centre section). Tapping the indicator opens a dropdown showing recent member actions — no longer buried in the Community tab. Only visible to multi-member households.
+- **SmartRecommendations in Recipe Finder tab**: `SmartRecommendations` component renders above the RecipeFinder on the Recipes tab; reads only the already-cached `inventory` and `savedRecipes` arrays (zero extra Firestore reads), matching pantry items against saved recipe ingredients for "Cook with What You Have" suggestions, expiry alerts, and time-based dinner prompts.
+- **Household activity tracking re-enabled**: Debounced `debouncedUpdateActivity` writes (tab-change + page-visibility) re-enabled in `useHouseholdActivity`.
+
+### Removed
+- **Email invite Cloud Function** (`sendHouseholdInvitation`): Deleted `functions/src/sendHouseholdInvitation.ts`, `functions/src/helpers/sendEmail.ts`, and `services/emailService.ts`; in-app bell notification (written directly to user cache) is the only invite signal.
+- **Stripe payment code**: Deleted `functions/src/stripe.ts`, `components/StripeCheckout.tsx`, and `services/stripeService.ts`; Stripe integration was fully dormant (null stub + commented-out CF export).
+
+### Fixed
+- **Notification action buttons**: Action labels in the notification dropdown (e.g. "View Items", "Add to Shopping List") were non-interactive `<div>` elements — replaced with functional `<button>` elements that invoke the correct handler for each `actionType`.
+- **Notification swipe-to-dismiss**: Added horizontal swipe gesture support on notification dropdown items with direction lock, red "Dismiss" reveal layer, 80 px threshold, and snap-back animation on release.
+- **MealPlanner timezone bug**: "This Week" compact view showed wrong day labels/dates due to UTC-midnight parsing. Fixed by appending `'T12:00:00'` for local noon parsing and recomputing `dayName` from the date string.
+
+## [1.5.4] - 2026-03-23
+
+### Added
+- **SmartRecommendations in Recipe Finder tab**: `SmartRecommendations` component now renders above the RecipeFinder on the Recipes tab; reads only the already-cached `inventory` and `savedRecipes` arrays (no extra Firestore reads), matching pantry items against saved recipe ingredients for "Cook with What You Have" suggestions, expiry alerts, and time-based dinner prompts
+- **Household Activity Feed**: Re-enabled `HouseholdActivityFeed` in the Community tab; shows recent household member actions (adds, removals, recipes, meals) with live Firestore subscription; member "currently viewing" activity tracking re-enabled via debounced writes
+
+### Removed
+- **Email invite Cloud Function** (`sendHouseholdInvitation`): Deleted `functions/src/sendHouseholdInvitation.ts`, `functions/src/helpers/sendEmail.ts`, and `services/emailService.ts`; in-app bell notification (written directly to user cache) is the only invite signal
+- **Stripe payment code**: Deleted `functions/src/stripe.ts`, `components/StripeCheckout.tsx`, and `services/stripeService.ts`; Stripe integration was fully dormant (null stub + commented-out CF export)
+
+### Added
+- **CookingMode component**: New step-by-step cooking mode view for guided recipe execution
+- **NotificationSettings**: Expanded notification preference controls
+
+### Fixed
+- **Notification action buttons**: Action labels in the notification dropdown (e.g. "View Items", "Add to Shopping List") were non-interactive `<div>` elements — replaced with functional `<button>` elements that invoke the correct handler for each `actionType` (`add_to_shopping`, `view_recipe`, `view_item`, `join_household`)
+- **Notification swipe-to-dismiss**: Added horizontal swipe gesture support on notification dropdown items with direction lock (won't interfere with vertical scroll), red "Dismiss" reveal layer, 80 px threshold, and snap-back animation on release
+- **MealPlanner timezone bug**: "This Week" compact view showed wrong day labels and date numbers due to `getUTCDay()` / `new Date("YYYY-MM-DD")` UTC-midnight parsing returning the previous calendar day in US timezones. Fixed by always appending `'T12:00:00'` for local noon parsing and always recomputing `dayName` from the date string instead of trusting a potentially corrupt stored value
+- **`parseIngredientForShoppingList`**: Fixed several ingredient parsing edge cases — Unicode vulgar fractions (½, ¼, ¾, etc.) now normalised to ASCII before parsing; mixed fractions ("1 1/2 cups") collapsed to decimal; "to taste" variants handled (prefix, suffix, after comma); bare article "an" now treated same as "a"; bare article nouns ("an egg", "a garlic clove") correctly strip the article and default quantity to 1; parenthetical notes ("(optional)", "(14.5 oz)") stripped from item name
+- **Smoke test suite**: Split into two workers (A–Q / R–Z) to prevent OOM under Vitest; replaced full `AppProvider` wrapper with minimal `MemoryRouter` wrapper to avoid Firebase service accumulation; added `afterEach` cleanup + fake timers; skip list for native-only components (`AdMobBanner`, `PantryScanner`, `QuickAdd`) that hang in jsdom
+- **ARIA / accessibility**: Fixed missing ARIA labels, roles, and keyboard-navigation attributes across multiple components
+- **TypeScript**: Removed `@ts-ignore` suppressions, resolved type errors in validation utilities and hooks
+
+## [1.5.4] - 2026-03-22
+
+### Fixed
+- Added `@import "tailwindcss"` to `src/index.css` so Tailwind utility classes are compiled into the bundle; the app was previously relying entirely on the CDN for all utility styles, causing broken layout after CDN removal
+
+## [1.5.3] - 2026-03-22
+
+### Changed
+- Switched Gemini AI model to `gemini-2.5-flash` for faster, more accurate pantry analysis
+- Updated all npm packages: firebase 12.11.0, firebase-admin 13.7.0, @google/genai 1.46.0, @sentry/react 10.45.0, tailwindcss 4.2.2, vitest 4.1.0, typescript 5.9.3, lucide-react 0.577.0, @capacitor/core 8.2.0, vite-plugin-pwa 1.2.0
+
+### Fixed
+- Notification write race condition: concurrent expiry/leftover checks caused `failed-precondition` (HTTP 400) errors; writes are now serialized per-user with exponential-backoff retry
+- Removed Tailwind CDN `<script>` tag from index.html (was triggering production warning; Tailwind is already bundled via PostCSS)
+- Barcode scanner now performs Spoonacular UPC product lookup to populate item name instead of showing raw barcode number
+- Add Item and Scan Review modals standardized to match `ItemDetailModal` pattern (centered, fixed header/footer)
+- Scan buttons reorganized into two rows to prevent overflow on narrow screens
+
+## [1.5.2] - 2026-03-22
+
+### Fixed
+- **Billing spike / Gemini API flood**: Fixed a critical bug in `RecipeFinder` and `MealPlanner` where `debounce()` was wrapped in `useMemo([query])`, causing a brand-new debounce instance to be created on every keystroke. This meant every character typed fired a separate Gemini API call instead of one call after the user stopped typing. Replaced with a stable `useRef`-based debounce so only one call is made per completed search.
+
+## [1.5.0] - 2026-03-21
+
+## [1.5.1] - 2026-03-22
+
+### Added
+- **Testability / Instrumentation**: Added stable `data-testid` attributes across many interactive components (examples: PantryScanner, MealPlanner, RecipeFinder, MealPrepPlanner, LeftoverQuickCapture, ProgressiveFeature, PriceTrends, Household, CategoryManager, BatchOperations) to improve Firebase Test Lab and automated UI test reliability.
+- **Version bump**: Bumped app version to `1.5.1` (Android `versionCode` 26).
+
+### Changed
+- Minor testability and instrumentation improvements only; no user-facing behavior changes.
+
+
+### Fixed
+- **Android Launcher Icon**: Regenerated all mipmap density variants (ldpi → xxxhdpi) with the correct Stock & Spoon logo, replacing the placeholder gray square icon
+- **Splash Screens**: Added splash screen assets for all screen densities, orientations, and night mode variants
+- Committed `resources/icon.png` and `resources/icon-foreground.png` as canonical sources for future icon generation
+
+## [1.4.10] - 2026-03-21
+
+### Added
+- **Hot-Patch Version System**: New `scripts/publish-version.cjs` script writes the current version to Firestore `app_versions/{android,ios,web}` — running `npm run version:publish` after any release immediately notifies all users of the update
+- **In-App Update Prompt on Foreground**: `GlobalUpdatePrompt` now re-checks for updates every time the app returns to foreground using Capacitor `App.addListener('appStateChange')`, so users see the update prompt even if they had the app open before the release
+- **Play Store Link in Version Check UI**: Settings → Check for Updates now always shows a direct link to the Google Play Store listing after any version check
+
+### Changed
+- **Update Dismiss Window**: Reduced the "remind me later" dismissal window from 7 days to 1 day — users are re-prompted daily instead of weekly for pending updates
+- **Force Update Guard**: `GlobalUpdatePrompt` skips dismiss logic entirely when `forceUpdate: true` is set in Firestore, so critical updates cannot be deferred
+- **Build-Time Version Injection**: `vite.config.ts` now injects `__APP_VERSION__` at build time from `package.json`; web version check fallback reads this value instead of a hardcoded string
+- **Release Skill**: Combined `release-build` and `update-changelog-push` workflows into a single `/release-build` command that type-checks, bumps versions, builds, syncs, publishes to Firestore, commits, and pushes
+
+### Fixed
+- **Version Service Web Fallback**: Settings version check was reporting `1.4.8` as "up to date" — now correctly reads build-time `__APP_VERSION__` constant
+- **Update Prompt Never Shown**: `GlobalUpdatePrompt` was never triggering because Firestore `app_versions` documents were empty; `publish-version.cjs` seeds all three platform documents automatically
+- **Wrong Firebase Project in Publish Script**: `publish-version.cjs` was targeting the wrong project ID; now auto-detects service account key from `scripts/` and uses correct project `ornate-compass-478504-e1`
+
+## [1.4.9] - 2026-03-20
+
+### Added
+- **Free Tier Invite Limit**: Free users are now capped at 1 household invite; `usageService.ts` enforces limit and `SubscriptionManager` surfaces upgrade prompt when cap is reached
+- **Firestore Composite Index**: Added index for `cache` collection queries to support notification and cache data access patterns
+
+### Changed
+- **Quantity Fill Level Icons**: Replaced flat rectangle fill-bar with distinct colored unicode circle icons (◔ ¼ amber, ◑ ½ orange, ◕ ¾ green, ● full dark-green) with glow on selection in `ItemDetailModal`
+- **Add to Schedule Default Date**: Schedule modal now pre-selects tomorrow's date when opening instead of always defaulting to Monday/index 0
+- **Meal Plan Default Day**: `onShowAddToPlanDialog` callback finds tomorrow in the meal plan array by ISO date and falls back to index 0 only if tomorrow is not in the plan
+
+### Fixed
+- **Redundant Firestore Queries**: `getUnreadNotifications` was called once per expiring item in the notification loop — now fetched once before the loop and passed as a cache parameter to `createExpirationAlert`
+- **"Checking In" Notification Spam**: Suppressed low-value notifications for risk levels 1 (Staples) and 2 (Hardy Fridge) entirely; suppressed level 3 (Produce) alerts when item has more than 3 days remaining
+- **Stale "Online" Member Badge**: Household members shown as online only if `isOnline === true` AND `lastSeen` is within the last 5 minutes — prevents stale presence from persisting after app close without logout
+- **Household Header Too Many Lines**: Status indicator capped at 2 lines (first online member's name + "+N others online") instead of 3; `recentlyActiveMembers` excludes anyone already counted as online
+- **Expired Notification Pruning**: `notificationsService.ts` now prunes expired notifications from the queue during sync
+- **LeftoversHotZone Doc Snapshot**: Rewritten to use Firestore doc snapshot listener for live updates instead of stale data
+- **ItemDetailModal TDZ Crash**: Fixed temporal dead zone reference error on modal open
+
+## [1.4.8] - 2026-03-20
+
+### Changed
+- Release build preparation and version updates (versionCode 22)
+
+## [1.4.7] - 2026-03-20
+
+### Added
+- **Full Internationalization (i18n)**: All UI text across 9 components now translatable via `react-intl` — `App.tsx`, `ShoppingList`, `ItemDetailModal`, `MealPlanner`, `RecipeFinder`, `Settings`, `Household`, `ExpiredItemsModal`, and supporting views
+- **7-Language Locale Support**: Complete translation files added for English, Spanish, French, German, Russian, Chinese (Simplified), and Japanese (`src/locales/`)
+- **Dependabot Configuration**: `.github/dependabot.yml` set up with weekly dependency updates for npm (root, `/functions`, `/website`) and Gradle (`/android`), with minor/patch updates grouped to reduce PR noise
+- **Secret Scanning**: `.github/secret_scanning.yml` added to configure path exclusions for test fixtures, example files, and third-party vendored clients; push protection guidance documented
+
+### Fixed
+- Minor packaging and build metadata updates for release (version bump)
+
+## [1.4.6] - 2026-03-19
+
+
+### Changed
+- Release build preparation and version updates
+
+## [1.4.4] - 2026-03-17
+
+### Added
+- **Personalized Greeting**: AppHeader now shows a time-based greeting ("Good morning/afternoon/evening, [Name]!") using the user's display name for a more personal experience
+- **Household Data Migration on Join**: When a user accepts a household invitation, all personal data (inventory, shopping list, meal plan, saved recipes) is automatically migrated and merged into the household — no data is lost on join
+- **Household Data Migration Retry**: Migration uses a localStorage checkpoint; if the app closes mid-migration or a step fails, a persistent "Retry now" toast appears on next load to resume
+- **Persistent Invite Notifications**: A sticky banner beneath the app header and a persistent toast with a "View" action button now appear whenever pending household invitations are detected on login
+- **User Profile Recipe Scoring**: RecipeFinder now filters and ranks recipes by personal profile — diet goals, favourite cuisines, preferred proteins, and disliked ingredients are all considered, with a score-based sort and toast highlight for top matches
+- **Profile-Aware Preference Utilities**: New `checkRecipeAgainstUserProfile` and `filterRecipesByUserProfile` helpers in `preferenceUtils.ts` for personalised recipe recommendation scoring
+- **Nutrition Utilities**: New `nutritionUtils.ts` with `getUserNutritionTargets` and `checkRecipeMacros` helpers; covered by unit tests in `src/test/utils/nutritionUtils.test.ts`
+- **UserProfile Type Extensions**: Added `favoriteCuisines`, `preferredProteins`, `dislikedIngredients`, `specialNeeds`, and `userProfile` fields to the `UserProfile` type
+
+### Changed
+- **Settings Reorganisation**: Removed Database Monitoring from the More tab; moved Leftover Analytics to the Organisation tab; Privacy & Legal confirmed in More tab; user name field present in profile
+- **HouseholdInviteModal Redesign**: Rebuilt as a theme-aware modal with accent-colour header, a checklist of what joining means, a prominent "Accept & Join" button, and a "Decide later" dismiss link — replaces the previous minimal dialog
+- **RecipeFinder Search UI**: Added inline search button that appears when query text is present; search input now uses theme-consistent styling
+- **MealPlanCacheService**: Extended to support household-scoped meal plan reads and writes needed by the data migration flow
+
+### Fixed
+- **Alert → Toast (Settings)**: All `alert()` calls in Settings.tsx (household creation, avatar update/remove, feedback submit, bulk image update, Privacy & Legal clipboard copy) replaced with non-blocking `addToast` notifications
+- **Alert → Toast (ItemDetailModal)**: Image upload failure `alert` replaced with `addToast`; related `console.warn/error` calls routed through `logService`
+- **Console Logging (Login)**: Replaced all `console.*` calls in `Login.tsx` with structured `logService` (`log.debug/warn/error/info`)
+- **Console Logging (Household)**: `console.error` calls in `leaveHousehold` and `removeMember` replaced with `log.error`
+- **Console Logging (HouseholdInviteModal)**: `console.error` replaced with `log.error`; removed unused `serverTimestamp`, `DatabaseMonitoringService`, and `markNotificationRead` imports
+- **Gemini Service**: Minor fixes to model reference and error handling
+
+## [1.4.3] - 2026-03-16
+
+### Fixed
+- **Premium Tier Enforcement**: Fixed critical bug where new users and users without stored subscriptions defaulted to premium tier instead of free tier, ensuring proper revenue gating
+- **Premium Upgrade Navigation**: Upgrade buttons in PremiumFeature now navigate to the Settings/Subscription tab instead of showing a placeholder alert
+- **Version Check Display**: Verified version check in Settings correctly reads current version from Capacitor App plugin with web fallback
+- **Capacitor Plugins Update**: Updated all Capacitor plugins from v7 to v8 to resolve deprecated ProGuard configuration causing Gradle 9+ build failures
+- **Safe Area Plugin ProGuard Fix**: Applied patch to capacitor-plugin-safe-area to use modern ProGuard configuration for Gradle 9+ compatibility
+- **Safe Area Plugin Build Fix**: Built and added missing distribution files to capacitor-plugin-safe-area to resolve Vite import errors
+- **Safe Area Plugin Patch Application**: Applied patch-package to capacitor-plugin-safe-area and committed patch files for persistent ProGuard fixes
+- **Help Page Link**: Added "View FAQ & Help" button in Settings > More > Help & Support section to access the comprehensive FAQ page
+
+### Changed
+- **Capacitor Core**: Updated from v7.6.0 to v8.0.1
+- **Capacitor Plugins**: Updated all plugins (app, browser, camera, device, haptics, local-notifications, push-notifications) to v8.0.1
+- **Capacitor Android**: Updated to v9.0.0 (dev) to resolve ProGuard deprecation issues with Gradle 9+
+- **Safe Area Plugin**: Updated to v4.0.3 from v6 branch with ProGuard compatibility patch and built distribution files
+
+## [1.4.2] - 2026-03-16
+
+### Changed
+- **Android Build Modernization**: Migrated Android build configuration to use version catalogs for better dependency management and maintainability
+- **Settings Performance**: Added debounced saving for profile changes to reduce unnecessary API calls and improve user experience
+- **Copilot Instructions**: Enhanced AI agent documentation with comprehensive project context, testing patterns, advanced features, and development guidelines
+- **Premium Upgrade Flow**: Updated PremiumFeature component to navigate to Settings tab instead of showing alert placeholders
+
+### Fixed
+- **Household Admin Leave Button**: Fixed issue where household admins couldn't see the leave household button due to conditional logic that only showed it for non-admin users
+- **Gemini API Integration**: Updated all model references from incorrect names to `gemini-2.5-pro` for proper AI image analysis
+- **Image Service Improvements**: Added timeout handling and Unsplash API fallback for pantry item images to resolve CORS issues
+- **Modal UI Layout**: Fixed footer overlap in pantry scanner component with proper flex layout structure
+- **Database Analytics Button**: Resized oversized button to 20×20px for consistent UI sizing
+- **Meal Plan Calendar**: Fixed date selection logic to properly show today as default instead of being stuck on previous dates
+- **App Code Cleanup**: Removed unused code and improved import organization in App.tsx
+- **Premium Tier Enforcement**: Fixed critical bug where new users and users without stored subscriptions defaulted to premium tier instead of free, ensuring proper revenue gating
+- **Production Readiness**: Added modal focus traps for accessibility, OS dark mode detection, camera permission error handling with user-friendly toasts, aria-live regions for validation errors, removed dead calendar export button
+- **Console Logging**: Replaced all console.* calls with proper logService/Sentry routing for production monitoring
+- **TypeScript Fixes**: Resolved type errors in MealPlanCacheService and useFocusTrap hook
+
+## [1.4.1] - 2026-03-13
+
+### Added
+- PullToRefreshWrapper component for managing store layouts
+- StoreLayoutEditor component for managing store layouts
+- priceCalculator utility for price calculations
+- purge-git-history script for repository maintenance
+
+### Changed
+- Comprehensive performance improvements across multiple components
+- Enhanced notification system with deduplication
+- Settings reorganization with Food Safety preferences moved to top
+- Updated authentication and app URL handling
+- Improved meal planning and shopping list features
+- Enhanced database analytics and caching services
+
+### Fixed
+- Meal planner day selection: Fixed issue where clicking different days wouldn't load correctly due to race condition in day creation
+- Removed race condition by ensuring all displayPlan days exist in mealPlan before rendering
+- Fixed auth API errors by removing problematic configurations
+- Improved Firebase redirects and app verification
+- Resolved HTTP load errors in Android builds
+- Updated app icon references for consistency
+
+### Removed
+- Pull-to-refresh functionality (causing scrolling issues and data loading problems)
+- react-pull-to-refresh dependency
+
+## [1.4.0] - 2026-03-13
+
+### Added
+- **Pull-to-Refresh Functionality**: Implemented pull-to-refresh across all app tabs using react-pull-to-refresh library
+  - Added `PullToRefreshWrapper` component for consistent refresh behavior
+  - Integrated `refreshAllData` function in data management hook for efficient data reloading
+  - Maintains scroll position and provides smooth user experience across Pantry, Shopping List, Meal Planner, and Community tabs
+
+- **Meal Planner Calendar Enhancements**: Improved visual indicators for better user experience
+  - Days with meals now display white dots/text for clear identification
+  - Selected day shows green background for improved navigation feedback
+  - Enhanced calendar styling for better visual hierarchy and usability
+
+- **Recipe Image Placeholders**: Added attractive SVG-based placeholder images for recipe search results
+  - Implemented `generateRecipePlaceholderImage` function that creates consistent, colorful placeholders
+  - Color generation based on recipe titles for visual variety and consistency
+  - Fallback handling for all recipe sources (saved, cached, and Gemini-generated recipes)
+  - Improved visual consistency in meal plan search results
+
+### Changed
+- **Recipe Search Modal**: Updated to display placeholder images instead of empty spaces for recipes without images
+- **Meal Planner Component**: Enhanced with improved calendar styling and image handling logic
+
+## [1.3.9] - 2026-03-09
+
+### Performance
+- Optimized database writes when adding multiple missing ingredients to shopping list
+- Parallelized price lookups to reduce sequential query delays
+- Improved caching batch operations for better performance
+
+### Fixed
+- Reduced excessive database reads on Community tab
+- Fixed recipe images not saving with ratings
+- Corrected usage limits reset function for all users
+
+## [1.3.8] - 2026-03-07
+
+### Added
+- Household management enhancements: Admin controls for member removal with data migration, member name editing, and fixed "Manage Household" button functionality.
+
+## [1.3.2] - 2026-03-03
+
+### Added
+- **Recipe Creation UX**: Completely redesigned the add recipe modal for better user experience
+  - Added meal type dropdown (vegan, keto, paleo, gluten-free, dairy-free, etc.)
+  - Implemented dynamic ingredient/step inputs that start with 4 fields and expand automatically
+  - Changed from confusing portions section to simple servings count
+  - Clarified "submit for inclusion" checkbox with better explanation
+
+### Fixed
+- **Missing Ingredients Count**: Fixed missing ingredients to only count current/future meals in the 7-day meal plan view
+  - Previously included past meals that hadn't been manually removed
+  - Now automatically excludes meals that have "passed" as days progress
+  - Button resets to 0 when meals move from today to yesterday
+
+### Changed
+- **Recipe Modal**: Removed "Mark as Made" and "Add to Schedule" buttons from recipe creation mode
+- **Recipe Modal**: Removed nutrition facts display from recipe creation (kept only in view mode)
+- **Recipe Modal**: Changed from textarea inputs to single-line inputs for ingredients and instructions
 
 ## [Unreleased] - 2026-02-13
 
 ### Added
+- **Risk-Based Notification System**: Implemented comprehensive 5-tier food safety risk classification system
+  - **Risk Levels**: High-risk (meat/fish/poultry), Perishables (produce/eggs/dairy), Fridge items (cheese/yogurt), Hardy fridge (condiments), Staples (canned/pasta)
+  - **Contextual Messaging**: Notifications vary in tone and urgency based on food safety risk to prevent "notification fatigue"
+  - **Notification Stacking**: Multiple expiring items are grouped to avoid spam notifications
+  - **Waste Notifications**: Guilt-free messaging when items are tossed with learning insights
+- **Scenario-Based Onboarding**: Replaced boring direct risk tolerance questions with engaging "Vibe Check"
+  - **Milk Test**: "Expired milk scenario" with conservative/moderate/risk-taking response options
+  - **Meat Test**: "Chicken at Use By date scenario" with freezer/storage decision options
+  - **Risk Level Computation**: Responses mapped to 5-tier safety levels (Purist=5, Pragmatist=3, Adventurer=1)
+  - **Visual Interface**: Clean button-based selection instead of checkbox questions
+- **Onboarding Flow Integration**: Risk assessment now occurs before tutorial to ensure completion
+  - **Mandatory Phase**: Users must complete risk assessment before accessing interactive tutorials
+  - **Data Persistence**: Risk levels saved to user profile in Firestore for personalized notifications
+  - **Analytics Tracking**: Risk levels included in onboarding completion metrics
 - **Expiry Alerts**: Added persistent expiry alert system with visual indicators
   - Items expiring within 7 days now show a clock icon in the pantry view
   - Alert status is stored with each item to avoid constant database queries
   - Automatic calculation when adding or updating items with expiration dates
+ - **Community Quick-Save**: Added a "Save Recipe" quick action on Community cards to let users save recipes directly from community ratings
+ - **Rating Persistence**: Ratings now persist the embedded `recipe` object at submission time so Community entries display correct title, image, and ingredients without additional lookups
+ - **Sanitize Recipe Saves**: Recipe saves now strip placeholder or empty ingredient/instruction fields to prevent saving incomplete recipes
 
 ### Fixed
 - **Database Performance**: Resolved critical performance issue causing excessive database reads
@@ -24,10 +784,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Prevents unnecessary state updates when meal plan data hasn't actually changed
 - **Database Monitoring**: Fixed TypeError in `DatabaseMonitoringService.getDocs` when queryRef.parent is null
 
+### Fixed (2026-02-24)
+- **Meal Planner today label & date handling**: Corrected local date handling and label logic so the Meal Planner shows the correct "today" meal and preserves meal-type labels when editing or saving plans.
+- **Database instrumentation coverage**: Replaced several runtime direct Firestore calls with `DatabaseMonitoringService` wrappers to ensure reads/writes are tracked by analytics and monitoring.
+- **TypeScript: defensive casts and guards**: Added defensive `doc.data()` casts/guards in services and small type fixes to reduce compile errors (e.g., `recipeRatingService`, `householdService`, `imageCacheService`).
+- **Meal plan cache API**: Fixed incorrect `setDoc` call signature in `mealPlanCacheService` (removed unsupported options arg for wrapper).
+
+### Changed (2026-02-24)
+- **Developer**: Continued incremental TypeScript remediation focused on low-risk fixes (casting, adding missing local interfaces, and normalizing date handling) to make the codebase easier to iterate on.
+
 ### Changed
 - **Inventory Management**: Migrated PantryScanner to use InventoryCacheService for efficient bulk operations
 - **Database Monitoring**: Reduced update frequencies for PerformanceMonitoringDashboard (1s → 60s) and DatabaseAnalytics (5s → 60s)
 - **Listener Optimization**: Added 6-second throttling to inventory listeners to prevent excessive reads
+ - **AdMob Gating**: AdMob banners and interstitials are now shown only to non-premium (free) users; ad display is gated by feature flags and user subscription status
+ - **Payments Migration**: Removed Stripe and PayPal client integrations; migrated in-app purchases and subscriptions to Google Play Billing (Android). Web payment UI components were removed or gated behind premium feature flags.
 
 ### Investigation
 - **Database Read Issue**: Investigated excessive database reads occurring every 6 seconds; implemented throttling and monitoring adjustments (later reverted due to increased read volume)
@@ -496,7 +1267,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.0.0] - 2025-12-XX
 
 ### Added
-- Initial release of Smart Pantry Chef
+- Initial release of Stock & Spoon
 - Cross-platform pantry and meal management
 - Real-time household sharing via Firebase
 - Recipe management and meal planning

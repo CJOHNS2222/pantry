@@ -4,6 +4,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 vi.mock('../../../services/databaseMonitoringService', () => ({
   default: {
     trackOperation: vi.fn(),
+    doc: vi.fn().mockReturnValue('mock-doc-ref'),
+    collection: vi.fn().mockReturnValue('mock-collection-ref'),
+    query: vi.fn().mockReturnValue('mock-query'),
+    where: vi.fn().mockReturnValue('mock-constraint'),
+    orderBy: vi.fn().mockReturnValue('mock-orderby'),
+    limit: vi.fn().mockReturnValue('mock-limit'),
     getDoc: vi.fn(),
     getDocs: vi.fn(),
     setDoc: vi.fn(),
@@ -17,24 +23,25 @@ vi.mock('../../../services/databaseMonitoringService', () => ({
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
-import GroceryPriceService, { groceryPriceService } from '../../../services/groceryPriceService';
+import { groceryPriceService } from '../../../services/groceryPriceService';
 import DatabaseMonitoringService from '../../../services/databaseMonitoringService';
 
+const DatabaseMonitoringServiceMock = vi.mocked(DatabaseMonitoringService);
+
 describe('GroceryPriceService', () => {
-  let service: typeof groceryPriceService;
+  const service = groceryPriceService;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    service = groceryPriceService;
 
     // Set up default mock behaviors for dependencies
-    DatabaseMonitoringService.getDoc.mockResolvedValue({
-      exists: vi.fn(() => true),
-      data: vi.fn(() => ({ averagePrice: 2.99, minPrice: 2.49, maxPrice: 3.49, sampleSize: 10, lastUpdated: new Date(), unit: 'lb' })),
+    DatabaseMonitoringServiceMock.getDoc.mockResolvedValue({
+      exists: () => true,
+      data: () => ({ averagePrice: 2.99, minPrice: 2.49, maxPrice: 3.49, sampleSize: 10, lastUpdated: new Date(), unit: 'lb' }),
       id: 'test-doc-id'
     });
 
-    DatabaseMonitoringService.getDocs.mockResolvedValue({
+    DatabaseMonitoringServiceMock.getDocs.mockResolvedValue({
       size: 0,
       docs: [],
       forEach: vi.fn((callback) => {
@@ -43,10 +50,10 @@ describe('GroceryPriceService', () => {
       empty: true
     });
 
-    DatabaseMonitoringService.setDoc.mockResolvedValue(undefined);
-    DatabaseMonitoringService.updateDoc.mockResolvedValue(undefined);
-    DatabaseMonitoringService.addDoc.mockResolvedValue({ id: 'price123' });
-    DatabaseMonitoringService.deleteDoc.mockResolvedValue(undefined);
+    DatabaseMonitoringServiceMock.setDoc.mockResolvedValue(undefined);
+    DatabaseMonitoringServiceMock.updateDoc.mockResolvedValue(undefined);
+    DatabaseMonitoringServiceMock.addDoc.mockResolvedValue({ id: 'price123' });
+    DatabaseMonitoringServiceMock.deleteDoc.mockResolvedValue(undefined);
 
     // Mock fetch for API calls
     mockFetch.mockResolvedValue({
@@ -115,6 +122,7 @@ describe('GroceryPriceService', () => {
       vi.mocked(DatabaseMonitoringService.getDocs).mockResolvedValueOnce(mockEmptyQuerySnapshot);
 
       // Mock the private fetchOpenPrices method
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const fetchOpenPricesSpy = vi.spyOn(service as any, 'fetchOpenPrices').mockResolvedValueOnce([
         {
           product_id: 'chicken',
@@ -202,6 +210,7 @@ describe('GroceryPriceService', () => {
       vi.mocked(DatabaseMonitoringService.getDocs).mockResolvedValueOnce(mockQuerySnapshot);
 
       // Mock API to return empty so we only get Firestore data
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const fetchOpenPricesHistorySpy = vi.spyOn(service as any, 'fetchOpenPricesHistory').mockResolvedValueOnce([]);
 
       const result = await service.getPriceTrends('chicken breast', 30);
@@ -229,6 +238,7 @@ describe('GroceryPriceService', () => {
       vi.mocked(DatabaseMonitoringService.getDocs).mockRejectedValueOnce(new Error('Query failed'));
 
       // Mock API fallback to return empty
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const fetchOpenPricesHistorySpy = vi.spyOn(service as any, 'fetchOpenPricesHistory').mockResolvedValueOnce([]);
 
       const result = await service.getPriceTrends('chicken breast', 30);
@@ -295,6 +305,7 @@ describe('GroceryPriceService', () => {
       ];
 
       // Mock the private method
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const fetchOpenPricesHistorySpy = vi.spyOn(service as any, 'fetchOpenPricesHistory').mockResolvedValueOnce(mockApiResponse);
 
       const result = await service.getPriceTrendsFromAPI('chicken breast', 30);
@@ -305,6 +316,7 @@ describe('GroceryPriceService', () => {
 
     it('handles API errors', async () => {
       // Mock the private method to throw an error
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const fetchOpenPricesHistorySpy = vi.spyOn(service as any, 'fetchOpenPricesHistory').mockRejectedValueOnce(new Error('API error'));
 
       const result = await service.getPriceTrendsFromAPI('unknown ingredient', 30);

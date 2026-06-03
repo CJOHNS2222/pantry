@@ -3,6 +3,8 @@ import { render, screen, fireEvent } from '@testing-library/react';
 // Explicit Vitest imports to avoid relying on globals in some CI/test setups
 import { vi, describe, test, expect } from 'vitest';
 import { PantryScanner } from '../PantryScanner';
+import { AppProvider } from '../../contexts/AppContext';
+import { AppActionsProvider } from '../../contexts/AppActionsContext';
 
 function makeItem(i: number) {
   return {
@@ -26,18 +28,22 @@ describe('PantryScanner bulk behavior and virtualization', () => {
     const mockOnUpdateItem = vi.fn();
 
     render(
-      <PantryScanner
-        inventory={inventory}
-        addToShoppingList={addToShoppingList}
-        onDeleteItem={mockOnDeleteItem}
-        onAddItem={mockOnAddItem}
-        onAddItems={mockOnAddItems}
-        onUpdateItem={mockOnUpdateItem}
-      />
+      <AppProvider>
+        <AppActionsProvider>
+          <PantryScanner
+          inventory={inventory}
+          addToShoppingList={addToShoppingList}
+          onDeleteItem={mockOnDeleteItem}
+          onAddItem={mockOnAddItem}
+          onAddItems={mockOnAddItems}
+          onUpdateItem={mockOnUpdateItem}
+          />
+        </AppActionsProvider>
+      </AppProvider>
     );
 
-    // Click Select Multiple
-    const selectBtn = screen.getAllByRole('button', { name: /Select Multiple/i })[0];
+    // Click Select Multiple (match visible text or aria-label)
+    const selectBtn = screen.getAllByRole('button', { name: /Select Multiple|Enter bulk selection mode/i })[0];
     fireEvent.click(selectBtn);
 
     // Check first checkbox
@@ -45,8 +51,8 @@ describe('PantryScanner bulk behavior and virtualization', () => {
     expect(checkboxes.length).toBeGreaterThan(0);
     fireEvent.click(checkboxes[0]);
 
-    // Change the bulk location select to 'fridge'
-    const moveOption = screen.getAllByText('Move to Pantry')[0];
+    // Change the bulk location select to 'fridge' (select shows 'Change Location')
+    const moveOption = screen.getAllByText('Change Location')[0];
     const combobox = moveOption.closest('select');
     expect(combobox).not.toBeNull();
     if (combobox) fireEvent.change(combobox, { target: { value: 'fridge' } });
@@ -65,14 +71,18 @@ describe('PantryScanner bulk behavior and virtualization', () => {
     const mockOnUpdateItem = vi.fn();
 
     render(
-      <PantryScanner
-        inventory={many}
-        addToShoppingList={addToShoppingList}
-        onDeleteItem={mockOnDeleteItem}
-        onAddItem={mockOnAddItem}
-        onAddItems={mockOnAddItems}
-        onUpdateItem={mockOnUpdateItem}
-      />
+      <AppProvider>
+        <AppActionsProvider>
+          <PantryScanner
+          inventory={many}
+          addToShoppingList={addToShoppingList}
+          onDeleteItem={mockOnDeleteItem}
+          onAddItem={mockOnAddItem}
+          onAddItems={mockOnAddItems}
+          onUpdateItem={mockOnUpdateItem}
+          />
+        </AppActionsProvider>
+      </AppProvider>
     );
 
     const matches = screen.getAllByText(/Item 0|Item 1/);

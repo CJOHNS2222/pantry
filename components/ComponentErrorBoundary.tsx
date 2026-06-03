@@ -1,6 +1,8 @@
 import React from 'react';
 import * as Sentry from '@sentry/react';
 import AnalyticsService from '../services/analyticsService';
+import { log } from '../services/logService';
+import crashlytics from '../services/crashlyticsService';
 
 interface ComponentErrorBoundaryProps {
   children: React.ReactNode;
@@ -27,7 +29,7 @@ class ComponentErrorBoundary extends React.Component<ComponentErrorBoundaryProps
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error(`Error in ${this.props.componentName}:`, error, errorInfo);
+    log.error(`Error in ${this.props.componentName}`, { error, errorInfo }, 'ComponentErrorBoundary');
 
     // Report to Sentry with component context
     Sentry.withScope((scope) => {
@@ -48,6 +50,13 @@ class ComponentErrorBoundary extends React.Component<ComponentErrorBoundaryProps
       error.message,
       errorInfo.componentStack?.split('\n')[1]?.trim() || 'unknown'
     );
+
+    // Record in Crashlytics
+    crashlytics.log(`ComponentErrorBoundary [${this.props.componentName}] caught: ${error.message}`);
+    crashlytics.recordException(error.message, [
+      { key: 'component', value: this.props.componentName },
+      { key: 'error_type', value: 'component_error' },
+    ]);
   }
 
   handleRetry = () => {

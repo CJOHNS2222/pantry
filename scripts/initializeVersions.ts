@@ -27,8 +27,8 @@ export const initializeAppVersions = async () => {
 
     console.log('All app versions initialized successfully');
   } catch (err: any) {
-    console.error('Failed to initialize app versions:', error);
-    throw error;
+    console.error('Failed to initialize app versions:', err);
+    throw err;
   }
 };
 
@@ -54,7 +54,7 @@ export const updateAppVersion = async (
     await setDoc(doc(db, 'app_versions', platform), versionData, { merge: true });
     console.log(`Updated version data for ${platform} to ${version}`);
   } catch (err: any) {
-    console.error('Failed to update app version:', error);
-    throw error;
+    console.error('Failed to update app version:', err);
+    throw err;
   }
 };

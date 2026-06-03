@@ -29,14 +29,15 @@ service firebase.storage {
 
     // Pantry item images for caching (uploaded by imageCacheService)
     match /pantry_images/{allPaths=**} {
-      // Allow public read access to pantry images (for efficient caching)
-      allow read: if true;
+      // Require authenticated reads for pantry images to protect personal photos
+      allow read: if request.auth != null;
       // Allow write access to authenticated users for pantry images
       allow write: if request.auth != null &&
                    request.resource.size < 5 * 1024 * 1024 && // 5MB limit (smaller for pantry items)
-                   request.resource.contentType.matches('image/.*');
-      // Allow delete access to authenticated users
-      allow delete: if request.auth != null;
+                   request.resource.contentType.matches('image/.*') &&
+                   request.resource.metadata['uploader'] == request.auth.uid;
+      // Allow delete access to the uploader only
+      allow delete: if request.auth != null && resource.metadata['uploader'] == request.auth.uid;
     }
   }
 }

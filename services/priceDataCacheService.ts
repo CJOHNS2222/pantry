@@ -1,5 +1,6 @@
 import { auth } from '../firebaseConfig';
 import DatabaseMonitoringService from './databaseMonitoringService';
+import { log } from './logService';
 
 // Represents the structure of price data for a single grocery item
 export interface PriceData {
@@ -27,6 +28,7 @@ export class PriceDataCacheService {
   // In-memory cache to reduce Firestore reads
   private static priceData: PriceDataCache = {};
   private static hasLoaded = false;
+  private static isLoading = false;
 
   // Get a reference to the global cache document
   private static getCacheRef() {
@@ -37,13 +39,17 @@ export class PriceDataCacheService {
   static async loadPriceData(): Promise<PriceDataCache> {
     // Ensure we only try to load if a user is logged in
     if (!auth.currentUser) {
-      console.log('User not authenticated, skipping price data load.');
       return {};
     }
     // Avoid re-loading if we already have the data
     if (this.hasLoaded) {
         return this.priceData;
     }
+    // Prevent concurrent loads
+    if (this.isLoading) {
+      return this.priceData;
+    }
+    this.isLoading = true;
 
     try {
       const cacheRef = this.getCacheRef();
@@ -57,13 +63,16 @@ export class PriceDataCacheService {
           }
         }
         this.priceData = data;
-        this.hasLoaded = true;
-        return data;
       }
+      // Mark loaded whether the doc existed or not — prevents repeated reads on every auth change
+      this.hasLoaded = true;
     } catch (err: any) {
-      console.error("Failed to load price data cache:", err);
+      log.error("Failed to load price data cache:", err);
+      // hasLoaded stays false on error so the next auth state change retries
+    } finally {
+      this.isLoading = false;
     }
-    return {};
+    return this.priceData;
   }
 
   // Get price data for a single item from the in-memory cache
@@ -97,7 +106,7 @@ export class PriceDataCacheService {
 
     try {
       const cacheRef = this.getCacheRef();
-      await DatabaseMonitoringService.setDoc(cacheRef, this.priceData, { merge: true });
+      await DatabaseMonitoringService.setDoc(cacheRef, this.priceData);
     } catch (err: any) {
       console.error("Failed to save price data cache:", err);
     }

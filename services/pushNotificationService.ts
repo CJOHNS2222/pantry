@@ -1,7 +1,7 @@
 import { PushNotifications, PushNotificationSchema, ActionPerformed } from '@capacitor/push-notifications';
 import { Capacitor } from '@capacitor/core';
-import { messaging } from '../firebaseConfig';
-import { getToken, onMessage } from 'firebase/messaging';
+import { App as CapApp } from '@capacitor/app';
+import { log } from './logService';
 
 class PushNotificationService {
   private static instance: PushNotificationService;
@@ -17,16 +17,68 @@ class PushNotificationService {
     return PushNotificationService.instance;
   }
 
+  /**
+   * Waits until the app is in the foreground (isActive: true) before resolving.
+   * This prevents a NullPointerException in Bridge.getPermissionStates on Android
+   * cold starts where getActivity() can return null during early initialization.
+   */
+  private async waitForAppActive(): Promise<void> {
+    try {
+      const { isActive } = await CapApp.getState();
+      if (!isActive) {
+        await new Promise<void>((resolve) => {
+          const listenerPromise = CapApp.addListener('appStateChange', ({ isActive: active }) => {
+            if (active) {
+              listenerPromise.then(l => l.remove());
+              resolve();
+            }
+          });
+        });
+      }
+      // Brief delay to ensure Bridge internals are ready after the app appears active.
+      await new Promise<void>(r => setTimeout(r, 300));
+    } catch {
+      // App plugin unavailable (e.g. web); proceed anyway
+    }
+  }
+
+  /**
+   * Requests push notification permissions with retry logic.
+   * On Android (especially API 36+ / Capacitor 8), the native Bridge can throw a
+   * NullPointerException in Bridge.getPermissionStates() during cold start because
+   * the PluginHandle's annotation field is not yet visible on the CapacitorPlugins
+   * handler thread. Retrying after a short delay gives the JMM time to propagate
+   * the field write.
+   */
+  private async requestPermissionsWithRetry(maxAttempts = 3): Promise<{ receive: string }> {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        return await PushNotifications.requestPermissions();
+      } catch (err) {
+        if (attempt === maxAttempts) throw err;
+        // Exponential back-off: 500ms, 1000ms
+        await new Promise<void>(r => setTimeout(r, attempt * 500));
+      }
+    }
+    // Unreachable, but satisfies TypeScript
+    throw new Error('requestPermissions failed after retries');
+  }
+
   async initialize(): Promise<void> {
     if (this.isInitialized || !Capacitor.isNativePlatform()) {
       return;
     }
 
     try {
-      // Request permission for push notifications
-      const permission = await PushNotifications.requestPermissions();
+      // Ensure the app is foregrounded before requesting permissions.
+      // Calling requestPermissions() before Bridge.getActivity() is set causes a
+      // fatal NullPointerException on the CapacitorPlugins thread during cold start.
+      await this.waitForAppActive();
+
+      // Request permission with retry to survive transient Bridge NPE on cold start.
+      const permission = await this.requestPermissionsWithRetry();
       if (permission.receive !== 'granted') {
-        console.log('Push notification permissions not granted');
+        // Push notification permissions not granted
         return;
       }
 
@@ -37,16 +89,16 @@ class PushNotificationService {
       this.setupListeners();
 
       this.isInitialized = true;
-      console.log('Push notifications initialized successfully');
-    } catch (err: any) {
-      console.error('Failed to initialize push notifications:', err);
+      // Push notifications initialized successfully
+    } catch (err: unknown) {
+      log.error('Failed to initialize push notifications', err);
     }
   }
 
   private setupListeners(): void {
     // When registration succeeds
     PushNotifications.addListener('registration', (token) => {
-      console.log('Push notification registration successful, token:', token.value);
+      // Push notification registration successful
       this.fcmToken = token.value;
       // Store token for server-side sending
       this.storeToken(token.value);
@@ -54,19 +106,19 @@ class PushNotificationService {
 
     // When registration fails
     PushNotifications.addListener('registrationError', (error) => {
-      console.error('Push notification registration failed:', error);
+      log.error('Push notification registration failed', { error });
     });
 
     // When a notification is received while app is in foreground
     PushNotifications.addListener('pushNotificationReceived', (notification) => {
-      console.log('Push notification received:', notification);
+      // Push notification received
       // Handle foreground notification (could show in-app notification)
       this.handleForegroundNotification(notification);
     });
 
     // When a notification action is performed
     PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
-      console.log('Push notification action performed:', action);
+      // Push notification action performed
       this.handleNotificationAction(action);
     });
   }
@@ -75,16 +127,16 @@ class PushNotificationService {
     try {
       // Store token in localStorage for now (in production, send to your server)
       localStorage.setItem('fcmToken', token);
-      console.log('FCM token stored:', token);
-    } catch (err: any) {
-      console.error('Failed to store FCM token:', err);
+      // FCM token stored
+    } catch (err: unknown) {
+      log.error('Failed to store FCM token', { err });
     }
   }
 
-  private handleForegroundNotification(notification: PushNotificationSchema): void {
+  private handleForegroundNotification(_notification: PushNotificationSchema): void {
     // When app is in foreground, show in-app notification instead of system notification
     // This prevents duplicate notifications
-    console.log('Handling foreground notification:', notification);
+    // Handling foreground notification
 
     // You could dispatch to your existing notification system here
     // For example, create an in-app notification banner
@@ -92,7 +144,7 @@ class PushNotificationService {
 
   private handleNotificationAction(action: ActionPerformed): void {
     // Handle user tapping on notification or action buttons
-    console.log('Handling notification action:', action);
+    // Handling notification action
 
     const { notification, actionId } = action;
 
@@ -127,16 +179,16 @@ class PushNotificationService {
     }
   }
 
-  private navigateToPantry(itemId?: string): void {
+  private navigateToPantry(_itemId?: string): void {
     // Use your app's navigation system
     // For example: router.push('/pantry' + (itemId ? `?highlight=${itemId}` : ''));
-    console.log('Navigate to pantry, highlight item:', itemId);
+    // Navigate to pantry, highlight item
   }
 
   private navigateToShoppingList(): void {
     // Use your app's navigation system
     // For example: router.push('/shopping');
-    console.log('Navigate to shopping list');
+    // Navigate to shopping list
   }
 
   private handleDailyCheck(notification: PushNotificationSchema): void {
@@ -159,19 +211,19 @@ class PushNotificationService {
   private navigateToMeals(): void {
     // Use your app's navigation system
     // For example: router.push('/meals');
-    console.log('Navigate to meal planner');
+    // Navigate to meal planner
   }
 
   // Method to send test push notification (for development)
   async sendTestNotification(): Promise<void> {
     if (!this.fcmToken) {
-      console.error('No FCM token available');
+      log.error('No FCM token available');
       return;
     }
 
     // In production, this would be done server-side
     // For testing, you could use Firebase Admin SDK or REST API
-    console.log('Test notification would be sent to token:', this.fcmToken);
+    // Test notification would be sent
   }
 
   // Get current FCM token
@@ -191,9 +243,9 @@ class PushNotificationService {
       localStorage.removeItem('fcmToken');
       this.fcmToken = null;
       this.isInitialized = false;
-      console.log('Push notifications unregistered');
-    } catch (err: any) {
-      console.error('Failed to unregister push notifications:', err);
+      // Push notifications unregistered
+    } catch (err: unknown) {
+      log.error('Failed to unregister push notifications', { err });
     }
   }
 }

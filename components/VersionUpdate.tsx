@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { versionService, VersionCheckResult } from '../services/versionService';
-import { RefreshCw, Download, AlertTriangle, CheckCircle, X } from 'lucide-react';
+import { RefreshCw, Download, AlertTriangle, CheckCircle, ExternalLink } from 'lucide-react';
 import { log } from '../services/logService';
+
+const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=com.smart.pantry';
 
 interface VersionUpdateProps {
   onUpdateAvailable?: (result: VersionCheckResult) => void;
@@ -24,6 +26,7 @@ export const VersionUpdate: React.FC<VersionUpdateProps> = ({ onUpdateAvailable,
       }, 2000);
       return () => clearTimeout(timer);
     }
+    return undefined;
   }, [autoCheck]);
 
   const loadVersionInfo = async () => {
@@ -112,7 +115,7 @@ export const VersionUpdate: React.FC<VersionUpdateProps> = ({ onUpdateAvailable,
       {/* Update Check Button */}
       <div className="flex items-center justify-between">
         <button
-          onClick={checkForUpdates}
+          onClick={() => checkForUpdates()}
           disabled={checking}
           className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
         >
@@ -136,6 +139,19 @@ export const VersionUpdate: React.FC<VersionUpdateProps> = ({ onUpdateAvailable,
           </div>
         )}
       </div>
+
+      {/* Play Store link — always visible after a check */}
+      {versionCheck && (
+        <a
+          href={PLAY_STORE_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 hover:underline"
+        >
+          <ExternalLink className="w-4 h-4" />
+          View on Google Play Store
+        </a>
+      )}
 
       {/* Update Available Prompt */}
       {showUpdatePrompt && versionCheck && (

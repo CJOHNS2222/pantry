@@ -1,18 +1,38 @@
 import { PantryItem } from '../types';
+import remoteConfig from './remoteConfigService';
 
 type ActionType = 'delete_item' | 'bulk_edit' | 'update_item';
 
-interface Action {
+export interface UndoAction {
   id: string;
   type: ActionType;
   timestamp: number;
   userId: string; // Add user ID to scope actions per user
-  data: any; // Previous state or details
+  data: unknown; // Previous state or details
 }
 
 const DB_NAME = 'SmartPantryUndo';
 const STORE_NAME = 'actions';
-const MAX_ACTIONS = 20;
+
+// Number of undo actions to retain — read from RC so it can be tuned without a release.
+// Cache the value so remoteConfig.getNumber() is not called on every prune/get operation.
+const DEFAULT_MAX_ACTIONS = 20;
+let _cachedMaxActions: number = DEFAULT_MAX_ACTIONS;
+let _maxActionsFetched = false;
+
+const getMaxActions = (): number => {
+  if (!_maxActionsFetched) {
+    const val = remoteConfig.getNumber('undo_max_actions');
+    _cachedMaxActions = val > 0 ? val : DEFAULT_MAX_ACTIONS;
+    _maxActionsFetched = true;
+  }
+  return _cachedMaxActions;
+};
+
+/** Call this after a Remote Config fetch completes to refresh the cached cap. */
+export const refreshUndoMaxActions = (): void => {
+  _maxActionsFetched = false;
+};
 
 class UndoService {
   private db: IDBDatabase | null = null;
@@ -37,10 +57,10 @@ class UndoService {
     });
   }
 
-  async recordAction(action: Omit<Action, 'id' | 'timestamp' | 'userId'>, userId: string): Promise<void> {
+  async recordAction(action: Omit<UndoAction, 'id' | 'timestamp' | 'userId'>, userId: string): Promise<void> {
     if (!this.db) await this.init();
 
-    const fullAction: Action = {
+    const fullAction: UndoAction = {
       ...action,
       id: `${action.type}_${userId}_${Date.now()}`,
       timestamp: Date.now(),
@@ -54,14 +74,14 @@ class UndoService {
 
       request.onerror = () => reject(request.error);
       request.onsuccess = () => {
-        // Keep only last MAX_ACTIONS per user
+        // Keep only last getMaxActions() per user
         this.pruneOldActions(userId);
         resolve();
       };
     });
   }
 
-  async getRecentActions(userId: string, limit: number = MAX_ACTIONS): Promise<Action[]> {
+  async getRecentActions(userId: string, limit: number = getMaxActions()): Promise<UndoAction[]> {
     if (!this.db) await this.init();
 
     return new Promise((resolve, reject) => {
@@ -70,7 +90,7 @@ class UndoService {
       const index = store.index('timestamp');
       const request = index.openCursor(null, 'prev'); // Most recent first
 
-      const actions: Action[] = [];
+      const actions: UndoAction[] = [];
       request.onsuccess = (event) => {
         const cursor = (event.target as IDBRequest).result;
         if (cursor && actions.length < limit) {
@@ -124,16 +144,17 @@ class UndoService {
   }
 
   private async pruneOldActions(userId: string): Promise<void> {
-    const actions = await this.getRecentActions(userId, MAX_ACTIONS + 10);
-    if (actions.length > MAX_ACTIONS) {
-      const toDelete = actions.slice(MAX_ACTIONS);
+    const maxActions = getMaxActions();
+    const actions = await this.getRecentActions(userId, maxActions + 10);
+    if (actions.length > maxActions) {
+      const toDelete = actions.slice(maxActions);
       for (const action of toDelete) {
         await this.removeAction(action.id);
       }
     }
   }
 
-  async undoAction(action: Action): Promise<{ type: 'restore_item' | 'revert_edit'; data: any } | null> {
+  async undoAction(action: UndoAction): Promise<{ type: 'restore_item' | 'revert_edit'; data: unknown } | null> {
     // Return the undo operation details
     if (action.type === 'delete_item') {
       return { type: 'restore_item', data: action.data };

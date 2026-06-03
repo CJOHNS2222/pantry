@@ -9,6 +9,12 @@ vi.mock('../../../hooks/useSubscription', () => ({
   useSubscription: (...args: any[]) => mockUseSubscription(...args),
 }));
 
+// Mock AppContext to satisfy useApp() inside PremiumFeature
+const mockSetActiveTab = vi.fn();
+vi.mock('../../../contexts/AppContext', () => ({
+  useApp: () => ({ setActiveTab: mockSetActiveTab }),
+}));
+
 describe('PremiumFeature', () => {
   afterEach(() => {
     cleanup();
@@ -188,14 +194,12 @@ describe('PremiumFeature', () => {
     expect(onUpgrade).toHaveBeenCalled();
   });
 
-  it('handles upgrade button click with default alert', () => {
+  it('handles upgrade button click with default navigation', () => {
     mockUseSubscription.mockReturnValue({
       isPremium: false,
       isActive: false,
       loading: false,
     });
-
-    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
 
     render(
       <PremiumFeature feature="mealPlanning" user={mockUser}>
@@ -206,9 +210,7 @@ describe('PremiumFeature', () => {
     const upgradeButton = screen.getByText('Try Premium Free for 7 Days');
     fireEvent.click(upgradeButton);
 
-    expect(alertSpy).toHaveBeenCalledWith('Upgrade functionality would navigate to subscription manager');
-
-    alertSpy.mockRestore();
+    expect(mockSetActiveTab).toHaveBeenCalled();
   });
 });
 

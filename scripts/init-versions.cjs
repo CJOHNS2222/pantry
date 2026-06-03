@@ -3,7 +3,7 @@ const { getFirestore, doc, setDoc } = require('firebase/firestore');
 
 // Firebase config - using actual values from .env.local
 const firebaseConfig = {
-  apiKey: "AIzaSyBqJB2SjnyoKvNPx5jZbGD96DnqMLrVsOc",
+  apiKey: process.env.VITE_API_KEY || "REDACTED_COMMITTED_KEY",
   authDomain: "gen-lang-client-0893655267.firebaseapp.com",
   projectId: "gen-lang-client-0893655267",
   storageBucket: "gen-lang-client-0893655267.appspot.com",

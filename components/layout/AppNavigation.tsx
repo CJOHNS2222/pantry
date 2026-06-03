@@ -5,10 +5,11 @@ import { Tab } from '../../types/app';
 interface AppNavigationProps {
   activeTab: Tab;
   setActiveTab: (tab: Tab) => void;
+  hiddenTabs?: string[];
 }
 
-export const AppNavigation: React.FC<AppNavigationProps> = ({ activeTab, setActiveTab }) => {
-  const tabs = [
+export const AppNavigation: React.FC<AppNavigationProps> = ({ activeTab, setActiveTab, hiddenTabs }) => {
+  const allTabs = [
     { id: Tab.PANTRY, icon: ChefHat, label: 'Pantry' },
     { id: Tab.SHOPPING, icon: ShoppingBasket, label: 'Shop' },
     { id: Tab.MEALS, icon: CalendarDays, label: 'Plan' },
@@ -16,6 +17,12 @@ export const AppNavigation: React.FC<AppNavigationProps> = ({ activeTab, setActi
     { id: Tab.COMMUNITY, icon: Users, label: 'Social' },
     { id: Tab.SETTINGS, icon: Sun, label: 'Settings' },
   ];
+
+  // PANTRY and SETTINGS are always visible regardless of the user's preference
+  const alwaysVisible = new Set([Tab.PANTRY, Tab.SETTINGS]);
+  const tabs = hiddenTabs?.length
+    ? allTabs.filter(t => alwaysVisible.has(t.id) || !hiddenTabs.includes(t.id))
+    : allTabs;
 
   return (
     <nav 
@@ -30,6 +37,7 @@ export const AppNavigation: React.FC<AppNavigationProps> = ({ activeTab, setActi
           return (
             <button
               key={tab.id}
+              type="button"
               data-tutorial={tutorialIds[index]}
               onClick={() => setActiveTab(tab.id)}
               className={`flex flex-col items-center justify-center flex-1 py-2 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:ring-offset-2 focus:ring-offset-theme-secondary ${
@@ -37,8 +45,6 @@ export const AppNavigation: React.FC<AppNavigationProps> = ({ activeTab, setActi
               }`}
               aria-label={`${tab.label} ${isActive ? '(current page)' : ''}`}
               aria-current={isActive ? 'page' : undefined}
-              role="tab"
-              tabIndex={0}
             >
               <div className={`p-1.5 rounded-full mb-0.5 transition-all ${
                 isActive ? 'bg-theme-primary shadow-lg border border-theme' : ''

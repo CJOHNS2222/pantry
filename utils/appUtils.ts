@@ -1,22 +1,54 @@
-import { doc, setDoc, Timestamp, serverTimestamp } from 'firebase/firestore';
-import { db } from '../firebaseConfig';
+import { Timestamp, serverTimestamp } from 'firebase/firestore';
+import DatabaseMonitoringService from '../services/databaseMonitoringService';
 import { DayPlan, User, Household } from '../types';
+import { Capacitor } from '@capacitor/core';
+import { UsageService } from '../services/usageService';
+import remoteConfig from '../services/remoteConfigService';
 import { ConsumptionSuggestion, ExpirationAlert, RecipeSuggestion, PantryItem, CustomCategory, Member } from '../types';
+import { getQuantityAmount, getQuantityUnit } from './quantityUtils';
 import { getPerformance, trace } from "firebase/performance";
+import { itemImages, ITEM_IMAGE_CDN_BASE } from '../data/item-images';
 
 const performance = getPerformance();
 
+function normalizeItemImageLookupName(itemName: string): string {
+  return itemName.toLowerCase().trim()
+    .replace(/^\d+\s+/, '')
+    .replace(/\b(large|medium|small|big|tiny|huge|giant)\s+/g, '')
+    .replace(/\b(red|green|yellow|blue|black|white|brown|orange|purple|pink)\s+/g, '')
+    .replace(/\b(fresh|dried|canned|chopped|sliced|diced|minced|crushed|ground|cubed|grated|finely)\s+/g, '')
+    .replace(/\b(ripe|raw|cooked|baked|fried|organic)\s+/g, '')
+    .trim();
+}
+
+function resolveSeededItemImageFilename(itemName: string): string | undefined {
+  const name = itemName.toLowerCase().trim();
+  const cleanedName = normalizeItemImageLookupName(itemName);
+
+  if (itemImages[cleanedName]) return itemImages[cleanedName];
+  if (itemImages[name]) return itemImages[name];
+
+  let bestKey = '';
+  for (const key of Object.keys(itemImages)) {
+    if ((cleanedName.includes(key) || name.includes(key)) && key.length > bestKey.length) {
+      bestKey = key;
+    }
+  }
+
+  return bestKey ? itemImages[bestKey] : undefined;
+}
+
 export async function saveDayPlan(householdId: string, day: DayPlan) {
   const id = day.date; // 'YYYY-MM-DD'
-  const ref = doc(db, 'households', householdId, 'mealPlan', id);
-  await setDoc(ref, {
+  const ref = DatabaseMonitoringService.doc(`households/${householdId}/mealPlan`, id);
+  await DatabaseMonitoringService.setDoc(ref, {
     date: Timestamp.fromDate(new Date(day.date)),
     breakfast: day.breakfast || [],
     lunch: day.lunch || [],
     dinner: day.dinner || [],
     lastModifiedBy: localStorage.getItem('clientId') || null,
     lastModifiedAt: serverTimestamp()
-  }, { merge: true });
+  });
 }
 
 /**
@@ -44,11 +76,17 @@ export function next7DateKeys(start = new Date()) {
  */
 export function isHouseholdMember(h: Household | null | undefined, u: User | null | undefined) {
   if (!h || !u) return false;
-  if (Array.isArray(h.memberIds) && h.memberIds.includes(u.id)) return true;
-  if (Array.isArray(h.members)) {
-    return h.members.some((m: Member) => (m.id && m.id === u.id) || (m.email && m.email === u.email));
+  // Prefer the members array — it carries status, so we can exclude pending invites.
+  // Treat a missing status as 'active' for backward-compat with legacy data.
+  if (Array.isArray(h.members) && h.members.length > 0) {
+    return h.members.some(
+      (m: Member) =>
+        ((m.id && m.id === u.id) || (m.email && m.email === u.email)) &&
+        (m.status === 'active' || !m.status)
+    );
   }
-  return false;
+  // Fallback: legacy households that only have memberIds (no members array).
+  return Array.isArray(h.memberIds) && h.memberIds.includes(u.id);
 }
 
 /**
@@ -67,6 +105,8 @@ export function parseItemText(itemText: string): { quantity: number; description
   let description = text
     // Remove quantities at the beginning
     .replace(/^\d+\s+/, '')
+    // Remove leading store-brand abbreviations (CV = Clover Valley, GV = Great Value)
+    .replace(/^(CV|GV)\s+/i, '')
     // Remove common size descriptors
     .replace(/\b(large|medium|small|big|tiny|huge|giant)\s+/g, '')
     // Keep colors for distinguishing items (like red vs green apples)
@@ -94,7 +134,46 @@ export function parseIngredientForShoppingList(ingredientText: string): { quanti
   perfTrace.start();
 
   try {
-    const text = ingredientText.trim();
+    // ── Pre-processing ──────────────────────────────────────────────────────
+    // 1) Normalise Unicode vulgar fractions so the rest of the parser only
+    //    ever sees ASCII digit sequences.
+    let text = ingredientText.trim()
+      .replace(/½/g, '1/2')
+      .replace(/¼/g, '1/4')
+      .replace(/¾/g, '3/4')
+      .replace(/⅓/g, '1/3')
+      .replace(/⅔/g, '2/3')
+      .replace(/⅛/g, '1/8')
+      .replace(/⅜/g, '3/8')
+      .replace(/⅝/g, '5/8')
+      .replace(/⅞/g, '7/8');
+
+    // 2) Handle mixed fractions written as two separate tokens, e.g. "1 1/2 tsp"
+    //    Collapse them into a single token like "1.5 tsp" so the regex below
+    //    matches on the first word.
+    text = text.replace(/^(\d+)\s+(\d+\/\d+)(\s|$)/, (_, whole, frac, rest) => {
+      const [num, den] = frac.split('/').map(Number);
+      const value = parseInt(whole) + num / den;
+      return value + (rest || ' ');
+    });
+
+    // 3) Strip "to taste" variants — keep just the ingredient name.
+    //    Covers: "to taste pepper", "salt, to taste", "pepper to taste"
+    let toTasteQty = '';
+    if (/^to\s+taste\b/i.test(text)) {
+      toTasteQty = 'to taste';
+      text = text.replace(/^to\s+taste\s*/i, '').trim();
+    } else if (/\bto\s+taste\s*$/i.test(text)) {
+      toTasteQty = 'to taste';
+      text = text.replace(/,?\s*\bto\s+taste\s*$/i, '').trim();
+    }
+
+    if (toTasteQty) {
+      // Capitalise and return immediately — no quantity splitting needed.
+      const itemName = text.replace(/\b\w/g, l => l.toUpperCase());
+      return { quantity: toTasteQty, itemName: itemName || 'Item' };
+    }
+    // ────────────────────────────────────────────────────────────────────────
 
     // Add custom metrics
     perfTrace.putMetric('input_length', text.length);
@@ -113,12 +192,40 @@ export function parseIngredientForShoppingList(ingredientText: string): { quanti
         // Check if next word is a unit
         if (words.length > 1) {
           const potentialUnit = (words[1] || '').toLowerCase();
-          // Common units that should be included in quantity
-          const units = ['tbs', 'tbsp', 'tsp', 'cup', 'cups', 'oz', 'ounce', 'ounces', 'lb', 'pound', 'pounds', 
-                        'g', 'gram', 'grams', 'kg', 'liter', 'l', 'ml', 'clove', 'cloves', 'bunch', 'bunches', 
-                        'sprig', 'sprigs', 'head', 'heads', 'stalk', 'stalks', 'slice', 'slices', 'piece', 'pieces',
-                        'can', 'cans', 'bottle', 'bottles', 'package', 'packages', 'box', 'boxes', 'bag', 'bags',
-                        'dash', 'dashes', 'pinch', 'pinches', 'teaspoon', 'teaspoons', 'tablespoon', 'tablespoons'];
+          // Comprehensive list of units including abbreviations and common terms
+          const units = [
+            // Volume - Imperial/US Customary
+            't', 'tsp', 'teaspoon', 'teaspoons',
+            'tbs', 'tb', 'tbl', 'tbsp', 'tablespoon', 'tablespoons',
+            'c', 'cup', 'cups',
+            'fl oz', 'fluid ounce', 'fluid ounces',
+            'pt', 'pint', 'pints',
+            'qt', 'quart', 'quarts',
+            'gal', 'gallon', 'gallons',
+            
+            // Volume - Metric
+            'ml', 'milliliter', 'milliliters',
+            'l', 'liter', 'liters',
+            'cl', 'centiliter', 'centiliters',
+            
+            // Weight - Imperial/US Customary
+            'oz', 'ounce', 'ounces',
+            'lb', 'lbs', 'pound', 'pounds',
+            
+            // Weight - Metric
+            'g', 'gram', 'grams',
+            'kg', 'kilogram', 'kilograms',
+            
+            // Count/Pieces
+            'clove', 'cloves', 'bunch', 'bunches', 'sprig', 'sprigs', 'head', 'heads', 
+            'stalk', 'stalks', 'slice', 'slices', 'piece', 'pieces', 'dozen',
+            'can', 'cans', 'bottle', 'bottles', 'package', 'packages', 'box', 'boxes', 
+            'bag', 'bags', 'jar', 'jars', 'container', 'containers',
+            
+            // Cooking measurements
+            'dash', 'dashes', 'pinch', 'pinches', 'handful', 'handfuls', 'scoop', 'scoops',
+            'loaf', 'loaves', 'stick', 'sticks', 'block', 'blocks'
+          ];
           
           if (units.includes(potentialUnit) || potentialUnit.endsWith('s')) {
             // Check if it's a plural of a known unit
@@ -136,6 +243,23 @@ export function parseIngredientForShoppingList(ingredientText: string): { quanti
           itemName = words.slice(1).join(' ');
         }
         perfTrace.putAttribute('parsing_method', 'word_analysis');
+      } else if ((firstPart.toLowerCase() === 'a' || firstPart.toLowerCase() === 'an') && words.length > 1) {
+        // Handle "a slice of", "a pinch of", "a dash of", "an egg", etc.
+        const secondPart = words[1]!.toLowerCase();
+        const commonQuantities = ['slice', 'pinch', 'dash', 'handful', 'scoop', 'clove', 'bunch', 'sprig', 'head', 'stalk', 'piece', 'loaf', 'stick', 'block'];
+        
+        if (commonQuantities.includes(secondPart)) {
+          quantity = '1 ' + secondPart;
+          itemName = words.slice(2).join(' ');
+          // Remove "of" if it follows
+          itemName = itemName.replace(/^of\s+/i, '');
+          perfTrace.putAttribute('parsing_method', 'article_quantity');
+        } else {
+          // Bare article ("a garlic clove", "an egg") — strip the article, default qty=1
+          quantity = '1';
+          itemName = words.slice(1).join(' ');
+          perfTrace.putAttribute('parsing_method', 'article_noun');
+        }
       } else {
         perfTrace.putAttribute('parsing_method', 'no_quantity');
       }
@@ -143,8 +267,14 @@ export function parseIngredientForShoppingList(ingredientText: string): { quanti
 
     // Clean the item name by removing common descriptors, but keep preparation methods for shopping list display
     itemName = itemName
+      // Strip parenthetical size/method notes (e.g. "(14.5 oz)", "(optional)", "(or water)")
+      .replace(/\s*\([^)]*\)/g, '')
+      // Strip trailing comma + anything after (e.g. "garlic, minced" → "garlic", "oil, divided" → "oil")
+      .replace(/,.*$/, '')
       // Remove common size descriptors
       .replace(/\b(large|medium|small|big|tiny|huge|giant)\s+/gi, '')
+      // Remove "of" preposition
+      .replace(/\bof\s+/gi, '')
       // Keep colors for distinguishing items (like red vs green apples)
       // Keep preparation descriptors for shopping list clarity (user wants to see "chopped", "minced", etc.)
       // Remove common quality descriptors
@@ -179,6 +309,8 @@ export function cleanItemNameForShopping(itemName: string): string {
   let cleaned = itemName.toLowerCase()
     // Remove quantities at the beginning (e.g., "1 ", "2 ", "3 ", etc.)
     .replace(/^\d+\s+/, '')
+    // Remove leading store-brand abbreviations (CV = Clover Valley, GV = Great Value)
+    .replace(/^(cv|gv)\s+/, '')
     // Remove common size descriptors
     .replace(/\b(large|medium|small|big|tiny|huge|giant)\s+/g, '')
     // Remove common color descriptors
@@ -196,8 +328,47 @@ export function cleanItemNameForShopping(itemName: string): string {
   return cleaned;
 }
 
+/**
+ * Decide whether ads should be shown to a given user.
+ * Current policy: only show ads on native platforms for users on the `free` tier
+ * and only while they remain under at least one of their free-tier usage limits
+ * (saved recipes, weekly meal-plan recipe additions, or weekly recipe searches).
+ * Returns a Promise<boolean>.
+ */
+export async function canShowAds(user?: User | null): Promise<boolean> {
+  try {
+    if (!user) return false;
+    if (!remoteConfig.getBoolean('ads_enabled')) return false;
+    if (remoteConfig.getBoolean('kill_ads')) return false;
+    // Don't show ads on web
+    if (Capacitor.getPlatform() === 'web') return false;
+
+    const limits = await UsageService.getUsageLimits(user);
+
+    // Don't show ads to paid users (includes household-elevated members)
+    if (limits.resolvedTier !== 'free') return false;
+
+    const underRecipeLimit = limits.recipes.max === -1 || (limits.recipes.used < limits.recipes.max);
+    const underMealPlanLimit = limits.mealPlanning.weeklyRecipes === -1 || (limits.mealPlanning.weeklyUsed < limits.mealPlanning.weeklyRecipes);
+    const underSearchLimit = limits.searches.weekly === -1 || (limits.searches.used < limits.searches.weekly);
+
+    // Show ads when user is within at least one of the usage limits
+    return underRecipeLimit || underMealPlanLimit || underSearchLimit;
+  } catch {
+    // Conservative fallback: show ads for free users if limit check fails
+    try {
+      if (!user) return false;
+      if (!remoteConfig.getBoolean('ads_enabled')) return false;
+      if (remoteConfig.getBoolean('kill_ads')) return false;
+      return user.subscription?.tier === 'free';
+    } catch {
+      return false;
+    }
+  }
+}
+
 export function getItemImage(itemName: string, category: string): string {
-  const name = itemName.toLowerCase();
+  const name = itemName.toLowerCase().trim();
   const cat = category.toLowerCase();
 
   // Clean the item name by removing quantities and common descriptors
@@ -264,6 +435,13 @@ export function getItemImage(itemName: string, category: string): string {
 
   const normalizedCat = cat === 'manual' || cat === 'uncategorized' ? inferCategoryFromName(cleanedName) : normalizeCategory(cat);
 
+  // Prefer seeded local item photos when available.
+  const seededFilename = resolveSeededItemImageFilename(itemName);
+  if (seededFilename) {
+    const ext = seededFilename.includes('.') ? '' : '.jpg';
+    return `/images/items/${seededFilename}${ext}`;
+  }
+
   // Priority function for image types: png > svg
   const getImagePriority = (image: string): number => {
     if (image.endsWith('.png')) return 2;
@@ -274,21 +452,21 @@ export function getItemImage(itemName: string, category: string): string {
   // Direct matches for item names - prefer thumb images, then webp, png, svg
   const itemMappings: Record<string, string> = {
     // Fruits
-    'apple': 'apple.png',
-    'apples': 'apples.png',
-    'green apple': 'green_apple.png',
-    'red apple': 'red_apple.png',
-    'banana': 'banana.png',
-    'bananas': 'banana.png',
-    'orange': 'orange.png',
-    'oranges': 'orange.png',
-    'strawberry': 'strawberry.png',
-    'strawberries': 'strawberry.png',
-    'cherries': 'cherries.png',
+    'apple': 'apple.svg',
+    'apples': 'apples.webp',
+    'green apple': 'green_apple.webp',
+    'red apple': 'red_apple.webp',
+    'banana': 'banana.webp',
+    'bananas': 'banana.webp',
+    'orange': 'orange.webp',
+    'oranges': 'orange.webp',
+    'strawberry': 'strawberry.webp',
+    'strawberries': 'strawberry.webp',
+    'cherries': 'cherries.webp',
     'cherry': 'cherry.svg',
     'grapes': 'grapes.svg',
     'grape': 'grapes.svg',
-    'lemon': 'lemon.png',
+    'lemon': 'lemon.webp',
     'mangos': 'mango.svg',
     'raspberry': 'raspberry.svg',
     'raspberries': 'raspberry.svg',
@@ -313,46 +491,46 @@ export function getItemImage(itemName: string, category: string): string {
     'chili pepper': 'chili-pepper.svg',
     'chili peppers': 'chili-pepper.svg',
     // Dairy & Eggs
-    'egg': 'egg.png',
+    'egg': 'egg.webp',
 
     // Meat & Poultry
-    'sausage': 'sausage.png',
-    'ham': 'ham.png',
-    'pork': 'pork.png',
-    'hot dog': 'hot_dog.png',
-    'fried chicken': 'fried_chicken.png',
+    'sausage': 'sausage.webp',
+    'ham': 'ham.webp',
+    'pork': 'pork.webp',
+    'hot dog': 'hot_dog.webp',
+    'fried chicken': 'fried_chicken.webp',
 
     // Seafood
     'salmon': 'salmon.svg',
-    'baked salmon': 'baked_salmon.png',
+    'baked salmon': 'baked_salmon.webp',
     'crab': 'crab.svg',
     'lobster': 'lobster.svg',
-    'steamed lobster': 'steamed_lobster.png',
+    'steamed lobster': 'steamed_lobster.webp',
 
     // Grains & Bread
-    'muffin': 'muffin.png',
+    'muffin': 'muffin.webp',
 
     // Condiments & Sauces
     'mayonnaise': 'mayonnaise.svg',
-    'pickle': 'pickle.png',
+    'pickle': 'pickle.webp',
 
     // Snacks & Nuts
-    'almond': 'almond.png',
-    'cashew nuts': 'cashew_nuts.png',
+    'almond': 'almond.webp',
+    'cashew nuts': 'cashew_nuts.webp',
     'almond butter': 'almond-butter.svg',
-    'popcorn': 'pop_corn.png',
-    'walnut': 'walnut.png',
+    'popcorn': 'pop_corn.webp',
+    'walnut': 'walnut.webp',
 
     // Beverages
-    'tea bag': 'tea_bag.png',
-    'apple juice': 'apple_juice.png',
-    'scotch whisky': 'scotch_whisky.png',
+    'tea bag': 'tea_bag.webp',
+    'apple juice': 'apple_juice.webp',
+    'scotch whisky': 'scotch_whisky.webp',
 
     // Baking & Sweets
     'chocolate': 'chocolate-bar.svg',
 
     // Canned & Processed
-    'tomato puree': 'tomato_puree.png',
+    'tomato puree': 'tomato_puree.webp',
 
     // Spices & Herbs
     'cinnamon': 'cinnamon-sticks.svg',
@@ -364,174 +542,174 @@ export function getItemImage(itemName: string, category: string): string {
     'soy': 'soy.svg',
 
     // Thumb images (high priority)
-    'milk': '1galmilk.png',
-    '2% milk': '2percentmilk.png',
-    'almond milk': 'almondmilk.png',
-    'eggs': 'eggs.png',
-    'bacon': 'bacon.png',
-    'butter': 'buttersticks.png',
-    'cheese': 'slicedcheese.png',
-    'bread': 'wheatbread.png',
-    'pasta': 'spaghetti.png',
-    'angel hair': 'angelhairnoodles.png',
-    'angel hair pasta': 'angelhairnoodles.png',
-    'barilla angel hair': 'angelhairnoodles.png',
-    'barilla elbows': 'elbownoodles.png',
-    'elbows': 'elbownoodles.png',
-    'elbow pasta': 'elbownoodles.png',
-    'rotini': 'rotininoodles.png',
-    'tri-color rotini': 'rotininoodles.png',
-    'barilla tri-color rotini': 'rotininoodles.png',
-    'barilla': 'spaghetti.png',
-    'fettuccine': 'spaghetti.png',
-    'penne': 'spaghetti.png',
-    'rigatoni': 'spaghetti.png',
-    'ravioli': 'spaghetti.png',
-    'tortellini': 'spaghetti.png',
-    'ramen': 'spaghetti.png',
-    'udon': 'spaghetti.png',
-    'chicken': 'frozenchicken.png',
-    'beef': 'groundbeef.png',
-    'fish': 'frozenfishfilet.png',
-    'shrimp': 'frozenshrimp.png',
-    'steak': 'steak.png',
-    'ketchup': 'ketchup.png',
-    'mustard': 'mustard.png',
-    'mayo': 'mayo.png',
-    'peanut butter': 'peanutbutter.png',
-    'coffee': 'folgerscoffee.png',
-    'ice cream': 'vanillaicecream.png',
-    'cookies': 'cookiesncreamicecream.png',
-    'soup': 'chickennoodlesoup.png',
-    'oatmeal': 'quakeroats.png',
-    'rice': 'rice.png',
-    'flour': 'flour.png',
-    'sugar': 'cakebox.png',
-    'salt': 'saltseason.png',
-    'pepper': 'blackpepperseason.png',
-    'garlic': 'mincedgarlicseason.png',
-    'onion': 'mincedonionseason.png',
-    'oil': 'oilnvinegar.png',
-    'vinegar': 'oilnvinegar.png',
-    'sauce': 'spaghetti.png',
-    'juice': 'applejuice.png',
-    'beer': 'beer.png',
-    'wine': 'oilnvinegar.png',
-    'chips': 'doritos.png',
-    'nuts': 'peanuts.png',
-    'candy': 'mnms.png',
-    'fruit': 'applejuice.png',
-    'vegetable': 'cannedcarrots.png',
-    'canned asparagus': 'cannedasparagus.png',
-    'canned carrots': 'cannedcarrots.png',
-    'canned collard greens': 'cannedcollardgreens.png',
-    'canned corn': 'cannedcorn.png',
-    'canned cream corn': 'cannedcreamcorn.png',
-    'canned diced tomatoes': 'canneddicedtomatos.png',
-    'canned field peas': 'cannedfielpeas.png',
-    'canned french style green beans': 'cannedfrenchstylegreenbeans.png',
-    'canned green beans': 'cannedgreenbeans.png',
-    'canned lima beans': 'cannedlimabeans.png',
-    'canned mixed vegetables': 'cannedmixedvegetables.png',
-    'canned mushrooms': 'cannedmushrooms.png',
-    'canned peas': 'cannedpeas.png',
-    'canned peas and carrots': 'cannedpeasandcarrots.png',
-    'canned potatoes': 'cannedpotatos.png',
-    'canned ravioli': 'cannedravioli.png',
-    'canned yams': 'cannedyams.png',
-    'chicken noodle soup': 'chickennoodlesoup.png',
-    'chicken nuggets': 'chickennuggets.png',
-    'chicken patties': 'chickenpatties.png',
-    'chili seasoning': 'chiliseaon.png',
-    'chocolate cake': 'chocolatecake.png',
-    'chocolate ice cream': 'chocolateicecream.png',
-    'chocolate milk': 'chocolatemilk.png',
-    'cocktail sauce': 'cocktailsauce.png',
-    'coffee creamer': 'coffeecreamer.png',
-    'condensed milk': 'condensedmilkcan.png',
-    'cookie dough': 'cookiedough.png',
-    'cookie dough ice cream': 'cookiedoughicecream.png',
-    'cookies and cream ice cream': 'cookiesncreamicecream.png',
-    'cream cheese': 'creamcheese.png',
-    'cream of chicken soup': 'creamofchickensoup.png',
-    'cream of mushroom soup': 'creamofmushroomsoup.png',
-    'creole seasoning': 'creoleseason.png',
-    'croissant': 'croissant.png',
-    'cupcake': 'cupcake.png',
-    'dinner rolls': 'dinnerrolls.png',
-    'doritos': 'doritos.png',
-    'easy spray cheese': 'easyspraycheese.png',
-    'english muffin': 'englishmuffin.png',
-    'evaporated milk': 'evaporatedmilk.png',
-    'fettuccine noodles': 'fettuccinenoodles.png',
-    'folgers coffee': 'folgerscoffee.png',
-    'french onion soup': 'frenchonionsoup.png',
-    'frozen chicken': 'frozenchicken.png',
-    'frozen chicken breast': 'frozenchickenbreast.png',
-    'frozen chicken tenderloins': 'frozenchickentenderloins.png',
-    'frozen fish filet': 'frozenfishfilet.png',
-    'frozen shrimp': 'frozenshrimp.png',
-    'frozen steak': 'frozensteak.png',
-    'garlic herb seasoning': 'garlicherbseason.png',
-    'garlic powder': 'garlicpowder.png',
-    'grape jelly': 'grapejelly.png',
-    'grated parmesan cheese': 'gratedparmesancheese.png',
-    'ground beef': 'groundbeef.png',
-    'ground cinnamon': 'groundcinnamonseason.png',
-    'half gallon whole milk': 'halfgallonwholemilk.png',
-    'hamburger buns': 'hamburgerbuns.png',
-    'hamburger helper': 'hamburgerhelper.png',
-    'hamburger helper philly cheesesteak': 'hamburgerhelperphillycheesesteak.png',
-    'honey mustard': 'honeymustard.png',
-    'hot dogs': 'hotdogs.png',
-    'hot sauce': 'hotsauce.png',
-    'ice cream fudge bar': 'icecreamfudgebar.png',
-    'ice cream sandwich': 'icecreamsandwich.png',
-    'italian loaf bread': 'italianloafbread.png',
-    'italian seasoning': 'itatlianseason.png',
-    'kraft mac and cheese': 'kraftmacandcheese.png',
-    'lasagna noodles': 'lasagnanoodles.png',
-    'lemon pepper seasoning': 'lemonpepperseason.png',
-    'minced garlic': 'mincedgarlicseason.png',
-    'minced onion': 'mincedonionseason.png',
-    'mint ice cream': 'minticecream.png',
-    'm&ms': 'mnms.png',
-    'parsley seasoning': 'parsleyseason.png',
-    'paprika seasoning': 'paprikaseason.png',
-    'penne noodles': 'pennenoodles.png',
-    'pickles': 'pickles.png',
-    'pinto beans': 'pintobeans.png',
-    'progresso chicken noodle soup': 'progressochickennoodlesoup.png',
-    'quaker oats': 'quakeroats.png',
-    'ramen noodles': 'ramennoodles.png',
-    'ranch dressing': 'ranchdressing.png',
-    'relish': 'relish.png',
-    'rigatoni noodles': 'rigatoninoodles.png',
-    'rotini noodles': 'rotininoodles.png',
-    'shell noodles': 'shellnoodles.png',
-    'shells and cheese': 'shellsandcheese.png',
-    'shredded cheddar cheese': 'shreddedcheddarcheese.png',
-    'shredded parmesan': 'shreddedparmesan.png',
-    'sriracha': 'siracha.png',
-    'sliced cheese': 'slicedcheese.png',
-    'sliced colby jack cheese': 'slicedcolbyjackcheese.png',
-    'sliced pepper jack cheese': 'slicedpepperjackcheese.png',
-    'sliced swiss cheese': 'slicedswisscheese.png',
-    'sour cream': 'sourcream.png',
-    'soy sauce': 'soysauce.png',
-    'spaghetti sauce': 'spegheatisauce.png',
-    'spicy mustard': 'spicymustard.png',
-    'steak sauce': 'steaksauce.png',
-    'string cheese': 'stringcheese.png',
-    'taco seasoning': 'tacoseason.png',
-    'tartar sauce': 'tartarsauce.png',
-    'tomato soup': 'tomatosoup.png',
-    'tortilla': 'tortilla.png',
-    'wheat bread': 'wheatbread.png',
-    'white bread': 'whitebread.png',
-    'white round top bread': 'whiteroundtopbread.png',
-    'whole pickles': 'wholepickles.png',
-    'yum yum sauce': 'yumyumsauce.png'
+    'milk': '1galmilk.webp',
+    '2% milk': '2percentmilk.webp',
+    'almond milk': 'almondmilk.webp',
+    'eggs': 'eggs.webp',
+    'bacon': 'bacon.webp',
+    'butter': 'buttersticks.webp',
+    'cheese': 'slicedcheese.webp',
+    'bread': 'wheatbread.webp',
+    'pasta': 'spaghetti.webp',
+    'angel hair': 'angelhairnoodles.webp',
+    'angel hair pasta': 'angelhairnoodles.webp',
+    'barilla angel hair': 'angelhairnoodles.webp',
+    'barilla elbows': 'elbownoodles.webp',
+    'elbows': 'elbownoodles.webp',
+    'elbow pasta': 'elbownoodles.webp',
+    'rotini': 'rotininoodles.webp',
+    'tri-color rotini': 'rotininoodles.webp',
+    'barilla tri-color rotini': 'rotininoodles.webp',
+    'barilla': 'spaghetti.webp',
+    'fettuccine': 'spaghetti.webp',
+    'penne': 'spaghetti.webp',
+    'rigatoni': 'spaghetti.webp',
+    'ravioli': 'spaghetti.webp',
+    'tortellini': 'spaghetti.webp',
+    'ramen': 'spaghetti.webp',
+    'udon': 'spaghetti.webp',
+    'chicken': 'frozenchicken.webp',
+    'beef': 'groundbeef.webp',
+    'fish': 'frozenfishfilet.webp',
+    'shrimp': 'frozenshrimp.webp',
+    'steak': 'steak.webp',
+    'ketchup': 'ketchup.webp',
+    'mustard': 'mustard.webp',
+    'mayo': 'mayo.webp',
+    'peanut butter': 'peanutbutter.webp',
+    'coffee': 'folgerscoffee.webp',
+    'ice cream': 'vanillaicecream.webp',
+    'cookies': 'cookiesncreamicecream.webp',
+    'soup': 'chickennoodlesoup.webp',
+    'oatmeal': 'quakeroats.webp',
+    'rice': 'rice.webp',
+    'flour': 'flour.webp',
+    'sugar': 'cakebox.webp',
+    'salt': 'saltseason.webp',
+    'pepper': 'blackpepperseason.webp',
+    'garlic': 'mincedgarlicseason.webp',
+    'onion': 'mincedonionseason.webp',
+    'oil': 'oilnvinegar.webp',
+    'vinegar': 'oilnvinegar.webp',
+    'sauce': 'spaghetti.webp',
+    'juice': 'applejuice.webp',
+    'beer': 'beer.webp',
+    'wine': 'oilnvinegar.webp',
+    'chips': 'doritos.webp',
+    'nuts': 'peanuts.webp',
+    'candy': 'mnms.webp',
+    'fruit': 'applejuice.webp',
+    'vegetable': 'cannedcarrots.webp',
+    'canned asparagus': 'cannedasparagus.webp',
+    'canned carrots': 'cannedcarrots.webp',
+    'canned collard greens': 'cannedcollardgreens.webp',
+    'canned corn': 'cannedcorn.webp',
+    'canned cream corn': 'cannedcreamcorn.webp',
+    'canned diced tomatoes': 'canneddicedtomatos.webp',
+    'canned field peas': 'cannedfielpeas.webp',
+    'canned french style green beans': 'cannedfrenchstylegreenbeans.webp',
+    'canned green beans': 'cannedgreenbeans.webp',
+    'canned lima beans': 'cannedlimabeans.webp',
+    'canned mixed vegetables': 'cannedmixedvegetables.webp',
+    'canned mushrooms': 'cannedmushrooms.webp',
+    'canned peas': 'cannedpeas.webp',
+    'canned peas and carrots': 'cannedpeasandcarrots.webp',
+    'canned potatoes': 'cannedpotatos.webp',
+    'canned ravioli': 'cannedravioli.webp',
+    'canned yams': 'cannedyams.webp',
+    'chicken noodle soup': 'chickennoodlesoup.webp',
+    'chicken nuggets': 'chickennuggets.webp',
+    'chicken patties': 'chickenpatties.webp',
+    'chili seasoning': 'chiliseaon.webp',
+    'chocolate cake': 'chocolatecake.webp',
+    'chocolate ice cream': 'chocolateicecream.webp',
+    'chocolate milk': 'chocolatemilk.webp',
+    'cocktail sauce': 'cocktailsauce.webp',
+    'coffee creamer': 'coffeecreamer.webp',
+    'condensed milk': 'condensedmilkcan.webp',
+    'cookie dough': 'cookiedough.webp',
+    'cookie dough ice cream': 'cookiedoughicecream.webp',
+    'cookies and cream ice cream': 'cookiesncreamicecream.webp',
+    'cream cheese': 'creamcheese.webp',
+    'cream of chicken soup': 'creamofchickensoup.webp',
+    'cream of mushroom soup': 'creamofmushroomsoup.webp',
+    'creole seasoning': 'creoleseason.webp',
+    'croissant': 'croissant.webp',
+    'cupcake': 'cupcake.webp',
+    'dinner rolls': 'dinnerrolls.webp',
+    'doritos': 'doritos.webp',
+    'easy spray cheese': 'easyspraycheese.webp',
+    'english muffin': 'englishmuffin.webp',
+    'evaporated milk': 'evaporatedmilk.webp',
+    'fettuccine noodles': 'fettuccinenoodles.webp',
+    'folgers coffee': 'folgerscoffee.webp',
+    'french onion soup': 'frenchonionsoup.webp',
+    'frozen chicken': 'frozenchicken.webp',
+    'frozen chicken breast': 'frozenchickenbreast.webp',
+    'frozen chicken tenderloins': 'frozenchickentenderloins.webp',
+    'frozen fish filet': 'frozenfishfilet.webp',
+    'frozen shrimp': 'frozenshrimp.webp',
+    'frozen steak': 'frozensteak.webp',
+    'garlic herb seasoning': 'garlicherbseason.webp',
+    'garlic powder': 'garlicpowder.webp',
+    'grape jelly': 'grapejelly.webp',
+    'grated parmesan cheese': 'gratedparmesancheese.webp',
+    'ground beef': 'groundbeef.webp',
+    'ground cinnamon': 'groundcinnamonseason.webp',
+    'half gallon whole milk': 'halfgallonwholemilk.webp',
+    'hamburger buns': 'hamburgerbuns.webp',
+    'hamburger helper': 'hamburgerhelper.webp',
+    'hamburger helper philly cheesesteak': 'hamburgerhelperphillycheesesteak.webp',
+    'honey mustard': 'honeymustard.webp',
+    'hot dogs': 'hotdogs.webp',
+    'hot sauce': 'hotsauce.webp',
+    'ice cream fudge bar': 'icecreamfudgebar.webp',
+    'ice cream sandwich': 'icecreamsandwich.webp',
+    'italian loaf bread': 'italianloafbread.webp',
+    'italian seasoning': 'itatlianseason.webp',
+    'kraft mac and cheese': 'kraftmacandcheese.webp',
+    'lasagna noodles': 'lasagnanoodles.webp',
+    'lemon pepper seasoning': 'lemonpepperseason.webp',
+    'minced garlic': 'mincedgarlicseason.webp',
+    'minced onion': 'mincedonionseason.webp',
+    'mint ice cream': 'minticecream.webp',
+    'm&ms': 'mnms.webp',
+    'parsley seasoning': 'parsleyseason.webp',
+    'paprika seasoning': 'paprikaseason.webp',
+    'penne noodles': 'pennenoodles.webp',
+    'pickles': 'pickles.webp',
+    'pinto beans': 'pintobeans.webp',
+    'progresso chicken noodle soup': 'progressochickennoodlesoup.webp',
+    'quaker oats': 'quakeroats.webp',
+    'ramen noodles': 'ramennoodles.webp',
+    'ranch dressing': 'ranchdressing.webp',
+    'relish': 'relish.webp',
+    'rigatoni noodles': 'rigatoninoodles.webp',
+    'rotini noodles': 'rotininoodles.webp',
+    'shell noodles': 'shellnoodles.webp',
+    'shells and cheese': 'shellsandcheese.webp',
+    'shredded cheddar cheese': 'shreddedcheddarcheese.webp',
+    'shredded parmesan': 'shreddedparmesan.webp',
+    'sriracha': 'siracha.webp',
+    'sliced cheese': 'slicedcheese.webp',
+    'sliced colby jack cheese': 'slicedcolbyjackcheese.webp',
+    'sliced pepper jack cheese': 'slicedpepperjackcheese.webp',
+    'sliced swiss cheese': 'slicedswisscheese.webp',
+    'sour cream': 'sourcream.webp',
+    'soy sauce': 'soysauce.webp',
+    'spaghetti sauce': 'spegheatisauce.webp',
+    'spicy mustard': 'spicymustard.webp',
+    'steak sauce': 'steaksauce.webp',
+    'string cheese': 'stringcheese.webp',
+    'taco seasoning': 'tacoseason.webp',
+    'tartar sauce': 'tartarsauce.webp',
+    'tomato soup': 'tomatosoup.webp',
+    'tortilla': 'tortilla.webp',
+    'wheat bread': 'wheatbread.webp',
+    'white bread': 'whitebread.webp',
+    'white round top bread': 'whiteroundtopbread.webp',
+    'whole pickles': 'wholepickles.webp',
+    'yum yum sauce': 'yumyumsauce.webp'
   };
 
   // Check for exact item name matches - prefer longest/most specific matches
@@ -563,22 +741,22 @@ export function getItemImage(itemName: string, category: string): string {
 
   // Category-based mappings - prefer PNG when available
   const categoryMappings: Record<string, string> = {
-    'fruit': 'fruits.png',
+    'fruit': 'fruits.webp',
     'vegetable': 'carrot.svg',
-    'dairy': 'cheese.png',
-    'meat': 'beef.png',
+    'dairy': 'cheese.webp',
+    'meat': 'beef.webp',
     'seafood': 'lobster.svg',
-    'pasta': 'spaghetti.png',
-    'bakery': 'pasta.png',
-    'condiments': 'ketchup.png',
-    'spices': 'salt.png',
-    'nuts': 'peanuts.png',
-    'snacks': 'pop_corn.png',
-    'beverages': 'coffee.png',
-    'frozen': 'vanilla_ice_cream.png',
-    'baking': 'flour.png',
-    'breakfast': 'egg.png',
-    'canned': 'tomato_puree.png'
+    'pasta': 'spaghetti.webp',
+    'bakery': 'pasta.webp',
+    'condiments': 'ketchup.webp',
+    'spices': 'salt.webp',
+    'nuts': 'peanuts.webp',
+    'snacks': 'pop_corn.webp',
+    'beverages': 'coffee.webp',
+    'frozen': 'vanilla_ice_cream.webp',
+    'baking': 'flour.webp',
+    'breakfast': 'egg.webp',
+    'canned': 'tomato_puree.webp'
   };
 
   for (const [key, image] of Object.entries(categoryMappings)) {
@@ -589,6 +767,44 @@ export function getItemImage(itemName: string, category: string): string {
 
   // Default placeholder
   return '/images/placeholder.svg';
+}
+
+export function getPreferredItemDisplayImage(itemName: string, category: string, currentImage?: string | null): string {
+  const preferredImage = getItemImage(itemName, category);
+  const normalizedCurrentImage = currentImage?.trim();
+
+  if (!normalizedCurrentImage) {
+    return preferredImage;
+  }
+
+  if (
+    normalizedCurrentImage.startsWith('http://') ||
+    normalizedCurrentImage.startsWith('https://') ||
+    normalizedCurrentImage.startsWith('blob:') ||
+    normalizedCurrentImage.startsWith('data:')
+  ) {
+    return normalizedCurrentImage;
+  }
+
+  if (normalizedCurrentImage.startsWith('/images/items/')) {
+    return normalizedCurrentImage;
+  }
+
+  if (normalizedCurrentImage.startsWith('/images/')) {
+    return preferredImage;
+  }
+
+  return normalizedCurrentImage;
+}
+
+/**
+ * Returns the Spoonacular CDN URL for an item name if it exists in the
+ * seeded image map. Use this in <img onError> handlers to fall back from a
+ * missing local file to the CDN before hitting the placeholder.
+ */
+export function getItemImageCdnUrl(itemName: string): string | null {
+  const filename = resolveSeededItemImageFilename(itemName);
+  return filename ? `${ITEM_IMAGE_CDN_BASE}${filename}` : null;
 }
 
 export async function fetchExternalItemImage(itemName: string): Promise<string | null> {
@@ -825,14 +1041,151 @@ export function inferStorageLocationFromItemName(itemName: string): 'pantry' | '
 }
 
 /**
+ * Returns USDA-based freezer shelf-life in days for a given food item name.
+ * Defaults to 120 days (4 months) for unrecognised items.
+ */
+export function getFreezerShelfLifeDays(itemName: string): number {
+  const name = itemName.toLowerCase();
+
+  // Ground / minced meat — highest turnover, 4 months
+  if (name.includes('ground') || name.includes('hamburger') || name.includes('mince')) return 120;
+
+  // Fatty fish — quality degrades faster, 3 months
+  if (name.includes('salmon') || name.includes('tuna') || name.includes('mackerel') || name.includes('sardine')) return 90;
+
+  // Shellfish / seafood, 4 months
+  if (name.includes('shrimp') || name.includes('prawn') || name.includes('crab') ||
+      name.includes('lobster') || name.includes('scallop') || name.includes('clam') ||
+      name.includes('mussel') || name.includes('oyster')) return 120;
+
+  // Lean fish, 6 months
+  if (name.includes('fish') || name.includes('tilapia') || name.includes('cod') ||
+      name.includes('halibut') || name.includes('flounder')) return 180;
+
+  // Poultry (whole bird or parts), 9 months
+  if (name.includes('chicken') || name.includes('turkey') || name.includes('duck')) return 270;
+
+  // Pork, sausage, bacon, 6 months
+  if (name.includes('pork') || name.includes('ham') || name.includes('bacon') ||
+      name.includes('sausage')) return 180;
+
+  // Beef steaks / roasts (ground already handled above), 9 months
+  if (name.includes('beef') || name.includes('steak') || name.includes('roast') ||
+      name.includes('brisket') || name.includes('rib')) return 270;
+
+  // Lamb / veal, 9 months
+  if (name.includes('lamb') || name.includes('veal')) return 270;
+
+  // Deli / cured meats, 2 months
+  if (name.includes('deli') || name.includes('cold cut') || name.includes('lunch meat') ||
+      name.includes('bologna') || name.includes('salami') || name.includes('pepperoni')) return 60;
+
+  // Bread and baked goods, 3 months
+  if (name.includes('bread') || name.includes('roll') || name.includes('bun') ||
+      name.includes('muffin') || name.includes('bagel') || name.includes('waffle') ||
+      name.includes('pancake')) return 90;
+
+  // Butter, 1 year
+  if (name.includes('butter')) return 365;
+
+  // Default for unrecognised items (casseroles, leftovers, etc.)
+  return 120;
+}
+
+/**
+ * Returns how many days an item typically lasts after being opened.
+ * Based on USDA / FDA shelf-life guidance.
+ * @param itemName Item name (used for name-based overrides within a category)
+ * @param category The item's category string
+ * @returns Number of days of opened shelf life, or undefined if unknown
+ */
+export function getOpenedShelfLifeDays(itemName: string, category: string): number | undefined {
+  const name = itemName.toLowerCase();
+  const cat = (category || '').toLowerCase();
+
+  // Dairy
+  if (cat.includes('dairy') || cat.includes('milk') || cat.includes('cheese')) {
+    if (name.includes('hard cheese') || name.includes('parmesan') || name.includes('romano')) return 21;
+    if (name.includes('soft cheese') || name.includes('brie') || name.includes('camembert') ||
+        name.includes('ricotta') || name.includes('cottage')) return 7;
+    if (name.includes('cream cheese') || name.includes('sour cream') || name.includes('creme fraiche')) return 14;
+    if (name.includes('butter')) return 21;
+    if (name.includes('yogurt')) return 7;
+    if (name.includes('milk') || name.includes('cream')) return 5;
+    return 7; // default dairy
+  }
+
+  // Deli / Meat
+  if (cat.includes('deli') || cat.includes('meat') || cat.includes('poultry') || cat.includes('seafood')) {
+    if (name.includes('deli') || name.includes('cold cut') || name.includes('lunch meat')) return 5;
+    if (name.includes('bacon')) return 7;
+    if (name.includes('sausage') && !name.includes('frozen')) return 4;
+    return 3; // fresh meat / fish after opening / thawing
+  }
+
+  // Canned Goods
+  if (cat.includes('canned') || cat.includes('can ')) {
+    if (name.includes('fish') || name.includes('tuna') || name.includes('salmon') ||
+        name.includes('sardine')) return 3; // canned fish refrigerated
+    return 5; // other canned goods once opened
+  }
+
+  // Condiments & Sauces
+  if (cat.includes('condiment') || cat.includes('sauce')) {
+    if (name.includes('ketchup') || name.includes('mustard')) return 60;
+    if (name.includes('mayonnaise') || name.includes('mayo')) return 60;
+    if (name.includes('salad dressing') || name.includes('dressing')) return 60;
+    if (name.includes('soy sauce')) return 180;
+    if (name.includes('hot sauce')) return 180;
+    if (name.includes('vinegar')) return 365;
+    return 90; // default condiment
+  }
+
+  // Bread / Bakery
+  if (cat.includes('bread') || cat.includes('bak')) {
+    return 5;
+  }
+
+  // Nut Butters
+  if (cat.includes('nut butter') || name.includes('peanut butter') || name.includes('almond butter') ||
+      name.includes('cashew butter') || name.includes('tahini')) {
+    return 90;
+  }
+
+  // Produce
+  if (cat.includes('produce') || cat.includes('vegetable') || cat.includes('fruit')) {
+    if (name.includes('leafy') || name.includes('lettuce') || name.includes('spinach') ||
+        name.includes('arugula') || name.includes('kale')) return 3;
+    if (name.includes('berry') || name.includes('berries')) return 3;
+    return 5;
+  }
+
+  // Beverages
+  if (cat.includes('beverage') || cat.includes('juice')) {
+    return 7;
+  }
+
+  return undefined; // category unknown — don't set openedExpiry
+}
+
+/**
  * Determines if an item should have an automatic expiration date and returns the date
  * @param itemName The name of the item
  * @param category The category of the item
+ * @param storageLocation Optional storage location — 'freezer' returns freezer shelf-life dates
  * @returns ISO date string (YYYY-MM-DD) for expiration, or undefined if no auto-expiration
  */
-export function getAutoExpirationDate(itemName: string, category: string): string | undefined {
+export function getAutoExpirationDate(itemName: string, category: string, storageLocation?: string): string | undefined {
   const name = itemName.toLowerCase();
   const cat = category.toLowerCase();
+
+  // Frozen items: use USDA freezer shelf life instead of fridge durations
+  if (storageLocation === 'freezer') {
+    const days = getFreezerShelfLifeDays(itemName);
+    const d = new Date();
+    d.setDate(d.getDate() + days);
+    return d.toISOString().slice(0, 10);
+  }
 
   // Long-term storage items should not have expiration dates
   const longTermCategories = ['pasta & noodles', 'grains & bread', 'canned goods', 'baking supplies', 'condiments & sauces', 'spices & herbs', 'snacks', 'beverages'];
@@ -966,6 +1319,22 @@ export function getAutoExpirationDate(itemName: string, category: string): strin
  * @returns True if an alert should be shown
  */
 export function shouldShowExpiryAlert(item: PantryItem): boolean {
+  // Never show expiry alerts for immortal items
+  if (item.is_immortal) return false;
+
+  const isFrozen = item.is_frozen || item.storageLocation === 'freezer';
+
+  // Frozen items: use freezerExpiry if available; only alert within RC-configured window
+  if (isFrozen) {
+    const dateStr = item.freezerExpiry || item.expirationDate;
+    if (!dateStr || item.expiryAlertShown) return false;
+    const d = new Date(dateStr);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const daysRemaining = Math.ceil((d.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    return daysRemaining <= remoteConfig.getNumber('expiry_frozen_alert_days');
+  }
+
   if (!item.expirationDate || item.expiryAlertShown) {
     return false;
   }
@@ -1006,7 +1375,10 @@ export function generateConsumptionSuggestions(inventory: PantryItem[]): Consump
     // Calculate average interval between purchases
     const intervals: number[] = [];
     for (let i = 1; i < history.length; i++) {
-      const days = Math.floor((history[i].getTime() - history[i - 1].getTime()) / (1000 * 60 * 60 * 24));
+      const prev = history[i - 1];
+      const curr = history[i];
+      if (!curr || !prev) continue;
+      const days = Math.floor((curr.getTime() - prev.getTime()) / (1000 * 60 * 60 * 24));
       if (days > 0 && days < 90) { // Ignore intervals longer than 3 months
         intervals.push(days);
       }
@@ -1016,6 +1388,7 @@ export function generateConsumptionSuggestions(inventory: PantryItem[]): Consump
 
     const averageInterval = intervals.reduce((sum, interval) => sum + interval, 0) / intervals.length;
     const lastPurchase = history[history.length - 1];
+    if (!lastPurchase) return; // defensive
     const daysSinceLastPurchase = Math.floor((today.getTime() - lastPurchase.getTime()) / (1000 * 60 * 60 * 24));
 
     // Suggest restocking if it's been longer than average interval
@@ -1062,37 +1435,59 @@ export function generateExpirationAlerts(inventory: PantryItem[]): ExpirationAle
   const today = new Date().toISOString().slice(0, 10);
 
   inventory.forEach(item => {
-    if (!item.expirationDate) return;
+    // Skip immortal items entirely
+    if (item.is_immortal) return;
 
-    const expirationDate = new Date(item.expirationDate);
+    const isFrozen = item.is_frozen || item.storageLocation === 'freezer';
+    // Frozen: prefer freezerExpiry; non-frozen: use expirationDate
+    const activeDateStr = isFrozen ? (item.freezerExpiry || item.expirationDate) : item.expirationDate;
+    if (!activeDateStr) return;
+
+    const activeDate = new Date(activeDateStr);
     const todayDate = new Date(today);
-    const daysRemaining = Math.ceil((expirationDate.getTime() - todayDate.getTime()) / (1000 * 60 * 60 * 24));
+    const daysRemaining = Math.ceil((activeDate.getTime() - todayDate.getTime()) / (1000 * 60 * 60 * 24));
 
     const expirationType = item.expirationType || 'best-by';
     let alertLevel: 'expired' | 'critical' | 'warning' | 'info';
     let message: string;
 
-    // Special handling for milk - only warn when 3 days or less remain
-    const isMilk = item.item.toLowerCase().includes('milk') || item.category.toLowerCase() === 'dairy';
-    const warningThreshold = isMilk ? 3 : 7;
-
-    if (daysRemaining < 0) {
-      alertLevel = 'expired';
-      message = `${item.item} has expired!`;
-    } else if (daysRemaining === 0) {
-      alertLevel = 'critical';
-      message = `${item.item} expires today!`;
-    } else if (daysRemaining <= 1) {
-      alertLevel = 'critical';
-      message = `${item.item} expires in ${daysRemaining} day!`;
-    } else if (daysRemaining <= 3) {
-      alertLevel = 'warning';
-      message = `${item.item} expires in ${daysRemaining} days`;
-    } else if (daysRemaining <= warningThreshold) {
-      alertLevel = 'info';
-      message = `${item.item} expires in ${daysRemaining} days`;
+    if (isFrozen) {
+      // Frozen items: only surface alerts within RC-configured window; use gentler language
+      if (daysRemaining < 0) {
+        alertLevel = 'expired';
+        message = `${item.item} is past its freezer date`;
+      } else if (daysRemaining <= remoteConfig.getNumber('expiry_critical_days')) {
+        alertLevel = 'critical';
+        message = `${item.item} should be used within ${daysRemaining} day${daysRemaining === 1 ? '' : 's'} (frozen)`;
+      } else if (daysRemaining <= remoteConfig.getNumber('expiry_frozen_alert_days')) {
+        alertLevel = 'warning';
+        message = `${item.item} is best used within ${daysRemaining} days (frozen)`;
+      } else {
+        return; // Plenty of freezer time left
+      }
     } else {
-      return; // No alert needed
+      // Special handling for milk - only warn when 3 days or less remain
+      const isMilk = item.item.toLowerCase().includes('milk') || item.category.toLowerCase() === 'dairy';
+      const warningThreshold = isMilk ? remoteConfig.getNumber('expiry_warning_days') : remoteConfig.getNumber('expiry_info_days');
+
+      if (daysRemaining < 0) {
+        alertLevel = 'expired';
+        message = `${item.item} has expired!`;
+      } else if (daysRemaining === 0) {
+        alertLevel = 'critical';
+        message = `${item.item} expires today!`;
+      } else if (daysRemaining <= remoteConfig.getNumber('expiry_critical_days')) {
+        alertLevel = 'critical';
+        message = `${item.item} expires in ${daysRemaining} day!`;
+      } else if (daysRemaining <= remoteConfig.getNumber('expiry_warning_days')) {
+        alertLevel = 'warning';
+        message = `${item.item} expires in ${daysRemaining} days`;
+      } else if (daysRemaining <= warningThreshold) {
+        alertLevel = 'info';
+        message = `${item.item} expires in ${daysRemaining} days`;
+      } else {
+        return; // No alert needed
+      }
     }
 
     alerts.push({
@@ -1169,8 +1564,8 @@ export function generateRecipeSuggestions(inventory: PantryItem[]): RecipeSugges
     const todayDate = new Date(today);
     const daysRemaining = Math.ceil((expirationDate.getTime() - todayDate.getTime()) / (1000 * 60 * 60 * 24));
 
-    // Only suggest recipes for items expiring within 7 days
-    if (daysRemaining < 0 || daysRemaining > 7) return;
+    // Only suggest recipes for items expiring within RC-configured window
+    if (daysRemaining < 0 || daysRemaining > remoteConfig.getNumber('expiry_recipe_suggestion_days')) return;
 
     // Find recipes based on item name (case insensitive partial match)
     const itemNameLower = item.item.toLowerCase();
@@ -1233,13 +1628,28 @@ export function generateRecipeSuggestions(inventory: PantryItem[]): RecipeSugges
  * @param expirationType Type of expiration date
  * @returns Color class name
  */
-export function getExpirationColor(daysRemaining: number, expirationType: 'use-by' | 'best-by' = 'best-by'): string {
+ 
+export function getExpirationColor(daysOrDate: number | string, _expirationType: 'use-by' | 'best-by' = 'best-by'): string {
+  // Accept either a precomputed daysRemaining number or an ISO date string.
+  let daysRemaining: number;
+  if (typeof daysOrDate === 'number') {
+    daysRemaining = daysOrDate;
+  } else {
+    const date = new Date(daysOrDate);
+    if (isNaN(date.getTime())) {
+      // If invalid date, treat as distant future
+      daysRemaining = 3650;
+    } else {
+      daysRemaining = Math.ceil((date.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+    }
+  }
+
   if (daysRemaining < 0) return 'text-red-600 bg-red-50 border-red-200'; // Expired
   if (daysRemaining === 0) return 'text-red-600 bg-red-50 border-red-200'; // Expires today
-  if (daysRemaining <= 1) return 'text-red-600 bg-red-50 border-red-200'; // Critical (1 day)
-  if (daysRemaining <= 3) return 'text-orange-600 bg-orange-50 border-orange-200'; // Warning (2-3 days)
-  if (daysRemaining <= 7) return 'text-yellow-600 bg-yellow-50 border-yellow-200'; // Info (4-7 days)
-  return 'text-green-600 bg-green-50 border-green-200'; // Good (>7 days)
+  if (daysRemaining <= remoteConfig.getNumber('expiry_critical_days')) return 'text-red-600 bg-red-50 border-red-200'; // Critical
+  if (daysRemaining <= remoteConfig.getNumber('expiry_warning_days')) return 'text-orange-600 bg-orange-50 border-orange-200'; // Warning
+  if (daysRemaining <= remoteConfig.getNumber('expiry_info_days')) return 'text-yellow-600 bg-yellow-50 border-yellow-200'; // Info
+  return 'text-green-600 bg-green-50 border-green-200'; // Good
 }
 
 // Custom Category Management Functions
@@ -1318,7 +1728,8 @@ export function getCategoryIcon(categoryName: string, customCategories: CustomCa
     'Frozen Foods': '🧊',
     'Baking Supplies': '🧁',
     'Breakfast Foods': '🥞',
-    'Canned Goods': '🥫'
+    'Canned Goods': '🥫',
+    'Leftovers': '🥡'
   };
 
   return defaultIcons[categoryName] || '📦';
@@ -1404,7 +1815,7 @@ export interface QuantityResult {
 }
 
 // Unit conversion factors (to grams or milliliters)
-const UNIT_CONVERSIONS = {
+const UNIT_CONVERSIONS: Record<string, number> = {
   // Weight
   'g': 1,
   'gram': 1,
@@ -1490,10 +1901,10 @@ export function parseQuantity(quantityText: string): ParsedQuantity | null {
   let processedText = text;
   const fractionMatch = text.match(fractionRegex);
   if (fractionMatch) {
-    const whole = parseInt(fractionMatch[1]);
-    const numerator = parseInt(fractionMatch[2]);
-    const denominator = parseInt(fractionMatch[3]);
-    const decimal = whole + (numerator / denominator);
+    const whole = parseInt(fractionMatch[1] ?? '0', 10);
+    const numerator = parseInt(fractionMatch[2] ?? '0', 10);
+    const denominator = parseInt(fractionMatch[3] ?? '1', 10);
+    const decimal = whole + (numerator / Math.max(1, denominator));
     processedText = text.replace(fractionMatch[0], decimal.toString());
   }
 
@@ -1501,9 +1912,9 @@ export function parseQuantity(quantityText: string): ParsedQuantity | null {
   const simpleFractionRegex = /(\d+)\/(\d+)/;
   const simpleMatch = processedText.match(simpleFractionRegex);
   if (simpleMatch && !fractionMatch) {
-    const numerator = parseInt(simpleMatch[1]);
-    const denominator = parseInt(simpleMatch[2]);
-    const decimal = numerator / denominator;
+    const numerator = parseInt(simpleMatch[1] ?? '0', 10);
+    const denominator = parseInt(simpleMatch[2] ?? '1', 10);
+    const decimal = numerator / Math.max(1, denominator);
     processedText = processedText.replace(simpleMatch[0], decimal.toString());
   }
 
@@ -1513,17 +1924,22 @@ export function parseQuantity(quantityText: string): ParsedQuantity | null {
     return null;
   }
 
-  const amount = parseFloat(match[1]);
-  const unit = match[2].trim();
+  const amount = parseFloat(match[1] ?? '0');
+  const unitRaw = (match[2] ?? '').trim();
+  const unitKey = unitRaw.toLowerCase();
 
-  // Validate unit exists in our conversions
-  if (!UNIT_CONVERSIONS[unit] && !UNIT_CONVERSIONS[unit + 's']) {
-    return null;
-  }
+  // Find conversion for unit or plural form
+  const resolvedUnit = UNIT_CONVERSIONS[unitKey]
+    ? unitKey
+    : UNIT_CONVERSIONS[unitKey + 's']
+    ? unitKey + 's'
+    : undefined;
+
+  if (!resolvedUnit) return null;
 
   return {
     amount,
-    unit: UNIT_CONVERSIONS[unit] ? unit : unit + 's'
+    unit: resolvedUnit
   };
 }
 
@@ -1531,20 +1947,22 @@ export function parseQuantity(quantityText: string): ParsedQuantity | null {
  * Convert quantity to normalized grams/ml for comparison
  */
 export function normalizeQuantity(quantity: ParsedQuantity): QuantityResult {
-  const conversionFactor = UNIT_CONVERSIONS[quantity.unit.toLowerCase()];
+  const key = quantity.unit.toLowerCase();
+  const conversionFactor = UNIT_CONVERSIONS[key] ?? UNIT_CONVERSIONS[key + 's'];
   if (!conversionFactor) {
     return { ...quantity };
   }
 
   // For weight/volume units, convert to grams/ml
-  if (['g', 'gram', 'grams', 'kg', 'kilogram', 'kilograms', 'oz', 'ounce', 'ounces', 'lb', 'pound', 'pounds'].includes(quantity.unit.toLowerCase())) {
+  const lowUnit = key;
+  if (['g', 'gram', 'grams', 'kg', 'kilogram', 'kilograms', 'oz', 'ounce', 'ounces', 'lb', 'pound', 'pounds'].includes(lowUnit)) {
     return {
       ...quantity,
       normalizedGrams: quantity.amount * conversionFactor
     };
   }
 
-  if (['ml', 'milliliter', 'milliliters', 'l', 'liter', 'liters', 'cup', 'cups', 'tbsp', 'tablespoon', 'tablespoons', 'tsp', 'teaspoon', 'teaspoons', 'qt', 'quart', 'quarts', 'pt', 'pint', 'pints', 'gal', 'gallon', 'gallons'].includes(quantity.unit.toLowerCase())) {
+  if (['ml', 'milliliter', 'milliliters', 'l', 'liter', 'liters', 'cup', 'cups', 'tbsp', 'tablespoon', 'tablespoons', 'tsp', 'teaspoon', 'teaspoons', 'qt', 'quart', 'quarts', 'pt', 'pint', 'pints', 'gal', 'gallon', 'gallons'].includes(lowUnit)) {
     return {
       ...quantity,
       normalizedGrams: quantity.amount * conversionFactor // Using grams field for volume too
@@ -1580,7 +1998,8 @@ export function combineQuantities(q1: ParsedQuantity, q2: ParsedQuantity): Parse
   if (n1.normalizedGrams !== undefined && n2.normalizedGrams !== undefined) {
     // Convert both to grams/ml, add, then convert back to first unit
     const totalGrams = n1.normalizedGrams + n2.normalizedGrams;
-    const amountInOriginalUnit = totalGrams / UNIT_CONVERSIONS[q1.unit.toLowerCase()];
+    const conv = UNIT_CONVERSIONS[q1.unit.toLowerCase()] ?? UNIT_CONVERSIONS[q1.unit.toLowerCase() + 's'];
+    const amountInOriginalUnit = conv ? totalGrams / conv : totalGrams;
     return {
       amount: Math.round(amountInOriginalUnit * 100) / 100, // Round to 2 decimal places
       unit: q1.unit
@@ -1609,7 +2028,8 @@ export function subtractQuantities(total: ParsedQuantity, used: ParsedQuantity):
     const remainingGrams = nTotal.normalizedGrams - nUsed.normalizedGrams;
     if (remainingGrams <= 0) return null; // All used up
 
-    const amountInOriginalUnit = remainingGrams / UNIT_CONVERSIONS[total.unit.toLowerCase()];
+    const conv = UNIT_CONVERSIONS[total.unit.toLowerCase()] ?? UNIT_CONVERSIONS[total.unit.toLowerCase() + 's'];
+    const amountInOriginalUnit = conv ? remainingGrams / conv : remainingGrams;
     return {
       amount: Math.round(amountInOriginalUnit * 100) / 100,
       unit: total.unit
@@ -1631,11 +2051,11 @@ export function subtractQuantities(total: ParsedQuantity, used: ParsedQuantity):
  * Shows available quantity (total - reserved)
  */
 export function formatItemQuantity(item: PantryItem): string {
-  const totalAmount = item.quantity ? item.quantity.amount : parseInt(item.quantity_estimate) || 1;
-  const unit = item.quantity?.unit || 'count';
+  const totalAmount = getQuantityAmount(item.quantity ?? item.quantity_estimate);
+  const unit = getQuantityUnit(item.quantity ?? item.quantity_estimate);
 
   // Calculate reserved amount
-  const reservedAmount = item.reservations?.reduce((sum, res) => sum + res.quantity, 0) || 0;
+  const reservedAmount = item.reservations?.reduce((sum, res) => sum + (res?.quantity || 0), 0) || 0;
   const availableAmount = Math.max(0, totalAmount - reservedAmount);
 
   // Format common fractions nicely

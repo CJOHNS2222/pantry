@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Star, MessageSquare, Camera, Heart, X, ThumbsUp, Users, TrendingUp, ChefHat, Loader2 } from 'lucide-react';
+import { Star, MessageSquare, Camera, Heart, X, Users, TrendingUp, ChefHat, Loader2 } from 'lucide-react';
 import { RecipeRating, StructuredRecipe, RecipeFeedback, RecipePhoto, RecipeModification, RecipeCommunityStats } from '../types';
 import { RecipeRatingService } from '../services/recipeRatingService';
 import { RecipePhotoService } from '../services/recipePhotoService';
 import { useAuth } from '../hooks/useAuth';
 import { useToasts } from '../hooks/useToasts';
+import { log } from '../services/logService';
 
 interface RecipeRatingUIProps {
   recipeTitle: string;
@@ -25,9 +26,12 @@ export const RecipeRatingUI: React.FC<RecipeRatingUIProps> = ({
   const { addToast } = useToasts();
   const [existingRating, setExistingRating] = useState<RecipeRating | null>(null);
   // Support prop user override for testing
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const user = (typeof (window as any).TEST_USER !== 'undefined') ? (window as any).TEST_USER : (contextUser ?? undefined);
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [starRating, setStarRating] = useState<number>(0);
+  const [hoverStar, setHoverStar] = useState<number>(0);
   const [selectedVerdict, setSelectedVerdict] = useState<'make-again' | 'skip' | 'modify' | null>(null);
   const [selectedFeedback, setSelectedFeedback] = useState<Set<string>>(new Set());
   const [comment, setComment] = useState('');
@@ -53,13 +57,14 @@ export const RecipeRatingUI: React.FC<RecipeRatingUIProps> = ({
       if (rating) {
         setExistingRating(rating);
         setSelectedVerdict(rating.wouldMakeAgain ? 'make-again' : rating.wouldMakeAgain === false ? 'skip' : null);
+        setStarRating(rating.rating || 0);
         setSelectedFeedback(new Set(rating.feedback?.map(f => f.type) || []));
         setComment(rating.comment || '');
         setPhotos(rating.photos || []);
         setIsSubmitted(true);
       }
     } catch (error) {
-      console.error('Failed to load existing rating:', error);
+      log.error('Failed to load existing rating:', error);
     } finally {
       setIsLoading(false);
     }
@@ -122,9 +127,9 @@ export const RecipeRatingUI: React.FC<RecipeRatingUIProps> = ({
       );
 
       setPhotos(prev => [...prev, photo]);
-      addToast('Photo uploaded successfully!', 'success');
+      addToast('Photo uploaded successfully!', 'info');
     } catch (error) {
-      console.error('Photo upload failed:', error);
+      log.error('Photo upload failed:', error);
       addToast('Failed to upload photo. Please try again.', 'error');
     } finally {
       setIsLoading(false);
@@ -139,6 +144,9 @@ export const RecipeRatingUI: React.FC<RecipeRatingUIProps> = ({
     try {
       setIsSubmitting(true);
 
+      // Use the provided `recipe` object directly — it should include recipe info at submit time.
+      const enrichedRecipe: StructuredRecipe = recipe;
+
       const feedback: RecipeFeedback[] = Array.from(selectedFeedback).map(type => ({
         type: type as RecipeFeedback['type'],
         comment: type === 'love-it' ? comment : undefined
@@ -147,12 +155,12 @@ export const RecipeRatingUI: React.FC<RecipeRatingUIProps> = ({
       const rating: RecipeRating = {
         id: existingRating?.id || `${recipeTitle}_${user?.id || 'anon'}_${Date.now()}`,
         recipeTitle,
-        rating: selectedVerdict === 'make-again' ? 5 : selectedVerdict === 'modify' ? 3 : 1,
+        rating: starRating || (selectedVerdict === 'make-again' ? 5 : selectedVerdict === 'modify' ? 3 : 1),
         comment,
         userName: user?.name || 'Anonymous User',
         userAvatar: user?.avatar,
         date: new Date().toISOString(),
-        recipe,
+        recipe: enrichedRecipe,
         wouldMakeAgain: selectedVerdict === 'make-again',
         feedback,
         photos,
@@ -166,9 +174,9 @@ export const RecipeRatingUI: React.FC<RecipeRatingUIProps> = ({
       setExistingRating(rating);
       setIsSubmitted(true);
       onRatingSubmitted?.(rating);
-      addToast('Rating submitted successfully!', 'success');
+      addToast('Rating submitted successfully!', 'info');
     } catch (error) {
-      console.error('Failed to submit rating:', error);
+      log.error('Failed to submit rating', { error }, 'RecipeRatingUI');
       addToast('Failed to submit rating. Please try again.', 'error');
     } finally {
       setIsSubmitting(false);
@@ -191,9 +199,9 @@ export const RecipeRatingUI: React.FC<RecipeRatingUIProps> = ({
 
       setModificationText('');
       setShowModificationForm(false);
-      addToast('Modification suggestion added!', 'success');
+      addToast('Modification suggestion added!', 'info');
     } catch (error) {
-      console.error('Failed to add modification:', error);
+      log.error('Failed to add modification', { error }, 'RecipeRatingUI');
       addToast('Failed to add modification. Please try again.', 'error');
     }
   };
@@ -264,6 +272,31 @@ export const RecipeRatingUI: React.FC<RecipeRatingUIProps> = ({
       </h4>
 
       <form onSubmit={handleSubmit} onClick={(e) => e.stopPropagation()}>
+        {/* Star Rating */}
+        <div className="mb-4">
+          <div className="text-sm text-theme-secondary mb-2">Star rating:</div>
+          <div className="flex gap-1">
+            {[1, 2, 3, 4, 5].map(star => (
+              <button
+                key={star}
+                type="button"
+                onClick={() => setStarRating(star)}
+                onMouseEnter={() => setHoverStar(star)}
+                onMouseLeave={() => setHoverStar(0)}
+                className="p-1 transition-transform hover:scale-110"
+              >
+                <Star
+                  className={`w-7 h-7 transition-colors ${
+                    star <= (hoverStar || starRating)
+                      ? 'text-yellow-400 fill-yellow-400'
+                      : 'text-theme-secondary'
+                  }`}
+                />
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Verdict Selection */}
         <div className="mb-4">
           <div className="text-sm text-theme-secondary mb-2">Would you make this again?</div>
@@ -275,7 +308,10 @@ export const RecipeRatingUI: React.FC<RecipeRatingUIProps> = ({
                 <button
                   key={option.key}
                   type="button"
-                  onClick={() => handleVerdictSelect(option.key as any)}
+                  onClick={() => {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    handleVerdictSelect(option.key as any)
+                  }}
                   className={`flex-1 flex flex-col items-center gap-2 p-3 rounded-lg border transition-all ${
                     isSelected
                       ? 'border-[var(--accent-color)] bg-[var(--accent-color)]/10'

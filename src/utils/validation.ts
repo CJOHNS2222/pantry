@@ -1,4 +1,4 @@
-// Input validation utilities for the Smart Pantry Chef app
+// Input validation utilities for the Stock & Spoon app
 // Provides comprehensive validation for forms, user inputs, and data integrity
 
 export interface ValidationResult {
@@ -106,7 +106,7 @@ export function validatePassword(password: string): ValidationResult {
     if (!/(?=.*\d)/.test(password)) {
       errors.push('Password must contain at least one number');
     }
-    if (!/(?=.*[@$!%*?&])/.test(password)) {
+    if (!/(?=.*[@$!%*?&#^()_+\-=\[\]{}|\\;:'",.<>\/~`])/.test(password)) {
       errors.push('Password must contain at least one special character');
     }
   }

@@ -1,8 +1,10 @@
-import React, { useMemo } from 'react';
-import { TrendingUp, ChefHat, Clock, Target, Lightbulb, Star } from 'lucide-react';
-import { useAuth } from '../hooks/useAuth';
-import { useDataManagement } from '../hooks/useDataManagement';
+import React, { useMemo, useState } from 'react';
+import { ChefHat, Clock, Lightbulb, Star, ChevronDown, ChevronUp } from 'lucide-react';
 import AnalyticsService from '../services/analyticsService';
+import { log } from '../services/logService';
+import { PantryItem, SavedRecipe, User } from '../types';
+import { Tab } from '../types/app';
+import { useSubscription } from '../hooks/useSubscription';
 
 /**
  * Interface for smart recommendation data
@@ -16,6 +18,7 @@ interface SmartRecommendation {
   icon: React.ReactNode;
   actionText: string;
   category: string;
+  recipe?: SavedRecipe;
 }
 
 /**
@@ -29,33 +32,29 @@ interface SmartRecommendation {
  * - Usage pattern analysis and personalized insights
  * - Impact-based prioritization (high/medium/low)
  */
-const SmartRecommendations: React.FC = () => {
-  const { user } = useAuth();
-  const { userInventory, userShoppingList, userMealPlan, userSavedRecipes } = useDataManagement();
+interface SmartRecommendationsProps {
+  inventory: PantryItem[];
+  savedRecipes: SavedRecipe[];
+  user?: User | null;
+  setActiveTab: (tab: Tab) => void;
+}
 
-  /**
-   * Generate personalized recommendations based on user data and behavior patterns
-   * Analyzes inventory, meal plans, saved recipes, and usage patterns to provide
-   * actionable suggestions for improving the user experience.
-   */
+const SmartRecommendations: React.FC<SmartRecommendationsProps> = ({ inventory, savedRecipes, user, setActiveTab }) => {
+  const [isCollapsed, setIsCollapsed] = useState(true);
+  const { isPremium } = useSubscription(user ?? null);
   const recommendations = useMemo((): SmartRecommendation[] => {
     const recs: SmartRecommendation[] = [];
 
-    // Analyze user behavior patterns
-    const hasInventory = userInventory && userInventory.length > 0;
-    const hasShoppingList = userShoppingList && userShoppingList.length > 0;
-    const hasMealPlan = userMealPlan && userMealPlan.length > 0;
-    const hasSavedRecipes = userSavedRecipes && userSavedRecipes.length > 0;
+    const hasInventory = inventory.length > 0;
+    const hasSavedRecipes = savedRecipes.length > 0;
 
-    // Recipe-based recommendations
+    // Recipe-based recommendations — match pantry items against saved recipe ingredients
     if (hasInventory && hasSavedRecipes) {
-      const inventoryItems = userInventory.map(item => item.name.toLowerCase());
-      const savedRecipeTitles = userSavedRecipes.map(recipe => recipe.title.toLowerCase());
+      const inventoryItems = inventory.map((item) => item.item.toLowerCase());
 
-      // Check for recipes that match current inventory
-      const matchingRecipes = userSavedRecipes.filter(recipe =>
-        recipe.ingredients?.some(ingredient =>
-          inventoryItems.some(item =>
+      const matchingRecipes = savedRecipes.filter((recipe) =>
+        recipe.ingredients?.some((ingredient) =>
+          inventoryItems.some((item) =>
             ingredient.toLowerCase().includes(item) || item.includes(ingredient.toLowerCase())
           )
         )
@@ -70,36 +69,10 @@ const SmartRecommendations: React.FC = () => {
           impact: 'high',
           icon: <ChefHat className="w-5 h-5" />,
           actionText: 'View Recipe',
-          category: 'Recipe Match'
+          category: 'Recipe Match',
+          recipe: matchingRecipes[0]
         });
       }
-    }
-
-    // Feature adoption recommendations
-    if (!hasMealPlan && hasSavedRecipes) {
-      recs.push({
-        id: 'try-meal-planning',
-        type: 'feature',
-        title: 'Start Meal Planning',
-        description: 'With your saved recipes, you could plan meals for the week and save time on grocery shopping.',
-        impact: 'medium',
-        icon: <Target className="w-5 h-5" />,
-        actionText: 'Create Meal Plan',
-        category: 'Feature Discovery'
-      });
-    }
-
-    if (!hasShoppingList && hasInventory) {
-      recs.push({
-        id: 'create-shopping-list',
-        type: 'shopping',
-        title: 'Track What You Need',
-        description: 'Create a shopping list to stay organized and never run out of essentials again.',
-        impact: 'medium',
-        icon: <TrendingUp className="w-5 h-5" />,
-        actionText: 'Create List',
-        category: 'Organization'
-      });
     }
 
     // Time-based recommendations
@@ -119,9 +92,9 @@ const SmartRecommendations: React.FC = () => {
       });
     }
 
-    // Inventory optimization
+    // Expiring inventory alert
     if (hasInventory) {
-      const expiringSoon = userInventory.filter(item => {
+      const expiringSoon = inventory.filter((item) => {
         if (!item.expirationDate) return false;
         const expiry = new Date(item.expirationDate);
         const daysUntilExpiry = Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
@@ -129,11 +102,12 @@ const SmartRecommendations: React.FC = () => {
       });
 
       if (expiringSoon.length > 0) {
+        const names = expiringSoon.map(i => i.item).join(', ');
         recs.push({
           id: 'use-expiring-items',
           type: 'recipe',
           title: 'Use Before It Expires',
-          description: `${expiringSoon.length} item${expiringSoon.length > 1 ? 's' : ''} ${expiringSoon.length > 1 ? 'are' : 'is'} expiring soon. Plan meals around them!`,
+          description: `Expiring soon: ${names}. Plan meals around them!`,
           impact: 'high',
           icon: <Clock className="w-5 h-5" />,
           actionText: 'Find Recipes',
@@ -142,8 +116,8 @@ const SmartRecommendations: React.FC = () => {
       }
     }
 
-    // Premium feature suggestions (if not premium)
-    if (!user?.isPremium) {
+    // Premium upgrade suggestion — only show if not already on a paid plan (own or inherited)
+    if (!isPremium) {
       recs.push({
         id: 'upgrade-premium',
         type: 'feature',
@@ -156,13 +130,13 @@ const SmartRecommendations: React.FC = () => {
       });
     }
 
-    // Learning recommendations
-    if (!hasInventory && !hasShoppingList && !hasMealPlan) {
+    // Getting started nudge
+    if (!hasInventory && !hasSavedRecipes) {
       recs.push({
         id: 'getting-started',
         type: 'feature',
         title: 'Getting Started Guide',
-        description: 'New to Smart Pantry? Start by adding some items to your inventory to unlock personalized recommendations.',
+        description: 'Start by adding some items to your inventory to unlock personalized recommendations.',
         impact: 'high',
         icon: <Lightbulb className="w-5 h-5" />,
         actionText: 'Add First Item',
@@ -170,7 +144,6 @@ const SmartRecommendations: React.FC = () => {
       });
     }
 
-    // Sort by impact (high first) and limit to top 5
     return recs
       .sort((a, b) => {
         const impactOrder = { high: 3, medium: 2, low: 1 };
@@ -178,7 +151,7 @@ const SmartRecommendations: React.FC = () => {
       })
       .slice(0, 5);
 
-  }, [userInventory, userShoppingList, userMealPlan, userSavedRecipes, user]);
+  }, [inventory, savedRecipes, user, isPremium]);
 
   const getImpactColor = (impact: string) => {
     switch (impact) {
@@ -199,41 +172,34 @@ const SmartRecommendations: React.FC = () => {
   };
 
   const handleRecommendationAction = (rec: SmartRecommendation) => {
-    // Track the recommendation action
-    AnalyticsService.trackRecommendationAction(rec.id, rec.type);
+    (AnalyticsService as unknown as { trackRecommendationAction?: (id: string, type: string) => void }).trackRecommendationAction?.(rec.id, rec.type);
 
     switch (rec.type) {
       case 'recipe':
-        // Navigate to recipes tab
-        if (rec.actionText.includes('View Recipe') || rec.actionText.includes('Browse Recipes')) {
-          // This would need to be passed as a prop or accessed via context
-          // For now, we'll just show a toast
-          console.log(`Navigate to recipes for: ${rec.title}`);
-        } else if (rec.actionText.includes('Find Recipes')) {
-          console.log(`Find recipes using expiring items for: ${rec.title}`);
+        if (rec.recipe) {
+          window.dispatchEvent(new CustomEvent('openRecipeModal', { detail: { recipe: rec.recipe, isSavedView: true } }));
+        } else if (rec.actionText.includes('Browse Recipes')) {
+          // Already on recipes tab — scroll RecipeFinder into view
+          document.querySelector('[data-recipe-finder]')?.scrollIntoView({ behavior: 'smooth' });
+        } else if (rec.actionText.includes('Find Recipes') && savedRecipes.length > 0) {
+          window.dispatchEvent(new CustomEvent('openRecipeModal', { detail: { recipe: savedRecipes[0], isSavedView: true } }));
         }
         break;
       case 'feature':
-        if (rec.actionText.includes('Create Meal Plan')) {
-          console.log('Navigate to meal planning');
-        } else if (rec.actionText.includes('Upgrade Now')) {
-          console.log('Navigate to premium upgrade');
+        if (rec.actionText.includes('Upgrade Now') || rec.actionText.includes('Create Meal Plan')) {
+          setActiveTab(Tab.SETTINGS);
         } else if (rec.actionText.includes('Add First Item')) {
-          console.log('Navigate to add inventory item');
+          setActiveTab(Tab.PANTRY);
         }
         break;
       case 'shopping':
         if (rec.actionText.includes('Create List')) {
-          console.log('Navigate to shopping list creation');
+          setActiveTab(Tab.SHOPPING);
         }
         break;
       default:
-        console.log(`Action for ${rec.type}: ${rec.actionText}`);
+        log.debug(`Unhandled recommendation action: ${rec.actionText}`);
     }
-
-    // For now, show a toast indicating the action
-    // In a real implementation, this would navigate or perform the action
-    console.log(`Recommendation action: ${rec.actionText} for ${rec.title}`);
   };
 
   if (recommendations.length === 0) {
@@ -242,8 +208,11 @@ const SmartRecommendations: React.FC = () => {
         <div className="text-center py-8">
           <Lightbulb className="w-12 h-12 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">No Recommendations Yet</h3>
-          <p className="text-gray-600">
+          <p className="text-sm text-gray-600">
             Start using the app to get personalized recommendations based on your behavior and preferences.
+          </p>
+          <p className="text-sm text-gray-500 mt-2">
+            Add items, plan meals, or rate recipes to unlock smarter suggestions.
           </p>
         </div>
       </div>
@@ -251,42 +220,49 @@ const SmartRecommendations: React.FC = () => {
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border">
-      <div className="p-6 border-b">
-        <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
-          <Lightbulb className="w-6 h-6 text-blue-600" />
+    <div className="bg-white rounded-lg shadow-sm border mb-3">
+      <button
+        onClick={() => setIsCollapsed(c => !c)}
+        className="w-full px-4 py-3 border-b flex items-center justify-between text-left hover:bg-gray-50 transition-colors"
+        aria-expanded={!isCollapsed}
+      >
+        <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+          <Lightbulb className="w-5 h-5 text-blue-600 flex-shrink-0" />
           Smart Recommendations
+          {isCollapsed && recommendations.length > 0 && (
+            <span className="text-sm font-normal text-gray-500 ml-1">({recommendations.length})</span>
+          )}
         </h2>
-        <p className="text-gray-600 mt-1">
-          Personalized suggestions based on your usage patterns
-        </p>
-      </div>
+        {isCollapsed ? <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" /> : <ChevronUp className="w-4 h-4 text-gray-400 flex-shrink-0" />}
+      </button>
 
-      <div className="divide-y">
-        {recommendations.map((rec) => (
-          <div key={rec.id} className="p-6 hover:bg-gray-50 transition-colors">
-            <div className="flex items-start gap-4">
+      {!isCollapsed && (
+        <>
+        <div className="divide-y">
+          {recommendations.map((rec) => (
+          <div key={rec.id} className="px-4 py-3 hover:bg-gray-50 transition-colors">
+            <div className="flex items-start gap-3">
               <div className="flex-shrink-0">
-                <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center text-blue-600">
+                <div className="w-7 h-7 bg-blue-50 rounded-md flex items-center justify-center text-blue-600">
                   {rec.icon}
                 </div>
               </div>
 
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-2">
-                  <h3 className="text-lg font-medium text-gray-900">{rec.title}</h3>
-                  <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getImpactColor(rec.impact)}`}>
-                    {getImpactIcon(rec.impact)} {rec.impact.toUpperCase()} IMPACT
+                <div className="flex items-center gap-2 mb-0.5">
+                  <h3 className="text-sm font-medium text-gray-900 leading-snug">{rec.title}</h3>
+                  <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium border ${getImpactColor(rec.impact)}`}>
+                    {getImpactIcon(rec.impact)} {rec.impact.toUpperCase()}
                   </span>
                 </div>
 
-                <p className="text-gray-600 mb-3">{rec.description}</p>
+                <p className="text-sm text-gray-600 mb-1.5 leading-snug">{rec.description}</p>
 
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-gray-500">{rec.category}</span>
                   <button 
                     onClick={() => handleRecommendationAction(rec)}
-                    className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                    className="inline-flex items-center px-3 py-1 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
                   >
                     {rec.actionText}
                   </button>
@@ -303,6 +279,8 @@ const SmartRecommendations: React.FC = () => {
             More recommendations available as you continue using the app
           </p>
         </div>
+      )}
+        </>
       )}
     </div>
   );

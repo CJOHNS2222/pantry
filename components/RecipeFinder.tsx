@@ -1,22 +1,32 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Search, Loader2, Sparkles, ExternalLink, Globe, Plus, Clock, List, ChefHat, ToggleLeft, ToggleRight, Star, Heart, Bookmark, Zap, Mic } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { searchRecipes } from '../services/geminiService';
-import { getSavedRecipes, getCachedPopularRecipes } from '../services/recipeService';
-import { RecipeSearchResult, LoadingState, RecipeRating, StructuredRecipe, PantryItem, SavedRecipe, User, Household } from '../types';
-import { Tab } from '../types/app';
-import { RecipeCardSkeleton } from './SkeletonLoader';
+import { setUserGeminiOptIn } from '../services/featureFlags';
+import { getCachedPopularRecipes, submitRecipeForReview } from '../services/recipeService';
+import { RecipeSearchResult, LoadingState, RecipeRating, StructuredRecipe, PantryItem, SavedRecipe, User, Household, RecipeSearchParams } from '../types';
 import { PremiumFeature } from './PremiumFeature';
-import { RecipeRatingUI } from './RecipeRating';
-import { ProgressiveImage } from './ProgressiveImage';
 import { log } from '../services/logService';
-import { generateBlurDataURL } from '../utils/appUtils';
-import RecipeModal from './RecipeModal';
 import AnalyticsService from '../services/analyticsService';
 import { UsageService } from '../services/usageService';
-import { searchPantryItems, getEnhancedAutocompleteSuggestions, filterPantryItems, savePantryFilter, loadPantryFilter, defaultPantryFilter, saveSearchToHistory, getRecentSearchSuggestions, AutocompleteSuggestion } from '../utils/searchUtils';
+import { saveSearchToHistory, getRecentSearchSuggestions } from '../utils/searchUtils';
 import { useKeyboardNavigation } from '../hooks/useKeyboardNavigation';
-import { debounce } from '../utils/debounceUtils';
-import { filterRecipesByHouseholdPreferences } from '../utils/preferenceUtils';
+import { useAndroidBack } from '../hooks/useAndroidBack';
+
+import { filterRecipesByHouseholdPreferences, checkRecipeAgainstPreferences, rankCachedRecipesByPreferences, recipeMatchesCacheFilters, CacheMealTypeFilter } from '../utils/preferenceUtils';
+import { getUserMeasurementSystem } from '../utils/measurementUtils';
+import { useIntl } from 'react-intl';
+import { Capacitor } from '@capacitor/core';
+import { SpeechRecognition } from '@capacitor-community/speech-recognition';
+import { maybeRequestReviewAfterRecipeSave } from '../services/appReviewService';
+import { RecipeFinderSavedView } from './recipe-finder/RecipeFinderSavedView';
+import { RecipeFinderPopularSection } from './recipe-finder/RecipeFinderPopularSection';
+import { RecipeFinderSearchControls } from './recipe-finder/RecipeFinderSearchControls';
+import { RecipeFinderResultStates } from './recipe-finder/RecipeFinderResultStates';
+import { RecipeFinderCard, RecipeFinderTile } from './recipe-finder/RecipeFinderCards';
+import { RecipeFinderTabs } from './recipe-finder/RecipeFinderTabs';
+import { RecipeFinderModalSection } from './recipe-finder/RecipeFinderModalSection';
+
+/** Internal search params — partial RecipeSearchParams plus component-local filter fields */
+type RecipeFinderSearchParams = Partial<RecipeSearchParams> & { type?: string };
 
 interface RecipeFinderProps {
     onAddToPlan: (recipe: StructuredRecipe) => void;
@@ -32,7 +42,7 @@ interface RecipeFinderProps {
     persistedResult?: RecipeSearchResult | null;
     setPersistedResult?: (result: RecipeSearchResult | null) => void;
     initialSearchQuery?: string;
-    addToast?: (message: string, type?: 'error' | 'info', ttl?: number, actionLabel?: string, action?: () => void) => void;
+    addToast?: (message: string, type?: 'error' | 'info' | 'success', ttl?: number, actionLabel?: string, action?: () => void) => void;
     // Usage limit states
     recipeSaveLimitExceeded?: boolean;
     mealPlanLimitExceeded?: boolean;
@@ -43,6 +53,7 @@ interface RecipeFinderProps {
 }
 
 export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveRecipe, onDeleteRecipe, onMarkAsMade, inventory, ratings = [], onRate, savedRecipes, user, setActiveTab, persistedResult, setPersistedResult, initialSearchQuery, addToast, recipeSaveLimitExceeded = false, mealPlanLimitExceeded = false, isLoadingSavedRecipes = false, household }) => {
+    const intl = useIntl();
     // List of staple items to ignore
     const STAPLES = ['salt', 'pepper', 'oil', 'water', 'flour', 'sugar', 'butter', 'vinegar', 'baking powder', 'baking soda', 'spices', 'seasoning', 'soy sauce', 'cornstarch', 'yeast'];
     
@@ -81,8 +92,12 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
             canMake
         };
     };
+
+    // Import modal state
+    const [showImportModal, setShowImportModal] = useState(false);
     
     // Get recipe suggestions based on inventory
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const getRecipeSuggestions = useMemo(() => {
         if (!savedRecipes.length || !inventory.length) return { canMake: [], needMore: [] };
         
@@ -99,17 +114,36 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
             needMore: suggestions.filter(item => !item.feasibility.canMake).slice(0, 8)
         };
     }, [savedRecipes, inventory]);
-    
+
+    const [savedSort, setSavedSort] = useState<'recent' | 'top-rated'>('recent');
+
+    const sortedSavedRecipes = useMemo(() => {
+        if (savedSort === 'recent') {
+            return [...savedRecipes].sort((a, b) =>
+                (b.dateSaved ?? '').localeCompare(a.dateSaved ?? '')
+            );
+        }
+        // top-rated: match by title against ratings array, average per recipe
+        const avgRating = (recipe: SavedRecipe) => {
+            const recipeRatings = ratings.filter(r => r.recipeTitle === recipe.title);
+            if (!recipeRatings.length) return 0;
+            return recipeRatings.reduce((sum, r) => sum + r.rating, 0) / recipeRatings.length;
+        };
+        return [...savedRecipes].sort((a, b) => avgRating(b) - avgRating(a));
+    }, [savedRecipes, savedSort, ratings]);
+
     // Extract search logic to custom hook
     const [activeView, setActiveView] = useState<'search' | 'saved'>('search');
-    const [selectedCategory, setSelectedCategory] = useState<string>('All');
+    const [cacheMealTypeFilter, setCacheMealTypeFilter] = useState<CacheMealTypeFilter>('');
+    const [cacheCuisineFilter, setCacheCuisineFilter] = useState<string>('');
     
     // Search parameters
     const [specificQuery, setSpecificQuery] = useState('');
     const [maxCookTime, setMaxCookTime] = useState<string>('60');
     const [maxIngredients, setMaxIngredients] = useState<string>('10');
     const [recipeType, setRecipeType] = useState<'Snack' | 'Dinner' | 'Dessert' | ''>('');
-    const [measurement, setMeasurement] = useState<'Metric' | 'Standard'>('Standard');
+    // Use user's measurement preference instead of local state
+    const measurement = getUserMeasurementSystem(user?.profile);
     const [strictMode, setStrictMode] = useState(false);
     
     // New smart filters
@@ -123,13 +157,38 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
     
     // Search state
     const [result, setResult] = useState<RecipeSearchResult | null>(persistedResult || null);
+    // Map of recipe title -> warning strings for post-fetch preference checking
+    const [recipeWarnings, setRecipeWarnings] = useState<Map<string, { warnings: string[], isAllergen: boolean }>>(new Map());
     const [loadingState, setLoadingState] = useState<LoadingState>(LoadingState.IDLE);
     const [searchError, setSearchError] = useState<string | null>(null);
     const [isResultFromCache, setIsResultFromCache] = useState(false);
 
     // Firebase recipes state
     const [firebaseRecipes, setFirebaseRecipes] = useState<SavedRecipe[]>([]);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const [firebaseRecipesLoading, setFirebaseRecipesLoading] = useState(false);
+    // Visible count for incremental rendering from cached doc
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const [visibleFirebaseCount, setVisibleFirebaseCount] = useState<number>(25);
+
+    const availableCuisineFilters = useMemo(() => {
+        const cuisines = Array.from(new Set(firebaseRecipes
+            .map(recipe => ((recipe as SavedRecipe & { cuisine?: string }).cuisine || 'other').trim().toLowerCase())
+            .filter(Boolean)
+        )).sort();
+        return cuisines;
+    }, [firebaseRecipes]);
+
+    // Memoized filtered recipes for popular cache section
+    const filteredFirebaseRecipes = useMemo(() => {
+        const filtered = firebaseRecipes.filter(recipe =>
+            recipeMatchesCacheFilters(recipe, {
+                mealType: cacheMealTypeFilter,
+                cuisine: cacheCuisineFilter
+            })
+        );
+        return rankCachedRecipesByPreferences(filtered, household?.members || [], user?.profile);
+    }, [firebaseRecipes, cacheMealTypeFilter, cacheCuisineFilter, household?.members, user?.profile]);
     
     // Recipe cache to avoid duplicate API calls
     const [recipeCache, setRecipeCache] = useState<Map<string, RecipeSearchResult>>(new Map());
@@ -142,14 +201,19 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
     const [voiceSearchSupported, setVoiceSearchSupported] = useState(false);
 
     // Token estimation state
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const [estimatedTokens, setEstimatedTokens] = useState<number>(0);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const [estimatedCost, setEstimatedCost] = useState<number>(0);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const [freeTierNote, setFreeTierNote] = useState<string>('');
-    const [pendingSearchParams, setPendingSearchParams] = useState<any>(null);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const [pendingSearchParams, setPendingSearchParams] = useState<RecipeFinderSearchParams | null>(null);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const [showTokenConfirmation, setShowTokenConfirmation] = useState<boolean>(false);
 
     // Token estimation function
-    const estimateTokens = (params: any) => {
+    const estimateTokens = (params: RecipeFinderSearchParams) => {
         // Simple estimation based on ingredients count
         const ingredients = params.ingredients || '';
         const ingredientCount = ingredients.split(',').length;
@@ -171,9 +235,13 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
         };
     };
 
-    // Check for speech recognition support
+    // Check for speech recognition support (native on Capacitor, Web Speech API on web)
     useEffect(() => {
-        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+        if (Capacitor.isNativePlatform()) {
+            SpeechRecognition.available().then(({ available }) => {
+                setVoiceSearchSupported(available);
+            }).catch(() => setVoiceSearchSupported(false));
+        } else if ((window as Window & typeof globalThis & { webkitSpeechRecognition?: unknown; SpeechRecognition?: unknown }).webkitSpeechRecognition || (window as Window & typeof globalThis & { SpeechRecognition?: unknown }).SpeechRecognition) {
             setVoiceSearchSupported(true);
         }
     }, []);
@@ -184,51 +252,72 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
         setRecentRecipeSearches(recent);
     }, []);
 
-    // Voice search function
-    const startVoiceSearch = () => {
+    // Voice search function — uses native Capacitor plugin on iOS/Android, Web Speech API on web
+    const startVoiceSearch = async () => {
         if (!voiceSearchSupported) return;
 
-        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-        const recognition = new SpeechRecognition();
+        if (Capacitor.isNativePlatform()) {
+            try {
+                await SpeechRecognition.requestPermissions();
+                setIsListening(true);
+                await SpeechRecognition.start({
+                    language: 'en-US',
+                    maxResults: 1,
+                    popup: false,
+                });
+                const { matches } = await new Promise<{ matches: string[] }>((resolve, reject) => {
+                    const listener = SpeechRecognition.addListener('partialResults', (data: { matches: string[] }) => {
+                        listener.then(h => h.remove());
+                        resolve(data);
+                    });
+                    // Timeout safety
+                    setTimeout(() => reject(new Error('timeout')), 10000);
+                });
+                const transcript = matches?.[0] ?? '';
+                if (transcript) {
+                    setSpecificQuery(transcript);
+                    AnalyticsService.trackVoiceSearch(true);
+                    setTimeout(() => performSearch({ query: transcript, ingredients: '' }), 300);
+                }
+            } catch (err) {
+                AnalyticsService.trackVoiceSearch(false, String(err));
+            } finally {
+                setIsListening(false);
+                await SpeechRecognition.stop().catch(() => {});
+            }
+        } else {
+            // Web Speech API fallback
+            type WebSpeechCtor = new() => { continuous: boolean; interimResults: boolean; lang: string; onstart: (() => void) | null; onresult: ((e: Event) => void) | null; onerror: ((e: Event) => void) | null; onend: (() => void) | null; start(): void; };
+            const SpeechRecognitionClass = ((window as unknown as Record<string, unknown>).SpeechRecognition
+                ?? (window as unknown as Record<string, unknown>).webkitSpeechRecognition) as WebSpeechCtor | undefined;
+            if (!SpeechRecognitionClass) return;
 
-        recognition.continuous = false;
-        recognition.interimResults = false;
-        recognition.lang = 'en-US';
+            const recognition = new SpeechRecognitionClass();
+            recognition.continuous = false;
+            recognition.interimResults = false;
+            recognition.lang = 'en-US';
 
-        recognition.onstart = () => {
-            setIsListening(true);
-        };
-
-        recognition.onresult = (event) => {
-            const transcript = event.results[0][0].transcript;
-            setSpecificQuery(transcript);
-            setIsListening(false);
-
-            // Track successful voice search
-            AnalyticsService.trackVoiceSearch(true);
-
-            // Auto-submit the search
-            setTimeout(() => {
-                const params = { query: transcript, ingredients: '' };
-                performSearch(params);
-            }, 500);
-        };
-
-        recognition.onerror = (event) => {
-            setIsListening(false);
-            // Track failed voice search
-            AnalyticsService.trackVoiceSearch(false, event.error);
-        };
-
-        recognition.onend = () => {
-            setIsListening(false);
-        };
-
-        recognition.start();
+            recognition.onstart = () => setIsListening(true);
+            recognition.onresult = (event: Event) => {
+                const se = event as Event & { results: { [key: number]: { [key: number]: { transcript: string } } } };
+                const transcript = se.results[0][0].transcript;
+                setSpecificQuery(transcript);
+                setIsListening(false);
+                AnalyticsService.trackVoiceSearch(true);
+                setTimeout(() => performSearch({ query: transcript, ingredients: '' }), 500);
+            };
+            recognition.onerror = (event: Event) => {
+                const se = event as Event & { error?: string };
+                setIsListening(false);
+                AnalyticsService.trackVoiceSearch(false, se?.error);
+            };
+            recognition.onend = () => setIsListening(false);
+            recognition.start();
+        }
     };
 
     // Generate cache key for search parameters
-    const getCacheKey = (params: any): string => {
+    const getCacheKey = (params: RecipeFinderSearchParams): string => {
         return JSON.stringify({
             query: params.query || '',
             ingredients: params.ingredients || '',
@@ -237,7 +326,9 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
             maxIngredients: params.maxIngredients || 10,
             measurementSystem: params.measurementSystem || 'Standard',
             type: params.type || '',
-            strictMode: params.strictMode || false
+            strictMode: params.strictMode || false,
+            cacheMealTypeFilter,
+            cacheCuisineFilter
         });
     };
     
@@ -245,6 +336,10 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
     const [showRecipeModal, setShowRecipeModal] = useState(false);
     const [modalRecipe, setModalRecipe] = useState<StructuredRecipe | null>(null);
     const [modalIsSavedView, setModalIsSavedView] = useState(false);
+    useAndroidBack(showRecipeModal, () => setShowRecipeModal(false));
+
+    // Stable ref so window event handler can call the latest openRecipeModal closure
+    const openRecipeModalRef = useRef<((recipe: StructuredRecipe | SavedRecipe, isSavedView?: boolean) => void) | null>(null);
 
     // Keyboard navigation support
     useKeyboardNavigation({
@@ -264,46 +359,27 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
         }
     }, [initialSearchQuery]);
 
+    // Allow sibling components (e.g. SmartRecommendations) to open a recipe via window event
+    useEffect(() => {
+        const handleOpenRecipeModal = (event: CustomEvent) => {
+            const { recipe, isSavedView } = event.detail;
+            openRecipeModalRef.current?.(recipe, isSavedView ?? true);
+        };
+        window.addEventListener('openRecipeModal', handleOpenRecipeModal as EventListener);
+        return () => window.removeEventListener('openRecipeModal', handleOpenRecipeModal as EventListener);
+    }, []);
+
     // Surprise me feature
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const handleSurpriseMe = async () => {
-        const allRecipes = firebaseRecipes.filter(recipe => {
-            if (selectedCategory === 'All') return true;
-
-            // Case-insensitive matching and handle variations
-            const recipeType = recipe.type?.toLowerCase() || '';
-            const filterCategory = selectedCategory.toLowerCase();
-
-            // Direct match
-            if (recipeType === filterCategory) return true;
-
-            // Check if recipe type contains the filter category (e.g., "italian dinner" contains "dinner")
-            if (recipeType.includes(filterCategory)) return true;
-
-            // Handle common variations and map recipe types to categories
-            const typeMappings: { [key: string]: string[] } = {
-                'dinner': ['dinner', 'main course', 'main dish', 'entree', 'chicken', 'beef', 'pork', 'seafood', 'miscellaneous'],
-                'lunch': ['lunch', 'main course', 'main dish', 'entree', 'chicken', 'beef', 'pork', 'seafood', 'miscellaneous', 'vegetarian'],
-                'breakfast': ['breakfast', 'morning meal', 'brunch'],
-                'dessert': ['dessert', 'sweet', 'cake', 'pie', 'cookie'],
-                'appetizer': ['appetizer', 'starter', 'snack', 'appetiser'],
-                'salad': ['salad', 'green salad', 'side salad', 'vegetarian'],
-                'soup': ['soup', 'stew', 'chowder', 'vegetarian'],
-                'drink': ['drink', 'beverage', 'cocktail', 'smoothie']
-            };
-
-            // Check if the recipe type maps to the selected category
-            const mappedTypes = typeMappings[filterCategory] || [];
-            if (mappedTypes.some(type => recipeType.includes(type))) return true;
-
-            return false;
-        });
+        const allRecipes = filteredFirebaseRecipes;
         if (allRecipes.length === 0) return;
 
         const randomRecipe = allRecipes[Math.floor(Math.random() * allRecipes.length)];
         openRecipeModal(randomRecipe, false);
 
         // Track surprise me usage
-        AnalyticsService.trackSurpriseMeUsed(selectedCategory);
+        AnalyticsService.trackSurpriseMeUsed(cacheMealTypeFilter || 'all');
         AnalyticsService.trackRecipeSearch('surprise_me', 1);
 
         // Record search usage for limit tracking
@@ -325,6 +401,8 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                 setFirebaseRecipesLoading(true);
                 const recipes = await getCachedPopularRecipes(); // Uses cached recipes (1 read vs 50+ reads)
                 setFirebaseRecipes(recipes);
+                // reset visible count when new recipes arrive
+                setVisibleFirebaseCount(25);
             } catch (error) {
                 log.error('Error loading cached Firebase recipes', { error }, 'RecipeFinder');
             } finally {
@@ -335,6 +413,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
     }, [user]); // Depend on user authentication
 
     // Popular recipes from CSV
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const csvRecipes: StructuredRecipe[] = [
         {
             title: "Chicken Parmesan",
@@ -873,54 +952,33 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
     .map(i => i.item)
     .join(', ');
 
-  const handleSpecificSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
+    const handleSpecificSearch = async (e?: React.FormEvent) => {
+        e?.preventDefault();
     if (!specificQuery.trim()) {
-      alert('Please enter a recipe name or ingredients to search for.');
+      addToast?.('Please enter a recipe name or ingredients to search for.', 'info');
       return;
     }
     if (specificQuery.trim().length < 2) {
-      alert('Please enter at least 2 characters for your search.');
+      addToast?.('Please enter at least 2 characters for your search.', 'info');
       return;
     }
+    saveSearchToHistory(specificQuery, 'recipe');
 
     const params = { query: specificQuery, ingredients: '' };
     await performSearch(params);
   };
 
-  // Debounced search for specific query input
-  const debouncedSpecificSearch = useMemo(
-    () => debounce(async () => {
-      if (specificQuery.trim() && specificQuery.trim().length >= 2) {
-        const params = { query: specificQuery, ingredients: '' };
-        await performSearch(params);
-      }
-    }, 800), // 800ms delay for recipe search
-    [specificQuery]
-  );
-
-  // Effect to trigger debounced search when query changes
-  useEffect(() => {
-    if (specificQuery.trim() && specificQuery.trim().length >= 2) {
-      debouncedSpecificSearch();
-    }
-  }, [specificQuery, debouncedSpecificSearch]);
-
-  // Save recipe search to history when user performs a meaningful search
-  useEffect(() => {
-    if (specificQuery.length >= 2) {
-      saveSearchToHistory(specificQuery, 'recipe');
-    }
-  }, [specificQuery]);
+  const performSearchRef = useRef<(params: RecipeFinderSearchParams) => Promise<void>>(async () => {});
+  // performSearchRef.current is set after performSearch is defined below
 
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (inventory.length === 0) {
-        alert("Please add items to your pantry list first!");
+        addToast?.("Please add items to your pantry list first!", 'info');
         return;
     }
     if (inventory.length < 2) {
-        alert("Please add at least 2 items to your pantry for better recipe suggestions.");
+        addToast?.("Please add at least 2 items to your pantry for better recipe suggestions.", 'info');
         return;
     }
     
@@ -940,7 +998,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
 
 
 
-    const performSearch = async (params: any) => {
+    const performSearch = async (params: RecipeFinderSearchParams) => {
         // Debounce: prevent searches within 2 seconds of each other
         const now = Date.now();
         if (now - lastSearchTime < 2000) {
@@ -953,7 +1011,8 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
         if (user) {
             try {
                 const limits = await UsageService.getUsageLimits(user);
-                const canSearch = await UsageService.canPerformSearch(user);
+                // Inline check using already-fetched limits (avoids a second getDoc via canPerformSearch)
+                const canSearch = limits.searches.weekly === -1 || limits.searches.used < limits.searches.weekly;
 
                 if (!canSearch) {
                     if (addToast) {
@@ -964,8 +1023,6 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                             'Upgrade Now',
                             () => setActiveTab(Tab.SETTINGS)
                         );
-                    } else {
-                        alert('You\'ve reached your weekly search limit. Upgrade to Premium for 15 searches per week or Family for unlimited searches!');
                     }
                     return;
                 }
@@ -1004,22 +1061,61 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
 
         setLoadingState(LoadingState.LOADING);
         setResult(null);
+        setRecipeWarnings(new Map());
         setIsResultFromCache(false);
         setSearchError(null);
         if (setPersistedResult) setPersistedResult(null);
         try {
             log.debug('Recipe search params:', params);
-            const data = await searchRecipes({
-                ...params,
-                maxCookTime: parseInt(maxCookTime),
-                maxIngredients: parseInt(maxIngredients),
-                measurementSystem: measurement,
-                type: recipeType,
-                dietaryRestrictions,
-                maxPrepTime: parseInt(maxPrepTime),
-                servings: parseInt(servings),
-                userId: user?.id
-            }, user);
+            // First, if there's a text query, try the cached popular recipes document
+            let data: RecipeSearchResult | null = null;
+            if (params.query && String(params.query).trim()) {
+                try {
+                    const cachedList = await getCachedPopularRecipes();
+                    const q = String(params.query).toLowerCase();
+                    const matches = cachedList.filter((r: SavedRecipe) => {
+                        const title = (r.title || '').toLowerCase();
+                        const desc = (r.description || '')?.toLowerCase() || '';
+                        const ingredients = (Array.isArray(r.ingredients) ? r.ingredients.join(' ') : (r.ingredients || '')).toLowerCase();
+                        const keywords = (Array.isArray((r as SavedRecipe & { keywords?: string[] }).keywords) ? (r as SavedRecipe & { keywords?: string[] }).keywords!.join(' ') : '').toLowerCase();
+                        return title.includes(q) || desc.includes(q) || ingredients.includes(q) || keywords.includes(q);
+                    });
+
+                    const filteredMatches = matches.filter((r: SavedRecipe) =>
+                        recipeMatchesCacheFilters(r, {
+                            mealType: cacheMealTypeFilter,
+                            cuisine: cacheCuisineFilter
+                        })
+                    );
+
+                    const rankedMatches = rankCachedRecipesByPreferences(filteredMatches, household?.members || [], user?.profile);
+
+                    if (rankedMatches.length > 0) {
+                        data = { recipes: rankedMatches };
+                        setIsResultFromCache(true);
+                        AnalyticsService.trackRecipeSearch(params.query, rankedMatches.length);
+                    }
+                } catch (e) {
+                    // If cache read or filtering fails, fall back to external search below
+                    log.warn('Cached recipe search failed, falling back to external search', { error: e });
+                }
+            }
+
+            if (!data) {
+                data = await searchRecipes({
+                    ...params,
+                    maxCookTime: parseInt(maxCookTime),
+                    maxIngredients: parseInt(maxIngredients),
+                    measurementSystem: measurement,
+                    type: recipeType,
+                    dietaryRestrictions,
+                    maxPrepTime: parseInt(maxPrepTime),
+                    servings: parseInt(servings),
+                    userId: user?.id,
+                    userProfile: user?.profile
+                } as RecipeSearchParams, user);
+                setIsResultFromCache(false);
+            }
             // Filter results by type (quick meal, dinner, dessert)
             let filteredRecipes = data.recipes;
             if (recipeType) {
@@ -1029,27 +1125,53 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                 });
             }
 
-            // Filter recipes based on household member preferences
+            // Build per-recipe warnings from household members and the user's own profile
+            const warningsMap = new Map<string, { warnings: string[], isAllergen: boolean }>();
+
+            // Check household member preferences
             if (household?.members && Array.isArray(household.members) && household.members.length > 0) {
                 const { safeRecipes, riskyRecipes } = filterRecipesByHouseholdPreferences(
                     filteredRecipes,
                     household.members,
-                    false // Allow recipes with restrictions/dislikes but no allergies
+                    false
                 );
-
-                // Show warning for risky recipes if any exist
-                if (riskyRecipes.length > 0 && addToast) {
-                    const totalIssues = riskyRecipes.reduce((sum, r) => sum + r.violations.length, 0);
-                    addToast(
-                        `${riskyRecipes.length} recipes may not suit all household members (${totalIssues} issues found). Check recipe details for warnings.`,
-                        'info',
-                        5000
-                    );
-                }
-
-                // Use safe recipes, but include risky ones with warnings
                 filteredRecipes = [...safeRecipes, ...riskyRecipes.map(r => r.recipe)];
+
+                // Attach per-card warnings for risky recipes
+                for (const { recipe: rr, violations } of riskyRecipes) {
+                    const allWarnings = violations.flatMap(v => v.result.warnings.map(w => `${v.member.name}: ${w}`));
+                    const hasAllergen = violations.some(v => v.result.violations.allergies.length > 0);
+                    warningsMap.set(rr.title, { warnings: allWarnings, isAllergen: hasAllergen });
+                }
             }
+
+            // Check the individual user's own allergens / dislikes
+            if (user?.profile) {
+                const userAsMember = {
+                    id: user.id ?? '',
+                    name: user.name ?? 'You',
+                    email: '',
+                    role: 'member' as const,
+                    status: 'active' as const,
+                    joinedAt: '',
+                    allergies: user.profile.allergies,
+                    dietaryRestrictions: user.profile.dietaryRestrictions,
+                    dislikedIngredients: user.profile.dislikedIngredients,
+                };
+
+                for (const recipe of filteredRecipes) {
+                    if (warningsMap.has(recipe.title)) continue; // already has household warnings
+                    const check = checkRecipeAgainstPreferences(recipe, userAsMember);
+                    if (check.warnings.length > 0) {
+                        warningsMap.set(recipe.title, {
+                            warnings: check.warnings,
+                            isAllergen: check.violations.allergies.length > 0,
+                        });
+                    }
+                }
+            }
+
+            setRecipeWarnings(warningsMap);
 
             setResult({ ...data, recipes: filteredRecipes });
             setIsResultFromCache(false);
@@ -1066,8 +1188,8 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                 newCache.set(cacheKey, { ...data, recipes: filteredRecipes });
                 // Keep only the 20 most recent entries
                 if (newCache.size > 20) {
-                    const oldestKey = newCache.keys().next().value;
-                    newCache.delete(oldestKey);
+                    const oldestKey = newCache.keys().next().value as string | undefined;
+                    if (oldestKey) newCache.delete(oldestKey);
                 }
                 return newCache;
             });
@@ -1088,9 +1210,9 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                     // Don't fail the search if recording fails
                 }
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
             log.error('performSearch error', { error }, 'RecipeFinder');
-            let errorMessage = error?.message ? String(error.message) : JSON.stringify(error);
+            let errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
             
             // Provide user-friendly error messages
             if (errorMessage.includes('API key not configured')) {
@@ -1110,6 +1232,9 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
         }
     };
 
+  // Wire up the stable ref now that performSearch is defined
+  performSearchRef.current = performSearch;
+
   const getRatingInfo = (title: string) => {
       const related = ratings.filter(r => !!r?.recipeTitle && r.recipeTitle.toLowerCase() === title.toLowerCase());
       if (related.length === 0) return null;
@@ -1122,7 +1247,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
       };
   };
 
-        const openRecipeModal = (recipe: any, isSavedView = false) => {
+        const openRecipeModal = (recipe: StructuredRecipe | SavedRecipe, isSavedView = false) => {
             // Track recipe view
             AnalyticsService.trackRecipeView(
                 recipe.title || 'Untitled Recipe',
@@ -1131,12 +1256,16 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
             );
 
             // Normalize recipe shape so modal can safely render instructions/ingredients
-            const normalized: any = { ...recipe };
+            type NormalizedRecipe = Omit<StructuredRecipe, 'instructions' | 'ingredients'> & {
+              instructions: string | string[];
+              ingredients: string | string[];
+            };
+            const normalized = { ...(recipe as StructuredRecipe) } as NormalizedRecipe;
             normalized.title = normalized.title || 'Untitled Recipe';
             if (!Array.isArray(normalized.instructions)) {
                 if (typeof normalized.instructions === 'string') {
                     // Split on newlines or numbered steps
-                    normalized.instructions = normalized.instructions.split(/\r?\n+/).map(s => s.trim()).filter(Boolean);
+                    normalized.instructions = normalized.instructions.split(/\r?\n+/).map((s: string) => s.trim()).filter(Boolean);
                 } else if (normalized.instructions && typeof normalized.instructions === 'object') {
                     // If stored as object with numeric keys, convert to array
                     normalized.instructions = Object.values(normalized.instructions).map(String).filter(Boolean);
@@ -1146,7 +1275,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
             }
             if (!Array.isArray(normalized.ingredients)) {
                 if (typeof normalized.ingredients === 'string') {
-                    normalized.ingredients = normalized.ingredients.split(/\r?\n+/).map(s => s.trim()).filter(Boolean);
+                    normalized.ingredients = normalized.ingredients.split(/\r?\n+/).map((s: string) => s.trim()).filter(Boolean);
                 } else if (normalized.ingredients && typeof normalized.ingredients === 'object') {
                     normalized.ingredients = Object.values(normalized.ingredients).map(String).filter(Boolean);
                 } else {
@@ -1157,188 +1286,175 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
             setModalIsSavedView(Boolean(isSavedView));
             setShowRecipeModal(true);
         };
+        openRecipeModalRef.current = openRecipeModal;
+
+        const handleModalSaveRecipe = async (r: StructuredRecipe & { __imageFile?: File; __submitForInclusion?: boolean }) => {
+            try {
+                // Track save event
+                AnalyticsService.trackRecipeSave(r.title || 'Untitled Recipe', r.title || 'Untitled Recipe');
+
+                // Build minimal recipe object for saving
+                const rIngredients = r.ingredients as string | string[];
+                const rInstructions = r.instructions as string | string[];
+                const recipeToSave: StructuredRecipe = {
+                    title: r.title || '',
+                    description: r.description || '',
+                    ingredients: Array.isArray(rIngredients) ? rIngredients : (typeof rIngredients === 'string' ? rIngredients.split('\n').map((s:string)=>s.trim()).filter(Boolean) : []),
+                    instructions: Array.isArray(rInstructions) ? rInstructions : (typeof rInstructions === 'string' ? rInstructions.split('\n').map((s:string)=>s.trim()).filter(Boolean) : []),
+                    cookTime: r.cookTime || '',
+                    type: r.type || 'Dinner',
+                    image: r.image || ''
+                };
+
+                // Call the proper save handler that will update the cache correctly
+                if (onSaveRecipe) {
+                    await onSaveRecipe(recipeToSave);
+                    // Prompt for app store review at meaningful milestones
+                    await maybeRequestReviewAfterRecipeSave(savedRecipes.length + 1);
+                }
+
+                // If an image File was attached, we need to handle it separately
+                // For now, skip image upload for popular recipes to avoid complexity
+                if (r.__imageFile) {
+                    log.warn('Image upload not supported for popular recipes yet', {}, 'RecipeFinder');
+                }
+
+                // If user requested submission for inclusion, handle it
+                if (r.__submitForInclusion) {
+                    try {
+                        // Generate a temporary ID for submission
+                        const tempId = `temp_${Date.now()}`;
+                        await submitRecipeForReview({ ...recipeToSave, id: tempId }, user?.id);
+                    } catch (subErr: unknown) {
+                        log.error('Failed to submit recipe for review', { error: subErr }, 'RecipeFinder');
+                    }
+                }
+
+                // Notify user
+                if (addToast) addToast('Recipe saved successfully!', 'success');
+
+            } catch (err) {
+                log.error('Error saving recipe', { error: err }, 'RecipeFinder');
+                if (addToast) addToast('Failed to save recipe. Please try again.', 'error');
+            }
+        };
+
+        const DIETARY_BADGE_MAP: { keyword: string; label: string; variant: 'success' | 'warning' | 'info' }[] = [
+            { keyword: 'vegan', label: 'Vegan', variant: 'success' },
+            { keyword: 'vegetarian', label: 'Veggie', variant: 'success' },
+            { keyword: 'gluten-free', label: 'GF', variant: 'warning' },
+            { keyword: 'gluten free', label: 'GF', variant: 'warning' },
+            { keyword: 'dairy-free', label: 'DF', variant: 'info' },
+            { keyword: 'dairy free', label: 'DF', variant: 'info' },
+            { keyword: 'keto', label: 'Keto', variant: 'info' },
+            { keyword: 'paleo', label: 'Paleo', variant: 'warning' },
+            { keyword: 'low-carb', label: 'Low-Carb', variant: 'warning' },
+        ];
+
+        const getDietaryBadges = (recipe: StructuredRecipe) => {
+            const haystack = [
+                (recipe.type || '').toLowerCase(),
+                (recipe.description || '').toLowerCase(),
+                ...(recipe.tags || []).map(t => t.toLowerCase()),
+            ].join(' ');
+            const badges: { label: string; variant: 'success' | 'warning' | 'info' }[] = [];
+            const seen = new Set<string>();
+            for (const { keyword, label, variant } of DIETARY_BADGE_MAP) {
+                if (!seen.has(label) && haystack.includes(keyword)) {
+                    badges.push({ label, variant });
+                    seen.add(label);
+                }
+                if (badges.length >= 3) break;
+            }
+            return badges;
+        };
+
+        const getPreferenceSignals = (recipe: StructuredRecipe): { positive: string[]; warning: string[] } => {
+            if (!user?.profile) return { positive: [], warning: [] };
+
+            const searchableText = [
+                recipe.title || '',
+                recipe.description || '',
+                recipe.type || '',
+                (recipe as StructuredRecipe & { cuisine?: string }).cuisine || '',
+                Array.isArray(recipe.ingredients) ? recipe.ingredients.join(' ') : ''
+            ].join(' ').toLowerCase();
+
+            const positive: string[] = [];
+            const warning: string[] = [];
+
+            for (const cuisine of user.profile.favoriteCuisines || []) {
+                if (searchableText.includes(cuisine.toLowerCase().trim())) {
+                    positive.push(`Matches favorite cuisine: ${cuisine}`);
+                }
+            }
+
+            for (const protein of user.profile.preferredProteins || []) {
+                if (searchableText.includes(protein.toLowerCase().trim())) {
+                    positive.push(`Includes preferred protein: ${protein}`);
+                }
+            }
+
+            for (const disliked of user.profile.dislikedIngredients || []) {
+                if (searchableText.includes(disliked.toLowerCase().trim())) {
+                    warning.push(`Contains disliked ingredient: ${disliked}`);
+                }
+            }
+
+            return {
+                positive: [...new Set(positive)].slice(0, 2),
+                warning: [...new Set(warning)].slice(0, 1)
+            };
+        };
 
         const renderRecipeCard = (recipe: StructuredRecipe, isSavedView = false, isCompact = false) => {
             const ratingInfo = getRatingInfo(recipe.title);
-            const isSaved = savedRecipes.some(r => r.title === recipe.title);
-            const titleKey = `${recipe.title || 'Untitled Recipe'}-${Math.random()}`;
+            const dietaryBadges = getDietaryBadges(recipe);
+            const cardWarning = recipeWarnings.get(recipe.title);
             
             // Filter out staple items from ingredient list
             const filteredIngredients = recipe.ingredients.filter(ing => {
                 const ingLower = ing.toLowerCase();
                 return !STAPLES.some(staple => ingLower.includes(staple));
             });
-
-            if (isCompact) {
-                return (
-                    <div key={`compact-${titleKey}`} className="bg-theme-secondary rounded-lg shadow-md border border-theme overflow-hidden group hover:shadow-lg transition-all cursor-pointer" onClick={() => openRecipeModal(recipe, isSavedView)}>
-                        {/* Recipe Image */}
-                        <div className="aspect-video bg-theme-primary/20 relative overflow-hidden">
-                            {recipe.image ? (
-                                <ProgressiveImage
-                                    src={recipe.image}
-                                    alt={recipe.title}
-                                    className="w-full h-full group-hover:scale-105 transition-transform duration-300"
-                                    blurDataURL={generateBlurDataURL(300, 200)}
-                                    placeholderSrc="/images/placeholder.svg"
-                                    lazy={true}
-                                />
-                            ) : (
-                                <div className="w-full h-full bg-theme-primary/10 flex items-center justify-center">
-                                    <div className="text-theme-secondary/50 text-xs">No Image</div>
-                                </div>
-                            )}
-                        </div>
-                        
-                        <div className="p-3">
-                            <h4 className="font-bold text-sm mb-2 line-clamp-2">{recipe.title}</h4>
-                            <div className="flex items-center gap-2 text-xs opacity-70">
-                                <Clock className="w-3 h-3" /> {recipe.cookTime}
-                                {ratingInfo && (
-                                    <>
-                                        <Star className="w-3 h-3 text-yellow-400" /> {ratingInfo.avg}
-                                    </>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                );
-            }
-
             return (
-                <div key={`full-${titleKey}`} className="bg-theme-secondary rounded-2xl shadow-xl border border-theme overflow-hidden group hover:shadow-2xl transition-all mb-6 cursor-pointer" onClick={() => openRecipeModal(recipe, isSavedView)}>
-                    {/* Recipe Header */}
-                    <div className="bg-gradient-to-r from-theme-primary to-theme-primary/80 p-4 border-b border-theme">
-                        <h4 className="text-lg font-serif font-bold mb-2">{recipe.title}</h4>
-                        <div className="flex items-center gap-3 text-xs font-medium opacity-90">
-                            <span className="flex items-center gap-1">
-                                <Clock className="w-3 h-3 text-[var(--accent-color)]" /> {recipe.cookTime}
-                            </span>
-                            {ratingInfo && (
-                                <span className="flex items-center gap-1">
-                                    <Star className="w-3 h-3 text-yellow-400" /> {ratingInfo.avg} ({ratingInfo.count})
-                                </span>
-                            )}
-                        </div>
-                    </div>
-
-                    <div className="p-4">
-                        <p className="text-theme-secondary opacity-70 text-sm mb-3 leading-relaxed">{recipe.description}</p>
-                        <div className="grid gap-3 mb-4">
-                            <div className="bg-theme-primary/50 p-3 rounded-lg">
-                                <h5 className="text-xs font-bold text-[var(--accent-color)] uppercase mb-2 flex items-center gap-2">
-                                    <List className="w-3 h-3" /> Ingredients
-                                </h5>
-                                <ul className="text-sm text-theme-secondary opacity-80 space-y-1 list-disc list-inside">
-                                    {filteredIngredients.map((ing, i) => <li key={i}>{ing}</li>)}
-                                </ul>
-                            </div>
-                        </div>
-
-                        <div className="flex gap-2">
-                            <button 
-                                onClick={(e) => { e.stopPropagation(); onAddToPlan(recipe); }}
-                                disabled={mealPlanLimitExceeded}
-                                className={`flex-1 border font-bold py-2 rounded-xl transition-all flex items-center justify-center gap-2 ${
-                                    mealPlanLimitExceeded 
-                                        ? 'bg-gray-400 text-gray-600 cursor-not-allowed opacity-50 border-gray-400' 
-                                        : 'bg-theme-primary border-theme hover:border-[var(--accent-color)] text-[var(--accent-color)] hover:bg-[var(--accent-color)] hover:text-white'
-                                }`}
-                            >
-                                <Plus className="w-4 h-4" /> {mealPlanLimitExceeded ? 'Limit Reached' : 'Add to Schedule'}
-                            </button>
-                        </div>
-
-                        <div className="mt-3 pt-3 border-t border-theme" onClick={(e) => e.stopPropagation()}>
-                             <RecipeRatingUI recipeTitle={recipe.title} recipe={recipe} onRatingSubmitted={onRate} householdId={user?.householdId} />
-                        </div>
-                    </div>
-                </div>
+                <RecipeFinderCard
+                    recipe={recipe}
+                    isSavedView={isSavedView}
+                    isCompact={isCompact}
+                    ratingInfo={ratingInfo}
+                    dietaryBadges={dietaryBadges}
+                    cardWarning={cardWarning}
+                    filteredIngredients={filteredIngredients}
+                    mealPlanLimitExceeded={mealPlanLimitExceeded}
+                    onOpen={openRecipeModal}
+                    onAddToPlan={onAddToPlan}
+                    onRate={onRate}
+                    user={user}
+                    noImageLabel={intl.formatMessage({ id: 'recipes.noImage' })}
+                />
             );
         };
 
         const renderRecipeTile = (recipe: StructuredRecipe) => {
             const ratingInfo = getRatingInfo(recipe.title);
-            const titleKey = recipe.title || 'Untitled Recipe';
+            const preferenceSignals = getPreferenceSignals(recipe);
+            const showPreferenceSignals = isResultFromCache && (preferenceSignals.positive.length > 0 || preferenceSignals.warning.length > 0);
 
             return (
-                <div
-                    key={`tile-${titleKey}`}
-                    className="bg-theme-secondary rounded-lg shadow-md border border-theme overflow-hidden group hover:shadow-xl hover:shadow-theme/20 hover:-translate-y-1 transition-all duration-300 cursor-pointer"
-                    onClick={() => openRecipeModal(recipe, false)}
-                    role="button"
-                    tabIndex={0}
-                    aria-label={`View recipe: ${recipe.title}, cooking time: ${recipe.cookTime}${ratingInfo ? `, rating: ${ratingInfo.avg} stars` : ''}`}
-                    onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault();
-                            openRecipeModal(recipe, false);
-                        }
-                    }}
-                >
-                    {/* Recipe Image */}
-                    <div className="aspect-square bg-theme-primary/20 relative overflow-hidden">
-                        {recipe.image ? (
-                            <ProgressiveImage
-                                src={recipe.image}
-                                alt={recipe.title}
-                                className="w-full h-full group-hover:scale-110 transition-transform duration-500 filter group-hover:brightness-110"
-                                blurDataURL={generateBlurDataURL(300, 300)}
-                                placeholderSrc="/images/placeholder.svg"
-                                lazy={true}
-                            />
-                        ) : (
-                            <div className="w-full h-full flex items-center justify-center bg-theme-primary/10">
-                                <ChefHat className="w-8 h-8 text-theme-secondary opacity-50" />
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Recipe Info */}
-                    <div className="p-3 group-hover:bg-theme-secondary/80 transition-colors duration-300">
-                        <h4 className="font-bold text-sm mb-2 line-clamp-2 leading-tight group-hover:text-theme-primary transition-colors duration-300">{recipe.title}</h4>
-
-                        <div className="flex items-center justify-between text-xs text-theme-secondary opacity-70 group-hover:opacity-90 transition-opacity duration-300">
-                            <div className="flex items-center gap-1">
-                                <Clock className="w-3 h-3" />
-                                {recipe.cookTime}
-                            </div>
-                            {ratingInfo && (
-                                <div className="flex items-center gap-1">
-                                    <Star className="w-3 h-3 text-yellow-400" />
-                                    {ratingInfo.avg}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
+                <RecipeFinderTile
+                    recipe={recipe}
+                    ratingInfo={ratingInfo}
+                    showPreferenceSignals={showPreferenceSignals}
+                    preferenceSignals={preferenceSignals}
+                    onOpen={(selectedRecipe) => openRecipeModal(selectedRecipe, false)}
+                />
             );
         };
 
   return (
     <div className="space-y-6 pb-24 max-w-2xl mx-auto animate-fade-in" role="main" aria-label="Recipe finder">
-      <div className="flex justify-center gap-4 mb-2" role="tablist" aria-label="Recipe finder tabs">
-          <button 
-            onClick={() => setActiveView('search')}
-            className={`px-4 py-2 rounded-full text-sm font-bold transition-all ${activeView === 'search' ? 'bg-[var(--accent-color)] text-white' : 'text-theme-secondary opacity-50'}`}
-            role="tab"
-            aria-selected={activeView === 'search'}
-            aria-controls="search-panel"
-            id="search-tab"
-          >
-              Search & Generate
-          </button>
-          <button 
-            onClick={() => setActiveView('saved')}
-            className={`px-4 py-2 rounded-full text-sm font-bold transition-all flex items-center gap-2 ${activeView === 'saved' ? 'bg-[var(--accent-color)] text-white' : 'text-theme-secondary opacity-50'}`}
-            role="tab"
-            aria-selected={activeView === 'saved'}
-            aria-controls="saved-panel"
-            id="saved-tab"
-          >
-              <Bookmark className="w-4 h-4" aria-hidden="true" /> Saved ({savedRecipes.length})
-          </button>
-      </div>
+            <RecipeFinderTabs activeView={activeView} setActiveView={setActiveView} savedCount={savedRecipes.length} />
 
       {activeView === 'saved' ? (
           <PremiumFeature
@@ -1349,573 +1465,157 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
             fallbackMessage="Upgrade to Premium to save more than 10 recipes"
             onUpgrade={() => setActiveTab(Tab.SETTINGS)}
           >
-            <div className="space-y-4">
-                {isLoadingSavedRecipes ? (
-                    <div className="grid grid-cols-3 gap-4">
-                        {Array.from({ length: 8 }).map((_, index) => (
-                            <RecipeCardSkeleton key={index} />
-                        ))}
-                    </div>
-                ) : savedRecipes.length === 0 ? (
-                    <div className="text-center py-12 opacity-30">
-                        <Bookmark className="w-12 h-12 mx-auto mb-2" />
-                        <p>No saved recipes yet.</p>
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-3 gap-4">
-                        {savedRecipes.map(r => renderRecipeCard(r, true, true))}
-                    </div>
-                )}
-            </div>
+            <RecipeFinderSavedView
+              showImportModal={showImportModal}
+              setShowImportModal={setShowImportModal}
+              recipeSaveLimitExceeded={recipeSaveLimitExceeded}
+              savedRecipes={savedRecipes}
+              setActiveTab={setActiveTab}
+              isLoadingSavedRecipes={isLoadingSavedRecipes}
+              savedSort={savedSort}
+              setSavedSort={setSavedSort}
+              sortedSavedRecipes={sortedSavedRecipes}
+              renderRecipeCard={renderRecipeCard}
+              onExportRecipes={() => {
+                try {
+                  const dataStr = JSON.stringify(savedRecipes, null, 2);
+                  const blob = new Blob([dataStr], { type: 'application/json' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = 'saved_recipes.json';
+                  document.body.appendChild(a);
+                  a.click();
+                  setTimeout(() => {
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                  }, 100);
+                  AnalyticsService.trackFeatureUsage('recipe_export', { success: true, count: savedRecipes.length });
+                } catch (error: unknown) {
+                  const errMsg = error instanceof Error ? error.message : String(error);
+                  AnalyticsService.trackFeatureUsage('recipe_export', { success: false, error: errMsg });
+                  AnalyticsService.trackError('recipe_export_error', errMsg, 'RecipeFinder');
+                  if (addToast) addToast('Failed to export recipes', 'error');
+                }
+              }}
+              onAddManualRecipe={() => {
+                const empty: StructuredRecipe & { __editing: boolean } = {
+                  title: '',
+                  description: '',
+                  ingredients: [],
+                  instructions: [],
+                  cookTime: '',
+                  type: 'Dinner',
+                  image: '',
+                  __editing: true,
+                };
+                setModalRecipe(empty as StructuredRecipe);
+                setModalIsSavedView(false);
+                setShowRecipeModal(true);
+              }}
+            />
           </PremiumFeature>
       ) : (
         <>
-            {/* Recipe Suggestions - Show above search when there are suggestions */}
-            {(getRecipeSuggestions.canMake.length > 0 || getRecipeSuggestions.needMore.length > 0) && (
-                <div className="space-y-3">
-                    {/* Can Make Now Section */}
-                    {getRecipeSuggestions.canMake.length > 0 && (
-                        <div className="bg-theme-secondary rounded-lg p-3 border border-theme">
-                            <h3 className="text-xs font-semibold text-theme-primary mb-2 flex items-center gap-1">
-                                <span className="text-green-500 text-sm">✅</span>
-                                Can Make Now
-                            </h3>
-                            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide flex-nowrap">
-                                {getRecipeSuggestions.canMake.slice(0, 6).map(({ recipe, feasibility }) => (
-                                    <button
-                                        key={`can-make-${recipe.id}`}
-                                        onClick={() => openRecipeModal(recipe, true)}
-                                        className="flex-shrink-0 flex flex-col items-center gap-1 p-2 bg-theme-primary rounded-md border border-theme hover:border-green-500 hover:bg-green-500/5 transition-all group min-w-[65px]"
-                                    >
-                                        <div className="w-7 h-7 rounded-md bg-theme-secondary border border-theme flex items-center justify-center">
-                                            <ChefHat className="w-3.5 h-3.5 text-theme-primary opacity-60" />
-                                        </div>
-                                        <span className="text-[10px] font-medium text-theme-primary text-center leading-tight group-hover:text-green-500 transition-colors line-clamp-2">
-                                            {recipe.title}
-                                        </span>
-                                        <div className="text-[8px] text-green-500 font-medium">
-                                            {Math.round(feasibility.matchPercentage)}%
-                                        </div>
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    )}
 
-                    {/* Need More Items Section */}
-                    {getRecipeSuggestions.needMore.length > 0 && (
-                        <div className="bg-theme-secondary rounded-lg p-3 border border-theme">
-                            <h3 className="text-xs font-semibold text-theme-primary mb-2 flex items-center gap-1">
-                                <span className="text-orange-500 text-sm">🛒</span>
-                                Almost There
-                            </h3>
-                            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide flex-nowrap">
-                                {getRecipeSuggestions.needMore.slice(0, 6).map(({ recipe, feasibility }) => (
-                                    <button
-                                        key={`need-more-${recipe.id}`}
-                                        onClick={() => openRecipeModal(recipe, true)}
-                                        className="flex-shrink-0 flex flex-col items-center gap-1 p-2 bg-theme-primary rounded-md border border-theme hover:border-orange-500 hover:bg-orange-500/5 transition-all group min-w-[65px]"
-                                    >
-                                        <div className="w-7 h-7 rounded-md bg-theme-secondary border border-theme flex items-center justify-center">
-                                            <ChefHat className="w-3.5 h-3.5 text-theme-primary opacity-60" />
-                                        </div>
-                                        <span className="text-[10px] font-medium text-theme-primary text-center leading-tight group-hover:text-orange-500 transition-colors line-clamp-2">
-                                            {recipe.title}
-                                        </span>
-                                        <div className="text-[8px] text-orange-500 font-medium">
-                                            +{feasibility.missingIngredients.length}
-                                        </div>
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                </div>
-            )}
 
-            <div className="bg-theme-secondary p-5 rounded-2xl border border-theme shadow-lg">
-                <div className="flex gap-2">
-                    <div className="flex-1 relative">
-                        <input
-                        id="specificQuery"
-                        name="specificQuery"
-                        value={specificQuery}
-                        onChange={(e) => setSpecificQuery(e.target.value)}
-                        onFocus={() => setShowRecipeAutocomplete(specificQuery.length === 0 && recentRecipeSearches.length > 0)}
-                        onBlur={() => setTimeout(() => setShowRecipeAutocomplete(false), 200)}
-                        placeholder="Search e.g. Pasta..."
-                        className="w-full bg-theme-primary border border-theme rounded-xl px-4 py-3 pr-12 text-theme-primary focus:border-[var(--accent-color)] outline-none"
-                        />
-                        {voiceSearchSupported && (
-                            <button
-                                type="button"
-                                onClick={startVoiceSearch}
-                                disabled={loadingState === LoadingState.LOADING}
-                                className={`absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-lg transition-colors ${
-                                    isListening
-                                        ? 'bg-red-500 text-white animate-pulse'
-                                        : 'text-theme-secondary hover:text-[var(--accent-color)] hover:bg-theme-secondary'
-                                }`}
-                                title="Voice search"
-                                data-tutorial="voice-search"
-                            >
-                                <Mic className="w-4 h-4" />
-                            </button>
-                        )}
-                        
-                        {/* Recipe Autocomplete Suggestions */}
-                        {showRecipeAutocomplete && (
-                            <div className="absolute top-full left-0 right-0 bg-theme-primary border border-theme rounded-lg shadow-lg mt-1 z-10 max-h-60 overflow-y-auto">
-                                {/* Recent Recipe Searches */}
-                                {specificQuery.length === 0 && recentRecipeSearches.length > 0 && (
-                                    <>
-                                        <div className="px-4 py-2 text-xs font-semibold text-theme-secondary opacity-70 uppercase tracking-wider border-b border-theme">
-                                            Recent Searches
-                                        </div>
-                                        {recentRecipeSearches.map((recentQuery, index) => (
-                                            <button
-                                                key={`recent-recipe-${index}`}
-                                                onClick={() => {
-                                                    setSpecificQuery(recentQuery);
-                                                    saveSearchToHistory(recentQuery, 'recipe');
-                                                    setShowRecipeAutocomplete(false);
-                                                }}
-                                                className="w-full text-left px-4 py-2 hover:bg-theme-secondary text-theme-primary flex items-center gap-2"
-                                            >
-                                                <Clock className="w-3 h-3 text-theme-secondary opacity-50" />
-                                                <span>{recentQuery}</span>
-                                            </button>
-                                        ))}
-                                    </>
-                                )}
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </div>
 
-            <div className="flex items-center gap-4">
-                <div className="h-px bg-theme opacity-30 flex-1"></div>
-                <span className="text-xs font-bold text-theme-secondary opacity-50 uppercase tracking-widest">OR</span>
-                <div className="h-px bg-theme opacity-30 flex-1"></div>
-            </div>
+            <RecipeFinderSearchControls
+              specificQuery={specificQuery}
+              onSpecificQueryChange={setSpecificQuery}
+              onSpecificQueryFocus={() => setShowRecipeAutocomplete(specificQuery.length === 0 && recentRecipeSearches.length > 0)}
+              onSpecificQueryBlur={() => setTimeout(() => setShowRecipeAutocomplete(false), 200)}
+              onSpecificSearch={handleSpecificSearch}
+              loadingState={loadingState}
+              voiceSearchSupported={voiceSearchSupported}
+              isListening={isListening}
+              onStartVoiceSearch={startVoiceSearch}
+              showRecipeAutocomplete={showRecipeAutocomplete}
+              recentRecipeSearches={recentRecipeSearches}
+              onSelectRecentSearch={(recentQuery) => {
+                setSpecificQuery(recentQuery);
+                saveSearchToHistory(recentQuery, 'recipe');
+                setShowRecipeAutocomplete(false);
+              }}
+              strictMode={strictMode}
+              onSetStrictMode={setStrictMode}
+              recipeType={recipeType}
+              onSetRecipeType={setRecipeType}
+              dietaryRestriction={dietaryRestrictions[0] || ''}
+              onSetDietaryRestriction={(value) => setDietaryRestrictions(value ? [value] : [])}
+              maxPrepTime={maxPrepTime}
+              onSetMaxPrepTime={setMaxPrepTime}
+              servings={servings}
+              onSetServings={setServings}
+              maxCookTime={maxCookTime}
+              onSetMaxCookTime={setMaxCookTime}
+              maxIngredients={maxIngredients}
+              onSetMaxIngredients={setMaxIngredients}
+              onGenerate={handleGenerate}
+            />
 
-            <div className="bg-theme-secondary p-6 rounded-2xl border border-theme shadow-xl relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-[var(--accent-color)] rounded-full blur-3xl opacity-10"></div>
-                <h3 className="text-xs font-bold text-[var(--accent-color)] uppercase mb-4 flex items-center gap-2 relative z-10">
-                    <Sparkles className="w-4 h-4" /> Generate Ideas from Pantry
-                </h3>
+            <RecipeFinderResultStates
+              loadingState={loadingState}
+              searchError={searchError}
+              result={result}
+              isResultFromCache={isResultFromCache}
+              renderRecipeTile={renderRecipeTile}
+              onEnableAiSearch={() => {
+                setUserGeminiOptIn(user.id, true);
+                setSearchError(null);
+                setLoadingState(LoadingState.IDLE);
+                const params = { ingredients: inventoryString, strictMode: strictMode };
+                performSearchRef.current(params);
+              }}
+              onRetry={() => {
+                setSearchError(null);
+                setLoadingState(LoadingState.IDLE);
+                const params = {
+                  ingredients: inventoryString,
+                  strictMode: strictMode,
+                };
+                const estimate = estimateTokens(params);
+                setEstimatedTokens(estimate.tokens);
+                setEstimatedCost(estimate.cost);
+                setFreeTierNote(estimate.freeTierNote);
+                setPendingSearchParams(params);
+                setShowTokenConfirmation(true);
+              }}
+              onSuggestionClick={setSpecificQuery}
+            />
 
-                <form onSubmit={handleGenerate} className="space-y-4 relative z-10">
-                    {/* Toggles Row */}
-                    <div className="grid grid-cols-2 gap-3">
-                        {/* Inventory Toggle */}
-                        <div 
-                            onClick={() => setStrictMode(!strictMode)}
-                            className="flex flex-col justify-between bg-theme-primary p-3 rounded-xl border border-theme cursor-pointer hover:border-[var(--accent-color)]/30 transition-all group"
-                        >
-                            <div>
-                                <span className="text-xs font-bold text-theme-primary block">Use Inventory Only</span>
-                                <span className="text-[10px] text-theme-secondary opacity-60 leading-tight block mt-0.5">
-                                    {strictMode ? "Strict match" : "Allow extra items"}
-                                </span>
-                            </div>
-                            <div className="self-end mt-1">
-                                {strictMode ? (
-                                    <ToggleRight className="w-7 h-7 text-[var(--accent-color)]" />
-                                ) : (
-                                    <ToggleLeft className="w-7 h-7 text-theme-secondary opacity-30" />
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Measurement Toggle */}
-                        <div className="flex flex-col justify-between bg-theme-primary p-3 rounded-xl border border-theme">
-                             <span className="text-[10px] text-[var(--accent-color)] font-bold uppercase mb-1">Measurement</span>
-                             <div className="flex bg-theme-secondary rounded-lg p-1 border border-theme h-8">
-                                <button
-                                    type="button"
-                                    onClick={() => setMeasurement('Standard')}
-                                    className={`flex-1 text-[10px] font-bold rounded transition-all ${measurement === 'Standard' ? 'bg-[var(--accent-color)] text-white shadow-sm' : 'text-theme-secondary opacity-50'}`}
-                                >
-                                    Standard
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setMeasurement('Metric')}
-                                    className={`flex-1 text-[10px] font-bold rounded transition-all ${measurement === 'Metric' ? 'bg-[var(--accent-color)] text-white shadow-sm' : 'text-theme-secondary opacity-50'}`}
-                                >
-                                    Metric
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Recipe Type Selector & Inputs Row */}
-                                        <div className="grid grid-cols-6 gap-2">
-                                                <div>
-                                                        <label htmlFor="recipeType" className="text-[10px] text-[var(--accent-color)] font-bold uppercase mb-1 block">Type</label>
-                                                        <select
-                                                            id="recipeType"
-                                                            name="recipeType"
-                                                            value={recipeType}
-                                                            onChange={e => setRecipeType(e.target.value as 'Snack' | 'Dinner' | 'Dessert' | '')}
-                                                            className="w-full p-2 rounded-lg border border-theme bg-theme-primary text-theme-primary focus:border-[var(--accent-color)] outline-none text-xs"
-                                                        >
-                                                            <option value="">Any</option>
-                                                            <option value="Snack">Snack</option>
-                                                            <option value="Dinner">Dinner</option>
-                                                            <option value="Dessert">Dessert</option>
-                                                        </select>
-                                                </div>
-                                                <div>
-                                                        <label htmlFor="dietaryRestrictions" className="text-[10px] text-[var(--accent-color)] font-bold uppercase mb-1 block">Diet</label>
-                                                        <select
-                                                            id="dietaryRestrictions"
-                                                            name="dietaryRestrictions"
-                                                            value={dietaryRestrictions[0] || ''}
-                                                            onChange={(e) => setDietaryRestrictions(e.target.value ? [e.target.value] : [])}
-                                                            className="w-full p-2 rounded-lg border border-theme bg-theme-primary text-theme-primary focus:border-[var(--accent-color)] outline-none text-xs"
-                                                        >
-                                                            <option value="">Any</option>
-                                                            <option value="vegetarian">Veg</option>
-                                                            <option value="vegan">Vegan</option>
-                                                            <option value="gluten-free">GF</option>
-                                                            <option value="dairy-free">DF</option>
-                                                            <option value="keto">Keto</option>
-                                                            <option value="paleo">Paleo</option>
-                                                        </select>
-                                                </div>
-                                                <div>
-                                                        <label htmlFor="maxPrepTime" className="text-[10px] text-[var(--accent-color)] font-bold uppercase mb-1 block">Prep</label>
-                                                        <div className="relative">
-                                                                <input
-                                                                id="maxPrepTime"
-                                                                name="maxPrepTime"
-                                                                type="number"
-                                                                value={maxPrepTime}
-                                                                onChange={(e) => setMaxPrepTime(e.target.value)}
-                                                                className="w-14 p-2 rounded-lg border border-theme bg-theme-primary text-theme-primary focus:border-[var(--accent-color)] outline-none text-xs"
-                                                                />
-                                                                <span className="absolute right-1 top-1.5 opacity-50 text-[8px] font-bold">MIN</span>
-                                                        </div>
-                                                </div>
-                                                <div>
-                                                        <label htmlFor="servings" className="text-[10px] text-[var(--accent-color)] font-bold uppercase mb-1 block">Serves</label>
-                                                        <input
-                                                                id="servings"
-                                                                name="servings"
-                                                                type="number"
-                                                                value={servings}
-                                                                onChange={(e) => setServings(e.target.value)}
-                                                                className="w-14 p-2 rounded-lg border border-theme bg-theme-primary text-theme-primary focus:border-[var(--accent-color)] outline-none text-xs"
-                                                        />
-                                                </div>
-                                                <div>
-                                                        <label htmlFor="maxCookTime" className="text-[10px] text-[var(--accent-color)] font-bold uppercase mb-1 block">Cook</label>
-                                                        <div className="relative">
-                                                                <input
-                                                                id="maxCookTime"
-                                                                name="maxCookTime"
-                                                                type="number"
-                                                                value={maxCookTime}
-                                                                onChange={(e) => setMaxCookTime(e.target.value)}
-                                                                className="w-14 p-2 rounded-lg border border-theme bg-theme-primary text-theme-primary focus:border-[var(--accent-color)] outline-none text-xs"
-                                                                />
-                                                                <span className="absolute right-1 top-1.5 opacity-50 text-[8px] font-bold">MIN</span>
-                                                        </div>
-                                                </div>
-                                                <div>
-                                                        <label htmlFor="maxIngredients" className="text-[10px] text-[var(--accent-color)] font-bold uppercase mb-1 block">Items</label>
-                                                        <input
-                                                                id="maxIngredients"
-                                                                name="maxIngredients"
-                                                                type="number"
-                                                                value={maxIngredients}
-                                                                onChange={(e) => setMaxIngredients(e.target.value)}
-                                                                className="w-14 p-2 rounded-lg border border-theme bg-theme-primary text-theme-primary focus:border-[var(--accent-color)] outline-none text-xs"
-                                                        />
-                                                </div>
-                                        </div>
-
-                    <button
-                        type="submit"
-                        disabled={loadingState === LoadingState.LOADING}
-                        className="w-full py-3.5 rounded-xl font-bold text-sm uppercase tracking-wider flex items-center justify-center gap-3 bg-gradient-to-r from-[var(--accent-color)] to-[var(--text-secondary)] text-white shadow-lg mt-2"
-                    >
-                        {loadingState === LoadingState.LOADING ? <Loader2 className="w-5 h-5 animate-spin" /> : <ChefHat className="w-5 h-5" />}
-                        Suggest Recipes
-                    </button>
-                </form>
-            </div>
-
-            {loadingState === LoadingState.LOADING && (
-                <div className="animate-fade-in-up space-y-8 mt-8">
-                    <RecipeCardSkeleton />
-                    <RecipeCardSkeleton />
-                    <RecipeCardSkeleton />
-                </div>
-            )}
-
-            {loadingState === LoadingState.ERROR && (
-                <div className="p-4 bg-red-900/20 border border-red-500 text-red-400 rounded-xl text-center font-medium">
-                <div>Search failed. Please try again.</div>
-                {searchError && (
-                    <div className="text-xs mt-2 text-red-300">Error: {searchError}</div>
-                )}
-                <button
-                    onClick={() => {
-                        // Reset error state and show token confirmation for retry
-                        setSearchError(null);
-                        setLoadingState(LoadingState.IDLE);
-                        // Get the current form parameters and show confirmation
-                        const params = { 
-                            ingredients: inventoryString,
-                            strictMode: strictMode
-                        };
-                        const estimate = estimateTokens(params);
-                        setEstimatedTokens(estimate.tokens);
-                        setEstimatedCost(estimate.cost);
-                        setFreeTierNote(estimate.freeTierNote);
-                        setPendingSearchParams(params);
-                        setShowTokenConfirmation(true);
-                    }}
-                    className="mt-3 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors"
-                >
-                    Try Again
-                </button>
-                </div>
-            )}
-
-            {loadingState === LoadingState.LOADING && (
-                <div className="animate-fade-in-up mt-8">
-                    <div className="grid grid-cols-3 gap-4">
-                        {Array.from({ length: 8 }).map((_, idx) => (
-                            <RecipeCardSkeleton key={`skeleton-${idx}`} />
-                        ))}
-                    </div>
-                </div>
-            )}
-
-            {result && result.recipes && (
-                    <div className="animate-fade-in-up mt-8">
-                        {/* Cache indicator */}
-                        {isResultFromCache && (
-                            <div className="flex justify-center mb-4">
-                                <div className="bg-green-900/20 border border-green-500 text-green-400 px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1">
-                                    <Zap className="w-3 h-3" />
-                                    Instant Results (Cached)
-                                </div>
-                            </div>
-                        )}
-                        <div className="grid grid-cols-3 gap-4">
-                            {result.recipes.map((recipe, idx) => renderRecipeTile(recipe))}
-                        </div>
-                    </div>
-            )}
-
-            {/* Search results empty state */}
-            {loadingState === LoadingState.SUCCESS && result && (!result.recipes || result.recipes.length === 0) && (
-                <div className="animate-fade-in-up mt-8 text-center py-12 opacity-60">
-                    <Search className="w-12 h-12 mx-auto mb-4 text-theme-secondary/50" />
-                    <h3 className="text-lg font-semibold text-theme-primary mb-2">No recipes found</h3>
-                    <p className="text-theme-secondary opacity-70 mb-4">Try adjusting your search terms or ingredients</p>
-                    <div className="flex flex-wrap justify-center gap-2 text-sm">
-                        <span className="text-theme-secondary/60">Suggestions:</span>
-                        <button 
-                            onClick={() => setSearchQuery('chicken')}
-                            className="px-3 py-1 bg-theme-secondary/50 rounded-full hover:bg-theme-secondary/70 transition-colors"
-                        >
-                            chicken
-                        </button>
-                        <button 
-                            onClick={() => setSearchQuery('pasta')}
-                            className="px-3 py-1 bg-theme-secondary/50 rounded-full hover:bg-theme-secondary/70 transition-colors"
-                        >
-                            pasta
-                        </button>
-                        <button 
-                            onClick={() => setSearchQuery('salad')}
-                            className="px-3 py-1 bg-theme-secondary/50 rounded-full hover:bg-theme-secondary/70 transition-colors"
-                        >
-                            salad
-                        </button>
-                    </div>
-                </div>
-            )}
-
-            {/* Popular Recipes Section */}
-            <div className="mt-12">
-                <h2 className="text-xl font-bold text-theme-primary mb-6">Popular Recipes</h2>
-
-                {/* Category Filter and Surprise Me */}
-                <div className="flex items-center justify-between mb-6">
-                    <div className="flex flex-wrap gap-2">
-                        {['All', 'Dinner', 'Lunch', 'Breakfast', 'Soup', 'Drink'].map((category) => (
-                            <button
-                                key={category}
-                                onClick={() => setSelectedCategory(category)}
-                                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                                    selectedCategory === category
-                                        ? 'bg-theme-primary text-white'
-                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
-                                }`}
-                            >
-                                {category}
-                            </button>
-                        ))}
-                    </div>
-
-                    <button
-                        onClick={handleSurpriseMe}
-                        disabled={firebaseRecipesLoading || firebaseRecipes.length === 0}
-                        className="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-full text-sm font-medium hover:from-purple-600 hover:to-pink-600 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-lg hover:shadow-xl"
-                    >
-                        <Sparkles className="w-4 h-4" />
-                        Surprise Me
-                    </button>
-                </div>
-
-                {firebaseRecipesLoading ? (
-                    <div className="text-center py-12 opacity-50">
-                        <Loader2 className="w-8 h-8 mx-auto mb-2 animate-spin" />
-                        <p>Loading recipes...</p>
-                    </div>
-                ) : firebaseRecipes.length === 0 ? (
-                    <div className="text-center py-12 opacity-60">
-                        <ChefHat className="w-12 h-12 mx-auto mb-4 text-theme-secondary/50" />
-                        <h3 className="text-lg font-semibold text-theme-primary mb-2">No recipes yet</h3>
-                        <p className="text-theme-secondary opacity-70 mb-4">Start building your recipe collection</p>
-                        <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                            <button 
-                                onClick={() => setActiveView('search')}
-                                className="px-4 py-2 bg-[var(--accent-color)] text-white rounded-lg hover:bg-[var(--accent-color)]/90 transition-colors flex items-center gap-2"
-                            >
-                                <Search className="w-4 h-4" />
-                                Search for Recipes
-                            </button>
-                            <button 
-                                onClick={() => setActiveTab(Tab.PANTRY)}
-                                className="px-4 py-2 border border-theme rounded-lg hover:bg-theme-secondary/50 transition-colors"
-                            >
-                                Add Pantry Items First
-                            </button>
-                        </div>
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-3 gap-4">
-                        {firebaseRecipes
-                            .filter(recipe => {
-                                if (selectedCategory === 'All') return true;
-
-                                // Case-insensitive matching and handle variations
-                                const recipeType = recipe.type?.toLowerCase() || '';
-                                const filterCategory = selectedCategory.toLowerCase();
-
-                                // Direct match
-                                if (recipeType === filterCategory) return true;
-
-                                // Check if recipe type contains the filter category (e.g., "italian dinner" contains "dinner")
-                                if (recipeType.includes(filterCategory)) return true;
-
-                                // Handle common variations and map recipe types to categories
-                                const typeMappings: { [key: string]: string[] } = {
-                                    'dinner': ['dinner', 'main course', 'main dish', 'entree', 'chicken', 'beef', 'pork', 'seafood', 'miscellaneous'],
-                                    'lunch': ['lunch', 'main course', 'main dish', 'entree', 'chicken', 'beef', 'pork', 'seafood', 'miscellaneous', 'vegetarian'],
-                                    'breakfast': ['breakfast', 'morning meal', 'brunch'],
-                                    'dessert': ['dessert', 'sweet', 'cake', 'pie', 'cookie'],
-                                    'appetizer': ['appetizer', 'starter', 'snack', 'appetiser'],
-                                    'salad': ['salad', 'green salad', 'side salad', 'vegetarian'],
-                                    'soup': ['soup', 'stew', 'chowder', 'vegetarian'],
-                                    'drink': ['drink', 'beverage', 'cocktail', 'smoothie']
-                                };
-
-                                // Check if the recipe type maps to the selected category
-                                const mappedTypes = typeMappings[filterCategory] || [];
-                                if (mappedTypes.some(type => recipeType.includes(type))) return true;
-
-                                return false;
-                            })
-                            .map((recipe, index) => (
-                                <div
-                                    key={`firebase-${recipe.id || index}`}
-                                    className="bg-theme-secondary rounded-lg overflow-hidden cursor-pointer hover:shadow-xl hover:shadow-theme/20 hover:-translate-y-1 transition-all duration-300 group"
-                                    onClick={() => openRecipeModal(recipe, false)}
-                                    role="button"
-                                    tabIndex={0}
-                                    aria-label={`View recipe: ${recipe.title}, cooking time: ${recipe.cookTime}`}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter' || e.key === ' ') {
-                                            e.preventDefault();
-                                            openRecipeModal(recipe, false);
-                                        }
-                                    }}
-                                >
-                                    {/* Recipe Image */}
-                                    <div className="aspect-square bg-theme-primary/20 relative overflow-hidden">
-                                        {recipe.image ? (
-                                            <ProgressiveImage
-                                                src={recipe.image}
-                                                alt={recipe.title}
-                                                className="w-full h-full group-hover:scale-110 transition-transform duration-500 filter group-hover:brightness-110"
-                                                blurDataURL={generateBlurDataURL(200, 200)}
-                                                placeholderSrc="/images/placeholder.svg"
-                                                lazy={true}
-                                            />
-                                        ) : (
-                                            <div className="w-full h-full flex items-center justify-center bg-theme-primary/10">
-                                                <svg className="w-6 h-6 text-theme-secondary opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
-                                                </svg>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {/* Recipe Info */}
-                                    <div className="p-2 group-hover:bg-theme-secondary/80 transition-colors duration-300">
-                                        <h5 className="font-semibold text-xs text-theme-primary line-clamp-2 leading-tight mb-1 group-hover:text-theme-primary transition-colors duration-300">{recipe.title}</h5>
-                                        <div className="flex items-center justify-between text-xs text-theme-secondary opacity-70 group-hover:opacity-90 transition-opacity duration-300">
-                                            <span>{recipe.cookTime}</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-                    </div>
-                )}
-            </div>
+            <RecipeFinderPopularSection
+              title={intl.formatMessage({ id: 'recipes.popular' })}
+              cacheMealTypeFilter={cacheMealTypeFilter}
+              setCacheMealTypeFilter={setCacheMealTypeFilter}
+              cacheCuisineFilter={cacheCuisineFilter}
+              setCacheCuisineFilter={setCacheCuisineFilter}
+              availableCuisineFilters={availableCuisineFilters}
+              openRecipeModal={openRecipeModal}
+              onAddToPlan={onAddToPlan}
+              user={user}
+              household={household}
+              filteredFirebaseRecipes={filteredFirebaseRecipes}
+            />
 
         </>
       )}
 
-
-
-      {/* Modal for full recipe details */}
-      {showRecipeModal && modalRecipe && (
-        <RecipeModal
-          recipe={modalRecipe}
-          isOpen={showRecipeModal}
-          onClose={() => setShowRecipeModal(false)}
-          onAddToPlan={(r) => { 
-            onAddToPlan(r); 
-          }}
-          onSaveRecipe={(r) => {
-            AnalyticsService.trackRecipeSave(r.title || 'Untitled Recipe', r.title || 'Untitled Recipe');
-            onSaveRecipe(r);
-          }}
-          onDeleteRecipe={(r) => { onDeleteRecipe(r); }}
-          onRate={onRate}
-          onMarkAsMade={(r) => { 
-            if (onMarkAsMade) onMarkAsMade(r); 
-          }}
-          showSaveButton={!modalIsSavedView}
-          showDeleteButton={modalIsSavedView}
-          showMarkAsMade={true}
-          showAddToPlan={true}
-          recipeSaveLimitExceeded={recipeSaveLimitExceeded}
-          mealPlanLimitExceeded={mealPlanLimitExceeded}
-          user={user}
-        />
-      )}
+            <RecipeFinderModalSection
+                showRecipeModal={showRecipeModal}
+                modalRecipe={modalRecipe}
+                setShowRecipeModal={setShowRecipeModal}
+                onAddToPlan={onAddToPlan}
+                handleModalSaveRecipe={handleModalSaveRecipe}
+                onDeleteRecipe={onDeleteRecipe}
+                onRate={onRate}
+                onMarkAsMade={onMarkAsMade}
+                modalIsSavedView={modalIsSavedView}
+                recipeSaveLimitExceeded={recipeSaveLimitExceeded}
+                mealPlanLimitExceeded={mealPlanLimitExceeded}
+                savedRecipesCount={savedRecipes.length}
+                user={user}
+            />
     </div>
   );
 };

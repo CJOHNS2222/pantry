@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, ChevronRight, Lightbulb, Sparkles, Target } from 'lucide-react';
+import { X, ChevronRight, Lightbulb } from 'lucide-react';
 
 interface ContextualTipProps {
   id: string;
@@ -31,6 +31,8 @@ export const ContextualTip: React.FC<ContextualTipProps> = ({
   const tipRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    let timer: number | undefined;
+
     if (targetElement) {
       const element = document.querySelector(targetElement);
       if (element) {
@@ -40,11 +42,14 @@ export const ContextualTip: React.FC<ContextualTipProps> = ({
     }
 
     if (autoHideDelay) {
-      const timer = setTimeout(() => {
+      timer = window.setTimeout(() => {
         handleDismiss();
       }, autoHideDelay);
-      return () => clearTimeout(timer);
     }
+
+    return () => {
+      if (timer) window.clearTimeout(timer);
+    };
   }, [targetElement, autoHideDelay]);
 
   const handleDismiss = () => {

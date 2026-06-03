@@ -14,23 +14,31 @@ interface SmartShoppingListOrganizerProps {
   items: ShoppingItem[];
   onToggleCheck: (id: string) => void;
   onRemove: (id: string) => void;
+  onQuantityChange?: (id: string, quantity: string) => void;
+  onUpdateItem?: (id: string, updates: Partial<ShoppingItem>) => void;
+  householdMembers?: Array<{ id: string; name: string; avatar?: string }>;
   isOffline?: boolean;
   lastSynced?: Date;
   isSelected?: (id: string) => boolean;
   onLongPress?: (id: string) => void;
+  storeLayout?: string[]; // Custom order of store aisles
 }
 
 export const SmartShoppingListOrganizer: React.FC<SmartShoppingListOrganizerProps> = ({
   items,
   onToggleCheck,
   onRemove,
+  onQuantityChange,
+  onUpdateItem,
+  householdMembers,
   isOffline = false,
   lastSynced,
   isSelected,
-  onLongPress
+  onLongPress,
+  storeLayout
 }) => {
   const aisleGroups = useMemo(() => {
-    const groups: StoreAisleGroup[] = [
+    const defaultGroups: StoreAisleGroup[] = [
       { aisle: 'Produce', items: [], icon: '🥕', color: 'bg-green-100 text-green-800 border-green-200' },
       { aisle: 'Dairy', items: [], icon: '🥛', color: 'bg-blue-100 text-blue-800 border-blue-200' },
       { aisle: 'Meat & Seafood', items: [], icon: '🥩', color: 'bg-red-100 text-red-800 border-red-200' },
@@ -42,6 +50,18 @@ export const SmartShoppingListOrganizer: React.FC<SmartShoppingListOrganizerProp
       { aisle: 'Household', items: [], icon: '🧹', color: 'bg-gray-100 text-gray-800 border-gray-200' },
       { aisle: 'Other', items: [], icon: '📦', color: 'bg-stone-100 text-stone-800 border-stone-200' }
     ];
+
+    // Use custom layout if provided, otherwise use default
+    const layoutOrder = storeLayout || defaultGroups.map(g => g.aisle);
+    const groups: StoreAisleGroup[] = layoutOrder.map(aisleName => {
+      const defaultGroup = defaultGroups.find(g => g.aisle === aisleName);
+      return defaultGroup ? { ...defaultGroup, items: [] } : {
+        aisle: aisleName,
+        items: [],
+        icon: '📦',
+        color: 'bg-stone-100 text-stone-800 border-stone-200'
+      };
+    });
 
     // Group items by aisle based on category
     items.forEach(item => {
@@ -84,7 +104,7 @@ export const SmartShoppingListOrganizer: React.FC<SmartShoppingListOrganizerProp
 
     // Return only groups that have items
     return groups.filter(group => group.items.length > 0);
-  }, [items]);
+  }, [items, storeLayout]);
 
   const uncheckedCount = items.filter(item => !item.checked).length;
   const checkedCount = items.filter(item => item.checked).length;
@@ -145,6 +165,9 @@ export const SmartShoppingListOrganizer: React.FC<SmartShoppingListOrganizerProp
                 item={item}
                 onToggleCheck={onToggleCheck}
                 onRemove={onRemove}
+                onQuantityChange={onQuantityChange}
+                onUpdateItem={onUpdateItem}
+                householdMembers={householdMembers}
                 isOffline={isOffline}
                 lastSynced={lastSynced}
                 isSelected={isSelected ? isSelected(item.id) : false}

@@ -1,6 +1,6 @@
 import React, { Suspense } from 'react';
 import { Tab } from '../../types/app';
-import { User, PantryItem, DayPlan, StructuredRecipe, Household, ShoppingItem, SavedRecipe, RecipeRating, RecipeSearchResult, CustomCategory } from '../../types';
+import { User, PantryItem, DayPlan, StructuredRecipe } from '../../types';
 
 // Lazy load all major components for better performance
 const PantryScanner = React.lazy(() => import('../PantryScanner').then(module => ({ default: module.PantryScanner })));
@@ -10,15 +10,11 @@ const RecipeFinder = React.lazy(() => import('../RecipeFinder').then(module => (
 const Community = React.lazy(() => import('../Community').then(module => ({ default: module.Community })));
 const Settings = React.lazy(() => import('../Settings').then(module => ({ default: module.Settings })));
 
-// Keep Login and Tutorial as regular imports since they're shown immediately
-import { Login } from '../Login';
-import { Tutorial } from '../Tutorial';
-import { HouseholdActivityFeed } from '../HouseholdActivityFeed';
+import SmartRecommendations from '../SmartRecommendations';
 import { UsageIndicator } from '../UsageIndicator';
 import ComponentErrorBoundary from '../ComponentErrorBoundary';
 import { useApp } from '../../contexts/AppContext';
 import { useAppActions } from '../../contexts/AppActionsContext';
-import { parseIngredientForShoppingList, parseQuantity, subtractQuantities } from '../../utils/appUtils';
 
 // Loading component for lazy-loaded components
 const LoadingSpinner: React.FC = () => (
@@ -52,13 +48,17 @@ export const MainContent: React.FC = () => {
     isLoadingShoppingList,
     isLoadingMealPlan,
     isLoadingSavedRecipes,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     isLoadingRatings,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     isLoadingHousehold,
     consumptionSuggestions,
     expirationAlerts,
     recipeSuggestions,
     household,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     recentActivities,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     isLoadingActivities
   } = appState;
 
@@ -81,11 +81,12 @@ export const MainContent: React.FC = () => {
     onUpdateCustomCategory,
     onDeleteCustomCategory,
     onLogout,
-    onShowTutorial,
     onShowHousehold,
-    updateMealPlan
+    updateMealPlan,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    refreshAllData
   } = appActions;
-  // Helper function to match ingredients to inventory
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const inventoryNeeded = (ingredients: string[], pantryInventory: PantryItem[]): PantryItem[] => {
     const toRemove: PantryItem[] = [];
     
@@ -104,22 +105,24 @@ export const MainContent: React.FC = () => {
     return toRemove;
   };
 
-  // Handler for removing a recipe from meal plan
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleRemoveFromMealPlan = (recipe: StructuredRecipe) => {
     const recipeTitle = recipe.title;
     const newMealPlan = mealPlan.map(day => ({
-      breakfast: day.breakfast?.filter(meal => meal.recipe.title !== recipeTitle),
-      lunch: day.lunch?.filter(meal => meal.recipe.title !== recipeTitle),
-      dinner: day.dinner?.filter(meal => meal.recipe.title !== recipeTitle),
-    }));
-    
+      ...day,
+      breakfast: day.breakfast?.filter(meal => meal.recipe.title !== recipeTitle) || [],
+      lunch: day.lunch?.filter(meal => meal.recipe.title !== recipeTitle) || [],
+      dinner: day.dinner?.filter(meal => meal.recipe.title !== recipeTitle) || [],
+    } as DayPlan));
+
     updateMealPlan(newMealPlan);
   };
   return (
-    <main className="overflow-y-auto overflow-x-hidden pb-safe px-4 scrollbar-hide bg-theme-primary" style={{ paddingTop: '120px', height: 'calc(100vh - 5rem - max(0.5rem, var(--safe-area-inset-bottom, 0px)))', WebkitOverflowScrolling: 'touch', touchAction: 'auto' }}>
+    <main className="overflow-y-auto overflow-x-hidden pb-safe px-4 scrollbar-hide bg-theme-primary" style={{ paddingTop: 'var(--app-header-h)', height: 'calc(100dvh - 5rem - max(0.5rem, var(--safe-area-inset-bottom, 0px)))', WebkitOverflowScrolling: 'touch', touchAction: 'auto' }}>
       {/* Usage Indicator - Show for free users */}
       <UsageIndicator
-        user={user}
+        user={user || undefined}
+        savedRecipesCount={savedRecipes.length}
         showUpgradeCTA={true}
         onUpgrade={() => setActiveTab(Tab.SETTINGS)}
       />
@@ -133,19 +136,20 @@ export const MainContent: React.FC = () => {
               inventory={inventory}
               isLoadingInventory={isLoadingInventory}
               addToShoppingList={onAddToShoppingList}
+              addShoppingListItem={addShoppingListItem}
               onDeleteItem={deleteItem}
               onAddItem={addItem}
-              onAddItems={addItems}
-              onUpdateItem={updateItem}
-              consumptionSuggestions={consumptionSuggestions}
-              expirationAlerts={expirationAlerts}
-              recipeSuggestions={recipeSuggestions}
-              customCategories={customCategories}
-              setActiveTab={setActiveTab}
-              setInitialSearchQuery={appActions.setInitialSearchQuery}
-              user={user}
-            />
-          </Suspense>
+                onAddItems={addItems}
+                onUpdateItem={updateItem}
+                consumptionSuggestions={consumptionSuggestions}
+                expirationAlerts={expirationAlerts}
+                recipeSuggestions={recipeSuggestions}
+                customCategories={customCategories}
+                setActiveTab={setActiveTab}
+                setInitialSearchQuery={appActions.setInitialSearchQuery}
+                user={user as User}
+              />
+            </Suspense>
         </ComponentErrorBoundary>
       )}
 
@@ -155,27 +159,27 @@ export const MainContent: React.FC = () => {
             <MealPlanner
               mealPlan={mealPlan}
               updateMealPlan={updateMealPlan}
-              inventory={inventory}
-              shoppingList={shoppingList}
-              addToShoppingList={onAddToShoppingList}
-              onAddToPlan={onAddToPlan}
-              onSaveRecipe={onSaveRecipe}
-              onMarkAsMade={handleMarkAsMade}
-              onRate={onRateRecipe}
-              user={user}
-              setActiveTab={setActiveTab}
-              recipeSaveLimitExceeded={recipeSaveLimitExceeded}
-              mealPlanLimitExceeded={mealPlanLimitExceeded}
-              isLoadingMealPlan={isLoadingMealPlan}
-              isLoadingSavedRecipes={isLoadingSavedRecipes}
-              savedRecipes={savedRecipes}
-              settings={settings}
-              onOpenRecipeSearch={() => {
-                // This will be called by the tutorial to open recipe search modal
-                // The MealPlanner component handles this internally
-              }}
-            />
-          </Suspense>
+                inventory={inventory}
+                shoppingList={shoppingList}
+                addToShoppingList={onAddToShoppingList}
+                onAddToPlan={onAddToPlan}
+                onSaveRecipe={onSaveRecipe}
+                onMarkAsMade={handleMarkAsMade}
+                onRate={onRateRecipe}
+                user={user || undefined}
+                setActiveTab={setActiveTab}
+                recipeSaveLimitExceeded={recipeSaveLimitExceeded}
+                mealPlanLimitExceeded={mealPlanLimitExceeded}
+                isLoadingMealPlan={isLoadingMealPlan}
+                isLoadingSavedRecipes={isLoadingSavedRecipes}
+                savedRecipes={savedRecipes}
+                settings={settings}
+                onOpenRecipeSearch={() => {
+                  // This will be called by the tutorial to open recipe search modal
+                  // The MealPlanner component handles this internally
+                }}
+              />
+            </Suspense>
         </ComponentErrorBoundary>
       )}
       {activeTab === Tab.SHOPPING && (
@@ -185,16 +189,24 @@ export const MainContent: React.FC = () => {
               items={shoppingList}
               setItems={appState.setShoppingList}
               onMoveToPantry={onMoveToPantry}
-              addShoppingListItem={addShoppingListItem}
-              user={user}
-              household={appState.household}
-              isLoadingShoppingList={isLoadingShoppingList}
-            />
-          </Suspense>
+                addShoppingListItem={addShoppingListItem}
+                user={user || undefined}
+                household={appState.household}
+                isLoadingShoppingList={isLoadingShoppingList}
+                settings={settings}
+              />
+            </Suspense>
         </ComponentErrorBoundary>
       )}
       {activeTab === Tab.RECIPES && (
-        <ComponentErrorBoundary componentName="RecipeFinder">
+        <>
+          <SmartRecommendations
+            inventory={inventory}
+            savedRecipes={savedRecipes}
+            user={user}
+            setActiveTab={setActiveTab}
+          />
+          <ComponentErrorBoundary componentName="RecipeFinder">
           <Suspense fallback={<LoadingSpinner />}>
             <RecipeFinder
               onAddToPlan={onAddToPlan}
@@ -205,31 +217,28 @@ export const MainContent: React.FC = () => {
               ratings={ratings}
               onRate={onRateRecipe}
               savedRecipes={savedRecipes}
-              user={user}
+              user={user || undefined}
               setActiveTab={setActiveTab}
               addToast={addToast}
-              onShareRecipe={(recipe) => {
-                alert(`Recipe shared: ${recipe.title}`);
-              }}
               persistedResult={persistedRecipeResult}
               setPersistedResult={appActions.setPersistedRecipeResult}
               initialSearchQuery={initialSearchQuery}
               recipeSaveLimitExceeded={recipeSaveLimitExceeded}
               mealPlanLimitExceeded={mealPlanLimitExceeded}
               isLoadingSavedRecipes={isLoadingSavedRecipes}
-              household={household}
-            />
-          </Suspense>
-        </ComponentErrorBoundary>
+              household={household ?? undefined}
+              />
+            </Suspense>
+          </ComponentErrorBoundary>
+        </>
       )}
       {activeTab === Tab.COMMUNITY && (
         <ComponentErrorBoundary componentName="Community">
           <Suspense fallback={<LoadingSpinner />}>
             <Community
-              ratings={ratings}
               onAddToPlan={onAddToPlan}
               onSaveRecipe={onSaveRecipe}
-              user={user}
+              user={user || undefined}
             />
           </Suspense>
         </ComponentErrorBoundary>
@@ -247,10 +256,9 @@ export const MainContent: React.FC = () => {
               onUpdateCustomCategory={onUpdateCustomCategory}
               onDeleteCustomCategory={onDeleteCustomCategory}
               mealPlan={mealPlan}
-              inventory={inventory}
-              onShowTutorial={onShowTutorial}
-              household={household}
+              household={household ?? undefined}
               onShowHousehold={onShowHousehold}
+              addToast={addToast}
             />
           </Suspense>
         </ComponentErrorBoundary>

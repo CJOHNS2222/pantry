@@ -4,21 +4,28 @@ export interface PantryItem {
   category: string;
   quantity_estimate: string; // Legacy field, keep for compatibility
   image?: string;
-  storageLocation?: 'pantry' | 'freezer' | 'fridge' | 'spices' | 'other';
+  // Optional photo of the container/storage for leftovers (user-supplied)
+  containerImage?: string;
+  storageLocation?: string; // legacy values include 'pantry' | 'freezer' | 'fridge' | 'spices' | 'other'
   expirationDate?: string; // ISO date string (YYYY-MM-DD)
+  // Backwards-compatible alias used across components
+  expiryDate?: string;
   expirationType?: 'use-by' | 'best-by'; // Type of expiration date
   dateAdded?: string; // ISO date string when item was first added
   lastRestocked?: string; // ISO date string when item was last restocked
   consumptionHistory?: string[]; // Array of ISO dates when item was consumed/replaced
 
   // Enhanced quantity tracking
-  quantity?: {
+  // Can be a simple numeric estimate or a structured quantity object
+  quantity?: number | {
     amount: number;        // Numeric amount (e.g., 2.5)
     unit: string;          // Unit (cups, lbs, oz, etc.)
     originalAmount?: number; // Original purchase amount
     originalUnit?: string;   // Original purchase unit
   };
 
+  // Support multiple purchase batches with independent expirations
+  batches?: Batch[];
   // Visual quantity estimation
   visualLevel?: 'empty' | 'quarter' | 'half' | 'threeQuarter' | 'full';
 
@@ -32,6 +39,54 @@ export interface PantryItem {
 
   // Expiry alert tracking
   expiryAlertShown?: boolean; // Whether expiry alert has been displayed to user
+  tags?: string[];
+  // Denormalized product-level risk score (1-5)
+  productRiskLevel?: number;
+  // Product-level immortal flag: when true, item should never be treated as expired
+  // (e.g., salt, sugar, honey). UI will show a 'Shelf Stable' badge and expiry
+  // checks/notifications will be bypassed for these items.
+  is_immortal?: boolean;
+  // Leftover support: flag inventory items that represent leftovers
+  is_leftover?: boolean;
+  // User notes about the item
+  notes?: string;
+  leftoverMeta?: LeftoverMeta;
+  // Cooked rice flag: denormalized boolean to indicate this item contains cooked rice
+  // (affects safety window calculations). New writes should set this when applicable.
+  cooked_rice?: boolean;
+  // Freezer/frozen state
+  is_frozen?: boolean;
+  frozenAt?: string; // ISO date when item was moved to freezer
+  freezerExpiry?: string; // ISO date for freezer-specific expiry
+  freezerZone?: string; // Freezer zone hint (e.g., top, middle, bottom, door, drawer)
+  freezerLabelPhotoUrl?: string; // Optional photo URL of freezer label/container
+  freezerPortionCount?: number; // Optional portion count for frozen leftovers/items
+  // Opened tracking for items with different shelf lives once opened
+  isOpened?: boolean; // Whether the item has been opened
+  openedAt?: string; // ISO date when item was opened
+  openedExpiry?: string; // ISO date for opened-specific expiry
+  // Staples: items that auto-reappear on shopping list when depleted
+  isStaple?: boolean;
+}
+
+export interface Batch {
+  batchId: string;
+  quantity: number;
+  unit?: string;
+  expires?: string; // ISO date string (YYYY-MM-DD)
+  purchaseDate?: string; // ISO date when purchased
+  note?: string;
+}
+
+export interface LeftoverMeta {
+  createdAt?: string; // ISO date
+  createdBy?: string; // UID
+  // sourcePantryItemId removed: leftovers are independent of pantry items
+  computedBestBefore?: string; // ISO date computed by leftoverService
+  servings?: number; // Number of servings contained in this leftover
+  riskLevel?: number; // 1-5 user risk mapping at creation
+  notes?: string;
+  lastConsumedAt?: string; // ISO date when last serving was consumed
 }
 
 export interface ShoppingItem {
@@ -45,6 +100,12 @@ export interface ShoppingItem {
     amount: number;
     unit: string;
   }; // Quantity actually purchased
+  purchasedBatch?: {
+    amount: number;
+    unit?: string;
+    expires?: string; // ISO date
+    note?: string;
+  };
   addedAt?: Date; // When the item was added to the shopping list
   completedAt?: Date; // When the item was checked off
   estimatedPrice?: number; // Estimated price for analytics
@@ -56,6 +117,14 @@ export interface ShoppingItem {
     lastUpdated: Date;
     unit: string;
   }; // Full price data for reference
+  priceOptions?: {
+    amount: number;
+    unit: string;
+    price: number;
+    store?: string;
+  }[]; // Multiple price options for comparison
+  assignedTo?: string; // Household member name the item is assigned to
+  notes?: string; // Per-item note visible to all household members
 }
 
 export interface GroundingChunk {
@@ -70,9 +139,20 @@ export interface StructuredRecipe {
   description: string;
   ingredients: string[];
   instructions: string[];
-  cookTime: string;
+  cookTime: string | number;
+  prepTime?: string | number;
+  servings?: number;
+  id?: string;
   type?: string;
   image?: string;
+  nutrition?: {
+    calories?: number;
+    protein?: number;
+    carbs?: number;
+    fat?: number;
+    [key: string]: number | undefined;
+  };
+  tags?: string[];
 }
 
 export interface SavedRecipe extends StructuredRecipe {
@@ -80,6 +160,8 @@ export interface SavedRecipe extends StructuredRecipe {
   dateSaved: string;
   imagePlaceholder?: string; // CSS color or placeholder ID
   image?: string; // URL to recipe image
+  userId?: string; // Owner UID for private recipes
+  visibility?: 'public' | 'private';
 }
 
 export interface RecipeSearchResult {
@@ -138,8 +220,11 @@ export interface RecipePhoto {
   id: string;
   url: string;
   caption?: string;
-  uploadedBy: string;
+  uploadedBy?: string;
   uploadedAt: string;
+  fileName?: string;
+  ratingId?: string;
+  recipeTitle?: string;
 }
 
 export interface RecipeModification {
@@ -182,6 +267,8 @@ export interface RecipeSearchParams {
   maxIngredients?: number;
   measurementSystem: 'Metric' | 'Standard';
   strictMode?: boolean; // Only use inventory
+  userId?: string;
+  userProfile?: UserProfile; // For personalized recommendations
 }
 
 export interface User {
@@ -189,7 +276,9 @@ export interface User {
   name: string;
   email: string;
   avatar?: string;
-  provider: 'email' | 'google' | 'facebook';
+  provider: 'email' | 'google' | 'facebook' | 'guest';
+  /** true for users who skipped sign-up; data is localStorage-only */
+  isGuest?: boolean;
   hasSeenTutorial: boolean;
   subscription?: Subscription;
   profile?: UserProfile;
@@ -199,6 +288,7 @@ export interface User {
 }
 
 export interface UserProfile {
+  name?: string; // Display name override
   height?: number; // in inches (stored as total inches, displayed as ft/in)
   weight?: number; // in pounds
   age?: number;
@@ -208,6 +298,19 @@ export interface UserProfile {
   dietaryRestrictions?: string[];
   allergies?: string[];
   householdSize?: number; // number of people in household
+  // Optional risk level for safety notifications (1 = low, 5 = highest)
+  riskLevel?: number;
+  // If true, user prefers stricter health/safety notifications
+  sensitiveHealthMode?: boolean;
+  // Leftover persona for food-safety guidance: 'strict' | 'normal' | 'relaxed'
+  leftoverPersona?: 'strict' | 'normal' | 'relaxed';
+  // Measurement system preference: 'Standard' (imperial) or 'Metric'
+  measurementSystem?: 'Standard' | 'Metric';
+  // Food preferences
+  favoriteCuisines?: string[];
+  preferredProteins?: string[];
+  dislikedIngredients?: string[];
+  specialNeeds?: string;
 }
 
 export interface HouseholdMember {
@@ -276,6 +379,14 @@ export interface Household {
   name: string;
   members: Member[];
   memberIds: string[]; // For querying households by user ID
+  /** Live presence map written by householdActivityService — keyed by userId */
+  memberActivity?: Record<string, { isOnline?: boolean; lastSeen?: { toDate(): Date } | string; currentActivity?: string }>;
+  /**
+   * The household owner/admin's current subscription tier, synced by the owner's
+   * session via useSubscription.  Non-admin members inherit 'family' features while
+   * this equals 'family' and they remain active members of the household.
+   */
+  ownerSubscriptionTier?: 'free' | 'premium' | 'family';
 }
 
 export interface Member {
@@ -307,18 +418,27 @@ export interface Settings {
     types: {
       shoppingList: boolean;
       mealPlan: boolean;
-      cookingReminders?: boolean;
+      cookingReminders: boolean;
     };
-    cookingReminderTime?: number;
+    cookingReminderTime: number;
   };
   theme: {
-    mode: 'light' | 'dark' | 'system';
+    mode: string;
     accentColor: string;
     backgroundColor?: string;
     textColor?: string;
   };
   shopping?: {
     includeStaples?: boolean;
+    autoReaddStaples?: boolean;
+    storeLayout?: string[]; // Custom order of store aisles (legacy – used when no storeProfiles)
+    storeProfiles?: Record<string, string[]>; // Named per-store aisle orderings
+    activeStoreProfile?: string; // Currently selected store profile name
+    showNutrition?: boolean;
+    showPriceData?: boolean;
+  };
+  navigation?: {
+    hiddenTabs?: string[]; // Tab enum values that are hidden from the bottom nav
   };
 }
 
@@ -330,6 +450,6 @@ export interface HouseholdActivity {
   details?: string;
   itemId?: string;
   itemName?: string;
-  timestamp: any; // Firebase Timestamp
+  timestamp: unknown; // Firebase Timestamp
   householdId: string;
 }

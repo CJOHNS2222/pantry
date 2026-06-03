@@ -37,9 +37,9 @@ class VersionService {
       this.currentVersion = appInfo.version;
       this.platform = deviceInfo.platform;
     } catch (err: any) {
-      log.warn('Failed to get app info', { error }, 'VersionService');
-      // Fallback for web
-      this.currentVersion = '1.0.0';
+      log.warn('Failed to get app info', { error: err }, 'VersionService');
+      // Fallback for web — injected at build time from package.json
+      this.currentVersion = (typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.4.9');
       this.platform = 'web';
     }
   }
@@ -113,7 +113,7 @@ class VersionService {
 
       return result;
     } catch (err: any) {
-      log.error('Failed to check for updates', { error }, 'VersionService');
+      log.error('Failed to check for updates', { error: err }, 'VersionService');
       // Return safe defaults
       const currentVersion = await this.getCurrentVersion();
       const result = {
@@ -147,42 +147,42 @@ class VersionService {
   async updateVersionInfo(versionData: Partial<AppVersion>): Promise<void> {
     try {
       const platform = await this.getPlatform();
-      const versionDocRef = doc(db, 'app_versions', platform);
+      const versionDocRef = DatabaseMonitoringService.doc('app_versions/' + platform);
 
-      await updateDoc(versionDocRef, {
+      await DatabaseMonitoringService.updateDoc(versionDocRef, {
         ...versionData,
         updatedAt: new Date()
       });
     } catch (err: any) {
-      log.error('Failed to update version info', { error }, 'VersionService');
-      throw error;
+      log.error('Failed to update version info', { error: err }, 'VersionService');
+      throw err;
     }
   }
 
   private async initializeVersionData(platform: string): Promise<void> {
     try {
-      const versionDocRef = doc(db, 'app_versions', platform);
+      const versionDocRef = DatabaseMonitoringService.doc('app_versions/' + platform);
       const initialVersionData: AppVersion = {
-        version: '1.0.0',
-        buildNumber: '1',
+        version: '1.4.9',
+        buildNumber: '23',
         platform: platform as 'ios' | 'android' | 'web',
-        releaseNotes: 'Initial release with pantry management features',
+        releaseNotes: 'Notification improvements, fill level icons, schedule defaults, and bug fixes.',
         forceUpdate: false,
         downloadUrl: platform === 'android'
           ? 'https://play.google.com/store/apps/details?id=com.smart.pantry'
           : platform === 'ios'
           ? 'https://apps.apple.com/app/smart-pantry/id1234567890'
-          : null,
+          : undefined,
       };
 
-      await setDoc(versionDocRef, {
+      await DatabaseMonitoringService.setDoc(versionDocRef, {
         ...initialVersionData,
         updatedAt: new Date()
       });
 
       // console.log(`Initialized version data for ${platform}`);
     } catch (err: any) {
-      log.error('Failed to initialize version data', { error }, 'VersionService');
+      log.error('Failed to initialize version data', { error: err }, 'VersionService');
       // Don't throw - this is a non-critical operation
     }
   }

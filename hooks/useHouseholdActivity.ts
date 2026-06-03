@@ -1,10 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { User, Household, HouseholdActivity } from '../types';
-import { Tab } from '../types/app';
 import { HouseholdActivityService } from '../services/householdActivityService';
 import { debounce } from '../utils/debounceUtils';
 
-export function useHouseholdActivity(user: User | null, household: Household | null, currentTab: Tab) {
+export function useHouseholdActivity(user: User | null, household: Household | null) {
   const [recentActivities, setRecentActivities] = useState<HouseholdActivity[]>([]);
   const [isLoadingActivities, setIsLoadingActivities] = useState(false);
 
@@ -12,28 +11,16 @@ export function useHouseholdActivity(user: User | null, household: Household | n
   const debouncedUpdateActivity = useCallback(
     debounce((userId: string, householdId: string, activity: string) => {
       HouseholdActivityService.updateMemberActivity(userId, householdId, activity);
-    }, 1000), // 1 second debounce
+    }, 5000), // 5 second debounce for actual activity changes
     []
   );
 
-  // Update member activity when tab changes
-  useEffect(() => {
+  // Only update activity status when there are actual data changes, not on navigation
+  // This method can be called from data management hooks when items are added/removed
+  const updateActivityStatus = useCallback((activity: string) => {
     if (!user?.id || !household?.id) return;
-
-    const activityMap = {
-      [Tab.PANTRY]: 'viewing pantry',
-      [Tab.PANTRY_CACHE_TEST]: 'testing cached pantry',
-      [Tab.SHOPPING]: 'viewing shopping list',
-      [Tab.MEAL_PLAN]: 'viewing meal plan',
-      [Tab.RECIPES]: 'viewing recipes',
-      [Tab.SETTINGS]: 'viewing settings',
-      [Tab.ANALYTICS]: 'viewing analytics'
-    };
-
-    const currentActivity = activityMap[currentTab] || 'using app';
-    // Temporarily disabled to test if this causes excessive reads
-    // debouncedUpdateActivity(user.id, household.id, currentActivity);
-  }, [currentTab, user?.id, household?.id, debouncedUpdateActivity]);
+    debouncedUpdateActivity(user.id, household.id, activity);
+  }, [user?.id, household?.id, debouncedUpdateActivity]);
 
   // Mark user as offline when component unmounts or page visibility changes
   useEffect(() => {
@@ -43,18 +30,9 @@ export function useHouseholdActivity(user: User | null, household: Household | n
       if (document.hidden) {
         HouseholdActivityService.markMemberOffline(user.id, household.id);
       } else {
-        const activityMap = {
-          [Tab.PANTRY]: 'viewing pantry',
-          [Tab.PANTRY_CACHE_TEST]: 'testing cached pantry',
-          [Tab.SHOPPING]: 'viewing shopping list',
-          [Tab.MEAL_PLAN]: 'viewing meal plan',
-          [Tab.RECIPES]: 'viewing recipes',
-          [Tab.SETTINGS]: 'viewing settings',
-          [Tab.ANALYTICS]: 'viewing analytics'
-        };
-        const currentActivity = activityMap[currentTab] || 'using app';
-        // Temporarily disabled
-        // debouncedUpdateActivity(user.id, household.id, currentActivity);
+        // Mark as online but don't update activity status on visibility change
+        // Activity status will only be updated when actual data changes occur
+        HouseholdActivityService.updateMemberActivity(user.id, household.id, 'active');
       }
     };
 
@@ -70,7 +48,7 @@ export function useHouseholdActivity(user: User | null, household: Household | n
       window.removeEventListener('beforeunload', handleBeforeUnload);
       HouseholdActivityService.markMemberOffline(user.id, household.id);
     };
-  }, [user?.id, household?.id, currentTab]);
+  }, [user?.id, household?.id]);
 
   // Subscribe to household activities
   useEffect(() => {
@@ -136,6 +114,7 @@ export function useHouseholdActivity(user: User | null, household: Household | n
     logItemRemoved,
     logShoppingAdded,
     logRecipeSaved,
-    logMealCompleted
+    logMealCompleted,
+    updateActivityStatus
   };
 }

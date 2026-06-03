@@ -1,5 +1,3 @@
-import { db } from '../firebaseConfig';
-import { setDoc, deleteDoc, doc } from 'firebase/firestore';
 import { reportSyncIssue } from './sentryService';
 import { log } from './logService';
 
@@ -24,12 +22,14 @@ export function calculateRetryDelay(attempt: number): number {
   return Math.max(1000, delay + jitter);
 }
 
-export function isRetryableError(error: any): boolean {
+export function isRetryableError(error: unknown): boolean {
   // Network errors
   if (!navigator.onLine) return false;
 
+  const err = error as { code?: string; message?: string };
+
   // Firebase specific errors
-  if (error?.code) {
+  if (err?.code) {
     const retryableCodes = [
       'unavailable',
       'deadline-exceeded',
@@ -38,11 +38,11 @@ export function isRetryableError(error: any): boolean {
       'internal',
       'unknown'
     ];
-    return retryableCodes.includes(error.code);
+    return retryableCodes.includes(err.code);
   }
 
   // Network-related errors
-  if (error?.message) {
+  if (err?.message) {
     const retryableMessages = [
       'network',
       'timeout',
@@ -50,7 +50,7 @@ export function isRetryableError(error: any): boolean {
       'fetch',
       'failed to fetch'
     ];
-    return retryableMessages.some(msg => error.message.toLowerCase().includes(msg));
+    return retryableMessages.some(msg => err.message!.toLowerCase().includes(msg));
   }
 
   return false;
@@ -66,11 +66,11 @@ export async function withRetry<T>(
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       return await operation();
-    } catch (err: any) {
-      lastError = error as Error;
+    } catch (err) {
+      lastError = err as Error;
 
-      if (attempt === maxAttempts || !isRetryableError(error)) {
-        throw error;
+      if (attempt === maxAttempts || !isRetryableError(err)) {
+        throw err;
       }
 
       const delay = calculateRetryDelay(attempt);
@@ -88,7 +88,7 @@ type BaseOp = {
   type: string;
   userId?: string;
   householdId?: string | null;
-  payload?: any;
+  payload?: unknown;
   attempts?: number;
   nextAttempt?: number; // timestamp
   timestamp: number;
@@ -98,7 +98,7 @@ type BaseOp = {
 type InventorySyncOp = BaseOp & {
   type: 'inventorySync';
   inHousehold: boolean;
-  inventory: any[];
+  inventory: unknown[];
 };
 
 const DB_NAME = 'smartpantry-write-queue';
@@ -136,7 +136,7 @@ export async function enqueueGenericOp(op: Omit<BaseOp, 'id' | 'timestamp' | 'at
     const tx = dbInst.transaction(STORE_NAME, 'readwrite');
     const store = tx.objectStore(STORE_NAME);
     const entry = { ...op, timestamp: Date.now(), attempts: 0, nextAttempt: 0 };
-    const req = store.add(entry as any);
+    const req = store.add(entry);
     req.onsuccess = () => resolve(req.result as number);
     req.onerror = () => reject(req.error);
   });
@@ -162,14 +162,6 @@ async function deleteOp(id: number) {
     req.onsuccess = () => resolve();
     req.onerror = () => reject(req.error);
   });
-}
-
-function cleanObject(obj: any) {
-  const cleaned: any = {};
-  for (const k in obj) {
-    if (obj[k] !== undefined) cleaned[k] = obj[k];
-  }
-  return cleaned;
 }
 
 export async function processQueue() {
@@ -200,6 +192,7 @@ export async function processQueue() {
     } catch (err) {
       const error = err as Error;
       const attempts = (op.attempts || 0) + 1;
+      let nextAttempt: number | undefined;
 
       if (attempts >= RETRY_CONFIG.maxAttempts || !isRetryableError(error)) {
         log.error(`Operation failed permanently after retries`, { 
@@ -212,8 +205,8 @@ export async function processQueue() {
         if (op.id) await deleteOp(op.id);
       } else {
         // Schedule retry with exponential backoff
-        const delay = calculateRetryDelay(attempts);
-        const nextAttempt = Date.now() + delay;
+      const delay = calculateRetryDelay(attempts);
+      nextAttempt = Date.now() + delay;
 
         log.warn(`Operation failed, scheduling retry`, { 
           type: op.type, 
@@ -231,7 +224,7 @@ export async function processQueue() {
           ...op,
           attempts,
           nextAttempt,
-          lastError: error.message
+          lastError: error.message || String(error)
         };
         store.put(updatedOp);
       }
@@ -256,7 +249,7 @@ export async function processQueue() {
           const existing = getReq.result;
           if (existing) {
             existing.attempts = attempts;
-            existing.nextAttempt = nextAttempt;
+            if (typeof nextAttempt !== 'undefined') existing.nextAttempt = nextAttempt;
             store.put(existing);
           }
         };
@@ -273,11 +266,21 @@ export async function processQueue() {
   }
 }
 
-// Auto-process when online
+// Auto-process when online — store reference for cleanup
+let onlineListener: (() => void) | null = null;
 if (typeof window !== 'undefined') {
-  window.addEventListener('online', () => {
+  onlineListener = () => {
     processQueue().catch(err => log.error('Error processing write queue on online', { error: err }, 'WriteQueue'));
-  });
+  };
+  window.addEventListener('online', onlineListener);
+}
+
+// Cleanup function to remove event listeners
+export function cleanupWriteQueueService(): void {
+  if (typeof window !== 'undefined' && onlineListener) {
+    window.removeEventListener('online', onlineListener);
+    onlineListener = null;
+  }
 }
 
 export default { enqueueInventorySync, processQueue };

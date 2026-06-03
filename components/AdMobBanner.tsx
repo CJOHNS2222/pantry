@@ -1,0 +1,50 @@
+import React from 'react';
+import { Capacitor } from '@capacitor/core';
+import { AdMob, BannerAdSize, BannerAdPosition } from '@capacitor-community/admob';
+import { log } from '../services/logService';
+
+// Use Google's sample/test ad unit for development/testing:
+// Banner test unit: ca-app-pub-3940256099942544/6300978111
+// Production unit: ca-app-pub-5084706792909644/2077776375
+ 
+const PROD_AD_UNIT = 'ca-app-pub-5084706792909644/2077776375';
+ 
+const TEST_AD_UNIT = 'ca-app-pub-3940256099942544/6300978111';
+
+ 
+const useTestAds = (): boolean => {
+  return import.meta.env.MODE !== 'production' || import.meta.env.VITE_ADMOB_USE_TEST === 'true';
+};
+// To re-enable: set `VITE_ADMOB_ENABLED=true` in .env.local and ensure `admob_app_id` in Android strings.xml is your production App ID.
+const ADMOB_ENABLED = import.meta.env.VITE_ADMOB_ENABLED === 'true';
+
+export const AdMobBanner: React.FC = () => {
+  React.useEffect(() => {
+    if (!ADMOB_ENABLED) {
+      // AdMob disabled: skip initialization
+      return;
+    }
+
+    if (Capacitor.getPlatform() === 'web') {
+      return;
+    }
+
+    const AD_UNIT_ID = useTestAds() ? TEST_AD_UNIT : PROD_AD_UNIT;
+
+    AdMob.showBanner({
+      adId: AD_UNIT_ID,
+      adSize: BannerAdSize.ADAPTIVE_BANNER,
+      position: BannerAdPosition.BOTTOM_CENTER
+    }).catch((error) => {
+      log.error('AdMob banner failed to show', error);
+    });
+
+    return () => {
+      AdMob.hideBanner().catch((error) => {
+        log.warn('AdMob banner hide failed', error);
+      });
+    };
+  }, []);
+
+  return null;
+};

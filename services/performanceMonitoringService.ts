@@ -4,6 +4,7 @@ import { trackPerformanceMetric } from './sentryService';
 class PerformanceMonitoringService {
   private static observers: PerformanceObserver[] = [];
   private static marks: Map<string, number> = new Map();
+  private static beforeUnloadListener: (() => void) | null = null;
 
   // Initialize Core Web Vitals tracking
   static init() {
@@ -63,9 +64,10 @@ class PerformanceMonitoringService {
         this.observers.push(clsObserver);
 
         // Report CLS on page unload
-        window.addEventListener('beforeunload', () => {
+        this.beforeUnloadListener = () => {
           trackPerformanceMetric('cls', clsValue, 'score');
-        });
+        };
+        window.addEventListener('beforeunload', this.beforeUnloadListener);
       } catch (e) {
         console.warn('CLS observation not supported');
       }
@@ -196,6 +198,12 @@ class PerformanceMonitoringService {
     });
     this.observers = [];
     this.marks.clear();
+
+    // Remove beforeunload listener
+    if (this.beforeUnloadListener) {
+      window.removeEventListener('beforeunload', this.beforeUnloadListener);
+      this.beforeUnloadListener = null;
+    }
   }
 }
 

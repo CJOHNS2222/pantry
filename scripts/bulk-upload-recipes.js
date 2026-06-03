@@ -30,29 +30,25 @@ try {
   console.error('Could not load .env.local file:', error.message);
 }
 
-import { initializeApp } from "firebase/app";
-import { getFirestore, collection, addDoc, getDocs, query, where } from "firebase/firestore";
-import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { getAuth, signInAnonymously } from "firebase/auth";
+import { initializeApp, cert } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
 
-// Firebase config (same as in your app)
-const firebaseConfig = {
-  apiKey: process.env.VITE_API_KEY,
-  authDomain: process.env.VITE_AUTH_DOMAIN,
-  projectId: process.env.VITE_PROJECT_ID,
-  storageBucket: process.env.VITE_STORAGE_BUCKET,
-  messagingSenderId: process.env.VITE_MESSAGING_SENDER_ID,
-  appId: process.env.VITE_APP_ID,
-  measurementId: process.env.VITE_MEASUREMENT_ID
-};
+// Load service account for Admin SDK (bypasses anonymous auth restriction)
+const serviceAccountPath = join(__dirname, '..', 'firebase-service-account.json');
+let serviceAccount;
+try {
+  serviceAccount = JSON.parse(readFileSync(serviceAccountPath, 'utf8'));
+} catch (error) {
+  console.error('❌ Could not load firebase-service-account.json:', error.message);
+  process.exit(1);
+}
 
-// Initialize Firebase client app
-const app = initializeApp(firebaseConfig);
+// Initialize Firebase Admin app (no authentication needed)
+const app = initializeApp({
+  credential: cert(serviceAccount),
+  projectId: process.env.VITE_PROJECT_ID
+});
 const db = getFirestore(app);
-
-// Use client storage for uploads (requires authentication)
-const storage = getStorage(app);
-const auth = getAuth(app);
 
 const SPOONACULAR_API_KEY = process.env.VITE_SPOONACULAR_API_KEY;
 const SPOONACULAR_BASE_URL = "https://api.spoonacular.com";
@@ -177,8 +173,12 @@ function convertMealDBToStructured(mealDBRecipe) {
     }
   }
 
+  const rawInstructions = mealDBRecipe.strInstructions || '';
+  // Split "step 1 ... step 2 ..." format into a proper numbered array
+  const instructions = /step\s+\d+/i.test(rawInstructions)
+    ? rawInstructions.split(/step\s+\d+\s*/i).filter(s => s.trim()).map(s => s.trim())
+    : [rawInstructions.trim()].filter(Boolean);
   const description = mealDBRecipe.strInstructions || `${mealDBRecipe.strMeal} - A delicious recipe`;
-  const instructions = [mealDBRecipe.strInstructions];
 
   // Check if description matches instructions (for MealDB, description is often set to instructions)
   const instructionsText = instructions.join(' ').trim();
@@ -227,12 +227,63 @@ async function uploadRecipeImage(imageUrl, recipeId) {
 }
 
 /**
+ * Fetch ALL recipes from TheMealDB by browsing every category and area.
+ * The filter endpoint returns stubs (id + name + thumb), so we look up each
+ * meal individually to get full details (ingredients, instructions, etc.).
+ */
+async function fetchAllMealDBRecipes(onProgress) {
+  const allRecipes = [];
+  const seenIds = new Set();
+
+  // Get all categories
+  const [catRes, areaRes] = await Promise.all([
+    fetch(`${MEALDB_BASE_URL}/categories.php`),
+    fetch(`${MEALDB_BASE_URL}/list.php?a=list`)
+  ]);
+  const categories = catRes.ok ? (await catRes.json()).categories?.map(c => c.strCategory) || [] : [];
+  const areas = areaRes.ok ? (await areaRes.json()).meals?.map(a => a.strArea) || [] : [];
+
+  const sources = [
+    ...categories.map(c => ({ type: 'category', value: c })),
+    ...areas.map(a => ({ type: 'area', value: a })),
+  ];
+
+  let done = 0;
+  for (const source of sources) {
+    try {
+      const param = source.type === 'category' ? `c=${encodeURIComponent(source.value)}` : `a=${encodeURIComponent(source.value)}`;
+      const res = await fetch(`${MEALDB_BASE_URL}/filter.php?${param}`);
+      if (!res.ok) { done++; onProgress?.(done, sources.length); continue; }
+      const stubs = (await res.json()).meals || [];
+
+      for (const stub of stubs) {
+        if (seenIds.has(stub.idMeal)) continue;
+        seenIds.add(stub.idMeal);
+        try {
+          const detailRes = await fetch(`${MEALDB_BASE_URL}/lookup.php?i=${stub.idMeal}`);
+          if (detailRes.ok) {
+            const detail = (await detailRes.json()).meals?.[0];
+            if (detail) allRecipes.push(detail);
+          }
+          await new Promise(r => setTimeout(r, 100)); // be gentle
+        } catch { /* skip individual failures */ }
+      }
+    } catch (e) {
+      console.warn(`⚠️  Failed to fetch ${source.type} "${source.value}": ${e.message}`);
+    }
+    done++;
+    onProgress?.(done, sources.length);
+  }
+
+  return allRecipes;
+}
+
+/**
  * Check if a recipe with the given title already exists in Firestore
  */
 async function recipeExists(title) {
   try {
-    const q = query(collection(db, "recipes"), where("title", "==", title));
-    const querySnapshot = await getDocs(q);
+    const querySnapshot = await db.collection('recipes').where('title', '==', title).get();
     return !querySnapshot.empty;
   } catch (error) {
     console.error("Error checking if recipe exists:", error);
@@ -250,7 +301,7 @@ async function saveRecipeToFirestore(recipe) {
       dateSaved: new Date().toISOString()
     };
 
-    const docRef = await addDoc(collection(db, "recipes"), savedRecipe);
+    const docRef = await db.collection('recipes').add(savedRecipe);
     console.log(`✅ Saved recipe: ${recipe.title} (${recipe.source})`);
     return docRef.id;
   } catch (error) {
@@ -311,12 +362,83 @@ const SEARCH_QUERIES = [
   "mexican beef",
   "italian pasta",
   "french roasted",
-  "thai curry"
+  "thai curry",
+  // World cuisines
+  "japanese ramen",
+  "korean bibimbap",
+  "indian butter chicken",
+  "greek moussaka",
+  "moroccan tagine",
+  "vietnamese pho",
+  "spanish paella",
+  "lebanese hummus",
+  "turkish kebab",
+  "ethiopian injera",
+  "peruvian ceviche",
+  "jamaican jerk chicken",
+  "chinese fried rice",
+  "thai pad thai",
+  "brazilian churrasco",
+  // Proteins
+  "lamb chops",
+  "pork tenderloin",
+  "duck breast",
+  "turkey meatballs",
+  "tuna steak",
+  "cod fillet",
+  "lobster bisque",
+  "crab cakes",
+  "venison stew",
+  "bison burger",
+  // Vegetarian & Vegan
+  "vegan tacos",
+  "vegetarian chili",
+  "lentil soup",
+  "black bean burger",
+  "mushroom risotto",
+  "eggplant parmesan",
+  "cauliflower steak",
+  "chickpea curry",
+  "stuffed bell peppers",
+  "zucchini boats",
+  // Baking & Desserts
+  "banana bread",
+  "chocolate cake",
+  "apple pie",
+  "lemon tart",
+  "cheesecake",
+  "brownies",
+  "cinnamon rolls",
+  "sourdough bread",
+  "pumpkin muffins",
+  "tiramisu",
+  // Comfort food
+  "mac and cheese",
+  "chicken pot pie",
+  "beef lasagna",
+  "clam chowder",
+  "potato soup",
+  "shepherd's pie",
+  "chicken marsala",
+  "beef stroganoff",
+  "pulled pork",
+  "chicken alfredo",
+  // Salads & Light meals
+  "caesar salad",
+  "nicoise salad",
+  "quinoa bowl",
+  "grain bowl",
+  "buddha bowl",
+  "avocado toast",
+  "caprese salad",
+  "greek salad",
+  "coleslaw",
+  "pasta salad"
 ];
 
 const SORT_OPTIONS = ["random", "popularity", "time", "calories", "protein", "fat", "carbs"];
 
-const RECIPES_PER_QUERY = 1; // Reduced to get more variety from different queries
+const RECIPES_PER_QUERY = 10; // More per query to fill the database
 
 async function bulkUploadRecipes(searchQueries, recipesPerQuery, onProgress) {
   const result = {
@@ -425,65 +547,56 @@ async function bulkUploadRecipes(searchQueries, recipesPerQuery, onProgress) {
 }
 
 async function main() {
-  console.log('🚀 Starting bulk recipe upload...');
-  console.log(`📊 Will fetch up to ${RECIPES_PER_QUERY} recipes for each of ${SEARCH_QUERIES.length} search terms`);
-  console.log(`📈 Total estimated recipes: up to ${SEARCH_QUERIES.length * RECIPES_PER_QUERY} (may be less due to duplicates)`);
-  console.log(`🔀 Using TheMealDB (free) as primary, Spoonacular as fallback`);
-  console.log(`⏱️  Rate limit: None for MealDB, 1 request/second for Spoonacular`);
+  console.log('🚀 Starting bulk recipe upload (TheMealDB full browse)...');
+  console.log('📦 Fetching every recipe from all TheMealDB categories and areas...');
 
   const startTime = Date.now();
+  console.log('✅ Admin SDK initialized — no authentication required');
 
-  // Authenticate before uploading
-  console.log('🔐 Authenticating with Firebase...');
-  try {
-    await signInAnonymously(auth);
-    console.log('✅ Authentication successful');
-  } catch (error) {
-    console.error('❌ Authentication failed:', error);
-    process.exit(1);
-  }
+  let success = 0, skipped = 0, failed = 0;
 
   try {
-    const result = await bulkUploadRecipes(
-      SEARCH_QUERIES,
-      RECIPES_PER_QUERY,
-      (completed, total) => {
-        const percentage = Math.round((completed / total) * 100);
-        console.log(`📋 Progress: ${completed}/${total} queries completed (${percentage}%)`);
+    console.log('\n🌐 Discovering all TheMealDB categories and areas...');
+    const allMealDBRecipes = await fetchAllMealDBRecipes((done, total) => {
+      process.stdout.write(`\r🔍 Browsing TheMealDB: ${done}/${total} sources scanned...`);
+    });
+    console.log(`\n✅ Discovered ${allMealDBRecipes.length} unique recipes from TheMealDB`);
+
+    console.log('\n💾 Uploading new recipes to Firebase...');
+    for (const recipe of allMealDBRecipes) {
+      try {
+        const structured = convertMealDBToStructured(recipe);
+        if (!structured) { skipped++; continue; }
+
+        const exists = await recipeExists(structured.title);
+        if (exists) {
+          console.log(`⏭️  Skipping duplicate: ${structured.title}`);
+          skipped++;
+          continue;
+        }
+
+        await saveRecipeToFirestore(structured);
+        success++;
+        console.log(`✅ Saved: ${structured.title}`);
+      } catch (e) {
+        failed++;
+        console.error(`❌ Failed to save "${recipe.strMeal}": ${e.message}`);
       }
-    );
-
-    const duration = Math.round((Date.now() - startTime) / 1000);
-
-    console.log('\n✅ Bulk upload completed!');
-    console.log(`📊 Results:`);
-    console.log(`   ✅ Successful: ${result.success}`);
-    console.log(`   ⏭️  Skipped (duplicates): ${result.skipped}`);
-    console.log(`   ❌ Failed: ${result.failed}`);
-    console.log(`   ⏱️  Duration: ${duration} seconds`);
-
-    if (result.errors.length > 0) {
-      console.log('\n⚠️  Errors encountered:');
-      result.errors.forEach((error, index) => {
-        console.log(`   ${index + 1}. ${error}`);
-      });
     }
 
+    const duration = Math.round((Date.now() - startTime) / 1000);
+    console.log('\n✅ Bulk upload completed!');
+    console.log(`📊 Results:`);
+    console.log(`   ✅ Successful: ${success}`);
+    console.log(`   ⏭️  Skipped (duplicates/no-instructions): ${skipped}`);
+    console.log(`   ❌ Failed: ${failed}`);
+    console.log(`   ⏱️  Duration: ${duration} seconds`);
     console.log('\n🎉 Recipe database populated successfully!');
 
   } catch (error) {
     console.error('❌ Bulk upload failed:', error);
     process.exit(1);
   }
-}
-
-// Check if Spoonacular API key is configured
-if (!process.env.VITE_SPOONACULAR_API_KEY) {
-  console.error('❌ VITE_SPOONACULAR_API_KEY environment variable not set');
-  console.log('Please add your Spoonacular API key to your .env.local file:');
-  console.log('VITE_SPOONACULAR_API_KEY=your_api_key_here');
-  console.log('Get your free API key at: https://spoonacular.com/food-api');
-  process.exit(1);
 }
 
 main().catch(console.error);

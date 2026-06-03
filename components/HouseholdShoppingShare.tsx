@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Users, UserCheck, Clock, MessageCircle } from 'lucide-react';
+import React, { useState } from 'react';
+import { Users, MessageCircle } from 'lucide-react';
 
 interface HouseholdMember {
   id: string;
@@ -28,7 +28,7 @@ interface HouseholdShoppingShareProps {
 export const HouseholdShoppingShare: React.FC<HouseholdShoppingShareProps> = ({
   householdMembers,
   recentActivity,
-  currentUserId,
+  currentUserId: _currentUserId,
   onSendMessage
 }) => {
   const [showActivity, setShowActivity] = useState(false);
@@ -72,8 +72,9 @@ export const HouseholdShoppingShare: React.FC<HouseholdShoppingShareProps> = ({
           Household ({activeMembers.length})
         </h3>
         <button
+          type="button"
           onClick={() => setShowActivity(!showActivity)}
-          className="text-xs text-[var(--accent-color)] hover:underline"
+          className="text-sm text-[var(--accent-color)] hover:underline"
         >
           {showActivity ? 'Hide' : 'Show'} activity
         </button>
@@ -101,7 +102,7 @@ export const HouseholdShoppingShare: React.FC<HouseholdShoppingShareProps> = ({
                 </div>
               )}
             </div>
-            <span className="text-xs text-theme-secondary text-center leading-tight">
+            <span className="text-sm text-theme-secondary text-center leading-tight">
               {member.name.split(' ')[0]}
             </span>
           </div>
@@ -118,7 +119,7 @@ export const HouseholdShoppingShare: React.FC<HouseholdShoppingShareProps> = ({
 
       {/* Current Activity Summary */}
       {activeMembers.some(m => m.currentActivity) && (
-        <div className="text-xs text-theme-secondary opacity-70 mb-3">
+        <div className="text-sm text-theme-secondary opacity-70 mb-3">
           {activeMembers
             .filter(m => m.currentActivity)
             .map(m => `${m.name.split(' ')[0]} is ${m.currentActivity}`)
@@ -129,12 +130,12 @@ export const HouseholdShoppingShare: React.FC<HouseholdShoppingShareProps> = ({
       {/* Recent Activity */}
       {showActivity && (
         <div className="space-y-2 mb-3 animate-fade-in">
-          <div className="text-xs text-theme-secondary opacity-70 mb-2">
+          <div className="text-sm text-theme-secondary opacity-70 mb-2">
             Recent activity:
           </div>
 
           {recentActivity.slice(0, 5).map(activity => (
-            <div key={activity.id} className="flex items-center gap-2 text-xs">
+            <div key={activity.id} className="flex items-center gap-2 text-sm">
               <span className="text-base">{getActivityIcon(activity.action)}</span>
               <div className="flex-1">
                 <span className="font-medium text-theme-primary">{activity.memberName}</span>
@@ -150,7 +151,7 @@ export const HouseholdShoppingShare: React.FC<HouseholdShoppingShareProps> = ({
           ))}
 
           {recentActivity.length === 0 && (
-            <div className="text-xs text-theme-secondary opacity-60 italic">
+            <div className="text-sm text-theme-secondary opacity-60 italic">
               No recent activity
             </div>
           )}

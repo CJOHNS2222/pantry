@@ -2,8 +2,13 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.smart.pantry',
-  appName: 'Smart Pantry',
+  appName: 'Stock & Spoon',
   webDir: 'dist',
+  // Remove server config for production builds - Capacitor will load from webDir
+  // server: {
+  //   androidScheme: 'com.smart.pantry',
+  //   iosScheme: 'com.smart.pantry'
+  // },
   plugins: {
     App: {
       // App plugin configuration
@@ -15,7 +20,10 @@ const config: CapacitorConfig = {
       presentationOptions: ["badge", "sound", "alert"],
     },
     // Calendar: {
-    //   // Calendar plugin configuration - temporarily disabled due to build compatibility
+    //   // capacitor-calendar plugin is NOT installed.
+    //   // ICS file export (exportWeekAsICS) works without it.
+    //   // To restore native calendar push, install @howljs/capacitor-calendar
+    //   // (Capacitor 8 compatible) and uncomment this block.
     // },
     SafeArea: {
       // Safe area plugin configuration
@@ -27,17 +35,16 @@ const config: CapacitorConfig = {
     //   enabled: true,
     //   excludePatterns: ["*firestore.googleapis.com*"]
     // },
-    // Browser: {
-    //   toolbarColor: '#2A0A10'
-    // }
+    Browser: {
+      // toolbarColor: '#2A0A10'
+    },
+    GoogleAuth: {
+      scopes: ['profile', 'email'],
+      serverClientId: '13848266518-0co4dav6sn9epov13vt0covii2nmg1ne.apps.googleusercontent.com',
+      forceCodeForRefreshToken: true,
+    },
   },
-  // App icon configuration
-  android: {
-    icon: 'public/icons/smartpantryicon.png'
-  },
-  ios: {
-    icon: 'public/icons/smartpantryicon.png'
-  }
+  // App icon configuration (icons are handled by the build pipeline)
 };
 
 export default config;

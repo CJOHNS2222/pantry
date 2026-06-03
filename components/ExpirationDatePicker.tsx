@@ -1,5 +1,5 @@
 // components/ExpirationDatePicker.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, AlertTriangle, CheckCircle, Info } from 'lucide-react';
 
 interface ExpirationDatePickerProps {
@@ -18,6 +18,14 @@ const ExpirationDatePicker: React.FC<ExpirationDatePickerProps> = ({
   className = ''
 }) => {
   const [isOpen, setIsOpen] = useState(false);
+
+  // Close dropdown on Escape key
+  useEffect(() => {
+    if (!isOpen) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setIsOpen(false); };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [isOpen]);
 
   // Quick date options
   const quickOptions = [
@@ -127,6 +135,18 @@ const ExpirationDatePicker: React.FC<ExpirationDatePickerProps> = ({
             </div>
           </div>
 
+          {/* Date label explainer */}
+          <details className="mb-4 rounded-lg border border-theme overflow-hidden text-xs text-theme-secondary">
+            <summary className="px-3 py-2 cursor-pointer font-medium hover:bg-theme-secondary select-none">
+              What do these mean?
+            </summary>
+            <div className="px-3 pb-3 pt-1 space-y-1 bg-theme-secondary/30">
+              <p><strong>Best By</strong> — quality date; food is safe after this date but may lose freshness.</p>
+              <p><strong>Use By</strong> — manufacturer's safety/quality cutoff; triggers earlier alerts in the app.</p>
+              <p><strong>Sell By</strong> — store stocking date only; enter the best-by or use-by date from the label instead.</p>
+            </div>
+          </details>
+
           {/* Quick Options */}
           <div className="mb-4">
             <label className="block text-sm font-medium text-theme-primary mb-2">Quick Set</label>
@@ -151,7 +171,7 @@ const ExpirationDatePicker: React.FC<ExpirationDatePickerProps> = ({
               type="date"
               value={value}
               onChange={(e) => handleCustomDate(e.target.value)}
-              className="w-full px-3 py-2 text-sm border border-theme rounded-lg bg-theme-primary text-theme-primary focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]"
+              className="w-full px-3 py-2 text-sm border border-theme rounded-lg bg-theme-primary text-theme-secondary focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]"
             />
           </div>
 

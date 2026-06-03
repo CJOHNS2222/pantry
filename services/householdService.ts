@@ -9,10 +9,13 @@ import {
   arrayRemove,
   serverTimestamp,
 } from 'firebase/firestore';
-import { db } from '../firebaseConfig';
-import DatabaseMonitoringService from './databaseMonitoringService';
 import { Household, Member, User } from '../types';
 import { getPerformance, trace } from "firebase/performance";
+import { log } from './logService';
+import {
+  migrateUserCacheToHousehold,
+  copyHouseholdCacheToUser,
+} from './householdDataMigrationService';
 
 const performance = getPerformance();
 
@@ -42,9 +45,10 @@ export const getOrCreateHousehold = async (user: User): Promise<Household | null
       // User is already in a household
       const doc = querySnapshot.docs[0];
       perfTrace.putAttribute('action', 'existing_household_found');
+      const d = doc.data() as any;
       return {
         id: doc.id,
-        ...doc.data(),
+        ...d,
       } as Household;
     }
 
@@ -57,7 +61,7 @@ export const getOrCreateHousehold = async (user: User): Promise<Household | null
 
     return newHousehold;
   } catch (err: any) {
-    console.error('Error getting/creating household:', err);
+    log.error('Error getting/creating household:', { err }, 'HouseholdService');
     return null;
   } finally {
     perfTrace.stop();
@@ -177,7 +181,7 @@ export const updateMemberStatus = async (
 
     await DatabaseMonitoringService.updateDoc(householdRef, updatePayload);
   } catch (err: any) {
-    console.error('Unable to join 10: Error updating member status:', err);
+    log.error('Unable to join 10: Error updating member status:', { err }, 'HouseholdService');
     throw err;
   }
 };
@@ -230,14 +234,22 @@ export const removeMemberFromHousehold = async (
       updatePayload.memberIds = arrayRemove(memberId);
     }
 
-    await DatabaseMonitoringService.updateDoc(household.ref, updatePayload);
+    await DatabaseMonitoringService.updateDoc(householdRef, updatePayload);
+
+    // Copy the household caches to the departing member's personal cache
+    // so they don't lose their pantry/shopping/meal-plan/recipe data.
+    // Use the member's User shape from what we have available.
+    const departingUser: User = { id: memberId } as User;
+    copyHouseholdCacheToUser(departingUser, householdId).catch(err =>
+      log.error('Cache copy failed after removing member', { err }, 'HouseholdService')
+    );
 
     // If this was the last member besides the admin, delete the household
     if (updatedMembers.length === 1) {
       await DatabaseMonitoringService.deleteDoc(householdRef);
     }
   } catch (err: any) {
-    console.error('Error removing member from household:', err);
+    log.error('Error removing member from household:', { err }, 'HouseholdService');
     throw err;
   }
 };
@@ -298,7 +310,7 @@ export const findHouseholdByInvite = async (
       memberIds: householdData.memberIds || []
     } as Household;
   } catch (err: any) {
-    console.error('Unable to join 5: Error finding household by invite:', err);
+    log.error('Unable to join 5: Error finding household by invite:', { err }, 'HouseholdService');
     return null;
   }
 };
@@ -363,6 +375,12 @@ export const joinHousehold = async (
       updatedAt: serverTimestamp(),
     });
 
+    // Merge the user's personal caches into the household caches (deduplicating).
+    // Fire-and-forget: non-fatal if it fails, user is already joined.
+    migrateUserCacheToHousehold(user, householdId).catch(err =>
+      log.error('Cache migration failed after joining household', { err }, 'HouseholdService')
+    );
+
     // Return updated household
     return {
       ...household,
@@ -371,7 +389,7 @@ export const joinHousehold = async (
       ),
     };
   } catch (err: any) {
-    console.error('Unable to join 7: Error joining household:', err);
+    log.error('Unable to join 7: Error joining household:', { err }, 'HouseholdService');
     throw err;
   } finally {
     perfTrace.stop();
@@ -383,23 +401,22 @@ export const joinHousehold = async (
  */
 export const getUserHouseholds = async (userEmail: string): Promise<Household[]> => {
   try {
-    const householdQuery = query(
-      collection(db, 'households'),
-      where('members', 'array-contains', { email: userEmail })
+    const householdQuery = DatabaseMonitoringService.query(
+      DatabaseMonitoringService.collection('households'),
+      DatabaseMonitoringService.where('members', 'array-contains', { email: userEmail })
     );
 
-    // Option 1: Use direct Firestore (current)
-    // const querySnapshot = await getDocs(householdQuery);
-
-    // Option 2: Use DatabaseMonitoringService for tracking (recommended for analytics)
     const querySnapshot = await DatabaseMonitoringService.getDocs(householdQuery);
 
-    return querySnapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    })) as Household[];
+    return querySnapshot.docs.map((doc: any) => {
+      const d = doc.data() as any;
+      return {
+        id: doc.id,
+        ...d,
+      } as Household;
+    });
   } catch (err: any) {
-    console.error('Error getting user households:', err);
+    log.error('Error getting user households:', { err }, 'HouseholdService');
     return [];
   }
 };

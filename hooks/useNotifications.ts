@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { Capacitor } from '@capacitor/core';
 import { DayPlan } from '../types';
+import { log } from '../services/logService';
 
 interface NotificationSettings {
   enabled: boolean;
@@ -12,8 +13,15 @@ interface NotificationSettings {
   };
 }
 
-export function useNotifications(settings: NotificationSettings, userEmail?: string, mealPlan?: DayPlan[]): any {
-  const [notificationPermission, setNotificationPermission] = useState<'default' | 'granted' | 'denied'>('default');
+interface UseNotificationsResult {
+  notificationPermission: string;
+  requestNotificationPermission: () => Promise<string>;
+}
+
+export function useNotifications(settings: NotificationSettings, userEmail?: string, mealPlan?: DayPlan[]): UseNotificationsResult | Record<string, never> {
+  // Capacitor PermissionState can vary between platforms; keep this a wide string
+  // so we can assign whatever the plugin returns without narrowing errors.
+  const [notificationPermission, setNotificationPermission] = useState<string>('default');
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) {
@@ -25,8 +33,8 @@ export function useNotifications(settings: NotificationSettings, userEmail?: str
       try {
         const permission = await LocalNotifications.checkPermissions();
         setNotificationPermission(permission.display);
-      } catch (err: any) {
-        console.error('Error checking notification permissions:', error);
+      } catch (err: unknown) {
+        log.error('Error checking notification permissions:', { error: err instanceof Error ? err.message : String(err) }, 'useNotifications');
       }
     };
 
@@ -37,7 +45,7 @@ export function useNotifications(settings: NotificationSettings, userEmail?: str
         // Request permissions
         const permission = await LocalNotifications.requestPermissions();
         if (permission.display !== 'granted') {
-          console.log('Notification permissions not granted');
+          log.debug('Notification permissions not granted');
           return;
         }
 
@@ -47,21 +55,21 @@ export function useNotifications(settings: NotificationSettings, userEmail?: str
         if (settings.enabled && userEmail) {
           await scheduleNotifications(settings, mealPlan);
         }
-      } catch (err: any) {
-        console.error('Error setting up notifications:', error);
+      } catch (err: unknown) {
+        log.error('Error setting up notifications:', { error: err instanceof Error ? err.message : String(err) }, 'useNotifications');
       }
     };
 
     setupNotifications();
-  }, [settings.enabled, settings.time, settings.types, userEmail, mealPlan]);
+  }, [settings.enabled, settings.time, settings.types, userEmail]);
 
   const requestNotificationPermission = async () => {
     try {
       const permission = await LocalNotifications.requestPermissions();
       setNotificationPermission(permission.display);
       return permission.display;
-    } catch (err: any) {
-      console.error('Error requesting notification permissions:', error);
+    } catch (err: unknown) {
+      log.error('Error requesting notification permissions:', { error: err instanceof Error ? err.message : String(err) }, 'useNotifications');
       return 'denied';
     }
   };
@@ -97,7 +105,8 @@ export function useNotifications(settings: NotificationSettings, userEmail?: str
       }
 
       if (notifications.length > 0) {
-        await LocalNotifications.schedule({ notifications });
+        // Cast to any to satisfy differing LocalNotificationSchema definitions across platforms
+        await LocalNotifications.schedule({ notifications: notifications as any });
       }
     }
   };

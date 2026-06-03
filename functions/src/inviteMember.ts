@@ -1,13 +1,11 @@
 
 import {onCall, onRequest, HttpsError} from "firebase-functions/v2/https";
-import { defineJsonSecret } from "firebase-functions/params";
+import {logger} from "firebase-functions/v2";
 import admin from 'firebase-admin';
 import {getFirestore, FieldValue} from "firebase-admin/firestore";
 import { getAuth } from 'firebase-admin/auth';
-import { sendEmail } from './helpers/sendEmail.js';
 
-// Define the secret for Gmail configuration
-const gmailConfigSecret = defineJsonSecret("EMAILSECRET");
+// (email secret removed — email sending disabled temporarily)
 
 // Ensure the Admin SDK is initialized
 if (!admin.apps?.length) {
@@ -16,13 +14,10 @@ if (!admin.apps?.length) {
 
 // Core invite logic as a function so it can be used by both callable and HTTP handlers
 async function inviteMemberCore(inviterUid: string, email: string, householdId: string) {
-  console.log('inviteMemberCore called with:', { inviterUid, email, householdId });
   const db = getFirestore();
 
   const householdRef = db.collection("households").doc(householdId);
-  console.log('Household ref path:', householdRef.path);
   const householdDoc = await householdRef.get();
-  console.log('Household doc exists:', householdDoc.exists);
   if (!householdDoc.exists) {
     throw new HttpsError("not-found", "The specified household does not exist.");
   }
@@ -31,32 +26,15 @@ async function inviteMemberCore(inviterUid: string, email: string, householdId: 
     throw new HttpsError("not-found", "The household data is corrupted.");
   }
 
-  // Add a small delay to see if it's a race condition
-  await new Promise(resolve => setTimeout(resolve, 1000));
-
-  console.log('Full household data:', JSON.stringify(householdData, null, 2));
-  console.log('Household data members type:', typeof householdData.members);
-  console.log('Household data members:', householdData.members);
-  console.log('Household data memberIds type:', typeof householdData.memberIds);
-  console.log('Household data memberIds:', householdData.memberIds);
-  console.log('Inviter UID:', inviterUid);
-
   // Check both members array and memberIds array for backward compatibility
   const members = Array.isArray(householdData.members) ? householdData.members : [];
   const memberIds = Array.isArray(householdData.memberIds) ? householdData.memberIds : [];
-
-  console.log('Members array after check:', members);
-  console.log('Member IDs array:', memberIds);
 
   // Check if inviter is in either members or memberIds
   const isMemberByMembers = members.some((member: { id: string; }) => member.id === inviterUid);
   const isMemberByIds = memberIds.includes(inviterUid);
 
-  console.log('Is member by members array:', isMemberByMembers);
-  console.log('Is member by memberIds array:', isMemberByIds);
-
   if (!isMemberByMembers && !isMemberByIds) {
-    console.log('User not found in members or memberIds');
     throw new HttpsError("permission-denied", "You are not a member of this household.");
   }
 
@@ -83,7 +61,7 @@ async function inviteMemberCore(inviterUid: string, email: string, householdId: 
       // Note: photoURL is not available in Firebase Functions for security reasons
     }
   } catch (err) {
-    console.warn('Unable to resolve invited email to UID:', err);
+    logger.warn('Unable to resolve invited email to UID:', err);
   }
 
   const newMember: any = { 
@@ -128,76 +106,60 @@ async function inviteMemberCore(inviterUid: string, email: string, householdId: 
   if (memberIdToStore && memberIdToStore !== email) {
     try {
       await admin.auth().setCustomUserClaims(memberIdToStore, { householdId });
-      console.log(`Custom claim 'householdId' set for user ${memberIdToStore} to ${householdId}`);
+      // Custom claim set successfully
     } catch (err: any) {
-      console.error('Error setting custom claims:', error);
+      logger.error('Error setting custom claims:', err);
       // Don't fail the invite if claim setting fails
     }
   }
 
-  const notificationsRef = db.collection('notifications');
-  await notificationsRef.add({ 
-    userId: memberIdToStore, 
+  // Send notification to invited user.
+  // Registered users (have a UID) → write to their per-user cache so the bell badge picks it up.
+  // Unregistered users (email-only) → fall back to the top-level collection as a best-effort.
+  const notificationId = db.collection('_').doc().id; // generate a random ID
+  const notificationPayload: Record<string, any> = {
+    id: notificationId,
+    userId: memberIdToStore,
     type: 'household_invite',
     title: 'Household Invitation',
-    message: `${inviterName} has invited you to join the "${householdName}" household on Smart Pantry!`, 
+    message: `${inviterName} has invited you to join the "${householdName}" household on Smart Pantry!`,
     priority: 'medium',
     actionType: 'join_household',
     actionLabel: 'Accept',
     actionData: { householdId },
     read: false,
-    createdAt: FieldValue.serverTimestamp()
-  });
+  };
 
-  // Send email invitation
+  const inviteeHasUid = memberIdToStore && memberIdToStore !== email;
   try {
-    const subject = `You're invited to join ${householdName} on Smart Pantry!`;
-    const body = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2 style="color: #a51401;">Household Invitation</h2>
-        <p>Hi there!</p>
-        <p><strong>${inviterName}</strong> has invited you to join their household <strong>"${householdName}"</strong> on Smart Pantry!</p>
-
-        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
-          <h3>What you can do:</h3>
-          <ul>
-            <li>Share pantry inventory with family members</li>
-            <li>Collaborate on meal planning</li>
-            <li>View and rate community recipes</li>
-            <li>Keep shopping lists in sync</li>
-          </ul>
-        </div>
-
-        <p style="margin-top: 30px;">
-          <a href="https://smartpantry.app" style="background-color: #a51401; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">
-            Open Smart Pantry
-          </a>
-        </p>
-
-        <p style="color: #666; font-size: 14px; margin-top: 30px;">
-          If you don't have an account yet, you can sign up for free at <a href="https://smartpantry.app">smartpantry.app</a>
-        </p>
-
-        <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
-        <p style="color: #999; font-size: 12px;">
-          This invitation was sent by ${inviterName}. If you believe this was sent in error, you can safely ignore this email.
-        </p>
-      </div>
-    `;
-
-    await sendEmail(email, subject, body);
-    console.log('Email invitation sent successfully to:', email);
-  } catch (emailError) {
-    console.error('Failed to send email invitation:', emailError);
-    // Don't fail the whole invite process if email fails
+    if (inviteeHasUid) {
+      // Write into the per-user notifications cache array (same path the client uses)
+      notificationPayload.createdAt = new Date().toISOString();
+      const cacheRef = db.collection('users').doc(memberIdToStore).collection('cache').doc('notifications');
+      await db.runTransaction(async (tx) => {
+        const snap = await tx.get(cacheRef);
+        const existing: any[] = snap.exists ? ((snap.data()?.items as any[]) ?? []) : [];
+        const updated = [...existing, notificationPayload].slice(-200); // cap at 200 items
+        if (snap.exists) {
+          tx.update(cacheRef, { items: updated });
+        } else {
+          tx.set(cacheRef, { items: updated });
+        }
+      });
+    } else {
+      // Invitee not yet registered — fall back to top-level collection
+      notificationPayload.createdAt = FieldValue.serverTimestamp();
+      await db.collection('notifications').add(notificationPayload);
+    }
+  } catch (err) {
+    logger.error('Failed to create household invite notification:', err);
+    throw new HttpsError("internal", "Failed to send invitation notification.");
   }
 
   return { success: true, newMember };
 }
 
-export const inviteMember = onCall(
-  { secrets: [gmailConfigSecret] },
-  async (request) => {
+export const inviteMember = onCall(async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'You must be logged in to invite members.');
   const inviterUid = request.auth.uid;
   const { email, householdId } = request.data;
@@ -229,16 +191,14 @@ export const inviteMemberHttp = onRequest(async (req, res) => {
     res.json({ success: true });
     return;
   } catch (err: any) {
-    console.error('inviteMemberHttp error:', err);
+    logger.error('inviteMemberHttp error:', err);
     res.status(500).json({ error: err?.message || 'internal' });
     return;
   }
 });
 
 // Leave household function (admin privileges to bypass security rules)
-export const leaveHousehold = onCall(
-  { secrets: [gmailConfigSecret] },
-  async (request) => {
+export const leaveHousehold = onCall(async (request) => {
     const { householdId } = request.data;
     const userId = request.auth?.uid;
 
@@ -301,7 +261,7 @@ export const leaveHousehold = onCall(
           });
           
           await batch.commit();
-          console.log(`Copied ${inventorySnapshot.size} inventory items to user ${userId}`);
+          logger.log(`Copied ${inventorySnapshot.size} inventory items to user ${userId}`);
         }
 
         // Copy household meal plan
@@ -319,7 +279,7 @@ export const leaveHousehold = onCall(
           });
           
           await batch.commit();
-          console.log(`Copied ${mealPlanSnapshot.size} meal plan items to user ${userId}`);
+          logger.log(`Copied ${mealPlanSnapshot.size} meal plan items to user ${userId}`);
         }
 
         // Copy household shopping list
@@ -337,7 +297,7 @@ export const leaveHousehold = onCall(
           });
           
           await batch.commit();
-          console.log(`Copied ${shoppingListSnapshot.size} shopping list items to user ${userId}`);
+          logger.log(`Copied ${shoppingListSnapshot.size} shopping list items to user ${userId}`);
         }
 
         // Copy household saved recipes
@@ -355,17 +315,17 @@ export const leaveHousehold = onCall(
           });
           
           await batch.commit();
-          console.log(`Copied ${savedRecipesSnapshot.size} saved recipes to user ${userId}`);
+          logger.log(`Copied ${savedRecipesSnapshot.size} saved recipes to user ${userId}`);
         }
 
       } catch (copyError) {
-        console.error('Error copying household data to user:', copyError);
+        logger.error('Error copying household data to user:', copyError);
         // Continue with household deletion even if copying fails
       }
 
       // Delete the household
       await householdRef.delete();
-      console.log(`Deleted household ${householdId} as it had fewer than 2 remaining members`);
+      logger.log(`Deleted household ${householdId} as it had fewer than 2 remaining members`);
     }
 
     return { success: true };
@@ -374,7 +334,6 @@ export const leaveHousehold = onCall(
 
 // HTTP handler for leaving household
 export const leaveHouseholdHttp = onRequest(
-  { secrets: [gmailConfigSecret] },
   async (req, res) => {
     try {
       if (req.method !== 'POST') { res.status(405).json({ error: 'method not allowed' }); return; }
@@ -428,7 +387,7 @@ export const leaveHouseholdHttp = onRequest(
             });
             
             await batch.commit();
-            console.log(`Copied ${inventorySnapshot.size} inventory items to user ${userId}`);
+            logger.log(`Copied ${inventorySnapshot.size} inventory items to user ${userId}`);
           }
 
           // Copy household meal plan
@@ -446,7 +405,7 @@ export const leaveHouseholdHttp = onRequest(
             });
             
             await batch.commit();
-            console.log(`Copied ${mealPlanSnapshot.size} meal plan items to user ${userId}`);
+            logger.log(`Copied ${mealPlanSnapshot.size} meal plan items to user ${userId}`);
           }
 
           // Copy household shopping list
@@ -464,7 +423,7 @@ export const leaveHouseholdHttp = onRequest(
             });
             
             await batch.commit();
-            console.log(`Copied ${shoppingListSnapshot.size} shopping list items to user ${userId}`);
+            logger.log(`Copied ${shoppingListSnapshot.size} shopping list items to user ${userId}`);
           }
 
           // Copy household saved recipes
@@ -482,23 +441,23 @@ export const leaveHouseholdHttp = onRequest(
             });
             
             await batch.commit();
-            console.log(`Copied ${savedRecipesSnapshot.size} saved recipes to user ${userId}`);
+            logger.log(`Copied ${savedRecipesSnapshot.size} saved recipes to user ${userId}`);
           }
 
         } catch (copyError) {
-          console.error('Error copying household data to user:', copyError);
+          logger.error('Error copying household data to user:', copyError);
           // Continue with household deletion even if copying fails
         }
 
         // Delete the household
         await householdRef.delete();
-        console.log(`Deleted household ${householdId} as it had fewer than 2 remaining members`);
+        logger.log(`Deleted household ${householdId} as it had fewer than 2 remaining members`);
       }
 
       res.json({ success: true });
       return;
     } catch (err: any) {
-      console.error('leaveHouseholdHttp error:', err);
+      logger.error('leaveHouseholdHttp error:', err);
       res.status(500).json({ error: err?.message || 'internal' });
       return;
     }

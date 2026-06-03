@@ -1,3 +1,47 @@
+@import "tailwindcss";
+
+@theme {
+  /* xs breakpoint for phones narrower than 360px (e.g. iPhone SE 1st gen, 320px Galaxy) */
+  --breakpoint-xs: 360px;
+}
+
+/* App layout heights – keep in sync with AppHeader paddingTop and AppNavigation height.
+   --app-header-h accounts for the device safe-area-inset-top (notch/dynamic island)
+   so that MainContent and .modal-safe-h always clear the fixed header. */
+:root {
+  --app-header-h: calc(max(12px, env(safe-area-inset-top, 0px)) + 5.5rem);
+  --app-nav-h: calc(5rem + max(0.5rem, var(--safe-area-inset-bottom, 0px)));
+}
+
+/* Safe modal max-height: fits between the fixed header and fixed nav bar */
+.modal-safe-h {
+  max-height: calc(100dvh - var(--app-header-h) - var(--app-nav-h) - 1.5rem);
+}
+
+/* Hide fixed header and nav while any full-screen modal is open */
+body.modal-open header.fixed,
+body.modal-open nav.fixed {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* Theme utility classes */
+.bg-theme-primary { background-color: var(--bg-primary); }
+.bg-theme-secondary { background-color: var(--bg-secondary); }
+.text-theme-primary { color: var(--text-primary); }
+.text-theme-secondary { color: var(--text-secondary); }
+.border-theme { border-color: var(--border-color); }
+
+.theme-transition {
+  transition: all 0.3s ease;
+}
+
+.gold-gradient {
+  background: linear-gradient(135deg, #FCD34D 0%, #F59E0B 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
 /* Premium Feature Overlay Styles */
 .premium-overlay-container {
   position: relative;
@@ -59,6 +103,10 @@ html, body {
     box-shadow: 0 0 30px rgba(76, 175, 80, 1), 0 0 60px rgba(76, 175, 80, 0.6), 0 0 90px rgba(76, 175, 80, 0.3);
   }
 }
+
+/* Tutorial arrow pointers */
+.arrow-up { }
+.arrow-down { }
 
 /* Hide scrollbar for horizontal scrolling */
 .scrollbar-hide {

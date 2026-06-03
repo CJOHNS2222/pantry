@@ -1,5 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Mic, MicOff, Camera, Search, Plus, X, Loader2 } from 'lucide-react';
+import { useIntl } from 'react-intl';
+import { useModalOpen } from '../utils/useModalOpen';
+import { useAndroidBack } from '../hooks/useAndroidBack';
+import { useAppActions } from '../contexts/AppActionsContext';
+import { log } from '../services/logService';
 
 interface QuickAddItem {
   name: string;
@@ -27,6 +32,10 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
   isOnline,
   recentItems = []
 }) => {
+  useModalOpen(isOpen);
+  useAndroidBack(isOpen, onClose);
+  const intl = useIntl();
+  const { addToast } = useAppActions();
   const [input, setInput] = useState('');
   const [isListening, setIsListening] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
@@ -35,7 +44,8 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Voice recognition setup
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const recognitionRef = useRef<any>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -46,31 +56,46 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
   }, [isOpen]);
 
   useEffect(() => {
-    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      recognitionRef.current = new SpeechRecognition();
-      recognitionRef.current.continuous = false;
-      recognitionRef.current.interimResults = false;
-      recognitionRef.current.lang = 'en-US';
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const win: any = window;
+    if (win.webkitSpeechRecognition || win.SpeechRecognition) {
+      const SpeechRecognition = win.SpeechRecognition || win.webkitSpeechRecognition;
+      try {
+        recognitionRef.current = new SpeechRecognition();
+        recognitionRef.current.continuous = false;
+        recognitionRef.current.interimResults = false;
+        recognitionRef.current.lang = intl.locale || 'en-US'; // updated at start() time too
 
-      recognitionRef.current.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
-        setInput(transcript);
-        setIsListening(false);
-      };
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        recognitionRef.current.onresult = (event: any) => {
+          const transcript = event.results?.[0]?.[0]?.transcript;
+          if (transcript) setInput(transcript);
+          setIsListening(false);
+        };
 
-      recognitionRef.current.onerror = () => {
-        setIsListening(false);
-      };
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        recognitionRef.current.onerror = (ev: any) => {
+          setIsListening(false);
+          const errorCode: string = ev?.error || '';
+          if (errorCode !== 'no-speech' && errorCode !== 'aborted') {
+            addToast('Voice input failed. Please try again or type your item.', 'error');
+          }
+        };
 
-      recognitionRef.current.onend = () => {
-        setIsListening(false);
-      };
+        recognitionRef.current.onend = () => {
+          setIsListening(false);
+        };
+      } catch {
+      }
     }
 
     return () => {
-      if (recognitionRef.current) {
-        recognitionRef.current.stop();
+      try {
+        if (recognitionRef.current && typeof recognitionRef.current.stop === 'function') {
+          recognitionRef.current.stop();
+        }
+      } catch {
+        // ignore
       }
     };
   }, []);
@@ -81,10 +106,15 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
       const filtered = recentItems.filter(item =>
         item.toLowerCase().includes(input.toLowerCase())
       ).slice(0, 5);
-      setSuggestions(filtered);
+      setSuggestions(prev => {
+        if (prev.length === filtered.length && prev.every((v, i) => v === filtered[i])) return prev;
+        return filtered;
+      });
       setShowSuggestions(filtered.length > 0);
     } else {
-      setSuggestions([]);
+      // Use functional updater to keep the same reference when already empty,
+      // preventing an infinite loop when recentItems defaults to a new [] each render.
+      setSuggestions(prev => prev.length === 0 ? prev : []);
       setShowSuggestions(false);
     }
   }, [input, recentItems]);
@@ -100,7 +130,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
             setInput(result);
           }
         } catch (error) {
-          console.error('Voice input failed:', error);
+          log.error('Voice input failed', { error }, 'QuickAddModal');
         } finally {
           setIsListening(false);
         }
@@ -113,6 +143,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
       setIsListening(false);
     } else {
       setIsListening(true);
+      recognitionRef.current.lang = intl.locale || 'en-US';
       recognitionRef.current.start();
     }
   };
@@ -128,7 +159,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
         onClose();
       }
     } catch (error) {
-      console.error('Barcode scan failed:', error);
+      log.error('Barcode scan failed', { error }, 'QuickAddModal');
     } finally {
       setIsScanning(false);
     }
@@ -182,8 +213,8 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-60 p-4" onClick={handleBackdropClick}>
-      <div className="bg-theme-primary rounded-lg shadow-xl w-full max-w-md mx-auto max-h-[80vh] overflow-hidden border border-theme">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] px-4 pt-[var(--safe-area-inset-top,0px)] pb-[var(--safe-area-inset-bottom,0px)]" onClick={handleBackdropClick} data-testid="quickadd-backdrop">
+      <div className="bg-theme-primary rounded-lg shadow-xl w-full max-w-md mx-auto h-full flex flex-col overflow-hidden border border-theme" role="dialog" aria-modal="true" aria-label="Add Item">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-theme">
           <h3 className="text-lg font-semibold text-theme-primary">Add Item</h3>
@@ -197,25 +228,27 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
         </div>
 
         {/* Content */}
-        <div className="p-4 max-h-[60vh] overflow-y-auto">
+        <div className="p-4 flex-1 overflow-y-auto">
           <div className="relative mb-4">
           <div className="flex gap-2">
             <div className="flex-1 relative">
               <input
                 ref={inputRef}
                 type="text"
+                data-testid="quickadd-input"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyPress}
                 onFocus={() => setShowSuggestions(suggestions.length > 0)}
                 placeholder="Add item (e.g., '2 lbs chicken' or 'milk')"
-                className="w-full bg-theme-secondary border border-theme rounded-lg px-3 py-3 text-theme-primary placeholder-theme-secondary/50 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] pr-10"
+                className="w-full bg-theme-secondary border border-theme rounded-lg px-3 py-3 text-black placeholder-theme-secondary/50 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] pr-10"
               />
 
               {input && (
                 <button
                   onClick={() => setInput('')}
                   className="absolute right-2 top-1/2 -translate-y-1/2 text-theme-secondary hover:text-theme-primary"
+                  data-testid="quickadd-clear"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -226,6 +259,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
               onClick={() => handleSubmit()}
               disabled={!input.trim()}
               className="px-4 py-3 bg-[var(--accent-color)] text-white rounded-lg hover:bg-[var(--accent-color)]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              data-testid="quickadd-submit"
             >
               <Plus className="w-5 h-5" />
             </button>
@@ -239,6 +273,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
                   key={suggestion}
                   onClick={() => handleSuggestionClick(suggestion)}
                   className="w-full text-left px-3 py-2 hover:bg-theme-secondary transition-colors first:rounded-t-lg last:rounded-b-lg"
+                  data-testid={`quickadd-suggestion-${index}`}
                 >
                   <div className="flex items-center gap-2">
                     <Search className="w-3 h-3 text-theme-secondary" />
@@ -255,6 +290,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
           <button
             onClick={onClose}
             className="px-3 py-2 bg-theme-secondary text-theme-primary hover:bg-theme-primary border border-theme rounded-lg transition-colors"
+            data-testid="quickadd-cancel"
           >
             Cancel
           </button>
@@ -267,6 +303,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
                 ? 'bg-red-500 text-white animate-pulse'
                 : 'bg-theme-secondary text-theme-primary hover:bg-theme-primary border border-theme'
             } disabled:opacity-50 disabled:cursor-not-allowed`}
+            data-testid="quickadd-voice"
           >
             {isListening ? (
               <>
@@ -285,6 +322,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
             onClick={handleScanBarcode}
             disabled={!isOnline || isScanning || !onScanBarcode}
             className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-theme-secondary text-theme-primary hover:bg-theme-primary border border-theme rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            data-testid="quickadd-scan"
           >
             {isScanning ? (
               <>

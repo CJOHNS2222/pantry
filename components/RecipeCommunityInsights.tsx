@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Users, TrendingUp, ChefHat, ThumbsUp, MessageSquare, Star, Loader2 } from 'lucide-react';
+import { Users, TrendingUp, ChefHat, MessageSquare, Loader2, ThumbsUp } from 'lucide-react';
 import { RecipeCommunityStats, RecipeModification, RecipeRating } from '../types';
 import { RecipeRatingService } from '../services/recipeRatingService';
+import DatabaseMonitoringService from '../services/databaseMonitoringService';
 import { useAuth } from '../hooks/useAuth';
 import { useToasts } from '../hooks/useToasts';
+import { log } from '../services/logService';
 
 interface RecipeCommunityInsightsProps {
   recipeTitle: string;
@@ -24,6 +26,25 @@ export const RecipeCommunityInsights: React.FC<RecipeCommunityInsightsProps> = (
 
   useEffect(() => {
     loadCommunityData();
+
+    // Subscribe to realtime updates for the community stats doc so UI updates when stats are created/updated
+    let unsubscribeStats: (() => void) | null = null;
+    try {
+      const statsRef = DatabaseMonitoringService.doc('recipeCommunityStats', recipeTitle);
+      unsubscribeStats = DatabaseMonitoringService.onSnapshot(statsRef, (snap) => {
+        log.debug('RecipeCommunityInsights realtime stats snapshot', { recipeTitle, exists: snap.exists() }, 'RecipeCommunityInsights');
+        if (snap.exists()) {
+          const data = snap.data();
+          setStats({ ...data } as RecipeCommunityStats);
+        }
+      });
+    } catch (e) {
+      log.debug('RecipeCommunityInsights realtime subscribe failed', { error: e }, 'RecipeCommunityInsights');
+    }
+
+    return () => {
+      if (unsubscribeStats) unsubscribeStats();
+    };
   }, [recipeTitle, householdId]);
 
   const loadCommunityData = async () => {
@@ -33,19 +54,22 @@ export const RecipeCommunityInsights: React.FC<RecipeCommunityInsightsProps> = (
 
       // Load community stats
       const communityStats = await RecipeRatingService.getCommunityStats(recipeTitle, householdId);
+      log.debug('RecipeCommunityInsights fetched communityStats', { recipeTitle, hasStats: Boolean(communityStats) }, 'RecipeCommunityInsights');
       setStats(communityStats);
 
       // Load top modifications
       const modifications = await RecipeRatingService.getTopModifications(recipeTitle, 5);
+      log.debug('RecipeCommunityInsights fetched modifications', { count: modifications.length }, 'RecipeCommunityInsights');
       setTopModifications(modifications);
 
       // Load household ratings
       if (householdId) {
         const householdRatingsData = await RecipeRatingService.getHouseholdRatings(recipeTitle, householdId);
+        log.debug('RecipeCommunityInsights fetched household ratings', { count: householdRatingsData.length }, 'RecipeCommunityInsights');
         setHouseholdRatings(householdRatingsData);
       }
     } catch (err) {
-      console.error('Failed to load community data:', err);
+      log.error('Failed to load community data', { error: err }, 'RecipeCommunityInsights');
       setError('Failed to load community insights');
       addToast('Failed to load community insights', 'error');
     } finally {
@@ -63,7 +87,7 @@ export const RecipeCommunityInsights: React.FC<RecipeCommunityInsightsProps> = (
       setTopModifications(modifications);
       addToast('Thanks for your feedback!', 'success');
     } catch (err) {
-      console.error('Failed to mark modification as helpful:', err);
+      log.error('Failed to mark modification as helpful', { error: err }, 'RecipeCommunityInsights');
       addToast('Failed to mark as helpful', 'error');
     }
   };
@@ -206,7 +230,7 @@ export const RecipeCommunityInsights: React.FC<RecipeCommunityInsightsProps> = (
                       </div>
                     </div>
                   </div>
-                  {onModificationHelpful && (
+                  {user?.id && (
                     <button
                       onClick={() => handleModificationHelpful(mod.id)}
                       className="flex items-center gap-1 px-2 py-1 text-xs text-theme-secondary hover:text-[var(--accent-color)] transition-colors"

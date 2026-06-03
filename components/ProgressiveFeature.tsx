@@ -81,6 +81,7 @@ export const ProgressiveFeature: React.FC<ProgressiveFeatureProps> = ({
           <button
             onClick={toggleExpanded}
             className="text-yellow-600 hover:text-yellow-800 transition-colors"
+            data-testid="progressivefeature-toggle"
           >
             {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </button>
@@ -88,6 +89,7 @@ export const ProgressiveFeature: React.FC<ProgressiveFeatureProps> = ({
             <button
               onClick={handleDismiss}
               className="text-yellow-600 hover:text-yellow-800 transition-colors"
+              data-testid="progressivefeature-dismiss"
             >
               <X className="w-4 h-4" />
             </button>
@@ -99,7 +101,7 @@ export const ProgressiveFeature: React.FC<ProgressiveFeatureProps> = ({
         <div className="mt-3 pt-3 border-t border-yellow-200 dark:border-yellow-700">
           <div className="text-xs text-yellow-700 dark:text-yellow-300">
             💡 <strong>Pro tip:</strong> This feature becomes available as you use the app more.
-            It helps you get the most out of Smart Pantry Chef!
+            It helps you get the most out of Stock & Spoon!
           </div>
         </div>
       )}

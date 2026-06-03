@@ -9,6 +9,7 @@ import * as Sentry from '@sentry/react';
 vi.mock('../../../services/analyticsService', () => ({
   default: {
     trackError: vi.fn(),
+    trackAppCrash: vi.fn(),
   },
 }));
 
@@ -18,8 +19,10 @@ vi.mock('@sentry/react', () => ({
     setTag: vi.fn(),
     setContext: vi.fn(),
     captureException: vi.fn(),
+    addBreadcrumb: vi.fn(),
   })),
   captureException: vi.fn(),
+  addBreadcrumb: vi.fn(),
 }));
 
 // Component that throws an error

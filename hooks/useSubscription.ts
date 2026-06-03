@@ -1,12 +1,18 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import DatabaseMonitoringService from '../services/databaseMonitoringService';
 import { User, Subscription } from '../types';
 import { UsageService } from '../services/usageService';
+import { log } from '../services/logService';
 
 export function useSubscription(user: User | null) {
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [loading, setLoading] = useState(true);
+  // Tier inherited from the household owner (non-null only when member is in a family household)
+  const [householdOwnerTier, setHouseholdOwnerTier] = useState<'free' | 'premium' | 'family' | null>(null);
+  // Track the last synced owner tier to avoid redundant Firestore writes
+  const lastSyncedOwnerTier = useRef<string | null>(null);
 
+  // ── Own subscription listener ──────────────────────────────────────────────
   useEffect(() => {
     if (!user?.id) {
       setLoading(false);
@@ -18,11 +24,11 @@ export function useSubscription(user: User | null) {
       if (data?.subscription) {
         setSubscription(data.subscription);
       } else {
-        // Default to premium tier for development/testing
+        // Default to free tier for users without a stored subscription
         setSubscription({
-          tier: 'premium',
+          tier: 'free',
           status: 'active',
-          current_period_end: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year from now
+          current_period_end: new Date(),
           cancel_at_period_end: false
         });
       }
@@ -31,6 +37,61 @@ export function useSubscription(user: User | null) {
 
     return unsubscribe;
   }, [user?.id]);
+
+  // ── Household subscription listener ───────────────────────────────────────
+  // Two responsibilities:
+  //   1. If user is a non-admin member in a household whose owner has 'family', elevate.
+  //   2. If user is the household admin, keep ownerSubscriptionTier in sync with their tier.
+  useEffect(() => {
+    const householdId = user?.householdId;
+    if (!householdId || !user?.id || !subscription) {
+      setHouseholdOwnerTier(null);
+      return;
+    }
+
+    const unsubscribe = DatabaseMonitoringService.onSnapshot(
+      DatabaseMonitoringService.doc('households', householdId),
+      (doc) => {
+        if (!doc.exists()) {
+          setHouseholdOwnerTier(null);
+          return;
+        }
+
+        const data = doc.data();
+        const members: Array<{ id: string; role: string }> = data.members || [];
+        const currentMember = members.find(m => m.id === user.id);
+        const isAdmin = currentMember?.role === 'admin';
+
+        if (isAdmin) {
+          // Owner: keep ownerSubscriptionTier on the household doc in sync with own tier
+          const ownTier = subscription.tier ?? 'free';
+          if (ownTier !== lastSyncedOwnerTier.current) {
+            lastSyncedOwnerTier.current = ownTier;
+            DatabaseMonitoringService.updateDoc(
+              DatabaseMonitoringService.doc('households', householdId),
+              { ownerSubscriptionTier: ownTier }
+            ).catch((err: any) =>
+              log.error('Failed to sync ownerSubscriptionTier', { error: err?.message }, 'useSubscription')
+            );
+          }
+          // Admin always uses their own subscription — no elevation needed
+          setHouseholdOwnerTier(null);
+        } else {
+          // Non-admin member: inherit the owner's tier (premium or family) if it beats their own
+          const ownerTier = data.ownerSubscriptionTier as 'free' | 'premium' | 'family' | undefined;
+          const elevated = (ownerTier === 'family' || ownerTier === 'premium') ? ownerTier : null;
+          setHouseholdOwnerTier(elevated);
+        }
+      },
+      (err: any) => {
+        // Access denied (e.g. removed from household) — clear elevation
+        log.debug('Household listener error (access likely revoked)', { error: err?.message }, 'useSubscription');
+        setHouseholdOwnerTier(null);
+      }
+    );
+
+    return unsubscribe;
+  }, [user?.id, user?.householdId, subscription]);
 
   const updateSubscription = async (updates: Partial<Subscription>) => {
     if (!user?.id) return;
@@ -46,14 +107,16 @@ export function useSubscription(user: User | null) {
         await UsageService.updatePlanLimits(user, updates.tier);
       }
     } catch (err: any) {
-      console.error('Error updating subscription:', error);
-      throw error;
+      log.error('Error updating subscription:', { error: err?.message }, 'useSubscription');
+      throw err;
     }
   };
 
-  const isPremium = subscription?.tier === 'premium' || subscription?.tier === 'family';
-  const isFamily = subscription?.tier === 'family';
-  const isActive = subscription?.status === 'active' || subscription?.status === 'trialing';
+  // Effective tier: own tier, elevated to 'family' if in a family household as non-admin
+  const effectiveTier = householdOwnerTier ?? subscription?.tier ?? 'free';
+  const isPremium = effectiveTier === 'premium' || effectiveTier === 'family';
+  const isFamily = effectiveTier === 'family';
+  const isActive = subscription?.status === 'active' || subscription?.status === 'trialing' || householdOwnerTier === 'family';
 
   return {
     subscription,
@@ -61,6 +124,8 @@ export function useSubscription(user: User | null) {
     updateSubscription,
     isPremium,
     isFamily,
-    isActive
+    isActive,
+    /** The resolved tier after household inheritance is applied. Use this when passing to UsageService. */
+    effectiveTier,
   };
 }

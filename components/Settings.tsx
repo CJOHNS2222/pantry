@@ -1,24 +1,69 @@
-import React, { useState, useEffect } from 'react';
-import { db } from '../firebaseConfig';
-import { collection, addDoc, Timestamp, doc, updateDoc } from 'firebase/firestore';
-import { SubscriptionManager } from './SubscriptionManager';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Timestamp } from 'firebase/firestore';
+import DatabaseMonitoringService from '../services/databaseMonitoringService';
 import { CategoryManager } from './CategoryManager';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { log } from '../services/logService';
+import { useIntl } from 'react-intl';
 import AnalyticsService from '../services/analyticsService';
-import { LanguageSelector } from '../src/components/LanguageSelector';
 import { useNotifications } from '../hooks/useNotifications';
+import { FAQPage } from './FAQPage';
 import { User, UserProfile, CustomCategory, Member } from '../types';
+import type { Settings as AppSettings } from '../types';
 
 type MemberPreferences = Pick<Member, 'dietaryRestrictions' | 'allergies' | 'dietGoal' | 'favoriteCuisines' | 'specialNeeds' | 'preferredProteins' | 'dislikedIngredients'>;
-import { NotificationSettingsComponent } from './NotificationSettings';
-import { PendingNotifications } from './PendingNotifications';
 import { NotificationService, NotificationSettings } from '../services/notificationService';
 import { DayPlan } from '../types';
-import { Loader2, ChevronDown, ChevronRight, Heart, AlertTriangle, Edit2, X, Settings as SettingsIcon } from 'lucide-react';
+import { Loader2, ChevronDown, ChevronRight, Heart, AlertTriangle, X, Settings as SettingsIcon, User as UserIcon } from 'lucide-react';
 import { userOptedInToGemini, setUserGeminiOptIn, getGeminiUsage } from '../services/featureFlags';
-import { VersionUpdate } from './VersionUpdate';
-import { MonitoringDashboard } from './MonitoringDashboard';
+
 import { Household } from '../types';
+import { serverTimestamp } from 'firebase/firestore';
+import { InventoryCacheService } from '../services/inventoryCacheService';
+import { MealPlanCacheService } from '../services/MealPlanCacheService';
+import { RecipesCacheService } from '../services/recipesCacheService';
+import { useSubscription } from '../hooks/useSubscription';
+import { UsageService } from '../services/usageService';
+import type { UsageLimits } from '../services/usageService';
+import { ShoppingListCacheService } from '../services/shoppingListCacheService';
+import { setDoc } from 'firebase/firestore';
+import { useIsAdmin } from '../hooks/useIsAdmin';
+import { useAndroidBack } from '../hooks/useAndroidBack';
+import { SettingsFeedbackSection } from './settings/SettingsFeedbackSection';
+import { SettingsAppUpdatesSection } from './settings/SettingsAppUpdatesSection';
+import { SettingsHelpSection } from './settings/SettingsHelpSection';
+import { SettingsAppPreferencesSection } from './settings/SettingsAppPreferencesSection';
+import { SettingsCategoriesSection } from './settings/SettingsCategoriesSection';
+import { SettingsFoodSafetySection } from './settings/SettingsFoodSafetySection';
+import { SettingsGuestBanner } from './settings/SettingsGuestBanner';
+import { SettingsHouseholdSection } from './settings/SettingsHouseholdSection';
+import { SettingsLeftoverAnalyticsSection } from './settings/SettingsLeftoverAnalyticsSection';
+import { SettingsNotificationsSection } from './settings/SettingsNotificationsSection';
+import { SettingsPantryImagesSection } from './settings/SettingsPantryImagesSection';
+import { SettingsPendingNotificationsSection } from './settings/SettingsPendingNotificationsSection';
+import { SettingsPrivacyLegalSection } from './settings/SettingsPrivacyLegalSection';
+import { SettingsRemoteConfigDebugSection } from './settings/SettingsRemoteConfigDebugSection';
+import { SettingsResetUsageSection } from './settings/SettingsResetUsageSection';
+import { SettingsPowerFeaturesSection } from './settings/SettingsPowerFeaturesSection';
+import { SettingsStoreLayoutSection } from './settings/SettingsStoreLayoutSection';
+import { SettingsSubscriptionSection } from './settings/SettingsSubscriptionSection';
+import { SettingsTabPills } from './settings/SettingsTabPills';
+import { SettingsThemeSection } from './settings/SettingsThemeSection';
+import { SettingsUsageLimitsSection } from './settings/SettingsUsageLimitsSection';
+import { SettingsTabVisibilitySection } from './settings/SettingsTabVisibilitySection';
+
+const defaultStoreLayout = [
+  'Produce',
+  'Dairy',
+  'Meat & Seafood',
+  'Bakery',
+  'Frozen',
+  'Pantry Staples',
+  'Snacks',
+  'Beverages',
+  'Household',
+  'Other'
+];
 
 const defaultSettings = {
   notifications: {
@@ -39,12 +84,21 @@ const defaultSettings = {
   },
   shopping: {
     includeStaples: false,
+    autoReaddStaples: true,
+    storeLayout: defaultStoreLayout,
+    storeProfiles: {} as Record<string, string[]>,
+    activeStoreProfile: undefined as string | undefined,
+    showNutrition: false,
+    showPriceData: false,
+  },
+  navigation: {
+    hiddenTabs: [] as string[],
   },
 };
 
 interface SettingsProps {
-  settings: typeof defaultSettings;
-  setSettings: React.Dispatch<React.SetStateAction<typeof defaultSettings>>;
+  settings: AppSettings;
+  setSettings: React.Dispatch<React.SetStateAction<AppSettings>>;
   user?: User;
   onLogout?: () => void;
   customCategories?: CustomCategory[];
@@ -52,8 +106,9 @@ interface SettingsProps {
   onUpdateCustomCategory?: (categoryId: string, updates: Partial<Pick<CustomCategory, 'name' | 'icon' | 'color'>>) => void;
   onDeleteCustomCategory?: (categoryId: string) => void;
   mealPlan?: DayPlan[];
-  onShowTutorial?: () => void;
   household?: Household | null;
+  onShowHousehold?: () => void;
+  addToast?: (message: string, type: 'success' | 'error' | 'info' | 'warning', duration?: number) => void;
 }
 
 export const Settings: React.FC<SettingsProps> = ({ 
@@ -66,34 +121,79 @@ export const Settings: React.FC<SettingsProps> = ({
   onUpdateCustomCategory,
   onDeleteCustomCategory,
   mealPlan,
-  onShowTutorial,
-  household
+  household,
+  onShowHousehold,
+  addToast
 }) => {
+  const intl = useIntl();
   const [feedback, setFeedback] = useState('');
   const [sending, setSending] = useState(false);
+  const { isPremium, isFamily } = useSubscription(user || null);
+  const [usageLimits, setUsageLimits] = useState<UsageLimits | null>(null);
+  const { isAdmin } = useIsAdmin(user?.id);
+
+  useEffect(() => {
+    if (!user) return;
+    UsageService.getUsageLimits(user).then(limits => setUsageLimits(limits)).catch(() => {});
+  }, [user?.id]);
   const [savingProfile, setSavingProfile] = useState(false);
   const [updatingAvatar, setUpdatingAvatar] = useState(false);
   const [pendingNotifications, setPendingNotifications] = useState(settings?.notifications || defaultSettings.notifications);
-  const [_notifChanged, setNotifChanged] = useState(false);
+  const [, setNotifChanged] = useState(false);
   const [showAvatarSelection, setShowAvatarSelection] = useState(false);
-  const [_householdMembers, _setHouseholdMembers] = useState(user?.householdMembers || []);
-  const [_showHouseholdManager, _setShowHouseholdManager] = useState(false);
+
   const [profileChanged, setProfileChanged] = useState(false);
   const [showCategoryManager, setShowCategoryManager] = useState(false);
   const [userProfile, setUserProfile] = useState<UserProfile | undefined>(user?.profile);
   const [geminiOptedIn, setGeminiOptedIn] = useState(() => userOptedInToGemini(user?.id));
-  const [_geminiUsage, setGeminiUsage] = useState(() => getGeminiUsage(user?.id));
+  const [, setGeminiUsage] = useState(() => getGeminiUsage(user?.id));
   const [updatingBulkImages, setUpdatingBulkImages] = useState(false);
   const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>(
     NotificationService.getDefaultSettings()
   );
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['Profile', 'Household', 'Notifications']));
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['Profile', 'Household']));
+  const [activeSettingsTab, setActiveSettingsTab] = useState<'account' | 'preferences' | 'organization' | 'more'>('account');
 
   // Member preferences state
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [memberPreferences, setMemberPreferences] = useState<Partial<MemberPreferences>>({});
   const [savingMemberPrefs, setSavingMemberPrefs] = useState(false);
   const [showMemberPreferencesModal, setShowMemberPreferencesModal] = useState(false);
+
+  // FAQ modal state
+  const [showFAQModal, setShowFAQModal] = useState(false);
+
+  // Delete account state
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+
+  // Android back-button registration for Settings modals
+  useAndroidBack(showAvatarSelection, () => setShowAvatarSelection(false));
+  useAndroidBack(showCategoryManager, () => setShowCategoryManager(false));
+  useAndroidBack(showMemberPreferencesModal, () => setShowMemberPreferencesModal(false));
+  useAndroidBack(showFAQModal, () => setShowFAQModal(false));
+
+  const handleDeleteAccount = async () => {
+    if (!user) return;
+    setIsDeletingAccount(true);
+    try {
+      const fns = getFunctions();
+      const deleteAccountFn = httpsCallable(fns, 'deleteAccount');
+      await deleteAccountFn();
+      // Auth user was deleted server-side; sign out locally
+      onLogout?.();
+    } catch (err: unknown) {
+      log.error('Account deletion failed', err instanceof Error ? err : new Error(String(err)));
+      addToast?.('Failed to delete account. Please try again or contact support.', 'error');
+    } finally {
+      setIsDeletingAccount(false);
+      setShowDeleteConfirm(false);
+    }
+  };
+
+  // Household creation state
+  const [householdName, setHouseholdName] = useState('');
+  const [isCreatingHousehold, setIsCreatingHousehold] = useState(false);
 
   const toggleSection = (section: string) => {
     setExpandedSections(prev => {
@@ -139,8 +239,8 @@ export const Settings: React.FC<SettingsProps> = ({
       const updatedMembers = [...household.members];
       updatedMembers[memberIndex] = { ...updatedMembers[memberIndex], ...memberPreferences } as Member;
 
-      const householdRef = doc(db, 'households', household.id);
-      await updateDoc(householdRef, {
+      const householdRef = DatabaseMonitoringService.doc('households', household.id);
+      await DatabaseMonitoringService.updateDoc(householdRef, {
         members: updatedMembers,
         updatedAt: Timestamp.now()
       });
@@ -148,9 +248,117 @@ export const Settings: React.FC<SettingsProps> = ({
       log.info('Member preferences updated', { memberId: selectedMember.id }, 'Settings');
       closeMemberPreferences();
     } catch (error) {
-      log.error(error as Error, 'Settings');
+      const msg = error instanceof Error ? error.message : String(error);
+      const stack = error instanceof Error ? error.stack : undefined;
+      log.error('Failed saving member preferences', { message: msg, stack }, 'Settings');
     } finally {
       setSavingMemberPrefs(false);
+    }
+  };
+
+  const removeMemberFromHousehold = async (member: Member) => {
+    if (!household || !user) return;
+    
+    try {
+      // Copy household data to user's personal collections
+      await copyHouseholdDataToUser(member.id);
+      
+      // Remove member from household
+      const updatedMembers = household.members.filter(m => m.id !== member.id);
+      const updatedMemberIds = household.memberIds.filter(id => id !== member.id);
+
+      const householdRef = DatabaseMonitoringService.doc('households', household.id);
+      await DatabaseMonitoringService.updateDoc(householdRef, {
+        members: updatedMembers,
+        memberIds: updatedMemberIds,
+        updatedAt: Timestamp.now()
+      });
+
+      // Update user's householdId to null
+      const userRef = DatabaseMonitoringService.doc('users', member.id);
+      await DatabaseMonitoringService.updateDoc(userRef, {
+        householdId: null
+      });
+
+      log.info('Member removed from household', { memberId: member.id, householdId: household.id }, 'Settings');
+      addToast?.(`${member.name} has been removed from the household`, 'info');
+      
+      // Refresh household data
+      // This would need to be implemented to refresh the household state
+      
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      const stack = error instanceof Error ? error.stack : undefined;
+      log.error('Failed removing member from household', { message: msg, stack }, 'Settings');
+      addToast?.('Failed to remove member from household', 'error');
+    }
+  };
+
+  const copyHouseholdDataToUser = async (userId: string) => {
+    try {
+      // Copy inventory data
+      const inventoryQuery = DatabaseMonitoringService.query(
+        DatabaseMonitoringService.collection(`households/${household!.id}/inventory`)
+      );
+      const inventorySnapshot = await DatabaseMonitoringService.getDocs(inventoryQuery);
+      
+      for (const doc of inventorySnapshot.docs) {
+        const itemData = doc.data();
+        await setDoc(
+          DatabaseMonitoringService.doc(`users/${userId}/inventory`, doc.id),
+          itemData
+        );
+      }
+
+      // Copy shopping list data
+      const shoppingQuery = DatabaseMonitoringService.query(
+        DatabaseMonitoringService.collection(`households/${household!.id}/shoppingList`)
+      );
+      const shoppingSnapshot = await DatabaseMonitoringService.getDocs(shoppingQuery);
+      
+      for (const doc of shoppingSnapshot.docs) {
+        const itemData = doc.data();
+        await setDoc(
+          DatabaseMonitoringService.doc(`users/${userId}/shoppingList`, doc.id),
+          itemData
+        );
+      }
+
+      // Copy meal plan data
+      const mealPlanQuery = DatabaseMonitoringService.query(
+        DatabaseMonitoringService.collection(`households/${household!.id}/mealPlan`)
+      );
+      const mealPlanSnapshot = await DatabaseMonitoringService.getDocs(mealPlanQuery);
+      
+      for (const doc of mealPlanSnapshot.docs) {
+        const itemData = doc.data();
+        await setDoc(
+          DatabaseMonitoringService.doc(`users/${userId}/mealPlan`, doc.id),
+          itemData
+        );
+      }
+
+      // Copy recipes data
+      const recipesQuery = DatabaseMonitoringService.query(
+        DatabaseMonitoringService.collection(`households/${household!.id}/recipes`)
+      );
+      const recipesSnapshot = await DatabaseMonitoringService.getDocs(recipesQuery);
+      
+      for (const doc of recipesSnapshot.docs) {
+        const itemData = doc.data();
+        await setDoc(
+          DatabaseMonitoringService.doc(`users/${userId}/recipes`, doc.id),
+          itemData
+        );
+      }
+
+      log.info('Household data copied to user', { userId, householdId: household!.id }, 'Settings');
+      
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      const stack = error instanceof Error ? error.stack : undefined;
+      log.error('Failed copying household data to user', { message: msg, stack }, 'Settings');
+      throw error;
     }
   };
 
@@ -164,11 +372,11 @@ export const Settings: React.FC<SettingsProps> = ({
   // Use the notifications hook
   useNotifications(settings.notifications, user?.email, mealPlan);
 
-  const handleChange = (field: string, value: any) => {
+  const handleChange = (field: string, value: Record<string, unknown>) => {
     setSettings((prev) => ({
       ...prev,
       [field]: {
-        ...(prev as any)[field],
+        ...(prev as unknown as Record<string, unknown>)[field] as object,
         ...value,
       },
     }));
@@ -183,14 +391,16 @@ export const Settings: React.FC<SettingsProps> = ({
     }
   };
 
-  const _handleNotifChange = (key: string, value: any) => {
+   
+  const _handleNotifChange = (key: string, value: unknown) => {
     setPendingNotifications(prev => ({
       ...prev,
-      [key]: typeof value === 'object' ? { ...(prev as any)[key], ...value } : value,
+      [key]: typeof value === 'object' && value !== null ? { ...(prev as Record<string, unknown>)[key] as object, ...value } : value,
     }));
     setNotifChanged(false);
   };
 
+   
   const _confirmNotifChanges = () => {
     setSettings(prev => ({
       ...prev,
@@ -202,7 +412,7 @@ export const Settings: React.FC<SettingsProps> = ({
     AnalyticsService.trackNotificationSettingsUpdate(pendingNotifications);
   };
 
-  const handleProfileChange = (field: string, value: any) => {
+  const handleProfileChange = (field: string, value: unknown) => {
     setUserProfile(prev => ({
       ...prev,
       [field]: value
@@ -214,16 +424,112 @@ export const Settings: React.FC<SettingsProps> = ({
     if (!user || !userProfile) return;
     setSavingProfile(true);
     try {
-      await updateDoc(doc(db, 'users', user.id), {
+      const userRef = DatabaseMonitoringService.doc('users', user.id);
+      await DatabaseMonitoringService.updateDoc(userRef, {
         profile: userProfile
       });
       setProfileChanged(false);
-      alert('Profile updated successfully!');
+      addToast?.('Profile updated successfully!', 'success');
     } catch (error) {
-      log.error(error as Error, 'Settings');
-      alert('Failed to update profile. Please try again.');
+      const msg = error instanceof Error ? error.message : String(error);
+      const stack = error instanceof Error ? error.stack : undefined;
+      log.error('Failed saving profile', { message: msg, stack }, 'Settings');
+      addToast?.('Failed to update profile. Please try again.', 'error');
     } finally {
       setSavingProfile(false);
+    }
+  };
+
+  const saveProfileData = async (data: typeof userProfile, silent = false) => {
+    if (!user || !data) return;
+    setSavingProfile(true);
+    try {
+      const userRef = DatabaseMonitoringService.doc('users', user.id);
+      await DatabaseMonitoringService.updateDoc(userRef, { profile: data });
+      setProfileChanged(false);
+      if (!silent) addToast?.('Profile updated successfully!', 'success');
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      const stack = error instanceof Error ? error.stack : undefined;
+      log.error('Failed saving profile', { message: msg, stack }, 'Settings');
+      if (!silent) addToast?.('Failed to update profile. Please try again.', 'error');
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
+  // Debounced save for profile changes
+  const [pendingProfileSave, setPendingProfileSave] = useState<NodeJS.Timeout | null>(null);
+  const debouncedSaveProfile = useCallback((data: typeof userProfile) => {
+    if (pendingProfileSave) {
+      clearTimeout(pendingProfileSave);
+    }
+    const timeout = setTimeout(() => {
+      saveProfileData(data, true);
+      setPendingProfileSave(null);
+    }, 1000); // Save after 1 second of no changes
+    setPendingProfileSave(timeout);
+  }, [user, saveProfileData]);
+
+  const createHousehold = async () => {
+    if (!householdName.trim() || isCreatingHousehold || !user) return;
+
+    setIsCreatingHousehold(true);
+    try {
+      const householdsColl = DatabaseMonitoringService.collection('households');
+      const newHousehold = {
+        name: householdName.trim(),
+        memberIds: [user.id],
+        members: [{
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: 'admin',
+          status: 'active'
+        }]
+      };
+
+      const createdRef = await DatabaseMonitoringService.addDoc(householdsColl, newHousehold);
+
+      const userRef = DatabaseMonitoringService.doc('users', user.id);
+      await DatabaseMonitoringService.updateDoc(userRef, {
+        householdId: createdRef.id,
+        updatedAt: serverTimestamp()
+      });
+
+      // Migrate user data to household using cache services
+      const userId = user.id;
+      const householdId = createdRef.id;
+
+      const inventory = await InventoryCacheService.getCachedInventory(undefined, userId);
+      await InventoryCacheService.updateCache(inventory, householdId, undefined);
+      await InventoryCacheService.updateCache([], undefined, userId); // Clear user's cache
+
+      const mealPlan = await MealPlanCacheService.getCachedMealPlan(undefined, userId);
+      await MealPlanCacheService.updateCache(mealPlan, householdId, undefined);
+      await MealPlanCacheService.updateCache([], undefined, userId); // Clear user's cache
+
+      const shoppingList = await ShoppingListCacheService.getCachedShoppingList(undefined, userId);
+      await ShoppingListCacheService.setCache(shoppingList, householdId, undefined);
+      await ShoppingListCacheService.setCache([], undefined, userId); // Clear user's cache
+
+      const savedRecipes = await RecipesCacheService.getCachedRecipes(undefined, userId);
+      await RecipesCacheService.updateCache(savedRecipes, householdId, undefined);
+      await RecipesCacheService.updateCache([], undefined, userId); // Clear user's cache
+
+      setHouseholdName('');
+      addToast?.('Household created successfully!', 'success');
+
+      // Refresh the page to show the new household
+      window.location.reload();
+
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      const stack = error instanceof Error ? error.stack : undefined;
+      log.error('Failed creating household', { message: msg, stack }, 'Settings');
+      addToast?.('Failed to create household. Please try again.', 'error');
+    } finally {
+      setIsCreatingHousehold(false);
     }
   };
 
@@ -233,14 +539,17 @@ export const Settings: React.FC<SettingsProps> = ({
     if (!user) return;
     setUpdatingAvatar(true);
     try {
-      await updateDoc(doc(db, 'users', user.id), {
+      const userRef = DatabaseMonitoringService.doc('users', user.id);
+      await DatabaseMonitoringService.updateDoc(userRef, {
         avatar: avatarPath
       });
       setShowAvatarSelection(false);
-      alert('Avatar updated successfully!');
+      addToast?.('Avatar updated successfully!', 'success');
     } catch (error) {
-      log.error(error as Error, 'Settings');
-      alert('Failed to update avatar. Please try again.');
+      const msg = error instanceof Error ? error.message : String(error);
+      const stack = error instanceof Error ? error.stack : undefined;
+      log.error('Failed updating avatar', { message: msg, stack }, 'Settings');
+      addToast?.('Failed to update avatar. Please try again.', 'error');
     } finally {
       setUpdatingAvatar(false);
     }
@@ -248,19 +557,18 @@ export const Settings: React.FC<SettingsProps> = ({
 
   const handleRemoveAvatar = async () => {
     if (!user) return;
-    if (confirm('Remove your avatar?')) {
-      setUpdatingAvatar(true);
-      try {
-        await updateDoc(doc(db, 'users', user.id), {
+    setUpdatingAvatar(true);
+    try {
+        const userRef = DatabaseMonitoringService.doc('users', user.id);
+        await DatabaseMonitoringService.updateDoc(userRef, {
           avatar: null
         });
-        alert('Avatar removed successfully!');
-      } catch (_error) {
-        alert('Failed to remove avatar');
+        addToast?.('Avatar removed successfully!', 'success');
+      } catch {
+        addToast?.('Failed to remove avatar', 'error');
       } finally {
         setUpdatingAvatar(false);
       }
-    }
   };
 
   const handleFeedbackSubmit = async (e: React.FormEvent) => {
@@ -268,8 +576,8 @@ export const Settings: React.FC<SettingsProps> = ({
     if (!feedback.trim()) return;
     setSending(true);
     try {
-      await addDoc(collection(db, 'feedback'), {
-        text: feedback,
+      await DatabaseMonitoringService.addDoc(DatabaseMonitoringService.collection('feedback'), {
+        message: feedback,
         createdAt: Timestamp.now(),
         user: user ? {
           id: user.id,
@@ -278,22 +586,69 @@ export const Settings: React.FC<SettingsProps> = ({
           avatar: user.avatar || null
         } : null
       });
-      alert('Thank you for your feedback!');
+      addToast?.('Thank you for your feedback!', 'success');
       setFeedback('');
-    } catch (_err) {
-      alert('Failed to send feedback. Please try again later.');
+    } catch {
+      addToast?.('Failed to send feedback. Please try again later.', 'error');
     }
     setSending(false);
+  };
+
+  const handleBulkImageUpdate = async () => {
+    if (!user) return;
+    setUpdatingBulkImages(true);
+    try {
+      const { BulkImageUpdateService } = await import('../services/bulkImageUpdateService');
+      const result = await BulkImageUpdateService.updateAllPantryItemImages(user, (completed, total) => {
+        log.info(`Updated ${completed}/${total} items`, { completed, total }, 'Settings');
+      });
+
+      addToast?.(
+        `Updated ${result.updatedItems} items${result.failedItems > 0 ? ` (${result.failedItems} failed)` : ''}`,
+        result.failedItems > 0 ? 'warning' : 'success'
+      );
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      const stack = error instanceof Error ? error.stack : undefined;
+      log.error('Failed bulk image update', { message: msg, stack }, 'Settings');
+      addToast?.('Failed to update images. Please try again.', 'error');
+    } finally {
+      setUpdatingBulkImages(false);
+    }
+  };
+
+  const handleResetUsageCounters = async () => {
+    if (!user) return;
+    try {
+      await UsageService.resetUsage(user);
+      UsageService.getUsageLimits(user).then(limits => setUsageLimits(limits)).catch(() => {});
+      addToast?.('Usage counters reset successfully.', 'success');
+    } catch {
+      addToast?.('Failed to reset usage counters.', 'error');
+    }
   };
 
   return (
     <>
 
-      <div className="p-6 pb-24 max-w-md mx-auto space-y-6">
+      <div className="pb-24 max-w-md mx-auto">
+      <SettingsTabPills
+        activeTab={activeSettingsTab}
+        onTabChange={setActiveSettingsTab}
+      />
+
+      <div className="pt-2 pb-6 px-6 space-y-6">
+
+      {activeSettingsTab === 'account' && <>
+
+      <SettingsGuestBanner
+        isGuest={!!user?.isGuest}
+        onLogout={onLogout}
+      />
 
       {/* Profile Section */}
-      {user && onLogout && (
-        <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden">
+      {user && onLogout && !user.isGuest && (
+        <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden" data-section="profile">
           <div
             onClick={() => toggleSection('Profile')}
             className="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-theme-primary transition-colors"
@@ -304,53 +659,13 @@ export const Settings: React.FC<SettingsProps> = ({
               ) : (
                 <ChevronRight className="w-5 h-5 text-theme-primary" />
               )}
-              <h3 className="font-semibold text-theme-primary">Profile</h3>
+              <UserIcon className="w-5 h-5 text-[var(--accent-color)]" />
+              <h3 className="font-semibold text-theme-primary">{intl.formatMessage({ id: 'settings.profile' })}</h3>
             </div>
           </div>
 
           {expandedSections.has('Profile') && (
             <div className="border-t border-theme p-4">
-          {/* AI Opt-in and Shopping Preferences - Side by side */}
-          <div className="mb-4">
-            <div className="flex items-center justify-between gap-4">
-              {/* AI Opt-in */}
-              <div className="flex-1 min-w-0">
-                <label htmlFor="geminiOptIn" className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    id="geminiOptIn"
-                    name="geminiOptIn"
-                    type="checkbox"
-                    checked={geminiOptedIn}
-                    onChange={e => handleGeminiOptIn(e.target.checked)}
-                    className="flex-shrink-0"
-                  />
-                  <span className="text-sm text-theme-primary break-words">Enable AI Features</span>
-                </label>
-              </div>
-
-              {/* Shopping Preferences */}
-              <div className="flex-1 min-w-0">
-                <label htmlFor="includeStaples" className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    id="includeStaples"
-                    name="includeStaples"
-                    type="checkbox"
-                    checked={settings.shopping?.includeStaples || false}
-                    onChange={e => setSettings(prev => ({
-                      ...prev,
-                      shopping: {
-                        ...prev.shopping,
-                        includeStaples: e.target.checked
-                      }
-                    }))}
-                    className="flex-shrink-0"
-                  />
-                  <span className="text-sm text-theme-primary break-words">Include Staples in Shopping Lists</span>
-                </label>
-              </div>
-            </div>
-          </div>
-
           {/* Avatar Section */}
           <div className="mb-4">
             <div className="flex items-center gap-4 mb-3">
@@ -362,7 +677,7 @@ export const Settings: React.FC<SettingsProps> = ({
                 )}
               </div>
               <div className="flex-1">
-                <p className="font-medium text-theme-primary">{user.name}</p>
+                <p className="font-medium text-theme-primary">{userProfile?.name || user.name}</p>
                 <p className="text-sm text-theme-secondary">{user.email}</p>
               </div>
             </div>
@@ -388,7 +703,7 @@ export const Settings: React.FC<SettingsProps> = ({
 
             {showAvatarSelection && (
               <div className="mb-4">
-                <h4 className="text-sm font-medium mb-2 text-theme-primary">Choose an avatar:</h4>
+                <h4 className="text-sm font-medium mb-2 text-theme-primary">{intl.formatMessage({ id: 'settings.chooseAvatar' })}</h4>
                 <div className="grid grid-cols-5 gap-2 max-h-48 overflow-y-auto">
                   {avatarOptions.map((avatarPath) => (
                     <button
@@ -412,16 +727,30 @@ export const Settings: React.FC<SettingsProps> = ({
                 </div>
               </div>
             )}
-          </div>
 
-          {/* User Profile Information */}
+            {/* Name Field */}
+            <div className="mb-4">
+              <label htmlFor="userName" className="block text-sm font-medium text-theme-primary mb-2">{intl.formatMessage({ id: 'settings.displayName' })}</label>
+              <input
+                id="userName"
+                name="userName"
+                type="text"
+                value={userProfile?.name ?? user.name ?? ''}
+                onChange={(e) => handleProfileChange('name', e.target.value)}
+                placeholder="Enter your display name"
+                className="w-full px-3 py-2 border border-theme rounded-lg bg-theme-primary text-theme-secondary placeholder-theme-secondary/50 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:border-transparent"
+              />
+              <p className="text-xs text-theme-secondary mt-1">This name will be used throughout the app to personalize your experience.</p>
+            </div>
+          </div>
+            {/* User Profile Information */}
           <div className="space-y-4 mb-4">
-            <h4 className="text-sm font-medium mb-3 text-theme-primary">Personal Information</h4>
+            <h4 className="text-sm font-medium mb-3 text-theme-primary">{intl.formatMessage({ id: 'settings.personalInfo' })}</h4>
             
             {/* Height and Weight - keep in 2 columns */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs text-theme-secondary mb-1">Height</label>
+                <label className="block text-xs text-theme-secondary mb-1">{intl.formatMessage({ id: 'settings.height' })}</label>
                 <div className="flex gap-1">
                   <div className="flex-1">
                     <input
@@ -464,11 +793,12 @@ export const Settings: React.FC<SettingsProps> = ({
                 </div>
               </div>
               <div>
-                <label htmlFor="weight" className="block text-xs text-theme-secondary mb-1">Weight (lbs)</label>
+                <label htmlFor="weight" className="block text-xs text-theme-secondary mb-1">{intl.formatMessage({ id: 'settings.weight' })}</label>
                 <input
                   id="weight"
                   name="weight"
                   type="number"
+                  min="0"
                   value={userProfile?.weight || ''}
                   onChange={(e) => handleProfileChange('weight', e.target.value ? parseInt(e.target.value) : undefined)}
                   placeholder="154"
@@ -486,6 +816,7 @@ export const Settings: React.FC<SettingsProps> = ({
                   id="age"
                   name="age"
                   type="number"
+                  min="0"
                   value={userProfile?.age || ''}
                   onChange={(e) => handleProfileChange('age', e.target.value ? parseInt(e.target.value) : undefined)}
                   placeholder="30"
@@ -494,7 +825,7 @@ export const Settings: React.FC<SettingsProps> = ({
                 />
               </div>
               <div>
-                <label htmlFor="gender" className="block text-xs text-theme-secondary mb-1">Gender</label>
+                <label htmlFor="gender" className="block text-xs text-theme-secondary mb-1">{intl.formatMessage({ id: 'settings.gender' })}</label>
                 <select
                   id="gender"
                   name="gender"
@@ -502,15 +833,15 @@ export const Settings: React.FC<SettingsProps> = ({
                   onChange={(e) => handleProfileChange('gender', e.target.value || undefined)}
                   className="w-full p-1 text-xs border rounded text-black bg-white"
                 >
-                  <option value="">Select gender</option>
-                  <option value="male">Male</option>
-                  <option value="female">Female</option>
-                  <option value="other">Other</option>
-                  <option value="prefer-not-to-say">Prefer not to say</option>
+                  <option value="">{intl.formatMessage({ id: 'settings.selectGender' })}</option>
+                  <option value="male">{intl.formatMessage({ id: 'settings.genders.male' })}</option>
+                  <option value="female">{intl.formatMessage({ id: 'settings.genders.female' })}</option>
+                  <option value="other">{intl.formatMessage({ id: 'settings.genders.other' })}</option>
+                  <option value="prefer-not-to-say">{intl.formatMessage({ id: 'settings.genders.preferNotToSay' })}</option>
                 </select>
               </div>
               <div>
-                <label htmlFor="householdSize" className="block text-xs text-theme-secondary mb-1">Household</label>
+                <label htmlFor="householdSize" className="block text-xs text-theme-secondary mb-1">{intl.formatMessage({ id: 'settings.household' })}</label>
                 <input
                   id="householdSize"
                   name="householdSize"
@@ -530,7 +861,7 @@ export const Settings: React.FC<SettingsProps> = ({
             {/* Diet Goal and Activity Level - combine into 2 columns */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label htmlFor="dietGoal" className="block text-xs text-theme-secondary mb-1">Diet Goal</label>
+                <label htmlFor="dietGoal" className="block text-xs text-theme-secondary mb-1">{intl.formatMessage({ id: 'settings.dietGoal' })}</label>
                 <select
                   id="dietGoal"
                   name="dietGoal"
@@ -538,16 +869,16 @@ export const Settings: React.FC<SettingsProps> = ({
                   onChange={(e) => handleProfileChange('dietGoal', e.target.value || undefined)}
                   className="w-full p-2 border rounded text-sm text-black bg-white"
                 >
-                  <option value="">Select diet goal</option>
-                  <option value="lose-weight">Lose Weight</option>
-                  <option value="maintain-weight">Maintain Weight</option>
-                  <option value="gain-weight">Gain Weight</option>
-                  <option value="build-muscle">Build Muscle</option>
-                  <option value="improve-health">Improve Health</option>
+                  <option value="">{intl.formatMessage({ id: 'settings.selectDietGoal' })}</option>
+                  <option value="lose-weight">{intl.formatMessage({ id: 'settings.dietGoals.loseWeight' })}</option>
+                  <option value="maintain-weight">{intl.formatMessage({ id: 'settings.dietGoals.maintainWeight' })}</option>
+                  <option value="gain-weight">{intl.formatMessage({ id: 'settings.dietGoals.gainWeight' })}</option>
+                  <option value="build-muscle">{intl.formatMessage({ id: 'settings.dietGoals.buildMuscle' })}</option>
+                  <option value="improve-health">{intl.formatMessage({ id: 'settings.dietGoals.improveHealth' })}</option>
                 </select>
               </div>
               <div>
-                <label htmlFor="activityLevel" className="block text-xs text-theme-secondary mb-1">Activity Level</label>
+                <label htmlFor="activityLevel" className="block text-xs text-theme-secondary mb-1">{intl.formatMessage({ id: 'settings.activityLevel' })}</label>
                 <select
                   id="activityLevel"
                   name="activityLevel"
@@ -555,42 +886,14 @@ export const Settings: React.FC<SettingsProps> = ({
                   onChange={(e) => handleProfileChange('activityLevel', e.target.value || undefined)}
                   className="w-full p-2 border rounded text-sm text-black bg-white"
                 >
-                  <option value="">Select activity level</option>
-                  <option value="sedentary">Sedentary</option>
-                  <option value="lightly-active">Lightly Active</option>
-                  <option value="moderately-active">Moderately Active</option>
-                  <option value="very-active">Very Active</option>
-                  <option value="extremely-active">Extremely Active</option>
+                  <option value="">{intl.formatMessage({ id: 'settings.selectActivityLevel' })}</option>
+                  <option value="sedentary">{intl.formatMessage({ id: 'settings.activityLevels.sedentary' })}</option>
+                  <option value="lightly-active">{intl.formatMessage({ id: 'settings.activityLevels.lightlyActive' })}</option>
+                  <option value="moderately-active">{intl.formatMessage({ id: 'settings.activityLevels.moderatelyActive' })}</option>
+                  <option value="very-active">{intl.formatMessage({ id: 'settings.activityLevels.veryActive' })}</option>
+                  <option value="extremely-active">{intl.formatMessage({ id: 'settings.activityLevels.extremelyActive' })}</option>
                 </select>
               </div>
-            </div>
-
-            {/* Dietary Restrictions - full width but more compact */}
-            <div>
-              <label htmlFor="dietaryRestrictions" className="block text-xs text-theme-secondary mb-1">Dietary Restrictions</label>
-              <input
-                id="dietaryRestrictions"
-                name="dietaryRestrictions"
-                type="text"
-                value={userProfile?.dietaryRestrictions?.join(', ') || ''}
-                onChange={(e) => handleProfileChange('dietaryRestrictions', e.target.value ? e.target.value.split(',').map(s => s.trim()) : undefined)}
-                placeholder="vegetarian, gluten-free"
-                className="w-full p-1 text-xs border rounded text-black bg-white"
-              />
-            </div>
-
-            {/* Allergies - full width but more compact */}
-            <div>
-              <label htmlFor="allergies" className="block text-xs text-theme-secondary mb-1">Allergies</label>
-              <input
-                id="allergies"
-                name="allergies"
-                type="text"
-                value={userProfile?.allergies?.join(', ') || ''}
-                onChange={(e) => handleProfileChange('allergies', e.target.value ? e.target.value.split(',').map(s => s.trim()) : undefined)}
-                placeholder="nuts, shellfish, dairy"
-                className="w-full p-1 text-xs border rounded text-black bg-white"
-              />
             </div>
 
             {profileChanged && (
@@ -600,7 +903,7 @@ export const Settings: React.FC<SettingsProps> = ({
                 className="w-full bg-green-500 text-white px-4 py-2 rounded text-sm font-medium hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {savingProfile && <Loader2 className="w-4 h-4 animate-spin" />}
-                {savingProfile ? 'Saving...' : 'Save Profile'}
+                {savingProfile ? 'Saving...' : intl.formatMessage({ id: 'settings.saveProfile' })}
               </button>
             )}
           </div>
@@ -617,451 +920,250 @@ export const Settings: React.FC<SettingsProps> = ({
         </div>
       )}
 
-      {/* Household Members Section */}
-      {user && (
-        <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden" data-section="household">
-          <div
-            onClick={() => toggleSection('Household')}
-            className="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-theme-primary transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              {expandedSections.has('Household') ? (
-                <ChevronDown className="w-5 h-5 text-theme-primary" />
-              ) : (
-                <ChevronRight className="w-5 h-5 text-theme-primary" />
-              )}
-              <h3 className="font-semibold text-theme-primary">Household</h3>
-            </div>
-          </div>
+      <SettingsPendingNotificationsSection
+        user={user}
+        expanded={expandedSections.has('PendingNotifications')}
+        onToggle={() => toggleSection('PendingNotifications')}
+        title={intl.formatMessage({ id: 'settings.pendingNotifications' })}
+      />
 
-          {expandedSections.has('Household') && (
-            <div className="border-t border-theme p-4">
-              {household ? (
-                <>
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <p className="text-sm font-medium text-theme-primary">{household.name}</p>
-                      <p className="text-xs text-theme-secondary">
-                        {household.members && Array.isArray(household.members) ? household.members.length : 0} member{household.members && Array.isArray(household.members) && household.members.length === 1 ? '' : 's'}
-                      </p>
-                    </div>
-                  </div>
+      <SettingsUsageLimitsSection
+        userExists={!!user}
+        expanded={expandedSections.has('UsageLimits')}
+        onToggle={() => toggleSection('UsageLimits')}
+        title={intl.formatMessage({ id: 'settings.usageLimits' })}
+        isPremium={isPremium}
+        isFamily={isFamily}
+        usageLimits={usageLimits}
+        onOpenUpgrade={() => setActiveSettingsTab('more')}
+      />
 
-                  {/* Member List */}
-                  <div className="space-y-3 mb-4">
-                    {household.members && Array.isArray(household.members) && household.members.map((member) => (
-                      <div key={member.id} className="bg-theme-secondary/50 rounded-lg p-3 border border-theme">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 bg-theme-primary rounded-full flex items-center justify-center text-sm font-medium text-theme-secondary">
-                              {member.name.charAt(0).toUpperCase()}
-                            </div>
-                            <div>
-                              <p className="text-sm font-medium text-theme-primary">{member.name}</p>
-                              <p className="text-xs text-theme-secondary">{member.email}</p>
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => openMemberPreferences(member)}
-                            className="flex items-center gap-2 px-3 py-1 bg-theme-primary hover:bg-theme-secondary text-theme-secondary hover:text-theme-primary rounded-lg text-sm transition-colors"
-                          >
-                            <Edit2 className="w-4 h-4" />
-                            Preferences
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+      <SettingsHouseholdSection
+        user={user}
+        household={household}
+        expanded={expandedSections.has('Household')}
+        onToggle={() => toggleSection('Household')}
+        title={intl.formatMessage({ id: 'settings.household' })}
+        onShowHousehold={onShowHousehold}
+        openMemberPreferences={openMemberPreferences}
+        removeMemberFromHousehold={removeMemberFromHousehold}
+        householdName={householdName}
+        setHouseholdName={setHouseholdName}
+        isCreatingHousehold={isCreatingHousehold}
+        createHousehold={createHousehold}
+        manageHouseholdLabel={intl.formatMessage({ id: 'settings.manageHousehold' })}
+      />
 
-                  {/* Member Preferences Form - Now handled in modal */}
+      </>}
+
+      {activeSettingsTab === 'preferences' && <>
+
+      <SettingsPowerFeaturesSection
+        onOpenCategories={() => {
+          setActiveSettingsTab('organization');
+          setShowCategoryManager(true);
+        }}
+        onOpenStoreLayout={() => setActiveSettingsTab('organization')}
+        onOpenFoodSafety={() => setExpandedSections((previous) => new Set([...previous, 'FoodSafety']))}
+        onOpenAppPreferences={() => setExpandedSections((previous) => new Set([...previous, 'AppPreferences']))}
+      />
+
+      <SettingsAppPreferencesSection
+        expanded={expandedSections.has('AppPreferences')}
+        onToggle={() => toggleSection('AppPreferences')}
+        title={intl.formatMessage({ id: 'settings.appPreferences' })}
+        settings={settings}
+        setSettings={setSettings}
+        userProfile={userProfile}
+        onMeasurementSystemChange={(value) => handleProfileChange('measurementSystem', value)}
+        geminiOptedIn={geminiOptedIn}
+        onGeminiOptInChange={handleGeminiOptIn}
+        labels={{
+          enableNotifications: intl.formatMessage({ id: 'settings.enableNotifications' }),
+          measurementSystem: intl.formatMessage({ id: 'settings.measurementSystem' }),
+          enableAiFeatures: intl.formatMessage({ id: 'settings.enableAiFeatures' }),
+          includeStaples: intl.formatMessage({ id: 'settings.includeStaples' }),
+          autoRestockStaples: intl.formatMessage({ id: 'settings.autoRestockStaples' }),
+          showNutrition: intl.formatMessage({ id: 'settings.showNutrition' }),
+          showPriceData: intl.formatMessage({ id: 'settings.showPriceData' }),
+        }}
+      />
+
+      <SettingsTabVisibilitySection
+        expanded={expandedSections.has('TabVisibility')}
+        onToggle={() => toggleSection('TabVisibility')}
+        hiddenTabs={settings.navigation?.hiddenTabs}
+        onTabVisibilityChange={(tab, isVisible) => {
+          const hidden = settings.navigation?.hiddenTabs ?? [];
+          const newHidden = isVisible ? hidden.filter((currentTab: string) => currentTab !== tab) : [...hidden, tab];
+          setSettings((previous) => ({
+            ...previous,
+            navigation: { ...previous.navigation, hiddenTabs: newHidden },
+          }));
+        }}
+      />
+
+      <SettingsFoodSafetySection
+        expanded={expandedSections.has('FoodSafety')}
+        onToggle={() => toggleSection('FoodSafety')}
+        title={intl.formatMessage({ id: 'settings.foodSafety' })}
+        user={user}
+        userProfile={userProfile}
+        setUserProfile={setUserProfile}
+        debouncedSaveProfile={debouncedSaveProfile}
+        saveProfileData={saveProfileData}
+      />
+
+      <SettingsThemeSection
+        expanded={expandedSections.has('Theme')}
+        onToggle={() => toggleSection('Theme')}
+        title={intl.formatMessage({ id: 'settings.themeSettings' })}
+        settings={settings}
+        onResetTheme={() => {
+          setSettings((previous) => ({
+            ...previous,
+            theme: {
+              mode: 'dark',
+              accentColor: '#4CAF50',
+              backgroundColor: undefined,
+              textColor: undefined,
+            },
+          }));
+        }}
+        onThemeModeChange={(mode) => handleChange('theme', { mode })}
+        onAccentColorChange={(accentColor) => handleChange('theme', { accentColor })}
+        onBackgroundColorChange={(backgroundColor) => handleChange('theme', { backgroundColor })}
+        onTextColorChange={(textColor) => handleChange('theme', { textColor })}
+        labels={{
+          theme: intl.formatMessage({ id: 'settings.theme' }),
+          accent: intl.formatMessage({ id: 'settings.accent' }),
+          background: intl.formatMessage({ id: 'settings.background' }),
+          textColor: intl.formatMessage({ id: 'settings.textColor' }),
+          language: intl.formatMessage({ id: 'settings.language' }),
+          dark: intl.formatMessage({ id: 'settings.themes.dark' }),
+          light: intl.formatMessage({ id: 'settings.themes.light' }),
+        }}
+      />
+
+      <SettingsNotificationsSection
+        expanded={expandedSections.has('Notifications')}
+        onToggle={() => toggleSection('Notifications')}
+        title={intl.formatMessage({ id: 'settings.notifications' })}
+        user={user}
+        notificationSettings={notificationSettings}
+        setNotificationSettings={setNotificationSettings}
+      />
+
+      </>}
+
+      {activeSettingsTab === 'organization' && <>
+
+      <SettingsCategoriesSection
+        userExists={!!user}
+        expanded={expandedSections.has('Categories')}
+        onToggle={() => toggleSection('Categories')}
+        title={intl.formatMessage({ id: 'settings.categories' })}
+        customCategoryCount={customCategories.length}
+        onManageCategories={() => setShowCategoryManager(true)}
+      />
+
+      <SettingsStoreLayoutSection
+        userExists={!!user}
+        expanded={expandedSections.has('Store Layout')}
+        onToggle={() => toggleSection('Store Layout')}
+        title={intl.formatMessage({ id: 'settings.storeLayout' })}
+        storeLayout={settings.shopping?.storeLayout || defaultStoreLayout}
+        onStoreLayoutChange={(newLayout) => setSettings((previous) => ({
+          ...previous,
+          shopping: {
+            ...previous.shopping,
+            storeLayout: newLayout,
+          },
+        }))}
+        storeProfiles={settings.shopping?.storeProfiles ?? {}}
+        activeStoreProfile={settings.shopping?.activeStoreProfile}
+        onStoreProfilesChange={(profiles, active) => setSettings((previous) => ({
+          ...previous,
+          shopping: {
+            ...previous.shopping,
+            storeProfiles: profiles,
+            activeStoreProfile: active,
+          },
+        }))}
+      />
+
+      <SettingsLeftoverAnalyticsSection
+        userId={user?.id}
+        householdId={household?.id}
+        expanded={expandedSections.has('Leftover Analytics')}
+        onToggle={() => toggleSection('Leftover Analytics')}
+        title={intl.formatMessage({ id: 'settings.leftoverAnalytics' })}
+      />
+
+      </>}
+
+      {activeSettingsTab === 'more' && <>
+
+      <SettingsFeedbackSection
+        expanded={expandedSections.has('Feedback')}
+        onToggle={() => toggleSection('Feedback')}
+        title={intl.formatMessage({ id: 'settings.feedback' })}
+        feedback={feedback}
+        setFeedback={setFeedback}
+        sending={sending}
+        onSubmit={handleFeedbackSubmit}
+      />
+
+      <SettingsSubscriptionSection
+        user={user}
+        expanded={expandedSections.has('Subscription')}
+        onToggle={() => toggleSection('Subscription')}
+        title={intl.formatMessage({ id: 'settings.subscription' })}
+      />
 
 
-                  <p className="text-sm text-theme-secondary">
-                    Customize preferences for each household member to get personalized recipe recommendations and shopping suggestions.
-                  </p>
-                </>
-              ) : (
-                <p className="text-sm text-theme-secondary">
-                  Create a household to share your pantry with family members. Click your avatar above to get started.
-                </p>
-              )}
-            </div>
-          )}
-        </div>
-      )}
 
+      <SettingsPantryImagesSection
+        user={user}
+        expanded={expandedSections.has('Pantry Images')}
+        onToggle={() => toggleSection('Pantry Images')}
+        title={intl.formatMessage({ id: 'settings.pantryImages' })}
+        updatingBulkImages={updatingBulkImages}
+        onBulkUpdate={handleBulkImageUpdate}
+      />
 
+      <SettingsHelpSection
+        expanded={expandedSections.has('Help & Support')}
+        onToggle={() => toggleSection('Help & Support')}
+        title={intl.formatMessage({ id: 'settings.help' })}
+        description="Need help? Check out our FAQ or contact our support team for assistance."
+        onOpenFAQ={() => setShowFAQModal(true)}
+        buttonLabel="View FAQ & Help"
+      />
 
-      {/* Categories Section */}
-      {user && (
-        <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden">
-          <div
-            onClick={() => toggleSection('Categories')}
-            className="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-theme-primary transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              {expandedSections.has('Categories') ? (
-                <ChevronDown className="w-5 h-5 text-theme-primary" />
-              ) : (
-                <ChevronRight className="w-5 h-5 text-theme-primary" />
-              )}
-              <h3 className="font-semibold text-theme-primary">Categories</h3>
-            </div>
-          </div>
+      <SettingsAppUpdatesSection
+        expanded={expandedSections.has('App Updates')}
+        onToggle={() => toggleSection('App Updates')}
+        title={intl.formatMessage({ id: 'settings.appUpdates' })}
+      />
 
-          {expandedSections.has('Categories') && (
-            <div className="border-t border-theme p-4">
-              <div className="space-y-3">
-                <p className="text-sm text-theme-secondary">
-                  Create custom categories to better organize your pantry items.
-                </p>
-                <button
-                  onClick={() => setShowCategoryManager(true)}
-                  className="bg-[var(--accent-color)] text-white px-4 py-2 rounded font-medium text-sm hover:bg-opacity-90 transition-colors"
-                >
-                  Manage Categories
-                </button>
-                <div className="text-xs text-theme-secondary">
-                  {customCategories.length} custom categor{customCategories.length === 1 ? 'y' : 'ies'}
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+      <SettingsResetUsageSection
+        isAdmin={isAdmin}
+        expanded={expandedSections.has('Reset Usage')}
+        onToggle={() => toggleSection('Reset Usage')}
+        onReset={handleResetUsageCounters}
+      />
 
-      {/* Theme Settings Section */}
-      <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden">
-        <div
-          onClick={() => toggleSection('Theme')}
-          className="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-theme-primary transition-colors"
-        >
-          <div className="flex items-center gap-3">
-            {expandedSections.has('Theme') ? (
-              <ChevronDown className="w-5 h-5 text-theme-primary" />
-            ) : (
-              <ChevronRight className="w-5 h-5 text-theme-primary" />
-            )}
-            <h3 className="font-semibold text-theme-primary">Theme Settings</h3>
-          </div>
-        </div>
+      <SettingsRemoteConfigDebugSection
+        isAdmin={isAdmin}
+        expanded={expandedSections.has('Remote Config Debug')}
+        onToggle={() => toggleSection('Remote Config Debug')}
+        addToast={addToast}
+      />
 
-        {expandedSections.has('Theme') && (
-          <div className="border-t border-theme p-4">
-          <div className="flex items-center justify-between mb-3">
-          <button
-            onClick={() => {
-              setSettings(prev => ({
-                ...prev,
-                theme: {
-                  mode: 'dark',
-                  accentColor: '#4CAF50',
-                  backgroundColor: undefined,
-                  textColor: undefined,
-                }
-              }));
-            }}
-            className="text-xs px-3 py-1 bg-theme-primary border border-theme rounded hover:bg-theme-secondary transition-colors text-theme-primary"
-          >
-            Reset to Default
-          </button>
-          </div>
-          <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-theme-primary">Theme</span>
-            <select
-              id="themeMode"
-              name="themeMode"
-              value={settings.theme.mode}
-              onChange={(e) => handleChange('theme', { mode: e.target.value })}
-              className="border rounded px-2 py-1 text-black bg-white text-sm"
-            >
-              <option value="dark">Dark</option>
-              <option value="light">Light</option>
-            </select>
-            <span className="text-sm text-theme-primary ml-4">Accent</span>
-            <input
-              id="accentColor"
-              name="accentColor"
-              type="color"
-              value={settings.theme.accentColor}
-              onChange={(e) => handleChange('theme', { accentColor: e.target.value })}
-              className="border rounded w-8 h-8 ml-2"
-            />
-          </div>
+      </>}
 
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-theme-primary">Background</span>
-            <input
-              id="backgroundColor"
-              name="backgroundColor"
-              type="color"
-              value={settings.theme.backgroundColor || '#ffffff'}
-              onChange={(e) => handleChange('theme', { backgroundColor: e.target.value })}
-              className="border rounded w-8 h-8"
-            />
-            <span className="text-sm text-theme-primary ml-4">Text</span>
-            <input
-              id="textColor"
-              name="textColor"
-              type="color"
-              value={settings.theme.textColor || '#000000'}
-              onChange={(e) => handleChange('theme', { textColor: e.target.value })}
-              className="border rounded w-8 h-8 ml-2"
-            />
-          </div>
-        </div>
-
-        {/* Language Selector */}
-        <div className="mt-4 pt-3 border-t border-theme">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-theme-primary">Language</span>
-            <LanguageSelector />
-          </div>
-        </div>
-          </div>
-        )}
-      </div>
-
-      {/* Notifications Section */}
-      <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden" data-section="notifications">
-        <div
-          onClick={() => toggleSection('Notifications')}
-          className="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-theme-primary transition-colors"
-        >
-          <div className="flex items-center gap-3">
-            {expandedSections.has('Notifications') ? (
-              <ChevronDown className="w-5 h-5 text-theme-primary" />
-            ) : (
-              <ChevronRight className="w-5 h-5 text-theme-primary" />
-            )}
-            <h3 className="font-semibold text-theme-primary">Notifications</h3>
-          </div>
-        </div>
-
-        {expandedSections.has('Notifications') && (
-          <div className="border-t border-theme p-4">
-            {user && (
-              <NotificationSettingsComponent
-                user={user}
-                currentSettings={notificationSettings}
-                onSettingsChange={setNotificationSettings}
-              />
-            )}
-
-            {/* Pending Notifications Section */}
-            {user && (
-              <PendingNotifications user={user} />
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Feedback Section */}
-      <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden">
-        <div
-          onClick={() => toggleSection('Feedback')}
-          className="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-theme-primary transition-colors"
-        >
-          <div className="flex items-center gap-3">
-            {expandedSections.has('Feedback') ? (
-              <ChevronDown className="w-5 h-5 text-theme-primary" />
-            ) : (
-              <ChevronRight className="w-5 h-5 text-theme-primary" />
-            )}
-            <h3 className="font-semibold text-theme-primary">Feedback</h3>
-          </div>
-        </div>
-
-        {expandedSections.has('Feedback') && (
-          <div className="border-t border-theme p-4">
-        <form onSubmit={handleFeedbackSubmit} className="space-y-3">
-          <textarea
-            value={feedback}
-            onChange={e => setFeedback(e.target.value)}
-            placeholder="Let us know your thoughts..."
-            className="w-full p-3 border rounded resize-none text-black bg-white text-sm"
-            rows={3}
-            disabled={sending}
-          />
-          <button
-            type="submit"
-            disabled={sending || !feedback.trim()}
-            className="bg-[var(--accent-color)] text-white px-4 py-2 rounded font-medium text-sm w-full hover:bg-opacity-90 transition-colors"
-          >
-            {sending ? 'Sending...' : 'Send Feedback'}
-          </button>
-        </form>
-          </div>
-        )}
-      </div>
-
-      {/* Subscription Section */}
-      {user && (
-        <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden">
-          <div
-            onClick={() => toggleSection('Subscription')}
-            className="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-theme-primary transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              {expandedSections.has('Subscription') ? (
-                <ChevronDown className="w-5 h-5 text-theme-primary" />
-              ) : (
-                <ChevronRight className="w-5 h-5 text-theme-primary" />
-              )}
-              <h3 className="font-semibold text-theme-primary">Subscription</h3>
-            </div>
-          </div>
-
-          {expandedSections.has('Subscription') && (
-            <div className="border-t border-theme p-4">
-              <SubscriptionManager user={user} />
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Database Monitoring Section - Developer/Admin Only */}
-      {user && process.env.NODE_ENV === 'development' && (
-        <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden">
-          <div
-            onClick={() => toggleSection('Database Monitoring')}
-            className="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-theme-primary transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              {expandedSections.has('Database Monitoring') ? (
-                <ChevronDown className="w-5 h-5 text-theme-primary" />
-              ) : (
-                <ChevronRight className="w-5 h-5 text-theme-primary" />
-              )}
-              <h3 className="font-semibold text-theme-primary">Database Monitoring</h3>
-            </div>
-          </div>
-
-          {expandedSections.has('Database Monitoring') && (
-            <div className="border-t border-theme p-4">
-              <MonitoringDashboard user={user} />
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Bulk Image Update Section */}
-      {user && (
-        <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden">
-          <div
-            onClick={() => toggleSection('Pantry Images')}
-            className="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-theme-primary transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              {expandedSections.has('Pantry Images') ? (
-                <ChevronDown className="w-5 h-5 text-theme-primary" />
-              ) : (
-                <ChevronRight className="w-5 h-5 text-theme-primary" />
-              )}
-              <h3 className="font-semibold text-theme-primary">Pantry Images</h3>
-            </div>
-          </div>
-
-          {expandedSections.has('Pantry Images') && (
-            <div className="border-t border-theme p-4">
-          <div className="space-y-3">
-            <p className="text-sm text-theme-secondary">
-              Automatically fetch better images for pantry items that currently have placeholder images.
-              This will scan your inventory and update items with images from food databases and stock photos.
-              Images are cached locally for faster loading and offline access.
-            </p>
-            <button
-              onClick={async () => {
-                if (!confirm('This will scan all your pantry items and attempt to update images for items with placeholders. This may take a few minutes. Continue?')) {
-                  return;
-                }
-
-                setUpdatingBulkImages(true);
-                try {
-                  const { BulkImageUpdateService } = await import('../services/bulkImageUpdateService');
-                  const result = await BulkImageUpdateService.updateAllPantryItemImages(user, (completed, total) => {
-                    log.info(`Updated ${completed}/${total} items`, { completed, total }, 'Settings');
-                  });
-
-                  alert(`Image update complete!\n\n${result.updatedItems} items updated\n${result.failedItems} items failed\n\nCheck the console for details.`);
-                } catch (error) {
-                  log.error(error as Error, 'Settings');
-                  alert('Failed to update images. Check the console for details.');
-                } finally {
-                  setUpdatingBulkImages(false);
-                }
-              }}
-              disabled={updatingBulkImages}
-              className="bg-blue-500 text-white px-4 py-2 rounded font-medium text-sm hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              {updatingBulkImages && <Loader2 className="w-4 h-4 animate-spin" />}
-              {updatingBulkImages ? 'Updating Images...' : 'Update Pantry Images'}
-            </button>
-            <div className="text-xs text-theme-secondary">
-              This feature uses external APIs and may take time for large inventories.
-            </div>
-          </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Help & Support Section */}
-      <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden">
-        <div
-          onClick={() => toggleSection('Help & Support')}
-          className="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-theme-primary transition-colors"
-        >
-          <div className="flex items-center gap-3">
-            {expandedSections.has('Help & Support') ? (
-              <ChevronDown className="w-5 h-5 text-theme-primary" />
-            ) : (
-              <ChevronRight className="w-5 h-5 text-theme-primary" />
-            )}
-            <h3 className="font-semibold text-theme-primary">Help & Support</h3>
-          </div>
-        </div>
-
-        {expandedSections.has('Help & Support') && (
-          <div className="border-t border-theme p-4">
-        <div className="space-y-3">
-          <p className="text-sm text-theme-secondary">
-            Need help getting started or want to see the app features again?
-          </p>
-          <button
-            onClick={onShowTutorial}
-            className="bg-[var(--accent-color)] text-white px-4 py-2 rounded font-medium text-sm hover:bg-opacity-90 transition-colors"
-          >
-            Watch Tutorial
-          </button>
-        </div>
-          </div>
-        )}
-      </div>
-
-      {/* App Updates Section */}
-      <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden">
-        <div
-          onClick={() => toggleSection('App Updates')}
-          className="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-theme-primary transition-colors"
-        >
-          <div className="flex items-center gap-3">
-            {expandedSections.has('App Updates') ? (
-              <ChevronDown className="w-5 h-5 text-theme-primary" />
-            ) : (
-              <ChevronRight className="w-5 h-5 text-theme-primary" />
-            )}
-            <h3 className="font-semibold text-theme-primary">App Updates</h3>
-          </div>
-        </div>
-
-        {expandedSections.has('App Updates') && (
-          <div className="border-t border-theme p-4">
-            <VersionUpdate autoCheck={true} />
-          </div>
-        )}
-      </div>
+      </div> {/* end tab content */}
 
       {/* Category Manager Modal */}
       {user && (
@@ -1072,6 +1174,7 @@ export const Settings: React.FC<SettingsProps> = ({
           onDeleteCategory={onDeleteCustomCategory || (() => {})}
           isOpen={showCategoryManager}
           onClose={() => setShowCategoryManager(false)}
+          maxCategories={isPremium || isFamily ? undefined : 1}
         />
       )}
 
@@ -1163,7 +1266,7 @@ export const Settings: React.FC<SettingsProps> = ({
                   <label className="block text-sm font-medium text-theme-primary mb-3">Diet Goal</label>
                   <select
                     value={memberPreferences.dietGoal || ''}
-                    onChange={(e) => setMemberPreferences(prev => ({ ...prev, dietGoal: e.target.value as any || undefined }))}
+                    onChange={(e) => setMemberPreferences(prev => ({ ...prev, dietGoal: e.target.value as UserProfile['dietGoal'] || undefined }))}
                     className="w-full bg-theme-secondary border border-theme rounded-lg px-3 py-2 text-sm text-theme-primary focus:border-theme-primary outline-none"
                   >
                     <option value="">No specific goal</option>
@@ -1289,7 +1392,84 @@ export const Settings: React.FC<SettingsProps> = ({
           </div>
         </div>
       )}
+
+      {activeSettingsTab === 'more' && <>
+
+      <SettingsPrivacyLegalSection
+        expanded={expandedSections.has('Privacy & Legal')}
+        onToggle={() => toggleSection('Privacy & Legal')}
+        title={intl.formatMessage({ id: 'settings.privacy' })}
+        onViewPrivacyPolicy={() => {
+          const privacyUrl = (window as Window & { PRIVACY_POLICY_URL?: string }).PRIVACY_POLICY_URL || 'https://smartpantrymobile.page.gd/privacy.html';
+          window.open(privacyUrl, '_blank');
+        }}
+        onCopyPrivacyUrl={() => {
+          const privacyUrl = (window as Window & { PRIVACY_POLICY_URL?: string }).PRIVACY_POLICY_URL || 'https://smartpantrymobile.page.gd/privacy.html';
+          if (navigator.clipboard) navigator.clipboard.writeText(privacyUrl);
+          addToast?.('Privacy policy URL copied to clipboard', 'success');
+        }}
+        canDeleteAccount={!!user && !user.isGuest}
+        onDeleteAccount={() => setShowDeleteConfirm(true)}
+      />
+
+      </>}
+
     </div>
+
+    {/* FAQ Modal */}
+    {showFAQModal && (
+      <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
+        <div className="bg-theme-primary rounded-2xl shadow-2xl max-w-4xl w-full h-[90vh] max-h-[800px] flex flex-col">
+          <div className="flex-shrink-0 p-4 border-b border-theme bg-theme-secondary">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <SettingsIcon className="w-5 h-5 text-theme-primary flex-shrink-0" />
+                <h2 className="font-serif font-bold text-theme-primary text-lg truncate">Help & FAQ</h2>
+              </div>
+              <button onClick={() => setShowFAQModal(false)} className="text-theme-secondary hover:text-theme-primary flex-shrink-0 ml-2">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+          </div>
+
+          <div className="flex-1 p-6 overflow-y-auto min-h-0">
+            <FAQPage onBack={() => setShowFAQModal(false)} />
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* Delete Account Confirmation Modal */}
+    {showDeleteConfirm && (
+      <div className="fixed inset-0 bg-black/60 z-[110] flex items-center justify-center p-4">
+        <div className="bg-theme-primary rounded-2xl shadow-2xl max-w-sm w-full p-6 flex flex-col gap-4">
+          <div className="flex items-center gap-3">
+            <AlertTriangle className="w-6 h-6 text-red-500 flex-shrink-0" />
+            <h2 className="font-serif font-bold text-theme-primary text-lg">Delete Account</h2>
+          </div>
+          <p className="text-sm text-theme-secondary leading-relaxed">
+            This will <strong>permanently delete</strong> your account, all pantry data, meal plans, saved recipes, and remove you from any households. This action cannot be undone.
+          </p>
+          <div className="flex gap-3 mt-2">
+            <button
+              onClick={() => setShowDeleteConfirm(false)}
+              disabled={isDeletingAccount}
+              className="flex-1 bg-theme-secondary text-theme-primary py-2 px-4 rounded-lg font-medium text-sm transition-colors hover:bg-theme-primary disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleDeleteAccount}
+              disabled={isDeletingAccount}
+              className="flex-1 bg-red-500 text-white py-2 px-4 rounded-lg font-medium text-sm transition-colors hover:bg-red-600 disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {isDeletingAccount ? <><Loader2 className="w-4 h-4 animate-spin" /> Deleting…</> : 'Delete My Account'}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
     </>
   );
 };

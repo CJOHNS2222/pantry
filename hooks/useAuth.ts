@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth';
-import { doc, setDoc, getDoc, onSnapshot, query, where, getDocs, updateDoc, collection } from 'firebase/firestore';
+import DatabaseMonitoringService from '../services/databaseMonitoringService';
 import { logEvent } from 'firebase/analytics';
 import { User } from '../types';
-import { analytics, db } from '../firebaseConfig';
+import { analytics } from '../firebaseConfig';
 import AnalyticsService from '../services/analyticsService';
 import { setUserContext, clearUserContext, trackAuthEvent } from '../services/sentryService';
 import { PriceDataCacheService } from '../services/priceDataCacheService';
+import { log } from '../services/logService';
+import { GUEST_USER_ID_KEY } from '../components/Login';
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
@@ -27,55 +29,86 @@ export function useAuth() {
         setUser(null);
         clearUserContext();
         PriceDataCacheService.clearCache(); // Clear cache on logout
+
+        // Restore a guest session if the user had previously chosen guest mode
+        const guestId = localStorage.getItem(GUEST_USER_ID_KEY);
+        if (guestId) {
+          setUser({
+            id: guestId,
+            name: 'Guest',
+            email: '',
+            provider: 'guest',
+            isGuest: true,
+            hasSeenTutorial: false
+          });
+        }
+
         setIsAuthReady(true); // Auth is ready, even with no user
         return;
       }
 
-      // Create user document if it doesn't exist
-      const userDocRef = doc(db, 'users', fbUser.uid);
-      const userDocSnap = await getDoc(userDocRef);
+      const userDocRef = DatabaseMonitoringService.doc('users', fbUser.uid);
 
-      if (!userDocSnap.exists()) {
-        try {
-          await setDoc(userDocRef, {
-            subscription: {
-              tier: 'premium',
-              status: 'active',
-              current_period_end: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
-              cancel_at_period_end: false
-            },
-            createdAt: new Date(),
-            email: fbUser.email,
-            name: fbUser.displayName || (fbUser.email ? fbUser.email.split('@')[0] : 'User'),
-          });
-        } catch (err: any) {
-          console.error('Failed to create user document:', err);
+      // Set up listener for user document changes (handles doc creation on first login)
+      userDocUnsubscribe = DatabaseMonitoringService.onSnapshot(userDocRef, async (userDocSnap) => {
+        if (!userDocSnap.exists()) {
+          try {
+            await DatabaseMonitoringService.setDoc(userDocRef, {
+              subscription: {
+                tier: 'free',
+                status: 'active',
+                current_period_end: new Date(),
+                cancel_at_period_end: false
+              },
+              createdAt: new Date(),
+              email: fbUser.email,
+              name: fbUser.displayName || (fbUser.email ? fbUser.email.split('@')[0] : 'User'),
+            });
+          } catch (err: unknown) {
+            log.error('Failed to create user document:', { error: (err as Error)?.message }, 'useAuth');
+          }
+          return; // Listener will re-fire once doc is created
         }
-      }
 
-      // Set up listener for user document changes
-      userDocUnsubscribe = onSnapshot(userDocRef, async (userDocSnap) => {
         const userData = userDocSnap.data();
         const householdId = userData?.householdId;
 
         if (!householdId) {
           try {
-            const householdQuery = query(
-              collection(db, 'households'),
-              where('memberIds', 'array-contains', fbUser.uid)
+            const householdQuery = DatabaseMonitoringService.query(
+              DatabaseMonitoringService.collection('households'),
+              DatabaseMonitoringService.where('memberIds', 'array-contains', fbUser.uid)
             );
-            const querySnapshot = await getDocs(householdQuery);
+            const querySnapshot = await DatabaseMonitoringService.getDocs(householdQuery);
             if (!querySnapshot.empty) {
               const foundHouseholdId = querySnapshot.docs[0].id;
-              await updateDoc(userDocRef, {
+              await DatabaseMonitoringService.updateDoc(userDocRef, {
                 householdId: foundHouseholdId,
                 updatedAt: new Date()
               });
               return; // Listener will refire
             }
-          } catch (err: any) {
-            console.error('Failed to check for existing household:', err);
+          } catch (err: unknown) {
+            log.error('Failed to check for existing household:', { error: (err as Error)?.message }, 'useAuth');
           }
+        }
+
+        // One-time migration: move customCategories from old subcollection cache to user doc.
+        // After migration the user doc update triggers this listener again with the field present.
+        let customCategories = userData?.customCategories;
+        if (!customCategories) {
+          try {
+            const oldCacheRef = DatabaseMonitoringService.doc(`users/${fbUser.uid}/cache/customCategories`);
+            const oldCacheSnap = await DatabaseMonitoringService.getDoc(oldCacheRef);
+            if (oldCacheSnap.exists()) {
+              const legacyCategories = oldCacheSnap.data()?.categories || [];
+              await DatabaseMonitoringService.updateDoc(userDocRef, { customCategories: legacyCategories });
+              return; // Listener will refire with the new field set
+            }
+          } catch (err: unknown) {
+            log.warn('Could not migrate customCategories from cache', { error: (err as Error)?.message }, 'useAuth');
+          }
+          customCategories = [];
         }
 
         setUser({
@@ -87,7 +120,8 @@ export function useAuth() {
           hasSeenTutorial: userData?.hasSeenTutorial ?? false,
           subscription: userData?.subscription,
           profile: userData?.profile,
-          householdId: householdId
+          householdId: householdId,
+          customCategories,
         });
 
         setUserContext(fbUser.uid, fbUser.email || undefined, householdId);
@@ -117,9 +151,22 @@ export function useAuth() {
     if (confirm("Are you sure you want to log out?")) {
       trackAuthEvent('logout');
       AnalyticsService.trackLogout();
+      // Guest users have no Firebase session — just clear localStorage
+      const currentUser = await new Promise<User | null>(resolve => resolve(null)).then(() => null);
+      void currentUser; // unused, just keeping async shape
+      const guestId = localStorage.getItem(GUEST_USER_ID_KEY);
+      if (guestId) {
+        localStorage.removeItem(GUEST_USER_ID_KEY);
+        // Also clear guest data from localStorage
+        localStorage.removeItem('guest_inventory');
+        localStorage.removeItem('guest_shopping');
+        localStorage.removeItem('guest_recipes');
+        localStorage.removeItem('guest_mealplan');
+        setUser(null);
+        return;
+      }
       await signOut(getAuth());
       // No need to call setUser(null), onAuthStateChanged will handle it.
-      // No need for localStorage.clear() or window.location.reload()
     }
   };
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { inferStorageLocationFromItemName } from '../../../utils/appUtils';
+import { inferStorageLocationFromItemName, parseIngredientForShoppingList } from '../../../utils/appUtils';
 
 // Test utility functions from App.tsx
 describe('next7DateKeys', () => {
@@ -163,3 +163,96 @@ describe('inferStorageLocationFromItemName', () => {
     expect(inferStorageLocationFromItemName('random food')).toBe('pantry');
   });
 });
+
+describe('parseIngredientForShoppingList', () => {
+  it('parses standard quantity + unit + name', () => {
+    const r = parseIngredientForShoppingList('2 cups chicken broth');
+    expect(r.quantity).toBe('2 cups');
+    expect(r.itemName).toBe('Chicken Broth');
+  });
+
+  it('parses fraction quantity', () => {
+    const r = parseIngredientForShoppingList('1/2 cup butter');
+    expect(r.quantity).toBe('1/2 cup');
+    expect(r.itemName).toBe('Butter');
+  });
+
+  it('handles Unicode fraction prefix (½)', () => {
+    const r = parseIngredientForShoppingList('½ tsp smoked paprika');
+    expect(r.quantity).toBe('1/2 tsp');
+    expect(r.itemName).toBe('Smoked Paprika');
+  });
+
+  it('handles mixed fraction (1 1/2)', () => {
+    const r = parseIngredientForShoppingList('1 1/2 cups flour');
+    expect(r.quantity).toBe('1.5 cups');
+    expect(r.itemName).toBe('Flour');
+  });
+
+  it('strips "to taste" prefix', () => {
+    const r = parseIngredientForShoppingList('to taste pepper');
+    expect(r.quantity).toBe('to taste');
+    expect(r.itemName).toBe('Pepper');
+  });
+
+  it('strips "to taste" suffix', () => {
+    const r = parseIngredientForShoppingList('salt to taste');
+    expect(r.quantity).toBe('to taste');
+    expect(r.itemName).toBe('Salt');
+  });
+
+  it('strips "to taste" after comma', () => {
+    const r = parseIngredientForShoppingList('salt, to taste');
+    expect(r.quantity).toBe('to taste');
+    expect(r.itemName).toBe('Salt');
+  });
+
+  it('handles "an" article without unit', () => {
+    const r = parseIngredientForShoppingList('an egg');
+    expect(r.quantity).toBe('1');
+    expect(r.itemName).toBe('Egg');
+  });
+
+  it('handles "an" article with following noun phrase', () => {
+    const r = parseIngredientForShoppingList('an avocado, sliced');
+    expect(r.quantity).toBe('1');
+    expect(r.itemName).toBe('Avocado');
+  });
+
+  it('handles "a" article without unit', () => {
+    const r = parseIngredientForShoppingList('a garlic clove');
+    expect(r.quantity).toBe('1');
+    expect(r.itemName).toBe('Garlic Clove');
+  });
+
+  it('strips trailing comma+descriptor (minced)', () => {
+    const r = parseIngredientForShoppingList('2 cloves garlic, minced');
+    expect(r.quantity).toBe('2 cloves');
+    expect(r.itemName).toBe('Garlic');
+  });
+
+  it('strips trailing comma+descriptor (divided)', () => {
+    const r = parseIngredientForShoppingList('1/2 cup olive oil, divided');
+    expect(r.quantity).toBe('1/2 cup');
+    expect(r.itemName).toBe('Olive Oil');
+  });
+
+  it('strips parenthetical size note', () => {
+    const r = parseIngredientForShoppingList('1 can (14.5 oz) diced tomatoes');
+    expect(r.quantity).toBe('1 can');
+    expect(r.itemName).toBe('Diced Tomatoes');
+  });
+
+  it('strips parenthetical alternative note', () => {
+    const r = parseIngredientForShoppingList('2 cups chicken broth (or water)');
+    expect(r.quantity).toBe('2 cups');
+    expect(r.itemName).toBe('Chicken Broth');
+  });
+
+  it('defaults to qty 1 when no quantity detected', () => {
+    const r = parseIngredientForShoppingList('fresh cilantro');
+    expect(r.quantity).toBe('1');
+    expect(r.itemName).toBe('Fresh Cilantro');
+  });
+});
+

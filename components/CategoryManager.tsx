@@ -1,7 +1,11 @@
 import React, { useState } from 'react';
-import { Plus, Edit2, Trash2, X, Check, Palette } from 'lucide-react';
+import { Plus, Edit2, Trash2, X, Check } from 'lucide-react';
+import { useModalOpen } from '../utils/useModalOpen';
+import { useKeyboardNavigation } from '../hooks/useKeyboardNavigation';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 import { CustomCategory } from '../types';
 import { getCategoryIcon, getCategoryColor } from '../utils/appUtils';
+import AnalyticsService from '../services/analyticsService';
 
 interface CategoryManagerProps {
   customCategories: CustomCategory[];
@@ -10,6 +14,7 @@ interface CategoryManagerProps {
   onDeleteCategory: (categoryId: string) => void;
   isOpen: boolean;
   onClose: () => void;
+  maxCategories?: number;
 }
 
 const commonEmojis = [
@@ -32,8 +37,12 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({
   onUpdateCategory,
   onDeleteCategory,
   isOpen,
-  onClose
+  onClose,
+  maxCategories
 }) => {
+  useModalOpen(isOpen);
+  useKeyboardNavigation({ onEscape: onClose, enabled: isOpen });
+  const modalRef = useFocusTrap({ isActive: isOpen });
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
@@ -57,8 +66,19 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({
         icon: formData.icon,
         color: formData.color
       });
+      AnalyticsService.trackEvent('category_updated', {
+        categoryId: editingId,
+        name: formData.name.trim(),
+        icon: formData.icon,
+        color: formData.color
+      });
     } else {
       onAddCategory(formData.name.trim(), formData.icon, formData.color);
+      AnalyticsService.trackEvent('category_created', {
+        name: formData.name.trim(),
+        icon: formData.icon,
+        color: formData.color
+      });
     }
     resetForm();
   };
@@ -75,8 +95,8 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-theme-primary rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-4 pt-[var(--safe-area-inset-top,0px)] pb-[var(--safe-area-inset-bottom,0px)]" onClick={onClose}>
+      <div ref={modalRef} role="dialog" aria-modal="true" aria-label="Manage Categories" className="bg-theme-primary rounded-lg shadow-xl max-w-2xl w-full max-h-full overflow-hidden" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-theme">
           <h2 className="text-xl font-bold text-theme-primary">Manage Categories</h2>
@@ -84,6 +104,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({
             onClick={onClose}
             className="p-2 hover:bg-theme-secondary rounded-lg transition-colors"
             aria-label="Close category manager"
+            data-testid="category-close"
           >
             <X className="w-5 h-5 text-theme-secondary" />
           </button>
@@ -91,7 +112,19 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({
 
         {/* Content */}
         <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
-          {/* Add/Edit Form */}
+          {/* Upgrade banner when at limit */}
+          {maxCategories !== undefined && customCategories.length >= maxCategories && (
+            <div className="mb-4 p-3 bg-amber-50 border border-amber-300 rounded-lg flex items-start gap-3">
+              <span className="text-amber-500 text-lg flex-shrink-0">🔒</span>
+              <div>
+                <p className="text-sm font-semibold text-amber-800">Free plan limit reached</p>
+                <p className="text-sm text-amber-700 mt-0.5">
+                  You've used your 1 free custom category. Upgrade to <strong>Premium</strong> or <strong>Family</strong> for unlimited categories — starting at $4.99/mo.
+                </p>
+                <p className="text-sm text-amber-600 mt-1">Go to Settings → More → Subscription to upgrade.</p>
+              </div>
+            </div>
+          )}
           {(isAdding || editingId) && (
             <div className="mb-6 p-4 bg-theme-secondary rounded-lg">
               <h3 className="text-lg font-semibold text-theme-primary mb-4">
@@ -109,7 +142,9 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({
                     value={formData.name}
                     onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                     placeholder="Enter category name"
+                    maxLength={50}
                     className="w-full px-3 py-2 bg-theme-primary border border-theme rounded-lg text-theme-primary placeholder-theme-secondary focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]"
+                    data-testid="category-name-input"
                   />
                 </div>
 
@@ -126,16 +161,18 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({
                       onChange={(e) => setFormData(prev => ({ ...prev, icon: e.target.value }))}
                       placeholder="Or type emoji"
                       className="flex-1 px-3 py-2 bg-theme-primary border border-theme rounded-lg text-theme-primary placeholder-theme-secondary focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]"
+                      data-testid="category-icon-input"
                     />
                   </div>
                   <div className="grid grid-cols-12 gap-1">
-                    {commonEmojis.map(emoji => (
+                    {commonEmojis.map((emoji, idx) => (
                       <button
-                        key={emoji}
+                        key={emoji + idx}
                         onClick={() => setFormData(prev => ({ ...prev, icon: emoji }))}
                         className={`p-2 rounded hover:bg-theme-primary transition-colors ${
                           formData.icon === emoji ? 'bg-[var(--accent-color)] text-white' : ''
                         }`}
+                        data-testid={`category-emoji-${idx}`}
                       >
                         {emoji}
                       </button>
@@ -158,10 +195,11 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({
                       value={formData.color}
                       onChange={(e) => setFormData(prev => ({ ...prev, color: e.target.value }))}
                       className="w-8 h-8 rounded border border-theme cursor-pointer"
+                      data-testid="category-color-input"
                     />
                   </div>
                   <div className="flex gap-2">
-                    {colorOptions.map(color => (
+                    {colorOptions.map((color, idx) => (
                       <button
                         key={color}
                         onClick={() => setFormData(prev => ({ ...prev, color }))}
@@ -169,6 +207,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({
                           formData.color === color ? 'border-theme-primary' : 'border-theme'
                         }`}
                         style={{ backgroundColor: color }}
+                        data-testid={`category-color-${idx}`}
                       />
                     ))}
                   </div>
@@ -180,6 +219,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({
                     onClick={handleSubmit}
                     disabled={!formData.name.trim()}
                     className="flex items-center gap-2 px-4 py-2 bg-[var(--accent-color)] text-white rounded-lg hover:bg-opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    data-testid="category-submit"
                   >
                     <Check className="w-4 h-4" />
                     {editingId ? 'Update' : 'Add'} Category
@@ -187,6 +227,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({
                   <button
                     onClick={resetForm}
                     className="px-4 py-2 border border-theme rounded-lg text-theme-secondary hover:bg-theme-secondary transition-colors"
+                    data-testid="category-cancel"
                   >
                     Cancel
                   </button>
@@ -200,20 +241,28 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold text-theme-primary">Your Categories</h3>
               {!isAdding && !editingId && (
+                maxCategories !== undefined && customCategories.length >= maxCategories ? (
+                  <div className="flex flex-col items-end gap-1">
+                    <span className="text-sm text-amber-600 font-medium">Free plan: 1 category limit</span>
+                    <span className="text-sm text-theme-secondary opacity-60">Upgrade for unlimited categories</span>
+                  </div>
+                ) : (
                 <button
                   onClick={() => setIsAdding(true)}
                   className="flex items-center gap-2 px-4 py-2 bg-[var(--accent-color)] text-white rounded-lg hover:bg-opacity-90 transition-colors"
+                  data-testid="category-add-button"
                 >
                   <Plus className="w-4 h-4" />
                   Add Category
                 </button>
+                )
               )}
             </div>
 
             {customCategories.length === 0 ? (
               <div className="text-center py-8 text-theme-secondary">
                 <p>No custom categories yet.</p>
-                <p className="text-sm mt-1">Create your first category to get started!</p>
+                <p className="text-sm mt-1">Create a category to keep pantry items organized and easier to scan.</p>
               </div>
             ) : (
               <div className="grid gap-3">
@@ -250,14 +299,22 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({
                         className="p-2 text-theme-secondary hover:text-theme-primary hover:bg-theme-primary rounded-lg transition-colors"
                         title="Edit category"
                         aria-label={`Edit category: ${category.name}`}
+                        data-testid={`category-edit-${category.id}`}
                       >
                         <Edit2 className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => onDeleteCategory(category.id)}
+                        onClick={() => {
+                          onDeleteCategory(category.id);
+                          AnalyticsService.trackEvent('category_deleted', {
+                            categoryId: category.id,
+                            name: category.name
+                          });
+                        }}
                         className="p-2 text-theme-secondary hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                         title="Delete category"
                         aria-label={`Delete category: ${category.name}`}
+                        data-testid={`category-delete-${category.id}`}
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>

@@ -10,6 +10,8 @@ interface VisualQuantitySelectorProps {
   maxValue?: number;
   showTypicalAmounts?: boolean;
   showVisualLevels?: boolean;
+  step?: number;
+  minValue?: number;
   className?: string;
 }
 
@@ -28,6 +30,8 @@ const VisualQuantitySelector: React.FC<VisualQuantitySelectorProps> = ({
   maxValue = 10,
   showTypicalAmounts = true,
   showVisualLevels = true,
+  step = 0.25,
+  minValue = 0.25,
   className = ''
 }) => {
   const [isDragging, setIsDragging] = useState(false);
@@ -192,14 +196,24 @@ const VisualQuantitySelector: React.FC<VisualQuantitySelectorProps> = ({
     onChange(newValue);
   };
 
+  const stepValue = (typeof step === 'number' && isFinite(step) && step > 0) ? step : 0.25;
+  const minVal = (typeof minValue === 'number' && isFinite(minValue) && minValue >= 0) ? minValue : 0.25;
+
+  // Ensure `value` is a safe number to avoid NaN/Infinity propagation
+  const safeValue = (typeof value === 'number' && isFinite(value)) ? value : minVal;
+
   const handleIncrement = () => {
-    const newValue = Math.min(smartMaxValue, value + 1);
-    onChange(newValue);
+    if (stepValue === 0) return onChange(safeValue);
+    const rounded = Math.round((safeValue + stepValue) / stepValue) * stepValue;
+    const newValue = Math.min(smartMaxValue, rounded || minVal);
+    onChange(Number(newValue.toFixed(3)));
   };
 
   const handleDecrement = () => {
-    const newValue = Math.max(0, value - 1);
-    onChange(newValue);
+    if (stepValue === 0) return onChange(safeValue);
+    const rounded = Math.round((safeValue - stepValue) / stepValue) * stepValue;
+    const newValue = Math.max(minVal, rounded || minVal);
+    onChange(Number(newValue.toFixed(3)));
   };
 
   const handleLevelClick = (levelValue: number) => {
@@ -251,9 +265,9 @@ const VisualQuantitySelector: React.FC<VisualQuantitySelectorProps> = ({
         <div className="relative">
           <input
             type="range"
-            min="1"
+            min={minVal}
             max={smartMaxValue}
-            step="0.25"
+            step={stepValue}
             value={value}
             onChange={handleSliderChange}
             onMouseDown={() => setIsDragging(true)}

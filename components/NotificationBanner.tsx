@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Bell, X, Clock, Settings } from 'lucide-react';
-import { NotificationService, NotificationItem, NotificationSettings } from '../services/notificationService';
-import { User } from '../types';
+import { NotificationItem } from '../services/notificationService';
 
 interface NotificationBannerProps {
   notification: NotificationItem;

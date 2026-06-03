@@ -1,6 +1,7 @@
 import Fuse from 'fuse.js';
 import { PantryItem, StructuredRecipe, SavedRecipe } from '../types';
 import { log } from '../services/logService';
+import remoteConfig from '../services/remoteConfigService';
 
 // Ingredient matching result interface
 export interface IngredientMatch {
@@ -8,7 +9,7 @@ export interface IngredientMatch {
   available: boolean;
   pantryItem?: PantryItem;
   requiredQuantity?: number;
-  availableQuantity?: number;
+  availableQuantity?: number | { amount: number; unit?: string } | undefined;
 }
 
 export interface RecipeIngredientMatch {
@@ -22,11 +23,11 @@ export interface RecipeIngredientMatch {
 }
 
 // Fuzzy search configuration for pantry items
-const pantryItemSearchOptions: Fuse.IFuseOptions<PantryItem> = {
+const pantryItemSearchOptions = {
   keys: [
     { name: 'item', weight: 0.7 },
     { name: 'category', weight: 0.2 },
-    { name: 'location', weight: 0.1 }
+    { name: 'storageLocation', weight: 0.1 }
   ],
   threshold: 0.4, // Lower threshold = more strict matching
   includeScore: true,
@@ -35,7 +36,7 @@ const pantryItemSearchOptions: Fuse.IFuseOptions<PantryItem> = {
 };
 
 // Fuzzy search configuration for recipes
-const recipeSearchOptions: Fuse.IFuseOptions<StructuredRecipe | SavedRecipe> = {
+const recipeSearchOptions = {
   keys: [
     { name: 'title', weight: 0.6 },
     { name: 'ingredients', weight: 0.3 },
@@ -220,25 +221,32 @@ export const filterPantryItems = (items: PantryItem[], filter: PantryFilter): Pa
 
   // Filter by locations
   if (filter.locations.length > 0) {
-    filtered = filtered.filter(item => filter.locations.includes(item.location));
+    filtered = filtered.filter(item => filter.locations.includes(item.storageLocation || 'unknown'));
   }
 
   // Filter by expiration status
   if (filter.expirationStatus !== 'all') {
     const now = new Date();
-    const soon = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // 7 days from now
+    const soon = new Date(now.getTime() + remoteConfig.getNumber('expiry_info_days') * 24 * 60 * 60 * 1000);
+    const soonFrozen = new Date(now.getTime() + remoteConfig.getNumber('expiry_frozen_alert_days') * 24 * 60 * 60 * 1000);
 
     filtered = filtered.filter(item => {
-      if (!item.expirationDate) return filter.expirationStatus === 'fresh';
+      const isFrozen = item.is_frozen || item.storageLocation === 'freezer';
+      const effectiveExpiry = isFrozen
+        ? (item.freezerExpiry || item.expirationDate)
+        : item.expirationDate;
+      const threshold = isFrozen ? soonFrozen : soon;
 
-      const expDate = new Date(item.expirationDate);
+      if (!effectiveExpiry) return filter.expirationStatus === 'fresh';
+
+      const expDate = new Date(effectiveExpiry);
       switch (filter.expirationStatus) {
         case 'expired':
           return expDate < now;
         case 'expiring-soon':
-          return expDate >= now && expDate <= soon;
+          return expDate >= now && expDate <= threshold;
         case 'fresh':
-          return expDate > soon;
+          return expDate > threshold;
         default:
           return true;
       }
@@ -248,7 +256,7 @@ export const filterPantryItems = (items: PantryItem[], filter: PantryFilter): Pa
   // Filter by quantity status
   if (filter.quantityStatus !== 'all') {
     filtered = filtered.filter(item => {
-      const quantity = parseFloat(item.quantity) || 0;
+      const quantity = getQuantityValue(item);
       switch (filter.quantityStatus) {
         case 'out-of-stock':
           return quantity <= 0;
@@ -276,16 +284,16 @@ export const filterPantryItems = (items: PantryItem[], filter: PantryFilter): Pa
         bValue = b.expirationDate ? new Date(b.expirationDate).getTime() : Infinity;
         break;
       case 'quantity':
-        aValue = parseFloat(a.quantity) || 0;
-        bValue = parseFloat(b.quantity) || 0;
+        aValue = getQuantityValue(a);
+        bValue = getQuantityValue(b);
         break;
       case 'category':
         aValue = a.category.toLowerCase();
         bValue = b.category.toLowerCase();
         break;
       case 'location':
-        aValue = a.location.toLowerCase();
-        bValue = b.location.toLowerCase();
+        aValue = (a.storageLocation || '').toLowerCase();
+        bValue = (b.storageLocation || '').toLowerCase();
         break;
       default:
         return 0;
@@ -301,6 +309,15 @@ export const filterPantryItems = (items: PantryItem[], filter: PantryFilter): Pa
   return filtered;
 };
 
+// Helper to normalize quantity from PantryItem: handles numeric, structured, or legacy estimate
+function getQuantityValue(item: PantryItem): number {
+  if (typeof item.quantity === 'number') return item.quantity;
+  if (item.quantity && typeof item.quantity === 'object') return (item.quantity as any).amount || 0;
+  // Fallback to legacy estimate string
+  const est = parseFloat(item.quantity_estimate || '0');
+  return isNaN(est) ? 0 : est;
+}
+
 // Search history management
 export interface SearchHistoryItem {
   query: string;
@@ -310,7 +327,8 @@ export interface SearchHistoryItem {
 }
 
 const SEARCH_HISTORY_KEY = 'smartpantry-search-history';
-const MAX_HISTORY_ITEMS = 20;
+// Max search history entries — read from RC so it can be tuned without a release.
+const getMaxHistoryItems = () => remoteConfig.getNumber('search_history_max_items');
 
 // Save search to history
 export const saveSearchToHistory = (query: string, type: 'pantry' | 'recipe', resultCount?: number): void => {
@@ -332,11 +350,11 @@ export const saveSearchToHistory = (query: string, type: 'pantry' | 'recipe', re
     filtered.unshift(newItem);
 
     // Keep only recent items
-    const recentHistory = filtered.slice(0, MAX_HISTORY_ITEMS);
+    const recentHistory = filtered.slice(0, getMaxHistoryItems());
 
     localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(recentHistory));
   } catch (err: any) {
-    log.error('Failed to save search history', error, 'SearchUtils');
+    log.error('Failed to save search history', err, 'SearchUtils');
   }
 };
 
@@ -352,7 +370,7 @@ export const loadSearchHistory = (type?: 'pantry' | 'recipe'): SearchHistoryItem
       return history;
     }
   } catch (err: any) {
-    log.error('Failed to load search history', error, 'SearchUtils');
+    log.error('Failed to load search history', err, 'SearchUtils');
   }
   return [];
 };
@@ -374,7 +392,7 @@ export const clearSearchHistory = (type?: 'pantry' | 'recipe'): void => {
       localStorage.removeItem(SEARCH_HISTORY_KEY);
     }
   } catch (err: any) {
-    log.error('Failed to clear search history', error, 'SearchUtils');
+    log.error('Failed to clear search history', err, 'SearchUtils');
   }
 };
 
@@ -385,7 +403,7 @@ export const savePantryFilter = (filter: PantryFilter): void => {
   try {
     localStorage.setItem(PANTRY_FILTER_KEY, JSON.stringify(filter));
   } catch (err: any) {
-    log.error('Failed to save pantry filter', error, 'SearchUtils');
+    log.error('Failed to save pantry filter', err, 'SearchUtils');
   }
 };
 
@@ -398,7 +416,7 @@ export const loadPantryFilter = (): PantryFilter => {
       return { ...defaultPantryFilter, ...parsed };
     }
   } catch (err: any) {
-    log.error('Failed to load pantry filter', error, 'SearchUtils');
+    log.error('Failed to load pantry filter', err, 'SearchUtils');
   }
   return defaultPantryFilter;
 };
@@ -413,7 +431,7 @@ export const matchRecipeIngredients = (
   const missingIngredients: IngredientMatch[] = [];
 
   // Create fuzzy search instance for pantry items
-  const pantrySearchOptions: Fuse.IFuseOptions<PantryItem> = {
+  const pantrySearchOptions = {
     keys: [
       { name: 'item', weight: 0.8 },
       { name: 'category', weight: 0.2 }
@@ -423,7 +441,7 @@ export const matchRecipeIngredients = (
     minMatchCharLength: 2
   };
 
-  const fuse = new Fuse(pantryItems, pantrySearchOptions);
+  const fuse = new Fuse(pantryItems, pantrySearchOptions as any);
 
   ingredients.forEach(ingredient => {
     // Parse ingredient to get name and quantity
@@ -435,24 +453,25 @@ export const matchRecipeIngredients = (
     const bestMatch = searchResults.length > 0 ? searchResults[0] : null;
 
     // Consider it a match if score is good enough and quantities match
+    const availableQty = bestMatch ? getQuantityValue(bestMatch.item) : 0;
     const isAvailable = bestMatch &&
-                       bestMatch.score! < 0.4 && // Good match threshold
-                       (!parsed.quantity || bestMatch.item.quantity >= parsed.quantity);
+                       (bestMatch as any).score < 0.4 && // Good match threshold
+                       (!parsed.quantity || availableQty >= (parsed.quantity || 0));
 
-    if (isAvailable) {
+    if (isAvailable && bestMatch) {
       matchedIngredients.push({
         ingredient: parsed.original,
         available: true,
         pantryItem: bestMatch.item,
         requiredQuantity: parsed.quantity,
-        availableQuantity: bestMatch.item.quantity
+        availableQuantity: availableQty
       });
     } else {
       missingIngredients.push({
         ingredient: parsed.original,
         available: false,
         requiredQuantity: parsed.quantity,
-        availableQuantity: bestMatch?.item.quantity
+        availableQuantity: bestMatch ? getQuantityValue(bestMatch.item) : undefined
       });
     }
   });
@@ -521,3 +540,98 @@ export const getMealPrepSuggestions = (
     })
     .slice(0, 10); // Limit to top 10 suggestions
 };
+
+/**
+ * Generate an intelligent recipe search query based on pantry items and dietary preferences
+ */
+export function generateIntelligentRecipeQuery(
+  inventory: PantryItem[],
+  userDietaryRestrictions?: string[]
+): string {
+  // Check dietary restrictions
+  const hasMeatRestrictions = userDietaryRestrictions?.some(
+    restriction => restriction === 'vegan' || restriction === 'vegetarian'
+  ) || false;
+
+  // Define meat products to look for
+  const meatProducts = ['chicken', 'beef', 'pork', 'fish', 'turkey', 'lamb', 'sausage', 'bacon', 'salmon', 'tuna'];
+
+  let itemsToUse: string[] = [];
+
+  if (!hasMeatRestrictions) {
+    // Look for meat products first (prioritize soonest expiring meat)
+    const availableMeat = inventory
+      .filter(item =>
+        !item.is_leftover &&
+        meatProducts.some(meat => item.item.toLowerCase().includes(meat.toLowerCase()))
+      )
+      .sort((a, b) => {
+        // Sort by expiration date first, then by meat type priority
+        if (a.expirationDate && b.expirationDate) {
+          return new Date(a.expirationDate).getTime() - new Date(b.expirationDate).getTime();
+        }
+        if (a.expirationDate && !b.expirationDate) return -1;
+        if (!a.expirationDate && b.expirationDate) return 1;
+        return 0;
+      });
+
+    if (availableMeat.length > 0) {
+      // Include 1-2 meat items
+      const meatItems = availableMeat.slice(0, 2).map(item => item.item);
+      itemsToUse.push(...meatItems);
+
+      // Add complementary non-meat items (soonest expiring first)
+      const complementaryItems = inventory
+        .filter(item =>
+          item.expirationDate &&
+          !item.is_leftover &&
+          !meatProducts.some(meat => item.item.toLowerCase().includes(meat.toLowerCase())) &&
+          !itemsToUse.includes(item.item)
+        )
+        .sort((a, b) => new Date(a.expirationDate!).getTime() - new Date(b.expirationDate!).getTime())
+        .slice(0, 3)
+        .map(item => item.item);
+
+      itemsToUse.push(...complementaryItems);
+    }
+  }
+
+  // Fallback: if no meat-focused selection or has dietary restrictions, use soonest expiring items
+  if (itemsToUse.length === 0) {
+    itemsToUse = inventory
+      .filter(item => item.expirationDate && !item.is_leftover)
+      .sort((a, b) => new Date(a.expirationDate!).getTime() - new Date(b.expirationDate!).getTime())
+      .slice(0, 5)
+      .map(item => item.item);
+  }
+
+  // Final fallback: if no expiring items, use any pantry items
+  if (itemsToUse.length === 0) {
+    itemsToUse = inventory
+      .filter(item => !item.is_leftover)
+      .slice(0, 5)
+      .map(item => item.item);
+  }
+
+  if (itemsToUse.length === 0) {
+    return '';
+  }
+
+  // Create a more intelligent search query
+  let query = `recipes using ${itemsToUse.join(', ')}`;
+
+  // Add dietary context if restrictions exist
+  if (hasMeatRestrictions) {
+    const restrictions = userDietaryRestrictions || [];
+    if (restrictions.includes('vegan')) {
+      query += ' (vegan recipes only)';
+    } else if (restrictions.includes('vegetarian')) {
+      query += ' (vegetarian recipes only)';
+    }
+  } else if (itemsToUse.some(item => meatProducts.some(meat => item.toLowerCase().includes(meat.toLowerCase())))) {
+    // If we have meat, suggest meat-based recipes
+    query += ' (focus on meat-based recipes)';
+  }
+
+  return query;
+}

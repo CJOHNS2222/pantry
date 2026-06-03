@@ -1,0 +1,53 @@
+[
+  {
+    "steps": [
+      { "type": "start_activity", "intent": { "action": "android.intent.action.MAIN", "package": "com.smart.pantry" } },
+      { "type": "wait", "milliseconds": 1200 },
+
+      { "type": "enter_text", "resource_name": "com.smart.pantry:id/login_email", "text": "cjohns22@duck.com" },
+      { "type": "enter_text", "resource_name": "com.smart.pantry:id/login_password", "text": "63789632a" },
+      { "type": "click", "resource_name": "com.smart.pantry:id/login_submit" },
+      { "type": "wait", "milliseconds": 3000 },
+
+      { "type": "click", "resource_name": "com.smart.pantry:id/onboard_close" },
+      { "type": "wait", "milliseconds": 800 },
+
+      { "type": "click", "resource_name": "com.smart.pantry:id/pantry_add_button" },
+      { "type": "wait", "milliseconds": 600 },
+      { "type": "enter_text", "resource_name": "com.smart.pantry:id/quickadd_input", "text": "Test Tomato" },
+      { "type": "click", "resource_name": "com.smart.pantry:id/quickadd_submit" },
+      { "type": "wait", "milliseconds": 900 },
+
+      { "type": "click", "resource_name": "com.smart.pantry:id/item_add_to_shopping" },
+      { "type": "wait", "milliseconds": 700 },
+
+      { "type": "enter_text", "resource_name": "com.smart.pantry:id/recipefinder_search_input", "text": "chili" },
+      { "type": "click", "resource_name": "com.smart.pantry:id/recipefinder_search_button" },
+      { "type": "wait", "milliseconds": 2000 },
+      { "type": "click", "resource_name": "com.smart.pantry:id/recipefinder_import_button" },
+      { "type": "wait", "milliseconds": 1200 },
+
+      { "type": "click", "resource_name": "com.smart.pantry:id/mealplanner_search_input" },
+      { "type": "wait", "milliseconds": 900 },
+
+      { "type": "click", "resource_name": "com.smart.pantry:id/item_close" },
+      { "type": "wait", "milliseconds": 700 },
+      { "type": "click", "resource_name": "com.smart.pantry:id/item_save_expiration" },
+      { "type": "wait", "milliseconds": 800 },
+
+      { "type": "click", "resource_name": "com.smart.pantry:id/notificationsettings_toggle_notifications" },
+      { "type": "wait", "milliseconds": 500 },
+      { "type": "press_back" },
+      { "type": "wait", "milliseconds": 600 },
+
+      { "type": "enter_text", "resource_name": "com.smart.pantry:id/household_invite_input", "text": "test+robot@yourdomain.test" },
+      { "type": "click", "resource_name": "com.smart.pantry:id/household_invite_submit" },
+      { "type": "wait", "milliseconds": 700 },
+
+      { "type": "click", "resource_name": "com.smart.pantry:id/login_toggle_signup" },
+      { "type": "wait", "milliseconds": 400 },
+      { "type": "click", "resource_name": "com.smart.pantry:id/login_submit" },
+      { "type": "wait", "milliseconds": 1500 }
+    ]
+  }
+]

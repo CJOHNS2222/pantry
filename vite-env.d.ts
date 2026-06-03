@@ -10,13 +10,15 @@ interface ImportMetaEnv {
   readonly VITE_MEASUREMENT_ID: string
   readonly VITE_GEMINI_API_KEY: string
   readonly VITE_SPOONACULAR_API_KEY: string
-  readonly VITE_STRIPE_PUBLISHABLE_KEY: string
-  readonly VITE_PAYPAL_CLIENT_ID: string
+  readonly VITE_ADMOB_USE_TEST?: string
+    // Stripe and PayPal variables removed for Google Play Billing migration
 }
 
 interface ImportMeta {
   readonly env: ImportMetaEnv
 }
+
+declare const __APP_VERSION__: string;
 
 declare global {
   interface Window {

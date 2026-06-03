@@ -59,6 +59,24 @@
           "order": "ASCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "cache",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "is_leftover",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "leftoverMeta.createdAt",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "__name__",
+          "order": "DESCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": []

@@ -4,6 +4,7 @@ import { db } from '../firebaseConfig';
 import { Member, PantryItem, Household } from '../types';
 import { checkInventoryAgainstHouseholdAllergies } from '../utils/preferenceUtils';
 import { NotificationService } from './notificationService';
+import { log } from './logService';
 
 /**
  * Service for checking household member preferences against inventory and recipes
@@ -19,7 +20,7 @@ export class HouseholdPreferenceService {
       const householdSnap = await DatabaseMonitoringService.getDoc(householdRef);
 
       if (!householdSnap.exists()) {
-        console.warn(`Household ${householdId} not found`);
+        log.warn(`Household ${householdId} not found`, {}, 'HouseholdPreferenceService');
         return;
       }
 
@@ -30,9 +31,9 @@ export class HouseholdPreferenceService {
       }
 
       // Check if any household member has allergies - if not, skip expensive inventory read
-      const hasAnyAllergies = household.members.some(member => member.allergies?.length > 0);
+      const hasAnyAllergies = household.members.some(member => (member.allergies?.length || 0) > 0);
       if (!hasAnyAllergies) {
-        console.log('No household members have allergies set, skipping inventory allergy check');
+        log.debug('No household members have allergies set, skipping inventory allergy check', {}, 'HouseholdPreferenceService');
         return;
       }
 
@@ -60,11 +61,11 @@ export class HouseholdPreferenceService {
             item.id
           );
 
-          console.log(`Created allergy alert for ${member.name} regarding ${item.item}`);
+          log.debug(`Created allergy alert for ${member.name} regarding ${item.item}`, {}, 'HouseholdPreferenceService');
         }
       }
     } catch (err: any) {
-      console.error('Error checking household inventory for allergies:', error);
+      log.error('Error checking household inventory for allergies:', { err }, 'HouseholdPreferenceService');
     }
   }
 
@@ -83,7 +84,7 @@ export class HouseholdPreferenceService {
       const household = householdSnap.data() as Household;
       return household.members || [];
     } catch (err: any) {
-      console.error('Error getting household members:', error);
+      log.error('Error getting household members:', { err }, 'HouseholdPreferenceService');
       return [];
     }
   }

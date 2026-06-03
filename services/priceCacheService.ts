@@ -22,6 +22,9 @@ class PriceCacheService {
   // This is the in-memory cache that we use to store price data.
   private cache: PriceCache = {};
 
+  // Timeout for debouncing saves
+  private saveTimeout: NodeJS.Timeout | null = null;
+
   // This function loads the price data from the cache.
   async loadPriceData() {
     const cachedData = await PriceDataCacheService.loadPriceData();
@@ -73,10 +76,15 @@ class PriceCacheService {
 
   // This function persists the in-memory cache to Firestore.
   private persistToFirestore() {
-    // We use a timeout to debounce the writes to Firestore.
-    setTimeout(() => {
+    // Clear any existing timeout
+    if (this.saveTimeout) {
+      clearTimeout(this.saveTimeout);
+    }
+    // Set a new timeout to debounce the writes to Firestore.
+    this.saveTimeout = setTimeout(() => {
       try {
         PriceDataCacheService.savePriceData();
+        this.saveTimeout = null;
       } catch (error: any) {
         console.error('Failed to persist price data to Firestore:', error);
       }

@@ -37,18 +37,19 @@ const PerformanceMonitoringDashboard: React.FC = () => {
     fcp: null,
     ttfb: null
   });
-  const [componentMetrics, setComponentMetrics] = useState<Map<string, ComponentRenderMetrics>>(new Map());
+  const [_componentMetrics, _setComponentMetrics] = useState<Map<string, ComponentRenderMetrics>>(new Map());
   const [networkRequests, setNetworkRequests] = useState<NetworkRequest[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [dbMetrics, setDbMetrics] = useState<any>(null);
 
   // Track component renders
-  const renderTracker = useRef<Map<string, { count: number; times: number[]; startTime: number }>>(new Map());
+  const _renderTracker = useRef<Map<string, { count: number; times: number[]; startTime: number }>>(new Map());
 
   useEffect(() => {
     if (!isVisible) return;
 
     // Track Core Web Vitals
-    const trackWebVitals = () => {
+    const trackWebVitals = (): (() => void) | undefined => {
       // Largest Contentful Paint
       if ('PerformanceObserver' in window) {
         try {
@@ -62,6 +63,7 @@ const PerformanceMonitoringDashboard: React.FC = () => {
           // First Input Delay
           const fidObserver = new PerformanceObserver((list) => {
             const entries = list.getEntries();
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             entries.forEach((entry: any) => {
               setCoreWebVitals(prev => ({ ...prev, fid: entry.processingStart - entry.startTime }));
             });
@@ -72,6 +74,7 @@ const PerformanceMonitoringDashboard: React.FC = () => {
           const clsObserver = new PerformanceObserver((list) => {
             let clsValue = 0;
             const entries = list.getEntries();
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             entries.forEach((entry: any) => {
               if (!entry.hadRecentInput) {
                 clsValue += entry.value;
@@ -92,6 +95,7 @@ const PerformanceMonitoringDashboard: React.FC = () => {
           // Time to First Byte
           const navigationObserver = new PerformanceObserver((list) => {
             const entries = list.getEntries();
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             entries.forEach((entry: any) => {
               setCoreWebVitals(prev => ({ ...prev, ttfb: entry.responseStart - entry.requestStart }));
             });
@@ -107,16 +111,19 @@ const PerformanceMonitoringDashboard: React.FC = () => {
           };
         } catch (error) {
           log.warn('Performance Observer not fully supported', { error }, 'PerformanceMonitoringDashboard');
+          return undefined;
         }
       }
+      return undefined;
     };
 
     // Track Network Requests
-    const trackNetworkRequests = () => {
+    const trackNetworkRequests = (): (() => void) | undefined => {
       if ('PerformanceObserver' in window) {
         try {
           const networkObserver = new PerformanceObserver((list) => {
             const entries = list.getEntries();
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const newRequests: NetworkRequest[] = entries.map((entry: any) => ({
               url: entry.name,
               method: 'GET', // Default, could be enhanced
@@ -133,8 +140,10 @@ const PerformanceMonitoringDashboard: React.FC = () => {
           return () => networkObserver.disconnect();
         } catch (error) {
           log.warn('Network tracking not supported', { error }, 'PerformanceMonitoringDashboard');
+          return undefined;
         }
       }
+      return undefined;
     };
 
     // Update database metrics
@@ -208,7 +217,7 @@ const PerformanceMonitoringDashboard: React.FC = () => {
         ].map(tab => (
           <button
             key={tab.id}
-            onClick={() => setActiveTab(tab.id as any)}
+            onClick={() => setActiveTab(tab.id as 'overview' | 'webVitals' | 'components' | 'network')}
             className={`flex-1 py-2 px-3 text-sm font-medium ${
               activeTab === tab.id
                 ? 'text-purple-600 border-b-2 border-purple-600'
@@ -229,7 +238,7 @@ const PerformanceMonitoringDashboard: React.FC = () => {
                 <div className="text-2xl font-bold text-blue-800">
                   {dbMetrics?.reads || 0}
                 </div>
-                <div className="text-xs text-blue-600">
+                <div className="text-sm text-blue-600">
                   {dbMetrics ? Math.round((dbMetrics.reads / dbMetrics.sessionDuration) * 60000) : 0}/min
                 </div>
               </div>
@@ -239,7 +248,7 @@ const PerformanceMonitoringDashboard: React.FC = () => {
                 <div className={`text-2xl font-bold ${getVitalsColor(coreWebVitals.lcp, { good: 2500, poor: 4000 })}`}>
                   {coreWebVitals.lcp ? formatTime(coreWebVitals.lcp) : 'N/A'}
                 </div>
-                <div className="text-xs text-green-600">Largest Contentful Paint</div>
+                <div className="text-sm text-green-600">Largest Contentful Paint</div>
               </div>
 
               <div className="bg-yellow-50 p-3 rounded-lg">
@@ -247,7 +256,7 @@ const PerformanceMonitoringDashboard: React.FC = () => {
                 <div className={`text-2xl font-bold ${getVitalsColor(coreWebVitals.fid, { good: 100, poor: 300 })}`}>
                   {coreWebVitals.fid ? formatTime(coreWebVitals.fid) : 'N/A'}
                 </div>
-                <div className="text-xs text-yellow-600">First Input Delay</div>
+                <div className="text-sm text-yellow-600">First Input Delay</div>
               </div>
 
               <div className="bg-red-50 p-3 rounded-lg">
@@ -255,7 +264,7 @@ const PerformanceMonitoringDashboard: React.FC = () => {
                 <div className={`text-2xl font-bold ${getVitalsColor(coreWebVitals.cls, { good: 0.1, poor: 0.25 })}`}>
                   {coreWebVitals.cls ? coreWebVitals.cls.toFixed(3) : 'N/A'}
                 </div>
-                <div className="text-xs text-red-600">Layout Shift</div>
+                <div className="text-sm text-red-600">Layout Shift</div>
               </div>
             </div>
 
@@ -280,7 +289,7 @@ const PerformanceMonitoringDashboard: React.FC = () => {
                      coreWebVitals.lcp && coreWebVitals.lcp <= 4000 ? 'Needs improvement' : 'Poor'}
                   </span>
                 </div>
-                <div className="text-xs text-gray-500 mt-1">Should be &lt; 2.5s</div>
+                <div className="text-sm text-gray-500 mt-1">Should be &lt; 2.5s</div>
               </div>
 
               <div className="bg-white border border-gray-200 rounded-lg p-4">
@@ -294,7 +303,7 @@ const PerformanceMonitoringDashboard: React.FC = () => {
                      coreWebVitals.fid && coreWebVitals.fid <= 300 ? 'Needs improvement' : 'Poor'}
                   </span>
                 </div>
-                <div className="text-xs text-gray-500 mt-1">Should be &lt; 100ms</div>
+                <div className="text-sm text-gray-500 mt-1">Should be &lt; 100ms</div>
               </div>
 
               <div className="bg-white border border-gray-200 rounded-lg p-4">
@@ -308,7 +317,7 @@ const PerformanceMonitoringDashboard: React.FC = () => {
                      coreWebVitals.cls && coreWebVitals.cls <= 0.25 ? 'Needs improvement' : 'Poor'}
                   </span>
                 </div>
-                <div className="text-xs text-gray-500 mt-1">Should be &lt; 0.1</div>
+                <div className="text-sm text-gray-500 mt-1">Should be &lt; 0.1</div>
               </div>
 
               <div className="bg-white border border-gray-200 rounded-lg p-4">
@@ -322,7 +331,7 @@ const PerformanceMonitoringDashboard: React.FC = () => {
                      coreWebVitals.fcp && coreWebVitals.fcp <= 3000 ? 'Needs improvement' : 'Poor'}
                   </span>
                 </div>
-                <div className="text-xs text-gray-500 mt-1">Should be &lt; 1.8s</div>
+                <div className="text-sm text-gray-500 mt-1">Should be &lt; 1.8s</div>
               </div>
 
               <div className="bg-white border border-gray-200 rounded-lg p-4">
@@ -336,7 +345,7 @@ const PerformanceMonitoringDashboard: React.FC = () => {
                      coreWebVitals.ttfb && coreWebVitals.ttfb <= 1800 ? 'Needs improvement' : 'Poor'}
                   </span>
                 </div>
-                <div className="text-xs text-gray-500 mt-1">Should be &lt; 800ms</div>
+                <div className="text-sm text-gray-500 mt-1">Should be &lt; 800ms</div>
               </div>
             </div>
           </div>
@@ -351,7 +360,7 @@ const PerformanceMonitoringDashboard: React.FC = () => {
 
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
               <div className="text-yellow-800 font-medium text-sm">Note</div>
-              <div className="text-yellow-700 text-xs mt-1">
+              <div className="text-yellow-700 text-sm mt-1">
                 Detailed component metrics require React DevTools or additional instrumentation.
                 This dashboard provides a foundation for performance monitoring.
               </div>
@@ -373,7 +382,7 @@ const PerformanceMonitoringDashboard: React.FC = () => {
 
             <div className="space-y-2 max-h-64 overflow-y-auto">
               {networkRequests.slice(-10).reverse().map((request, index) => (
-                <div key={index} className="bg-gray-50 border border-gray-200 rounded p-2 text-xs">
+                <div key={index} className="bg-gray-50 border border-gray-200 rounded p-2 text-sm">
                   <div className="flex justify-between items-start">
                     <div className="flex-1 min-w-0">
                       <div className="font-medium text-gray-800 truncate">
@@ -392,12 +401,12 @@ const PerformanceMonitoringDashboard: React.FC = () => {
 
               {networkRequests.length === 0 && (
                 <div className="text-center text-gray-500 py-4">
-                  No network requests recorded yet
+                  No network requests recorded yet. Open a screen or trigger an action to capture them here.
                 </div>
               )}
             </div>
 
-            <div className="text-xs text-gray-500 border-t border-gray-200 pt-2">
+            <div className="text-sm text-gray-500 border-t border-gray-200 pt-2">
               Network waterfall shows the last 10 requests. Full monitoring available in browser DevTools.
             </div>
           </div>
@@ -409,11 +418,11 @@ const PerformanceMonitoringDashboard: React.FC = () => {
           onClick={() => {
             DatabaseMonitoringService.logCurrentMetrics();
             log.info('Core Web Vitals', { coreWebVitals }, 'PerformanceMonitoringDashboard');
-            console.log('Network Requests:', networkRequests);
+            log.debug('Network Requests', { networkRequests }, 'PerformanceMonitoringDashboard');
           }}
-          className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1 rounded text-xs"
+          className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1 rounded text-sm"
         >
-          Log to Console
+          Log Metrics
         </button>
         <button
           onClick={() => {
@@ -421,7 +430,7 @@ const PerformanceMonitoringDashboard: React.FC = () => {
             setNetworkRequests([]);
             DatabaseMonitoringService.resetMetrics();
           }}
-          className="flex-1 bg-red-100 hover:bg-red-200 text-red-700 px-3 py-1 rounded text-xs"
+          className="flex-1 bg-red-100 hover:bg-red-200 text-red-700 px-3 py-1 rounded text-sm"
         >
           Reset All
         </button>

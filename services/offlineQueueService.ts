@@ -1,6 +1,7 @@
 import { db } from '../firebaseConfig';
 import DatabaseMonitoringService from './databaseMonitoringService';
 import { serverTimestamp } from 'firebase/firestore';
+import { log } from './logService';
 
 // IndexedDB setup
 const DB_NAME = 'SmartPantryQueue';
@@ -77,7 +78,7 @@ class OfflineQueueService {
 
     const queuedOp: QueuedOperation = {
       ...operation,
-      id: `${operation.type}_${operation.collection}_${operation.docId || Date.now()}_${Date.now()}`,
+      id: `${operation.type}_${operation.collection}_${crypto.randomUUID()}`,
       timestamp: Date.now(),
       retryCount: 0
     };
@@ -152,15 +153,15 @@ class OfflineQueueService {
     try {
       for (const op of operations) {
         try {
-          await this.executeOperationWithConflictResolution(op);
-          await this.remove(op.id);
-          progress.completed++;
-        } catch (err: any) {
-          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            await this.executeOperationWithConflictResolution(op);
+            await this.remove(op.id);
+            progress.completed++;
+        } catch (err: unknown) {
+            const errorMessage = err instanceof Error ? err.message : 'Unknown error';
 
-          if (this.isConflictError(error)) {
+            if (this.isConflictError(err)) {
             // Handle conflict resolution
-            await this.handleConflict(op, error);
+            await this.handleConflict(op, err);
             progress.conflicts++;
           } else {
             // Handle retry logic
@@ -185,7 +186,7 @@ class OfflineQueueService {
     const { type, collection: coll, docId, data } = op;
 
     if (type === 'add') {
-      await addDoc(collection(db, coll), data);
+      await DatabaseMonitoringService.addDoc(DatabaseMonitoringService.collection(coll), data);
     } else if (type === 'update' && docId) {
       // Check for conflicts before updating
       const docRef = DatabaseMonitoringService.doc(coll, docId);
@@ -201,9 +202,9 @@ class OfflineQueueService {
         }
       }
 
-      await updateDoc(docRef, { ...data, updatedAt: serverTimestamp() });
+      await DatabaseMonitoringService.updateDoc(docRef, { ...data, updatedAt: serverTimestamp() });
     } else if (type === 'delete' && docId) {
-      await deleteDoc(doc(db, coll, docId));
+      await DatabaseMonitoringService.deleteDoc(DatabaseMonitoringService.doc(coll, docId));
     }
   }
 
@@ -242,7 +243,7 @@ class OfflineQueueService {
 
     if (retryCount >= maxRetries) {
       // Move to failed operations or notify user
-      console.error(`Operation failed after ${maxRetries} retries:`, op, errorMessage);
+      log.error(`Operation failed after ${maxRetries} retries`, { op, errorMessage }, 'offlineQueueService');
       return;
     }
 

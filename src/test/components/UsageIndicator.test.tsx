@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, cleanup } from '@testing-library/react';
+import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 import { UsageIndicator } from '../../../components/UsageIndicator';
 import { User } from '../../../types';
 
@@ -31,8 +31,9 @@ describe('UsageIndicator', () => {
 
   const mockUsageLimits = {
     recipes: { used: 5, max: 10 },
-    searches: { used: 15, weekly: 20 },
+    searches: { used: 15, weekly: 20, resetDate: new Date() },
     mealPlanning: { weeklyUsed: 3, weeklyRecipes: 5 },
+    gemini: { used: 0, max: 0 },
   };
 
   it('renders nothing when loading', () => {
@@ -104,7 +105,11 @@ describe('UsageIndicator', () => {
 
     await new Promise(resolve => setTimeout(resolve, 0));
 
-    expect(screen.getByText('Usage Overview')).toBeInTheDocument();
+    // Header is always visible (collapsed by default)
+    expect(screen.getByText('Free Plan')).toBeInTheDocument();
+
+    // Expand the panel to verify detail content
+    fireEvent.click(screen.getByText('Free Plan'));
     expect(screen.getByText('Saved Recipes')).toBeInTheDocument();
     expect(screen.getByText('Weekly Searches')).toBeInTheDocument();
     expect(screen.getByText('Weekly Meal Plans')).toBeInTheDocument();
@@ -119,8 +124,9 @@ describe('UsageIndicator', () => {
 
     const highUsageLimits = {
       recipes: { used: 9, max: 10 }, // 90% - critical
-      searches: { used: 15, weekly: 20 },
+      searches: { used: 15, weekly: 20, resetDate: new Date() },
       mealPlanning: { weeklyUsed: 3, weeklyRecipes: 5 },
+      gemini: { used: 0, max: 0 },
     };
 
     const { UsageService } = await import('../../../services/usageService');
@@ -144,8 +150,9 @@ describe('UsageIndicator', () => {
 
     const unlimitedUsageLimits = {
       recipes: { used: 5, max: -1 }, // Unlimited
-      searches: { used: 15, weekly: 20 },
+      searches: { used: 15, weekly: 20, resetDate: new Date() },
       mealPlanning: { weeklyUsed: 3, weeklyRecipes: 5 },
+      gemini: { used: 0, max: 0 },
     };
 
     const { UsageService } = await import('../../../services/usageService');
@@ -190,7 +197,7 @@ describe('UsageIndicator', () => {
 
     await new Promise(resolve => setTimeout(resolve, 0));
 
-    expect(screen.getByText('Upgrade to Premium')).toBeInTheDocument();
+    expect(screen.getByText('Upgrade')).toBeInTheDocument();
   });
 
   it('hides upgrade CTA when showUpgradeCTA is false', async () => {
@@ -207,7 +214,7 @@ describe('UsageIndicator', () => {
 
     await new Promise(resolve => setTimeout(resolve, 0));
 
-    expect(screen.queryByText('Upgrade to Premium')).not.toBeInTheDocument();
+    expect(screen.queryByText('Upgrade')).not.toBeInTheDocument();
   });
 
   it('calls onUpgrade when upgrade button is clicked', async () => {
@@ -225,7 +232,7 @@ describe('UsageIndicator', () => {
 
     await new Promise(resolve => setTimeout(resolve, 0));
 
-    const upgradeButton = screen.getByText('Upgrade to Premium');
+    const upgradeButton = screen.getByText('Upgrade');
     upgradeButton.click();
 
     expect(onUpgrade).toHaveBeenCalled();

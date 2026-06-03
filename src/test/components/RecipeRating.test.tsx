@@ -4,6 +4,21 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { RecipeRatingUI } from '../../../components/RecipeRating';
 import { StructuredRecipe } from '../types';
 
+// Mock RecipeRatingService to avoid real Firestore writes in unit tests
+vi.mock('../../../services/recipeRatingService', () => ({
+  RecipeRatingService: {
+    submitRating: vi.fn().mockResolvedValue(undefined),
+    getUserRating: vi.fn().mockResolvedValue(null),
+    getCommunityStats: vi.fn().mockResolvedValue(null),
+    addModification: vi.fn().mockResolvedValue(undefined),
+  }
+}));
+
+// Mock recipeService upsert to avoid firebase serverTimestamp dependency
+vi.mock('../../../services/recipeService', () => ({
+  upsertCommunityRatedRecipeByTitle: vi.fn()
+}));
+
 // Mock cleanup to prevent DOM accumulation
 afterEach(() => {
   document.body.innerHTML = '';
@@ -52,16 +67,11 @@ describe('RecipeRatingUI', () => {
   it('allows selecting star rating', () => {
     render(<RecipeRatingUI {...defaultProps} />);
 
-    // Get star buttons (they contain SVG icons)
-    const starButtons = screen.getAllByRole('button').filter(button =>
-      button.querySelector('svg') !== null
-    );
-    expect(starButtons).toHaveLength(5);
+    // Select the 'I'd make again' verdict
+    const makeAgainBtn = screen.getByRole('button', { name: /i'd make again/i });
+    fireEvent.click(makeAgainBtn);
 
-    // Click on 4th star
-    fireEvent.click(starButtons[3]);
-
-    // The component should be in a state where rating is set
+    // The component should still show the comment textarea
     expect(screen.getByPlaceholderText('Share your thoughts or tips...')).toBeInTheDocument();
   });
 
@@ -74,16 +84,15 @@ describe('RecipeRatingUI', () => {
     expect(commentTextarea).toHaveValue('Great recipe!');
   });
 
-  it('submits rating with comment', () => {
+  it('submits rating with comment', async () => {
     const mockOnRate = vi.fn();
-    (window as any).TEST_USER = defaultProps.user;
+    // Ensure TEST_USER is set so component picks up a logged-in user in tests
+    (window as any).TEST_USER = mockUser;
     render(<RecipeRatingUI {...defaultProps} onRatingSubmitted={mockOnRate} />);
 
-    // Select 5 stars
-    const starButtons = screen.getAllByRole('button').filter(button =>
-      button.querySelector('svg') !== null
-    );
-    fireEvent.click(starButtons[4]);
+    // Select verdict 'make-again' which maps to 5-star rating
+    const makeAgainBtn = screen.getByRole('button', { name: /i'd make again/i });
+    fireEvent.click(makeAgainBtn);
 
     // Enter comment
     const commentTextarea = screen.getByPlaceholderText('Share your thoughts or tips...');
@@ -93,39 +102,42 @@ describe('RecipeRatingUI', () => {
     const submitButton = screen.getByRole('button', { name: /submit rating/i });
     fireEvent.click(submitButton);
 
-    expect(mockOnRate).toHaveBeenCalledWith(expect.objectContaining({
-      id: expect.any(String),
-      recipeTitle: 'Test Recipe',
-      userName: 'Test User',
-      recipe: mockRecipe,
-      rating: 5,
-      comment: 'Amazing recipe!',
-      date: expect.any(String),
-      feedback: expect.any(Array),
-      modifications: expect.any(Array),
-      photos: expect.any(Array),
-      userAvatar: expect.anything(),
-      wouldMakeAgain: expect.any(Boolean),
-    }));
+    await waitFor(() => {
+      expect(mockOnRate).toHaveBeenCalledWith(expect.objectContaining({
+        id: expect.any(String),
+        recipeTitle: 'Test Recipe',
+        userName: 'Test User',
+        recipe: mockRecipe,
+        rating: 5,
+        comment: 'Amazing recipe!',
+        date: expect.any(String),
+        feedback: expect.any(Array),
+        modifications: expect.any(Array),
+        photos: expect.any(Array),
+        userAvatar: expect.anything(),
+        wouldMakeAgain: expect.any(Boolean),
+      }));
+    });
     delete (window as any).TEST_USER;
   });
 
   it('shows thank you message after submission', async () => {
     const mockOnRate = vi.fn();
+    (window as any).TEST_USER = mockUser;
     render(<RecipeRatingUI {...defaultProps} onRatingSubmitted={mockOnRate} />);
 
     // Select rating and submit (use 5 stars for 'make-again' verdict)
-    const starButtons = screen.getAllByRole('button').filter(button =>
-      button.querySelector('svg') !== null
-    );
-    fireEvent.click(starButtons[4]); // 5 stars
+    const makeAgainBtn = screen.getByRole('button', { name: /i'd make again/i });
+    fireEvent.click(makeAgainBtn); // 5-star verdict
 
     const submitButton = screen.getByRole('button', { name: /submit rating/i });
     fireEvent.click(submitButton);
 
+    // Wait for thank-you message to appear
     await waitFor(() => {
-      expect(screen.getByText('Thanks for your feedback!')).toBeInTheDocument();
+      expect(screen.queryByText((content) => /thanks for your feedback/i.test(content))).toBeTruthy();
     });
+    delete (window as any).TEST_USER;
   });
 
   it('handles anonymous user', () => {
@@ -138,7 +150,7 @@ describe('RecipeRatingUI', () => {
     const starButtons = screen.getAllByRole('button').filter(button =>
       button.querySelector('svg') !== null
     );
-    fireEvent.click(starButtons[0]); // 1 star
+    fireEvent.click(starButtons[0]!); // 1 star
 
     const submitButton = screen.getByRole('button', { name: /submit rating/i });
     fireEvent.click(submitButton);

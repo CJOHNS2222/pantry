@@ -212,7 +212,7 @@ class IndexedDBCache {
         this.stats.storageUsed = this.stats.size * 1024; // Assume ~1KB per entry
       };
     } catch (err: any) {
-      log.warn('Failed to update cache stats', error, 'IndexedDBCache');
+      log.warn('Failed to update cache stats', err, 'IndexedDBCache');
     }
   }
 
@@ -250,7 +250,7 @@ class IndexedDBCache {
         log.error('Failed to cleanup cache', request.error, 'IndexedDBCache');
       };
     } catch (err: any) {
-      log.error('Cache cleanup failed', error, 'IndexedDBCache');
+      log.error('Cache cleanup failed', err, 'IndexedDBCache');
     }
   }
 
@@ -403,6 +403,11 @@ export class OfflineDataCache {
   async invalidateHouseholdData(householdId: string) {
     // This would need to be implemented with pattern matching in a real scenario
     log.info(`Invalidating cache for household: ${householdId}`, {}, 'OfflineDataCache');
+  }
+
+  // Cleanup method to clear intervals
+  destroy(): void {
+    this.cache.destroy();
   }
 }
 

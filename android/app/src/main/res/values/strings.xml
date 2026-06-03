@@ -1,7 +1,11 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Smart Pantry</string>
-    <string name="title_activity_main">Smart Pantry</string>
+    <string name="app_name">Stock &amp; Spoon</string>
+    <string name="title_activity_main">Stock &amp; Spoon</string>
     <string name="package_name">com.smart.pantry</string>
     <string name="custom_url_scheme">com.smart.pantry</string>
+    <!-- AdMob App ID: production value provided by owner -->
+    <string name="admob_app_id">ca-app-pub-5084706792909644~8942926412</string>
+    <!-- Google Sign-In: web client ID from google-services.json -->
+    <string name="server_client_id">13848266518-0co4dav6sn9epov13vt0covii2nmg1ne.apps.googleusercontent.com</string>
 </resources>

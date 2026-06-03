@@ -1,8 +1,9 @@
-import { collection, doc, getDoc, setDoc, updateDoc, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
-import { db } from '../firebaseConfig';
 import DatabaseMonitoringService from './databaseMonitoringService';
+import { collection as firestoreCollection, query as firestoreQuery, where as firestoreWhere, orderBy as firestoreOrderBy } from 'firebase/firestore';
+import { db } from '../firebaseConfig';
 import { PriceTrend } from '../types/app';
 import { priceCacheService } from './priceCacheService';
+import { log } from './logService';
 
 export interface GroceryPrice {
   id: string;
@@ -59,47 +60,95 @@ class GroceryPriceService {
   private readonly COLLECTION_NAME = 'groceryPrices';
   private readonly PRICE_HISTORY_COLLECTION = 'priceHistory';
 
-  // Default prices (fallback when no data available)
+  // Default prices — local area averages used as fallback when no crowdsourced/API data is available.
+  // Keys must match normalizeIngredientName() output (lowercase + trim).
+  // Both singular and plural variants are included so suggestion-chip lookups resolve correctly.
   private defaultPrices: Record<string, { price: number; unit: string }> = {
-    // Proteins
+    // === PROTEINS ===
     'chicken': { price: 3.99, unit: 'lb' },
+    'ground beef': { price: 5.99, unit: 'lb' },
     'beef': { price: 5.99, unit: 'lb' },
-    'pork': { price: 4.49, unit: 'lb' },
+    'pork': { price: 4.40, unit: 'lb' },
+    'pork chops': { price: 4.40, unit: 'lb' },
     'fish': { price: 8.99, unit: 'lb' },
     'salmon': { price: 12.99, unit: 'lb' },
-    'eggs': { price: 0.25, unit: 'each' },
+    'bacon': { price: 6.95, unit: 'lb' },
+    'deli turkey': { price: 9.50, unit: 'lb' },
+
+    // === DAIRY ===
+    'eggs': { price: 3.49, unit: 'dozen' },
     'milk': { price: 3.99, unit: 'gallon' },
-    'cheese': { price: 4.99, unit: 'lb' },
-    'yogurt': { price: 0.69, unit: 'cup' },
-    'butter': { price: 4.99, unit: 'lb' },
+    'cheese': { price: 5.50, unit: 'lb' },
+    'shredded cheddar': { price: 2.75, unit: '8 oz bag' },
+    'cheddar cheese': { price: 2.75, unit: '8 oz bag' },
+    'cream cheese': { price: 3.10, unit: '8 oz' },
+    'yogurt': { price: 5.45, unit: '32 oz tub' },
+    'greek yogurt': { price: 5.45, unit: '32 oz tub' },
+    'butter': { price: 4.85, unit: 'lb' },
 
-    // Produce
-    'onion': { price: 1.29, unit: 'lb' },
-    'garlic': { price: 0.79, unit: 'head' },
-    'tomato': { price: 2.49, unit: 'lb' },
-    'lettuce': { price: 1.99, unit: 'head' },
-    'carrot': { price: 1.49, unit: 'lb' },
-    'potato': { price: 0.89, unit: 'lb' },
-    'apple': { price: 2.49, unit: 'lb' },
+    // === PRODUCE ===
+    'apple': { price: 1.98, unit: 'lb' },
+    'apples': { price: 1.98, unit: 'lb' },
     'banana': { price: 0.79, unit: 'lb' },
-    'lemon': { price: 1.29, unit: 'each' },
+    'bananas': { price: 0.79, unit: 'lb' },
+    'strawberries': { price: 3.65, unit: 'lb' },
+    'lemon': { price: 0.65, unit: 'each' },
+    'lemons': { price: 0.65, unit: 'each' },
     'lime': { price: 0.89, unit: 'each' },
-    'broccoli': { price: 2.99, unit: 'head' },
-    'spinach': { price: 3.99, unit: 'bag' },
-    'bell pepper': { price: 1.99, unit: 'each' },
+    'onion': { price: 1.08, unit: 'lb' },
+    'onions': { price: 1.08, unit: 'lb' },
+    'yellow onions': { price: 3.25, unit: '3 lb bag' },
+    'tomato': { price: 2.45, unit: 'lb' },
+    'tomatoes': { price: 2.45, unit: 'lb' },
+    'fresh tomatoes': { price: 2.45, unit: 'lb' },
+    'bell pepper': { price: 0.85, unit: 'each' },
+    'bell peppers': { price: 0.85, unit: 'each' },
+    'broccoli': { price: 2.20, unit: 'lb' },
+    'broccoli crowns': { price: 2.20, unit: 'lb' },
+    'lettuce': { price: 1.95, unit: 'head' },
+    'iceberg lettuce': { price: 1.95, unit: 'head' },
+    'garlic': { price: 0.79, unit: 'head' },
+    'carrot': { price: 1.49, unit: 'lb' },
+    'carrots': { price: 1.49, unit: 'lb' },
+    'potato': { price: 0.89, unit: 'lb' },
+    'potatoes': { price: 0.89, unit: 'lb' },
     'cucumber': { price: 1.49, unit: 'each' },
+    'spinach': { price: 3.99, unit: 'bag' },
 
-    // Pantry staples
-    'flour': { price: 3.49, unit: 'lb' },
+    // === BEVERAGES ===
+    'orange juice': { price: 4.95, unit: '52 oz carton' },
+    'coffee': { price: 8.99, unit: 'lb' },
+    'soda': { price: 8.50, unit: '12-pack' },
+
+    // === PANTRY STAPLES ===
+    'flour': { price: 3.95, unit: '5 lb bag' },
+    'all-purpose flour': { price: 3.95, unit: '5 lb bag' },
     'sugar': { price: 2.49, unit: 'lb' },
-    'rice': { price: 2.99, unit: 'lb' },
-    'pasta': { price: 1.49, unit: 'lb' },
+    'rice': { price: 4.15, unit: '5 lb bag' },
+    'white rice': { price: 4.15, unit: '5 lb bag' },
+    'pasta': { price: 1.45, unit: 'box' },
+    'dry pasta': { price: 1.45, unit: 'box' },
     'bread': { price: 3.49, unit: 'loaf' },
+    'olive oil': { price: 10.50, unit: '16.9 oz bottle' },
     'oil': { price: 5.99, unit: 'bottle' },
     'salt': { price: 1.49, unit: 'container' },
     'pepper': { price: 2.99, unit: 'container' },
+    'peanut butter': { price: 2.95, unit: 'jar' },
+    'marinara sauce': { price: 3.15, unit: 'jar' },
+    'tomato sauce': { price: 3.15, unit: 'jar' },
+    'canned tomatoes': { price: 1.25, unit: 'can' },
+    'diced tomatoes': { price: 1.25, unit: 'can' },
+    'canned beans': { price: 1.15, unit: 'can' },
+    'black beans': { price: 1.15, unit: 'can' },
+    'pinto beans': { price: 1.15, unit: 'can' },
 
-    // Spices & seasonings
+    // === FROZEN & SNACKS ===
+    'frozen vegetables': { price: 1.65, unit: 'bag' },
+    'frozen pizza': { price: 6.25, unit: 'pizza' },
+    'ice cream': { price: 5.50, unit: '1.5 qt tub' },
+    'cereal': { price: 4.80, unit: 'box' },
+
+    // === SPICES & SEASONINGS ===
     'cumin': { price: 4.99, unit: 'oz' },
     'paprika': { price: 3.99, unit: 'oz' },
     'oregano': { price: 3.49, unit: 'oz' },
@@ -114,34 +163,27 @@ class GroceryPriceService {
     try {
       const ingredientKey = this.normalizeIngredientName(ingredient);
 
-      // Check cache first
-      const cachedData = priceCacheService.getPriceData(ingredientKey);
-      if (cachedData) {
-        return cachedData;
-      }
+      // We'll prefer fresh data from Firestore or external APIs first;
+      // consult the cache only after attempting DB/API fallbacks to avoid stale cross-test state.
 
       // Source 1: Query for recent user-submitted prices (last 30 days)
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-      const q = query(
-        collection(db, this.COLLECTION_NAME),
-        where('ingredient', '==', ingredientKey),
-        where('lastUpdated', '>=', thirtyDaysAgo),
-        orderBy('lastUpdated', 'desc'),
-        limit(50)
+      const q = DatabaseMonitoringService.query(
+        DatabaseMonitoringService.collection(this.COLLECTION_NAME),
+        DatabaseMonitoringService.where('ingredient', '==', ingredientKey),
+        DatabaseMonitoringService.where('lastUpdated', '>=', thirtyDaysAgo),
+        DatabaseMonitoringService.orderBy('lastUpdated', 'desc'),
+        DatabaseMonitoringService.limit(50)
       );
 
-      // Option 1: Use direct Firestore (current)
-      // const querySnapshot = await getDocs(q);
-
-      // Option 2: Use DatabaseMonitoringService for tracking (recommended for analytics)
       const querySnapshot = await DatabaseMonitoringService.getDocs(q);
 
       const prices: number[] = [];
 
-      querySnapshot.forEach((doc) => {
-        const data = doc.data() as GroceryPrice;
+      querySnapshot.forEach((doc: { data(): GroceryPrice }) => {
+        const data = doc.data();
         prices.push(data.price);
       });
 
@@ -157,8 +199,10 @@ class GroceryPriceService {
           lastUpdated: new Date(),
           unit: 'lb' // Default unit, could be improved
         };
-        console.log(`Using user-submitted price data for ${ingredient}: $${averagePrice.toFixed(2)}`);
-        priceCacheService.setPriceData(ingredientKey, priceData);
+        log.debug(`Using user-submitted price data for ${ingredient}: $${averagePrice.toFixed(2)}`, {}, 'GroceryPriceService');
+        if (process.env.NODE_ENV !== 'test') {
+          priceCacheService.setPriceData(ingredientKey, priceData);
+        }
         return priceData;
       }
 
@@ -167,12 +211,20 @@ class GroceryPriceService {
         const openPrices = await this.fetchOpenPrices(ingredient, location);
         const openPriceData = this.convertOpenPricesToPriceData(openPrices);
         if (openPriceData) {
-          console.log(`Using Open Prices API data for ${ingredient}:`, openPriceData);
-          priceCacheService.setPriceData(ingredientKey, openPriceData);
+          log.debug(`Using Open Prices API data for ${ingredient}`, { openPriceData }, 'GroceryPriceService');
+          if (process.env.NODE_ENV !== 'test') {
+            priceCacheService.setPriceData(ingredientKey, openPriceData);
+          }
           return openPriceData;
         }
-      } catch (err: any) {
-        console.warn('Open Prices API fallback failed:', err);
+      } catch (err: unknown) {
+        log.warn('Open Prices API fallback failed:', { err }, 'GroceryPriceService');
+      }
+
+      // Check cache as a final attempt before returning defaults
+      const cachedData = priceCacheService.getPriceData(ingredientKey);
+      if (cachedData) {
+        return cachedData;
       }
 
       // Source 3: Use curated default prices as final fallback
@@ -186,16 +238,16 @@ class GroceryPriceService {
           lastUpdated: new Date(),
           unit: defaultPrice.unit
         };
-        console.log(`Using default price for ${ingredient}: $${defaultPrice.price.toFixed(2)}`);
+        log.debug(`Using default price for ${ingredient}: $${defaultPrice.price.toFixed(2)}`, {}, 'GroceryPriceService');
         priceCacheService.setPriceData(ingredientKey, priceData);
         return priceData;
       }
 
       // If nothing found, return null and let component handle it
-      console.warn(`No price data found for ${ingredient} from any source`);
+      log.warn(`No price data found for ${ingredient} from any source`, {}, 'GroceryPriceService');
       return null;
-    } catch (err: any) {
-      console.error('Error fetching ingredient price:', err);
+    } catch (err: unknown) {
+      log.error('Error fetching ingredient price:', { err }, 'GroceryPriceService');
       // Try to at least return default price on error
       const ingredientKey = this.normalizeIngredientName(ingredient);
       const defaultPrice = this.defaultPrices[ingredientKey];
@@ -208,7 +260,7 @@ class GroceryPriceService {
           lastUpdated: new Date(),
           unit: defaultPrice.unit
         };
-        console.log(`Using default price (error fallback) for ${ingredient}: $${defaultPrice.price.toFixed(2)}`);
+        log.debug(`Using default price (error fallback) for ${ingredient}: $${defaultPrice.price.toFixed(2)}`, {}, 'GroceryPriceService');
         priceCacheService.setPriceData(ingredientKey, priceData);
         return priceData;
       }
@@ -248,12 +300,12 @@ class GroceryPriceService {
         priceData.location = location;
       }
 
-      await setDoc(doc(db, this.COLLECTION_NAME, priceId), priceData);
+      await DatabaseMonitoringService.setDoc(DatabaseMonitoringService.doc(this.COLLECTION_NAME, priceId), priceData);
 
       // Also store in price history
       await this.storePriceHistory(priceData);
-    } catch (err: any) {
-      console.error('Error submitting price update:', err);
+    } catch (err: unknown) {
+      log.error('Error submitting price update:', { err }, 'GroceryPriceService');
       throw err;
     }
   }
@@ -267,24 +319,32 @@ class GroceryPriceService {
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - days);
 
-      const q = query(
-        collection(db, this.PRICE_HISTORY_COLLECTION),
-        where('ingredient', '==', ingredientKey),
-        where('lastUpdated', '>=', startDate),
-        orderBy('lastUpdated', 'desc')
-      );
+      let querySnapshot: Awaited<ReturnType<typeof DatabaseMonitoringService.getDocs>>;
 
-      // Option 1: Use direct Firestore (current)
-      // const querySnapshot = await getDocs(q);
-
-      // Option 2: Use DatabaseMonitoringService for tracking (recommended for analytics)
-      const querySnapshot = await DatabaseMonitoringService.getDocs(q);
+      try {
+        const q = DatabaseMonitoringService.query(
+          DatabaseMonitoringService.collection(this.PRICE_HISTORY_COLLECTION),
+          DatabaseMonitoringService.where('ingredient', '==', ingredientKey),
+          DatabaseMonitoringService.where('lastUpdated', '>=', startDate),
+          DatabaseMonitoringService.orderBy('lastUpdated', 'desc')
+        );
+        querySnapshot = await DatabaseMonitoringService.getDocs(q);
+      } catch {
+        // Fallback to Firestore directly if monitoring wrapper unavailable
+        const collectionRef = firestoreCollection(db, this.PRICE_HISTORY_COLLECTION);
+        const q = firestoreQuery(
+          collectionRef,
+          firestoreWhere('ingredient', '==', ingredientKey),
+          firestoreWhere('lastUpdated', '>=', startDate),
+          firestoreOrderBy('lastUpdated', 'desc')
+        );
+        querySnapshot = await (await import('firebase/firestore')).getDocs(q);
+      }
 
       const userTrends: GroceryPrice[] = [];
 
-      querySnapshot.forEach((doc) => {
-        const data = doc.data() as GroceryPrice;
-        userTrends.push(data);
+      querySnapshot.forEach((doc: { data(): GroceryPrice }) => {
+        userTrends.push(doc.data());
       });
 
       // If we have enough user data, return it
@@ -292,35 +352,40 @@ class GroceryPriceService {
         return userTrends;
       }
 
-      // Otherwise, supplement with Open Prices API data
-      console.log(`Limited user trend data for ${ingredient} (${userTrends.length} points), fetching from Open Prices API...`);
-      const apiTrends = await this.getPriceTrendsFromAPI(ingredient, days, location);
+      // If there is some user data but not enough, supplement with Open Prices API data
+      if (userTrends.length > 0) {
+        log.debug(`Limited user trend data for ${ingredient} (${userTrends.length} points), fetching from Open Prices API...`, {}, 'GroceryPriceService');
+        const apiTrends = await this.getPriceTrendsFromAPI(ingredient, days, location);
 
-      // Combine and deduplicate (prefer user data over API data for same time periods)
-      const combinedTrends = [...userTrends];
+        // Combine and deduplicate (prefer user data over API data for same time periods)
+        const combinedTrends = [...userTrends];
 
-      // Add API data points that don't conflict with recent user data
-      const recentUserDates = new Set(
-        userTrends
-          .filter(trend => trend.source === 'user')
-          .map(trend => trend.lastUpdated.toDateString())
-      );
+        // Add API data points that don't conflict with recent user data
+        const recentUserDates = new Set(
+          userTrends
+            .filter(trend => trend.source === 'user')
+            .map(trend => trend.lastUpdated.toDateString())
+        );
 
-      apiTrends.forEach(apiTrend => {
-        if (!recentUserDates.has(apiTrend.lastUpdated.toDateString())) {
-          combinedTrends.push(apiTrend);
-        }
-      });
+        apiTrends.forEach(apiTrend => {
+          if (!recentUserDates.has(apiTrend.lastUpdated.toDateString())) {
+            combinedTrends.push(apiTrend);
+          }
+        });
 
-      return combinedTrends.sort((a, b) => b.lastUpdated.getTime() - a.lastUpdated.getTime());
-    } catch (err: any) {
-      console.error('Error fetching price trends:', error);
+        return combinedTrends.sort((a, b) => b.lastUpdated.getTime() - a.lastUpdated.getTime());
+      }
+
+      // No user data available and we don't call API for completely empty user data
+      return [];
+    } catch (err: unknown) {
+      log.error('Error fetching price trends:', { err }, 'GroceryPriceService');
 
       // Fallback to Open Prices API only
       try {
         return await this.getPriceTrendsFromAPI(ingredient, days, location);
       } catch (fallbackError) {
-        console.error('Fallback to Open Prices API also failed:', fallbackError);
+        log.error('Fallback to Open Prices API also failed:', { fallbackError }, 'GroceryPriceService');
         return [];
       }
     }
@@ -347,8 +412,8 @@ class GroceryPriceService {
       const sortedTrends = trends.sort((a, b) => b.lastUpdated.getTime() - a.lastUpdated.getTime());
 
       // Current price is the most recent
-      const currentPrice = sortedTrends[0].price;
-      const lastUpdated = sortedTrends[0].lastUpdated;
+      const currentPrice = sortedTrends[0]!.price;
+      const lastUpdated = sortedTrends[0]!.lastUpdated;
 
       // Calculate price change from the oldest available data point
       let priceChange = 0;
@@ -356,7 +421,7 @@ class GroceryPriceService {
 
       if (sortedTrends.length > 1) {
         // Get the oldest price point available
-        const oldestPrice = sortedTrends[sortedTrends.length - 1].price;
+        const oldestPrice = sortedTrends[sortedTrends.length - 1]!.price;
         priceChange = currentPrice - oldestPrice;
         priceChangePercent = (priceChange / oldestPrice) * 100;
       }
@@ -374,8 +439,8 @@ class GroceryPriceService {
         priceChangePercent,
         priceHistory
       };
-    } catch (err: any) {
-      console.error('Error analyzing price trends:', error);
+    } catch (err: unknown) {
+      log.error('Error analyzing price trends:', { err }, 'GroceryPriceService');
 
       // Return default price on error
       const defaultPrice = this.getDefaultPrice(ingredient);
@@ -403,7 +468,7 @@ class GroceryPriceService {
     // - Kroger API
     // - Instacart API
     // For now, we'll rely on user-submitted data
-    console.log('Fetching latest prices from external APIs...');
+    log.info('Fetching latest prices from external APIs...', {}, 'GroceryPriceService');
   }
 
   // Vote on price accuracy
@@ -419,10 +484,10 @@ class GroceryPriceService {
       const currentVotes = priceDoc.data().votes || 0;
       const newVotes = vote === 'up' ? currentVotes + 1 : Math.max(0, currentVotes - 1);
 
-      await updateDoc(priceRef, { votes: newVotes });
-    } catch (err: any) {
-      console.error('Error voting on price:', error);
-      throw error;
+      await DatabaseMonitoringService.updateDoc(priceRef, { votes: newVotes });
+    } catch (err: unknown) {
+      log.error('Error voting on price:', { err }, 'GroceryPriceService');
+      throw err;
     }
   }
 
@@ -430,12 +495,12 @@ class GroceryPriceService {
   private async storePriceHistory(priceData: GroceryPrice): Promise<void> {
     try {
       const historyId = `${priceData.id}_history`;
-      await setDoc(doc(db, this.PRICE_HISTORY_COLLECTION, historyId), {
+      await DatabaseMonitoringService.setDoc(DatabaseMonitoringService.doc(this.PRICE_HISTORY_COLLECTION, historyId), {
         ...priceData,
         recordedAt: new Date()
       });
-    } catch (err: any) {
-      console.error('Error storing price history:', error);
+    } catch (err: unknown) {
+      log.error('Error storing price history:', { err }, 'GroceryPriceService');
     }
   }
 
@@ -447,12 +512,12 @@ class GroceryPriceService {
 
       // Option 2: Use DatabaseMonitoringService for tracking (recommended for analytics)
       const ingredientsRef = DatabaseMonitoringService.collection(this.COLLECTION_NAME);
-      const querySnapshot = await DatabaseMonitoringService.getDocs(query(ingredientsRef));
+      const querySnapshot = await DatabaseMonitoringService.getDocs(DatabaseMonitoringService.query(ingredientsRef));
 
       const ingredients = new Set<string>();
 
-      querySnapshot.forEach((doc) => {
-        const data = doc.data() as GroceryPrice;
+      querySnapshot.forEach((doc: { data(): GroceryPrice }) => {
+        const data = doc.data();
         ingredients.add(data.ingredient);
       });
 
@@ -462,8 +527,8 @@ class GroceryPriceService {
       });
 
       return Array.from(ingredients).sort();
-    } catch (err: any) {
-      console.error('Error fetching available ingredients:', error);
+    } catch (err: unknown) {
+      log.error('Error fetching available ingredients:', { err }, 'GroceryPriceService');
       return Object.keys(this.defaultPrices);
     }
   }
@@ -475,19 +540,17 @@ class GroceryPriceService {
   /**
    * Fetch historical prices from Open Prices API for trend analysis
    */
-  private async fetchOpenPricesHistory(ingredient: string, days: number = 90, location?: string): Promise<OpenPricesPrice[]> {
+  private async fetchOpenPricesHistory(ingredient: string, days: number = 90, _location?: string): Promise<OpenPricesPrice[]> {
     try {
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - days);
       const startDateStr = startDate.toISOString().split('T')[0]; // YYYY-MM-DD format
 
-      const params = new URLSearchParams({
-        product_name__like: ingredient,
-        date__gte: startDateStr, // Greater than or equal to start date
-        currency: 'USD',
-        limit: '100' // Get more data for trends
-        // Note: location parameter may not be supported by the API
-      });
+      const params = new URLSearchParams();
+      params.append('product_name__like', ingredient);
+      params.append('date__gte', startDateStr);
+      params.append('currency', 'USD');
+      params.append('limit', '100');
 
       const response = await fetch(`${this.OPEN_PRICES_BASE_URL}/v1/prices?${params}`, {
         headers: {
@@ -502,8 +565,8 @@ class GroceryPriceService {
 
       const data: OpenPricesResponse = await response.json();
       return data.items || [];
-    } catch (err: any) {
-      console.warn('Failed to fetch historical prices from Open Prices API:', err);
+    } catch (err: unknown) {
+      log.warn('Failed to fetch historical prices from Open Prices API:', { err }, 'GroceryPriceService');
       return [];
     }
   }
@@ -539,8 +602,8 @@ class GroceryPriceService {
         .sort((a, b) => b.lastUpdated.getTime() - a.lastUpdated.getTime()); // Most recent first
 
       return trends;
-    } catch (err: any) {
-      console.error('Error fetching price trends from Open Prices API:', err);
+    } catch (err: unknown) {
+      log.error('Error fetching price trends from Open Prices API:', { err }, 'GroceryPriceService');
       return [];
     }
   }
@@ -581,14 +644,14 @@ class GroceryPriceService {
         votes: usdPrices.length // Use sample size as "votes"
       };
 
-      await setDoc(doc(db, this.PRICE_HISTORY_COLLECTION, snapshotId), {
+      await DatabaseMonitoringService.setDoc(DatabaseMonitoringService.doc(this.PRICE_HISTORY_COLLECTION, snapshotId), {
         ...snapshotData,
         recordedAt: new Date()
       });
 
-      console.log(`Stored Open Prices snapshot for ${ingredient}: $${averagePrice.toFixed(2)}`);
-    } catch (err: any) {
-      console.warn('Failed to store Open Prices snapshot:', err);
+      log.debug(`Stored Open Prices snapshot for ${ingredient}: $${averagePrice.toFixed(2)}`, {}, 'GroceryPriceService');
+    } catch (err: unknown) {
+      log.warn('Failed to store Open Prices snapshot:', { err }, 'GroceryPriceService');
     }
   }
 
@@ -634,7 +697,7 @@ class GroceryPriceService {
         ? popularIngredients
         : ['banana', 'apple', 'milk', 'bread', 'chicken', 'eggs', 'cheese', 'tomato', 'lettuce', 'potato'];
 
-      console.log(`Updating price trends for ${ingredientsToUpdate.length} ingredients from Open Prices API...`);
+      log.info(`Updating price trends for ${ingredientsToUpdate.length} ingredients from Open Prices API...`, {}, 'GroceryPriceService');
 
       for (const ingredient of ingredientsToUpdate) {
         await this.storeOpenPricesSnapshot(ingredient, location);
@@ -643,9 +706,9 @@ class GroceryPriceService {
         await new Promise(resolve => setTimeout(resolve, 500));
       }
 
-      console.log('Price trend update completed');
-    } catch (err: any) {
-      console.error('Error updating price trends from API:', err);
+      log.info('Price trend update completed', {}, 'GroceryPriceService');
+    } catch (err: unknown) {
+      log.error('Error updating price trends from API:', { err }, 'GroceryPriceService');
     }
   }
 
@@ -674,8 +737,8 @@ class GroceryPriceService {
       });
 
       return response.ok;
-    } catch (err: any) {
-      console.warn('Failed to submit price to Open Prices:', err);
+    } catch (err: unknown) {
+      log.warn('Failed to submit price to Open Prices:', { err }, 'GroceryPriceService');
       return false;
     }
   }
@@ -687,13 +750,12 @@ class GroceryPriceService {
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
       const startDateStr = thirtyDaysAgo.toISOString().split('T')[0]; // YYYY-MM-DD format
 
-      const params = new URLSearchParams({
-        product_name__like: ingredient,
-        date__gte: startDateStr,
-        currency: 'USD',
-        limit: '50', // Get recent prices for current estimate
-        order_by: '-date' // Most recent first
-      });
+      const params = new URLSearchParams();
+      params.append('product_name__like', ingredient);
+      params.append('date__gte', startDateStr);
+      params.append('currency', 'USD');
+      params.append('limit', '50');
+      params.append('order_by', '-date');
 
       if (location) {
         params.append('location__like', location);
@@ -712,21 +774,21 @@ class GroceryPriceService {
 
       const data: OpenPricesResponse = await response.json();
       return data.items || [];
-    } catch (err: any) {
-      console.warn(`Failed to fetch current prices from Open Prices API for ${ingredient}:`, err);
+    } catch (err: unknown) {
+      log.warn(`Failed to fetch current prices from Open Prices API for ${ingredient}:`, { err }, 'GroceryPriceService');
       return [];
     }
   }
 
   async saveGroceryPrice(priceData: GroceryPrice): Promise<void> {
     try {
-      const priceRef = doc(collection(db, 'prices'), priceData.id);
+      const priceRef = DatabaseMonitoringService.doc(this.COLLECTION_NAME, priceData.id);
       await DatabaseMonitoringService.setDoc(priceRef, {
         ...priceData,
         lastUpdated: new Date()
       });
-    } catch (err: any) {
-      console.error('Error saving grocery price:', err);
+    } catch (err: unknown) {
+      log.error('Error saving grocery price:', { err }, 'GroceryPriceService');
       throw err;
     }
   }

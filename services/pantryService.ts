@@ -1,10 +1,13 @@
 // services/pantryService.ts
-import { PantryItem } from '../types';
-import { analyzePantryImage } from './geminiService';
+import { PantryItem, User } from '../types';
+import { analyzePantryImage, analyzeReceiptImage } from './geminiService';
 import { getItemImage, inferCategoryFromItemName, inferStorageLocationFromItemName, getAutoExpirationDate, parseItemText, fetchExternalItemImage, combineQuantities } from '../utils/appUtils';
+import { getQuantityAmount, getQuantityUnit } from '../utils/quantityUtils';
 import { validatePantryItem } from '../utils/validationUtils';
 import AnalyticsService from './analyticsService';
 import { canUseGemini } from './featureFlags';
+import { getFoodRiskLevel } from '../utils/foodRiskClassification';
+import { log } from './logService';
 
 export class PantryService {
   /**
@@ -13,14 +16,24 @@ export class PantryService {
   static async analyzePantryImage(
     base64Data: string,
     mimeType: string,
-    user?: { id: string; name: string; email: string; avatar?: string }
+    user?: Partial<User>
   ): Promise<PantryItem[]> {
     // Check if user has opted in to AI features
+    log.debug('PantryService.analyzePantryImage: entry', {
+      userId: user?.id ?? 'none',
+      isGuest: user?.isGuest ?? false,
+      imageSizeKB: Math.round(base64Data.length / 1024),
+      mimeType,
+      canUseGemini: canUseGemini(user?.id),
+    }, 'PantryService');
+
     if (!canUseGemini(user?.id)) {
       throw new Error('Please enable AI features in Settings to use image analysis.');
     }
 
-    const items = await analyzePantryImage(base64Data, mimeType, user);
+    const items = await analyzePantryImage(base64Data, mimeType, user as any);
+    log.debug('PantryService.analyzePantryImage: Gemini returned items', { count: items.length }, 'PantryService');
+
     if (items.length === 0) {
       throw new Error('No items detected in the image.');
     }
@@ -31,6 +44,35 @@ export class PantryService {
     }));
 
     // Track pantry scan results
+    AnalyticsService.trackPantryScan(items.length, items.length);
+
+    return processedItems as PantryItem[];
+  }
+
+  /**
+   * Analyzes a receipt image and returns processed pantry items
+   */
+  static async analyzeReceiptImage(
+    base64Data: string,
+    mimeType: string,
+    user?: Partial<User>
+  ): Promise<PantryItem[]> {
+    // Check if user has opted in to AI features
+    if (!canUseGemini(user?.id)) {
+      throw new Error('Please enable AI features in Settings to use receipt scanning.');
+    }
+
+    const items = await analyzeReceiptImage(base64Data, mimeType, user as any);
+    if (items.length === 0) {
+      throw new Error('No items detected in the receipt.');
+    }
+
+    // Process items and fetch external images for placeholders
+    const processedItems = await Promise.all(items.map(async (item) => {
+      return this.processDetectedItem(item);
+    }));
+
+    // Track receipt scan results
     AnalyticsService.trackPantryScan(items.length, items.length);
 
     return processedItems as PantryItem[];
@@ -65,11 +107,31 @@ export class PantryService {
       id: crypto.randomUUID(),
       image,
       storageLocation: inferStorageLocationFromItemName(description),
-      expirationDate: getAutoExpirationDate(description, category),
+      expirationDate: getAutoExpirationDate(description, category, inferStorageLocationFromItemName(description)),
       expirationType: 'best-by', // Default to best-by for auto-detected items
       dateAdded: now,
       lastRestocked: now,
       consumptionHistory: [now] // Add current date to consumption history
+      // Denormalized safety hints for item-level expiry logic
+      ,tags: (() => {
+        const t: string[] = [];
+        const low = description.toLowerCase();
+        if (low.includes('rice') && low.includes('cooked')) t.push('cooked-rice');
+        if (low.includes('rice') && !t.includes('cooked-rice') && low.includes('leftover')) t.push('cooked-rice');
+        return t.length ? t : undefined;
+      })(),
+      productRiskLevel: (() => {
+        return getFoodRiskLevel(description, category);
+      })(),
+      cooked_rice: (() => {
+        const low = description.toLowerCase();
+        return (low.includes('rice') && low.includes('cooked')) || undefined;
+      })(),
+      is_immortal: (() => {
+        const low = description.toLowerCase();
+        if (low.includes('honey') || low.includes('salt') || low.includes('sugar')) return true;
+        return undefined;
+      })()
     };
   }
 
@@ -104,20 +166,32 @@ export class PantryService {
     // Try to get local image first
     let image = getItemImage(itemName, category);
 
-    // If it's a placeholder, try to fetch an external image
+    // If it's a placeholder, try to fetch an external image asynchronously
     if (image === '/images/placeholder.svg') {
       try {
-        const externalImage = fetchExternalItemImage(itemName);
-        if (externalImage) {
-          image = externalImage;
-        }
+        // fetchExternalItemImage returns a Promise; use then to avoid making this function async
+        fetchExternalItemImage(itemName)
+          .then(ext => {
+            if (ext) image = ext;
+          })
+          .catch(e => log.debug('Failed to fetch external image for', itemName, e));
       } catch (err: any) {
-        console.log('Failed to fetch external image for', itemName, err);
+        log.debug('Failed to fetch external image for', itemName, err);
       }
     }
 
     // Track pantry item addition
     AnalyticsService.trackPantryItemAdd(itemName, 'Manual', quantity, 'manual');
+
+    // Create initial batch for this manual purchase
+    const initialBatch = {
+      batchId: crypto.randomUUID(),
+      quantity,
+      unit,
+      expires: getAutoExpirationDate(itemName, category, inferStorageLocationFromItemName(itemName)),
+      purchaseDate: now,
+      note: ''
+    };
 
     return {
       id: crypto.randomUUID(),
@@ -125,13 +199,36 @@ export class PantryService {
       category: category,
       quantity_estimate: quantity.toString(), // Keep for backward compatibility
       quantity: { amount: quantity, unit: unit }, // New quantity system
+      batches: [initialBatch],
       image,
       storageLocation: inferStorageLocationFromItemName(itemName),
-      expirationDate: getAutoExpirationDate(itemName, category),
+      expirationDate: getAutoExpirationDate(itemName, category, inferStorageLocationFromItemName(itemName)),
       expirationType: 'best-by', // Default to best-by for manual additions
       dateAdded: now,
       lastRestocked: now,
-      consumptionHistory: [now] // Add current date to consumption history
+      consumptionHistory: [now], // Add current date to consumption history
+      // Denormalized safety hints for item-level expiry logic
+      tags: (() => {
+        const t: string[] = [];
+        const low = itemName.toLowerCase();
+        if (low.includes('rice') && low.includes('cooked')) t.push('cooked-rice');
+        if (low.includes('honey') || low.includes('salt') || low.includes('sugar')) t.push('shelf-stable');
+        return t.length ? t : undefined;
+      })(),
+      productRiskLevel: (() => {
+        const low = itemName.toLowerCase();
+        if (low.includes('rice') && low.includes('cooked')) return 4;
+        return undefined;
+      })(),
+      is_immortal: (() => {
+        const low = itemName.toLowerCase();
+        if (low.includes('honey') || low.includes('salt') || low.includes('sugar')) return true;
+        return undefined;
+      })()
+      ,cooked_rice: (() => {
+        const low = itemName.toLowerCase();
+        return (low.includes('rice') && low.includes('cooked')) || undefined;
+      })()
     };
   }
 
@@ -147,32 +244,187 @@ export class PantryService {
     );
 
     if (idx !== -1) {
-      // Merge quantity with existing item
+      // Merge by appending purchase batch(s) to existing item (preserve separate expirations)
       const updated = [...existingInventory];
-      const existingItem = updated[idx];
+      const existingItem = { ...updated[idx] };
       const now = new Date().toISOString();
 
-      if (existingItem.quantity) {
-        // Use new quantity system - combine quantities
-        const newQuantity = { amount: newItem.quantity.amount, unit: newItem.quantity.unit };
-        const combined = combineQuantities(existingItem.quantity, newQuantity);
-        updated[idx] = {
-          ...existingItem,
-          quantity: combined,
-          lastRestocked: now
-        };
-      } else {
-        // Fallback to old system for backward compatibility
-        const prevQty = parseInt(existingItem.quantity_estimate) || 1;
-        const newQty = newItem.quantity?.amount || 1;
-        updated[idx].quantity_estimate = (prevQty + newQty).toString();
+      // Ensure batches exist on the existing item
+      if (!existingItem.batches) existingItem.batches = [];
+
+      // Normalize incoming batches or create from newItem quantity/expiration
+      const incomingBatches = newItem.batches && newItem.batches.length > 0
+        ? newItem.batches
+        : [{
+            batchId: crypto.randomUUID(),
+            quantity: getQuantityAmount(newItem.quantity ?? newItem.quantity_estimate),
+            unit: getQuantityUnit(newItem.quantity ?? newItem.quantity_estimate),
+            expires: newItem.expirationDate,
+            purchaseDate: newItem.dateAdded || now,
+            note: ''
+          }];
+
+      existingItem.batches = [...existingItem.batches, ...incomingBatches];
+
+      // Update aggregate quantity where possible using combineQuantities helper
+      if (existingItem.quantity && newItem.quantity) {
+        try {
+          // Cast to any to satisfy combineQuantities parameter expectations
+          existingItem.quantity = combineQuantities(existingItem.quantity as any, newItem.quantity as any) as any;
+        } catch (err) {
+          // If combineQuantities fails due to unit mismatch, leave quantity as-is
+        }
+      } else if (!existingItem.quantity) {
+        // Try to compute a simple aggregate if all batches share the same unit
+        const allUnits = new Set(existingItem.batches.map(b => b.unit || 'count'));
+        if (allUnits.size === 1) {
+          const unit = existingItem.batches[0].unit || 'count';
+          const total = existingItem.batches.reduce((s, b) => s + (b.quantity || 0), 0);
+          existingItem.quantity = { amount: total, unit };
+        } else {
+          // Fallback: preserve legacy estimate if present
+          existingItem.quantity_estimate = (parseInt(existingItem.quantity_estimate || '0') + (parseInt(newItem.quantity_estimate || '0') || 0)).toString();
+        }
       }
 
+      existingItem.lastRestocked = now;
+      updated[idx] = existingItem;
       return updated;
     } else {
       // Add as new item
       return [...existingInventory, newItem];
     }
+  }
+
+  /**
+   * Append a batch to a single PantryItem and return the updated item
+   */
+  static addBatchToItem(item: PantryItem, batch: { quantity: number; unit?: string; expires?: string; purchaseDate?: string; note?: string }): PantryItem {
+    const now = new Date().toISOString();
+    const b = {
+      batchId: crypto.randomUUID(),
+      quantity: batch.quantity,
+      unit: batch.unit || (typeof item.quantity === 'number' ? 'count' : (item.quantity as any)?.unit) || 'count',
+      expires: batch.expires,
+      purchaseDate: batch.purchaseDate || now,
+      note: batch.note || ''
+    };
+    const updated = { ...item, batches: [...(item.batches || []), b], lastRestocked: now } as PantryItem;
+
+    // Update aggregate quantity if applicable
+    if (updated.quantity) {
+      try {
+        updated.quantity = combineQuantities(updated.quantity as any, { amount: b.quantity, unit: b.unit } as any) as any;
+      } catch (err) {
+        // ignore unit mismatch
+      }
+    } else {
+      // Try to compute aggregate if all batches share unit
+      const allUnits = new Set((updated.batches || []).map(x => x.unit || 'count'));
+      if (allUnits.size === 1) {
+        const unit = (updated.batches && updated.batches[0]?.unit) || 'count';
+        const total = updated.batches!.reduce((s, x) => s + (x.quantity || 0), 0);
+        updated.quantity = { amount: total, unit };
+      }
+    }
+
+    return updated;
+  }
+
+  static updateBatchOnItem(item: PantryItem, batchId: string, changes: Partial<{ quantity: number; expires?: string; note?: string }>): PantryItem {
+    const updated = { ...item } as PantryItem;
+    if (!updated.batches) return updated;
+    updated.batches = updated.batches.map(b => b.batchId === batchId ? { ...b, ...changes } : b);
+
+    // Recompute aggregate where possible
+    const allUnits = new Set((updated.batches || []).map(x => x.unit || 'count'));
+    if (allUnits.size === 1) {
+      const unit = (updated.batches && updated.batches[0]?.unit) || 'count';
+      const total = updated.batches!.reduce((s, x) => s + (x.quantity || 0), 0);
+      updated.quantity = { amount: total, unit };
+    }
+
+    return updated;
+  }
+
+  static removeBatchFromItem(item: PantryItem, batchId: string): PantryItem {
+    const updated = { ...item } as PantryItem;
+    if (!updated.batches) return updated;
+    updated.batches = updated.batches.filter(b => b.batchId !== batchId);
+
+    // Recompute aggregate where possible
+    if ((updated.batches || []).length === 0) {
+      // Clear quantity or leave legacy estimate
+      delete (updated as any).quantity;
+    } else {
+      const allUnits = new Set((updated.batches || []).map(x => x.unit || 'count'));
+      if (allUnits.size === 1) {
+        const unit = (updated.batches && updated.batches[0]?.unit) || 'count';
+        const total = updated.batches!.reduce((s, x) => s + (x.quantity || 0), 0);
+        updated.quantity = { amount: total, unit };
+      }
+    }
+
+    return updated;
+  }
+
+  /**
+   * Consume a quantity from an item using FEFO (first-expire-first-out) by default.
+   * Returns updated item and record of consumed amounts per batch.
+   */
+  static consumeFromItem(item: PantryItem, amount: number, strategy: 'FEFO' | 'MANUAL' = 'FEFO', targetBatchId?: string): { updatedItem: PantryItem; consumed: Array<{ batchId?: string; amount: number }> } {
+    const updated = { ...item } as PantryItem;
+    const consumed: Array<{ batchId?: string; amount: number }> = [];
+    let remaining = amount;
+
+    if (!updated.batches || updated.batches.length === 0) {
+      // Fallback to legacy quantity
+      if (updated.quantity && typeof updated.quantity !== 'number' && 'amount' in updated.quantity) {
+        updated.quantity.amount = Math.max(0, (updated.quantity.amount || 0) - remaining);
+        consumed.push({ amount });
+      }
+      return { updatedItem: updated, consumed };
+    }
+
+    if (strategy === 'MANUAL' && targetBatchId) {
+      updated.batches = updated.batches.map(b => {
+        if (b.batchId !== targetBatchId) return b;
+        const take = Math.min(b.quantity, remaining);
+        remaining -= take;
+        consumed.push({ batchId: b.batchId, amount: take });
+        return { ...b, quantity: Math.max(0, b.quantity - take) };
+      }).filter(b => b.quantity > 0);
+    } else {
+      // FEFO: sort batches by expires (earliest first, missing last)
+      const sorted = [...updated.batches].sort((a, b) => {
+        if (!a.expires && !b.expires) return 0;
+        if (!a.expires) return 1;
+        if (!b.expires) return -1;
+        return new Date(a.expires).getTime() - new Date(b.expires).getTime();
+      });
+
+      for (const b of sorted) {
+        if (remaining <= 0) break;
+        const take = Math.min(b.quantity, remaining);
+        remaining -= take;
+        consumed.push({ batchId: b.batchId, amount: take });
+        b.quantity = Math.max(0, b.quantity - take);
+      }
+
+      updated.batches = sorted.filter(b => b.quantity > 0);
+    }
+
+    // Recompute aggregate if units align
+    const allUnits = new Set((updated.batches || []).map(x => x.unit || 'count'));
+    if ((updated.batches || []).length === 0) {
+      updated.quantity = undefined;
+    } else if (allUnits.size === 1) {
+      const unit = updated.batches![0].unit || 'count';
+      const total = updated.batches!.reduce((s, x) => s + (x.quantity || 0), 0);
+      updated.quantity = { amount: total, unit };
+    }
+
+    return { updatedItem: updated, consumed };
   }
 
   /**
@@ -204,7 +456,7 @@ export class PantryService {
       case 'name':
         return sorted.sort((a, b) => a.item.localeCompare(b.item));
       case 'lastAdded':
-        return sorted.sort((a, b) => new Date(b.dateAdded).getTime() - new Date(a.dateAdded).getTime());
+        return sorted.sort((a, b) => (b.dateAdded ? new Date(b.dateAdded).getTime() : 0) - (a.dateAdded ? new Date(a.dateAdded).getTime() : 0));
       case 'expiration':
         return sorted.sort((a, b) => {
           if (!a.expirationDate && !b.expirationDate) return 0;
@@ -215,7 +467,7 @@ export class PantryService {
       case 'category':
         return sorted.sort((a, b) => a.category.localeCompare(b.category));
       case 'location':
-        return sorted.sort((a, b) => a.storageLocation.localeCompare(b.storageLocation));
+        return sorted.sort((a, b) => (a.storageLocation || '').localeCompare(b.storageLocation || ''));
       default:
         return sorted;
     }
@@ -229,7 +481,7 @@ export class PantryService {
     groupBy: 'category' | 'storage'
   ): Record<string, PantryItem[]> {
     return items.reduce((groups, item) => {
-      const key = groupBy === 'category' ? item.category : item.storageLocation;
+      const key = groupBy === 'category' ? item.category : (item.storageLocation ?? 'unknown');
       if (!groups[key]) {
         groups[key] = [];
       }
@@ -246,7 +498,8 @@ export class PantryService {
   }
 
   static bulkMoveToShoppingList(items: PantryItem[], indicesToMove: number[]): string[] {
-    return indicesToMove.map(index => items[index]?.item).filter(Boolean);
+    const mapped = indicesToMove.map(index => items[index]?.item);
+    return mapped.filter((x): x is string => typeof x === 'string');
   }
 
   static bulkChangeLocation(
@@ -266,7 +519,7 @@ export class PantryService {
     inventory: PantryItem[],
     indicesToUpdate: number[],
     expirationDate: string,
-    expirationType: string
+    expirationType: 'use-by' | 'best-by' | undefined
   ): PantryItem[] {
     return inventory.map((item, index) => {
       if (indicesToUpdate.includes(index)) {

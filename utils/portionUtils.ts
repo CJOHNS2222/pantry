@@ -16,29 +16,17 @@ export const PORTION_PRESETS = {
   extendedFamily: { householdSize: 8, baseServingSize: 4, scalingFactor: 2.0 }
 };
 
-// Calculate portion scaling factor based on household size
+// Calculate portion scaling factor based on target servings
 export const calculatePortionScaling = (
   household: Household | null,
   targetServings: number = 4
 ): PortionConfig => {
   const householdSize = household?.members?.length || 1;
 
-  // Find the best preset match
-  let bestPreset = PORTION_PRESETS.smallFamily; // Default to 4 people
-  let minDifference = Math.abs(householdSize - PORTION_PRESETS.smallFamily.householdSize);
-
-  for (const [key, preset] of Object.entries(PORTION_PRESETS)) {
-    const difference = Math.abs(householdSize - preset.householdSize);
-    if (difference < minDifference) {
-      minDifference = difference;
-      bestPreset = preset;
-    }
-  }
-
   return {
     householdSize,
-    baseServingSize: targetServings,
-    scalingFactor: bestPreset.scalingFactor
+    baseServingSize: 4, // Recipes are assumed to be for 4 servings
+    scalingFactor: targetServings / 4
   };
 };
 
@@ -66,6 +54,7 @@ export const scaleIngredient = (ingredient: string, scalingFactor: number): stri
 
   if (quantityMatch) {
     const [, qtyStr, rest] = quantityMatch;
+    if (typeof qtyStr !== 'string') return ingredient;
     const quantity = parseFloat(qtyStr);
 
     if (!isNaN(quantity)) {
@@ -131,15 +120,18 @@ export const createScaledRecipe = (
   portionConfig: PortionConfig
 ): StructuredRecipe | SavedRecipe => {
   const scaledIngredients = scaleRecipeIngredients(originalRecipe, portionConfig);
-  const newServings = Math.round(originalRecipe.servings * portionConfig.scalingFactor);
+  const origServings = typeof (originalRecipe as any).servings === 'number' ? (originalRecipe as any).servings : 4;
+  const newServings = Math.round(origServings * portionConfig.scalingFactor);
 
-  return {
+  const result: any = {
     ...originalRecipe,
     ingredients: scaledIngredients,
     servings: newServings,
-    // Add metadata about scaling
-    _scaledFrom: originalRecipe.servings,
+    // Add metadata about scaling (kept in a loose shape to avoid changing core types)
+    _scaledFrom: origServings,
     _scalingFactor: portionConfig.scalingFactor,
     _householdSize: portionConfig.householdSize
   };
+
+  return result as StructuredRecipe | SavedRecipe;
 };

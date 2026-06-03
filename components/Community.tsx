@@ -1,10 +1,18 @@
-import React, { useState } from 'react';
-import { Star, Clock, ChefHat, Plus, X } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { useApp } from '../contexts/AppContext';
+import { useAppActions } from '../contexts/AppActionsContext';
+import { Tab } from '../types/app';
+import { Star, Plus, UtensilsCrossed } from 'lucide-react';
 import { RecipeRating, StructuredRecipe } from '../types';
 import RecipeModal from './RecipeModal';
+import { getCachedCommunityRatedRecipes } from '../services/recipeService';
+import { log } from '../services/logService';
+import { useAndroidBack } from '../hooks/useAndroidBack';
+
+// Staple items to ignore in ingredient display
+const _STAPLES = ['salt', 'pepper', 'oil', 'water', 'flour', 'sugar', 'butter', 'vinegar', 'baking powder', 'baking soda', 'spices', 'seasoning', 'soy sauce', 'cornstarch', 'yeast'];
 
 interface CommunityProps {
-  ratings: RecipeRating[];
   onAddToPlan: (recipe: StructuredRecipe) => void;
   onSaveRecipe?: (recipe: StructuredRecipe) => void;
   user?: {
@@ -25,14 +33,62 @@ interface RecipeStats {
   comments: RecipeRating[];
 }
 
-export const Community: React.FC<CommunityProps> = ({ ratings = [], onAddToPlan, onSaveRecipe, user }) => {
-    // List of staple items to ignore in ingredient display
-    const STAPLES = ['salt', 'pepper', 'oil', 'water', 'flour', 'sugar', 'butter', 'vinegar', 'baking powder', 'baking soda', 'spices', 'seasoning', 'soy sauce', 'cornstarch', 'yeast'];
+export const Community: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecipe, user }) => {
+  const app = useApp();
+  const { isLoadingRatings, setLoadingRatingsComplete } = app;
+  const { setActiveTab, onRateRecipe } = useAppActions();
+  const [localLoading, setLocalLoading] = useState(false);
+  const [ratingsState, setRatingsState] = useState<RecipeRating[]>([]);
+  // Load community-rated cache once when the tab/component mounts (don't refresh on focus)
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      try {
+        setLocalLoading(true);
+        const cached = await getCachedCommunityRatedRecipes();
+        if (!mounted) return;
+
+        if (Array.isArray(cached) && cached.length > 0) {
+          // If cached items look like RecipeRating (have recipeTitle), use directly
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const first = cached[0] as any;
+          if (first && (first.recipeTitle || first.comment || first.userName)) {
+            setRatingsState(cached as unknown as RecipeRating[]);
+          } else {
+            // Convert SavedRecipe[] into synthetic RecipeRating[] so existing UI logic works
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const synthetic: RecipeRating[] = (cached as any[]).map((r: any, i: number) => ({
+              id: r.id || `community_${i}`,
+              recipeTitle: r.title || 'Untitled',
+              rating: (typeof r.averageRating === 'number' ? Math.round(r.averageRating * 10) / 10 : 0),
+              comment: r.description || '',
+              userName: 'Community',
+              date: r.lastUpdated || r.dateSaved || new Date().toISOString(),
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              recipe: r as any
+            }));
+            setRatingsState(synthetic);
+          }
+        }
+      } catch (e) {
+        log.error('Failed to load cached community recipes', { error: e }, 'Community');
+      } finally {
+        if (mounted) {
+          setLocalLoading(false);
+          // Mark global ratings loading as complete
+          setLoadingRatingsComplete();
+        }
+      }
+    };
+    load();
+    return () => { mounted = false; };
+  }, []);
   const [showModal, setShowModal] = useState(false);
   const [selectedRecipe, setSelectedRecipe] = useState<{ title: string, comments: RecipeRating[] } | null>(null);
+  useAndroidBack(showModal, () => setShowModal(false));
   
   // Group ratings by recipe title and calculate average
-  const recipeStats = ratings.reduce((acc, curr) => {
+  const recipeStats = ratingsState.reduce((acc, curr) => {
     const key = curr.recipeTitle || 'Untitled';
     // Skip ratings with no meaningful title or recipe data
     if (!key || key === 'Untitled' || !curr.recipeTitle) {
@@ -48,25 +104,55 @@ export const Community: React.FC<CommunityProps> = ({ ratings = [], onAddToPlan,
     }
     acc[key].totalRating += (typeof curr.rating === 'number' ? curr.rating : 0);
     acc[key].count += 1;
-    if (curr.comment) acc[key].comments.push(curr);
+    // Keep the full rating objects (comments array holds ratings) so embedded recipe data
+    // is preserved even when the rating has no textual comment.
+    acc[key].comments.push(curr);
     return acc;
   }, {} as Record<string, RecipeStats>);
 
   const sortedRecipes = Object.values(recipeStats)
     .filter((stat): stat is RecipeStats => {
       const s = stat as RecipeStats;
-      return s && typeof s === 'object' && 'count' in s && 'title' in s &&
-             s.count > 0 && s.title && s.title !== 'Untitled';
+      return !!(s && typeof s === 'object' && 'count' in s && 'title' in s &&
+             s.count > 0 && s.title && s.title !== 'Untitled');
     }) // Only show recipes with ratings and valid titles
     .sort((a, b) => (b.totalRating / Math.max(1, b.count)) - (a.totalRating / Math.max(1, a.count)));
   const [showAll, setShowAll] = useState(false);
   const findRecipeForStat = (stat: { comments: RecipeRating[] }) => {
-    const ratingWithRecipe = stat.comments.find(c => c.recipe && c.recipe.ingredients && c.recipe.instructions);
+    // Return the first available embedded recipe from comments, even if partial.
+    const ratingWithRecipe = stat.comments.find(c => c.recipe);
     return ratingWithRecipe ? ratingWithRecipe.recipe : null;
+  };
+
+  const sanitizeRecipeForSave = (r: StructuredRecipe): StructuredRecipe => {
+    const placeholderPattern = /Full recipe not available in this rating/i;
+    const sanitized: StructuredRecipe = {
+      title: r.title || '',
+      description: r.description || '',
+      ingredients: Array.isArray(r.ingredients) ? [...r.ingredients] : [],
+      instructions: Array.isArray(r.instructions) ? [...r.instructions] : [],
+      cookTime: r.cookTime || '',
+      image: r.image
+    };
+
+    if (sanitized.ingredients.length === 1 && placeholderPattern.test(String(sanitized.ingredients[0]))) {
+      sanitized.ingredients = [];
+    }
+    if (sanitized.instructions.length === 1 && placeholderPattern.test(String(sanitized.instructions[0]))) {
+      sanitized.instructions = [];
+    }
+
+    return sanitized;
   };
 
   return (
     <div className="space-y-6 pb-24 animate-fade-in">
+      {(isLoadingRatings || localLoading) && (
+        <div className="text-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--accent-color)] mx-auto mb-4"></div>
+          <p className="text-theme-secondary opacity-70">Loading community ratings…</p>
+        </div>
+      )}
       <div className="text-center mb-6">
         <h2 className="text-3xl font-serif font-bold text-theme-secondary">Community Favorites</h2>
         <p className="text-theme-secondary opacity-60 text-sm mt-1">Top rated recipes by our users</p>
@@ -77,9 +163,19 @@ export const Community: React.FC<CommunityProps> = ({ ratings = [], onAddToPlan,
           <div className="text-center py-12">
             <Star className="w-16 h-16 text-amber-500/30 mx-auto mb-4" />
             <h3 className="text-lg font-bold text-theme-secondary mb-2">No Community Ratings Yet</h3>
-            <p className="text-theme-secondary opacity-60 text-sm">
-              Be the first to rate a recipe! Community ratings will appear here.
+            <p className="text-theme-secondary opacity-60 text-sm mb-4">
+              Be the first to rate a recipe! Save and rate recipes to see them here.
             </p>
+            <p className="text-sm text-theme-secondary opacity-70 mb-4">
+              Start by opening Chef and rating one of your saved recipes.
+            </p>
+            <button
+              onClick={() => setActiveTab(Tab.RECIPES)}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--accent-color)] text-white text-sm font-semibold hover:opacity-90 transition-opacity"
+            >
+              <UtensilsCrossed className="w-4 h-4" />
+              Find &amp; Rate Recipes
+            </button>
           </div>
         ) : (
           <>
@@ -93,10 +189,35 @@ export const Community: React.FC<CommunityProps> = ({ ratings = [], onAddToPlan,
                key={idx} 
                className="bg-theme-secondary rounded-xl border border-theme shadow-lg overflow-hidden group hover:shadow-xl transition-all cursor-pointer"
                onClick={() => { setSelectedRecipe(stat); setShowModal(true); }}
+               role="button"
+               tabIndex={0}
+               aria-label={`Open community ratings for ${stat.title}`}
+               onKeyDown={(e) => {
+                 if (e.key === 'Enter' || e.key === ' ') {
+                   e.preventDefault();
+                   setSelectedRecipe(stat);
+                   setShowModal(true);
+                 }
+               }}
              >
-                {/* Simulated Image Header */}
+                {/* Recipe Image Header */}
                 <div className="h-32 bg-gray-200 relative overflow-hidden">
-                    <div className="absolute inset-0 flex items-center justify-center text-theme-secondary opacity-10 font-serif text-4xl font-bold bg-theme-primary">
+                    {fullRecipe?.image ? (
+                        <img
+                            src={fullRecipe.image}
+                            alt={stat.title}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                if (target) {
+                                    target.style.display = 'none';
+                                    const fallback = target.parentElement?.querySelector('.fallback-text') as HTMLElement;
+                                    if (fallback) fallback.style.display = 'flex';
+                                }
+                            }}
+                        />
+                    ) : null}
+                    <div className={`absolute inset-0 flex items-center justify-center text-theme-secondary opacity-10 font-serif text-4xl font-bold bg-theme-primary ${fullRecipe?.image ? 'hidden fallback-text' : ''}`}>
                         {(stat.title && String(stat.title).charAt ? String(stat.title).charAt(0) : '?')}
                     </div>
                      <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black/80 to-transparent p-4">
@@ -109,7 +230,7 @@ export const Community: React.FC<CommunityProps> = ({ ratings = [], onAddToPlan,
                         <div className="flex items-center gap-1 bg-amber-100 dark:bg-amber-900/30 px-2 py-1 rounded text-amber-600 dark:text-amber-400">
                              <Star className="w-4 h-4 fill-current" />
                              <span className="font-bold text-sm">{avg}</span>
-                             <span className="text-[10px] opacity-70">({stat.count})</span>
+                              <span className="text-xs opacity-70">({stat.count})</span>
                         </div>
                     </div>
 
@@ -119,33 +240,83 @@ export const Community: React.FC<CommunityProps> = ({ ratings = [], onAddToPlan,
                                 <div className="w-4 h-4 rounded-full bg-[var(--accent-color)] text-[8px] text-white flex items-center justify-center">
                                   {(latestComment && latestComment.userName) ? String(latestComment.userName).charAt(0) : '?'}
                                 </div>
-                                <span className="text-xs font-bold text-theme-secondary opacity-80">{latestComment.userName}</span>
+                                <span className="text-sm font-bold text-theme-secondary opacity-80">{latestComment.userName}</span>
                             </div>
-                            <p className="text-xs text-theme-secondary italic line-clamp-2">"{latestComment.comment}"</p>
+                              <p className="text-sm text-theme-secondary italic line-clamp-2">"{latestComment.comment}"</p>
                         </div>
                     )}
                     
-                    <button 
+                    {/* Quick inline star rating */}
+                    <div className="flex items-center gap-1 mb-3" onClick={(e) => e.stopPropagation()}>
+                      <span className="text-sm text-theme-secondary opacity-60 mr-1">Rate:</span>
+                      {[1,2,3,4,5].map((star) => (
+                        <button
+                          key={star}
+                          aria-label={`Rate ${star} star${star !== 1 ? 's' : ''}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onRateRecipe({
+                              id: Date.now().toString(),
+                              recipeTitle: stat.title,
+                              rating: star,
+                              comment: '',
+                              userName: user?.name || 'User',
+                              userAvatar: user?.avatar,
+                              recipe: fullRecipe ?? undefined
+                            });
+                          }}
+                          className="text-amber-400 hover:text-amber-500 transition-colors"
+                        >
+                          <Star className="w-4 h-4 fill-current" />
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="flex gap-2">
+                      <button
                         onClick={(e) => {
+                          e.stopPropagation();
+                          if (fullRecipe) {
+                            onAddToPlan(fullRecipe);
+                          } else {
+                            const mockRecipe: StructuredRecipe = {
+                              title: stat.title,
+                              description: 'Community favorite',
+                              ingredients: ['Full recipe not available in this rating. Please save it first.'],
+                              instructions: ['Full recipe not available in this rating. Please save it first.'],
+                              cookTime: 'N/A'
+                            };
+                            onAddToPlan(mockRecipe);
+                          }
+                        }}
+                        className="flex-1 py-2 bg-[var(--accent-color)]/10 text-[var(--accent-color)] font-bold text-xs uppercase tracking-wider rounded-lg hover:bg-[var(--accent-color)] hover:text-white transition-all flex items-center justify-center gap-2"
+                      >
+                        <Plus className="w-4 h-4" /> Add to Schedule
+                      </button>
+
+                      {onSaveRecipe && (
+                        <button
+                          onClick={(e) => {
                             e.stopPropagation();
                             if (fullRecipe) {
-                                onAddToPlan(fullRecipe);
+                              onSaveRecipe(sanitizeRecipeForSave(fullRecipe));
                             } else {
-                                // Fallback for older data that might not have the full recipe
-                                const mockRecipe: StructuredRecipe = {
-                                    title: stat.title,
-                                    description: "Community favorite",
-                                    ingredients: ["Full recipe not available in this rating. Please save it first."],
-                                    instructions: ["Full recipe not available in this rating. Please save it first."],
-                                    cookTime: "N/A"
-                                };
-                                onAddToPlan(mockRecipe);
+                              const mockRecipe: StructuredRecipe = {
+                                title: stat.title,
+                                description: 'Community favorite',
+                                ingredients: ['Full recipe not available in this rating. Please save it first.'],
+                                instructions: ['Full recipe not available in this rating. Please save it first.'],
+                                cookTime: 'N/A'
+                              };
+                              onSaveRecipe(sanitizeRecipeForSave(mockRecipe));
                             }
-                        }}
-                        className="w-full py-2 bg-[var(--accent-color)]/10 text-[var(--accent-color)] font-bold text-xs uppercase tracking-wider rounded-lg hover:bg-[var(--accent-color)] hover:text-white transition-all flex items-center justify-center gap-2"
-                    >
-                        <Plus className="w-4 h-4" /> Add to Schedule
-                    </button>
+                          }}
+                          className="py-2 px-3 bg-theme-primary border border-theme rounded-lg text-sm font-semibold hover:bg-theme-secondary transition-colors"
+                        >
+                          Save Recipe
+                        </button>
+                      )}
+                    </div>
                 </div>
              </div>
            );
@@ -173,12 +344,13 @@ export const Community: React.FC<CommunityProps> = ({ ratings = [], onAddToPlan,
               cookTime: 'N/A'
             };
         return (
-          <RecipeModal
+            <RecipeModal
             recipe={structured}
             isOpen={showModal}
             onClose={() => setShowModal(false)}
             onAddToPlan={(r) => { onAddToPlan(r); }}
-            onSaveRecipe={(r) => { onSaveRecipe(r); }}
+            onSaveRecipe={(r) => onSaveRecipe?.(r)}
+            onRate={onRateRecipe}
             showSaveButton={true}
             showMarkAsMade={false}
             showAddToPlan={true}

@@ -1,7 +1,29 @@
-# Smart Pantry Chef
+## Google Play Billing Integration (Android)
+
+The app now uses Google Play Billing for in-app purchases and subscriptions on Android. Stripe and PayPal have been removed for Play Store compliance.
+
+### Integration Plan
+1. **Install Capacitor Google Play Billing plugin**
+  - Use `@capacitor-community/play-billing` or similar plugin for Android billing.
+2. **Update Settings > Subscription tab**
+  - Replace Stripe/PayPal UI with Google Play Billing purchase flow.
+3. **Handle purchase and subscription events**
+  - Use plugin APIs to initiate purchase, check subscription status, and handle upgrades/cancels.
+4. **Sync subscription status to Firestore**
+  - Store subscription state in Firestore for cross-device sync.
+5. **Test with Google Play Console test accounts**
+  - Use Play Console to test subscription flows and edge cases.
+6. **Update documentation and agent instructions**
+  - Remove Stripe/PayPal references and clarify Google Play Billing usage.
+
+### Useful Links
+- [Capacitor Google Play Billing Plugin](https://github.com/capacitor-community/play-billing)
+- [Google Play Billing Documentation](https://developer.android.com/google/play/billing)
+- [Play Console Testing](https://developer.android.com/google/play/billing/test)
+# Stock & Spoon
 
 ## Overview
-Smart Pantry Chef is a cross-platform pantry and meal management app built with React, Vite, Firebase, and Capacitor. It supports real-time household sharing, notifications, recipe management, and user customization.
+Stock & Spoon is a cross-platform pantry and meal management app built with React, Vite, Firebase, and Capacitor. It supports real-time household sharing, notifications, recipe management, and user customization.
 
 ## Key Features
 - Household inventory, shopping list, meal plan, and saved recipes shared in real-time via Firebase Firestore
@@ -57,48 +79,15 @@ The app includes a subscription-based monetization system with the following lim
 
 Premium subscribers get unlimited access to all features.
 
-STRIPE_SECRET_KEY
-STRIPE_PREMIUM_PRICE_ID
-STRIPE_FAMILY_PRICE_ID
-
-
-### Stripe Setup
-1. **Create a Stripe account** at [stripe.com](https://stripe.com)
-2. **Get your API keys** from the Stripe dashboard:
-   - Publishable key (starts with `pk_test_` or `pk_live_`)
-   - Secret key (starts with `sk_test_` or `sk_live_`)
-3. **Create subscription products and prices** in your Stripe dashboard
-4. **Add environment variables** to your `.env.local` file (see above)
-
-### PayPal Setup
-1. **Create a PayPal Business account** at [paypal.com](https://paypal.com)
-2. **Set up PayPal Subscriptions:**
-   - Go to your PayPal Developer Dashboard
-   - Create subscription plans for Premium ($4.99/month) and Family ($9.99/month)
-   - Get your Client ID and Client Secret from the Apps & Credentials section
-3. **Add environment variables** to your `.env.local` file (see above)
-4. **For production**, change `PAYPAL_ENVIRONMENT` to `live`
-
-### Payment Flow
-- Users see upgrade prompts when hitting free tier limits
-- Clicking "Upgrade" navigates to Settings > Subscription tab
-- Users can choose between Stripe (Credit Card) or PayPal
-- Secure checkout handles payment processing
-- Firebase Functions create/manage subscriptions on the backend
-- Subscription status is stored in Firestore and synced across devices
+### Google Play Billing Setup
+1. **Google Play Billing is now used for in-app purchases and subscriptions.**
+2. **Upgrade prompts** appear when users hit free tier limits.
+3. **Upgrade flow** navigates to Settings > Subscription tab.
+4. **Secure checkout** is handled via Google Play Billing plugin.
+5. **Subscription status** is stored in Firestore and synced across devices.
 
 ### Testing the Payment Flow
-**Stripe Test Cards:**
-- Success: `4242 4242 4242 4242`
-- Declined: `4000 0000 0000 0002`
-- Requires authentication: `4000 0025 0000 3155`
-
-**PayPal Testing:**
-- Use your PayPal Developer account to create sandbox buyer/seller accounts
-- Test subscriptions will automatically cancel after a short period in sandbox mode
-- Use sandbox credentials in your environment variables during development
-
-Both payment methods support test subscriptions that will automatically cancel after a short period.
+Use Google Play Billing test accounts and Google Play Console for subscription testing.
 
 ## AI Recipe Generation
 
@@ -275,14 +264,6 @@ Centralized data management for all Firestore operations.
    - Create a `.env.local` file in the root directory:
      ```
      VITE_GEMINI_API_KEY=your_google_gemini_api_key
-     VITE_STRIPE_PUBLISHABLE_KEY=pk_test_your_publishable_key_here
-     STRIPE_SECRET_KEY=sk_test_your_secret_key_here
-     VITE_STRIPE_PREMIUM_PRICE_ID=price_your_premium_price_id
-     VITE_PAYPAL_CLIENT_ID=your_paypal_client_id
-     PAYPAL_CLIENT_ID=your_paypal_client_id
-     PAYPAL_CLIENT_SECRET=your_paypal_client_secret
-     PAYPAL_ENVIRONMENT=sandbox
-     PAYPAL_PREMIUM_PLAN_ID=your_paypal_premium_plan_id
      ```
    - Do not commit this file (it's in `.gitignore`).
 4. **Configure Firebase:**

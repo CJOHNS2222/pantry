@@ -1,4 +1,5 @@
 import {onCall, HttpsError} from "firebase-functions/v2/https";
+import {logger} from "firebase-functions/v2";
 import * as admin from 'firebase-admin';
 
 // Ensure the Admin SDK is initialized
@@ -22,8 +23,6 @@ export const getNutritionData = onCall(async (request) => {
 
       const detailUrl = `https://fdc.nal.usda.gov/api/foods/${fdcId}`;
 
-      console.log('Fetching detailed nutrition data from USDA API:', detailUrl);
-
       const response = await fetch(detailUrl, {
         method: 'GET',
         headers: {
@@ -33,14 +32,11 @@ export const getNutritionData = onCall(async (request) => {
       });
 
       if (!response.ok) {
-        console.error('USDA API detail error:', response.status, response.statusText);
+        logger.error('USDA API detail error', { status: response.status, statusText: response.statusText });
         throw new HttpsError('unavailable', `USDA API returned ${response.status}: ${response.statusText}`);
       }
 
       const data = await response.json();
-
-      // Log successful response
-      console.log(`Successfully fetched detailed nutrition data for FDC ID: ${fdcId}`);
 
       return data;
     }
@@ -56,8 +52,6 @@ export const getNutritionData = onCall(async (request) => {
 
     const apiUrl = `https://fdc.nal.usda.gov/api/foods/search?query=${encodeURIComponent(query)}&pageSize=${Math.min(pageSize, 10)}`;
 
-    console.log('Fetching nutrition data from USDA API:', apiUrl);
-
     const response = await fetch(apiUrl, {
       method: 'GET',
       headers: {
@@ -67,22 +61,19 @@ export const getNutritionData = onCall(async (request) => {
     });
 
     if (!response.ok) {
-      console.error('USDA API error:', response.status, response.statusText);
+      logger.error('USDA API error', { status: response.status, statusText: response.statusText });
       throw new HttpsError('unavailable', `USDA API returned ${response.status}: ${response.statusText}`);
     }
 
     const data = await response.json();
 
-    // Log successful response
-    console.log(`Successfully fetched ${data.foods?.length || 0} nutrition results for query: "${query}"`);
-
     return data;
 
   } catch (err: any) {
-    console.error('Error in getNutritionData function:', error);
+    logger.error('Error in getNutritionData function', err);
 
-    if (error instanceof HttpsError) {
-      throw error;
+    if (err instanceof HttpsError) {
+      throw err;
     }
 
     throw new HttpsError('internal', 'Failed to fetch nutrition data');

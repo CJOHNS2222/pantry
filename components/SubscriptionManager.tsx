@@ -1,27 +1,36 @@
 import React, { useState, useEffect } from 'react';
-import { Crown, Check, X, CreditCard, Users, ChefHat, Heart } from 'lucide-react';
+import { Crown, Check, X } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
 import { useSubscription } from '../hooks/useSubscription';
 import { User } from '../types';
-import { StripeCheckout } from './StripeCheckout';
-import { PayPalCheckout } from './PayPalCheckout';
 import { UsageService, UsageLimits } from '../services/usageService';
 import { log } from '../services/logService';
 import AnalyticsService from '../services/analyticsService';
+import {
+  initializePurchaseStore,
+  purchaseProduct,
+  restorePurchases,
+  getProductPrice,
+  PRODUCT_IDS,
+  ProductId,
+} from '../services/purchaseService';
 
 interface SubscriptionManagerProps {
   user: User | null;
 }
 
-interface SubscriptionManagerProps {
-  user: User | null;
-}
+const PLAN_PRODUCT_MAP: Record<string, ProductId> = {
+  premium: PRODUCT_IDS.PREMIUM_MONTHLY,
+  family: PRODUCT_IDS.FAMILY_MONTHLY,
+};
 
 export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }) => {
   const { subscription, isPremium, isFamily, isActive } = useSubscription(user);
   const [showPlans, setShowPlans] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState<any>(null);
-  const [paymentMethod, setPaymentMethod] = useState<'stripe' | 'paypal'>('stripe');
   const [usageLimits, setUsageLimits] = useState<UsageLimits | null>(null);
+  const [purchaseLoading, setPurchaseLoading] = useState<string | null>(null);
+  const [purchaseError, setPurchaseError] = useState<string | null>(null);
+  const [livePrices, setLivePrices] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const fetchUsageLimits = async () => {
@@ -36,7 +45,21 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }
     };
 
     fetchUsageLimits();
-    
+
+    // Initialize IAP store on Android and fetch live prices
+    if (user?.id && Capacitor.isNativePlatform()) {
+      initializePurchaseStore(user.id)
+        .then(() => {
+          setLivePrices({
+            [PRODUCT_IDS.PREMIUM_MONTHLY]: getProductPrice(PRODUCT_IDS.PREMIUM_MONTHLY) ?? '',
+            [PRODUCT_IDS.FAMILY_MONTHLY]: getProductPrice(PRODUCT_IDS.FAMILY_MONTHLY) ?? '',
+          });
+        })
+        .catch((err: any) =>
+          log.error('IAP store init error', { error: err?.message }, 'SubscriptionManager')
+        );
+    }
+
     // Track subscription funnel - viewing pricing
     AnalyticsService.trackSubscriptionFunnel('view_pricing', {
       current_tier: subscription?.tier || 'free',
@@ -44,28 +67,36 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }
     });
   }, [user, subscription?.tier, isActive]);
 
-  const handleUpgrade = (plan: any) => {
-    // Track subscription funnel
+  const handleUpgrade = async (plan: any) => {
+    if (plan.id === 'free') return;
+    const productId = PLAN_PRODUCT_MAP[plan.id];
+    if (!productId) return;
+
     AnalyticsService.trackSubscriptionFunnel('upgrade_intent', {
       plan_name: plan.name,
       plan_price: plan.price,
-      current_tier: subscription?.tier || 'free'
+      current_tier: subscription?.tier || 'free',
     });
-    
-    // Temporarily disabled until Stripe payments are fully functional
-    alert('Premium subscriptions coming soon! We\'re working on implementing payment processing. Stay tuned for updates.');
-    // setSelectedPlan(plan);
-  };
 
-  const handleCheckoutSuccess = (subscriptionId: string) => {
-    alert(`Subscription created successfully! ID: ${subscriptionId}`);
-    setSelectedPlan(null);
-    setShowPlans(false);
-    // In a real app, you'd refresh the subscription data here
-  };
-
-  const handleCheckoutCancel = () => {
-    setSelectedPlan(null);
+    setPurchaseError(null);
+    setPurchaseLoading(productId);
+    try {
+      AnalyticsService.trackSubscriptionFunnel('payment_attempt', { plan_name: plan.name });
+      const result = await purchaseProduct(productId);
+      if (result.success) {
+        AnalyticsService.trackSubscriptionFunnel('payment_success', { plan_name: plan.name });
+        // Subscription update is written to Firestore by verifyPurchase CF;
+        // useSubscription will pick it up automatically via the live listener.
+      } else {
+        setPurchaseError(result.error ?? 'Purchase failed. Please try again.');
+        AnalyticsService.trackSubscriptionFunnel('payment_failed', {
+          plan_name: plan.name,
+          error: result.error,
+        });
+      }
+    } finally {
+      setPurchaseLoading(null);
+    }
   };
 
   const plans = [
@@ -77,15 +108,18 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }
       description: 'Perfect for getting started',
       features: [
         'Up to 10 saved recipes',
-        '3 recipes per week meal planning',
-        '5 recipe searches per week',
-        '1 household member',
+        '3 meal plan entries per week',
+        '5 AI scans per week',
+        '1 custom pantry category',
+        'Grocery cost estimator (first 5 items)',
+        'Current week meal plan view',
+        'Invite 1 household member',
         'Community access'
       ],
       limitations: [
-        'Limited recipe storage',
-        'Limited searches',
-        'Basic meal planning only'
+        'No monthly calendar view',
+        'Limited grocery cost details',
+        'Limited custom categories'
       ],
       popular: false
     },
@@ -97,12 +131,14 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }
       description: 'Everything you need for meal planning',
       features: [
         'Up to 20 saved recipes',
-        '7 days meal planning (unlimited entries)',
-        '15 recipe searches per week',
+        'Unlimited meal plan entries',
+        '15 AI scans per week',
+        'Unlimited custom categories',
+        'Full grocery cost estimator',
+        '7-day + monthly calendar view',
         'Up to 3 household members',
         'Priority support',
-        'Offline access',
-        'Nutrition tracking'
+        'Offline access'
       ],
       limitations: [],
       popular: true
@@ -116,7 +152,11 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }
       features: [
         'Unlimited saved recipes',
         '2 weeks meal planning (unlimited entries)',
+        'Unlimited AI scans',
         'Unlimited recipe searches',
+        'Unlimited custom categories',
+        'Full grocery cost estimator',
+        'Monthly calendar view',
         'Up to 5 household members (you + 4 family)',
         'Shared shopping lists',
         'Family meal planning',
@@ -209,7 +249,7 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }
           onClick={() => setShowPlans(!showPlans)}
           className="w-full bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg font-medium transition-colors"
         >
-          {isPremium ? 'Manage Subscription' : 'View Plans (Coming Soon)'}
+          {isPremium ? 'Manage Subscription' : 'View Plans'}
         </button>
       </div>
 
@@ -288,15 +328,23 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }
                       ? 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 cursor-not-allowed'
                       : plan.id === 'free'
                       ? 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
-                      : 'bg-blue-500 hover:bg-blue-600 text-white'
+                      : 'bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-60'
                   }`}
-                  disabled={subscription?.tier === plan.id}
+                  disabled={
+                    subscription?.tier === plan.id ||
+                    purchaseLoading !== null ||
+                    (plan.id !== 'free' && !Capacitor.isNativePlatform())
+                  }
                 >
                   {subscription?.tier === plan.id
                     ? 'Current Plan'
                     : plan.id === 'free'
                     ? 'Downgrade'
-                    : 'Coming Soon'}
+                    : purchaseLoading === PLAN_PRODUCT_MAP[plan.id]
+                    ? 'Processing…'
+                    : livePrices[PLAN_PRODUCT_MAP[plan.id]]
+                    ? `Subscribe — ${livePrices[PLAN_PRODUCT_MAP[plan.id]]}/mo`
+                    : 'Subscribe'}
                 </button>
               </div>
             ))}
@@ -321,68 +369,29 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }
         </div>
       )}
 
-      {selectedPlan && (
-        <div className="mt-6">
-          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 mb-4">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              Choose Payment Method
-            </h3>
-
-            <div className="grid grid-cols-2 gap-4">
-              <button
-                onClick={() => setPaymentMethod('stripe')}
-                className={`p-4 border-2 rounded-lg transition-all ${
-                  paymentMethod === 'stripe'
-                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                    : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <CreditCard className="w-6 h-6 text-blue-500" />
-                  <div className="text-left">
-                    <div className="font-medium text-gray-900 dark:text-white">Credit Card</div>
-                    <div className="text-sm text-gray-600 dark:text-gray-400">Powered by Stripe</div>
-                  </div>
-                </div>
-              </button>
-
-              <button
-                onClick={() => setPaymentMethod('paypal')}
-                className={`p-4 border-2 rounded-lg transition-all ${
-                  paymentMethod === 'paypal'
-                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                    : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-6 h-6 bg-blue-600 rounded text-white flex items-center justify-center font-bold text-sm">P</div>
-                  <div className="text-left">
-                    <div className="font-medium text-gray-900 dark:text-white">PayPal</div>
-                    <div className="text-sm text-gray-600 dark:text-gray-400">PayPal Account</div>
-                  </div>
-                </div>
-              </button>
-            </div>
-          </div>
-
-          {paymentMethod === 'stripe' ? (
-            <StripeCheckout
-              planId={selectedPlan.id}
-              planName={selectedPlan.name}
-              planPrice={selectedPlan.price}
-              onSuccess={handleCheckoutSuccess}
-              onCancel={handleCheckoutCancel}
-            />
-          ) : (
-            <PayPalCheckout
-              planId={selectedPlan.id}
-              planName={selectedPlan.name}
-              planPrice={selectedPlan.price}
-              onSuccess={handleCheckoutSuccess}
-              onCancel={handleCheckoutCancel}
-            />
-          )}
+      {purchaseError && (
+        <div className="bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800 p-4">
+          <p className="text-sm text-red-700 dark:text-red-300">{purchaseError}</p>
         </div>
+      )}
+
+      <div className="flex gap-3">
+        <button
+          onClick={async () => {
+            setPurchaseError(null);
+            await restorePurchases();
+          }}
+          disabled={!Capacitor.isNativePlatform()}
+          className="flex-1 text-sm text-blue-500 hover:text-blue-600 disabled:text-gray-400 font-medium py-2 border border-blue-200 dark:border-blue-700 disabled:border-gray-200 rounded-lg transition-colors"
+        >
+          Restore Purchases
+        </button>
+      </div>
+
+      {!Capacitor.isNativePlatform() && (
+        <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
+          In-app purchases are available on the Android app.
+        </p>
       )}
     </div>
   );

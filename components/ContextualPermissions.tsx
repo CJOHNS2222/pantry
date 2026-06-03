@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Camera, Bell, MapPin, Mic, Image, X, CheckCircle, AlertCircle } from 'lucide-react';
+import { log } from '../services/logService';
 
 interface PermissionRequestProps {
   permission: 'camera' | 'notifications' | 'location' | 'microphone' | 'photos';
@@ -65,14 +66,63 @@ export const PermissionRequest: React.FC<PermissionRequestProps> = ({
   const handleGrant = async () => {
     setIsRequesting(true);
     try {
-      // Here you would implement the actual permission request
-      // For now, we'll simulate it
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      onGrant();
+      let granted = false;
+
+      // Implement actual permission requests
+      switch (permission) {
+        case 'camera':
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            stream.getTracks().forEach(track => track.stop()); // Stop immediately
+            granted = true;
+          } catch (error) {
+            log.warn('Camera permission denied or not available');
+            granted = false;
+          }
+          break;
+
+        case 'notifications':
+          if ('Notification' in window) {
+            const result = await Notification.requestPermission();
+            granted = result === 'granted';
+          } else {
+            log.warn('Notifications not supported');
+            granted = false;
+          }
+          break;
+
+        case 'location':
+          try {
+            await new Promise((resolve, reject) => {
+              navigator.geolocation.getCurrentPosition(
+                () => resolve(true),
+                () => reject(false),
+                { timeout: 10000 }
+              );
+            });
+            granted = true;
+          } catch (error) {
+            log.warn('Location permission denied or not available');
+            granted = false;
+          }
+          break;
+
+        default:
+          // For unsupported permissions, just simulate
+          await new Promise(resolve => setTimeout(resolve, 500));
+          granted = true;
+      }
+
+      if (granted) {
+        onGrant();
+      } else {
+        onDeny();
+      }
       setIsVisible(false);
     } catch (error) {
-      console.error('Permission request failed:', error);
+      log.error('Permission request failed', { error }, 'ContextualPermissions');
       onDeny();
+      setIsVisible(false);
     } finally {
       setIsRequesting(false);
     }

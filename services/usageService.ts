@@ -1,8 +1,8 @@
 import DatabaseMonitoringService from './databaseMonitoringService';
 import { increment, Timestamp } from 'firebase/firestore';
-import { db } from '../firebaseConfig';
 import { User } from '../types';
 import { log } from './logService';
+import remoteConfig from './remoteConfigService';
 
 export interface UsageLimits {
   searches: {
@@ -25,6 +25,8 @@ export interface UsageLimits {
     used: number;
     resetDate: Date;
   };
+  /** Effective subscription tier after household inheritance is applied. */
+  resolvedTier: 'free' | 'premium' | 'family';
 }
 
 export interface PlanLimits {
@@ -50,10 +52,10 @@ export interface PlanLimits {
 
 class UsageService {
   // Helper function to safely convert Firestore timestamps or Date objects to Date
-  private static toDate(value: any): Date | null {
+  private static toDate(value: unknown): Date | null {
     if (!value) return null;
     if (value instanceof Date) return value;
-    if (value && typeof value.toDate === 'function') return value.toDate();
+    if (value && typeof (value as { toDate?: unknown }).toDate === 'function') return (value as { toDate(): Date }).toDate();
     if (value instanceof Timestamp) return value.toDate();
     // If it's a number (timestamp), convert it
     if (typeof value === 'number') return new Date(value);
@@ -65,35 +67,76 @@ class UsageService {
     return null;
   }
 
-  private static readonly PLAN_LIMITS: PlanLimits = {
-    free: {
-      searches: { weekly: 5 },
-      recipes: { max: 10 },
-      mealPlanning: { weeklyRecipes: 3, twoWeekPlanning: false },
-      gemini: { weekly: 5 }
-    },
-    premium: {
-      searches: { weekly: 15 },
-      recipes: { max: 20 },
-      mealPlanning: { weeklyRecipes: -1, twoWeekPlanning: false }, // 7-day planning with unlimited entries
-      gemini: { weekly: 15 }
-    },
-    family: {
-      searches: { weekly: -1 }, // unlimited searches
-      recipes: { max: -1 }, // unlimited saved recipes
-      mealPlanning: { weeklyRecipes: -1, twoWeekPlanning: true }, // 2-week planning with unlimited entries
-      gemini: { weekly: -1 } // unlimited Gemini usage
-    }
-  };
+  // Short-lived in-memory cache to avoid redundant Firestore reads within the same
+  // search flow (RecipeFinder canPerformSearch → searchRecipes canUseGemini all read
+  // the same 'users/{uid}/usage/limits' doc). 30s TTL is negligible for limit enforcement.
+  private static readonly LIMITS_CACHE_TTL_MS = 30_000;
+  private static limitsCache = new Map<string, { limits: UsageLimits; fetchedAt: number }>();
+
+  private static buildPlanLimits(): PlanLimits {
+    return {
+      free: {
+        searches: { weekly: remoteConfig.getNumber('limit_free_searches_weekly') },
+        recipes: { max: remoteConfig.getNumber('limit_free_recipes_max') },
+        mealPlanning: {
+          weeklyRecipes: remoteConfig.getNumber('limit_free_mealplanning_weekly'),
+          twoWeekPlanning: false
+        },
+        gemini: { weekly: remoteConfig.getNumber('limit_free_gemini_weekly') }
+      },
+      premium: {
+        searches: { weekly: remoteConfig.getNumber('limit_premium_searches_weekly') },
+        recipes: { max: remoteConfig.getNumber('limit_premium_recipes_max') },
+        mealPlanning: {
+          weeklyRecipes: remoteConfig.getNumber('limit_premium_mealplanning_weekly'),
+          twoWeekPlanning: true
+        },
+        gemini: { weekly: remoteConfig.getNumber('limit_premium_gemini_weekly') }
+      },
+      family: {
+        searches: { weekly: -1 }, // unlimited
+        recipes: { max: -1 }, // unlimited
+        mealPlanning: { weeklyRecipes: -1, twoWeekPlanning: true },
+        gemini: { weekly: -1 } // unlimited
+      }
+    };
+  }
 
   static async getUsageLimits(user: User): Promise<UsageLimits> {
     if (!user?.id) {
       throw new Error('User required for usage tracking');
     }
 
-    // Determine user's plan tier
-    const planTier = user.subscription?.tier || 'free';
-    const planLimits = this.PLAN_LIMITS[planTier];
+    // Deduplicate reads — RecipeFinder + canPerformSearch + canUseGemini all read
+    // the same doc; one Firestore read per 30s window is enough
+    const cached = UsageService.limitsCache.get(user.id);
+    if (cached && Date.now() - cached.fetchedAt < UsageService.LIMITS_CACHE_TTL_MS) {
+      return cached.limits;
+    }
+
+    // Determine effective plan tier.
+    // Free members of a family-plan household inherit the family tier for limits.
+    let planTier = user.subscription?.tier || 'free';
+    if (planTier === 'free' && user.householdId) {
+      try {
+        const householdDoc = await DatabaseMonitoringService.getDoc(
+          DatabaseMonitoringService.doc('households/' + user.householdId)
+        );
+        if (householdDoc.exists()) {
+          const hData = householdDoc.data();
+          const members: Array<{ id: string; role: string }> = hData.members || [];
+          const member = members.find(m => m.id === user.id);
+          if (member && member.role !== 'admin' &&
+              (hData.ownerSubscriptionTier === 'family' || hData.ownerSubscriptionTier === 'premium')) {
+            planTier = hData.ownerSubscriptionTier as 'premium' | 'family';
+          }
+        }
+      } catch {
+        // Access revoked or network error — fall back to own tier
+      }
+    }
+
+    const planLimits = this.buildPlanLimits()[planTier as keyof PlanLimits] ?? this.buildPlanLimits().free;
 
     const usageRef = DatabaseMonitoringService.doc('users/' + user.id + '/usage/limits');
     const usageDoc = await DatabaseMonitoringService.getDoc(usageRef);
@@ -123,7 +166,8 @@ class UsageService {
           weekly: planLimits.gemini.weekly,
           used: 0,
           resetDate: weekStart
-        }
+        },
+        resolvedTier: planTier as 'free' | 'premium' | 'family'
       };
 
       await DatabaseMonitoringService.setDoc(usageRef, {
@@ -133,10 +177,17 @@ class UsageService {
         lastUpdated: now
       });
 
+      UsageService.limitsCache.set(user.id, { limits: initialUsage, fetchedAt: Date.now() });
       return initialUsage;
     }
 
-    const data = usageDoc.data() as any;
+    type UsageData = {
+      searches?: { used?: number; resetDate?: unknown };
+      mealPlanning?: { weeklyUsed?: number; resetDate?: unknown };
+      gemini?: { used?: number; resetDate?: unknown };
+      recipes?: { used?: number };
+    };
+    const data = usageDoc.data() as UsageData;
 
     // Get the earliest reset date from all weekly limits, or use weekStart if none exist
     const searchResetDate = this.toDate(data.searches?.resetDate);
@@ -147,8 +198,10 @@ class UsageService {
       .filter(date => date instanceof Date)
       .sort((a, b) => a.getTime() - b.getTime())[0] || weekStart;
 
-    // Reset weekly counters if the earliest reset date is in the past
-    if (now > earliestResetDate) {
+    // Reset weekly counters only when we've crossed into a new week
+    // (weekStart is the start of the current week; earliestResetDate is the start
+    // of the week when counters were last reset — if they differ, we're in a new week)
+    if (weekStart > earliestResetDate) {
       await DatabaseMonitoringService.updateDoc(usageRef, {
         'searches.used': 0,
         'searches.resetDate': weekStart,
@@ -171,15 +224,15 @@ class UsageService {
       data.gemini.resetDate = weekStart;
     }
 
-    return {
+    const result: UsageLimits = {
       searches: {
         weekly: planLimits.searches.weekly,
-        used: data.searches?.used || 0,
+        used: Math.max(0, data.searches?.used || 0),
         resetDate: this.toDate(data.searches?.resetDate) || weekStart
       },
       recipes: {
         max: planLimits.recipes.max,
-        used: data.recipes?.used || 0
+        used: Math.max(0, data.recipes?.used || 0)
       },
       mealPlanning: {
         weeklyRecipes: planLimits.mealPlanning.weeklyRecipes,
@@ -191,8 +244,11 @@ class UsageService {
         weekly: planLimits.gemini.weekly,
         used: data.gemini?.used || 0,
         resetDate: this.toDate(data.gemini?.resetDate) || weekStart
-      }
+      },
+      resolvedTier: planTier as 'free' | 'premium' | 'family'
     };
+    UsageService.limitsCache.set(user.id, { limits: result, fetchedAt: Date.now() });
+    return result;
   }
 
   static async canPerformSearch(user: User): Promise<boolean> {
@@ -202,7 +258,7 @@ class UsageService {
 
   static async recordSearch(user: User): Promise<void> {
     if (!user?.id) return;
-
+    UsageService.limitsCache.delete(user.id);
     const usageRef = DatabaseMonitoringService.doc('users/' + user.id + '/usage/limits');
     await DatabaseMonitoringService.updateDoc(usageRef, {
       'searches.used': increment(1),
@@ -220,19 +276,46 @@ class UsageService {
     return limits.mealPlanning.weeklyRecipes === -1 || currentWeeklyCount < limits.mealPlanning.weeklyRecipes;
   }
 
-  static async recordRecipeSave(user: User): Promise<void> {
-    if (!user?.id) return;
+  static async recordRecipeSave(_user: User): Promise<void> {
+    // Deprecated — use syncRecipeCount instead
+  }
 
+  static async recordRecipeDelete(_user: User): Promise<void> {
+    // Deprecated — use syncRecipeCount instead
+  }
+
+  /**
+   * Sync the recipes.used counter to match the actual number of saved recipes.
+   * This is the source-of-truth approach — avoids drift from increment/decrement.
+   */
+  static async syncRecipeCount(user: User, actualCount: number): Promise<void> {
+    if (!user?.id) return;
+    UsageService.limitsCache.delete(user.id);
     const usageRef = DatabaseMonitoringService.doc('users/' + user.id + '/usage/limits');
     await DatabaseMonitoringService.updateDoc(usageRef, {
-      'recipes.used': increment(1),
+      'recipes.used': Math.max(0, actualCount),
+      lastUpdated: new Date()
+    });
+  }
+
+  /**
+   * Sync the mealPlanning.weeklyUsed counter to the actual number of meal plan
+   * entries in the current week and future weeks. Past entries are excluded so they
+   * never count against the user's quota.
+   */
+  static async syncMealPlanCount(user: User, actualCurrentFutureCount: number): Promise<void> {
+    if (!user?.id) return;
+    UsageService.limitsCache.delete(user.id);
+    const usageRef = DatabaseMonitoringService.doc('users/' + user.id + '/usage/limits');
+    await DatabaseMonitoringService.updateDoc(usageRef, {
+      'mealPlanning.weeklyUsed': Math.max(0, actualCurrentFutureCount),
       lastUpdated: new Date()
     });
   }
 
   static async recordMealPlanAddition(user: User): Promise<void> {
     if (!user?.id) return;
-
+    UsageService.limitsCache.delete(user.id);
     const usageRef = DatabaseMonitoringService.doc('users/' + user.id + '/usage/limits');
     await DatabaseMonitoringService.updateDoc(usageRef, {
       'mealPlanning.weeklyUsed': increment(1),
@@ -247,7 +330,7 @@ class UsageService {
 
   static async recordGeminiUsage(user: User): Promise<void> {
     if (!user?.id) return;
-
+    UsageService.limitsCache.delete(user.id);
     const usageRef = DatabaseMonitoringService.doc('users/' + user.id + '/usage/limits');
     await DatabaseMonitoringService.updateDoc(usageRef, {
       'gemini.used': increment(1),
@@ -285,7 +368,7 @@ class UsageService {
     const householdDoc = await DatabaseMonitoringService.getDoc(householdRef);
     const currentMemberCount = householdDoc.exists() ? householdDoc.data().members?.length || 0 : 0;
 
-    // For free users: max 1 member (themselves)
+    // For free users: max 1 member (themselves only, no invites)
     // For premium: max 3 members
     // For family: max 5 members (user + 4 family members)
     const maxMembers = user.subscription?.tier === 'family' ? 5 :
@@ -305,7 +388,7 @@ class UsageService {
   static async updatePlanLimits(user: User, plan: 'free' | 'premium' | 'family'): Promise<void> {
     if (!user?.id) return;
 
-    const limits = this.PLAN_LIMITS[plan];
+    const limits = this.buildPlanLimits()[plan];
     const usageRef = DatabaseMonitoringService.doc('users/' + user.id + '/usage/limits');
 
     await DatabaseMonitoringService.updateDoc(usageRef, {
@@ -327,7 +410,22 @@ class UsageService {
   }
 
   static getPlanLimits(): PlanLimits {
-    return this.PLAN_LIMITS;
+    return this.buildPlanLimits();
+  }
+
+  static async resetUsage(user: User): Promise<void> {
+    if (!user?.id) return;
+    UsageService.limitsCache.delete(user.id);
+    const planLimits = this.buildPlanLimits()[user.subscription?.tier || 'free'];
+    const weekStart = this.getWeekStart(new Date());
+    const usageRef = DatabaseMonitoringService.doc('users/' + user.id + '/usage/limits');
+    await DatabaseMonitoringService.setDoc(usageRef, {
+      searches: { weekly: planLimits.searches.weekly, used: 0, resetDate: weekStart },
+      recipes: { max: planLimits.recipes.max, used: 0 },
+      mealPlanning: { weeklyRecipes: planLimits.mealPlanning.weeklyRecipes, weeklyUsed: 0, twoWeekPlanning: planLimits.mealPlanning.twoWeekPlanning, resetDate: weekStart },
+      gemini: { weekly: planLimits.gemini.weekly, used: 0, resetDate: weekStart },
+      lastUpdated: new Date()
+    });
   }
 }
 

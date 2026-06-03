@@ -8,8 +8,11 @@ import { serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 import { User, Household } from '../types';
 import { Tab } from '../types/app';
+import { log } from './logService';
 
 export class HouseholdActivityService {
+  // Throttle logActivity writes: at most one write per user per household per 30 seconds
+  private static lastWriteTime: Record<string, number> = {};
   /**
    * Update member's current activity and last seen
    */
@@ -24,7 +27,7 @@ export class HouseholdActivityService {
         [memberPath + '.isOnline']: true
       });
     } catch (err: any) {
-      console.error('Error updating member activity:', error);
+      log.error('Error updating member activity:', { err }, 'HouseholdActivityService');
     }
   }
 
@@ -40,7 +43,7 @@ export class HouseholdActivityService {
         [memberPath + '.isOnline']: false
       });
     } catch (err: any) {
-      console.error('Error marking member offline:', error);
+      log.error('Error marking member offline:', { err }, 'HouseholdActivityService');
     }
   }
 
@@ -56,6 +59,13 @@ export class HouseholdActivityService {
     itemId?: string,
     itemName?: string
   ) {
+    // Throttle: at most one activity write per user per household every 30 seconds
+    const throttleKey = `${householdId}:${userId}`;
+    const now = Date.now();
+    if (now - (HouseholdActivityService.lastWriteTime[throttleKey] ?? 0) < 30_000) {
+      return;
+    }
+    HouseholdActivityService.lastWriteTime[throttleKey] = now;
     try {
       const activityData = {
         userId,
@@ -71,7 +81,7 @@ export class HouseholdActivityService {
       const activityCollection = DatabaseMonitoringService.collection(`households/${householdId}/activity`);
       await DatabaseMonitoringService.addDoc(activityCollection, activityData);
     } catch (err: any) {
-      console.error('Error logging activity:', error);
+      log.error('Error logging activity:', { err }, 'HouseholdActivityService');
     }
   }
 
@@ -88,12 +98,15 @@ export class HouseholdActivityService {
       );
 
       const snapshot = await DatabaseMonitoringService.getDocs(activitiesQuery);
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+      return (snapshot.docs || []).map((doc: any) => {
+        const d = doc.data() as any;
+        return {
+          id: doc.id,
+          ...d
+        };
+      });
     } catch (err: any) {
-      console.error('Error getting recent activities:', error);
+      log.error('Error getting recent activities:', { err }, 'HouseholdActivityService');
       return [];
     }
   }
@@ -110,10 +123,13 @@ export class HouseholdActivityService {
     );
 
     return DatabaseMonitoringService.onSnapshot(activitiesQuery, (snapshot) => {
-      const activities = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+      const activities = (snapshot.docs || []).map((doc: any) => {
+        const d = doc.data() as any;
+        return {
+          id: doc.id,
+          ...d
+        };
+      });
       callback(activities);
     });
   }

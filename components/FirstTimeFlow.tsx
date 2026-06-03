@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { CheckCircle, ArrowRight, Sparkles, Users, ChefHat, Calendar } from 'lucide-react';
 import { Tab } from '../types/app';
 
@@ -32,7 +32,7 @@ export const FirstTimeFlow: React.FC<FirstTimeFlowProps> = ({
     {
       id: 'welcome',
       title: `Welcome, ${userName}!`,
-      description: 'Let\'s get your Smart Pantry Chef set up for the best experience. We\'ll guide you through the essentials.',
+      description: 'Let\'s get Stock & Spoon set up for the best experience. We\'ll guide you through the essentials.',
       icon: <Sparkles className="w-6 h-6 text-yellow-500" />,
       action: () => {},
       completed: true
@@ -91,8 +91,8 @@ export const FirstTimeFlow: React.FC<FirstTimeFlowProps> = ({
         <div className="p-6 border-b border-theme">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-serif font-bold text-theme-primary">
-              Get Started with Smart Pantry Chef
-            </h2>
+                Get Started with Stock & Spoon
+              </h2>
             <button
               onClick={handleSkip}
               className="text-theme-secondary/60 hover:text-theme-secondary transition-colors"
@@ -108,7 +108,7 @@ export const FirstTimeFlow: React.FC<FirstTimeFlowProps> = ({
               style={{ width: `${progressPercentage}%` }}
             />
           </div>
-          <p className="text-xs text-theme-secondary/70">
+          <p className="text-sm text-theme-secondary/70">
             {completedCount} of {steps.length} steps completed
           </p>
         </div>
@@ -126,6 +126,15 @@ export const FirstTimeFlow: React.FC<FirstTimeFlowProps> = ({
                   : 'bg-theme/5 border-theme hover:bg-theme/10'
               }`}
               onClick={() => handleStepClick(step)}
+              role="button"
+              tabIndex={0}
+              aria-label={`Open onboarding step: ${step.title}`}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  handleStepClick(step);
+                }
+              }}
             >
               <div className="flex items-start gap-3">
                 <div className={`flex-shrink-0 ${step.completed ? 'text-green-500' : ''}`}>
@@ -157,13 +166,14 @@ export const FirstTimeFlow: React.FC<FirstTimeFlowProps> = ({
             <button
               onClick={handleNext}
               className="flex-1 bg-[var(--accent-color)] hover:opacity-90 text-white py-3 px-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2"
+              data-testid="ftf-continue"
             >
               {currentStep === steps.length - 1 ? 'Get Cooking!' : 'Continue'}
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>
 
-          <p className="text-xs text-theme-secondary/60 text-center mt-3">
+          <p className="text-sm text-theme-secondary/60 text-center mt-3">
             You can always change these settings later in your account preferences.
           </p>
         </div>

@@ -25,6 +25,7 @@ export const ProgressiveImage: React.FC<ProgressiveImageProps> = ({
   const [imageError, setImageError] = useState(false);
   const [showPlaceholder, setShowPlaceholder] = useState(true);
   const [shouldLoad, setShouldLoad] = useState(!lazy);
+  const [retryCount, setRetryCount] = useState(0);
   const imgRef = React.useRef<HTMLImageElement>(null);
 
   useEffect(() => {
@@ -61,7 +62,7 @@ export const ProgressiveImage: React.FC<ProgressiveImageProps> = ({
     if (shouldLoad) {
       loadImage();
     }
-  }, [shouldLoad, src]);
+  }, [shouldLoad, src, retryCount]);
 
   const loadImage = () => {
     const img = new Image();
@@ -85,9 +86,20 @@ export const ProgressiveImage: React.FC<ProgressiveImageProps> = ({
     };
   };
 
-  // If there's an error and no placeholder, show nothing
+  // If there's an error and no placeholder, show a retry button
   if (imageError && !placeholderSrc) {
-    return null;
+    return (
+      <div className={`relative overflow-hidden flex items-center justify-center bg-theme-secondary/30 ${className}`}>
+        <button
+          onClick={() => { setImageError(false); setImageLoaded(false); setRetryCount(c => c + 1); }}
+          className="flex flex-col items-center gap-1 text-theme-secondary opacity-50 hover:opacity-80 transition-opacity"
+          aria-label="Retry loading image"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.51"/></svg>
+          <span className="text-xs">Retry</span>
+        </button>
+      </div>
+    );
   }
 
   return (

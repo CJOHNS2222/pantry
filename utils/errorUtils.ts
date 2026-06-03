@@ -1,5 +1,6 @@
 // utils/errorUtils.ts
 import { log } from '../services/logService';
+import AnalyticsService from '../services/analyticsService';
 export enum ErrorCode {
   // Network errors
   NETWORK_ERROR = 'NETWORK_ERROR',
@@ -32,6 +33,13 @@ export enum ErrorCode {
   // Unknown
   UNKNOWN_ERROR = 'UNKNOWN_ERROR'
 }
+// Add common error codes used in mappings
+export namespace ErrorCode {
+  export const NOT_FOUND = 'NOT_FOUND' as unknown as ErrorCode;
+  export const CONFLICT = 'CONFLICT' as unknown as ErrorCode;
+  export const RATE_LIMITED = 'RATE_LIMITED' as unknown as ErrorCode;
+}
+
 
 export class AppError extends Error {
   public readonly code: ErrorCode;
@@ -67,110 +75,162 @@ export class AppError extends Error {
 
     switch (firebaseError.code) {
       case 'permission-denied':
-        return new AppError(
-          ErrorCode.PERMISSION_DENIED,
-          firebaseError.message || 'Permission denied',
-          'You don\'t have permission to perform this action.',
-          { originalError: error, context, retryable: false }
-        );
+        AnalyticsService.trackError('firestore_error', firebaseError.message || 'Permission denied', 'errorUtils');
+        {
+          const opts: any = { originalError: error, retryable: false };
+          if (context) opts.context = context;
+          return new AppError(
+            ErrorCode.PERMISSION_DENIED,
+            firebaseError.message || 'Permission denied',
+            'You don\'t have permission to perform this action.',
+            opts
+          );
+        }
       case 'unavailable':
-        return new AppError(
-          ErrorCode.CONNECTION_LOST,
-          firebaseError.message || 'Service unavailable',
-          'Connection lost. Please check your internet connection and try again.',
-          { originalError: error, context, retryable: true }
-        );
+        AnalyticsService.trackError('firestore_error', firebaseError.message || 'Service unavailable', 'errorUtils');
+        {
+          const opts: any = { originalError: error, retryable: true };
+          if (context) opts.context = context;
+          return new AppError(
+            ErrorCode.CONNECTION_LOST,
+            firebaseError.message || 'Service unavailable',
+            'Connection lost. Please check your internet connection and try again.',
+            opts
+          );
+        }
       case 'deadline-exceeded':
-        return new AppError(
-          ErrorCode.TIMEOUT_ERROR,
-          firebaseError.message || 'Operation timed out',
-          'The operation took too long. Please try again.',
-          { originalError: error, context, retryable: true }
-        );
+        AnalyticsService.trackError('firestore_error', firebaseError.message || 'Operation timed out', 'errorUtils');
+        {
+          const opts: any = { originalError: error, retryable: true };
+          if (context) opts.context = context;
+          return new AppError(
+            ErrorCode.TIMEOUT_ERROR,
+            firebaseError.message || 'Operation timed out',
+            'The operation took too long. Please try again.',
+            opts
+          );
+        }
       default:
-        return new AppError(
-          ErrorCode.FIRESTORE_ERROR,
-          firebaseError.message || 'Database operation failed',
-          'Something went wrong. Please try again.',
-          { originalError: error, context, retryable: true }
-        );
+        AnalyticsService.trackError('firestore_error', firebaseError.message || 'Database operation failed', 'errorUtils');
+        {
+          const opts: any = { originalError: error, retryable: true };
+          if (context) opts.context = context;
+          return new AppError(
+            ErrorCode.FIRESTORE_ERROR,
+            firebaseError.message || 'Database operation failed',
+            'Something went wrong. Please try again.',
+            opts
+          );
+        }
     }
   }
 
   static fromNetworkError(error: any, context?: Record<string, any>): AppError {
     if (error instanceof TypeError && error.message.includes('fetch')) {
+      const opts: any = { originalError: error, retryable: true };
+      if (context) opts.context = context;
       return new AppError(
         ErrorCode.NETWORK_ERROR,
         error.message,
         'Network connection failed. Please check your internet connection.',
-        { originalError: error, context, retryable: true }
+        opts
       );
     }
 
     if (error.name === 'AbortError') {
+      const opts: any = { originalError: error, retryable: true };
+      if (context) opts.context = context;
       return new AppError(
         ErrorCode.TIMEOUT_ERROR,
         error.message,
         'Request timed out. Please try again.',
-        { originalError: error, context, retryable: true }
+        opts
       );
     }
 
-    return new AppError(
-      ErrorCode.API_ERROR,
-      error.message || 'Network request failed',
-      'Unable to connect to the service. Please try again later.',
-      { originalError: error, context, retryable: true }
-    );
+    {
+      const opts: any = { originalError: error, retryable: true };
+      if (context) opts.context = context;
+      return new AppError(
+        ErrorCode.API_ERROR,
+        error.message || 'Network request failed',
+        'Unable to connect to the service. Please try again later.',
+        opts
+      );
+    }
   }
 
   static fromApiError(response: Response, context?: Record<string, any>): AppError {
     switch (response.status) {
       case 401:
-        return new AppError(
-          ErrorCode.PERMISSION_DENIED,
-          `API returned ${response.status}`,
-          'Authentication required. Please sign in again.',
-          { statusCode: response.status, context, retryable: false }
-        );
+        {
+          const opts: any = { statusCode: response.status, retryable: false };
+          if (context) opts.context = context;
+          return new AppError(
+            ErrorCode.PERMISSION_DENIED,
+            `API returned ${response.status}`,
+            'Authentication required. Please sign in again.',
+            opts
+          );
+        }
       case 403:
-        return new AppError(
-          ErrorCode.INSUFFICIENT_PERMISSIONS,
-          `API returned ${response.status}`,
-          'You don\'t have permission to perform this action.',
-          { statusCode: response.status, context, retryable: false }
-        );
+        {
+          const opts: any = { statusCode: response.status, retryable: false };
+          if (context) opts.context = context;
+          return new AppError(
+            ErrorCode.INSUFFICIENT_PERMISSIONS,
+            `API returned ${response.status}`,
+            'You don\'t have permission to perform this action.',
+            opts
+          );
+        }
       case 404:
-        return new AppError(
-          ErrorCode.RESOURCE_NOT_FOUND,
-          `API returned ${response.status}`,
-          'The requested resource was not found.',
-          { statusCode: response.status, context, retryable: false }
-        );
+        {
+          const opts: any = { statusCode: response.status, retryable: false };
+          if (context) opts.context = context;
+          return new AppError(
+            ErrorCode.RESOURCE_NOT_FOUND,
+            `API returned ${response.status}`,
+            'The requested resource was not found.',
+            opts
+          );
+        }
       case 429:
-        return new AppError(
-          ErrorCode.API_RATE_LIMIT,
-          `API returned ${response.status}`,
-          'Too many requests. Please wait a moment and try again.',
-          { statusCode: response.status, context, retryable: true }
-        );
+        {
+          const opts: any = { statusCode: response.status, retryable: true };
+          if (context) opts.context = context;
+          return new AppError(
+            ErrorCode.API_RATE_LIMIT,
+            `API returned ${response.status}`,
+            'Too many requests. Please wait a moment and try again.',
+            opts
+          );
+        }
       case 500:
       case 502:
       case 503:
       case 504:
-        return new AppError(
-          ErrorCode.API_UNAVAILABLE,
-          `API returned ${response.status}`,
-          'Service is temporarily unavailable. Please try again later.',
-          { statusCode: response.status, context, retryable: true }
-        );
+        {
+          const opts: any = { statusCode: response.status, retryable: true };
+          if (context) opts.context = context;
+          return new AppError(
+            ErrorCode.API_UNAVAILABLE,
+            `API returned ${response.status}`,
+            'Service is temporarily unavailable. Please try again later.',
+            opts
+          );
+        }
       default:
-        return new AppError(
-          ErrorCode.API_ERROR,
-          `API returned ${response.status}`,
-          'An error occurred while communicating with the service.',
-          { statusCode: response.status, context, retryable: true }
-        );
+        {
+          const opts: any = { statusCode: response.status, retryable: true };
+          if (context) opts.context = context;
+          return new AppError(
+            ErrorCode.API_ERROR,
+            `API returned ${response.status}`,
+            'An error occurred while communicating with the service.',
+            opts
+          );
+        }
     }
   }
 }
@@ -194,20 +254,26 @@ export async function withErrorHandling<T>(
     try {
       return await operation();
     } catch (err: any) {
-      lastError = err instanceof AppError ? err : new AppError(
-        ErrorCode.UNKNOWN_ERROR,
-        err instanceof Error ? err.message : 'Unknown error occurred',
-        'An unexpected error occurred. Please try again.',
-        { originalError: err instanceof Error ? err : undefined, context, retryable: false }
-      );
+      if (err instanceof AppError) {
+        lastError = err;
+      } else {
+        const opts: any = { retryable: false, context: context ?? {} };
+        if (err instanceof Error) opts.originalError = err;
+        lastError = new AppError(
+          ErrorCode.UNKNOWN_ERROR,
+          err instanceof Error ? err.message : 'Unknown error occurred',
+          'An unexpected error occurred. Please try again.',
+          opts
+        );
+      }
 
       // Log error for debugging
       log.error(`Operation failed (attempt ${attempt + 1}/${retries + 1})`, {
         code: lastError.code,
         message: lastError.message,
-        context,
+        context: context ?? {},
         retryable: lastError.retryable
-      }, 'ErrorUtils');
+      } as any, 'ErrorUtils');
 
       // If this is the last attempt or error is not retryable, throw
       if (attempt === retries || !lastError.retryable) {
@@ -238,12 +304,19 @@ export async function safeAsync<T>(
     const data = await operation();
     return { success: true, data };
   } catch (err: any) {
-    const appError = err instanceof AppError ? err : new AppError(
-      ErrorCode.UNKNOWN_ERROR,
-      err instanceof Error ? err.message : 'Unknown error occurred',
-      'An unexpected error occurred.',
-      { originalError: err instanceof Error ? err : undefined, context, retryable: false }
-    );
+    let appError: AppError;
+    if (err instanceof AppError) {
+      appError = err;
+    } else {
+      const opts: any = { retryable: false, context: context ?? {} };
+      if (err instanceof Error) opts.originalError = err;
+      appError = new AppError(
+        ErrorCode.UNKNOWN_ERROR,
+        err instanceof Error ? err.message : 'Unknown error occurred',
+        'An unexpected error occurred.',
+        opts
+      );
+    }
     return { success: false, error: appError };
   }
 }
@@ -262,7 +335,7 @@ export async function withFirebaseRetry<T>(
     try {
       return await operation();
     } catch (err: any) {
-      lastError = error instanceof Error ? error : new Error(String(error));
+      lastError = err instanceof Error ? err : new Error(String(err));
 
       // Check if this is a retryable Firebase error
       const isRetryable = isFirebaseRetryableError(lastError);
@@ -275,9 +348,8 @@ export async function withFirebaseRetry<T>(
           `Operation failed: ${context}`,
           {
             originalError: lastError,
-            context,
-            retryable: isRetryable,
-            attempts: attempt
+            context: { context, attempts: attempt },
+            retryable: isRetryable
           }
         );
 

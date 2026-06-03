@@ -1,5 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
-import { offlineQueue } from '../services/offlineQueueService';
+// Note: The custom offline queue is intentionally not used here — Firebase SDK
+// handles offline persistence and write queuing natively. This hook's sole job
+// is to track real network connectivity so the UI can reflect offline state.
+import { useState, useEffect } from 'react';
+import { Network } from '@capacitor/network';
+import { Capacitor } from '@capacitor/core';
 
 export interface SyncStatus {
   isOnline: boolean;
@@ -24,147 +28,55 @@ export const useOfflineStatus = () => {
     pendingOperations: 0,
     syncError: null,
     syncProgress: null,
-    hasConflicts: false
+    hasConflicts: false,
   });
 
-  // Initialize offline queue and load initial state
   useEffect(() => {
-    const initOfflineQueue = async () => {
-      try {
-        await offlineQueue.init();
-        const pendingCount = await offlineQueue.getPendingCount();
-        const conflicts = await offlineQueue.getConflicts();
+    const setOnline = (online: boolean) =>
+      setSyncStatus(prev => ({ ...prev, isOnline: online }));
 
-        setSyncStatus(prev => ({
-          ...prev,
-          pendingOperations: pendingCount,
-          hasConflicts: conflicts.length > 0
-        }));
-      } catch (err: any) {
-        console.error('Failed to initialize offline queue:', error);
-      }
-    };
-
-    initOfflineQueue();
-  }, []);
-
-  useEffect(() => {
-    const handleOnline = () => {
-      setSyncStatus(prev => ({
-        ...prev,
-        isOnline: true,
-        syncError: null
-      }));
-    };
-
-    const handleOffline = () => {
-      setSyncStatus(prev => ({
-        ...prev,
-        isOnline: false
-      }));
-    };
-
-    // Listen for online/offline events
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
-    // Initial check
-    setSyncStatus(prev => ({
-      ...prev,
-      isOnline: navigator.onLine
-    }));
-
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
-
-  const updateSyncStatus = (updates: Partial<SyncStatus>) => {
-    setSyncStatus(prev => ({
-      ...prev,
-      ...updates
-    }));
-  };
-
-  const startSync = () => {
-    setSyncStatus(prev => ({
-      ...prev,
-      isSyncing: true,
-      syncError: null,
-      syncProgress: { total: 0, completed: 0, failed: 0, conflicts: 0 }
-    }));
-  };
-
-  const endSync = (success: boolean = true, error?: string) => {
-    setSyncStatus(prev => ({
-      ...prev,
-      isSyncing: false,
-      lastSyncTime: success ? new Date() : prev.lastSyncTime,
-      syncError: error || null,
-      syncProgress: null
-    }));
-  };
-
-  const setPendingOperations = (count: number) => {
-    setSyncStatus(prev => ({
-      ...prev,
-      pendingOperations: count
-    }));
-  };
-
-  // Enhanced sync method with progress tracking
-  const syncNow = useCallback(async () => {
-    if (!syncStatus.isOnline || syncStatus.isSyncing) {
-      return;
-    }
-
-    startSync();
-
-    try {
-      const progress = await offlineQueue.processQueueWithSync((progress) => {
-        setSyncStatus(prev => ({
-          ...prev,
-          syncProgress: progress
-        }));
+    if (Capacitor.isNativePlatform()) {
+      // Use hardware-level network detection on iOS/Android
+      let removeListener: (() => void) | null = null;
+      Network.addListener('networkStatusChange', status => {
+        setOnline(status.connected);
+      }).then(handle => {
+        removeListener = () => handle.remove();
       });
-
-      // Update pending operations and conflicts after sync
-      const pendingCount = await offlineQueue.getPendingCount();
-      const conflicts = await offlineQueue.getConflicts();
-
-      setSyncStatus(prev => ({
-        ...prev,
-        pendingOperations: pendingCount,
-        hasConflicts: conflicts.length > 0,
-        syncProgress: progress
-      }));
-
-      endSync(true);
-    } catch (err: any) {
-      const errorMessage = error instanceof Error ? error.message : 'Sync failed';
-      endSync(false, errorMessage);
+      Network.getStatus().then(status => setOnline(status.connected)).catch(() => {
+        setOnline(navigator.onLine);
+      });
+      return () => { removeListener?.(); };
+    } else {
+      // Web: use browser online/offline events
+      const handleOnline = () => setOnline(true);
+      const handleOffline = () => setOnline(false);
+      window.addEventListener('online', handleOnline);
+      window.addEventListener('offline', handleOffline);
+      return () => {
+        window.removeEventListener('online', handleOnline);
+        window.removeEventListener('offline', handleOffline);
+      };
     }
-  }, [syncStatus.isOnline, syncStatus.isSyncing]);
+  }, []);
 
-  // Auto-sync when coming back online
-  useEffect(() => {
-    if (syncStatus.isOnline && !syncStatus.isSyncing && syncStatus.pendingOperations > 0) {
-      // Debounce auto-sync to avoid immediate sync on every online event
-      const timeoutId = setTimeout(() => {
-        syncNow();
-      }, 2000);
-
-      return () => clearTimeout(timeoutId);
-    }
-  }, [syncStatus.isOnline, syncStatus.pendingOperations, syncStatus.isSyncing, syncNow]);
+  // These are kept for API compatibility but are no-ops. Firebase SDK manages
+  // its own write queue — no manual sync needed.
+  const updateSyncStatus = (updates: Partial<SyncStatus>) =>
+    setSyncStatus(prev => ({ ...prev, ...updates }));
+  const startSync = () => {};
+  const endSync = (_success?: boolean, _error?: string) => {};
+  const setPendingOperations = (_count: number) => {};
+  const syncNow = async () => {};
 
   return {
     syncStatus,
+    isOnline: syncStatus.isOnline,
     updateSyncStatus,
     startSync,
     endSync,
     setPendingOperations,
-    syncNow
+    syncNow,
   };
 };
+

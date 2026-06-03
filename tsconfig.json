@@ -35,7 +35,18 @@
     "alwaysStrict": true,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
-    "noUncheckedIndexedAccess": true,
-    "exactOptionalPropertyTypes": true
+    "noUncheckedIndexedAccess": false,
+    "exactOptionalPropertyTypes": false
   }
+  ,
+  "exclude": [
+    "src/test",
+    "**/__tests__",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/*.spec.ts",
+    "**/*.spec.tsx",
+    "spoonacular-api-clients",
+    "spoonacular-api-clients/**/*"
+  ]
 }

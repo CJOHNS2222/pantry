@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, X, ArrowRight, Gift } from 'lucide-react';
+import { Sparkles, X, ArrowRight } from 'lucide-react';
+import { type OnboardingMilestone, hasMilestone } from '../services/onboardingMilestoneService';
 
 interface FeatureDiscoveryProps {
   featureId: string;
@@ -13,6 +14,8 @@ interface FeatureDiscoveryProps {
   actionLabel?: string;
   autoHideDelay?: number;
   showSparkles?: boolean;
+  /** If provided, this discovery is suppressed until the user has reached the given milestone. */
+  requiredMilestone?: OnboardingMilestone;
 }
 
 export const FeatureDiscovery: React.FC<FeatureDiscoveryProps> = ({
@@ -237,11 +240,15 @@ export const FeatureDiscoveryManager: React.FC<FeatureDiscoveryManagerProps> = (
   const [queue, setQueue] = useState<FeatureDiscoveryProps[]>([]);
 
   useEffect(() => {
-    // Check which discoveries haven't been seen
+    // Check which discoveries haven't been seen AND whose milestone has been reached
     const discoveredFeatures = JSON.parse(localStorage.getItem('discovered-features') || '[]');
 
     const newDiscoveries = discoveries
       .filter(discovery => !discoveredFeatures.includes(discovery.featureId))
+      .filter(discovery =>
+        // If a required milestone is specified, gate on it; otherwise always eligible
+        !discovery.requiredMilestone || hasMilestone(discovery.requiredMilestone)
+      )
       .map(discovery => ({
         ...discovery,
         onDismiss: () => handleDiscoveryDismiss(discovery.featureId)

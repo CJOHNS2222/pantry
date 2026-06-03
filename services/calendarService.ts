@@ -1,6 +1,6 @@
 import { Capacitor } from '@capacitor/core';
-import { CapacitorCalendar } from 'capacitor-calendar';
 import { DayPlan } from '../types';
+import { log } from './logService';
 
 /**
  * CalendarEvent interface for Capacitor Calendar plugin
@@ -42,7 +42,7 @@ class CalendarService {
    */
   async requestPermissions(): Promise<boolean> {
     if (!this.isAvailable()) {
-      console.warn('Calendar plugin not available');
+      log.warn('Calendar plugin not available', {}, 'CalendarService');
       return false;
     }
 
@@ -51,7 +51,7 @@ class CalendarService {
       // Permissions are handled automatically by the native platforms
       return true;
     } catch (err: any) {
-      console.error('Error requesting calendar permissions:', error);
+      log.error('Error requesting calendar permissions', err, 'CalendarService');
       return false;
     }
   }
@@ -71,7 +71,7 @@ class CalendarService {
       // We'll assume permissions are granted if the plugin is available
       return true;
     } catch (err: any) {
-      console.error('Error checking calendar permissions:', error);
+      log.error('Error checking calendar permissions', err, 'CalendarService');
       return false;
     }
   }
@@ -84,7 +84,7 @@ class CalendarService {
    */
   async createMealPlanEvent(dayPlan: DayPlan, date: Date): Promise<boolean> {
     if (!this.isAvailable()) {
-      console.warn('Calendar plugin not available');
+      log.warn('Calendar plugin not available', {}, 'CalendarService');
       return false;
     }
 
@@ -97,28 +97,35 @@ class CalendarService {
         }
       }
 
-      const mealTitles = dayPlan.meals
+      const mealTitles = (dayPlan.meals || [])
         .filter(meal => meal.recipe)
-        .map(meal => `${meal.type}: ${meal.recipe!.title}`)
+        .map(meal => `${(meal as any).mealType || (meal as any).type}: ${meal.recipe!.title}`)
         .join('\n');
 
       if (!mealTitles) {
-        console.warn('No meals with recipes found in day plan');
+        log.warn('No meals with recipes found in day plan', {}, 'CalendarService');
         return false;
       }
 
       const event: CalendarEvent = {
         title: `Meal Plan - ${date.toLocaleDateString()}`,
-        notes: `Smart Pantry Meal Plan\n\n${mealTitles}\n\nTotal calories: ${dayPlan.totalCalories || 'Not calculated'}`,
+        notes: `Smart Pantry Meal Plan\n\n${mealTitles}\n\nTotal calories: ${(dayPlan as any).totalCalories || 'Not calculated'}`,
         startDate: date.getTime(),
         endDate: new Date(date.getTime() + 24 * 60 * 60 * 1000).getTime(), // Next day
         allDay: true
       };
-
-      await CapacitorCalendar.createEvent(event);
+      // Use plugin via Capacitor Plugins to avoid import/type issues
+      const plugin = (Capacitor as any).Plugins?.CapacitorCalendar || (globalThis as any).CapacitorCalendar;
+      if (plugin && typeof plugin.createEvent === 'function') {
+        await plugin.createEvent(event);
+      } else if ((Capacitor as any).createEvent) {
+        await (Capacitor as any).createEvent(event);
+      } else {
+        log.warn('CapacitorCalendar plugin not available to create event', {}, 'CalendarService');
+      }
       return true;
     } catch (err: any) {
-      console.error('Error creating calendar event:', error);
+      log.error('Error creating calendar event', err, 'CalendarService');
       return false;
     }
   }
@@ -131,7 +138,7 @@ class CalendarService {
    */
   async createCookingReminder(recipeTitle: string, scheduledTime: Date): Promise<boolean> {
     if (!this.isAvailable()) {
-      console.warn('Calendar plugin not available');
+      log.warn('Calendar plugin not available', {}, 'CalendarService');
       return false;
     }
 
@@ -152,10 +159,17 @@ class CalendarService {
         allDay: false
       };
 
-      await CapacitorCalendar.createEvent(event);
+      const plugin = (Capacitor as any).Plugins?.CapacitorCalendar || (globalThis as any).CapacitorCalendar;
+      if (plugin && typeof plugin.createEvent === 'function') {
+        await plugin.createEvent(event);
+      } else if ((Capacitor as any).createEvent) {
+        await (Capacitor as any).createEvent(event);
+      } else {
+        log.warn('CapacitorCalendar plugin not available to create event', {}, 'CalendarService');
+      }
       return true;
     } catch (err: any) {
-      console.error('Error creating cooking reminder:', error);
+      log.error('Error creating cooking reminder', err, 'CalendarService');
       return false;
     }
   }
@@ -167,17 +181,104 @@ class CalendarService {
    */
   async openCalendarAtDate(date: Date): Promise<void> {
     if (!this.isAvailable()) {
-      console.warn('Calendar plugin not available');
+      log.warn('Calendar plugin not available', {}, 'CalendarService');
       return;
     }
 
     try {
-      await CapacitorCalendar.openCalendar({
-        date: date.getTime()
-      });
+      const plugin = (Capacitor as any).Plugins?.CapacitorCalendar || (globalThis as any).CapacitorCalendar;
+      if (plugin && typeof plugin.openCalendar === 'function') {
+        await plugin.openCalendar({ date: date.getTime() });
+      } else if ((Capacitor as any).openCalendar) {
+        await (Capacitor as any).openCalendar({ date: date.getTime() });
+      } else {
+        log.warn('CapacitorCalendar plugin not available to open calendar', {}, 'CalendarService');
+      }
     } catch (err: any) {
-      console.error('Error opening calendar:', error);
+      log.error('Error opening calendar', err, 'CalendarService');
     }
+  }
+
+  /**
+   * Export a week of meal plans as an ICS file (web) or native calendar events (mobile).
+   * @param {DayPlan[]} days - Array of DayPlan objects to export
+   * @returns {Promise<void>}
+   */
+  async exportWeekAsICS(days: DayPlan[]): Promise<void> {
+    const platform = Capacitor.getPlatform();
+
+    if (platform !== 'web' && this.isAvailable()) {
+      // Mobile: create native calendar events
+      for (const day of days) {
+        const allMeals = [
+          ...(day.breakfast || []),
+          ...(day.lunch || []),
+          ...(day.dinner || []),
+          ...(day.meals || []),
+        ];
+        if (allMeals.length === 0) continue;
+        const date = new Date(day.date + 'T12:00:00');
+        await this.createMealPlanEvent(day, date);
+      }
+      return;
+    }
+
+    // Web: generate and download an ICS file
+    const escape = (str: string) =>
+      str.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
+
+    const lines: string[] = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//Stock & Spoon//EN',
+      'CALSCALE:GREGORIAN',
+      'METHOD:PUBLISH',
+    ];
+
+    for (const day of days) {
+      const allMeals = [
+        ...(day.breakfast || []).map(m => ({ type: 'Breakfast', ...m })),
+        ...(day.lunch || []).map(m => ({ type: 'Lunch', ...m })),
+        ...(day.dinner || []).map(m => ({ type: 'Dinner', ...m })),
+        ...(day.meals || []).map(m => ({ type: (m as any).mealType || 'Meal', ...m })),
+      ];
+      if (allMeals.length === 0) continue;
+
+      // Format date as YYYYMMDD (ICS all-day format)
+      const dateStr = day.date.replace(/-/g, '');
+      const nextDate = new Date(day.date + 'T00:00:00');
+      nextDate.setDate(nextDate.getDate() + 1);
+      const nextDateStr = nextDate.toISOString().slice(0, 10).replace(/-/g, '');
+
+      const description = allMeals
+        .map(m => `${m.type}: ${m.recipe?.title || 'Unknown'}`)
+        .join('\\n');
+
+      const uid = `stockandspoon-${day.date}-${Math.random().toString(36).substr(2, 6)}@stockandspoon.app`;
+
+      lines.push(
+        'BEGIN:VEVENT',
+        `DTSTART;VALUE=DATE:${dateStr}`,
+        `DTEND;VALUE=DATE:${nextDateStr}`,
+        `SUMMARY:${escape('Meal Plan – ' + day.dayName)}`,
+        `DESCRIPTION:${escape(description)}`,
+        `UID:${uid}`,
+        'END:VEVENT',
+      );
+    }
+
+    lines.push('END:VCALENDAR');
+
+    const icsContent = lines.join('\r\n');
+    const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'meal-plan.ics';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   }
 }
 

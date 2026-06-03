@@ -1,12 +1,14 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Notification Service
  * Manages contextual notifications, timing, and user preferences
  */
 
 import DatabaseMonitoringService from './databaseMonitoringService';
-import { serverTimestamp, Timestamp } from 'firebase/firestore';
-import { User } from '../types';
-import { pushNotificationService } from './pushNotificationService';
+import { Timestamp } from 'firebase/firestore';
+import { appendNotificationToUser, snoozeNotificationInCache, updateNotificationInCache } from './notificationsService';
+import { formatDangerSummary, DangerItem } from './notificationHelpers';
+import { getFoodRiskLevel, generateExpirationMessage, getNotificationTone, generateNotificationStackMessage, generateWasteNotificationMessage } from '../utils/foodRiskClassification';
 
 export interface NotificationItem {
   id: string;
@@ -22,6 +24,7 @@ export interface NotificationItem {
   createdAt: Timestamp;
   expiresAt?: Timestamp;
   snoozedUntil?: Timestamp;
+  dedupeKey?: string;
 }
 
 export interface NotificationSettings {
@@ -39,11 +42,12 @@ export interface NotificationSettings {
     system: boolean;
     allergy_alert: boolean;
     household_invite: boolean;
+    expired_items_check: boolean;
   };
 }
 
 export class NotificationService {
-  private static readonly COLLECTION = 'notifications';
+  static readonly COLLECTION = 'notifications';
 
   /**
    * Create a contextual notification
@@ -52,12 +56,27 @@ export class NotificationService {
     userId: string,
     notification: Omit<NotificationItem, 'id' | 'userId' | 'read' | 'createdAt'>
   ): Promise<string> {
-    const docRef = await DatabaseMonitoringService.addDoc(DatabaseMonitoringService.collection(this.COLLECTION), {
+    // Use per-user cached notifications to reduce reads/writes
+    const id = crypto.randomUUID();
+    const item: any = {
+      id,
       userId,
       read: false,
-      createdAt: serverTimestamp(),
+      // Use client-side ISO timestamp for cached array entries (serverTimestamp
+      // is not supported inside arrays).
+      createdAt: new Date().toISOString(),
       ...notification
-    });
+    };
+
+    try {
+      await appendNotificationToUser(userId, item as any);
+    } catch (err: any) {
+      // Log the error but don't fallback to inefficient root collection
+      console.error('Failed to append notification to user cache:', {
+        error: err?.message || err
+      });
+      throw err; // Re-throw to prevent silent failures
+    }
 
     // Send push notification for urgent notifications only (expired items)
     if (notification.priority === 'urgent') {
@@ -65,11 +84,116 @@ export class NotificationService {
         await this.sendPushNotification(userId, notification);
       } catch (err: any) {
         console.error('Failed to send push notification:', err);
-        // Don't fail the whole operation if push notification fails
       }
     }
 
-    return docRef.id;
+    return id;
+  }
+
+  /**
+   * Create an aggregated Danger Zone notification for multiple high-risk items
+   */
+  static async createDangerZoneAlert(userId: string, items: DangerItem[]) {
+    if (!items || items.length === 0) return ''
+    const { title, message, priority } = formatDangerSummary(items)
+
+    const actionData = { items: items.map(i => ({ itemId: i.itemId, itemName: i.itemName })) }
+
+    return this.createNotification(userId, {
+      type: 'expiration',
+      title,
+      message,
+      actionLabel: 'View Items',
+      actionType: 'view_item',
+      actionData,
+      priority: priority,
+      dedupeKey: 'expiration_danger_zone',
+      expiresAt: Timestamp.fromDate(new Date(Date.now() + 3 * 24 * 60 * 60 * 1000))
+    })
+  }
+
+  /**
+   * Create notification stack for multiple expiring items (prevents notification fatigue)
+   */
+  static async createNotificationStack(
+    userId: string,
+    items: Array<{ itemName: string; daysUntilExpiry: number; riskLevel: number; itemId: string }>
+  ): Promise<string> {
+    if (!items || items.length <= 1) return '';
+
+    // Only create stack notification if there are multiple items expiring today or high-risk items
+    const urgentItems = items.filter(item => item.daysUntilExpiry <= 0 || item.riskLevel >= 5);
+    const highRiskItems = items.filter(item => item.riskLevel >= 4);
+
+    if (urgentItems.length <= 1 && highRiskItems.length <= 1) return '';
+
+    // Check if stack notification already exists
+    const existingNotifications = await NotificationService.getUnreadNotifications(userId);
+    const existingStack = existingNotifications.find(n =>
+      n.type === 'expiration' &&
+      n.actionData?.isStack === true &&
+      !n.read
+    );
+
+    if (existingStack) {
+      // Update existing stack notification
+      const { title, message } = generateNotificationStackMessage(items);
+
+      const updateData = {
+        title,
+        message,
+        actionData: { isStack: true, items: items.map(i => ({ itemId: i.itemId, itemName: i.itemName, daysUntilExpiry: i.daysUntilExpiry, riskLevel: i.riskLevel })) }
+      };
+
+      try {
+        await updateNotificationInCache(userId, existingStack.id, updateData as any);
+      } catch (err: any) {
+        console.error('Failed to update stack notification:', err);
+      }
+
+      return existingStack.id;
+    }
+
+      // Create new stack notification
+    const { title, message } = generateNotificationStackMessage(items);
+
+    return this.createNotification(userId, {
+      type: 'expiration',
+      title,
+      message,
+      actionLabel: 'View Items',
+      actionType: 'view_item',
+      actionData: {
+        isStack: true,
+        items: items.map(i => ({ itemId: i.itemId, itemName: i.itemName, daysUntilExpiry: i.daysUntilExpiry, riskLevel: i.riskLevel }))
+      },
+      priority: urgentItems.length > 0 ? 'urgent' : highRiskItems.length > 0 ? 'high' : 'medium',
+      dedupeKey: 'expiration_stack',
+      expiresAt: Timestamp.fromDate(new Date(Date.now() + 3 * 24 * 60 * 60 * 1000))
+    });
+  }
+
+  /**
+   * Create waste notification when user tosses an item
+   */
+  static async createWasteNotification(
+    userId: string,
+    itemName: string,
+    itemId: string
+  ): Promise<string> {
+    const { title, message, actionLabel, actionType } = generateWasteNotificationMessage(itemName);
+
+    return this.createNotification(userId, {
+      type: 'system',
+      title,
+      message,
+      actionLabel,
+      actionType,
+      actionData: { itemId, itemName, wasteNotification: true },
+      priority: 'low',
+      dedupeKey: `waste_${itemId}`,
+      expiresAt: Timestamp.fromDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000))
+    });
   }
 
   /**
@@ -79,61 +203,102 @@ export class NotificationService {
     userId: string,
     itemName: string,
     daysUntilExpiry: number,
-    itemId: string
+    itemId: string,
+    userRiskLevel?: number,
+    itemCategory?: string,
+    cachedNotifications?: NotificationItem[]
   ): Promise<string> {
     // Check if notification already exists for this item
-    const existingNotifications = await this.getUnreadNotifications(userId);
+    const existingNotifications = cachedNotifications ?? await NotificationService.getUnreadNotifications(userId);
     const existingNotification = existingNotifications.find(n =>
       n.type === 'expiration' &&
       n.actionData?.itemId === itemId &&
       !n.read
     );
 
+    // Determine risk level for this item
+    const itemRiskLevel = getFoodRiskLevel(itemName, itemCategory);
+
+    // Skip low-value notifications:
+    // - Staples (1): don't meaningfully expire, "Inventory Check" is noise
+    // - Hardy Fridge (2): "Checking In" adds no value if everything is fine
+    if (itemRiskLevel <= 2) {
+      return '';
+    }
+
+    // Produce (3) only warrants a notification when truly imminent — skip generic "Expires Soon" spam
+    if (itemRiskLevel === 3 && daysUntilExpiry > 3) {
+      return '';
+    }
+
+    const { priority: basePriority } = getNotificationTone(itemRiskLevel);
+
+    // Adjust priority based on user risk level and time sensitivity
+    let finalPriority = basePriority;
+    if (userRiskLevel && userRiskLevel >= 4) {
+      // Bump priority for high-risk users
+      if (daysUntilExpiry <= 3) {
+        if (finalPriority === 'low') finalPriority = 'medium';
+        else if (finalPriority === 'medium') finalPriority = 'high';
+        else if (finalPriority === 'high') finalPriority = 'urgent';
+      }
+    }
+
+    // Override for expired items
+    if (daysUntilExpiry <= 0) {
+      finalPriority = 'urgent';
+    }
+
     if (existingNotification) {
       // Update existing notification if priority changed or days changed
       const currentPriority = existingNotification.priority;
-      const newPriority = daysUntilExpiry <= 0 ? 'urgent' :
-                         daysUntilExpiry === 1 ? 'high' :
-                         daysUntilExpiry <= 3 ? 'medium' : 'low';
 
-      if (currentPriority !== newPriority) {
-        await DatabaseMonitoringService.updateDoc(DatabaseMonitoringService.doc(this.COLLECTION + '/' + existingNotification.id), {
-          priority: newPriority,
-          title: daysUntilExpiry <= 0 ? 'Item Expired!' :
-                 daysUntilExpiry === 1 ? 'Expires Tomorrow!' :
-                 daysUntilExpiry <= 3 ? 'Expires Soon' : 'Expires This Week',
-          message: daysUntilExpiry <= 0 ? `${itemName} has expired and was moved to shopping list` :
-                  `${itemName} expires in ${daysUntilExpiry} days`
-        });
+      if (currentPriority !== finalPriority) {
+        const { title, message } = generateExpirationMessage(itemName, daysUntilExpiry, itemRiskLevel);
+
+        const updateData = {
+          priority: finalPriority,
+          title,
+          message
+        };
+
+        // Try to update the top-level notification document; if that fails
+        // (e.g., the notification only exists in the per-user cache or the
+        // client is not authorized to write to the collection), fall back
+        // to updating the per-user cache document.
+        try {
+          const docRef = DatabaseMonitoringService.doc(this.COLLECTION + '/' + existingNotification.id);
+          // Check existence first to avoid permission-denied when doc is missing
+          const topSnap = await DatabaseMonitoringService.getDoc(docRef);
+          if (topSnap && topSnap.exists()) {
+            await DatabaseMonitoringService.updateDoc(docRef, updateData as any);
+          } else {
+            // No top-level doc — update the per-user cache instead
+            await updateNotificationInCache(userId, existingNotification.id, updateData as any);
+          }
+        } catch (err: any) {
+          console.warn('Failed updating top-level notification; falling back to cache update', { error: err?.message || err, userId });
+          try {
+            await updateNotificationInCache(userId, existingNotification.id, updateData as any);
+          } catch (cacheErr: any) {
+            console.error('Failed to update notification in user cache fallback:', { error: cacheErr?.message || cacheErr, userId, notificationId: existingNotification.id });
+          }
+        }
       }
       return existingNotification.id;
     }
 
-    let priority: 'low' | 'medium' | 'high' | 'urgent' = 'low';
-    let title = '';
-    let message = '';
-    let actionLabel = '';
+    // Generate contextual message based on risk level
+    const { title, message } = generateExpirationMessage(itemName, daysUntilExpiry, itemRiskLevel);
 
-    if (daysUntilExpiry <= 0) {
-      priority = 'urgent';
-      title = 'Item Expired!';
-      message = `${itemName} has expired and was moved to shopping list`;
-      actionLabel = 'View Shopping List';
-    } else if (daysUntilExpiry === 1) {
-      priority = 'high';
-      title = 'Expires Tomorrow!';
-      message = `${itemName} expires tomorrow`;
+    // Determine action type based on context
+    let actionType: 'add_to_shopping' | 'view_item' = 'view_item';
+    let actionLabel = 'View Item';
+    const actionData: any = { itemId, itemName };
+
+    if (daysUntilExpiry <= 1 || itemRiskLevel >= 4) {
+      actionType = 'add_to_shopping';
       actionLabel = 'Add to Shopping List';
-    } else if (daysUntilExpiry <= 3) {
-      priority = 'medium';
-      title = 'Expires Soon';
-      message = `${itemName} expires in ${daysUntilExpiry} days`;
-      actionLabel = 'Add to Shopping List';
-    } else if (daysUntilExpiry <= 7) {
-      priority = 'low';
-      title = 'Expires This Week';
-      message = `${itemName} expires in ${daysUntilExpiry} days`;
-      actionLabel = 'View Item';
     }
 
     return this.createNotification(userId, {
@@ -141,9 +306,10 @@ export class NotificationService {
       title,
       message,
       actionLabel,
-      actionType: daysUntilExpiry <= 1 ? 'add_to_shopping' : 'view_item',
-      actionData: { itemId, itemName },
-      priority,
+      actionType,
+      actionData,
+      priority: finalPriority,
+      dedupeKey: `expiration_${itemId}`,
       expiresAt: Timestamp.fromDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)) // Expire in 7 days
     });
   }
@@ -299,42 +465,57 @@ export class NotificationService {
   /**
    * Get unread notifications for user
    */
-  static async getUnreadNotifications(userId: string, userEmail?: string): Promise<NotificationItem[]> {
+  static async getUnreadNotifications(userId: string, _userEmail?: string): Promise<NotificationItem[]> {
     try {
-      // Query for notifications where userId matches the user's ID
-      const q = DatabaseMonitoringService.query(
-        DatabaseMonitoringService.collection(this.COLLECTION),
-        DatabaseMonitoringService.where('userId', '==', userId),
-        DatabaseMonitoringService.orderBy('createdAt', 'desc'),
-        DatabaseMonitoringService.limit(50)
-      );
+      // Read from per-user cache document instead of querying root collection
+      const cacheRef = DatabaseMonitoringService.doc(`users/${userId}/cache/notifications`);
+      const cacheSnap = await DatabaseMonitoringService.getDoc(cacheRef);
 
-      const querySnapshot = await DatabaseMonitoringService.getDocs(q);
-      const allNotifications = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as NotificationItem));
+      if (!cacheSnap.exists()) {
+        return [];
+      }
 
-      // Filter for unread notifications in memory and check snooze status
-      const unreadNotifications = allNotifications.filter(notification => {
-        const isRead = notification.read;
-        const isSnoozed = notification.snoozedUntil && notification.snoozedUntil.toDate() > new Date();
-        return !isRead && !isSnoozed;
+      const data = cacheSnap.data() as any;
+      const allNotifications = Array.isArray(data.items) ? data.items : [];
+
+      // Filter for unread notifications from the last 30 days
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+      const unreadNotifications = allNotifications.filter((n: NotificationItem) => {
+        if (n.read) return false;
+
+        // Check if notification is within 30 days
+        let createdAt: Date | null = null;
+        if (n.createdAt) {
+          if (typeof n.createdAt === 'string') {
+            createdAt = new Date(n.createdAt);
+          } else if (n.createdAt && typeof n.createdAt.toDate === 'function') {
+            createdAt = n.createdAt.toDate();
+          }
+        }
+        if (!createdAt || createdAt < thirtyDaysAgo) return false;
+
+        return true;
       });
 
-      // Remove duplicates and sort by createdAt desc, limit to 20
-      const uniqueNotifications = unreadNotifications
-        .filter((notification, index, self) => 
-          index === self.findIndex(n => n.id === notification.id)
-        )
-        .sort((a, b) => {
-          const aTime = a.createdAt?.toMillis() || 0;
-          const bTime = b.createdAt?.toMillis() || 0;
-          return bTime - aTime;
-        })
-        .slice(0, 20);
+      // Sort by createdAt desc and limit to 20
+      const sorted = unreadNotifications.slice().sort((a: NotificationItem, b: NotificationItem) => {
+        const getTime = (n: NotificationItem): number => {
+          if (!n.createdAt) return 0;
+          if (typeof n.createdAt === 'string') {
+            return new Date(n.createdAt).getTime();
+          } else if (n.createdAt && typeof n.createdAt.toDate === 'function') {
+            return n.createdAt.toDate().getTime();
+          }
+          return 0;
+        };
+        const aTime = getTime(a);
+        const bTime = getTime(b);
+        return bTime - aTime;
+      }).slice(0, 20);
 
-      return uniqueNotifications;
+      return sorted;
     } catch (err: any) {
       console.error('Error getting unread notifications:', err);
       // Return empty array instead of throwing to prevent UI crashes
@@ -343,22 +524,70 @@ export class NotificationService {
   }
 
   /**
+   * Migrate pre-registration invite notifications from the root /notifications/ collection
+   * into the per-user cache. The Cloud Function writes there when the invitee has no UID yet,
+   * storing userId as the email address. On login we move them to the user's own cache doc
+   * so they surface through the normal notification flow.
+   */
+  static async migrateRootInviteNotifications(userId: string, userEmail: string): Promise<void> {
+    if (!userId || !userEmail) return;
+    try {
+      const q = DatabaseMonitoringService.query(
+        DatabaseMonitoringService.collection('notifications'),
+        DatabaseMonitoringService.where('userId', '==', userEmail)
+      );
+      const snap = await DatabaseMonitoringService.getDocs(q);
+      if (snap.empty) return;
+
+      for (const d of snap.docs) {
+        const raw = d.data() as any;
+        // Normalise createdAt – server timestamps arrive as Timestamp objects
+        let createdAt: string = new Date().toISOString();
+        if (raw.createdAt) {
+          if (typeof raw.createdAt === 'string') {
+            createdAt = raw.createdAt;
+          } else if (typeof raw.createdAt.toDate === 'function') {
+            createdAt = raw.createdAt.toDate().toISOString();
+          }
+        }
+        const migrated: NotificationItem = {
+          ...raw,
+          id: d.id,
+          userId, // rewrite to actual UID
+          createdAt,
+        } as NotificationItem;
+
+        await appendNotificationToUser(userId, migrated);
+        // Delete the root doc so it isn't processed again
+        const docRef = DatabaseMonitoringService.doc(`notifications/${d.id}`);
+        await DatabaseMonitoringService.deleteDoc(docRef);
+      }
+    } catch (err: any) {
+      // Non-fatal – log and continue so the rest of login flow is unaffected
+      console.warn('migrateRootInviteNotifications failed silently:', err?.message);
+    }
+  }
+
+  /**
    * Mark notification as read
    */
-  static async markAsRead(notificationId: string): Promise<void> {
-    await DatabaseMonitoringService.updateDoc(DatabaseMonitoringService.doc(this.COLLECTION + '/' + notificationId), {
-      read: true
-    });
+  static async markAsRead(userId: string, notificationId: string): Promise<void> {
+    try {
+      await updateNotificationInCache(userId, notificationId, { read: true });
+    } catch (err) {
+      console.error('Failed to mark notification read in cache:', err);
+    }
   }
 
   /**
    * Snooze notification
    */
-  static async snoozeNotification(notificationId: string, minutes: number): Promise<void> {
-    const snoozedUntil = new Date(Date.now() + minutes * 60 * 1000);
-    await DatabaseMonitoringService.updateDoc(DatabaseMonitoringService.doc(this.COLLECTION + '/' + notificationId), {
-      snoozedUntil: Timestamp.fromDate(snoozedUntil)
-    });
+  static async snoozeNotification(userId: string, notificationId: string, minutes: number): Promise<void> {
+    try {
+      await snoozeNotificationInCache(userId, notificationId, minutes);
+    } catch (err) {
+      console.error('Failed to snooze notification in cache:', err);
+    }
   }
 
   /**
@@ -406,8 +635,16 @@ export class NotificationService {
     }
 
     // Check if snoozed
-    if (notification.snoozedUntil && notification.snoozedUntil.toDate() > new Date()) {
-      return false;
+    if (notification.snoozedUntil) {
+      let snoozedDate: Date | null = null;
+      if (typeof notification.snoozedUntil === 'string') {
+        snoozedDate = new Date(notification.snoozedUntil);
+      } else if (notification.snoozedUntil && typeof notification.snoozedUntil.toDate === 'function') {
+        snoozedDate = notification.snoozedUntil.toDate();
+      }
+      if (snoozedDate && snoozedDate > new Date()) {
+        return false;
+      }
     }
 
     return true;
@@ -430,7 +667,9 @@ export class NotificationService {
         household_activity: true,
         shopping_reminder: true,
         system: true,
-        allergy_alert: true
+        allergy_alert: true,
+        household_invite: true,
+        expired_items_check: false
       }
     };
   }
@@ -439,19 +678,38 @@ export class NotificationService {
    * Clean up old notifications (older than 30 days)
    */
   static async cleanupOldNotifications(userId: string): Promise<void> {
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const q = DatabaseMonitoringService.query(
-      DatabaseMonitoringService.collection(this.COLLECTION),
-      DatabaseMonitoringService.where('userId', '==', userId),
-      DatabaseMonitoringService.where('createdAt', '<', Timestamp.fromDate(thirtyDaysAgo))
-    );
+    try {
+      const cacheRef = DatabaseMonitoringService.doc(`users/${userId}/cache/notifications`);
+      const cacheSnap = await DatabaseMonitoringService.getDoc(cacheRef);
 
-    const snapshot = await DatabaseMonitoringService.getDocs(q);
-    const batch = [];
-    for (const doc of snapshot.docs) {
-      batch.push(DatabaseMonitoringService.deleteDoc(DatabaseMonitoringService.doc(this.COLLECTION + '/' + doc.id)));
+      if (!cacheSnap.exists()) {
+        return;
+      }
+
+      const data = cacheSnap.data() as any;
+      const allNotifications = Array.isArray(data.items) ? data.items : [];
+
+      // Filter out notifications older than 30 days
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      const recentNotifications = allNotifications.filter((n: NotificationItem) => {
+        let createdAt: Date | null = null;
+        if (n.createdAt) {
+          if (typeof n.createdAt === 'string') {
+            createdAt = new Date(n.createdAt);
+          } else if (n.createdAt && typeof n.createdAt.toDate === 'function') {
+            createdAt = n.createdAt.toDate();
+          }
+        }
+        return createdAt && createdAt >= thirtyDaysAgo;
+      });
+
+      // Update the cache with only recent notifications
+      if (recentNotifications.length !== allNotifications.length) {
+        await DatabaseMonitoringService.setDoc(cacheRef, { items: recentNotifications }, { merge: true });
+      }
+    } catch (err: any) {
+      console.error('Error cleaning up old notifications:', err);
     }
-    await Promise.all(batch);
   }
 
   /**
@@ -459,76 +717,140 @@ export class NotificationService {
    * This prevents duplicate notifications from accumulating
    */
   static async deleteExistingDailyNotifications(userId: string): Promise<void> {
-    const q = DatabaseMonitoringService.query(
-      DatabaseMonitoringService.collection(this.COLLECTION),
-      DatabaseMonitoringService.where('userId', '==', userId),
-      DatabaseMonitoringService.where('type', '==', 'system'),
-      DatabaseMonitoringService.where('title', '==', 'Daily Pantry Check')
-    );
-
-    const snapshot = await DatabaseMonitoringService.getDocs(q);
-    const batch = [];
-    for (const doc of snapshot.docs) {
-      batch.push(DatabaseMonitoringService.deleteDoc(DatabaseMonitoringService.doc(this.COLLECTION + '/' + doc.id)));
-    }
-    await Promise.all(batch);
-  }
-
-  /**
-   * Send push notification for high-priority notifications
-   * Note: In production, this should be done server-side via Firebase Admin SDK
-   */
-  private static async sendPushNotification(
-    userId: string,
-    notification: Omit<NotificationItem, 'id' | 'userId' | 'read' | 'createdAt'>
-  ): Promise<void> {
-    // For now, we'll use local notifications on the device
-    // In production, you'd send to FCM server which would then push to device
-
-    if (!pushNotificationService.isSupported()) {
-      return; // Only send push notifications on native platforms
-    }
-
     try {
-      // Get the user's FCM token (stored locally for this demo)
-      const token = pushNotificationService.getToken();
-      if (!token) {
-        console.log('No FCM token available for push notification');
+      const cacheRef = DatabaseMonitoringService.doc(`users/${userId}/cache/notifications`);
+      const cacheSnap = await DatabaseMonitoringService.getDoc(cacheRef);
+
+      if (!cacheSnap.exists()) {
         return;
       }
 
-      // Prepare notification data for FCM
-      const fcmPayload = {
-        to: token,
-        notification: {
-          title: notification.title,
-          body: notification.message,
-          sound: 'default',
-          badge: 1,
-          click_action: 'FLUTTER_NOTIFICATION_CLICK' // For Android
-        },
-        data: {
-          type: notification.type,
-          actionType: notification.actionType,
-          actionData: JSON.stringify(notification.actionData || {}),
-          priority: notification.priority
-        },
-        priority: notification.priority === 'urgent' ? 'high' : 'normal'
-      };
+      const data = cacheSnap.data() as any;
+      const allNotifications = Array.isArray(data.items) ? data.items : [];
 
-      // In a real app, you'd send this to your server, which would use Firebase Admin SDK
-      // For this demo, we'll log it (server-side implementation would be needed for production)
-      console.log('FCM Payload (send to server):', JSON.stringify(fcmPayload, null, 2));
+      // Filter out daily pantry check notifications
+      const filteredNotifications = allNotifications.filter((n: NotificationItem) => {
+        return !(n.type === 'system' && n.title === 'Daily Pantry Check');
+      });
 
-      // For development/testing, you could implement a server endpoint that receives this payload
-      // and sends it to FCM. Here's how you would do it server-side with Firebase Admin SDK:
-      /*
-      const admin = require('firebase-admin');
-      await admin.messaging().send(fcmPayload);
-      */
-
+      // Update the cache if any notifications were removed
+      if (filteredNotifications.length !== allNotifications.length) {
+        await DatabaseMonitoringService.setDoc(cacheRef, { items: filteredNotifications }, { merge: true });
+      }
     } catch (err: any) {
-      console.error('Failed to prepare push notification:', error);
+      console.error('Error deleting existing daily notifications:', err);
     }
+  }
+
+  /**
+   * Create leftover expiration alert notification
+   */
+  static async createLeftoverExpirationAlert(
+    userId: string,
+    leftoverName: string,
+    daysUntilExpiry: number,
+    leftoverId: string,
+    isCookedRice: boolean = false
+  ): Promise<string> {
+    let priority: 'low' | 'medium' | 'high' | 'urgent' = 'low'
+    let title = ''
+    let message = ''
+    let actionLabel = ''
+
+    if (daysUntilExpiry <= 0) {
+      priority = 'urgent'
+      title = isCookedRice ? 'Cooked Rice Alert!' : 'Leftover Expired!'
+      message = isCookedRice
+        ? `🍚 ${leftoverName} has been in fridge for 4+ days. Even if it looks fine, Bacillus cereus isn't worth the risk. Time to toss!`
+        : `${leftoverName} has expired. Please discard immediately.`
+      actionLabel = 'View Leftovers'
+    } else if (daysUntilExpiry === 1) {
+      priority = 'high'
+      title = 'Leftover Expires Tomorrow!'
+      message = `${leftoverName} expires tomorrow. Consider eating or freezing today.`
+      actionLabel = 'View Leftovers'
+    } else if (daysUntilExpiry <= 3) {
+      priority = 'medium'
+      title = 'Leftover Expires Soon'
+      message = `${leftoverName} expires in ${daysUntilExpiry} days.`
+      actionLabel = 'View Leftovers'
+    } else if (daysUntilExpiry <= 5) {
+      priority = 'low'
+      title = 'Consider Freezing Leftover'
+      message = `${leftoverName} expires in ${daysUntilExpiry} days. Move to freezer for longer storage?`
+      actionLabel = 'View Leftovers'
+    }
+
+    return this.createNotification(userId, {
+      type: 'expiration',
+      title,
+      message,
+      actionLabel,
+      actionType: 'view_item',
+      actionData: { leftoverId, itemName: leftoverName, tab: 'pantry' },
+      priority,
+      expiresAt: Timestamp.fromDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)) // Expire in 7 days
+    })
+  }
+
+  /**
+   * Create aggregated leftover attention notification
+   */
+  static async createLeftoverAttentionAlert(
+    userId: string,
+    urgentLeftovers: Array<{ id: string; name: string; daysUntilExpiry: number; isCookedRice: boolean }>
+  ): Promise<string> {
+    if (!urgentLeftovers || urgentLeftovers.length === 0) return ''
+
+    const urgentCount = urgentLeftovers.filter(l => l.daysUntilExpiry <= 0).length
+    const expiringSoonCount = urgentLeftovers.filter(l => l.daysUntilExpiry > 0 && l.daysUntilExpiry <= 3).length
+
+    let title = 'Leftovers Need Attention'
+    let message = ''
+    let priority: 'low' | 'medium' | 'high' | 'urgent' = 'medium'
+
+    if (urgentCount > 0) {
+      title = `${urgentCount} Leftover${urgentCount > 1 ? 's' : ''} Expired!`
+      message = urgentLeftovers
+        .filter(l => l.daysUntilExpiry <= 0)
+        .slice(0, 3)
+        .map(l => l.name)
+        .join(', ')
+      if (urgentLeftovers.length > 3) message += ` and ${urgentLeftovers.length - 3} more`
+      message += ' have expired. Please discard immediately.'
+      priority = 'urgent'
+    } else if (expiringSoonCount > 0) {
+      title = 'Leftovers Expiring Soon'
+      message = `${expiringSoonCount} leftover${expiringSoonCount > 1 ? 's' : ''} expiring within 3 days: `
+      message += urgentLeftovers
+        .filter(l => l.daysUntilExpiry > 0 && l.daysUntilExpiry <= 3)
+        .slice(0, 2)
+        .map(l => l.name)
+        .join(', ')
+      priority = 'high'
+    }
+
+    return this.createNotification(userId, {
+      type: 'expiration',
+      title,
+      message,
+      actionLabel: 'View Leftovers',
+      actionType: 'view_item',
+      actionData: {
+        tab: 'pantry',
+        leftovers: urgentLeftovers.map(l => ({ id: l.id, name: l.name }))
+      },
+      priority,
+      expiresAt: Timestamp.fromDate(new Date(Date.now() + 3 * 24 * 60 * 60 * 1000)) // Expire in 3 days
+    })
+  }
+
+  /**
+   * Send a push notification (placeholder - push notifications are typically sent server-side)
+   */
+  private static async sendPushNotification(userId: string, notification: any): Promise<void> {
+    // Push notifications are sent server-side via Firebase Cloud Messaging
+    // This is a placeholder method for client-side notification creation
+    console.log('Push notification would be sent for user:', userId, notification);
   }
 }

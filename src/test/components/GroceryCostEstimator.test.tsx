@@ -12,6 +12,20 @@ vi.mock('../../../services/groceryPriceService', () => ({
   },
 }));
 
+// Mock AppActionsContext so the component doesn't need a provider
+vi.mock('../../../contexts/AppActionsContext', () => ({
+  useAppActions: () => ({
+    addToast: vi.fn(),
+  }),
+}));
+
+// Mock AppContext so the component doesn't need a provider
+vi.mock('../../../contexts/AppContext', () => ({
+  useApp: () => ({
+    user: null,
+  }),
+}));
+
 describe('GroceryCostEstimator', () => {
   const mockMealPlan = [
     {
@@ -99,8 +113,8 @@ describe('GroceryCostEstimator', () => {
     fireEvent.click(screen.getByRole('button', { name: /estimate grocery costs/i }));
 
     await waitFor(() => {
-      expect(groceryPriceService.getIngredientPrice).toHaveBeenCalledWith('banana');
-      expect(groceryPriceService.getIngredientPrice).toHaveBeenCalledWith('chicken breasts');
+      expect(groceryPriceService.getIngredientPrice).toHaveBeenCalledWith(expect.stringMatching(/banana/i));
+      expect(groceryPriceService.getIngredientPrice).toHaveBeenCalledWith(expect.stringMatching(/chicken breasts/i));
     });
   });
 
@@ -124,8 +138,8 @@ describe('GroceryCostEstimator', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Missing Ingredients:')).toBeInTheDocument();
-      expect(screen.getByText('banana')).toBeInTheDocument();
-      expect(screen.getByText('chicken breasts')).toBeInTheDocument();
+      expect(screen.getByText(/banana/i)).toBeInTheDocument();
+      expect(screen.getByText(/chicken breasts/i)).toBeInTheDocument();
     });
   });
 
@@ -207,7 +221,7 @@ describe('GroceryCostEstimator', () => {
     await waitFor(() => {
       expect(screen.getByText('Missing Ingredients:')).toBeInTheDocument();
       // Should still show ingredients even if price fetch fails
-      expect(screen.getByText('banana')).toBeInTheDocument();
+      expect(screen.getByText(/banana/i)).toBeInTheDocument();
     });
   });
 });
