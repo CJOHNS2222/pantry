@@ -7,6 +7,7 @@ import { Tab } from '../types/app';
 // Firestore access is instrumented via DatabaseMonitoringService when needed
 import { parseIngredientForShoppingList } from '../utils/appUtils';
 import AnalyticsService from '../services/analyticsService';
+import HapticService from '../services/hapticService';
 import { MealPlannerHeader } from './meal-planner/MealPlannerHeader';
 import { MealPlannerPremiumContent } from './meal-planner/MealPlannerPremiumContent';
 import { LeftoverModals } from './meal-planner/LeftoverModals';
@@ -483,6 +484,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
   };
 
   const handleCookedIt = (meal: MealPlanItem) => {
+    HapticService.success();
     if (onMarkAsMade) {
       onMarkAsMade(meal.recipe as StructuredRecipe);
     }

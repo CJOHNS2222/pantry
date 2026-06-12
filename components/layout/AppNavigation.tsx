@@ -6,9 +6,11 @@ interface AppNavigationProps {
   activeTab: Tab;
   setActiveTab: (tab: Tab) => void;
   hiddenTabs?: string[];
+  isKeyboardVisible?: boolean;
 }
 
-export const AppNavigation: React.FC<AppNavigationProps> = ({ activeTab, setActiveTab, hiddenTabs }) => {
+export const AppNavigation: React.FC<AppNavigationProps> = ({ activeTab, setActiveTab, hiddenTabs, isKeyboardVisible }) => {
+  if (isKeyboardVisible) return null;
   const allTabs = [
     { id: Tab.PANTRY, icon: ChefHat, label: 'Pantry' },
     { id: Tab.SHOPPING, icon: ShoppingBasket, label: 'Shop' },

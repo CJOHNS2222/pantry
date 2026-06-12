@@ -1,6 +1,7 @@
 import React from 'react';
 import { DayPlan, Household, PantryItem, SavedRecipe, StructuredRecipe, User } from '../../types';
 import { RecipeSearchModal } from './RecipeSearchModal';
+import { useAndroidBack } from '../../hooks/useAndroidBack';
 
 interface RecipeSearchOverlayProps {
   show: boolean;
@@ -29,6 +30,8 @@ export const RecipeSearchOverlay: React.FC<RecipeSearchOverlayProps> = ({
   savedRecipes,
   household
 }) => {
+  useAndroidBack(show, onClose);
+
   if (!show || !searchMealType) return null;
 
   return (

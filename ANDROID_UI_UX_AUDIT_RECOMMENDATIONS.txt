@@ -1,0 +1,81 @@
+================================================================================
+Stock & Spoon Android UI/UX & Functionality Audit Recommendations
+================================================================================
+Date: 2026-06-12
+Platform Context: Android Hybrid App (Capacitor/Webview Wrapper)
+
+This audit targets issues specific to running the Stock & Spoon application on Android devices. It focuses on touch interaction, keyboard behaviors, hardware back-button handling, safe-area cutouts, local caching reliability, and platform typography.
+
+--------------------------------------------------------------------------------
+1. TOUCH TARGET & GESTURES
+--------------------------------------------------------------------------------
+* **Issue**: Android's Material Design standard recommends a minimum touch target size of 48x48dp to prevent mis-clicks. While primary buttons on some list items (like chevron controls in [EnhancedShoppingListItem.tsx](file:///c:/Users/cjohn/pantry/components/EnhancedShoppingListItem.tsx)) have been upgraded to `min-w-[44px] min-h-[44px]`, some secondary buttons, close buttons, and inline action buttons (e.g. quantity triggers or calendar navigation arrows in [MealPlanner.tsx](file:///c:/Users/cjohn/pantry/components/MealPlanner.tsx)) remain smaller (approx. 24px - 32px) and are closely packed.
+* **Impact**: Increases cognitive load, leading to accidental mis-clicks on mobile screens.
+* **Recommendation**:
+  - Audit all `button` and clickable `div` elements. Ensure they have a minimum size of `w-12 h-12` (48x48px) or apply invisible padding margins (e.g., Tailwind `p-2` or `m-1`) to expand their touch target bounding box.
+  - Implement full swipe-to-delete gestures on pantry and shopping list items (rather than requiring a tap on a tiny chevron tab to reveal actions), utilizing touch velocity thresholds for a native feel.
+
+--------------------------------------------------------------------------------
+2. KEYBOARD & VIEWPORT OVERLAY MANAGEMENT
+--------------------------------------------------------------------------------
+* **Issue**: When a text input is selected on Android, the system soft keyboard launches, resizing the webview viewport window. Fixed elements at the bottom (like the global navigation bar [AppNavigation.tsx](file:///c:/Users/cjohn/pantry/components/layout/AppNavigation.tsx)) are automatically pushed up and float above the keyboard, obscuring the inputs and taking up valuable screen space.
+* **Impact**: Reduces vertical editing space on mobile screens, making forms (like the Profile display name, height/weight inputs, or recipe comments) feel cramped.
+* **Recommendation**:
+  - Listen to Capacitor's Keyboard plugin events (`keyboardWillShow` and `keyboardWillHide`).
+  - Toggle a CSS class or state on the main layout component to hide `AppNavigation` when the virtual keyboard is visible.
+  - Apply scroll offsets (`scrollIntoView({ block: 'center' })`) on focused input text fields so they automatically scroll to the center of the visible viewport area above the keyboard.
+
+--------------------------------------------------------------------------------
+3. BACK BUTTON STACK ACCURACY & PREDICTION
+--------------------------------------------------------------------------------
+* **Issue**: The current LIFO stack implementation in [useAndroidBack.ts](file:///c:/Users/cjohn/pantry/hooks/useAndroidBack.ts) successfully intercepts back button presses to close open modals. However, it does not manage smaller contextual menus (like the newly added member assignment pickers, details dropdowns in active meal planner cards, or autocomplete suggestions).
+* **Impact**: If a user has a dropdown or submenu open and presses the system back button, they expect the menu to close. Currently, the back press either navigates to the previous tab or triggers the "Press back again to exit" app exit warning.
+* **Recommendation**:
+  - Integrate contextual menus, pickers, and side sheets into the back button stack by registering them with `useAndroidBack`.
+  - Maintain a separate stack registry for floating overlays so they are popped and closed before main modals or tab navigation are triggered.
+
+--------------------------------------------------------------------------------
+4. SAFE AREA & CAMERA NOTCH ROBUSTNESS
+--------------------------------------------------------------------------------
+* **Issue**: [safeAreaService.ts](file:///c:/Users/cjohn/pantry/services/safeAreaService.ts) correctly reads native safe area insets via the `capacitor-plugin-safe-area` plugin and sets custom CSS variables (e.g., `--safe-area-inset-top`). However, some full-screen overlay components (like scanner screens or recipe modal headers) hardcode height properties (e.g., `h-16`) or use standard padding top (e.g., `pt-4`) without referencing the `--safe-area-inset-top` CSS variable.
+* **Impact**: In portrait mode, headers may slide underneath camera cutouts or status bars. In landscape mode, content on the left/right borders may overlap screen curves or system controls.
+* **Recommendation**:
+  - Standardize all screen containers and modal headers to use the safe area utility variable: e.g., `style={{ paddingTop: 'var(--safe-area-inset-top, 0px)' }}`.
+  - Review safe area handling on the scanner viewport inside [PantryScanner.tsx](file:///c:/Users/cjohn/pantry/components/PantryScanner.tsx) to ensure camera viewfinder bounds adjust dynamically.
+
+--------------------------------------------------------------------------------
+5. SYSTEM FONT SCALING (TYPOGRAPHY ROBUSTNESS)
+--------------------------------------------------------------------------------
+* **Issue**: Android allows users to change their system-wide font size (e.g. to Large or Extra Large) for accessibility. If the app UI uses hardcoded container pixel sizes (`h-[48px]`, `w-[120px]`) alongside standard text scaling, text will overflow container boundaries, clip, or overlap.
+* **Impact**: Broken visual styling and cut-off text for users with accessibility overrides.
+* **Recommendation**:
+  - Audit text container heights and widths. Avoid hardcoded `px` heights for divs that contain typography; use auto-sizing, flexbox padding, or relative unit thresholds (`rem` or `em`).
+  - Standardize line-heights alongside font-sizes to ensure multi-line wraps do not collapse.
+
+--------------------------------------------------------------------------------
+6. HAPTIC FEEDBACK ENHANCEMENT
+--------------------------------------------------------------------------------
+* **Issue**: While [HapticService.ts](file:///c:/Users/cjohn/pantry/services/hapticService.ts) supports light, medium, heavy, and success haptic responses, haptics are mostly triggered on tab switching and adding items.
+* **Impact**: The app feels like a standard web wrapper rather than a fully integrated native Android application.
+* **Recommendation**:
+  - Trigger a light haptic impact on toggle checkmarks (e.g. when checking off shopping list items in [EnhancedShoppingListItem.tsx](file:///c:/Users/cjohn/pantry/components/EnhancedShoppingListItem.tsx)).
+  - Trigger a medium haptic impact on long press events.
+  - Trigger a heavy or success haptic sequence upon completing a milestone (like marking a meal as "cooked" or clearing all checked items).
+
+--------------------------------------------------------------------------------
+7. CAMERA PERMISSIONS UX & FALLBACK
+--------------------------------------------------------------------------------
+* **Issue**: When accessing the pantry scanner, Capacitor requests camera permission directly. If the user rejects the permission, the app shows a generic warning or crashes the scan view.
+* **Impact**: High permission rejection rates and poor onboarding experience if the user is surprised by a system permission prompt.
+* **Recommendation**:
+  - Implement a pre-permission "educate" banner screen *before* invoking the system permission API. Explain precisely why camera access is required (e.g., "We use your camera to scan pantry items and auto-detect expiry dates. No photos are stored on our servers.").
+  - If the user has permanently denied permissions in the system, show a helpful screen with links to "Open App Settings" to manually enable permissions, accompanied by a quick manual add button fallback.
+
+--------------------------------------------------------------------------------
+8. OFFLINE SYNC VISIBILITY & LOCAL CACHING
+--------------------------------------------------------------------------------
+* **Issue**: Android devices frequently lose network connections or switch between Wi-Fi and cell data. While the application implements robust local caching and state management, users have little visual feedback about whether their local modifications are synced.
+* **Impact**: Users may feel insecure about closing the app if they are unsure if their pantry updates have been successfully pushed to the Cloud database.
+* **Recommendation**:
+  - Add a subtle status icon in the top header (e.g. a cloud with a check, or an orange sync icon) indicating connection state (Online/Offline) and sync status (Saved/Syncing...).
+  - Verify that the SQLite or IndexedDB caching system writes are completed asynchronously before rendering lists, avoiding empty rendering states upon network state transitions.

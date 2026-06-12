@@ -1,10 +1,8 @@
 import React from 'react';
-import { ChevronDown, ChevronRight, SlidersHorizontal } from 'lucide-react';
+import { SlidersHorizontal } from 'lucide-react';
 import type { Settings as AppSettings, UserProfile } from '../../types';
 
 interface SettingsAppPreferencesSectionProps {
-  expanded: boolean;
-  onToggle: () => void;
   title: string;
   settings: AppSettings;
   setSettings: React.Dispatch<React.SetStateAction<AppSettings>>;
@@ -24,29 +22,18 @@ interface SettingsAppPreferencesSectionProps {
 }
 
 export const SettingsAppPreferencesSection: React.FC<SettingsAppPreferencesSectionProps> = ({
-  expanded,
-  onToggle,
-  title,
-  settings,
-  setSettings,
-  userProfile,
-  onMeasurementSystemChange,
-  geminiOptedIn,
-  onGeminiOptInChange,
-  labels,
-}) => {
+  title, settings, setSettings, userProfile, onMeasurementSystemChange, geminiOptedIn, onGeminiOptInChange, labels, }) => {
   return (
     <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden">
-      <div onClick={onToggle} className="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-theme-primary transition-colors">
+      <div className="w-full flex items-center justify-between p-4 border-b border-theme bg-theme-primary/20">
         <div className="flex items-center gap-3">
-          {expanded ? <ChevronDown className="w-5 h-5 text-theme-primary" /> : <ChevronRight className="w-5 h-5 text-theme-primary" />}
+          
           <SlidersHorizontal className="w-5 h-5 text-[var(--accent-color)]" />
           <h3 className="font-semibold text-theme-primary">{title}</h3>
         </div>
       </div>
 
-      {expanded && (
-        <div className="border-t border-theme px-4 divide-y divide-theme">
+      <div className="px-4 divide-y divide-theme">
           <div className="flex items-center justify-between py-3">
             <div className="flex-1 pr-4">
               <p className="text-sm font-medium text-theme-primary">{labels.enableNotifications}</p>
@@ -190,7 +177,6 @@ export const SettingsAppPreferencesSection: React.FC<SettingsAppPreferencesSecti
             </label>
           </div>
         </div>
-      )}
     </div>
   );
 };

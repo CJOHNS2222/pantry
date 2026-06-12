@@ -41,6 +41,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
   const [isScanning, setIsScanning] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  useAndroidBack(isOpen && showSuggestions, () => setShowSuggestions(false));
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Voice recognition setup
@@ -86,6 +87,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
           setIsListening(false);
         };
       } catch {
+        // Ignore initialization errors
       }
     }
 

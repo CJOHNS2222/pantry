@@ -786,11 +786,7 @@ export function getPreferredItemDisplayImage(itemName: string, category: string,
     return normalizedCurrentImage;
   }
 
-  if (normalizedCurrentImage.startsWith('/images/items/')) {
-    return normalizedCurrentImage;
-  }
-
-  if (normalizedCurrentImage.startsWith('/images/')) {
+  if (normalizedCurrentImage.startsWith('/images/items/') || normalizedCurrentImage.startsWith('/images/')) {
     return preferredImage;
   }
 

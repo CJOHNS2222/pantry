@@ -1,11 +1,9 @@
 import React from 'react';
-import { ChevronDown, ChevronRight, Gauge } from 'lucide-react';
+import { Gauge } from 'lucide-react';
 import type { UsageLimits } from '../../services/usageService';
 
 interface SettingsUsageLimitsSectionProps {
   userExists: boolean;
-  expanded: boolean;
-  onToggle: () => void;
   title: string;
   isPremium: boolean;
   isFamily: boolean;
@@ -14,31 +12,22 @@ interface SettingsUsageLimitsSectionProps {
 }
 
 export const SettingsUsageLimitsSection: React.FC<SettingsUsageLimitsSectionProps> = ({
-  userExists,
-  expanded,
-  onToggle,
-  title,
-  isPremium,
-  isFamily,
-  usageLimits,
-  onOpenUpgrade,
-}) => {
+  userExists, title, isPremium, isFamily, usageLimits, onOpenUpgrade, }) => {
   if (!userExists) {
     return null;
   }
 
   return (
     <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden" data-section="usage-limits">
-      <div onClick={onToggle} className="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-theme-primary transition-colors">
+      <div className="w-full flex items-center justify-between p-4 border-b border-theme bg-theme-primary/20">
         <div className="flex items-center gap-3">
-          {expanded ? <ChevronDown className="w-5 h-5 text-theme-primary" /> : <ChevronRight className="w-5 h-5 text-theme-primary" />}
+          
           <Gauge className="w-5 h-5 text-[var(--accent-color)]" />
           <h3 className="font-semibold text-theme-primary">{title}</h3>
         </div>
         {!isPremium && !isFamily && <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">Free Plan</span>}
       </div>
-      {expanded && (
-        <div className="border-t border-theme p-4 space-y-4">
+      <div className="p-4 space-y-4">
           <div className="flex items-center gap-3 p-3 rounded-lg bg-theme-primary border border-theme">
             <span className="text-lg" aria-hidden="true">
               {isFamily ? '👨‍👩‍👧‍👦' : isPremium ? '⭐' : '🆓'}
@@ -175,7 +164,6 @@ export const SettingsUsageLimitsSection: React.FC<SettingsUsageLimitsSectionProp
             <p className="text-sm text-theme-secondary opacity-60">Loading usage data…</p>
           )}
         </div>
-      )}
     </div>
   );
 };

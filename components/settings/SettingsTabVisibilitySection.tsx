@@ -1,10 +1,8 @@
 import React from 'react';
-import { ChevronDown, ChevronRight, LayoutDashboard } from 'lucide-react';
+import { LayoutDashboard } from 'lucide-react';
 import { Tab } from '../../types/app';
 
 interface SettingsTabVisibilitySectionProps {
-  expanded: boolean;
-  onToggle: () => void;
   hiddenTabs: string[] | undefined;
   onTabVisibilityChange: (tab: Tab, isVisible: boolean) => void;
 }
@@ -18,23 +16,18 @@ const NAV_TABS: { tab: Tab; label: string; description: string }[] = [
 ];
 
 export const SettingsTabVisibilitySection: React.FC<SettingsTabVisibilitySectionProps> = ({
-  expanded,
-  onToggle,
-  hiddenTabs,
-  onTabVisibilityChange,
-}) => {
+  hiddenTabs, onTabVisibilityChange, }) => {
   return (
     <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden">
-      <div onClick={onToggle} className="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-theme-primary transition-colors">
+      <div className="w-full flex items-center justify-between p-4 border-b border-theme bg-theme-primary/20">
         <div className="flex items-center gap-3">
-          {expanded ? <ChevronDown className="w-5 h-5 text-theme-primary" /> : <ChevronRight className="w-5 h-5 text-theme-primary" />}
+          
           <LayoutDashboard className="w-5 h-5 text-[var(--accent-color)]" />
           <h3 className="font-semibold text-theme-primary">Navigation Tabs</h3>
         </div>
       </div>
 
-      {expanded && (
-        <div className="border-t border-theme px-4 divide-y divide-theme">
+      <div className="px-4 divide-y divide-theme">
           <p className="text-xs text-theme-secondary py-3">
             Choose which tabs appear in the bottom navigation. Pantry and Settings are always visible.
           </p>
@@ -59,7 +52,6 @@ export const SettingsTabVisibilitySection: React.FC<SettingsTabVisibilitySection
             );
           })}
         </div>
-      )}
     </div>
   );
 };

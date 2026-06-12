@@ -491,6 +491,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     const checkedItems = items.filter(i => i.checked);
     if (checkedItems.length === 0) return;
 
+    HapticService.success();
     const inHousehold = household?.id && user ? isHouseholdMember(household, user) : false;
     const householdId = inHousehold ? household?.id : undefined;
     const userId = inHousehold ? undefined : user?.id;
@@ -593,6 +594,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
 
     if (itemsToMove.length === 0) return;
 
+    HapticService.success();
     // Set default purchased quantities for items that don't have them
     const updatedItems = itemsToMove.map(item => {
       // Prefer purchasedBatch (from modal) if present, otherwise fall back to purchasedQuantity or estimate

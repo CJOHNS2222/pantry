@@ -58,6 +58,7 @@ import { InventoryCacheService } from './services/inventoryCacheService';
 import { recordMilestone } from './services/onboardingMilestoneService';
 import { useIntl } from 'react-intl';
 import { useAndroidBack, closeTopAndroidModal } from './hooks/useAndroidBack';
+import { useKeyboard } from './hooks/useKeyboard';
 
 // Lazy load monitoring components
 const DatabaseAnalytics = React.lazy(() => import('./components/DatabaseAnalytics').then(module => ({ default: module.default })));
@@ -82,6 +83,7 @@ const App: React.FC = () => {
   const visitedTabsRef = useRef<Set<Tab>>(new Set<Tab>());
   const [persistedRecipeResult, setPersistedRecipeResult] = useState<RecipeSearchResult | null>(null);
   const [initialSearchQuery, setInitialSearchQuery] = useState<string>('');
+  const isKeyboardVisible = useKeyboard();
 
   // Custom tab switching function that resets scroll position
   const switchTab = (tab: Tab) => {
@@ -1560,7 +1562,7 @@ const App: React.FC = () => {
             <MainContent />
           </AppActionsProvider>
         </AppProvider>
-        <AppNavigation activeTab={activeTab} setActiveTab={switchTab} hiddenTabs={settings.navigation?.hiddenTabs} />
+        <AppNavigation activeTab={activeTab} setActiveTab={switchTab} hiddenTabs={settings.navigation?.hiddenTabs} isKeyboardVisible={isKeyboardVisible} />
         
         {showHousehold && (
           <HouseholdManager

@@ -1,39 +1,30 @@
 import React from 'react';
-import { ChevronDown, ChevronRight, Tag } from 'lucide-react';
+import { Tag } from 'lucide-react';
 
 interface SettingsCategoriesSectionProps {
   userExists: boolean;
-  expanded: boolean;
-  onToggle: () => void;
   title: string;
   customCategoryCount: number;
   onManageCategories: () => void;
 }
 
 export const SettingsCategoriesSection: React.FC<SettingsCategoriesSectionProps> = ({
-  userExists,
-  expanded,
-  onToggle,
-  title,
-  customCategoryCount,
-  onManageCategories,
-}) => {
+  userExists, title, customCategoryCount, onManageCategories, }) => {
   if (!userExists) {
     return null;
   }
 
   return (
     <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden">
-      <div onClick={onToggle} className="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-theme-primary transition-colors">
+      <div className="w-full flex items-center justify-between p-4 border-b border-theme bg-theme-primary/20">
         <div className="flex items-center gap-3">
-          {expanded ? <ChevronDown className="w-5 h-5 text-theme-primary" /> : <ChevronRight className="w-5 h-5 text-theme-primary" />}
+          
           <Tag className="w-5 h-5 text-[var(--accent-color)]" />
           <h3 className="font-semibold text-theme-primary">{title}</h3>
         </div>
       </div>
 
-      {expanded && (
-        <div className="border-t border-theme p-4">
+      <div className="p-4">
           <div className="space-y-3">
             <p className="text-sm text-theme-secondary">Create custom categories to better organize your pantry items.</p>
             <button
@@ -47,7 +38,6 @@ export const SettingsCategoriesSection: React.FC<SettingsCategoriesSectionProps>
             </div>
           </div>
         </div>
-      )}
     </div>
   );
 };

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Wifi, WifiOff, RefreshCw, AlertCircle, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Cloud, CloudOff, RefreshCw, AlertCircle, AlertTriangle } from 'lucide-react';
 import { SyncStatus } from '../hooks/useOfflineStatus';
 
 interface SyncIndicatorProps {
@@ -30,9 +30,9 @@ export const SyncIndicator: React.FC<SyncIndicatorProps> = ({
     if (syncError) return <AlertCircle className="w-4 h-4" />;
     if (hasConflicts) return <AlertTriangle className="w-4 h-4" />;
     if (isSyncing) return <RefreshCw className="w-4 h-4 animate-spin" />;
-    if (!isOnline) return <WifiOff className="w-4 h-4" />;
-    if (pendingOperations > 0) return <Wifi className="w-4 h-4" />;
-    return <CheckCircle className="w-4 h-4" />;
+    if (!isOnline) return <CloudOff className="w-4 h-4" />;
+    if (pendingOperations > 0) return <Cloud className="w-4 h-4" />;
+    return <Cloud className="w-4 h-4" />;
   };
 
   const getStatusText = () => {

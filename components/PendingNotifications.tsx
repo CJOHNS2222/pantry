@@ -246,33 +246,15 @@ export const PendingNotifications: React.FC<PendingNotificationsProps> = ({
 
   if (loading) {
     return (
-      <div className="bg-theme-secondary rounded-xl border border-theme p-4">
-        <div className="flex items-center gap-2 mb-4">
-          <Bell className="w-5 h-5 text-amber-500" />
-          <h3 className="font-semibold text-theme-primary">Pending Notifications</h3>
-        </div>
-        <div className="flex items-center justify-center py-8">
-          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-amber-500"></div>
-          <span className="ml-2 text-theme-secondary">Loading notifications...</span>
-        </div>
+      <div className="flex items-center justify-center py-8">
+        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-amber-500"></div>
+        <span className="ml-2 text-theme-secondary">Loading notifications...</span>
       </div>
     );
   }
 
   return (
-    <div className="bg-theme-secondary rounded-xl border border-theme p-4">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <Bell className="w-5 h-5 text-amber-500" />
-          <h3 className="font-semibold text-theme-primary">Pending Notifications</h3>
-          {notifications.length > 0 && (
-            <span className="bg-amber-500 text-black text-xs px-2 py-1 rounded-full font-medium">
-              {notifications.length}
-            </span>
-          )}
-        </div>
-      </div>
-
+    <>
       {notifications.length === 0 ? (
         <div className="text-center py-8">
           <Bell className="w-12 h-12 text-theme-secondary mx-auto mb-3 opacity-50" />
@@ -345,6 +327,6 @@ export const PendingNotifications: React.FC<PendingNotificationsProps> = ({
           ))}
         </div>
       )}
-    </div>
+    </>
   );
 };

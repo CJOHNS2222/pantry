@@ -14,7 +14,7 @@ import type { Settings as AppSettings } from '../types';
 type MemberPreferences = Pick<Member, 'dietaryRestrictions' | 'allergies' | 'dietGoal' | 'favoriteCuisines' | 'specialNeeds' | 'preferredProteins' | 'dislikedIngredients'>;
 import { NotificationService, NotificationSettings } from '../services/notificationService';
 import { DayPlan } from '../types';
-import { Loader2, ChevronDown, ChevronRight, Heart, AlertTriangle, X, Settings as SettingsIcon, User as UserIcon } from 'lucide-react';
+import { Loader2, Heart, AlertTriangle, X, Settings as SettingsIcon, User as UserIcon } from 'lucide-react';
 import { userOptedInToGemini, setUserGeminiOptIn, getGeminiUsage } from '../services/featureFlags';
 
 import { Household } from '../types';
@@ -151,7 +151,6 @@ export const Settings: React.FC<SettingsProps> = ({
   const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>(
     NotificationService.getDefaultSettings()
   );
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['Profile', 'Household']));
   const [activeSettingsTab, setActiveSettingsTab] = useState<'account' | 'preferences' | 'organization' | 'more'>('account');
 
   // Member preferences state
@@ -195,17 +194,7 @@ export const Settings: React.FC<SettingsProps> = ({
   const [householdName, setHouseholdName] = useState('');
   const [isCreatingHousehold, setIsCreatingHousehold] = useState(false);
 
-  const toggleSection = (section: string) => {
-    setExpandedSections(prev => {
-      const next = new Set(prev);
-      if (next.has(section)) {
-        next.delete(section);
-      } else {
-        next.add(section);
-      }
-      return next;
-    });
-  };
+
 
   // Member preferences functions
   const openMemberPreferences = (member: Member) => {
@@ -649,288 +638,291 @@ export const Settings: React.FC<SettingsProps> = ({
       {/* Profile Section */}
       {user && onLogout && !user.isGuest && (
         <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden" data-section="profile">
-          <div
-            onClick={() => toggleSection('Profile')}
-            className="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-theme-primary transition-colors"
-          >
+          <div className="w-full flex items-center justify-between p-4 border-b border-theme bg-theme-primary/20">
             <div className="flex items-center gap-3">
-              {expandedSections.has('Profile') ? (
-                <ChevronDown className="w-5 h-5 text-theme-primary" />
-              ) : (
-                <ChevronRight className="w-5 h-5 text-theme-primary" />
-              )}
               <UserIcon className="w-5 h-5 text-[var(--accent-color)]" />
               <h3 className="font-semibold text-theme-primary">{intl.formatMessage({ id: 'settings.profile' })}</h3>
             </div>
           </div>
 
-          {expandedSections.has('Profile') && (
-            <div className="border-t border-theme p-4">
-          {/* Avatar Section */}
-          <div className="mb-4">
-            <div className="flex items-center gap-4 mb-3">
-              <div className="w-16 h-16 rounded-full overflow-hidden bg-gray-200 flex items-center justify-center">
-                {user.avatar ? (
-                  <img src={user.avatar} alt="Avatar" className="w-full h-full object-cover" />
-                ) : (
-                  <div className="text-2xl text-gray-500">{user.name.charAt(0).toUpperCase()}</div>
+          <div className="p-4">
+            {/* Avatar Section */}
+            <div className="mb-4">
+              <div className="flex items-center gap-4 mb-3">
+                <div className="w-16 h-16 rounded-full overflow-hidden bg-gray-200 flex items-center justify-center">
+                  {user.avatar ? (
+                    <img src={user.avatar} alt="Avatar" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="text-2xl text-gray-500">{user.name.charAt(0).toUpperCase()}</div>
+                  )}
+                </div>
+                <div className="flex-1">
+                  <p className="font-medium text-theme-primary">{userProfile?.name || user.name}</p>
+                  <p className="text-sm text-theme-secondary">{user.email}</p>
+                </div>
+              </div>
+              
+              <div className="flex gap-2 mb-4">
+                <button
+                  onClick={() => setShowAvatarSelection(!showAvatarSelection)}
+                  className="bg-blue-500 text-white px-3 py-2 rounded text-sm font-medium hover:bg-blue-600 flex-1 text-center"
+                >
+                  {showAvatarSelection ? 'Cancel' : 'Change Avatar'}
+                </button>
+                {user.avatar && (
+                  <button
+                    onClick={handleRemoveAvatar}
+                    disabled={updatingAvatar}
+                    className="bg-red-500 text-white px-3 py-2 rounded text-sm font-medium hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {updatingAvatar && <Loader2 className="w-4 h-4 animate-spin" />}
+                    {updatingAvatar ? 'Removing...' : 'Remove'}
+                  </button>
                 )}
               </div>
-              <div className="flex-1">
-                <p className="font-medium text-theme-primary">{userProfile?.name || user.name}</p>
-                <p className="text-sm text-theme-secondary">{user.email}</p>
+
+              {showAvatarSelection && (
+                <div className="mb-4">
+                  <h4 className="text-sm font-medium mb-2 text-theme-primary">{intl.formatMessage({ id: 'settings.chooseAvatar' })}</h4>
+                  <div className="grid grid-cols-5 gap-2 max-h-48 overflow-y-auto">
+                    {avatarOptions.map((avatarPath) => (
+                      <button
+                        key={avatarPath}
+                        onClick={() => handleAvatarSelect(avatarPath)}
+                        disabled={updatingAvatar}
+                        className="w-12 h-12 rounded-full overflow-hidden border-2 border-gray-300 hover:border-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed relative"
+                      >
+                        <img
+                          src={avatarPath}
+                          alt={`Avatar ${avatarPath.split('/').pop()?.split('.')[0]}`}
+                          className="w-full h-full object-cover"
+                        />
+                        {updatingAvatar && (
+                          <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                            <Loader2 className="w-4 h-4 animate-spin text-white" />
+                          </div>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Name Field */}
+              <div className="mb-4">
+                <label htmlFor="userName" className="block text-sm font-medium text-theme-primary mb-2">{intl.formatMessage({ id: 'settings.displayName' })}</label>
+                <input
+                  id="userName"
+                  name="userName"
+                  type="text"
+                  value={userProfile?.name ?? user.name ?? ''}
+                  onChange={(e) => handleProfileChange('name', e.target.value)}
+                  placeholder="Enter your display name"
+                  className="w-full px-3 py-2 border border-theme rounded-lg bg-theme-primary text-theme-secondary placeholder-theme-secondary/50 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:border-transparent"
+                />
+                <p className="text-xs text-theme-secondary mt-1">This name will be used throughout the app to personalize your experience.</p>
               </div>
             </div>
             
-            <div className="flex gap-2 mb-4">
-              <button
-                onClick={() => setShowAvatarSelection(!showAvatarSelection)}
-                className="bg-blue-500 text-white px-3 py-2 rounded text-sm font-medium hover:bg-blue-600 flex-1 text-center"
-              >
-                {showAvatarSelection ? 'Cancel' : 'Change Avatar'}
-              </button>
-              {user.avatar && (
+            {/* User Profile Information */}
+            <div className="space-y-4 mb-4">
+              <h4 className="text-sm font-medium mb-3 text-theme-primary">{intl.formatMessage({ id: 'settings.personalInfo' })}</h4>
+              
+              <div className="grid grid-cols-3 gap-3">
+                {/* Row 1: Height, Weight, Age */}
+                <div className="flex flex-col items-center">
+                  <div className="flex gap-1.5 w-full justify-center">
+                    <div className="flex items-center border border-theme rounded-lg bg-white px-2 py-1 w-1/2 focus-within:ring-2 focus-within:ring-[var(--accent-color)] focus-within:border-transparent">
+                      <input
+                        id="heightFeet"
+                        name="heightFeet"
+                        type="number"
+                        value={userProfile?.height ? Math.floor(userProfile.height / 12) : ''}
+                        onChange={(e) => {
+                          const feet = parseInt(e.target.value) || 0;
+                          const inches = userProfile?.height ? userProfile.height % 12 : 0;
+                          handleProfileChange('height', feet * 12 + inches);
+                        }}
+                        placeholder="5"
+                        className="w-full text-center text-sm font-semibold text-black bg-transparent outline-none border-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        min="0"
+                        max="8"
+                      />
+                      <span className="text-xs text-gray-500 font-medium ml-1">ft</span>
+                    </div>
+                    <div className="flex items-center border border-theme rounded-lg bg-white px-2 py-1 w-1/2 focus-within:ring-2 focus-within:ring-[var(--accent-color)] focus-within:border-transparent">
+                      <input
+                        id="heightInches"
+                        name="heightInches"
+                        type="number"
+                        value={userProfile?.height ? userProfile.height % 12 : ''}
+                        onChange={(e) => {
+                          const feet = userProfile?.height ? Math.floor(userProfile.height / 12) : 0;
+                          const inches = parseInt(e.target.value) || 0;
+                          handleProfileChange('height', feet * 12 + inches);
+                        }}
+                        placeholder="8"
+                        className="w-full text-center text-sm font-semibold text-black bg-transparent outline-none border-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        min="0"
+                        max="11"
+                      />
+                      <span className="text-xs text-gray-500 font-medium ml-1">in</span>
+                    </div>
+                  </div>
+                  <label className="text-[10px] text-theme-secondary font-bold uppercase tracking-wider mt-1.5 text-center">
+                    {intl.formatMessage({ id: 'settings.height' })}
+                  </label>
+                </div>
+
+                <div className="flex flex-col items-center">
+                  <div className="flex items-center border border-theme rounded-lg bg-white px-2 py-1 w-full focus-within:ring-2 focus-within:ring-[var(--accent-color)] focus-within:border-transparent">
+                    <input
+                      id="weight"
+                      name="weight"
+                      type="number"
+                      min="0"
+                      value={userProfile?.weight || ''}
+                      onChange={(e) => handleProfileChange('weight', e.target.value ? parseInt(e.target.value) : undefined)}
+                      placeholder="154"
+                      className="w-full text-center text-sm font-semibold text-black bg-transparent outline-none border-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    />
+                    <span className="text-xs text-gray-500 font-medium ml-1">lbs</span>
+                  </div>
+                  <label htmlFor="weight" className="text-[10px] text-theme-secondary font-bold uppercase tracking-wider mt-1.5 text-center">
+                    {intl.formatMessage({ id: 'settings.weight' })}
+                  </label>
+                </div>
+
+                <div className="flex flex-col items-center">
+                  <div className="flex items-center border border-theme rounded-lg bg-white px-2 py-1 w-full focus-within:ring-2 focus-within:ring-[var(--accent-color)] focus-within:border-transparent">
+                    <input
+                      id="age"
+                      name="age"
+                      type="number"
+                      min="0"
+                      value={userProfile?.age || ''}
+                      onChange={(e) => handleProfileChange('age', e.target.value ? parseInt(e.target.value) : undefined)}
+                      placeholder="30"
+                      className="w-full text-center text-sm font-semibold text-black bg-transparent outline-none border-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    />
+                    <span className="text-xs text-gray-500 font-medium ml-1">yrs</span>
+                  </div>
+                  <label htmlFor="age" className="text-[10px] text-theme-secondary font-bold uppercase tracking-wider mt-1.5 text-center">
+                    Age
+                  </label>
+                </div>
+
+                {/* Row 2: Gender (spans 2) and Household Size (spans 1) */}
+                <div className="col-span-2 flex flex-col items-center">
+                  <div className="w-full border border-theme rounded-lg bg-white px-2 py-1 focus-within:ring-2 focus-within:ring-[var(--accent-color)] focus-within:border-transparent">
+                    <select
+                      id="gender"
+                      name="gender"
+                      value={userProfile?.gender || ''}
+                      onChange={(e) => handleProfileChange('gender', e.target.value || undefined)}
+                      className="w-full text-center text-sm font-semibold text-black bg-transparent outline-none border-none cursor-pointer"
+                    >
+                      <option value="">{intl.formatMessage({ id: 'settings.selectGender' })}</option>
+                      <option value="male">{intl.formatMessage({ id: 'settings.genders.male' })}</option>
+                      <option value="female">{intl.formatMessage({ id: 'settings.genders.female' })}</option>
+                      <option value="other">{intl.formatMessage({ id: 'settings.genders.other' })}</option>
+                      <option value="prefer-not-to-say">{intl.formatMessage({ id: 'settings.genders.preferNotToSay' })}</option>
+                    </select>
+                  </div>
+                  <label htmlFor="gender" className="text-[10px] text-theme-secondary font-bold uppercase tracking-wider mt-1.5 text-center">
+                    {intl.formatMessage({ id: 'settings.gender' })}
+                  </label>
+                </div>
+
+                <div className="flex flex-col items-center">
+                  <div className="flex items-center border border-theme rounded-lg bg-white px-2 py-1 w-full focus-within:ring-2 focus-within:ring-[var(--accent-color)] focus-within:border-transparent">
+                    <input
+                      id="householdSize"
+                      name="householdSize"
+                      type="number"
+                      value={userProfile?.householdSize || ''}
+                      onChange={(e) => handleProfileChange('householdSize', e.target.value ? parseInt(e.target.value) : undefined)}
+                      placeholder="4"
+                      className="w-full text-center text-sm font-semibold text-black bg-transparent outline-none border-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      min="1"
+                      max="20"
+                    />
+                    <span className="text-xs text-gray-500 font-medium ml-1">people</span>
+                  </div>
+                  <label htmlFor="householdSize" className="text-[10px] text-theme-secondary font-bold uppercase tracking-wider mt-1.5 text-center">
+                    {intl.formatMessage({ id: 'settings.household' })}
+                  </label>
+                </div>
+              </div>
+
+              {/* Diet Goal and Activity Level - combine into 2 columns */}
+              <div className="grid grid-cols-2 gap-3 mt-4">
+                <div>
+                  <label htmlFor="dietGoal" className="block text-xs text-theme-secondary mb-1">{intl.formatMessage({ id: 'settings.dietGoal' })}</label>
+                  <select
+                    id="dietGoal"
+                    name="dietGoal"
+                    value={userProfile?.dietGoal || ''}
+                    onChange={(e) => handleProfileChange('dietGoal', e.target.value || undefined)}
+                    className="w-full p-2 border rounded text-sm text-black bg-white"
+                  >
+                    <option value="">{intl.formatMessage({ id: 'settings.selectDietGoal' })}</option>
+                    <option value="lose-weight">{intl.formatMessage({ id: 'settings.dietGoals.loseWeight' })}</option>
+                    <option value="maintain-weight">{intl.formatMessage({ id: 'settings.dietGoals.maintainWeight' })}</option>
+                    <option value="gain-weight">{intl.formatMessage({ id: 'settings.dietGoals.gainWeight' })}</option>
+                    <option value="build-muscle">{intl.formatMessage({ id: 'settings.dietGoals.buildMuscle' })}</option>
+                    <option value="improve-health">{intl.formatMessage({ id: 'settings.dietGoals.improveHealth' })}</option>
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="activityLevel" className="block text-xs text-theme-secondary mb-1">{intl.formatMessage({ id: 'settings.activityLevel' })}</label>
+                  <select
+                    id="activityLevel"
+                    name="activityLevel"
+                    value={userProfile?.activityLevel || ''}
+                    onChange={(e) => handleProfileChange('activityLevel', e.target.value || undefined)}
+                    className="w-full p-2 border rounded text-sm text-black bg-white"
+                  >
+                    <option value="">{intl.formatMessage({ id: 'settings.selectActivityLevel' })}</option>
+                    <option value="sedentary">{intl.formatMessage({ id: 'settings.activityLevels.sedentary' })}</option>
+                    <option value="lightly-active">{intl.formatMessage({ id: 'settings.activityLevels.lightlyActive' })}</option>
+                    <option value="moderately-active">{intl.formatMessage({ id: 'settings.activityLevels.moderatelyActive' })}</option>
+                    <option value="very-active">{intl.formatMessage({ id: 'settings.activityLevels.veryActive' })}</option>
+                    <option value="extremely-active">{intl.formatMessage({ id: 'settings.activityLevels.extremelyActive' })}</option>
+                  </select>
+                </div>
+              </div>
+
+              {profileChanged && (
                 <button
-                  onClick={handleRemoveAvatar}
-                  disabled={updatingAvatar}
-                  className="bg-red-500 text-white px-3 py-2 rounded text-sm font-medium hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  onClick={saveProfile}
+                  disabled={savingProfile}
+                  className="w-full bg-green-500 text-white px-4 py-2 rounded text-sm font-medium hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-4"
                 >
-                  {updatingAvatar && <Loader2 className="w-4 h-4 animate-spin" />}
-                  {updatingAvatar ? 'Removing...' : 'Remove'}
+                  {savingProfile && <Loader2 className="w-4 h-4 animate-spin" />}
+                  {savingProfile ? 'Saving...' : intl.formatMessage({ id: 'settings.saveProfile' })}
                 </button>
               )}
             </div>
 
-            {showAvatarSelection && (
-              <div className="mb-4">
-                <h4 className="text-sm font-medium mb-2 text-theme-primary">{intl.formatMessage({ id: 'settings.chooseAvatar' })}</h4>
-                <div className="grid grid-cols-5 gap-2 max-h-48 overflow-y-auto">
-                  {avatarOptions.map((avatarPath) => (
-                    <button
-                      key={avatarPath}
-                      onClick={() => handleAvatarSelect(avatarPath)}
-                      disabled={updatingAvatar}
-                      className="w-12 h-12 rounded-full overflow-hidden border-2 border-gray-300 hover:border-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed relative"
-                    >
-                      <img
-                        src={avatarPath}
-                        alt={`Avatar ${avatarPath.split('/').pop()?.split('.')[0]}`}
-                        className="w-full h-full object-cover"
-                      />
-                      {updatingAvatar && (
-                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                          <Loader2 className="w-4 h-4 animate-spin text-white" />
-                        </div>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Name Field */}
-            <div className="mb-4">
-              <label htmlFor="userName" className="block text-sm font-medium text-theme-primary mb-2">{intl.formatMessage({ id: 'settings.displayName' })}</label>
-              <input
-                id="userName"
-                name="userName"
-                type="text"
-                value={userProfile?.name ?? user.name ?? ''}
-                onChange={(e) => handleProfileChange('name', e.target.value)}
-                placeholder="Enter your display name"
-                className="w-full px-3 py-2 border border-theme rounded-lg bg-theme-primary text-theme-secondary placeholder-theme-secondary/50 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:border-transparent"
-              />
-              <p className="text-xs text-theme-secondary mt-1">This name will be used throughout the app to personalize your experience.</p>
-            </div>
+            {/* Logout Button */}
+            <button
+              onClick={onLogout}
+              className="w-full bg-red-500 text-white px-4 py-2 rounded font-medium hover:bg-red-600 mt-4"
+            >
+              Logout
+            </button>
           </div>
-            {/* User Profile Information */}
-          <div className="space-y-4 mb-4">
-            <h4 className="text-sm font-medium mb-3 text-theme-primary">{intl.formatMessage({ id: 'settings.personalInfo' })}</h4>
-            
-            {/* Height and Weight - keep in 2 columns */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs text-theme-secondary mb-1">{intl.formatMessage({ id: 'settings.height' })}</label>
-                <div className="flex gap-1">
-                  <div className="flex-1">
-                    <input
-                      id="heightFeet"
-                      name="heightFeet"
-                      type="number"
-                      value={userProfile?.height ? Math.floor(userProfile.height / 12) : ''}
-                      onChange={(e) => {
-                        const feet = parseInt(e.target.value) || 0;
-                        const inches = userProfile?.height ? userProfile.height % 12 : 0;
-                        handleProfileChange('height', feet * 12 + inches);
-                      }}
-                      placeholder="5"
-                      className="w-full p-1 text-xs border rounded text-black bg-white"
-                      min="0"
-                      max="8"
-                      size={3}
-                    />
-                    <span className="text-xs text-theme-secondary block mt-0.5">ft</span>
-                  </div>
-                  <div className="flex-1">
-                    <input
-                      id="heightInches"
-                      name="heightInches"
-                      type="number"
-                      value={userProfile?.height ? userProfile.height % 12 : ''}
-                      onChange={(e) => {
-                        const feet = userProfile?.height ? Math.floor(userProfile.height / 12) : 0;
-                        const inches = parseInt(e.target.value) || 0;
-                        handleProfileChange('height', feet * 12 + inches);
-                      }}
-                      placeholder="8"
-                      className="w-full p-1 text-xs border rounded text-black bg-white"
-                      min="0"
-                      max="11"
-                      size={3}
-                    />
-                    <span className="text-xs text-theme-secondary block mt-0.5">in</span>
-                  </div>
-                </div>
-              </div>
-              <div>
-                <label htmlFor="weight" className="block text-xs text-theme-secondary mb-1">{intl.formatMessage({ id: 'settings.weight' })}</label>
-                <input
-                  id="weight"
-                  name="weight"
-                  type="number"
-                  min="0"
-                  value={userProfile?.weight || ''}
-                  onChange={(e) => handleProfileChange('weight', e.target.value ? parseInt(e.target.value) : undefined)}
-                  placeholder="154"
-                  className="w-full p-1 text-xs border rounded text-black bg-white"
-                  size={3}
-                />
-              </div>
-            </div>
-
-            {/* Age, Gender, and Household Size - 3 columns */}
-            <div className="grid grid-cols-3 gap-2">
-              <div>
-                <label htmlFor="age" className="block text-xs text-theme-secondary mb-1">Age</label>
-                <input
-                  id="age"
-                  name="age"
-                  type="number"
-                  min="0"
-                  value={userProfile?.age || ''}
-                  onChange={(e) => handleProfileChange('age', e.target.value ? parseInt(e.target.value) : undefined)}
-                  placeholder="30"
-                  className="w-full p-1 text-xs border rounded text-black bg-white"
-                  size={2}
-                />
-              </div>
-              <div>
-                <label htmlFor="gender" className="block text-xs text-theme-secondary mb-1">{intl.formatMessage({ id: 'settings.gender' })}</label>
-                <select
-                  id="gender"
-                  name="gender"
-                  value={userProfile?.gender || ''}
-                  onChange={(e) => handleProfileChange('gender', e.target.value || undefined)}
-                  className="w-full p-1 text-xs border rounded text-black bg-white"
-                >
-                  <option value="">{intl.formatMessage({ id: 'settings.selectGender' })}</option>
-                  <option value="male">{intl.formatMessage({ id: 'settings.genders.male' })}</option>
-                  <option value="female">{intl.formatMessage({ id: 'settings.genders.female' })}</option>
-                  <option value="other">{intl.formatMessage({ id: 'settings.genders.other' })}</option>
-                  <option value="prefer-not-to-say">{intl.formatMessage({ id: 'settings.genders.preferNotToSay' })}</option>
-                </select>
-              </div>
-              <div>
-                <label htmlFor="householdSize" className="block text-xs text-theme-secondary mb-1">{intl.formatMessage({ id: 'settings.household' })}</label>
-                <input
-                  id="householdSize"
-                  name="householdSize"
-                  type="number"
-                  value={userProfile?.householdSize || ''}
-                  onChange={(e) => handleProfileChange('householdSize', e.target.value ? parseInt(e.target.value) : undefined)}
-                  placeholder="4"
-                  className="w-full p-1 text-xs border rounded text-black bg-white"
-                  min="1"
-                  max="20"
-                  size={3}
-                />
-                <span className="text-xs text-theme-secondary block mt-0.5">people</span>
-              </div>
-            </div>
-
-            {/* Diet Goal and Activity Level - combine into 2 columns */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label htmlFor="dietGoal" className="block text-xs text-theme-secondary mb-1">{intl.formatMessage({ id: 'settings.dietGoal' })}</label>
-                <select
-                  id="dietGoal"
-                  name="dietGoal"
-                  value={userProfile?.dietGoal || ''}
-                  onChange={(e) => handleProfileChange('dietGoal', e.target.value || undefined)}
-                  className="w-full p-2 border rounded text-sm text-black bg-white"
-                >
-                  <option value="">{intl.formatMessage({ id: 'settings.selectDietGoal' })}</option>
-                  <option value="lose-weight">{intl.formatMessage({ id: 'settings.dietGoals.loseWeight' })}</option>
-                  <option value="maintain-weight">{intl.formatMessage({ id: 'settings.dietGoals.maintainWeight' })}</option>
-                  <option value="gain-weight">{intl.formatMessage({ id: 'settings.dietGoals.gainWeight' })}</option>
-                  <option value="build-muscle">{intl.formatMessage({ id: 'settings.dietGoals.buildMuscle' })}</option>
-                  <option value="improve-health">{intl.formatMessage({ id: 'settings.dietGoals.improveHealth' })}</option>
-                </select>
-              </div>
-              <div>
-                <label htmlFor="activityLevel" className="block text-xs text-theme-secondary mb-1">{intl.formatMessage({ id: 'settings.activityLevel' })}</label>
-                <select
-                  id="activityLevel"
-                  name="activityLevel"
-                  value={userProfile?.activityLevel || ''}
-                  onChange={(e) => handleProfileChange('activityLevel', e.target.value || undefined)}
-                  className="w-full p-2 border rounded text-sm text-black bg-white"
-                >
-                  <option value="">{intl.formatMessage({ id: 'settings.selectActivityLevel' })}</option>
-                  <option value="sedentary">{intl.formatMessage({ id: 'settings.activityLevels.sedentary' })}</option>
-                  <option value="lightly-active">{intl.formatMessage({ id: 'settings.activityLevels.lightlyActive' })}</option>
-                  <option value="moderately-active">{intl.formatMessage({ id: 'settings.activityLevels.moderatelyActive' })}</option>
-                  <option value="very-active">{intl.formatMessage({ id: 'settings.activityLevels.veryActive' })}</option>
-                  <option value="extremely-active">{intl.formatMessage({ id: 'settings.activityLevels.extremelyActive' })}</option>
-                </select>
-              </div>
-            </div>
-
-            {profileChanged && (
-              <button
-                onClick={saveProfile}
-                disabled={savingProfile}
-                className="w-full bg-green-500 text-white px-4 py-2 rounded text-sm font-medium hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
-                {savingProfile && <Loader2 className="w-4 h-4 animate-spin" />}
-                {savingProfile ? 'Saving...' : intl.formatMessage({ id: 'settings.saveProfile' })}
-              </button>
-            )}
-          </div>
-
-          {/* Logout Button */}
-          <button
-            onClick={onLogout}
-            className="w-full bg-red-500 text-white px-4 py-2 rounded font-medium hover:bg-red-600"
-          >
-            Logout
-          </button>
-            </div>
-          )}
         </div>
       )}
 
       <SettingsPendingNotificationsSection
         user={user}
-        expanded={expandedSections.has('PendingNotifications')}
-        onToggle={() => toggleSection('PendingNotifications')}
         title={intl.formatMessage({ id: 'settings.pendingNotifications' })}
       />
 
       <SettingsUsageLimitsSection
         userExists={!!user}
-        expanded={expandedSections.has('UsageLimits')}
-        onToggle={() => toggleSection('UsageLimits')}
         title={intl.formatMessage({ id: 'settings.usageLimits' })}
         isPremium={isPremium}
         isFamily={isFamily}
@@ -941,8 +933,6 @@ export const Settings: React.FC<SettingsProps> = ({
       <SettingsHouseholdSection
         user={user}
         household={household}
-        expanded={expandedSections.has('Household')}
-        onToggle={() => toggleSection('Household')}
         title={intl.formatMessage({ id: 'settings.household' })}
         onShowHousehold={onShowHousehold}
         openMemberPreferences={openMemberPreferences}
@@ -964,13 +954,17 @@ export const Settings: React.FC<SettingsProps> = ({
           setShowCategoryManager(true);
         }}
         onOpenStoreLayout={() => setActiveSettingsTab('organization')}
-        onOpenFoodSafety={() => setExpandedSections((previous) => new Set([...previous, 'FoodSafety']))}
-        onOpenAppPreferences={() => setExpandedSections((previous) => new Set([...previous, 'AppPreferences']))}
+        onOpenFoodSafety={() => {
+          const el = document.querySelector('[data-section="food-safety"]');
+          el?.scrollIntoView({ behavior: 'smooth' });
+        }}
+        onOpenAppPreferences={() => {
+          const el = document.querySelector('[data-section="app-preferences"]');
+          el?.scrollIntoView({ behavior: 'smooth' });
+        }}
       />
 
       <SettingsAppPreferencesSection
-        expanded={expandedSections.has('AppPreferences')}
-        onToggle={() => toggleSection('AppPreferences')}
         title={intl.formatMessage({ id: 'settings.appPreferences' })}
         settings={settings}
         setSettings={setSettings}
@@ -990,8 +984,6 @@ export const Settings: React.FC<SettingsProps> = ({
       />
 
       <SettingsTabVisibilitySection
-        expanded={expandedSections.has('TabVisibility')}
-        onToggle={() => toggleSection('TabVisibility')}
         hiddenTabs={settings.navigation?.hiddenTabs}
         onTabVisibilityChange={(tab, isVisible) => {
           const hidden = settings.navigation?.hiddenTabs ?? [];
@@ -1004,8 +996,6 @@ export const Settings: React.FC<SettingsProps> = ({
       />
 
       <SettingsFoodSafetySection
-        expanded={expandedSections.has('FoodSafety')}
-        onToggle={() => toggleSection('FoodSafety')}
         title={intl.formatMessage({ id: 'settings.foodSafety' })}
         user={user}
         userProfile={userProfile}
@@ -1015,8 +1005,6 @@ export const Settings: React.FC<SettingsProps> = ({
       />
 
       <SettingsThemeSection
-        expanded={expandedSections.has('Theme')}
-        onToggle={() => toggleSection('Theme')}
         title={intl.formatMessage({ id: 'settings.themeSettings' })}
         settings={settings}
         onResetTheme={() => {
@@ -1046,8 +1034,6 @@ export const Settings: React.FC<SettingsProps> = ({
       />
 
       <SettingsNotificationsSection
-        expanded={expandedSections.has('Notifications')}
-        onToggle={() => toggleSection('Notifications')}
         title={intl.formatMessage({ id: 'settings.notifications' })}
         user={user}
         notificationSettings={notificationSettings}
@@ -1060,8 +1046,6 @@ export const Settings: React.FC<SettingsProps> = ({
 
       <SettingsCategoriesSection
         userExists={!!user}
-        expanded={expandedSections.has('Categories')}
-        onToggle={() => toggleSection('Categories')}
         title={intl.formatMessage({ id: 'settings.categories' })}
         customCategoryCount={customCategories.length}
         onManageCategories={() => setShowCategoryManager(true)}
@@ -1069,8 +1053,6 @@ export const Settings: React.FC<SettingsProps> = ({
 
       <SettingsStoreLayoutSection
         userExists={!!user}
-        expanded={expandedSections.has('Store Layout')}
-        onToggle={() => toggleSection('Store Layout')}
         title={intl.formatMessage({ id: 'settings.storeLayout' })}
         storeLayout={settings.shopping?.storeLayout || defaultStoreLayout}
         onStoreLayoutChange={(newLayout) => setSettings((previous) => ({
@@ -1095,8 +1077,6 @@ export const Settings: React.FC<SettingsProps> = ({
       <SettingsLeftoverAnalyticsSection
         userId={user?.id}
         householdId={household?.id}
-        expanded={expandedSections.has('Leftover Analytics')}
-        onToggle={() => toggleSection('Leftover Analytics')}
         title={intl.formatMessage({ id: 'settings.leftoverAnalytics' })}
       />
 
@@ -1105,8 +1085,6 @@ export const Settings: React.FC<SettingsProps> = ({
       {activeSettingsTab === 'more' && <>
 
       <SettingsFeedbackSection
-        expanded={expandedSections.has('Feedback')}
-        onToggle={() => toggleSection('Feedback')}
         title={intl.formatMessage({ id: 'settings.feedback' })}
         feedback={feedback}
         setFeedback={setFeedback}
@@ -1116,25 +1094,17 @@ export const Settings: React.FC<SettingsProps> = ({
 
       <SettingsSubscriptionSection
         user={user}
-        expanded={expandedSections.has('Subscription')}
-        onToggle={() => toggleSection('Subscription')}
         title={intl.formatMessage({ id: 'settings.subscription' })}
       />
 
-
-
       <SettingsPantryImagesSection
         user={user}
-        expanded={expandedSections.has('Pantry Images')}
-        onToggle={() => toggleSection('Pantry Images')}
         title={intl.formatMessage({ id: 'settings.pantryImages' })}
         updatingBulkImages={updatingBulkImages}
         onBulkUpdate={handleBulkImageUpdate}
       />
 
       <SettingsHelpSection
-        expanded={expandedSections.has('Help & Support')}
-        onToggle={() => toggleSection('Help & Support')}
         title={intl.formatMessage({ id: 'settings.help' })}
         description="Need help? Check out our FAQ or contact our support team for assistance."
         onOpenFAQ={() => setShowFAQModal(true)}
@@ -1142,22 +1112,16 @@ export const Settings: React.FC<SettingsProps> = ({
       />
 
       <SettingsAppUpdatesSection
-        expanded={expandedSections.has('App Updates')}
-        onToggle={() => toggleSection('App Updates')}
         title={intl.formatMessage({ id: 'settings.appUpdates' })}
       />
 
       <SettingsResetUsageSection
         isAdmin={isAdmin}
-        expanded={expandedSections.has('Reset Usage')}
-        onToggle={() => toggleSection('Reset Usage')}
         onReset={handleResetUsageCounters}
       />
 
       <SettingsRemoteConfigDebugSection
         isAdmin={isAdmin}
-        expanded={expandedSections.has('Remote Config Debug')}
-        onToggle={() => toggleSection('Remote Config Debug')}
         addToast={addToast}
       />
 
@@ -1396,8 +1360,6 @@ export const Settings: React.FC<SettingsProps> = ({
       {activeSettingsTab === 'more' && <>
 
       <SettingsPrivacyLegalSection
-        expanded={expandedSections.has('Privacy & Legal')}
-        onToggle={() => toggleSection('Privacy & Legal')}
         title={intl.formatMessage({ id: 'settings.privacy' })}
         onViewPrivacyPolicy={() => {
           const privacyUrl = (window as Window & { PRIVACY_POLICY_URL?: string }).PRIVACY_POLICY_URL || 'https://smartpantrymobile.page.gd/privacy.html';

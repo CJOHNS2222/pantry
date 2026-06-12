@@ -1,12 +1,10 @@
 import React from 'react';
-import { ChevronDown, ChevronRight, Edit2, Loader2, Users, X } from 'lucide-react';
+import { Edit2, Loader2, Users, X } from 'lucide-react';
 import { Household, Member, User } from '../../types';
 
 interface SettingsHouseholdSectionProps {
   user: User | null | undefined;
   household: Household | null | undefined;
-  expanded: boolean;
-  onToggle: () => void;
   title: string;
   onShowHousehold?: () => void;
   openMemberPreferences: (member: Member) => void;
@@ -19,36 +17,22 @@ interface SettingsHouseholdSectionProps {
 }
 
 export const SettingsHouseholdSection: React.FC<SettingsHouseholdSectionProps> = ({
-  user,
-  household,
-  expanded,
-  onToggle,
-  title,
-  onShowHousehold,
-  openMemberPreferences,
-  removeMemberFromHousehold,
-  householdName,
-  setHouseholdName,
-  isCreatingHousehold,
-  createHousehold,
-  manageHouseholdLabel,
-}) => {
+  user, household, title, onShowHousehold, openMemberPreferences, removeMemberFromHousehold, householdName, setHouseholdName, isCreatingHousehold, createHousehold, manageHouseholdLabel, }) => {
   if (!user) {
     return null;
   }
 
   return (
     <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden" data-section="household">
-      <div onClick={onToggle} className="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-theme-primary transition-colors">
+      <div className="w-full flex items-center justify-between p-4 border-b border-theme bg-theme-primary/20">
         <div className="flex items-center gap-3">
-          {expanded ? <ChevronDown className="w-5 h-5 text-theme-primary" /> : <ChevronRight className="w-5 h-5 text-theme-primary" />}
+          
           <Users className="w-5 h-5 text-[var(--accent-color)]" />
           <h3 className="font-semibold text-theme-primary">{title}</h3>
         </div>
       </div>
 
-      {expanded && (
-        <div className="border-t border-theme p-4">
+      <div className="p-4">
           {household ? (
             <>
               <div className="flex items-center justify-between mb-4">
@@ -153,7 +137,6 @@ export const SettingsHouseholdSection: React.FC<SettingsHouseholdSectionProps> =
             </div>
           )}
         </div>
-      )}
     </div>
   );
 };

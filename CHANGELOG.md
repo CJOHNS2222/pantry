@@ -1,3 +1,20 @@
+## [2.4.1] - 2026-06-12
+
+### Added
+- **Keyboard viewport hook** — added new `useKeyboard` hook that dynamically detects virtual soft keyboard and handles auto-scrolling focused inputs/textareas to the center of the viewport.
+- **Pre-permission educator screen** — added pre-permission educator dialog explaining camera privacy before requesting access on Android devices, alongside a denied settings fallback prompt.
+
+### Changed
+- **Navigation viewport auto-hiding** — bottom navigation bar automatically hides when the virtual keyboard is visible.
+- **Haptic feedback improvements** — integrated light feedback on checkmark clicks, medium feedback on item long-presses, and success feedback on key milestones (cooking meal, checkout, bulk-deleting).
+- **Cloud sync indicators** — updated connection status icons to cloud themes (`Cloud`, `CloudOff`, `RefreshCw` spin).
+
+### Fixed
+- **Hardware back button stack** — integrated autocomplete lists, details dropdowns, notes editors, and search overlays into the LIFO stack to support clean back-dismissals.
+- **AppNavigation tests** — updated test suite to reference standard button roles instead of obsolete tab roles.
+
+---
+
 ## [2.4.0] - 2026-06-03
 
 ### Added

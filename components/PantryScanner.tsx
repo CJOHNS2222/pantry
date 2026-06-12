@@ -218,6 +218,44 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   // Hide header/nav when any internal overlay is open
   useModalOpen(isAddModalOpen || showScanReviewModal || showBulkQuantityEdit);
   useAndroidBack(isAddModalOpen, () => setIsAddModalOpen(false));
+
+  const [showPermissionEducator, setShowPermissionEducator] = useState(false);
+  const [showSettingsFallback, setShowSettingsFallback] = useState(false);
+  const [pendingCameraAction, setPendingCameraAction] = useState<(() => Promise<void>) | null>(null);
+
+  useAndroidBack(showPermissionEducator, () => {
+    setShowPermissionEducator(false);
+    setPendingCameraAction(null);
+  });
+  useAndroidBack(showSettingsFallback, () => {
+    setShowSettingsFallback(false);
+    setPendingCameraAction(null);
+  });
+
+  const executeCameraActionWithPermissionCheck = useCallback(async (action: () => Promise<void>, type: 'camera' | 'photos' = 'camera') => {
+    if (!Capacitor.isNativePlatform()) {
+      await action();
+      return;
+    }
+
+    try {
+      const status = await CapacitorCamera.checkPermissions();
+      const permissionState = type === 'camera' ? status.camera : status.photos;
+      
+      if (permissionState === 'granted') {
+        await action();
+      } else if (permissionState === 'denied') {
+        setPendingCameraAction(() => action);
+        setShowSettingsFallback(true);
+      } else {
+        setPendingCameraAction(() => action);
+        setShowPermissionEducator(true);
+      }
+    } catch (err) {
+      log.error('Failed to check camera permissions', { err }, 'PantryScanner');
+      await action();
+    }
+  }, []);
   useAndroidBack(showScanReviewModal, () => setShowScanReviewModal(false));
   useAndroidBack(showBulkQuantityEdit, () => setShowBulkQuantityEdit(false));
   
@@ -2298,7 +2336,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                   onClick={async () => {
                     // Use Capacitor Camera if available, else fallback to file input
                     if (Capacitor.isNativePlatform()) {
-                      await handleTakePhoto();
+                      await executeCameraActionWithPermissionCheck(handleTakePhoto);
                     } else {
                       fileInputRef.current?.click();
                     }
@@ -2346,7 +2384,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                   <button
                     onClick={async () => {
                       if (Capacitor.isNativePlatform()) {
-                        await handleTakePhoto();
+                        await executeCameraActionWithPermissionCheck(handleTakePhoto);
                       } else {
                         fileInputRef.current?.click();
                       }
@@ -2362,7 +2400,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                   <button
                     onClick={async () => {
                       if (Capacitor.isNativePlatform()) {
-                        await handleSelectFromGallery();
+                        await executeCameraActionWithPermissionCheck(handleSelectFromGallery, 'photos');
                       } else {
                         fileInputRef.current?.click();
                       }
@@ -2377,7 +2415,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                   
                 {Capacitor.isNativePlatform() && (
                   <button
-                    onClick={handleScanBarcode}
+                    onClick={() => executeCameraActionWithPermissionCheck(handleScanBarcode)}
                     data-testid="pantry-barcode-button"
                     disabled={loadingState === LoadingState.LOADING}
                     className="flex-1 py-2 px-3 rounded-lg border border-theme text-theme-secondary hover:bg-theme-primary transition-colors flex items-center justify-center gap-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -2393,7 +2431,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                 {/* Action Buttons — Row 2: receipt & import */}
                 <div className="flex gap-2 mt-2">
                   <button
-                    onClick={handleScanReceipt}
+                    onClick={() => executeCameraActionWithPermissionCheck(handleScanReceipt)}
                     data-testid="pantry-receipt-button"
                     disabled={loadingState === LoadingState.LOADING}
                     className="flex-1 py-2 px-3 rounded-lg border border-theme text-theme-secondary hover:bg-theme-primary transition-colors flex items-center justify-center gap-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -3124,7 +3162,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
 
       {/* Freeze Transition Modal */}
       {freezeTargetIndex !== null && household?.id && inventory[freezeTargetIndex]?.id && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] px-4 pt-[var(--safe-area-inset-top,0px)] pb-[var(--safe-area-inset-bottom,0px)]">
           <div className="bg-theme-primary rounded-lg shadow-xl w-full max-w-md mx-auto border border-theme">
             <FreezeTransitionModal
               householdId={household.id}
@@ -3191,6 +3229,118 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
           user={user ? { id: user.id, name: user.name, email: user.email, avatar: user.avatar } : undefined}
         />
       )}
+
+      {/* Camera Pre-Permission Educator Modal */}
+      {showPermissionEducator && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4">
+          <div className="bg-theme-secondary rounded-2xl shadow-2xl max-w-sm w-full relative overflow-hidden border border-theme">
+            {/* Header banner */}
+            <div className="h-20 bg-gradient-to-r from-blue-500 to-cyan-500 relative flex items-center justify-center">
+              <Camera className="w-8 h-8 text-white" />
+            </div>
+            {/* Content */}
+            <div className="p-6">
+              <h2 className="text-xl font-bold text-theme-primary text-center mb-2">
+                Camera Access Needed
+              </h2>
+              <p className="text-theme-secondary text-sm text-center mb-6 leading-relaxed">
+                We use your camera to scan pantry item details, recognize receipt text, and check barcodes. No photos are stored on our servers.
+              </p>
+              
+              <div className="bg-theme/5 rounded-xl p-4 mb-6">
+                <h3 className="font-semibold text-theme-primary text-xs mb-2">Benefits:</h3>
+                <ul className="text-xs text-theme-secondary space-y-2">
+                  <li className="flex items-center gap-2">✓ Quick shelf scans</li>
+                  <li className="flex items-center gap-2">✓ Automatic expiry detection</li>
+                  <li className="flex items-center gap-2">✓ Instant list updates</li>
+                </ul>
+              </div>
+
+              <div className="space-y-3">
+                <button
+                  onClick={async () => {
+                    setShowPermissionEducator(false);
+                    try {
+                      const req = await CapacitorCamera.requestPermissions();
+                      if (req.camera === 'granted' && pendingCameraAction) {
+                        await pendingCameraAction();
+                      } else if (req.camera === 'denied') {
+                        setShowSettingsFallback(true);
+                      }
+                    } catch (err) {
+                      log.error('Permission request failed', { err }, 'PantryScanner');
+                    }
+                  }}
+                  className="w-full bg-gradient-to-r from-blue-500 to-cyan-500 hover:opacity-90 text-white py-3 px-6 rounded-xl font-semibold transition-all duration-200"
+                >
+                  Allow Access
+                </button>
+                <button
+                  onClick={() => {
+                    setShowPermissionEducator(false);
+                    setPendingCameraAction(null);
+                  }}
+                  className="w-full bg-theme/10 hover:bg-theme/20 text-theme-secondary py-3 px-6 rounded-xl font-medium transition-colors"
+                >
+                  Not Now
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Settings Denied Fallback Dialog */}
+      {showSettingsFallback && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4">
+          <div className="bg-theme-secondary rounded-2xl shadow-2xl max-w-sm w-full relative overflow-hidden border border-theme">
+            <div className="h-20 bg-gradient-to-r from-red-500 to-orange-500 relative flex items-center justify-center">
+              <Camera className="w-8 h-8 text-white" />
+            </div>
+            <div className="p-6">
+              <h2 className="text-xl font-bold text-theme-primary text-center mb-2">
+                Permission Required
+              </h2>
+              <p className="text-theme-secondary text-sm text-center mb-6 leading-relaxed">
+                Camera access was permanently denied. Please enable camera permissions in your Android system settings to use the scanner.
+              </p>
+              
+              <div className="bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-900/30 rounded-xl p-4 mb-6">
+                <h3 className="font-semibold text-orange-800 dark:text-orange-300 text-xs mb-1">How to enable:</h3>
+                <ol className="text-xs text-orange-700 dark:text-orange-400 list-decimal pl-4 space-y-1">
+                  <li>Open Android Settings</li>
+                  <li>Go to Apps & Notifications</li>
+                  <li>Select Stock & Spoon</li>
+                  <li>Tap Permissions and enable Camera</li>
+                </ol>
+              </div>
+
+              <div className="space-y-3">
+                <button
+                  onClick={() => {
+                    setShowSettingsFallback(false);
+                    setPendingCameraAction(null);
+                    setIsAddModalOpen(true); // Fallback directly to manual entry
+                  }}
+                  className="w-full bg-gradient-to-r from-blue-500 to-cyan-500 hover:opacity-90 text-white py-3 px-6 rounded-xl font-semibold transition-all duration-200"
+                >
+                  Add Item Manually
+                </button>
+                <button
+                  onClick={() => {
+                    setShowSettingsFallback(false);
+                    setPendingCameraAction(null);
+                  }}
+                  className="w-full bg-theme/10 hover:bg-theme/20 text-theme-secondary py-3 px-6 rounded-xl font-medium transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {canShowAdBanner && <AdMobBanner />}
     </div>
   );

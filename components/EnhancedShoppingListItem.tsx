@@ -1,7 +1,9 @@
 import React, { useState, useRef } from 'react';
-import { Check, Trash2, Calculator, MessageSquare, UserCheck, X } from 'lucide-react';
+import { Check, Trash2, Calculator, MessageSquare, UserCheck, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { ShoppingItem } from '../types';
 import { comparePriceOptions, formatPricePerUnit, getPriceComparisonSummary } from '../utils/priceCalculator';
+import { useAndroidBack } from '../hooks/useAndroidBack';
+import HapticService from '../services/hapticService';
 
 interface HouseholdMember {
   id: string;
@@ -36,18 +38,19 @@ export const EnhancedShoppingListItem: React.FC<ShoppingListItemProps> = ({
   lastSynced,
   showPriceData = false,
 }) => {
-  const [swipeOffset, setSwipeOffset] = useState(0);
-  const [isSwiping, setIsSwiping] = useState(false);
-  const [startX, setStartX] = useState(0);
-  const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
+  const [isOpen, setIsOpen] = useState(false);
   const [showAssignPicker, setShowAssignPicker] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
   const [noteText, setNoteText] = useState(item.notes ?? '');
   const itemRef = useRef<HTMLDivElement>(null);
 
-  const SWIPE_THRESHOLD = 80;
-  const MAX_SWIPE = 120;
-  const LONG_PRESS_DELAY = 500;
+  // Register Android system back button hooks for overlays
+  useAndroidBack(showAssignPicker, () => setShowAssignPicker(false));
+  useAndroidBack(showNotes, () => setShowNotes(false));
+
+  const hasNoteButton = !!onUpdateItem;
+  const drawerWidth = hasNoteButton ? 140 : 70;
+  const swipeOffset = isOpen ? -drawerWidth : 0;
 
   const [showPriceComparison, setShowPriceComparison] = useState(false);
 
@@ -59,102 +62,100 @@ export const EnhancedShoppingListItem: React.FC<ShoppingListItemProps> = ({
     ? getPriceComparisonSummary(item.priceOptions)
     : '';
 
-  const handleTouchStart = (e: React.TouchEvent) => {
-    setStartX(e.touches[0].clientX);
-    setIsSwiping(true);
+  const pointerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isLongPressing = useRef(false);
 
-    // Start long press timer
-    const timer = setTimeout(() => {
-      if (onLongPress && !isSwiping) {
+  const handlePointerDown = (_e: React.PointerEvent) => {
+    isLongPressing.current = false;
+    pointerTimer.current = setTimeout(() => {
+      isLongPressing.current = true;
+      HapticService.medium();
+      if (onLongPress) {
         onLongPress(item.id);
       }
-    }, LONG_PRESS_DELAY);
-    setLongPressTimer(timer);
+    }, 600);
   };
 
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (!isSwiping) return;
-
-    const currentX = e.touches[0].clientX;
-    const diff = currentX - startX;
-
-    // Clear long press timer if user starts swiping
-    if (longPressTimer) {
-      clearTimeout(longPressTimer);
-      setLongPressTimer(null);
-    }
-
-    // Only allow right swipe (positive diff) to mark as done
-    if (diff > 0) {
-      setSwipeOffset(Math.min(diff, MAX_SWIPE));
+  const handlePointerUpOrLeave = () => {
+    if (pointerTimer.current) {
+      clearTimeout(pointerTimer.current);
+      pointerTimer.current = null;
     }
   };
 
-  const handleTouchEnd = () => {
-    // Clear long press timer
-    if (longPressTimer) {
-      clearTimeout(longPressTimer);
-      setLongPressTimer(null);
+  const handleClick = (e: React.MouseEvent) => {
+    if (isLongPressing.current) {
+      e.stopPropagation();
+      e.preventDefault();
+      isLongPressing.current = false;
+      return;
     }
-
-    if (!isSwiping) return;
-
-    setIsSwiping(false);
-
-    if (Math.abs(swipeOffset) > SWIPE_THRESHOLD) {
-      // Swipe completed - remove item
-      onRemove(item.id);
-      setSwipeOffset(0);
-    } else {
-      // Reset position
-      setSwipeOffset(0);
+    if (isOpen) {
+      e.stopPropagation();
+      setIsOpen(false);
+      return;
     }
-  };
-
-  const handleClick = () => {
-    // Only handle click if not swiping and long press timer has cleared
-    if (!isSwiping && !longPressTimer) {
-      onToggleCheck(item.id);
-    }
-  };
-
-  const getSwipeActionColor = () => {
-    if (Math.abs(swipeOffset) > SWIPE_THRESHOLD) {
-      return 'bg-red-500';
-    }
-    return 'bg-red-400';
+    HapticService.light();
+    onToggleCheck(item.id);
   };
 
   return (
     <div className="relative overflow-hidden rounded-xl">
-      {/* Swipe Action Background - Left side for right swipe */}
+      {/* Swipe Actions Drawer - sits underneath the card on the right side */}
       <div
-        className={`absolute inset-y-0 left-0 ${getSwipeActionColor()} flex items-center justify-start px-4 transition-all duration-200`}
-        style={{ width: Math.max(0, swipeOffset) }}
+        className="absolute inset-y-0 right-0 flex items-stretch z-0 overflow-hidden rounded-r-xl"
+        style={{ width: `${drawerWidth}px` }}
       >
-        <div className="flex items-center gap-2 text-white">
-          <Trash2 className="w-5 h-5" />
-          <span className="text-sm font-medium">
-            {Math.abs(swipeOffset) > SWIPE_THRESHOLD ? 'Delete' : 'Swipe to Delete'}
-          </span>
-        </div>
+        {/* Note Button */}
+        {hasNoteButton && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowNotes(prev => !prev);
+              setShowAssignPicker(false);
+              if (!showNotes) setNoteText(item.notes ?? '');
+              setIsOpen(false);
+            }}
+            className="flex-1 flex flex-col items-center justify-center bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+            title={item.notes ? 'Edit note' : 'Add note'}
+            aria-label="Edit note"
+          >
+            <MessageSquare className="w-4 h-4 mb-1" />
+            <span className="text-[10px] font-medium">Note</span>
+          </button>
+        )}
+
+        {/* Delete/Remove Button */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove(item.id);
+            setIsOpen(false);
+          }}
+          className="flex-1 flex flex-col items-center justify-center bg-red-600 text-white hover:bg-red-700 transition-colors"
+          aria-label={`Remove ${item.item}`}
+        >
+          <Trash2 className="w-4 h-4 mb-1" />
+          <span className="text-[10px] font-medium">Delete</span>
+        </button>
       </div>
 
       {/* Main Item */}
       <div
         ref={itemRef}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
         onClick={handleClick}
-        className={`flex items-start justify-between gap-3 p-4 bg-theme-secondary border border-theme rounded-xl transition-all cursor-pointer group relative ${
+        onPointerDown={handlePointerDown}
+        onPointerUp={handlePointerUpOrLeave}
+        onPointerLeave={handlePointerUpOrLeave}
+        onPointerCancel={handlePointerUpOrLeave}
+        className={`flex items-start justify-between gap-3 p-4 bg-theme-secondary border border-theme rounded-xl transition-all cursor-pointer group relative z-10 ${
           isSelected
             ? 'bg-[var(--accent-color)]/10 border-[var(--accent-color)]/30'
             : 'hover:border-[var(--accent-color)]/50'
         }`}
         style={{
           transform: `translateX(${swipeOffset}px)`,
-          transition: isSwiping ? 'none' : 'all 0.3s ease'
+          transition: 'transform 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
         }}
       >
         <div className="flex items-start gap-3 flex-1 min-w-0">
@@ -226,27 +227,6 @@ export const EnhancedShoppingListItem: React.FC<ShoppingListItemProps> = ({
             </div>
           )}
 
-          {/* Notes Button */}
-          {onUpdateItem && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowNotes(!showNotes);
-                setShowAssignPicker(false);
-                if (!showNotes) setNoteText(item.notes ?? '');
-              }}
-              className={`p-2 min-w-[44px] min-h-[44px] flex items-center justify-center transition-opacity ${
-                item.notes
-                  ? 'text-[var(--accent-color)] opacity-90 hover:opacity-100'
-                  : 'text-theme-secondary opacity-40 hover:opacity-80'
-              }`}
-              title={item.notes ? 'Edit note' : 'Add note'}
-              aria-label="Toggle notes"
-            >
-              <MessageSquare className="w-4 h-4" />
-            </button>
-          )}
-
           {onQuantityChange && (
             <input
               type="text"
@@ -278,16 +258,17 @@ export const EnhancedShoppingListItem: React.FC<ShoppingListItemProps> = ({
             </button>
           )}
 
-          {/* Remove Button */}
+          {/* Chevron Reveal Tab */}
           <button
             onClick={(e) => {
               e.stopPropagation();
-              onRemove(item.id);
+              setIsOpen(!isOpen);
             }}
-            className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-theme-secondary opacity-30 hover:opacity-100 hover:text-red-500 transition-opacity"
-            aria-label={`Remove ${item.item}`}
+            className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-theme-secondary opacity-60 hover:opacity-100 hover:text-[var(--accent-color)] transition-opacity"
+            title={isOpen ? 'Close actions' : 'More actions'}
+            aria-label={isOpen ? 'Close actions' : 'More actions'}
           >
-            <Trash2 className="w-4 h-4" />
+            {isOpen ? <ChevronRight className="w-4 h-4 text-[var(--accent-color)]" /> : <ChevronLeft className="w-4 h-4" />}
           </button>
         </div>
       </div>

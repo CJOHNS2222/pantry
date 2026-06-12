@@ -1,11 +1,9 @@
 import React from 'react';
-import { AlertTriangle, ChevronDown, ChevronRight, Heart, ShieldCheck } from 'lucide-react';
+import { AlertTriangle, Heart, ShieldCheck } from 'lucide-react';
 import { User, UserProfile } from '../../types';
 import LeftoverPersonaQuestionnaire from '../LeftoverPersonaQuestionnaire';
 
 interface SettingsFoodSafetySectionProps {
-  expanded: boolean;
-  onToggle: () => void;
   title: string;
   user: User | null | undefined;
   userProfile: UserProfile | null | undefined;
@@ -19,15 +17,7 @@ const FAVORITE_CUISINES = ['Italian', 'Mexican', 'Chinese', 'Japanese', 'Indian'
 const PREFERRED_PROTEINS = ['Chicken', 'Beef', 'Pork', 'Fish', 'Tofu', 'Beans', 'Eggs', 'Turkey', 'Lamb', 'Shrimp'];
 
 export const SettingsFoodSafetySection: React.FC<SettingsFoodSafetySectionProps> = ({
-  expanded,
-  onToggle,
-  title,
-  user,
-  userProfile,
-  setUserProfile,
-  debouncedSaveProfile,
-  saveProfileData,
-}) => {
+  title, user, userProfile, setUserProfile, debouncedSaveProfile, saveProfileData, }) => {
   const updateProfile = (updates: Partial<UserProfile>) => {
     const nextProfile = { ...userProfile, ...updates } as UserProfile;
     setUserProfile(nextProfile);
@@ -36,16 +26,15 @@ export const SettingsFoodSafetySection: React.FC<SettingsFoodSafetySectionProps>
 
   return (
     <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden">
-      <div onClick={onToggle} className="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-theme-primary transition-colors">
+      <div className="w-full flex items-center justify-between p-4 border-b border-theme bg-theme-primary/20">
         <div className="flex items-center gap-3">
-          {expanded ? <ChevronDown className="w-5 h-5 text-theme-primary" /> : <ChevronRight className="w-5 h-5 text-theme-primary" />}
+          
           <ShieldCheck className="w-5 h-5 text-[var(--accent-color)]" />
           <h3 className="font-semibold text-theme-primary">{title}</h3>
         </div>
       </div>
 
-      {expanded && (
-        <div className="border-t border-theme p-4 space-y-5">
+      <div className="p-4 space-y-5">
           <div>
             <label className="block text-sm font-medium text-theme-primary mb-3 flex items-center gap-2">
               <AlertTriangle className="w-4 h-4" />
@@ -163,7 +152,6 @@ export const SettingsFoodSafetySection: React.FC<SettingsFoodSafetySectionProps>
             }}
           />
         </div>
-      )}
     </div>
   );
 };

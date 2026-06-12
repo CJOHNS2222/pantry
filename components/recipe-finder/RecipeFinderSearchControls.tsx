@@ -1,5 +1,5 @@
-import React from 'react';
-import { Search, Mic, Clock, Sparkles, Loader2, ChefHat } from 'lucide-react';
+import React, { useState } from 'react';
+import { Search, Mic, Clock, Sparkles, Loader2, ChefHat, ChevronDown, ChevronUp } from 'lucide-react';
 import { LoadingState } from '../../types';
 
 interface RecipeFinderSearchControlsProps {
@@ -61,6 +61,8 @@ export const RecipeFinderSearchControls: React.FC<RecipeFinderSearchControlsProp
   onSetMaxIngredients,
   onGenerate,
 }) => {
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+
   return (
     <>
       <div className="bg-theme-secondary p-5 rounded-2xl border border-theme shadow-lg">
@@ -137,11 +139,7 @@ export const RecipeFinderSearchControls: React.FC<RecipeFinderSearchControlsProp
         </div>
       </div>
 
-      <div className="flex items-center gap-4">
-        <div className="h-px bg-theme opacity-30 flex-1"></div>
-        <span className="text-xs font-bold text-theme-secondary opacity-50 uppercase tracking-widest">OR</span>
-        <div className="h-px bg-theme opacity-30 flex-1"></div>
-      </div>
+      <div className="h-3" />
 
       <div className="bg-theme-secondary p-6 rounded-2xl border border-theme shadow-xl relative overflow-hidden">
         <div className="absolute top-0 right-0 w-32 h-32 bg-[var(--accent-color)] rounded-full blur-3xl opacity-10"></div>
@@ -226,51 +224,72 @@ export const RecipeFinderSearchControls: React.FC<RecipeFinderSearchControlsProp
                 <span className="absolute right-1 top-1.5 opacity-50 text-[8px] font-bold">MIN</span>
               </div>
             </div>
-            <div>
-              <label htmlFor="servings" className="text-sm text-[var(--accent-color)] font-bold uppercase mb-1 block">
-                Serves
-              </label>
-              <input
-                id="servings"
-                name="servings"
-                type="number"
-                min="0"
-                value={servings}
-                onChange={(e) => onSetServings(e.target.value)}
-                className="w-full p-2 rounded-lg border border-theme bg-theme-primary text-theme-primary focus:border-[var(--accent-color)] outline-none text-sm"
-              />
-            </div>
-            <div>
-              <label htmlFor="maxCookTime" className="text-sm text-[var(--accent-color)] font-bold uppercase mb-1 block">
-                Cook
-              </label>
-              <div className="relative">
-                <input
-                  id="maxCookTime"
-                  name="maxCookTime"
-                  type="number"
-                  min="0"
-                  value={maxCookTime}
-                  onChange={(e) => onSetMaxCookTime(e.target.value)}
-                  className="w-full p-2 rounded-lg border border-theme bg-theme-primary text-theme-primary focus:border-[var(--accent-color)] outline-none text-sm"
-                />
-                <span className="absolute right-1 top-1.5 opacity-50 text-[8px] font-bold">MIN</span>
+          </div>
+
+          {/* Advanced Filters Accordion */}
+          <div className="space-y-3">
+            <button
+              type="button"
+              onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+              className="w-full flex items-center justify-between py-2 text-xs font-bold text-theme-secondary hover:text-theme-primary transition-colors border-t border-theme pt-3"
+            >
+              <span>Advanced Filters</span>
+              {showAdvancedFilters ? (
+                <ChevronUp className="w-4 h-4" />
+              ) : (
+                <ChevronDown className="w-4 h-4" />
+              )}
+            </button>
+
+            {showAdvancedFilters && (
+              <div className="grid grid-cols-3 gap-3 animate-fade-in">
+                <div>
+                  <label htmlFor="servings" className="text-sm text-[var(--accent-color)] font-bold uppercase mb-1 block">
+                    Serves
+                  </label>
+                  <input
+                    id="servings"
+                    name="servings"
+                    type="number"
+                    min="0"
+                    value={servings}
+                    onChange={(e) => onSetServings(e.target.value)}
+                    className="w-full p-2 rounded-lg border border-theme bg-theme-primary text-theme-primary focus:border-[var(--accent-color)] outline-none text-sm"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="maxCookTime" className="text-sm text-[var(--accent-color)] font-bold uppercase mb-1 block">
+                    Cook
+                  </label>
+                  <div className="relative">
+                    <input
+                      id="maxCookTime"
+                      name="maxCookTime"
+                      type="number"
+                      min="0"
+                      value={maxCookTime}
+                      onChange={(e) => onSetMaxCookTime(e.target.value)}
+                      className="w-full p-2 rounded-lg border border-theme bg-theme-primary text-theme-primary focus:border-[var(--accent-color)] outline-none text-sm"
+                    />
+                    <span className="absolute right-1 top-1.5 opacity-50 text-[8px] font-bold">MIN</span>
+                  </div>
+                </div>
+                <div>
+                  <label htmlFor="maxIngredients" className="text-sm text-[var(--accent-color)] font-bold uppercase mb-1 block">
+                    Items
+                  </label>
+                  <input
+                    id="maxIngredients"
+                    name="maxIngredients"
+                    type="number"
+                    min="0"
+                    value={maxIngredients}
+                    onChange={(e) => onSetMaxIngredients(e.target.value)}
+                    className="w-full p-2 rounded-lg border border-theme bg-theme-primary text-theme-primary focus:border-[var(--accent-color)] outline-none text-sm"
+                  />
+                </div>
               </div>
-            </div>
-            <div>
-              <label htmlFor="maxIngredients" className="text-sm text-[var(--accent-color)] font-bold uppercase mb-1 block">
-                Items
-              </label>
-              <input
-                id="maxIngredients"
-                name="maxIngredients"
-                type="number"
-                min="0"
-                value={maxIngredients}
-                onChange={(e) => onSetMaxIngredients(e.target.value)}
-                className="w-full p-2 rounded-lg border border-theme bg-theme-primary text-theme-primary focus:border-[var(--accent-color)] outline-none text-sm"
-              />
-            </div>
+            )}
           </div>
 
           <button

@@ -9,6 +9,16 @@ export interface ChangeEntry {
 
 export const RECENT_CHANGES: ChangeEntry[] = [
   {
+    "version": "2.4.1",
+    "date": "Jun 12, 2026",
+    "highlights": [
+      "Keyboard viewport hook — added new useKeyboard hook that dynamically detects virtual soft keyboard and handles…",
+      "Pre-permission educator screen — added pre-permission educator dialog explaining camera privacy before requesting…",
+      "Navigation viewport auto-hiding — bottom navigation bar automatically hides when the virtual keyboard is visible.",
+      "Haptic feedback improvements — integrated light feedback on checkmark clicks, medium feedback on item long-presses, and…"
+    ]
+  },
+  {
     "version": "2.4.0",
     "date": "Jun 3, 2026",
     "highlights": [
@@ -26,16 +36,6 @@ export const RECENT_CHANGES: ChangeEntry[] = [
       "Recipe Finder search button — replaced the hidden inline search icon (only shown when input was non-empty) with a…",
       "Chef tab cache filters — added meal-type chips (All Meals, breakfast, lunch, dinner) plus cuisine dropdown filters…",
       "Preference-aware cache ranking — added shared cache ranking/filter helpers in utils/preferenceUtils.ts so cache recipe…"
-    ]
-  },
-  {
-    "version": "2.3.0",
-    "date": "May 29, 2026",
-    "highlights": [
-      "Meal Prep Planner — household size + batch scaling — new \"Household size\" picker (1/2/4/6 people) beside the day-range…",
-      "Local grocery price defaults — 29 real local-area prices seeded into the pricing fallback (butter, bacon, pork chops,…",
-      "Quick Add chips (Shopping list) — complete rewrite: single onClick handler, useRef scroll container, green checkmark…",
-      "Recipe Finder — preference warnings — per-card allergen (red shield) and dislike/restriction (amber warning) badges…"
     ]
   }
 ];

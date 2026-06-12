@@ -1,9 +1,7 @@
 import React from 'react';
-import { ChevronDown, ChevronRight, MessageSquare } from 'lucide-react';
+import { MessageSquare } from 'lucide-react';
 
 interface SettingsFeedbackSectionProps {
-  expanded: boolean;
-  onToggle: () => void;
   title: string;
   feedback: string;
   setFeedback: React.Dispatch<React.SetStateAction<string>>;
@@ -12,26 +10,18 @@ interface SettingsFeedbackSectionProps {
 }
 
 export const SettingsFeedbackSection: React.FC<SettingsFeedbackSectionProps> = ({
-  expanded,
-  onToggle,
-  title,
-  feedback,
-  setFeedback,
-  sending,
-  onSubmit,
-}) => {
+  title, feedback, setFeedback, sending, onSubmit, }) => {
   return (
     <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden">
-      <div onClick={onToggle} className="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-theme-primary transition-colors">
+      <div className="w-full flex items-center justify-between p-4 border-b border-theme bg-theme-primary/20">
         <div className="flex items-center gap-3">
-          {expanded ? <ChevronDown className="w-5 h-5 text-theme-primary" /> : <ChevronRight className="w-5 h-5 text-theme-primary" />}
+          
           <MessageSquare className="w-5 h-5 text-[var(--accent-color)]" />
           <h3 className="font-semibold text-theme-primary">{title}</h3>
         </div>
       </div>
 
-      {expanded && (
-        <div className="border-t border-theme p-4">
+      <div className="p-4">
           <form onSubmit={onSubmit} className="space-y-3">
             <textarea
               value={feedback}
@@ -50,7 +40,6 @@ export const SettingsFeedbackSection: React.FC<SettingsFeedbackSectionProps> = (
             </button>
           </form>
         </div>
-      )}
     </div>
   );
 };
