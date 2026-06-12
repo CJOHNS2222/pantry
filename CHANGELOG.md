@@ -1,3 +1,18 @@
+## [2.4.0] - 2026-06-03
+
+### Added
+- **Progressive onboarding milestones** — added milestone tracking to stage post-onboarding feature discovery based on user behavior (`onboarding-completed`, first pantry/shopping/meal-planning actions)
+
+### Changed
+- **Feature discovery gating** — `FeatureDiscoveryManager` now supports milestone-based eligibility so one-time tips are shown when context is relevant, rather than all at once
+
+### Fixed
+- **RecipeFinder typing** — restored missing `Tab` type import used by settings navigation actions
+- **ShoppingList compile breakages** — restored missing utility/log imports (`log`, `inferCategoryFromItemName`, `isHouseholdMember`, validation helpers)
+- **Meal plan cache import casing** — normalized `mealPlanCacheService` imports to resolve TypeScript casing conflict across Windows/macOS builds
+
+---
+
 ## [2.3.1] - 2026-06-01
 
 ### Fixed

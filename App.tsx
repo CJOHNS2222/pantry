@@ -47,7 +47,7 @@ import { useIsAdmin } from './hooks/useIsAdmin';
 import PerformanceMonitoringService from './services/performanceMonitoringService';
 import HapticService from './services/hapticService';
 import { ShoppingListCacheService } from './services/shoppingListCacheService';
-import { MealPlanCacheService } from './services/MealPlanCacheService';
+import { MealPlanCacheService } from './services/mealPlanCacheService';
 import { RecipesCacheService } from './services/recipesCacheService';
 import { groceryPriceService } from './services/groceryPriceService';
 import { PriceDataCacheService } from './services/priceDataCacheService'; // Import the service

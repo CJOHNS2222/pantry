@@ -24,6 +24,7 @@ import { RecipeFinderResultStates } from './recipe-finder/RecipeFinderResultStat
 import { RecipeFinderCard, RecipeFinderTile } from './recipe-finder/RecipeFinderCards';
 import { RecipeFinderTabs } from './recipe-finder/RecipeFinderTabs';
 import { RecipeFinderModalSection } from './recipe-finder/RecipeFinderModalSection';
+import { Tab } from '../types/app';
 
 /** Internal search params — partial RecipeSearchParams plus component-local filter fields */
 type RecipeFinderSearchParams = Partial<RecipeSearchParams> & { type?: string };

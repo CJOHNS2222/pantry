@@ -1,17 +1,17 @@
 import React, { useState } from 'react';
 import { User, Household, Member } from '../types';
-import { Users, Mail, Plus, X, Settings, ChefHat, Heart, AlertTriangle } from 'lucide-react';
+import { Users, Mail, Plus, X, Settings, ChefHat } from 'lucide-react';
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { PremiumFeature } from './PremiumFeature';
 import { Tab } from '../types/app';
 import { serverTimestamp } from 'firebase/firestore';
-import { db, auth } from '../firebaseConfig';
+import { auth } from '../firebaseConfig';
 import DatabaseMonitoringService from '../services/databaseMonitoringService';
 import { removeMemberFromHousehold } from '../services/householdService';
 import { log } from '../services/logService';
 import { UsageService } from '../services/usageService';
 import { InventoryCacheService } from '../services/inventoryCacheService';
-import { MealPlanCacheService } from '../services/MealPlanCacheService';
+import { MealPlanCacheService } from '../services/mealPlanCacheService';
 import { RecipesCacheService } from '../services/recipesCacheService';
 import { ShoppingListCacheService } from '../services/shoppingListCacheService';
 import { useIntl } from 'react-intl';
@@ -419,7 +419,6 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
           </div>
           <div className="space-y-2">
             {household?.members && Array.isArray(household.members) && household.members.map((member) => {
-              const currentUser = household?.members && Array.isArray(household.members) ? household.members.find(m => m.email === user.email) : null;
               return (
               <div key={member.id} className="flex items-center justify-between bg-[#2A0A10] p-3 rounded-lg border border-red-900/30">
                 <div className="flex items-center gap-3 flex-1">
@@ -598,7 +597,6 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
           </div>
           <div className="space-y-2">
             {household.members && Array.isArray(household.members) && household.members.map((member) => {
-              const currentUser = household.members && Array.isArray(household.members) ? household.members.find(m => m.email === user.email) : null;
               return (
               <div key={member.id} className="flex items-center justify-between bg-[#2A0A10] p-3 rounded-lg border border-red-900/30">
                 <div className="flex items-center gap-3 flex-1">

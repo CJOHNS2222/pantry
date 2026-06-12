@@ -25,6 +25,23 @@ body.modal-open nav.fixed {
   pointer-events: none;
 }
 
+/* Base theme color defaults - adjust these for better contrast */
+:root[data-theme="light"] {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f3f4f6;
+  --text-primary: #111827;
+  --text-secondary: #374151;
+  --border-color: #d1d5db;
+}
+
+:root[data-theme="dark"] {
+  --bg-primary: #1f2937;
+  --bg-secondary: #374151;
+  --text-primary: #f9fafb;
+  --text-secondary: #d1d5db;
+  --border-color: #4b5563;
+}
+
 /* Theme utility classes */
 .bg-theme-primary { background-color: var(--bg-primary); }
 .bg-theme-secondary { background-color: var(--bg-secondary); }

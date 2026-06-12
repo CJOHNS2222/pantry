@@ -12,7 +12,7 @@
 
 import { InventoryCacheService } from './inventoryCacheService';
 import { ShoppingListCacheService } from './shoppingListCacheService';
-import { MealPlanCacheService } from './MealPlanCacheService';
+import { MealPlanCacheService } from './mealPlanCacheService';
 import { RecipesCacheService } from './recipesCacheService';
 import DatabaseMonitoringService from './databaseMonitoringService';
 import { User, PantryItem, ShoppingItem, DayPlan, MealPlanItem, SavedRecipe } from '../types';

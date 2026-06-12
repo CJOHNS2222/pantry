@@ -1,5 +1,5 @@
 import React from 'react';
-import { Archive, X } from 'lucide-react';
+import { Archive, X, CheckSquare, Square } from 'lucide-react';
 
 interface ShoppingListActionBarsProps {
   hasItems: boolean;
@@ -44,47 +44,42 @@ export const ShoppingListActionBars: React.FC<ShoppingListActionBarsProps> = ({
           </button>
         )}
 
-        <div className="flex gap-2">
+        {hasCheckedItems && (
           <button
             onClick={onCheckout}
-            disabled={!hasCheckedItems}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${
-              hasCheckedItems
-                ? 'bg-[var(--accent-color)] text-white shadow-lg'
-                : 'bg-theme-secondary text-theme-secondary opacity-50 cursor-not-allowed'
-            }`}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all bg-[var(--accent-color)] text-white shadow-lg"
           >
-            <Archive className="w-4 h-4" /> Move Checked to Pantry
+            <Archive className="w-3 h-3" /> Move Checked to Pantry
           </button>
-        </div>
+        )}
       </div>
 
       {!isLoadingShoppingList && (
         <div className="flex items-center justify-between gap-2 mb-1">
-          {hasUncheckedItems ? (
+          <div className="flex items-center gap-2">
+            {/* Tiny select all / deselect all icon button */}
             <button
-              onClick={onSelectAll}
-              className="text-xs font-medium text-[var(--accent-color)] hover:opacity-80 transition-opacity py-1 px-2 rounded-md hover:bg-[var(--accent-color)]/10"
+              onClick={hasUncheckedItems ? onSelectAll : onDeselectAll}
+              className="p-1.5 rounded transition-colors hover:bg-theme-secondary"
+              title={hasUncheckedItems ? 'Select all' : 'Deselect all'}
+              aria-label={hasUncheckedItems ? 'Select all' : 'Deselect all'}
             >
-              Mark all purchased
+              {hasUncheckedItems ? (
+                <Square className="w-4 h-4 text-[var(--accent-color)]" />
+              ) : (
+                <CheckSquare className="w-4 h-4 text-theme-secondary" />
+              )}
             </button>
-          ) : (
-            <button
-              onClick={onDeselectAll}
-              className="text-xs font-medium text-theme-secondary hover:opacity-80 transition-opacity py-1 px-2 rounded-md hover:bg-theme-secondary/50"
-            >
-              Unmark all
-            </button>
-          )}
 
-          {hasCheckedItems && (
-            <button
-              onClick={onDeleteCheckedItems}
-              className="text-xs font-medium text-red-500 hover:opacity-80 transition-opacity py-1 px-2 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20"
-            >
-              Clear purchased ({checkedItemsCount})
-            </button>
-          )}
+            {hasCheckedItems && (
+              <button
+                onClick={onDeleteCheckedItems}
+                className="text-xs font-medium text-red-500 hover:opacity-80 transition-opacity py-1 px-2 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20"
+              >
+                Clear purchased ({checkedItemsCount})
+              </button>
+            )}
+          </div>
         </div>
       )}
     </>

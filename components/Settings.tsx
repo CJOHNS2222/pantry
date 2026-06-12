@@ -20,7 +20,7 @@ import { userOptedInToGemini, setUserGeminiOptIn, getGeminiUsage } from '../serv
 import { Household } from '../types';
 import { serverTimestamp } from 'firebase/firestore';
 import { InventoryCacheService } from '../services/inventoryCacheService';
-import { MealPlanCacheService } from '../services/MealPlanCacheService';
+import { MealPlanCacheService } from '../services/mealPlanCacheService';
 import { RecipesCacheService } from '../services/recipesCacheService';
 import { useSubscription } from '../hooks/useSubscription';
 import { UsageService } from '../services/usageService';

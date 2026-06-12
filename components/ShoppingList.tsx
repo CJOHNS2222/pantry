@@ -5,6 +5,9 @@ import { Share } from '@capacitor/share';
 import { ShoppingItem, User, Household, Settings } from '../types';
 import HapticService from '../services/hapticService';
 import { ShoppingListCacheService } from '../services/shoppingListCacheService';
+import { log } from '../services/logService';
+import { inferCategoryFromItemName, isHouseholdMember } from '../utils/appUtils';
+import { validateItemName, validateQuantity } from '../src/utils/validation';
 
 // Import new enhancement components
 import { BatchOperations } from './BatchOperations';

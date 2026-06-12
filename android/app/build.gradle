@@ -1,11 +1,18 @@
 plugins {
     alias libs.plugins.android.application
-    alias libs.plugins.google.services
-    alias libs.plugins.firebase.appdistribution
-    alias libs.plugins.firebase.crashlytics
-    alias libs.plugins.firebase.perf
+    alias libs.plugins.google.services apply false
+    alias libs.plugins.firebase.appdistribution apply false
+    alias libs.plugins.firebase.crashlytics apply false
+    alias libs.plugins.firebase.perf apply false
 
     alias libs.plugins.sentry
+}
+
+if (file('google-services.json').exists()) {
+    apply plugin: 'com.google.gms.google-services'
+    apply plugin: 'com.google.firebase.appdistribution'
+    apply plugin: 'com.google.firebase.crashlytics'
+    apply plugin: 'com.google.firebase.firebase-perf'
 }
 
 
@@ -16,8 +23,8 @@ android {
         applicationId "com.smart.pantry"
         minSdk 24
         targetSdk 35
-        versionCode 58
-        versionName "2.3.1"
+        versionCode 59
+        versionName "2.4.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         
         buildFeatures {
@@ -47,10 +54,12 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             signingConfig signingConfigs.release
             
-            firebaseAppDistribution {
-                artifactType="APK"
-                releaseNotesFile="${rootDir}/release-notes.txt"
-                testersFile="${rootDir}/testers.txt"
+            pluginManager.withPlugin('com.google.firebase.appdistribution') {
+                firebaseAppDistribution {
+                    artifactType="APK"
+                    releaseNotesFile="${rootDir}/release-notes.txt"
+                    testersFile="${rootDir}/testers.txt"
+                }
             }
         }
     }
@@ -79,15 +88,6 @@ dependencies {
 }
 
 apply from: 'capacitor.build.gradle'
-
-try {
-    def servicesJSON = file('google-services.json')
-    if (servicesJSON.text) {
-        apply plugin: 'com.google.gms.google-services'
-    }
-} catch(Exception e) {
-    logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
-}
 
 sentry {
     org = "smart-pantry"

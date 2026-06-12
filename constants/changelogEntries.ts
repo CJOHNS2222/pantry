@@ -9,13 +9,23 @@ export interface ChangeEntry {
 
 export const RECENT_CHANGES: ChangeEntry[] = [
   {
+    "version": "2.4.0",
+    "date": "Jun 3, 2026",
+    "highlights": [
+      "Progressive onboarding milestones — added milestone tracking to stage post-onboarding feature discovery based on user…",
+      "Feature discovery gating — FeatureDiscoveryManager now supports milestone-based eligibility so one-time tips are shown…",
+      "RecipeFinder typing — restored missing Tab type import used by settings navigation actions",
+      "ShoppingList compile breakages — restored missing utility/log imports (log, inferCategoryFromItemName,…"
+    ]
+  },
+  {
     "version": "2.3.1",
     "date": "Jun 1, 2026",
     "highlights": [
+      "Recipe Finder — search-on-keystroke removed — Gemini/Spoonacular search no longer fires after every character typed;…",
+      "Recipe Finder search button — replaced the hidden inline search icon (only shown when input was non-empty) with a…",
       "Chef tab cache filters — added meal-type chips (All Meals, breakfast, lunch, dinner) plus cuisine dropdown filters…",
-      "Preference-aware cache ranking — added shared cache ranking/filter helpers in utils/preferenceUtils.ts so cache recipe…",
-      "Recommendation explainability badges — recommendation cards now show compact preference signals (favorite…",
-      "Recipe cache labelling script — scripts/label-recipe-cache.js rewritten to use local Ollama (default gemma3:1b) with…"
+      "Preference-aware cache ranking — added shared cache ranking/filter helpers in utils/preferenceUtils.ts so cache recipe…"
     ]
   },
   {
@@ -26,16 +36,6 @@ export const RECENT_CHANGES: ChangeEntry[] = [
       "Local grocery price defaults — 29 real local-area prices seeded into the pricing fallback (butter, bacon, pork chops,…",
       "Quick Add chips (Shopping list) — complete rewrite: single onClick handler, useRef scroll container, green checkmark…",
       "Recipe Finder — preference warnings — per-card allergen (red shield) and dislike/restriction (amber warning) badges…"
-    ]
-  },
-  {
-    "version": "2.2.1",
-    "date": "May 27, 2026",
-    "highlights": [
-      "Feedback form — \"Failed to send feedback\" error resolved; field name mismatch (text → message) now matches Firestore…",
-      "QuickAdd suggestion chips — multiple taps required on mobile to register resolved; added touch-action: manipulation,…",
-      "Meal Prep button — now uses accent colour fill (bg-[var(--accent-color)] with white text) for better visual prominence…",
-      "Meal Planner — removed redundant \"Search\" shortcut button from the planner header"
     ]
   }
 ];
