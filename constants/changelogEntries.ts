@@ -9,6 +9,16 @@ export interface ChangeEntry {
 
 export const RECENT_CHANGES: ChangeEntry[] = [
   {
+    "version": "2.4.2",
+    "date": "Jun 13, 2026",
+    "highlights": [
+      "Pantry Health Score — added interactive letter grade A–F ring in Pantry tab based on 5 health factors (freshness,…",
+      "Leftover prompt trigger — surfaces an action chip asking \"Log leftovers?\" after a scheduled day's meal has passed,…",
+      "Household presence strip — added real-time \"Sarah is shopping now 🛒\" indicator banner in Shopping List to coordinate…",
+      "Settings account hero card — settings dashboard now displays a premium subscription/membership status card containing…"
+    ]
+  },
+  {
     "version": "2.4.1",
     "date": "Jun 12, 2026",
     "highlights": [
@@ -26,16 +36,6 @@ export const RECENT_CHANGES: ChangeEntry[] = [
       "Feature discovery gating — FeatureDiscoveryManager now supports milestone-based eligibility so one-time tips are shown…",
       "RecipeFinder typing — restored missing Tab type import used by settings navigation actions",
       "ShoppingList compile breakages — restored missing utility/log imports (log, inferCategoryFromItemName,…"
-    ]
-  },
-  {
-    "version": "2.3.1",
-    "date": "Jun 1, 2026",
-    "highlights": [
-      "Recipe Finder — search-on-keystroke removed — Gemini/Spoonacular search no longer fires after every character typed;…",
-      "Recipe Finder search button — replaced the hidden inline search icon (only shown when input was non-empty) with a…",
-      "Chef tab cache filters — added meal-type chips (All Meals, breakfast, lunch, dinner) plus cuisine dropdown filters…",
-      "Preference-aware cache ranking — added shared cache ranking/filter helpers in utils/preferenceUtils.ts so cache recipe…"
     ]
   }
 ];

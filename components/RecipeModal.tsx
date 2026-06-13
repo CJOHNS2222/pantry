@@ -932,6 +932,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
             household={household}
             user={user}
             ratingRef={ratingRef}
+            inventory={inventory}
           />
         </div>
         <RecipeModalActionSection

@@ -86,15 +86,20 @@ export const RecipeFinderSearchControls: React.FC<RecipeFinderSearchControlsProp
                 onClick={onStartVoiceSearch}
                 data-testid="recipefinder-voice-button"
                 disabled={loadingState === LoadingState.LOADING}
-                className={`absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-lg transition-colors ${
+                className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg transition-all ${
                   isListening
-                    ? 'bg-red-500 text-white animate-pulse'
-                    : 'text-theme-secondary hover:text-[var(--accent-color)] hover:bg-theme-secondary'
+                    ? 'bg-red-500 text-white animate-pulse shadow-lg shadow-red-500/40'
+                    : 'bg-[var(--accent-color)]/10 text-[var(--accent-color)] hover:bg-[var(--accent-color)]/20 hover:scale-110'
                 }`}
                 aria-label={isListening ? 'Stop voice search' : 'Start voice search'}
                 data-tutorial="voice-search"
+                title={isListening ? 'Tap to stop' : 'Voice search — say a recipe name'}
               >
-                <Mic className="w-4 h-4" />
+                {/* Subtle ping ring when idle to draw attention */}
+                {!isListening && (
+                  <span className="absolute inset-0 rounded-lg bg-[var(--accent-color)]/20 animate-ping opacity-60 pointer-events-none" />
+                )}
+                <Mic className="w-4 h-4 relative z-10" />
               </button>
             )}
 

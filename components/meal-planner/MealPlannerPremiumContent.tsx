@@ -10,6 +10,7 @@ import { MealPlannerDragTrash } from './MealPlannerDragTrash';
 
 interface MealPlannerPremiumContentProps {
   missingItemsCount: number;
+  isAddingToShopping: boolean;
   onAddMissingToShopping: () => void;
   isEstimatorOpen: boolean;
   showPriceData: boolean;
@@ -62,6 +63,7 @@ interface MealPlannerPremiumContentProps {
 
 export const MealPlannerPremiumContent: React.FC<MealPlannerPremiumContentProps> = ({
   missingItemsCount,
+  isAddingToShopping,
   onAddMissingToShopping,
   isEstimatorOpen,
   showPriceData,
@@ -115,15 +117,15 @@ export const MealPlannerPremiumContent: React.FC<MealPlannerPremiumContentProps>
     <>
       <button
         onClick={onAddMissingToShopping}
-        disabled={missingItemsCount === 0}
+        disabled={missingItemsCount === 0 || isAddingToShopping}
         className={`w-full border font-medium py-3 rounded-xl transition-all flex items-center justify-center gap-2 mb-6 ${
-          missingItemsCount > 0
+          missingItemsCount > 0 && !isAddingToShopping
             ? 'bg-theme-secondary border-[var(--accent-color)] text-[var(--accent-color)] shadow-lg'
             : 'opacity-50 cursor-not-allowed border-theme'
         }`}
       >
         <ShoppingBasket className="w-5 h-5" />
-        {missingItemsCount > 0 ? `Add ${missingItemsCount} Missing Items to List` : 'Pantry is Stocked'}
+        {isAddingToShopping ? 'Added!' : missingItemsCount > 0 ? `Add ${missingItemsCount} Missing Items to List` : 'Pantry is Stocked'}
       </button>
 
       <div className={`flex gap-4 ${isEstimatorOpen ? 'flex-col' : ''}`}>

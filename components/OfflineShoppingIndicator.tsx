@@ -82,8 +82,16 @@ export const OfflineShoppingIndicator: React.FC<OfflineShoppingIndicatorProps> =
             </div>
 
             {isOffline && (
-              <div className="text-xs mt-1">
-                Your shopping list is saved locally and will sync when you're back online.
+              <div className="text-xs mt-1 space-y-1.5">
+                <div className="flex items-start gap-1.5">
+                  <span className="text-green-600 font-bold shrink-0">✓</span>
+                  <span><strong>Works offline:</strong> Shopping list, pantry browsing, saved recipes</span>
+                </div>
+                <div className="flex items-start gap-1.5">
+                  <span className="text-orange-500 font-bold shrink-0">⚠</span>
+                  <span><strong>Needs connection:</strong> AI recipe search, barcode scan, household sync</span>
+                </div>
+                <div className="opacity-70">Changes will sync automatically when you reconnect.</div>
               </div>
             )}
 

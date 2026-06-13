@@ -1,6 +1,6 @@
-import React from 'react';
-import { Minus, Plus } from 'lucide-react';
-import { Household, RecipeRating, SavedRecipe, StructuredRecipe } from '../../types';
+import React, { useMemo } from 'react';
+import { Minus, Plus, Check, AlertTriangle } from 'lucide-react';
+import { Household, RecipeRating, SavedRecipe, StructuredRecipe, PantryItem } from '../../types';
 import { RecipeRatingUI } from '../RecipeRating';
 
 interface RecipeModalDetailsSectionProps {
@@ -25,6 +25,7 @@ interface RecipeModalDetailsSectionProps {
     avatar?: string;
   };
   ratingRef: React.RefObject<HTMLDivElement | null>;
+  inventory?: PantryItem[];
 }
 
 export const RecipeModalDetailsSection: React.FC<RecipeModalDetailsSectionProps> = ({
@@ -44,7 +45,37 @@ export const RecipeModalDetailsSection: React.FC<RecipeModalDetailsSectionProps>
   household,
   user,
   ratingRef,
+  inventory = [],
 }) => {
+  const matchedList = useMemo(() => {
+    if (!inventory || inventory.length === 0 || !recipe.ingredients) return [];
+
+    const ingredients = recipe.ingredients || [];
+    return ingredients.map((ing) => {
+      const name = ing
+        .replace(/^[\d\/\s\.\-]+(cups?|tbsps?|tsps?|g|oz|lbs?|ml|pack(et)?s?|cans?|pieces?|cloves?|slices?|jars?|bottles?)?\s+/i, '')
+        .toLowerCase()
+        .trim();
+
+      const match = inventory.find(pi => {
+        const piName = pi.item.toLowerCase();
+        return piName.includes(name) || name.includes(piName);
+      });
+
+      if (match) {
+        const daysRemaining = match.expirationDate
+          ? Math.ceil((new Date(match.expirationDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+          : undefined;
+        const expiringSoon = daysRemaining !== undefined && daysRemaining <= 3 && !match.is_immortal;
+        return {
+          status: expiringSoon ? 'expiring' as const : 'available' as const,
+          pantryItem: match
+        };
+      }
+
+      return { status: 'missing' as const };
+    });
+  }, [recipe.ingredients, inventory]);
   return (
     <>
       {!editable && (
@@ -103,11 +134,36 @@ export const RecipeModalDetailsSection: React.FC<RecipeModalDetailsSectionProps>
               ))}
           </div>
         ) : (
-          <ul className="list-disc list-inside text-theme-secondary opacity-80">
+          <ul className="space-y-2 text-theme-secondary opacity-90">
             {Array.isArray(scaledIngredients) && scaledIngredients.length > 0 ? (
-              scaledIngredients.map((ingredient, index) => <li key={index}>{ingredient}</li>)
+              scaledIngredients.map((ingredient, index) => {
+                const match = matchedList[index];
+                let icon = <Plus className="w-4 h-4 text-theme-secondary opacity-60 flex-shrink-0" />;
+                let textClass = "text-theme-secondary opacity-80";
+                let badge = null;
+
+                if (match) {
+                  if (match.status === 'available') {
+                    icon = <Check className="w-4 h-4 text-green-500 flex-shrink-0" />;
+                    textClass = "text-theme-primary font-medium";
+                    badge = <span className="text-[10px] bg-green-500/15 text-green-500 font-semibold px-2 py-0.5 rounded-full">in pantry</span>;
+                  } else if (match.status === 'expiring') {
+                    icon = <AlertTriangle className="w-4 h-4 text-yellow-500 flex-shrink-0" />;
+                    textClass = "text-theme-primary font-medium";
+                    badge = <span className="text-[10px] bg-yellow-500/15 text-yellow-500 font-semibold px-2 py-0.5 rounded-full">expiring soon</span>;
+                  }
+                }
+
+                return (
+                  <li key={index} className="flex items-center gap-2.5 py-0.5">
+                    {icon}
+                    <span className={`text-sm ${textClass} flex-1 min-w-0 truncate`}>{ingredient}</span>
+                    {badge}
+                  </li>
+                );
+              })
             ) : (
-              <li>No ingredients available</li>
+              <li className="list-disc list-inside">No ingredients available</li>
             )}
           </ul>
         )}

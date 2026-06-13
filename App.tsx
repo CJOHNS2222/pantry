@@ -306,7 +306,7 @@ const App: React.FC = () => {
     const newItems: ShoppingItem[] = [];
     for (const { parsed, estimatedPrice } of priceResults) {
       newItems.push({
-        id: Math.random().toString(36).substr(2, 9),
+        id: crypto.randomUUID(),
         item: parsed.itemName,
         quantity: parsed.quantity,
         category: inferCategoryFromItemName(parsed.itemName),

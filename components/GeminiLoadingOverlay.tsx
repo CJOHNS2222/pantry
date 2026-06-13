@@ -14,10 +14,10 @@ export const IMAGE_ANALYSIS_STAGES: GeminiStage[] = [
 ];
 
 export const RECIPE_SEARCH_STAGES: GeminiStage[] = [
-  { threshold: 0,  label: 'Sending ingredients to AI…' },
-  { threshold: 3,  label: 'Finding matching recipes…' },
-  { threshold: 12, label: 'Filtering by your pantry…' },
-  { threshold: 25, label: 'Almost there, finishing up…' },
+  { threshold: 0,  label: 'Checking your pantry...' },
+  { threshold: 2,  label: 'Finding recipes you can make...' },
+  { threshold: 6,  label: 'Almost ready...' },
+  { threshold: 15, label: 'This is taking longer than usual. Hang tight...' },
 ];
 
 // Component -------------------------------------------------------------------

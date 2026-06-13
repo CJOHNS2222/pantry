@@ -100,14 +100,24 @@ export class PantryService {
       }
     }
 
+    const storageLocation = item.storageLocation || inferStorageLocationFromItemName(description);
+    const expirationDate = (() => {
+      if (typeof item.estimatedExpiryDays === 'number' && item.estimatedExpiryDays >= 0) {
+        const date = new Date();
+        date.setDate(date.getDate() + item.estimatedExpiryDays);
+        return date.toISOString().slice(0, 10);
+      }
+      return getAutoExpirationDate(description, category, storageLocation);
+    })();
+
     return {
       ...item,
       item: description, // Use cleaned description
       quantity_estimate: quantity.toString(), // Use extracted quantity
       id: crypto.randomUUID(),
       image,
-      storageLocation: inferStorageLocationFromItemName(description),
-      expirationDate: getAutoExpirationDate(description, category, inferStorageLocationFromItemName(description)),
+      storageLocation,
+      expirationDate,
       expirationType: 'best-by', // Default to best-by for auto-detected items
       dateAdded: now,
       lastRestocked: now,
@@ -271,7 +281,7 @@ export class PantryService {
         try {
           // Cast to any to satisfy combineQuantities parameter expectations
           existingItem.quantity = combineQuantities(existingItem.quantity as any, newItem.quantity as any) as any;
-        } catch (err) {
+        } catch (_err) {
           // If combineQuantities fails due to unit mismatch, leave quantity as-is
         }
       } else if (!existingItem.quantity) {
@@ -315,7 +325,7 @@ export class PantryService {
     if (updated.quantity) {
       try {
         updated.quantity = combineQuantities(updated.quantity as any, { amount: b.quantity, unit: b.unit } as any) as any;
-      } catch (err) {
+      } catch (_err) {
         // ignore unit mismatch
       }
     } else {

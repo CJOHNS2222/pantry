@@ -1,3 +1,29 @@
+## [2.4.2] - 2026-06-13
+
+### Added
+- **Pantry Health Score** — added interactive letter grade A–F ring in Pantry tab based on 5 health factors (freshness, variety, nutritional balance, item utilization, and waste reduction).
+- **Leftover prompt trigger** — surfaces an action chip asking "Log leftovers?" after a scheduled day's meal has passed, driving engagement with the leftover capture feature.
+- **Household presence strip** — added real-time "Sarah is shopping now 🛒" indicator banner in Shopping List to coordinate active shopping trips.
+- **Settings account hero card** — settings dashboard now displays a premium subscription/membership status card containing total items tracked, tier details, and active contextual CTAs.
+
+### Changed
+- **Expiration date picker chips** — redesigned expiration date inputs to a chips-first layout offering quick presets (3 days, 1 week, 2 weeks, 1 month, 3 months, 1 year, and no expiry).
+- **Voice search visual feedback** — voice mic icon in Recipe Finder is now accented and features a pulse ring animation while active.
+- **Recipe search result scaling** — increased default AI recipe recommendations to 3 results (5 for premium/family tier), replacing the hardcoded 2-recipe limit.
+- **Recipe import CTA highlighting** — highlighted the CSV/URL import button with accent color when the pantry list is empty.
+- **Offline indicator status clarity** — updated the offline status ribbon to describe precisely which local features remain available vs actions needing active network.
+- **Height and weight unit formatting** — Settings now formats height (cm) and weight (kg) measurements contextually depending on active metric vs imperial profile preference.
+- **CSV fallback recipes** — fallback recipes from CSV database are now integrated when the popular recipes cache is empty.
+- **Dietary preferences pre-fill** — Recipe Finder searches now automatically pre-populate restrictions directly from the user's active profile settings.
+
+### Fixed
+- **Structured logging migration** — replaced all 13 direct `console.log`, `console.warn`, and `console.error` calls in `notificationService.ts` with structured logs via `logService`.
+- **Token estimator cleanup** — removed dead `estimateTokens` calls and related state from Recipe Finder.
+- **Placeholder image cleanup** — removed obsolete `generateRecipePlaceholderImage` function from Meal Planner components.
+- **Recipe Finder search retry** — fixed `onRetry` handler to invoke `handleGenerate` directly instead of leaving search stuck in error.
+
+---
+
 ## [2.4.1] - 2026-06-12
 
 ### Added

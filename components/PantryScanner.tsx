@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { useModalOpen } from '../utils/useModalOpen';
 import { useAndroidBack } from '../hooks/useAndroidBack';
 import { Camera as CapacitorCamera, CameraResultType, CameraSource } from '@capacitor/camera';
@@ -60,6 +60,7 @@ import FreezeTransitionModal from './FreezeTransitionModal';
 
 import { InventoryCacheService } from '../services/inventoryCacheService';
 import ImportModal from './ImportModal';
+import { PantryHealthScore } from './PantryHealthScore';
 
 // Constants for virtualization threshold
 
@@ -104,7 +105,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   const appActions = useAppActions();
 
   // Destructure needed values
-  const { household, savedRecipes, recipeSaveLimitExceeded, settings } = appState;
+  const { household, savedRecipes, recipeSaveLimitExceeded, settings, mealPlan } = appState;
   const { onSaveRecipe, onRateRecipe } = appActions;
 
   const [canShowAdBanner, setCanShowAdBanner] = React.useState<boolean>(false);
@@ -203,6 +204,47 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   const [bulkQuantityEditItems, setBulkQuantityEditItems] = useState<PantryItem[]>([]);
   const [showBulkQuantityEdit, setShowBulkQuantityEdit] = useState(false);
   const [showUseSoon, setShowUseSoon] = useState(false);
+
+  const showDinnerCard = useMemo(() => {
+    const currentHour = new Date().getHours();
+    const isDinnerTime = currentHour >= 16 && currentHour < 20;
+    if (!isDinnerTime) return false;
+
+    const todayStr = (() => {
+      const d = new Date();
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const date = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${date}`;
+    })();
+
+    const todayPlan = mealPlan?.find(day => day.date === todayStr);
+    const hasDinner = todayPlan && Array.isArray(todayPlan.dinner) && todayPlan.dinner.length > 0;
+    return !hasDinner;
+  }, [mealPlan]);
+
+  // Show "Log leftovers?" chip: yesterday had a meal AND pantry not updated in 24h
+  const showLeftoverChip = useMemo(() => {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yyyyMmDd = (d: Date) => d.toISOString().slice(0, 10);
+    const yesterdayStr = yyyyMmDd(yesterday);
+    const yesterdayPlan = mealPlan?.find(day => day.date === yesterdayStr);
+    const hadMealYesterday = yesterdayPlan && (
+      (yesterdayPlan.dinner?.length ?? 0) > 0 ||
+      (yesterdayPlan.lunch?.length ?? 0) > 0
+    );
+    if (!hadMealYesterday) return false;
+    // Check if pantry was touched in last 24h
+    const mostRecentUpdate = inventory.reduce((latest, item) => {
+      const t = item.lastRestocked ? new Date(item.lastRestocked).getTime()
+              : item.dateAdded    ? new Date(item.dateAdded).getTime()
+              : 0;
+      return t > latest ? t : latest;
+    }, 0);
+    const twentyFourHoursAgo = Date.now() - 24 * 60 * 60 * 1000;
+    return mostRecentUpdate < twentyFourHoursAgo;
+  }, [mealPlan, inventory]);
   const [displayLayout, setDisplayLayout] = useState<'list' | 'grid'>(() => {
     try { return (localStorage.getItem('pantry_display_layout') as 'list' | 'grid') || 'list'; } catch { return 'list'; }
   });
@@ -1260,9 +1302,9 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
     const item = items[index];
     if (!item) return null;
     const expirationHeatClass = (d?: number) => {
-      if (d == null) return '';
-      if (d <= 2) return 'bg-orange-50/60 border-l-4 border-l-orange-300';
-      if (d <= 3) return 'bg-orange-50/30 border-l-4 border-l-orange-200';
+      if (d == null || item.is_immortal) return '';
+      if (d <= 0) return 'bg-red-500/10 dark:bg-red-500/15 border-l-4 border-l-red-500';
+      if (d <= 3) return 'bg-yellow-500/10 dark:bg-yellow-500/15 border-l-4 border-l-yellow-500';
       return '';
     };
     const daysRemaining = item.expirationDate ? Math.ceil((new Date(item.expirationDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : undefined;
@@ -1409,16 +1451,16 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
     if (!item) return null;
     const daysRemaining = item.expirationDate ? Math.ceil((new Date(item.expirationDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : undefined;
     const expirationBorderClass = (d?: number) => {
-      if (d == null) return ''
-      const c = getExpirationColor(d, item.expirationType)
-      return c === 'red' ? 'ring-2 ring-red-300/40' : c === 'yellow' ? 'ring-2 ring-yellow-300/30' : 'ring-2 ring-green-300/15'
-    }
+      if (d == null || item.is_immortal) return '';
+      const c = getExpirationColor(d, item.expirationType);
+      return c === 'red' ? 'ring-2 ring-red-300/40' : c === 'yellow' ? 'ring-2 ring-yellow-300/30' : '';
+    };
     const expirationHeatClass = (d?: number) => {
-      if (d == null) return '';
-      if (d <= 2) return 'bg-orange-50/60 border-l-4 border-l-orange-300';
-      if (d <= 3) return 'bg-orange-50/30 border-l-4 border-l-orange-200';
+      if (d == null || item.is_immortal) return '';
+      if (d <= 0) return 'bg-red-500/10 dark:bg-red-500/15 border-l-4 border-l-red-500';
+      if (d <= 3) return 'bg-yellow-500/10 dark:bg-yellow-500/15 border-l-4 border-l-yellow-500';
       return '';
-    }
+    };
 
     // Use the first original index for combined items
     const primaryIndex = item.originalIndices ? item.originalIndices[0] : item.originalIndex;
@@ -1509,16 +1551,16 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   function renderListItem(item: DisplayedPantryItem) {
     const daysRemaining = item.expirationDate ? Math.ceil((new Date(item.expirationDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : undefined;
     const expirationBorderClass = (d?: number) => {
-      if (d == null) return ''
-      const c = getExpirationColor(d, item.expirationType)
-      return c === 'red' ? 'ring-2 ring-red-300/40' : c === 'yellow' ? 'ring-2 ring-yellow-300/30' : 'ring-2 ring-green-300/15'
-    }
+      if (d == null || item.is_immortal) return '';
+      const c = getExpirationColor(d, item.expirationType);
+      return c === 'red' ? 'ring-2 ring-red-300/40' : c === 'yellow' ? 'ring-2 ring-yellow-300/30' : '';
+    };
     const expirationHeatClass = (d?: number) => {
-      if (d == null) return '';
-      if (d <= 2) return 'bg-orange-50/60 border-l-4 border-l-orange-300';
-      if (d <= 3) return 'bg-orange-50/30 border-l-4 border-l-orange-200';
+      if (d == null || item.is_immortal) return '';
+      if (d <= 0) return 'bg-red-500/10 dark:bg-red-500/15 border-l-4 border-l-red-500';
+      if (d <= 3) return 'bg-yellow-500/10 dark:bg-yellow-500/15 border-l-4 border-l-yellow-500';
       return '';
-    }
+    };
     // Use the first original index for combined items
     const primaryIndex = item.originalIndices ? item.originalIndices[0] : item.originalIndex;
 
@@ -1837,6 +1879,49 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
           <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-theme-primary pointer-events-none" />
         </div>
       </div>
+
+      {/* Pantry Health Score ring */}
+      {inventory.length >= 3 && (
+        <PantryHealthScore inventory={inventory} className="mb-2" />
+      )}
+
+      {/* "What's for dinner?" Contextual Card */}
+      {showDinnerCard && (
+        <div
+          onClick={handleWhatCanICookTonight}
+          className="bg-gradient-to-br from-indigo-500/10 via-purple-500/5 to-pink-500/10 border border-purple-500/20 hover:border-purple-500/40 p-5 rounded-xl cursor-pointer hover:shadow-lg transition-all duration-300 transform hover:-translate-y-0.5 group mb-6"
+        >
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-purple-500/20 text-purple-600 rounded-lg group-hover:scale-110 transition-transform">
+              <ChefHat className="w-6 h-6 animate-pulse" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-serif font-bold text-lg text-theme-primary">What's for dinner tonight?</h3>
+              <p className="text-sm text-theme-secondary opacity-80 mt-1">
+                You don't have dinner planned yet. Tap here to search recipes using what you have in your pantry!
+              </p>
+            </div>
+            <ChevronRight className="w-6 h-6 text-theme-secondary opacity-60 group-hover:translate-x-1 transition-transform" />
+          </div>
+        </div>
+      )}
+
+      {/* "Log leftovers?" chip — shown when yesterday had a meal but pantry wasn't updated */}
+      {showLeftoverChip && (
+        <div className="flex items-center gap-3 p-3 rounded-xl bg-amber-500/8 border border-amber-500/25 animate-fade-in">
+          <span className="text-xl">🥡</span>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-theme-primary">Did you have leftovers last night?</p>
+            <p className="text-xs text-theme-secondary opacity-70">Log them to track food waste and update your pantry.</p>
+          </div>
+          <button
+            onClick={() => setIsAddModalOpen(true)}
+            className="shrink-0 px-3 py-1.5 rounded-lg bg-amber-500 text-white text-xs font-bold hover:bg-amber-600 transition-colors shadow-sm"
+          >
+            Log now
+          </button>
+        </div>
+      )}
 
       {/* What Can I Cook Tonight Button */}
       <div className="text-center">
@@ -2445,11 +2530,15 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                   <button
                     onClick={() => setShowImportModal(true)}
                     data-testid="pantry-import-button"
-                    className="flex-1 py-2 px-3 rounded-lg border border-theme text-theme-secondary hover:bg-theme-primary transition-colors flex items-center justify-center gap-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:ring-offset-2"
-                    aria-label="Import items from CSV or recipe from URL"
+                    className={`flex-1 py-2 px-3 rounded-lg border text-sm flex items-center justify-center gap-2 transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:ring-offset-2 ${
+                      inventory.length === 0
+                        ? 'border-[var(--accent-color)]/40 bg-[var(--accent-color)]/5 text-[var(--accent-color)] font-semibold hover:bg-[var(--accent-color)]/10'
+                        : 'border-theme text-theme-secondary hover:bg-theme-primary'
+                    }`}
+                    aria-label="Import pantry items from CSV file or from a recipe URL"
                   >
                     <FilePlus className="w-4 h-4" aria-hidden="true" />
-                    Import CSV
+                    Import{inventory.length === 0 ? ' your pantry' : ' / URL'}
                   </button>
                 </div>
 

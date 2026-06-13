@@ -53,6 +53,8 @@ git commit -m "chore: release v{version}"
 ### 9. Push to GitHub
 Run `git push` to push the commit to the current remote branch.
 
+### 10. Build signed bundle
+
 ## Parameters
 
 - `versionIncrement`: `patch` (default, `+0.0.1`), `minor` (`+0.1.0`), or `major` (`+1.0.0`)

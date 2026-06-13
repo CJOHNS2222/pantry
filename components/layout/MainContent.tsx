@@ -189,13 +189,14 @@ export const MainContent: React.FC = () => {
               items={shoppingList}
               setItems={appState.setShoppingList}
               onMoveToPantry={onMoveToPantry}
-                addShoppingListItem={addShoppingListItem}
-                user={user || undefined}
-                household={appState.household}
-                isLoadingShoppingList={isLoadingShoppingList}
-                settings={settings}
-              />
-            </Suspense>
+              addShoppingListItem={addShoppingListItem}
+              user={user || undefined}
+              household={appState.household}
+              isLoadingShoppingList={isLoadingShoppingList}
+              settings={settings}
+              pantryItems={inventory}
+            />
+          </Suspense>
         </ComponentErrorBoundary>
       )}
       {activeTab === Tab.RECIPES && (

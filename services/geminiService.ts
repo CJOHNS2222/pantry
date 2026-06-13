@@ -43,8 +43,10 @@ export const analyzePantryImage = async (base64Image: string, mimeType: string, 
           item: { type: Type.STRING },
           category: { type: Type.STRING },
           quantity_estimate: { type: Type.STRING },
+          storageLocation: { type: Type.STRING, enum: ['fridge', 'freezer', 'pantry', 'spices', 'other'] },
+          estimatedExpiryDays: { type: Type.INTEGER },
         },
-        required: ['item', 'category', 'quantity_estimate'],
+        required: ['item', 'category', 'quantity_estimate', 'storageLocation', 'estimatedExpiryDays'],
       },
     };
 
@@ -57,7 +59,7 @@ export const analyzePantryImage = async (base64Image: string, mimeType: string, 
       contents: {
         parts: [
           { inlineData: { data: base64Image, mimeType } },
-          { text: 'List every food or pantry item visible in this image. For each item provide its name, food category (e.g. Fruits & Vegetables, Dairy & Eggs, Meat & Poultry, Grains & Bread, Canned Goods, Snacks, Beverages, Spices & Herbs, Uncategorized), and estimated quantity.' },
+          { text: 'List every food or pantry item visible in this image. For each item provide its name, food category (e.g. Fruits & Vegetables, Dairy & Eggs, Meat & Poultry, Grains & Bread, Canned Goods, Snacks, Beverages, Spices & Herbs, Uncategorized), estimated quantity, typical storage location (fridge, freezer, pantry, spices, or other), and estimated remaining shelf life in days from today (e.g. 7 for milk, 365 for salt).' },
         ],
       },
       config: {
@@ -121,8 +123,10 @@ export const analyzeReceiptImage = async (base64Image: string, mimeType: string,
           item: { type: Type.STRING },
           category: { type: Type.STRING },
           quantity_estimate: { type: Type.STRING },
+          storageLocation: { type: Type.STRING, enum: ['fridge', 'freezer', 'pantry', 'spices', 'other'] },
+          estimatedExpiryDays: { type: Type.INTEGER },
         },
-        required: ['item', 'category', 'quantity_estimate'],
+        required: ['item', 'category', 'quantity_estimate', 'storageLocation', 'estimatedExpiryDays'],
       },
     };
 
@@ -135,7 +139,7 @@ export const analyzeReceiptImage = async (base64Image: string, mimeType: string,
       contents: {
         parts: [
           { inlineData: { data: base64Image, mimeType } },
-          { text: 'Extract all grocery/food items from this receipt. For each item provide its name, food category (e.g. Fruits & Vegetables, Dairy & Eggs, Meat & Poultry, Grains & Bread, Canned Goods, Snacks, Beverages, Household, Uncategorized), and quantity. Skip taxes, totals, subtotals, and store information.' },
+          { text: 'Extract all grocery/food items from this receipt. For each item provide its name, food category (e.g. Fruits & Vegetables, Dairy & Eggs, Meat & Poultry, Grains & Bread, Canned Goods, Snacks, Beverages, Household, Uncategorized), quantity, typical storage location (fridge, freezer, pantry, spices, or other), and estimated remaining shelf life in days from today (e.g. 7 for milk, 365 for canned soup).' },
         ],
       },
       config: {
@@ -193,7 +197,9 @@ export const searchRecipes = async (params: RecipeSearchParams, user?: User): Pr
         await new Promise(resolve => setTimeout(resolve, delay));
       }
 
-      return await performSearch(params, user, perfTrace);
+      // Premium users get 5 recipes; free users get 3
+      const recipeCount = user && !user.isGuest && (user as User & { isPremium?: boolean }).isPremium ? 5 : 3;
+      return await performSearch(params, user, perfTrace, recipeCount);
     } catch (err: unknown) {
       lastError = err instanceof Error ? err : new Error(String(err));
 
@@ -213,7 +219,7 @@ export const searchRecipes = async (params: RecipeSearchParams, user?: User): Pr
 };
 
 // Internal function to perform the actual search
-const performSearch = async (params: RecipeSearchParams, user: User | undefined, perfTrace: PerformanceTrace | null): Promise<RecipeSearchResult> => {
+const performSearch = async (params: RecipeSearchParams, user: User | undefined, perfTrace: PerformanceTrace | null, recipeCount = 3): Promise<RecipeSearchResult> => {
   try {
     if (user?.isGuest) {
       throw new Error('AI features are not available in guest mode. Please sign in to search recipes.');
@@ -224,18 +230,21 @@ const performSearch = async (params: RecipeSearchParams, user: User | undefined,
   if (!import.meta.env.VITE_GEMINI_API_KEY) {
     throw new Error('Gemini API key not configured. Please check your environment variables.');
   }
-  
+
+  // Premium users get up to 5 results; clamp between 2 and 5
+  const count = Math.min(5, Math.max(2, recipeCount));
+
   let prompt = "";
 
   // Use short keys to minimize output tokens. Map: t=title, d=description, i=ingredients, s=steps, c=cookTime
   const jsonFormat = `{"r":[{"t":"title","d":"short desc","i":["qty ingredient"],"s":["step"],"c":"15 min"}]}`;
 
   if (params.query) {
-    prompt = `2 recipes for "${params.query}". Reply JSON: ${jsonFormat}`;
+    prompt = `${count} recipes for "${params.query}". Reply JSON: ${jsonFormat}`;
     if (params.restrictions) prompt += `. Diet: ${params.restrictions}`;
   } else {
     const limitedIngredients = params.ingredients.split(', ').slice(0, 20).join(', ');
-    prompt = `2 recipes from: ${limitedIngredients}. Reply JSON: ${jsonFormat}`;
+    prompt = `${count} recipes from: ${limitedIngredients}. Reply JSON: ${jsonFormat}`;
 
     if (params.strictMode) {
       prompt += `. Only these + basics`;

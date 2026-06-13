@@ -26,45 +26,6 @@ import { getMealPrepSuggestions } from '../utils/searchUtils';
 import CalendarService from '../services/calendarService';
 import type { Settings } from '../types';
 
-// Utility function to generate attractive recipe placeholder images
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const generateRecipePlaceholderImage = (title: string): string => {
-  // Create a simple hash from the title for consistent colors
-  let hash = 0;
-  for (let i = 0; i < title.length; i++) {
-    hash = ((hash << 5) - hash) + title.charCodeAt(i);
-    hash = hash & hash; // Convert to 32-bit integer
-  }
-  
-  // Generate colors based on hash
-  const hue = Math.abs(hash) % 360;
-  const saturation = 65 + (Math.abs(hash) % 20); // 65-85%
-  const lightness = 45 + (Math.abs(hash) % 15); // 45-60%
-  
-  // Create SVG with recipe icon
-  const svg = `
-    <svg width="120" height="120" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" style="stop-color:hsl(${hue}, ${saturation}%, ${lightness}%);stop-opacity:1" />
-          <stop offset="100%" style="stop-color:hsl(${(hue + 30) % 360}, ${saturation}%, ${lightness + 10}%);stop-opacity:1" />
-        </linearGradient>
-      </defs>
-      <rect width="120" height="120" fill="url(#bg)" rx="8"/>
-      <g transform="translate(30, 30)">
-        <!-- Recipe icon -->
-        <circle cx="30" cy="25" r="8" fill="white" opacity="0.9"/>
-        <rect x="22" y="35" width="16" height="8" fill="white" opacity="0.9" rx="2"/>
-        <rect x="18" y="45" width="24" height="3" fill="white" opacity="0.7" rx="1"/>
-        <rect x="18" y="50" width="20" height="3" fill="white" opacity="0.7" rx="1"/>
-        <rect x="18" y="55" width="16" height="3" fill="white" opacity="0.7" rx="1"/>
-      </g>
-    </svg>
-  `;
-  
-  // Convert to data URL
-  return `data:image/svg+xml;base64,${btoa(svg)}`;
-};
 
 interface MealPlannerProps {
   mealPlan: DayPlan[];
@@ -116,6 +77,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
   const [isEstimatorOpen, setIsEstimatorOpen] = useState(false);
   const [isCalendarExpanded, setIsCalendarExpanded] = useState(false);
   const [currentCalendarMonth, setCurrentCalendarMonth] = useState(new Date());
+  const [isAddingToShopping, setIsAddingToShopping] = useState(false);
 
   // Use prop savedRecipes or local state as fallback
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -449,8 +411,12 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
   };
 
   const handleAddMissingToShopping = () => {
+    // Debounce: prevent rapid-fire duplicate additions
+    if (isAddingToShopping) return;
+
     const missing = missingIngredients;
     if (missing.length > 0) {
+      setIsAddingToShopping(true);
       const itemsToAdd = missing.flatMap((item: { ingredient: string; quantity: number; unit: string; recipes: { name: string; id: string }[] }) => 
         item.recipes.map(recipe => ({
           ingredient: item.unit === 'count' 
@@ -465,6 +431,9 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
       const batchSource = `meal plan: ${missing.length} missing ingredients for planned meals`;
       addToShoppingList(allIngredients, batchSource);
       addToast(`Added ${missing.length} item${missing.length > 1 ? 's' : ''} to your shopping list`, 'success');
+
+      // Re-enable the button after 2 seconds to prevent duplicate adds
+      setTimeout(() => setIsAddingToShopping(false), 2000);
     }
   };
 
@@ -896,6 +865,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
       >
         <MealPlannerPremiumContent
           missingItemsCount={missingItemsCount}
+          isAddingToShopping={isAddingToShopping}
           onAddMissingToShopping={handleAddMissingToShopping}
           isEstimatorOpen={isEstimatorOpen}
           showPriceData={settings?.shopping?.showPriceData ?? false}

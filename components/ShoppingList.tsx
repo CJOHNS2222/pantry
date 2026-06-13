@@ -2,7 +2,7 @@ import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { useIntl } from 'react-intl';
 import { Capacitor } from '@capacitor/core';
 import { Share } from '@capacitor/share';
-import { ShoppingItem, User, Household, Settings } from '../types';
+import { ShoppingItem, User, Household, Settings, PantryItem } from '../types';
 import HapticService from '../services/hapticService';
 import { ShoppingListCacheService } from '../services/shoppingListCacheService';
 import { log } from '../services/logService';
@@ -19,6 +19,7 @@ import { canShowAds } from '../utils/appUtils';
 import { ShoppingListViewModeToggle } from './shopping-list/ShoppingListViewModeToggle';
 import { ShoppingListPurchaseModal } from './shopping-list/ShoppingListPurchaseModal';
 import { ShoppingListAddItemModal } from './shopping-list/ShoppingListAddItemModal';
+import { CheckoutExpiryModal } from './shopping-list/CheckoutExpiryModal';
 import { ShoppingListItemsSection } from './shopping-list/ShoppingListItemsSection';
 import { ShoppingListFooterActions } from './shopping-list/ShoppingListFooterActions';
 import { ShoppingListActionBars } from './shopping-list/ShoppingListActionBars';
@@ -30,6 +31,7 @@ import { useOfflineStatus } from '../hooks/useOfflineStatus';
 import { useAuth } from '../hooks/useAuth';
 import { offlineQueue } from '../services/offlineQueueService';
 import { useAppActions } from '../contexts/AppActionsContext';
+import { useApp } from '../contexts/AppContext';
 import { useAndroidBack } from '../hooks/useAndroidBack';
 import { groceryPriceService } from '../services/groceryPriceService';
 import AnalyticsService from '../services/analyticsService';
@@ -44,15 +46,7 @@ interface ShoppingListProps {
   user?: User;
   household?: Household | null;
   isLoadingShoppingList?: boolean;
-  pantryItems?: Array<{
-    id: string;
-    name: string;
-    quantity: number;
-    unit: string;
-    category?: string;
-    lastUpdated: Date;
-    expirationDate?: Date;
-  }>;
+  pantryItems?: PantryItem[];
   recentPurchases?: Array<{
     itemName: string;
     quantity: number;
@@ -89,6 +83,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   const [newItem, setNewItem] = React.useState('');
   const [canShowAdBanner, setCanShowAdBanner] = React.useState<boolean>(false);
   const { addToast } = useAppActions();
+  const { mealPlan } = useApp();
 
   useEffect(() => {
     let mounted = true;
@@ -137,11 +132,14 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   const [pendingDeleteCount, setPendingDeleteCount] = useState(0);;
   const [purchaseModalOpen, setPurchaseModalOpen] = useState(false);
   const [purchaseTargetItem, setPurchaseTargetItem] = useState<ShoppingItem | null>(null);
+  const [checkoutExpiryOpen, setCheckoutExpiryOpen] = useState(false);
+  const [checkoutItems, setCheckoutItems] = useState<ShoppingItem[]>([]);
 
   // Android back-button registration for ShoppingList modals
   useAndroidBack(isAddModalOpen, () => setIsAddModalOpen(false));
   useAndroidBack(showAnalytics, () => setShowAnalytics(false));
   useAndroidBack(purchaseModalOpen, () => setPurchaseModalOpen(false));
+  useAndroidBack(checkoutExpiryOpen, () => setCheckoutExpiryOpen(false));
   const [purchaseQty, setPurchaseQty] = useState<number>(1);
   const [purchaseUnit, setPurchaseUnit] = useState<string>('count');
   const [purchaseExpires, setPurchaseExpires] = useState<string | undefined>(undefined);
@@ -173,15 +171,16 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     if (savedSessions) {
       try {
         const parsed = JSON.parse(savedSessions);
-        setPreviousSessions(parsed.map((session: { startTime: string; endTime?: string; totalSpent: number; items: Array<{ addedAt?: string; completedAt?: string; [key: string]: unknown }> }) => ({
+        const slicedSessions = Array.isArray(parsed) ? parsed.slice(-20) : [];
+        setPreviousSessions(slicedSessions.map((session: { sessionId: string; startTime: string; endTime?: string; totalSpent: number; items: Array<Record<string, unknown>> }) => ({
           ...session,
           startTime: new Date(session.startTime),
           endTime: session.endTime ? new Date(session.endTime) : undefined,
-          items: session.items.map((item: { addedAt?: string; completedAt?: string; [key: string]: unknown }) => ({
+          items: session.items.map((item: Record<string, unknown>) => ({
             ...item,
-            addedAt: item.addedAt ? new Date(item.addedAt) : undefined,
-            completedAt: item.completedAt ? new Date(item.completedAt) : undefined,
-          }))
+            addedAt: item.addedAt ? new Date(item.addedAt as string) : undefined,
+            completedAt: item.completedAt ? new Date(item.completedAt as string) : undefined,
+          })) as unknown as ShoppingItem[]
         })));
       } catch (error) {
         log.warn('Failed to load previous shopping sessions:', error);
@@ -247,10 +246,10 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
       totalSpent
     };
 
-    const updatedSessions = [...previousSessions, newSession];
+    const updatedSessions = [...previousSessions, newSession].slice(-20);
     setPreviousSessions(updatedSessions);
 
-    // Save to localStorage
+    // Save to localStorage (already pruned to 20)
     try {
       localStorage.setItem('shoppingListSessions', JSON.stringify(updatedSessions));
     } catch (error) {
@@ -275,13 +274,110 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
 
   // Suggested items for quick adding — filter out what's already in the list
   const suggestedItems = useMemo(() => {
-    const inList = new Set(items.map(i => i.item.toLowerCase()));
-    return [
+    const inShoppingList = new Set(items.map(i => i.item.toLowerCase()));
+    const suggestionsSet = new Set<string>();
+
+    const addSuggestion = (name: string) => {
+      const trimmed = name.trim();
+      if (trimmed && !inShoppingList.has(trimmed.toLowerCase())) {
+        let found = false;
+        for (const existing of suggestionsSet) {
+          if (existing.toLowerCase() === trimmed.toLowerCase()) {
+            found = true;
+            break;
+          }
+        }
+        if (!found) {
+          suggestionsSet.add(trimmed);
+        }
+      }
+    };
+
+    // 1. Items consumed in the past 30 days
+    const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    _pantryItems.forEach(pi => {
+      if (pi.consumptionHistory && Array.isArray(pi.consumptionHistory)) {
+        const consumedRecently = pi.consumptionHistory.some(dateStr => {
+          try {
+            return new Date(dateStr).getTime() > thirtyDaysAgo;
+          } catch {
+            return false;
+          }
+        });
+        if (consumedRecently) {
+          addSuggestion(pi.item);
+        }
+      }
+    });
+
+    // 2. Ingredients in weekly meal plan but missing from pantry
+    const isIngredientInPantry = (ing: string) => {
+      const name = ing
+        .replace(/^[\d\/\s\.\-]+(cups?|tbsps?|tsps?|g|oz|lbs?|ml|pack(et)?s?|cans?|pieces?|cloves?|slices?|jars?|bottles?)?\s+/i, '')
+        .toLowerCase()
+        .trim();
+      return _pantryItems.some(pi => {
+        const piName = pi.item.toLowerCase();
+        return piName.includes(name) || name.includes(piName);
+      });
+    };
+
+    const getCleanIngredientName = (ing: string) => {
+      const name = ing
+        .replace(/^[\d\/\s\.\-]+(cups?|tbsps?|tsps?|g|oz|lbs?|ml|pack(et)?s?|cans?|pieces?|cloves?|slices?|jars?|bottles?)?\s+/i, '')
+        .trim();
+      if (!name) return '';
+      return name.charAt(0).toUpperCase() + name.slice(1);
+    };
+
+    if (Array.isArray(mealPlan)) {
+      mealPlan.forEach(day => {
+        const meals = [
+          ...(day.breakfast || []),
+          ...(day.lunch || []),
+          ...(day.dinner || []),
+          ...(day.meals || [])
+        ];
+        meals.forEach(meal => {
+          if (meal.recipe && Array.isArray(meal.recipe.ingredients)) {
+            meal.recipe.ingredients.forEach(ing => {
+              if (!isIngredientInPantry(ing)) {
+                const cleanName = getCleanIngredientName(ing);
+                if (cleanName) {
+                  addSuggestion(cleanName);
+                }
+              }
+            });
+          }
+        });
+      });
+    }
+
+    // 3. Previous shopping sessions
+    if (Array.isArray(previousSessions)) {
+      previousSessions.forEach(session => {
+        if (Array.isArray(session.items)) {
+          session.items.forEach(si => {
+            addSuggestion(si.item);
+          });
+        }
+      });
+    }
+
+    // 4. Static fallbacks
+    const staticFallbacks = [
       'Milk', 'Bread', 'Eggs', 'Cheese', 'Bananas', 'Apples', 'Chicken', 'Pasta',
       'Rice', 'Tomatoes', 'Lettuce', 'Onions', 'Potatoes', 'Carrots', 'Butter', 'Yogurt',
       'Orange Juice', 'Coffee', 'Cereal', 'Garlic', 'Ground Beef', 'Salmon', 'Broccoli', 'Spinach'
-    ].filter(name => !inList.has(name.toLowerCase()));
-  }, [items]);
+    ];
+
+    for (const item of staticFallbacks) {
+      if (suggestionsSet.size >= 15) break;
+      addSuggestion(item);
+    }
+
+    return Array.from(suggestionsSet);
+  }, [items, _pantryItems, mealPlan, previousSessions]);
 
   // Memoized expensive computations for sharing/exporting
   const uncheckedItemsText = useMemo(() => 
@@ -594,31 +690,21 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
 
     if (itemsToMove.length === 0) return;
 
+    setCheckoutItems(itemsToMove);
+    setCheckoutExpiryOpen(true);
+  };
+
+  const confirmCheckout = (updatedItems: ShoppingItem[]) => {
     HapticService.success();
-    // Set default purchased quantities for items that don't have them
-    const updatedItems = itemsToMove.map(item => {
-      // Prefer purchasedBatch (from modal) if present, otherwise fall back to purchasedQuantity or estimate
-      if (item.purchasedBatch) {
-        return { ...item, purchasedQuantity: { amount: item.purchasedBatch.amount, unit: item.purchasedBatch.unit || 'count' } };
-      }
-
-      if (!item.purchasedQuantity) {
-        const neededQty = item.quantity ? parseFloat(item.quantity as string) : 1;
-        return { ...item, purchasedQuantity: { amount: neededQty, unit: 'count' } };
-      }
-      return item;
-    });
-
     onMoveToPantry(updatedItems);
-    addToast(`${itemsToMove.length} item${itemsToMove.length > 1 ? 's' : ''} moved to pantry ✓`, 'success');
 
     // Clear undo history for the moved items
     setUndoHistory(prev => prev.filter(action =>
-      !itemsToMove.some(item => item.id === action.item.id)
+      !updatedItems.some(item => item.id === action.item.id)
     ));
 
     // Remove moved items from list
-    const movedIds = new Set(itemsToMove.map(i => i.id));
+    const movedIds = new Set(updatedItems.map(i => i.id));
     setItems(prev => prev.filter(i => !movedIds.has(i.id)));
 
     // Offline queue for sync
@@ -629,6 +715,21 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
         data: { action: 'checkout', items: updatedItems }
       });
     }
+
+    // Show toast with 8-second undo window
+    const restoredItems = updatedItems.map(i => ({ ...i, checked: false, completedAt: undefined }));
+    addToast(
+      `${updatedItems.length} item${updatedItems.length > 1 ? 's' : ''} moved to pantry ✓`,
+      'success',
+      8000,
+      'Undo',
+      () => {
+        setItems(prev => [...prev, ...restoredItems]);
+      }
+    );
+
+    setCheckoutExpiryOpen(false);
+    setCheckoutItems([]);
   };
 
   const handleCopyToClipboard = () => {
@@ -706,6 +807,27 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
           />
       )}
 
+      {/* Live presence strip — "Sarah is shopping now 🛒" */}
+      {(() => {
+        const currentUserId = authUser?.id || user?.id || '';
+        const shoppingNow = householdMembers.filter(
+          m => m.id !== currentUserId && m.currentActivity === 'shopping'
+        );
+        if (shoppingNow.length === 0) return null;
+        return (
+          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--accent-color)]/8 border border-[var(--accent-color)]/20 text-sm">
+            <span className="relative flex h-2 w-2 shrink-0">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+            </span>
+            <span className="text-theme-primary">
+              {shoppingNow.map(m => m.name.split(' ')[0]).join(' & ')}{' '}
+              {shoppingNow.length === 1 ? 'is' : 'are'} shopping now 🛒
+            </span>
+          </div>
+        );
+      })()}
+
       {/* Quick Add Component */}
       <QuickAdd
         suggestedItems={suggestedItems}
@@ -747,6 +869,13 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
         newUnit={newUnit}
         setNewUnit={setNewUnit}
         validationErrors={validationErrors}
+      />
+
+      <CheckoutExpiryModal
+        isOpen={checkoutExpiryOpen}
+        onClose={() => setCheckoutExpiryOpen(false)}
+        items={checkoutItems}
+        onConfirm={confirmCheckout}
       />
 
       <ShoppingListUndoBanners pendingDeleteCount={pendingDeleteCount} onUndoDelete={undoDelete} />
