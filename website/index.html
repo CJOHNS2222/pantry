@@ -4,63 +4,99 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Stock & Spoon - AI Kitchen Assistant</title>
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z3KZ5XQ2C"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'G-9Z3KZ5XQ2C');
+    </script>
     <meta name="description" content="Manage your pantry, plan meals, and discover recipes with AI-powered kitchen assistance. Never waste food again!">
     <meta name="keywords" content="pantry management, meal planning, recipe finder, AI kitchen assistant, food waste reduction">
     <meta name="author" content="Stock & Spoon">
 
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
-    <meta property="og:url" content="https://smartpantrymobile.page.gd/">
+    <meta property="og:url" content="https://ornate-compass-478504-e1.web.app/">
     <meta property="og:title" content="Stock & Spoon - AI Kitchen Assistant">
     <meta property="og:description" content="Manage your pantry, plan meals, and discover recipes with AI-powered kitchen assistance.">
-    <meta property="og:image" content="https://smartpantrymobile.page.gd/icons/smartpantryicon.png">
+    <meta property="og:image" content="https://ornate-compass-478504-e1.web.app/icons/stockspoon-icon.png">
 
     <!-- Twitter -->
     <meta property="twitter:card" content="summary_large_image">
-    <meta property="twitter:url" content="https://smartpantrymobile.page.gd/">
+    <meta property="twitter:url" content="https://ornate-compass-478504-e1.web.app/">
     <meta property="twitter:title" content="Stock & Spoon - AI Kitchen Assistant">
     <meta property="twitter:description" content="Manage your pantry, plan meals, and discover recipes with AI-powered kitchen assistance.">
-    <meta property="twitter:image" content="https://smartpantrymobile.page.gd/icons/smartpantryicon.png">
+    <meta property="twitter:image" content="https://ornate-compass-478504-e1.web.app/icons/stockspoon-icon.png">
 
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="icons/stockspoon-icon.png">
     <link rel="apple-touch-icon" href="icons/stockspoon-icon.png">
 
     <!-- Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;1,500&display=swap" rel="stylesheet">
 
     <style>
+        :root {
+            --bg-dark: #0b1329;
+            --bg-deep: #070b19;
+            --card-bg: rgba(15, 23, 42, 0.8);
+            --accent: #f59e0b;
+            --accent-hover: #d97706;
+            --border: #1e293b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
 
+        html {
+            scroll-behavior: smooth;
+        }
+
         body {
-            font-family: 'Inter', sans-serif;
+            font-family: 'Outfit', sans-serif;
             line-height: 1.6;
-            color: #333;
-            background: linear-gradient(135deg, #2A0A10 0%, #4A1A20 100%);
+            color: var(--text-main);
+            background-color: var(--bg-deep);
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(245, 158, 11, 0.05) 0px, transparent 50%),
+                radial-gradient(at 50% 0%, rgba(15, 23, 42, 0.5) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(245, 158, 11, 0.03) 0px, transparent 50%);
             min-height: 100vh;
+            overflow-x: hidden;
         }
 
         .container {
             max-width: 1200px;
             margin: 0 auto;
-            padding: 0 20px;
+            padding: 0 24px;
         }
 
         /* Header */
         header {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(11, 19, 41, 0.85);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-bottom: 1px solid var(--border);
             position: fixed;
             top: 0;
             left: 0;
             right: 0;
             z-index: 1000;
-            padding: 1rem 0;
+            padding: 1.25rem 0;
+            transition: all 0.3s ease;
+        }
+
+        header.scrolled {
+            padding: 0.8rem 0;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
         }
 
         nav {
@@ -69,239 +105,511 @@
             align-items: center;
         }
 
-        .logo {
-            font-family: 'Playfair Display', serif;
-            font-size: 1.8rem;
-            font-weight: 700;
-            color: #2A0A10;
+        .logo-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
             text-decoration: none;
+        }
+
+        .logo-img {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            border: 1.5px solid var(--accent);
+            background-color: white;
+            padding: 2px;
+        }
+
+        .logo-text {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: var(--text-main);
+            letter-spacing: -0.5px;
         }
 
         .nav-links {
             display: flex;
-            gap: 2rem;
+            gap: 2.5rem;
             align-items: center;
         }
 
         .nav-links a {
-            color: #2A0A10;
+            color: var(--text-muted);
             text-decoration: none;
             font-weight: 500;
             transition: color 0.3s;
+            font-size: 0.95rem;
         }
 
         .nav-links a:hover {
-            color: #8B2635;
+            color: var(--accent);
         }
 
         .cta-button {
-            background: linear-gradient(135deg, #8B2635 0%, #2A0A10 100%);
+            background: linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%);
             color: white;
-            padding: 0.5rem 1.5rem;
-            border-radius: 25px;
+            padding: 0.75rem 1.75rem;
+            border-radius: 50px;
             text-decoration: none;
             font-weight: 600;
-            transition: transform 0.3s, box-shadow 0.3s;
+            font-size: 0.95rem;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(245, 158, 11, 0.2);
+            border: none;
+            cursor: pointer;
         }
 
         .cta-button:hover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(139, 38, 53, 0.3);
+            box-shadow: 0 8px 25px rgba(245, 158, 11, 0.4);
         }
 
         /* Hero Section */
         .hero {
-            padding: 120px 0 80px;
+            padding: 180px 0 100px;
             text-align: center;
-            color: white;
+            position: relative;
         }
 
         .hero h1 {
             font-family: 'Playfair Display', serif;
-            font-size: 3.5rem;
+            font-size: 4rem;
             font-weight: 700;
-            margin-bottom: 1rem;
-            background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+            line-height: 1.15;
+            margin-bottom: 1.5rem;
+            letter-spacing: -1px;
+        }
+
+        .hero h1 span {
+            background: linear-gradient(135deg, #FFE082 0%, var(--accent) 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
         }
 
         .hero p {
-            font-size: 1.3rem;
-            margin-bottom: 2rem;
-            opacity: 0.9;
-            max-width: 600px;
+            font-size: 1.35rem;
+            color: var(--text-muted);
+            margin-bottom: 2.5rem;
+            max-width: 700px;
             margin-left: auto;
             margin-right: auto;
+            font-weight: 300;
         }
 
         .hero-buttons {
             display: flex;
-            gap: 1rem;
+            gap: 1.25rem;
             justify-content: center;
             flex-wrap: wrap;
+            margin-bottom: 4rem;
         }
 
         .hero .cta-button {
-            padding: 1rem 2rem;
+            padding: 1.1rem 2.5rem;
             font-size: 1.1rem;
         }
 
         .secondary-button {
-            background: rgba(255, 255, 255, 0.2);
-            color: white;
-            padding: 1rem 2rem;
-            border-radius: 25px;
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-main);
+            padding: 1.1rem 2.5rem;
+            border-radius: 50px;
             text-decoration: none;
             font-weight: 600;
-            border: 2px solid rgba(255, 255, 255, 0.3);
+            font-size: 1.1rem;
+            border: 1px solid var(--border);
             transition: all 0.3s;
         }
 
         .secondary-button:hover {
-            background: rgba(255, 255, 255, 0.3);
-            border-color: rgba(255, 255, 255, 0.5);
+            background: rgba(255, 255, 255, 0.1);
+            border-color: var(--text-muted);
         }
 
-        /* Features Section */
+        /* Hero Phone Mockup */
+        .hero-mockup {
+            max-width: 900px;
+            margin: 0 auto;
+            background: linear-gradient(180deg, rgba(30, 41, 59, 0.5) 0%, rgba(15, 23, 42, 0) 100%);
+            padding: 20px;
+            border-radius: 24px;
+            border: 1px solid var(--border);
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
+            position: relative;
+        }
+
+        .hero-mockup img {
+            width: 100%;
+            height: auto;
+            border-radius: 16px;
+            display: block;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        /* Features Grid */
         .features {
-            padding: 80px 0;
-            background: rgba(255, 255, 255, 0.05);
+            padding: 100px 0;
+            background-color: var(--bg-dark);
+            border-top: 1px solid var(--border);
+            border-bottom: 1px solid var(--border);
         }
 
-        .features h2 {
+        .section-header {
             text-align: center;
+            max-width: 650px;
+            margin: 0 auto 4rem;
+        }
+
+        .section-header h2 {
             font-family: 'Playfair Display', serif;
-            font-size: 2.5rem;
-            color: white;
-            margin-bottom: 3rem;
+            font-size: 2.75rem;
+            margin-bottom: 1rem;
+            letter-spacing: -0.5px;
+        }
+
+        .section-header p {
+            color: var(--text-muted);
+            font-size: 1.15rem;
+            font-weight: 300;
         }
 
         .features-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
             gap: 2rem;
         }
 
         .feature-card {
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
+            background: var(--card-bg);
             border-radius: 20px;
-            padding: 2rem;
-            text-align: center;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            transition: transform 0.3s, box-shadow 0.3s;
+            padding: 2.5rem 2rem;
+            border: 1px solid var(--border);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .feature-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            background: var(--accent);
+            opacity: 0;
+            transition: opacity 0.3s;
         }
 
         .feature-card:hover {
             transform: translateY(-5px);
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+            border-color: rgba(245, 158, 11, 0.3);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .feature-card:hover::before {
+            opacity: 1;
         }
 
         .feature-icon {
-            width: 80px;
-            height: 80px;
-            background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
-            border-radius: 50%;
+            font-size: 2.25rem;
+            margin-bottom: 1.5rem;
+            background: rgba(245, 158, 11, 0.1);
+            width: 64px;
+            height: 64px;
+            border-radius: 12px;
             display: flex;
             align-items: center;
             justify-content: center;
-            margin: 0 auto 1rem;
-            font-size: 2rem;
+            color: var(--accent);
         }
 
         .feature-card h3 {
-            color: white;
-            font-size: 1.5rem;
-            margin-bottom: 1rem;
+            font-size: 1.35rem;
+            margin-bottom: 0.8rem;
+            font-weight: 600;
         }
 
         .feature-card p {
-            color: rgba(255, 255, 255, 0.8);
+            color: var(--text-muted);
+            font-size: 0.98rem;
+            line-height: 1.6;
         }
 
-        /* Screenshots Section */
-        .screenshots {
+        /* Showcase / Deep-Dive Section */
+        .showcase {
+            padding: 100px 0;
+        }
+
+        .showcase-row {
+            display: flex;
+            align-items: center;
+            gap: 5rem;
+            margin-bottom: 8px;
             padding: 80px 0;
-            background: rgba(255, 255, 255, 0.02);
+            border-bottom: 1px solid rgba(30, 41, 59, 0.5);
         }
 
-        .screenshots h2 {
-            text-align: center;
+        .showcase-row:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+
+        .showcase-row.reverse {
+            flex-direction: row-reverse;
+        }
+
+        .showcase-content {
+            flex: 1;
+        }
+
+        .showcase-badge {
+            display: inline-block;
+            background: rgba(245, 158, 11, 0.1);
+            color: var(--accent);
+            padding: 0.4rem 1rem;
+            border-radius: 50px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 1.25rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border: 1px solid rgba(245, 158, 11, 0.2);
+        }
+
+        .showcase-content h3 {
             font-family: 'Playfair Display', serif;
-            font-size: 2.5rem;
-            color: white;
-            margin-bottom: 3rem;
+            font-size: 2.4rem;
+            margin-bottom: 1.25rem;
+            line-height: 1.25;
         }
 
-        .screenshot-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 2rem;
-            max-width: 1000px;
-            margin: 0 auto;
+        .showcase-content p {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+            margin-bottom: 1.5rem;
+            font-weight: 300;
         }
 
-        .screenshot {
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 15px;
-            padding: 1rem;
-            text-align: center;
-            border: 1px solid rgba(255, 255, 255, 0.2);
+        .showcase-features-list {
+            list-style: none;
         }
 
-        .screenshot img {
+        .showcase-features-list li {
+            margin-bottom: 0.75rem;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            color: var(--text-main);
+            font-size: 1rem;
+        }
+
+        .showcase-features-list li::before {
+            content: "✦";
+            color: var(--accent);
+            font-weight: bold;
+        }
+
+        .showcase-image {
+            flex: 1.1;
+            background: linear-gradient(135deg, rgba(30, 41, 59, 0.4) 0%, rgba(15, 23, 42, 0.2) 100%);
+            padding: 16px;
+            border-radius: 24px;
+            border: 1px solid var(--border);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            transition: transform 0.4s ease;
+        }
+
+        .showcase-image:hover {
+            transform: scale(1.02);
+        }
+
+        .showcase-image img {
             width: 100%;
-            height: 400px;
+            height: auto;
+            border-radius: 12px;
+            display: block;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        /* Light/Dark Comparison Section */
+        .theme-compare {
+            background-color: var(--bg-dark);
+            padding: 100px 0;
+            border-top: 1px solid var(--border);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .compare-container {
+            display: flex;
+            align-items: center;
+            gap: 4rem;
+        }
+
+        .compare-content {
+            flex: 1;
+        }
+
+        .compare-images {
+            flex: 1.2;
+            position: relative;
+            border-radius: 20px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.4);
+            aspect-ratio: 16 / 10;
+        }
+
+        .compare-images img {
+            width: 100%;
+            height: 100%;
             object-fit: cover;
-            border-radius: 10px;
-            margin-bottom: 1rem;
+            position: absolute;
+            top: 0;
+            left: 0;
+            display: block;
         }
 
-        .screenshot h3 {
+        .img-light {
+            z-index: 2;
+            clip-path: inset(0 0 0 50%);
+        }
+
+        .compare-slider-bar {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 50%;
+            width: 4px;
+            background: var(--accent);
+            z-index: 3;
+            box-shadow: 0 0 10px rgba(245, 158, 11, 0.8);
+            pointer-events: none;
+        }
+
+        .compare-slider-button {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 48px;
+            height: 48px;
+            background: var(--accent);
+            border-radius: 50%;
+            z-index: 4;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
             color: white;
-            font-size: 1.2rem;
-            margin-bottom: 0.5rem;
+            font-weight: bold;
+            pointer-events: none;
+            border: 2px solid white;
         }
 
-        .screenshot p {
-            color: rgba(255, 255, 255, 0.7);
-            font-size: 0.9rem;
-        }
-
-        /* CTA Section */
+        /* Download Call-to-action */
         .cta-section {
-            padding: 80px 0;
+            padding: 120px 0;
             text-align: center;
-            background: linear-gradient(135deg, rgba(139, 38, 53, 0.8) 0%, rgba(42, 10, 16, 0.8) 100%);
+            background: linear-gradient(180deg, var(--bg-deep) 0%, rgba(15, 23, 42, 0.9) 100%);
+            position: relative;
         }
 
         .cta-section h2 {
             font-family: 'Playfair Display', serif;
-            font-size: 2.5rem;
+            font-size: 3.25rem;
             color: white;
-            margin-bottom: 1rem;
+            margin-bottom: 1.5rem;
+            letter-spacing: -0.5px;
         }
 
         .cta-section p {
-            font-size: 1.2rem;
-            color: rgba(255, 255, 255, 0.9);
-            margin-bottom: 2rem;
+            font-size: 1.3rem;
+            color: var(--text-muted);
+            margin-bottom: 3rem;
             max-width: 600px;
             margin-left: auto;
             margin-right: auto;
+            font-weight: 300;
+        }
+
+        .download-badges {
+            display: flex;
+            gap: 1.5rem;
+            justify-content: center;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .download-badge-link img {
+            height: 52px;
+            transition: transform 0.3s;
+        }
+
+        .download-badge-link img:hover {
+            transform: scale(1.05);
         }
 
         /* Footer */
         footer {
-            padding: 40px 0;
-            background: rgba(0, 0, 0, 0.3);
-            text-align: center;
-            color: rgba(255, 255, 255, 0.7);
+            padding: 60px 0 40px;
+            background: #03060c;
+            border-top: 1px solid var(--border);
+            color: var(--text-muted);
+            font-size: 0.95rem;
         }
 
-        .footer-content {
+        .footer-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr;
+            gap: 4rem;
+            margin-bottom: 40px;
+        }
+
+        .footer-brand h4 {
+            color: white;
+            font-size: 1.3rem;
+            font-family: 'Playfair Display', serif;
+            margin-bottom: 1rem;
+        }
+
+        .footer-brand p {
+            max-width: 320px;
+            line-height: 1.6;
+        }
+
+        .footer-links-col h5 {
+            color: white;
+            font-size: 1rem;
+            margin-bottom: 1.25rem;
+            font-weight: 600;
+        }
+
+        .footer-links-col ul {
+            list-style: none;
+        }
+
+        .footer-links-col ul li {
+            margin-bottom: 0.75rem;
+        }
+
+        .footer-links-col ul li a {
+            color: var(--text-muted);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        .footer-links-col ul li a:hover {
+            color: var(--accent);
+        }
+
+        .footer-bottom {
+            border-top: 1px solid var(--border);
+            padding-top: 30px;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -309,241 +617,327 @@
             gap: 1rem;
         }
 
-        .footer-links {
-            display: flex;
-            gap: 2rem;
-        }
-
-        .footer-links a {
-            color: rgba(255, 255, 255, 0.7);
-            text-decoration: none;
-            transition: color 0.3s;
-        }
-
-        .footer-links a:hover {
-            color: white;
-        }
-
-        /* Mobile Responsive */
-        @media (max-width: 768px) {
+        /* Responsive */
+        @media (max-width: 992px) {
             .hero h1 {
-                font-size: 2.5rem;
+                font-size: 3rem;
             }
 
-            .hero p {
-                font-size: 1.1rem;
-            }
-
-            .hero-buttons {
+            .showcase-row, .showcase-row.reverse {
                 flex-direction: column;
-                align-items: center;
+                gap: 3rem;
+                padding: 60px 0;
             }
 
+            .showcase-image {
+                width: 100%;
+                max-width: 500px;
+                margin: 0 auto;
+            }
+
+            .compare-container {
+                flex-direction: column;
+                gap: 3rem;
+            }
+
+            .footer-grid {
+                grid-template-columns: 1fr 1fr;
+                gap: 3rem;
+            }
+        }
+
+        @media (max-width: 768px) {
             .nav-links {
                 display: none;
             }
 
-            .features-grid {
-                grid-template-columns: 1fr;
+            .hero h1 {
+                font-size: 2.4rem;
             }
 
-            .screenshot-grid {
-                grid-template-columns: 1fr;
+            .hero p {
+                font-size: 1.15rem;
             }
 
-            .footer-content {
+            .cta-section h2 {
+                font-size: 2.25rem;
+            }
+
+            .footer-grid {
+                grid-template-columns: 1fr;
+                gap: 2.5rem;
+            }
+
+            .footer-bottom {
                 flex-direction: column;
                 text-align: center;
             }
         }
-
-        /* Animations */
-        @keyframes fadeInUp {
-            from {
-                opacity: 0;
-                transform: translateY(30px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .fade-in-up {
-            animation: fadeInUp 0.6s ease-out;
-        }
-
-        /* Loading animation for images */
-        .screenshot img {
-            transition: opacity 0.3s;
-        }
-
-        .screenshot img.loaded {
-            opacity: 1;
-        }
     </style>
 </head>
 <body>
-    <header>
+    <header id="main-header">
         <nav class="container">
-            <a href="/" class="logo">Stock & Spoon</a>
+            <a href="/" class="logo-container">
+                <img src="icons/stockspoon-icon.png" alt="Stock & Spoon Logo" class="logo-img" />
+                <span class="logo-text">Stock & Spoon</span>
+            </a>
             <div class="nav-links">
                 <a href="#features">Features</a>
-                <a href="#screenshots">Screenshots</a>
-                <a href="https://ornate-compass-478504-e1.web.app" class="cta-button">Try It Now</a>
+                <a href="#showcase">Inside the App</a>
+                <a href="#theme-compare">Design</a>
+                <a href="https://ornate-compass-478504-e1.web.app/" class="cta-button">Launch Web App</a>
             </div>
         </nav>
     </header>
 
     <main>
+        <!-- Hero Section -->
         <section class="hero">
             <div class="container">
-                <h1 class="fade-in-up">Stock & Spoon</h1>
-                <p class="fade-in-up">AI-powered kitchen assistant that helps you manage your pantry, plan meals, and discover delicious recipes. Never waste food again!</p>
-                <div class="hero-buttons fade-in-up">
-                    <a href="https://ornate-compass-478504-e1.web.app" class="cta-button">🚀 Launch App</a>
-                    <a href="#features" class="secondary-button">Learn More</a>
+                <h1>Organize Your Kitchen with <br><span>Stock & Spoon</span></h1>
+                <p>An intelligent household kitchen assistant that keeps track of your pantry items, visualizes food waste, plans recipes dynamically, and coordinates grocery lists with family members.</p>
+                <div class="hero-buttons">
+                    <a href="https://ornate-compass-478504-e1.web.app/" class="cta-button">🍳 Launch Web App</a>
+                    <a href="https://play.google.com/store/apps/details?id=com.smart.pantry" class="secondary-button">Get Android App</a>
+                </div>
+                
+                <div class="hero-mockup">
+                    <img src="images/Pantrystock.jpg" alt="Stock & Spoon Pantry Dashboard" />
                 </div>
             </div>
         </section>
 
+        <!-- Core Features -->
         <section id="features" class="features">
             <div class="container">
-                <h2>Powerful Features</h2>
+                <div class="section-header">
+                    <h2>Everything You Need to Run Your Kitchen</h2>
+                    <p>Stop guessing what is in your fridge or buying duplicates. Stock & Spoon helps you save money and cook smarter.</p>
+                </div>
+                
                 <div class="features-grid">
-                    <div class="feature-card fade-in-up">
-                        <div class="feature-icon">📱</div>
-                        <h3>Smart Pantry Scanner</h3>
-                        <p>Scan your pantry items with your camera. AI recognizes ingredients and automatically adds them to your inventory.</p>
+                    <div class="feature-card">
+                        <div class="feature-icon">🥫</div>
+                        <h3>Pantry Caching System</h3>
+                        <p>Our optimized caching loads all inventory items in a single read. Instantly access list modifications offline.</p>
                     </div>
-                    <div class="feature-card fade-in-up">
-                        <div class="feature-icon">🍽️</div>
-                        <h3>AI Meal Planning</h3>
-                        <p>Get personalized meal suggestions based on your available ingredients and dietary preferences.</p>
+                    <div class="feature-card">
+                        <div class="feature-icon">🍳</div>
+                        <h3>AI Recipe Builder</h3>
+                        <p>Generate creative recipes instantly utilizing ingredients you already have, prioritizing items close to expiration.</p>
                     </div>
-                    <div class="feature-card fade-in-up">
-                        <div class="feature-icon">🛒</div>
-                        <h3>Smart Shopping Lists</h3>
-                        <p>Automatically generate shopping lists based on your meal plans and current pantry stock.</p>
-                    </div>
-                    <div class="feature-card fade-in-up">
+                    <div class="feature-card">
                         <div class="feature-icon">📅</div>
-                        <h3>Weekly Meal Planner</h3>
-                        <p>Plan your meals for the entire week with drag-and-drop simplicity and nutritional insights.</p>
+                        <h3>Drag-and-Drop Meal Planner</h3>
+                        <p>Schedule your weekly menu (Breakfast, Lunch, Dinner). Missing ingredients are identified and can be added to your shopping list with a single tap.</p>
                     </div>
-                    <div class="feature-card fade-in-up">
-                        <div class="feature-icon">🤖</div>
-                        <h3>AI Recipe Generator</h3>
-                        <p>Discover new recipes using your available ingredients. Powered by advanced AI for creative cooking.</p>
-                    </div>
-                    <div class="feature-card fade-in-up">
+                    <div class="feature-card">
                         <div class="feature-icon">👥</div>
-                        <h3>Household Sharing</h3>
-                        <p>Share your pantry and meal plans with family members. Perfect for households and roommates.</p>
+                        <h3>Real-time Household Sync</h3>
+                        <p>Invite family members or roommates to your household. Synchronize pantry stock and grocery checkout updates dynamically.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">📉</div>
+                        <h3>Food Waste Analytics</h3>
+                        <p>See exactly what you consumed versus what expired. Monitor your household safety score and get smart storage recommendations.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">🛒</div>
+                        <h3>Aisle-Assigned Shopping Lists</h3>
+                        <p>Sort items automatically by grocery store aisles. View quick-add item recommendations based on your historical cooking cycles.</p>
                     </div>
                 </div>
             </div>
         </section>
 
-        <section id="screenshots" class="screenshots">
+        <!-- Detailed Feature Showcase -->
+        <section id="showcase" class="showcase">
             <div class="container">
-                <h2>App Screenshots</h2>
-                <div class="screenshot-grid">
-                    <div class="screenshot fade-in-up">
-                        <img src="images/pantry.png" alt="Pantry Scanner" loading="lazy" onerror="this.src='icons/smartpantryicon.png'">
-                        <h3>Pantry Scanner</h3>
-                        <p>Scan ingredients with your camera</p>
+                <div class="section-header">
+                    <h2>Designed for Modern Kitchens</h2>
+                    <p>Take a closer look at the actual tools and workflows inside Stock & Spoon.</p>
+                </div>
+
+                <!-- Showcase 1: Pantry Stock -->
+                <div class="showcase-row">
+                    <div class="showcase-content">
+                        <span class="showcase-badge">Inventory Management</span>
+                        <h3>Smart Pantry Tracking</h3>
+                        <p>Our inventory screen lets you visually inspect container fill levels (1/4, 1/2, 3/4, Full) and auto-generates expiry alerts based on FDA food safety presets.</p>
+                        <ul class="showcase-row showcase-features-list" style="margin:0; padding:0; border:none; display:block;">
+                            <li>Visual quantity modifiers for quick inventory adjustments</li>
+                            <li>FDA-aligned safety alerts and smart shelf-life defaults</li>
+                            <li>Quick filtering by storage location (Freezer, Fridge, Spices)</li>
+                        </ul>
                     </div>
-                    <div class="screenshot fade-in-up">
-                        <img src="images/pasta.png" alt="Meal Planner" loading="lazy" onerror="this.src='icons/smartpantryicon.png'">
-                        <h3>Meal Planner</h3>
-                        <p>Plan meals for the week</p>
+                    <div class="showcase-image">
+                        <img src="images/Pantry.jpg" alt="Pantry Detail View Screen" />
                     </div>
-                    <div class="screenshot fade-in-up">
-                        <img src="images/steak.png" alt="Recipe Finder" loading="lazy" onerror="this.src='icons/smartpantryicon.png'">
-                        <h3>Recipe Finder</h3>
-                        <p>Discover new recipes with AI</p>
+                </div>
+
+                <!-- Showcase 2: Meal Planner -->
+                <div class="showcase-row reverse">
+                    <div class="showcase-content">
+                        <span class="showcase-badge">Meal Planning</span>
+                        <h3>Drag-and-Drop Planner</h3>
+                        <p>Schedule meals for the entire week. The meal planner calculates exactly what ingredients you are missing and links shopping items directly to the recipe source.</p>
+                        <ul class="showcase-row showcase-features-list" style="margin:0; padding:0; border:none; display:block;">
+                            <li>Bypasses redundant modal menus with direct drag-to-slot scheduling</li>
+                            <li>Lists recipe sources on your shopping items (e.g. "🍳 need 2 tbsp for Tacos")</li>
+                            <li>Calculates nutrition details for scheduled days</li>
+                        </ul>
                     </div>
-                    <div class="screenshot fade-in-up">
-                        <img src="images/bread.png" alt="Shopping List" loading="lazy" onerror="this.src='icons/smartpantryicon.png'">
-                        <h3>Shopping List</h3>
-                        <p>Smart shopping lists</p>
+                    <div class="showcase-image">
+                        <img src="images/MealPlanner.jpg" alt="Meal Planner Week View Screen" />
+                    </div>
+                </div>
+
+                <!-- Showcase 3: AI Recipe Generator -->
+                <div class="showcase-row">
+                    <div class="showcase-content">
+                        <span class="showcase-badge">AI Assistant</span>
+                        <h3>Recipe Generator & Search</h3>
+                        <p>Search or generate creative recipes using your available pantry items. Enter ingredients manually or let the app highlight matching recipes from the community.</p>
+                        <ul class="showcase-row showcase-features-list" style="margin:0; padding:0; border:none; display:block;">
+                            <li>Optimized local recipe caching on search tab re-mounts</li>
+                            <li>Rate, customize, and save modifications to community recipes</li>
+                            <li>Step-by-step cooking timers integrated directly into instructions</li>
+                        </ul>
+                    </div>
+                    <div class="showcase-image">
+                        <img src="images/Recipe.jpg" alt="AI Recipe Generator Screen" />
+                    </div>
+                </div>
+
+                <!-- Showcase 4: Shopping List -->
+                <div class="showcase-row reverse">
+                    <div class="showcase-content">
+                        <span class="showcase-badge">Grocery Shopping</span>
+                        <h3>Smart Shopping List Checkout</h3>
+                        <p>Add ingredients quickly using the 'Quick Add' suggestion tray. When checking out, the app automatically prompts for expiration dates using smart defaults based on the food type.</p>
+                        <ul class="showcase-row showcase-features-list" style="margin:0; padding:0; border:none; display:block;">
+                            <li>Consolidated select-all controls and clean swipe gestures</li>
+                            <li>Expiration checkout prompts that float cleanly above navigation tabs</li>
+                            <li>Preserves staples that reappear automatically when depleted</li>
+                        </ul>
+                    </div>
+                    <div class="showcase-image">
+                        <img src="images/Shopping.jpg" alt="Shopping List Checkout Screen" />
                     </div>
                 </div>
             </div>
         </section>
 
+        <!-- Light/Dark Mode Compare -->
+        <section id="theme-compare" class="theme-compare">
+            <div class="container">
+                <div class="compare-container">
+                    <div class="compare-content">
+                        <span class="showcase-badge">User Interface</span>
+                        <h3>Adaptive Styling</h3>
+                        <p>Whether you're cooking in a dim, cozy kitchen or standing in a brightly lit supermarket aisle, Stock & Spoon transitions seamlessly between light and dark themes to optimize readability.</p>
+                        <p>We've eliminated hardcoded palettes (such as burgundy) and aligned our entire theme to match system-wide design tokens for a premium, unified user experience.</p>
+                    </div>
+                    <div class="compare-images">
+                        <img src="images/Pantrystock.jpg" alt="Dark Slate Theme" />
+                        <img src="images/PantrystockLightTheme.jpg" alt="Modern Light Theme" class="img-light" />
+                        <div class="compare-slider-bar"></div>
+                        <div class="compare-slider-button">↔</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- CTA / Download Section -->
         <section class="cta-section">
             <div class="container">
-                <h2>Ready to Revolutionize Your Kitchen?</h2>
-                <p>Join thousands of users who have transformed their cooking experience with Stock & Spoon.</p>
-                <a href="https://ornate-compass-478504-e1.web.app" class="cta-button">🍳 Start Cooking Smarter Today</a>
+                <h2>Ready to Upgrade Your Kitchen?</h2>
+                <p>Join thousands of users who have transformed their cooking experience, saved money, and reduced food waste with Stock & Spoon.</p>
+                <div class="download-badges">
+                    <a href="https://play.google.com/store/apps/details?id=com.smart.pantry" class="download-badge-link">
+                        <img src="https://upload.wikimedia.org/wikipedia/commons/7/78/Google_Play_Store_badge_EN.svg" alt="Get it on Google Play" />
+                    </a>
+                    <a href="https://ornate-compass-478504-e1.web.app/" class="cta-button" style="padding: 0.95rem 2.2rem; font-size: 1.05rem;">🍳 Open Web App Immediately</a>
+                </div>
             </div>
         </section>
     </main>
 
     <footer>
         <div class="container">
-            <div class="footer-content">
-                <p>&copy; 2026 Stock & Spoon. All rights reserved.</p>
-                <div class="footer-links">
-                    <a href="/privacy.html">Privacy Policy</a>
-                    <a href="/terms.html">Terms of Service</a>
-                    <a href="/contact.html">Contact</a>
+            <div class="footer-grid">
+                <div class="footer-brand">
+                    <h4>Stock & Spoon</h4>
+                    <p>The intelligent AI kitchen assistant that minimizes waste, automates grocery lists, and syncs households.</p>
                 </div>
+                <div class="footer-links-col">
+                    <h5>Navigation</h5>
+                    <ul>
+                        <li><a href="#features">Features</a></li>
+                        <li><a href="#showcase">Inside the App</a></li>
+                        <li><a href="#theme-compare">Design</a></li>
+                        <li><a href="https://ornate-compass-478504-e1.web.app/">Launch Web App</a></li>
+                    </ul>
+                </div>
+                <div class="footer-links-col">
+                    <h5>Legal & Support</h5>
+                    <ul>
+                        <li><a href="/privacy.html">Privacy Policy</a></li>
+                        <li><a href="/terms.html">Terms of Service</a></li>
+                        <li><a href="/contact.html">Contact Us</a></li>
+                        <li><a href="mailto:smartpantry40@gmail.com">smartpantry40@gmail.com</a></li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="footer-bottom">
+                <p>&copy; 2026 Stock & Spoon. All rights reserved.</p>
+                <p>Designed for premium household optimization.</p>
             </div>
         </div>
     </footer>
 
     <script>
-        // Add loaded class to images when they load
-        document.addEventListener('DOMContentLoaded', function() {
-            const images = document.querySelectorAll('.screenshot img');
-            images.forEach(img => {
-                if (img.complete) {
-                    img.classList.add('loaded');
-                } else {
-                    img.addEventListener('load', function() {
-                        img.classList.add('loaded');
-                    });
-                }
-            });
+        // Scroll header style change
+        const header = document.getElementById('main-header');
+        window.addEventListener('scroll', () => {
+            if (window.scrollY > 50) {
+                header.classList.add('scrolled');
+            } else {
+                header.classList.remove('scrolled');
+            }
         });
 
-        // Smooth scrolling for anchor links
-        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-            anchor.addEventListener('click', function (e) {
-                e.preventDefault();
-                const target = document.querySelector(this.getAttribute('href'));
-                if (target) {
-                    target.scrollIntoView({
-                        behavior: 'smooth',
-                        block: 'start'
-                    });
+        // Interactive light/dark slider
+        const compareContainer = document.querySelector('.compare-images');
+        const imgLight = document.querySelector('.img-light');
+        const sliderBar = document.querySelector('.compare-slider-bar');
+        const sliderButton = document.querySelector('.compare-slider-button');
+
+        if (compareContainer) {
+            const moveSlider = (clientX) => {
+                const rect = compareContainer.getBoundingClientRect();
+                const x = clientX - rect.left;
+                let percentage = (x / rect.width) * 100;
+                if (percentage < 0) percentage = 0;
+                if (percentage > 100) percentage = 100;
+
+                imgLight.style.clipPath = `inset(0 0 0 ${percentage}%)`;
+                sliderBar.style.left = `${percentage}%`;
+                sliderButton.style.left = `${percentage}%`;
+            };
+
+            compareContainer.addEventListener('mousemove', (e) => {
+                moveSlider(e.clientX);
+            });
+
+            compareContainer.addEventListener('touchmove', (e) => {
+                if (e.touches && e.touches[0]) {
+                    moveSlider(e.touches[0].clientX);
                 }
             });
-        });
-
-        // Add fade-in animation to elements as they come into view
-        const observerOptions = {
-            threshold: 0.1,
-            rootMargin: '0px 0px -50px 0px'
-        };
-
-        const observer = new IntersectionObserver(function(entries) {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    entry.target.classList.add('fade-in-up');
-                }
-            });
-        }, observerOptions);
-
-        // Observe all elements that should fade in
-        document.querySelectorAll('.feature-card, .screenshot').forEach(el => {
-            observer.observe(el);
-        });
+        }
     </script>
-
-    <!-- Google Analytics or other tracking scripts can be added here -->
 </body>
 </html>

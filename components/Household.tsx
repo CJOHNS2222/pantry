@@ -8,6 +8,7 @@ import { serverTimestamp } from 'firebase/firestore';
 import { auth } from '../firebaseConfig';
 import DatabaseMonitoringService from '../services/databaseMonitoringService';
 import { removeMemberFromHousehold } from '../services/householdService';
+import { sendHouseholdInvitationEmail } from '../services/emailService';
 import { log } from '../services/logService';
 import { UsageService } from '../services/usageService';
 import { InventoryCacheService } from '../services/inventoryCacheService';
@@ -78,6 +79,17 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
       await UsageService.recordHouseholdMemberAdd(user.id);
 
       await AnalyticsService.trackHouseholdInviteSent(inviteEmail);
+
+      // Try to send email via EmailJS
+      await sendHouseholdInvitationEmail({
+        to_email: inviteEmail,
+        inviter_name: user.profile?.name || user.name || 'A family member',
+        household_name: household.name,
+        invite_link: window.location.origin,
+        app_url: 'https://stock-spoon-website.web.app/index.html'
+      }).catch(err => {
+        log.error('Failed to send invitation email', err, 'Household');
+      });
 
       await auth.currentUser?.getIdToken(true);
 

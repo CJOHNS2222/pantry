@@ -271,11 +271,11 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
   }, [onLogin]);
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-[#2A0A10] text-white relative overflow-auto">
+    <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-slate-950 text-white relative overflow-auto">
       {/* Background Ambience */}
-      <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-red-900/20 via-[#2A0A10] to-[#2A0A10] z-0 pointer-events-none"></div>
+      <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-amber-500/10 via-slate-950 to-slate-950 z-0 pointer-events-none"></div>
 
-      <div className="w-full max-w-md bg-[#3F1016] border border-red-900/30 rounded-3xl p-8 shadow-2xl relative z-10">
+      <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl relative z-10">
         <div className="flex flex-col items-center mb-8">
           <div className="w-20 h-20 bg-gradient-to-br from-amber-400 to-amber-600 rounded-full flex items-center justify-center shadow-lg mb-4">
             <ChefHat className="w-10 h-10 text-white" />
@@ -283,7 +283,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
           <h1 className="text-3xl font-bold font-serif tracking-wide text-amber-50">
             <FormattedMessage id="app.name" />
           </h1>
-          <p className="text-red-200/60 mt-2 text-sm uppercase tracking-widest">
+          <p className="text-slate-400 mt-2 text-sm uppercase tracking-widest">
             <FormattedMessage id="app.tagline" />
           </p>
         </div>
@@ -303,7 +303,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full bg-[#2A0A10] border border-red-900/50 rounded-xl px-4 py-3 text-white placeholder-red-900/50 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none transition-all"
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white placeholder-slate-600 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none transition-all"
                 placeholder={intl.formatMessage({ id: "auth.yourName" })}
                 autoComplete="name"
                 required
@@ -321,7 +321,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-[#2A0A10] border border-red-900/50 rounded-xl px-4 py-3 text-white placeholder-red-900/50 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none transition-all"
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white placeholder-slate-600 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none transition-all"
               placeholder={intl.formatMessage({ id: "auth.emailPlaceholder" })}
               autoComplete="email"
               required
@@ -338,7 +338,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-[#2A0A10] border border-red-900/50 rounded-xl px-4 py-3 text-white placeholder-red-900/50 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none transition-all"
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white placeholder-slate-600 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none transition-all"
               placeholder={intl.formatMessage({ id: "auth.passwordPlaceholder" })}
               autoComplete="current-password"
               required
@@ -366,7 +366,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full bg-[#2A0A10] border border-red-900/50 rounded-xl px-4 py-3 text-white placeholder-red-900/50 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none transition-all"
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white placeholder-slate-600 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none transition-all"
                 placeholder={intl.formatMessage({ id: "auth.confirmPasswordPlaceholder" })}
                 autoComplete="new-password"
                 required
@@ -391,11 +391,11 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
         </form>
 
         <div className="my-6 flex items-center gap-4">
-          <div className="h-px bg-red-900/30 flex-1"></div>
-          <span className="text-xs text-red-200/40 font-medium">
+          <div className="h-px bg-slate-800 flex-1"></div>
+          <span className="text-xs text-slate-500 font-medium">
             <FormattedMessage id="auth.orContinueWith" />
           </span>
-          <div className="h-px bg-red-900/30 flex-1"></div>
+          <div className="h-px bg-slate-800 flex-1"></div>
         </div>
         <div className="grid grid-cols-1 gap-4">
           <button
@@ -410,14 +410,14 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
           <button
             type="button"
             onClick={handleGuestLogin}
-            className="flex items-center justify-center gap-2 bg-transparent border border-amber-700/50 text-amber-200/80 font-medium py-3 rounded-xl hover:border-amber-500/70 hover:text-amber-100 hover:bg-amber-900/15 transition-colors"
+            className="flex items-center justify-center gap-2 bg-transparent border border-slate-700 text-slate-300 font-medium py-3 rounded-xl hover:bg-slate-800/50 transition-colors"
             data-testid="login-guest"
           >
             <UserX className="w-5 h-5" />
             Continue as Guest
           </button>
         </div>
-        <p className="text-sm text-amber-200/40 text-center mt-3">
+        <p className="text-sm text-slate-500 text-center mt-3">
           Guest mode: local storage only, no cross-device sync.
         </p>
       </div>

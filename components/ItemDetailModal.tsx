@@ -117,6 +117,20 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
     setEditUnit(newUnit);
   };
 
+  const handleVisualLevelChange = (value: PantryItem['visualLevel'] | undefined) => {
+    setLocalVisualLevel(value);
+    const originalQty = getQuantityAmount(item.quantity ?? item.quantity_estimate);
+    let multiplier = 1.0;
+    if (value === 'quarter') multiplier = 0.25;
+    else if (value === 'half') multiplier = 0.5;
+    else if (value === 'threeQuarter') multiplier = 0.75;
+    else if (value === 'full') multiplier = 1.0;
+    
+    const newQty = Math.round(originalQty * multiplier * 100) / 100;
+    setLocalQuantity(newQty);
+    setEditQuantity(newQty);
+  };
+
   const handleSaveExpiration = () => {
     setLocalExpirationDate(editExpirationDate || '');
     setLocalExpirationType(editExpirationType as 'use-by' | 'best-by');
@@ -387,7 +401,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                     <button
                       key={value}
                       type="button"
-                      onClick={() => setLocalVisualLevel(selected ? undefined : value)}
+                      onClick={() => handleVisualLevelChange(selected ? undefined : value)}
                       className={`flex-1 flex flex-col items-center gap-0.5 px-1 py-1.5 rounded-lg border transition-all duration-150 ${
                         selected
                           ? 'border-[var(--accent-color)] bg-[var(--accent-color)]/10 scale-105'

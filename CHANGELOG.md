@@ -1,3 +1,23 @@
+## [2.4.5] - 2026-06-14
+
+### Changed
+- **Single-Member Household Deletion**: Empty households are now disbanded automatically when a member departs, and the remaining admin's local/remote household associations and custom claims are cleared.
+- **Cache Data Preservation**: Copies all household databases (inventory, shopping lists, and meal plans) directly to the remaining member's personal cache upon household disbanding to prevent data loss.
+- **EmailJS Invitation Support**: Integrated household invitations directly with client-side EmailJS for direct family email notifications.
+- **Capacitor Firebase Analytics**: Added a native Capacitor Firebase Analytics bridge to log app actions and screen view transitions by tab name (e.g. Pantry, Shopping List, Meal Planner) on Android devices instead of generic `MainActivity` group logging.
+
+---
+
+## [2.4.4] - 2026-06-13
+
+### Changed
+- **Login Screen Themes**: Redesigned the authentication screen to use modern dark slate themes instead of hardcoded burgundy.
+- **Member Activity Box Header Style**: Aligned the member presence and activity status indicator box in the header with dynamic system theme variables.
+- **Recipe Ingredient Source Tags**: Added custom recipe metadata annotations on shopping list items when they are batch-added from meal planner ingredients, detailing exactly which recipe they belong to.
+- **Visual Fill Level Quantity Modifier**: Fixed the portion fill-level selector on the item detail modal (1/4, 1/2, 3/4, Full) to automatically scale and update the item's local quantity when selected.
+
+---
+
 ## [2.4.3] - 2026-06-13
 
 ### Changed

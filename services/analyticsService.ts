@@ -1,6 +1,8 @@
 import { analytics } from '../firebaseConfig';
 import { logEvent, setUserProperties, setUserId } from 'firebase/analytics';
 import { log } from './logService';
+import { FirebaseAnalytics } from '@capacitor-firebase/analytics';
+import { Capacitor } from '@capacitor/core';
 
 // Analytics service for tracking user interactions and app performance
 class AnalyticsService {
@@ -27,17 +29,32 @@ class AnalyticsService {
 
   // Track user identification
   static setUser(userId: string, properties?: Record<string, any>) {
-    if (analytics) {
-      setUserId(analytics, userId);
+    if (Capacitor.isNativePlatform()) {
+      FirebaseAnalytics.setUserId({ userId });
       if (properties) {
-        setUserProperties(analytics, properties);
+        Object.entries(properties).forEach(([key, value]) => {
+          FirebaseAnalytics.setUserProperty({ key, value: String(value) });
+        });
+      }
+    } else {
+      if (analytics) {
+        setUserId(analytics, userId);
+        if (properties) {
+          setUserProperties(analytics, properties);
+        }
       }
     }
   }
 
   static setUserProperties(properties: Record<string, any> | null) {
-    if (analytics && properties) {
-      setUserProperties(analytics, properties);
+    if (properties) {
+      if (Capacitor.isNativePlatform()) {
+        Object.entries(properties).forEach(([key, value]) => {
+          FirebaseAnalytics.setUserProperty({ key, value: String(value) });
+        });
+      } else if (analytics) {
+        setUserProperties(analytics, properties);
+      }
     }
   }
 
@@ -226,6 +243,17 @@ class AnalyticsService {
       screen_name: toTab,
       previous_screen: fromTab
     });
+
+    if (Capacitor.isNativePlatform()) {
+      try {
+        FirebaseAnalytics.setCurrentScreen({
+          screenName: toTab,
+          screenClassOverride: 'MainActivity'
+        });
+      } catch (err) {
+        log.warn('Failed to set native screen name', { err });
+      }
+    }
   }
 
   static trackFeatureUsage(featureName: string, details?: Record<string, any>) {
@@ -432,7 +460,12 @@ class AnalyticsService {
   // Generic event logging
   static logEvent(eventName: string, parameters?: Record<string, any>) {
     try {
-      if (analytics) {
+      if (Capacitor.isNativePlatform()) {
+        FirebaseAnalytics.logEvent({
+          name: eventName,
+          params: parameters
+        });
+      } else if (analytics) {
         logEvent(analytics, eventName, parameters);
       }
     } catch (err: any) {

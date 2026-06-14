@@ -169,7 +169,7 @@ export const EnhancedShoppingListItem: React.FC<ShoppingListItemProps> = ({
               {item.item}
             </span>
             {item.source && (
-              <div className="inline-flex items-center rounded-full border border-theme bg-theme-primary/50 px-2 py-0.5 text-[10px] font-medium text-theme-secondary whitespace-nowrap shrink-0">
+              <div className={`inline-flex items-center rounded-full border border-theme bg-theme-primary/50 px-2 py-0.5 text-[10px] font-medium text-theme-secondary ${item.source.startsWith('recipe:') ? 'max-w-[200px] truncate' : 'whitespace-nowrap shrink-0'}`}>
                 {item.source === 'suggested' && '💡 Quick Add'}
                 {item.source === 'manual' && '✏️ Manual'}
                 {item.source === 'meal planner' && '📅 Meal planner'}

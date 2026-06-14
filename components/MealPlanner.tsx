@@ -32,7 +32,7 @@ interface MealPlannerProps {
   updateMealPlan: (newPlan: DayPlan[]) => void;
   inventory: PantryItem[];
   shoppingList: ShoppingItem[];
-  addToShoppingList: (items: string[], source?: string) => void;
+  addToShoppingList: (items: (string | { item: string; source: string })[], source?: string) => void;
   onAddToPlan?: (recipe: StructuredRecipe, dayIndex?: number, mealType?: 'breakfast' | 'lunch' | 'dinner') => void;
   onSaveRecipe?: (recipe: StructuredRecipe) => void;
   onMarkAsMade?: (recipe: StructuredRecipe) => void;
@@ -433,7 +433,10 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
       );
       
       // Batch add all items at once
-      const allIngredients = itemsToAdd.map(item => item.ingredient);
+      const allIngredients = itemsToAdd.map(item => ({
+        item: item.ingredient,
+        source: item.source
+      }));
       const batchSource = `meal plan: ${missing.length} missing ingredients for planned meals`;
       addToShoppingList(allIngredients, batchSource);
       addToast(`Added ${missing.length} item${missing.length > 1 ? 's' : ''} to your shopping list`, 'success');
@@ -903,7 +906,10 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
           onAddSuggestionMissingIngredients={(suggestion) => {
             const missingItems = suggestion.missingIngredients
               .filter(match => !match.available)
-              .map(match => match.ingredient);
+              .map(match => ({
+                item: match.ingredient,
+                source: `recipe: needed for "${suggestion.recipe.title}"`
+              }));
             if (missingItems.length > 0) {
               addToShoppingList(missingItems);
               AnalyticsService.trackEvent('meal_prep_add_missing_ingredients', {

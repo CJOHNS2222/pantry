@@ -246,7 +246,22 @@ export const removeMemberFromHousehold = async (
 
     // If this was the last member besides the admin, delete the household
     if (updatedMembers.length === 1) {
+      const remainingAdminId = updatedMembers[0].id;
+      
+      // Copy household caches to the remaining admin's personal cache so they don't lose data
+      const remainingUser: User = { id: remainingAdminId } as User;
+      await copyHouseholdCacheToUser(remainingUser, householdId).catch(err =>
+        log.error('Cache copy failed for remaining admin', { err }, 'HouseholdService')
+      );
+
       await DatabaseMonitoringService.deleteDoc(householdRef);
+      
+      // Clear householdId from the remaining admin's user document
+      const adminUserRef = DatabaseMonitoringService.doc('users/' + remainingAdminId);
+      await DatabaseMonitoringService.updateDoc(adminUserRef, {
+        householdId: null,
+        updatedAt: serverTimestamp(),
+      });
     }
   } catch (err: any) {
     log.error('Error removing member from household:', { err }, 'HouseholdService');

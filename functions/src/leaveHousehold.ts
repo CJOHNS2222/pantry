@@ -92,9 +92,52 @@ export const leaveHousehold = onCall(async (request) => {
       // Don't fail the leave process if claim removal fails
     }
 
-    // If this was the last member, delete the household
-    const totalMembers = Math.max(members.length, memberIds.length);
-    if (totalMembers === 1) {
+    // If only one member remains, disband the household and clear their householdId
+    const remainingMembers = members.filter((m: { id: string; }) => m.id !== userId);
+    const remainingMemberIds = memberIds.filter((id: string) => id !== userId);
+    const remainingCount = Math.max(remainingMembers.length, remainingMemberIds.length);
+
+    if (remainingCount === 1) {
+      const lastMemberId = remainingMembers.length === 1 ? remainingMembers[0].id : remainingMemberIds[0];
+      
+      // Copy household caches to the remaining user's cache before deleting household doc
+      try {
+        const cacheDocs = ['inventory', 'shoppingList', 'mealPlan'];
+        for (const cacheDocName of cacheDocs) {
+          const hhCacheRef = db.collection("households").doc(householdId).collection("cache").doc(cacheDocName);
+          const userCacheRef = db.collection("users").doc(lastMemberId).collection("cache").doc(cacheDocName);
+          const hhCacheDoc = await hhCacheRef.get();
+          if (hhCacheDoc.exists) {
+            const cacheData = hhCacheDoc.data();
+            if (cacheData) {
+              await userCacheRef.set(cacheData);
+            }
+          }
+        }
+      } catch (err: any) {
+        logger.error('Error copying household cache to remaining admin', err);
+      }
+
+      // Delete the household document
+      await householdRef.delete();
+      
+      // Update user document
+      const lastUserRef = db.collection("users").doc(lastMemberId);
+      const lastUserDoc = await lastUserRef.get();
+      if (lastUserDoc.exists) {
+        await lastUserRef.update({
+          householdId: FieldValue.delete()
+        });
+      }
+      
+      // Remove custom claims
+      try {
+        await admin.auth().setCustomUserClaims(lastMemberId, { householdId: null });
+        logger.info('Custom claim householdId removed for last remaining admin', { userId: lastMemberId });
+      } catch (err: any) {
+        logger.error('Error removing custom claims for last remaining admin', err);
+      }
+    } else if (remainingCount === 0) {
       await householdRef.delete();
     }
 
@@ -203,9 +246,52 @@ export const leaveHouseholdHttp = onRequest(async (req, res) => {
       // Don't fail the leave process if claim removal fails
     }
 
-    // If this was the last member, delete the household
-    const totalMembers = Math.max(members.length, memberIds.length);
-    if (totalMembers === 1) {
+    // If only one member remains, disband the household and clear their householdId
+    const remainingMembers = members.filter((m: { id: string; }) => m.id !== userId);
+    const remainingMemberIds = memberIds.filter((id: string) => id !== userId);
+    const remainingCount = Math.max(remainingMembers.length, remainingMemberIds.length);
+
+    if (remainingCount === 1) {
+      const lastMemberId = remainingMembers.length === 1 ? remainingMembers[0].id : remainingMemberIds[0];
+      
+      // Copy household caches to the remaining user's cache before deleting household doc
+      try {
+        const cacheDocs = ['inventory', 'shoppingList', 'mealPlan'];
+        for (const cacheDocName of cacheDocs) {
+          const hhCacheRef = db.collection("households").doc(householdId).collection("cache").doc(cacheDocName);
+          const userCacheRef = db.collection("users").doc(lastMemberId).collection("cache").doc(cacheDocName);
+          const hhCacheDoc = await hhCacheRef.get();
+          if (hhCacheDoc.exists) {
+            const cacheData = hhCacheDoc.data();
+            if (cacheData) {
+              await userCacheRef.set(cacheData);
+            }
+          }
+        }
+      } catch (err: any) {
+        logger.error('Error copying household cache to remaining admin', err);
+      }
+
+      // Delete the household document
+      await householdRef.delete();
+      
+      // Update user document
+      const lastUserRef = db.collection("users").doc(lastMemberId);
+      const lastUserDoc = await lastUserRef.get();
+      if (lastUserDoc.exists) {
+        await lastUserRef.update({
+          householdId: FieldValue.delete()
+        });
+      }
+      
+      // Remove custom claims
+      try {
+        await admin.auth().setCustomUserClaims(lastMemberId, { householdId: null });
+        logger.info('Custom claim householdId removed for last remaining admin', { userId: lastMemberId });
+      } catch (err: any) {
+        logger.error('Error removing custom claims for last remaining admin', err);
+      }
+    } else if (remainingCount === 0) {
       await householdRef.delete();
     }
 

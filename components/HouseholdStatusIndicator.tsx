@@ -1,5 +1,5 @@
 import React from 'react';
-import { Household, Member } from '../types';
+import { Household } from '../types';
 import { Users, Clock } from 'lucide-react';
 
 interface HouseholdStatusIndicatorProps {
@@ -49,11 +49,12 @@ export const HouseholdStatusIndicator: React.FC<HouseholdStatusIndicatorProps> =
     return lastSeen > thirtyMinutesAgo && !isConsideredOnline(m.id);
   });
 
-  const getTimeAgo = (rawTime: any) => {
+  const getTimeAgo = (rawTime: unknown) => {
     if (!rawTime) return '';
-    const time = typeof rawTime === 'object' && rawTime?.toDate
-      ? rawTime.toDate()
-      : new Date(rawTime as string);
+    const firestoreTs = rawTime as { toDate?: () => Date };
+    const time = typeof rawTime === 'object' && firestoreTs?.toDate
+      ? firestoreTs.toDate()
+      : new Date(rawTime as string | number | Date);
     if (isNaN(time.getTime())) return '';
     const diffMs = Date.now() - time.getTime();
     const diffMins = Math.floor(diffMs / (1000 * 60));
@@ -74,22 +75,22 @@ export const HouseholdStatusIndicator: React.FC<HouseholdStatusIndicatorProps> =
   const lines: { color: string; dot?: 'green' | 'amber'; text: string }[] = [];
 
   if (onlineMembers.length >= 1) {
-    lines.push({ color: 'text-green-400', dot: 'green', text: `${onlineMembers[0].name} is online` });
+    lines.push({ color: 'text-green-500', dot: 'green', text: `${onlineMembers[0].name} is online` });
     const remaining = onlineMembers.length - 1;
     if (remaining > 0) {
-      lines.push({ color: 'text-green-400/70', text: `+${remaining} other${remaining > 1 ? 's' : ''} online` });
+      lines.push({ color: 'text-green-500/70', text: `+${remaining} other${remaining > 1 ? 's' : ''} online` });
     } else if (offlineRecent.length > 0) {
-      lines.push({ color: 'text-amber-500/60', dot: 'amber', text: `${offlineRecent[0].name} was active ${getTimeAgo(getActivity(offlineRecent[0].id).lastSeen)}` });
+      lines.push({ color: 'text-[var(--accent-color)]/70', dot: 'amber', text: `${offlineRecent[0].name} was active ${getTimeAgo(getActivity(offlineRecent[0].id).lastSeen)}` });
     }
   } else if (offlineRecent.length >= 1) {
-    lines.push({ color: 'text-amber-500/60', dot: 'amber', text: `${offlineRecent[0].name} was active ${getTimeAgo(getActivity(offlineRecent[0].id).lastSeen)}` });
+    lines.push({ color: 'text-[var(--accent-color)]/70', dot: 'amber', text: `${offlineRecent[0].name} was active ${getTimeAgo(getActivity(offlineRecent[0].id).lastSeen)}` });
     const remaining = offlineRecent.length - 1;
     if (remaining > 0) {
-      lines.push({ color: 'text-amber-500/40', text: `+${remaining} other${remaining > 1 ? 's' : ''} recently active` });
+      lines.push({ color: 'text-[var(--accent-color)]/50', text: `+${remaining} other${remaining > 1 ? 's' : ''} recently active` });
     }
   } else if (otherMembers.length > 0) {
     lines.push({
-      color: 'text-red-200/40',
+      color: 'text-theme-secondary opacity-60',
       text: otherMembers.length === 1
         ? `${otherMembers[0].name} hasn't been active recently`
         : `${otherMembers.length} members inactive`
@@ -97,13 +98,13 @@ export const HouseholdStatusIndicator: React.FC<HouseholdStatusIndicatorProps> =
   }
 
   return (
-    <div className="flex items-start gap-2 px-3 py-1.5 bg-[#2A0A10]/80 border border-amber-500/20 rounded-lg backdrop-blur-sm">
-      <Users className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+    <div className="flex items-start gap-2 px-3 py-1.5 bg-theme-secondary/80 border border-theme rounded-lg backdrop-blur-sm">
+      <Users className="w-4 h-4 text-[var(--accent-color)] mt-0.5 flex-shrink-0" />
       <div className="flex flex-col gap-0.5">
         {lines.slice(0, 2).map((line, i) => (
           <div key={i} className="flex items-center gap-1">
             {line.dot === 'green' && <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse flex-shrink-0" />}
-            {line.dot === 'amber' && <Clock className="w-3 h-3 text-amber-500/60 flex-shrink-0" />}
+            {line.dot === 'amber' && <Clock className="w-3 h-3 text-[var(--accent-color)]/60 flex-shrink-0" />}
             {!line.dot && <div className="w-2 h-2 flex-shrink-0" />}
             <span className={`text-xs ${line.color} leading-tight`}>{line.text}</span>
           </div>

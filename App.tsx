@@ -281,7 +281,7 @@ const App: React.FC = () => {
   }, [activeTab, user]);
 
   // Function to add items to shopping list
-  const addToShoppingList = async (items: string[], source: string = 'manual') => {
+  const addToShoppingList = async (items: (string | { item: string; source: string })[], source: string = 'manual') => {
     PerformanceMonitoringService.mark('shopping_list_add_start');
     
     trackShoppingListAction('add_item', { count: items.length, source });
@@ -292,26 +292,28 @@ const App: React.FC = () => {
     const userId = inHousehold ? undefined : user?.id;
     
     // Fetch prices in parallel
-    const pricePromises = items.map(async (item) => {
-      const parsed = parseIngredientForShoppingList(item);
+    const pricePromises = items.map(async (entry) => {
+      const itemStr = typeof entry === 'string' ? entry : entry.item;
+      const parsed = parseIngredientForShoppingList(itemStr);
       const priceData = await groceryPriceService.getIngredientPrice(parsed.itemName).catch(() => null);
       return {
         parsed,
-        estimatedPrice: priceData?.averagePrice || 0
+        estimatedPrice: priceData?.averagePrice || 0,
+        customSource: typeof entry === 'string' ? undefined : entry.source
       };
     });
     
     const priceResults = await Promise.all(pricePromises);
     
     const newItems: ShoppingItem[] = [];
-    for (const { parsed, estimatedPrice } of priceResults) {
+    for (const { parsed, estimatedPrice, customSource } of priceResults) {
       newItems.push({
         id: crypto.randomUUID(),
         item: parsed.itemName,
         quantity: parsed.quantity,
         category: inferCategoryFromItemName(parsed.itemName),
         checked: false,
-        source: source,
+        source: customSource || source,
         addedAt: new Date(),
         estimatedPrice
       });

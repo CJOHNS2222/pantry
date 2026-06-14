@@ -4,32 +4,52 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Privacy Policy - Stock & Spoon</title>
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z3KZ5XQ2C"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'G-9Z3KZ5XQ2C');
+    </script>
     <meta name="description" content="Privacy Policy for Stock & Spoon - Learn how we collect, use, and protect your personal information.">
     <meta name="keywords" content="privacy policy, data protection, Stock & Spoon">
     <meta name="author" content="Stock & Spoon">
 
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
-    <meta property="og:url" content="https://smartpantrymobile.page.gd/privacy">
+    <meta property="og:url" content="https://ornate-compass-478504-e1.web.app/privacy.html">
     <meta property="og:title" content="Privacy Policy - Stock & Spoon">
     <meta property="og:description" content="Learn how Stock & Spoon collects, uses, and protects your personal information.">
-    <meta property="og:image" content="https://smartpantrymobile.page.gd/icons/smartpantryicon.png">
+    <meta property="og:image" content="https://ornate-compass-478504-e1.web.app/icons/stockspoon-icon.png">
 
     <!-- Twitter -->
     <meta property="twitter:card" content="summary_large_image">
-    <meta property="twitter:url" content="https://smartpantrymobile.page.gd/privacy">
+    <meta property="twitter:url" content="https://ornate-compass-478504-e1.web.app/privacy.html">
     <meta property="twitter:title" content="Privacy Policy - Stock & Spoon">
     <meta property="twitter:description" content="Learn how Stock & Spoon collects, uses, and protects your personal information.">
-    <meta property="twitter:image" content="https://smartpantrymobile.page.gd/icons/smartpantryicon.png">
+    <meta property="twitter:image" content="https://ornate-compass-478504-e1.web.app/icons/stockspoon-icon.png">
 
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="icons/stockspoon-icon.png">
     <link rel="apple-touch-icon" href="icons/stockspoon-icon.png">
 
     <!-- Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;1,500&display=swap" rel="stylesheet">
 
     <style>
+        :root {
+            --bg-dark: #0b1329;
+            --bg-deep: #070b19;
+            --card-bg: rgba(15, 23, 42, 0.9);
+            --accent: #f59e0b;
+            --accent-hover: #d97706;
+            --border: #1e293b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -37,30 +57,36 @@
         }
 
         body {
-            font-family: 'Inter', sans-serif;
+            font-family: 'Outfit', sans-serif;
             line-height: 1.6;
-            color: #333;
-            background: linear-gradient(135deg, #2A0A10 0%, #4A1A20 100%);
+            color: var(--text-main);
+            background-color: var(--bg-deep);
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(245, 158, 11, 0.05) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(245, 158, 11, 0.03) 0px, transparent 50%);
             min-height: 100vh;
+            display: flex;
+            flex-direction: column;
         }
 
         .container {
-            max-width: 1200px;
+            max-width: 1000px;
             margin: 0 auto;
-            padding: 0 20px;
+            padding: 0 24px;
         }
 
         /* Header */
         header {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(11, 19, 41, 0.85);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-bottom: 1px solid var(--border);
             position: fixed;
             top: 0;
             left: 0;
             right: 0;
             z-index: 1000;
-            padding: 1rem 0;
+            padding: 1.25rem 0;
         }
 
         nav {
@@ -69,111 +95,139 @@
             align-items: center;
         }
 
-        .logo {
-            font-family: 'Playfair Display', serif;
-            font-size: 1.8rem;
-            font-weight: 700;
-            color: #2A0A10;
+        .logo-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
             text-decoration: none;
+        }
+
+        .logo-img {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            border: 1.5px solid var(--accent);
+            background-color: white;
+            padding: 2px;
+        }
+
+        .logo-text {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: var(--text-main);
+            letter-spacing: -0.5px;
         }
 
         .nav-links {
             display: flex;
-            gap: 2rem;
+            gap: 2.5rem;
             align-items: center;
         }
 
         .nav-links a {
-            color: #2A0A10;
+            color: var(--text-muted);
             text-decoration: none;
             font-weight: 500;
             transition: color 0.3s;
+            font-size: 0.95rem;
         }
 
         .nav-links a:hover {
-            color: #8B2635;
+            color: var(--accent);
         }
 
         .cta-button {
-            background: linear-gradient(135deg, #8B2635 0%, #2A0A10 100%);
+            background: linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%);
             color: white;
-            padding: 0.5rem 1.5rem;
-            border-radius: 25px;
+            padding: 0.75rem 1.75rem;
+            border-radius: 50px;
             text-decoration: none;
             font-weight: 600;
-            transition: transform 0.3s, box-shadow 0.3s;
+            font-size: 0.95rem;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(245, 158, 11, 0.2);
+            border: none;
         }
 
         .cta-button:hover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(139, 38, 53, 0.3);
+            box-shadow: 0 8px 25px rgba(245, 158, 11, 0.4);
         }
 
         /* Main Content */
         main {
-            padding: 120px 0 80px;
-            min-height: calc(100vh - 200px);
+            padding: 150px 0 80px;
+            flex: 1;
         }
 
-        .content-section {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            border-radius: 20px;
-            padding: 3rem;
-            margin-bottom: 2rem;
-            border: 1px solid rgba(255, 255, 255, 0.2);
+        .content-card {
+            background: var(--card-bg);
+            border-radius: 24px;
+            padding: 4rem 3rem;
+            border: 1px solid var(--border);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
         }
 
-        .content-section h1 {
+        .content-card h1 {
             font-family: 'Playfair Display', serif;
-            font-size: 2.5rem;
-            color: #2A0A10;
-            margin-bottom: 2rem;
-            text-align: center;
-        }
-
-        .content-section h2 {
-            font-family: 'Playfair Display', serif;
-            font-size: 1.8rem;
-            color: #2A0A10;
-            margin: 2rem 0 1rem 0;
-        }
-
-        .content-section h3 {
-            font-size: 1.3rem;
-            color: #4A1A20;
-            margin: 1.5rem 0 0.5rem 0;
-            font-weight: 600;
-        }
-
-        .content-section p {
-            margin-bottom: 1rem;
-            color: #555;
-        }
-
-        .content-section ul {
-            margin-left: 2rem;
-            margin-bottom: 1rem;
-        }
-
-        .content-section li {
+            font-size: 3rem;
             margin-bottom: 0.5rem;
-            color: #555;
+            letter-spacing: -0.5px;
+            text-align: center;
         }
 
         .last-updated {
             text-align: center;
-            color: #777;
+            color: var(--text-muted);
             font-style: italic;
-            margin-bottom: 2rem;
+            margin-bottom: 3rem;
+            font-size: 0.95rem;
+        }
+
+        .content-card h2 {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.8rem;
+            color: white;
+            margin: 2.5rem 0 1rem 0;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 8px;
+        }
+
+        .content-card h3 {
+            font-size: 1.25rem;
+            color: var(--accent);
+            margin: 1.5rem 0 0.5rem 0;
+            font-weight: 600;
+        }
+
+        .content-card p {
+            margin-bottom: 1.25rem;
+            color: var(--text-muted);
+            font-size: 1.05rem;
+            font-weight: 300;
+            line-height: 1.7;
+        }
+
+        .content-card ul {
+            margin-left: 2rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .content-card li {
+            margin-bottom: 0.5rem;
+            color: var(--text-muted);
+            font-weight: 300;
+            font-size: 1.02rem;
         }
 
         /* Footer */
         footer {
             padding: 40px 0;
-            background: rgba(0, 0, 0, 0.3);
-            text-align: center;
-            color: rgba(255, 255, 255, 0.7);
+            background: #03060c;
+            border-top: 1px solid var(--border);
+            color: var(--text-muted);
+            font-size: 0.95rem;
         }
 
         .footer-content {
@@ -181,7 +235,7 @@
             justify-content: space-between;
             align-items: center;
             flex-wrap: wrap;
-            gap: 1rem;
+            gap: 1.5rem;
         }
 
         .footer-links {
@@ -190,27 +244,27 @@
         }
 
         .footer-links a {
-            color: rgba(255, 255, 255, 0.7);
+            color: var(--text-muted);
             text-decoration: none;
             transition: color 0.3s;
         }
 
         .footer-links a:hover {
-            color: white;
+            color: var(--accent);
         }
 
-        /* Mobile Responsive */
+        /* Responsive */
         @media (max-width: 768px) {
-            .content-section {
-                padding: 2rem 1.5rem;
-            }
-
-            .content-section h1 {
-                font-size: 2rem;
-            }
-
             .nav-links {
                 display: none;
+            }
+
+            .content-card {
+                padding: 2.5rem 1.5rem;
+            }
+
+            .content-card h1 {
+                font-size: 2.25rem;
             }
 
             .footer-content {
@@ -218,127 +272,87 @@
                 text-align: center;
             }
         }
-
-        /* Animations */
-        @keyframes fadeInUp {
-            from {
-                opacity: 0;
-                transform: translateY(30px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .fade-in-up {
-            animation: fadeInUp 0.6s ease-out;
-        }
     </style>
 </head>
 <body>
     <header>
         <nav class="container">
-            <a href="/" class="logo">Stock & Spoon</a>
+            <a href="/" class="logo-container">
+                <img src="icons/stockspoon-icon.png" alt="Stock & Spoon Logo" class="logo-img" />
+                <span class="logo-text">Stock & Spoon</span>
+            </a>
             <div class="nav-links">
-                <a href="/">Home</a>
                 <a href="/#features">Features</a>
-                <a href="https://smartpantrychef.app" class="cta-button">Try It Now</a>
+                <a href="/#showcase">Inside the App</a>
+                <a href="https://ornate-compass-478504-e1.web.app/" class="cta-button">Launch Web App</a>
             </div>
         </nav>
     </header>
 
     <main>
         <div class="container">
-            <div class="content-section fade-in-up">
+            <div class="content-card">
                 <h1>Privacy Policy</h1>
-                <p class="last-updated">Last updated: February 5, 2026</p>
+                <p class="last-updated">Last updated: June 14, 2026</p>
 
                 <p>Welcome to Stock & Spoon ("we," "our," or "us"). We are committed to protecting your privacy and ensuring the security of your personal information. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our mobile application and website.</p>
 
                 <h2>Information We Collect</h2>
 
                 <h3>Personal Information</h3>
-                <p>We may collect the following personal information:</p>
+                <p>We may collect the following personal information when you register or interact with our service:</p>
                 <ul>
-                    <li>Email address (for account creation and communication)</li>
-                    <li>Name and profile information</li>
-                    <li>Device information and identifiers</li>
-                    <li>Usage data and preferences</li>
+                    <li>Email address (for account creation, invites, and system communication)</li>
+                    <li>Name and profile information (display name, dietary restrictions, height, weight, diet goals)</li>
+                    <li>Device information and push notifications preferences</li>
+                    <li>Usage data, crash reports, and system performance metrics</li>
                 </ul>
 
                 <h3>Pantry and Recipe Data</h3>
-                <p>When you use our app, we collect information about:</p>
+                <p>To provide core household coordination, we securely store:</p>
                 <ul>
-                    <li>Pantry items and inventory data</li>
-                    <li>Meal plans and recipes</li>
-                    <li>Shopping lists</li>
-                    <li>Household sharing information</li>
+                    <li>Pantry stock quantities, visual level modifiers, and expiration dates</li>
+                    <li>Weekly meal plans, recipe schedules, and custom recipe modifications</li>
+                    <li>Active shopping lists, checkout histories, and grocery item aisle classifications</li>
+                    <li>Household synchronization mappings (linking family members' accounts to a shared household database)</li>
                 </ul>
 
                 <h3>Automatically Collected Information</h3>
-                <p>We automatically collect certain information when you use our services:</p>
+                <p>We automatically collect technical details to support offline usage and performance monitoring:</p>
                 <ul>
-                    <li>Device information (model, operating system, unique device identifiers)</li>
-                    <li>Log data (IP address, browser type, pages visited)</li>
-                    <li>Usage analytics and performance data</li>
-                    <li>Location data (if permitted by your device settings)</li>
+                    <li>Device model, operating system version, and unique installation identifiers</li>
+                    <li>Firestore read/write monitoring logs and offline queue status</li>
+                    <li>Sentry crash metrics and app diagnostics logs</li>
                 </ul>
 
                 <h2>How We Use Your Information</h2>
                 <p>We use the collected information for the following purposes:</p>
                 <ul>
-                    <li>To provide and maintain our services</li>
-                    <li>To personalize your experience and provide relevant recommendations</li>
-                    <li>To communicate with you about updates, features, and support</li>
-                    <li>To analyze usage patterns and improve our services</li>
-                    <li>To ensure security and prevent fraud</li>
-                    <li>To comply with legal obligations</li>
+                    <li>To synchronize pantry stock, shopping lists, and meal plans between household members in real-time</li>
+                    <li>To calculate smart safety alerts, USDA-aligned expiration presets, and AI-powered recipe search matches</li>
+                    <li>To manage subscription tiers (free, premium, family) and verify in-app purchases securely</li>
+                    <li>To log error events and monitor database cache performance (minimizing redundant read operations)</li>
+                    <li>To communicate system updates or invite links sent at your request</li>
                 </ul>
 
                 <h2>Information Sharing and Disclosure</h2>
-                <p>We do not sell, trade, or otherwise transfer your personal information to third parties, except in the following circumstances:</p>
+                <p>We respect your privacy and do not sell or lease your personal data. We only share information under the following criteria:</p>
                 <ul>
-                    <li>With your explicit consent</li>
-                    <li>To comply with legal requirements</li>
-                    <li>To protect our rights and safety</li>
-                    <li>In connection with a business transfer or merger</li>
-                    <li>With service providers who assist our operations (under strict confidentiality agreements)</li>
+                    <li><strong>Household Members:</strong> Your name, dietary goals, list selections, and online status are shared with active members of your verified household.</li>
+                    <li><strong>Service Providers:</strong> Secure metadata is processed by Firebase (database/hosting), Sentry (crash tracking), and Stripe (payment processing) under strict data protection protocols.</li>
+                    <li><strong>Legal Requirements:</strong> If required by law or to protect safety, security, and integrity of the service.</li>
                 </ul>
 
-                <h2>Data Security</h2>
-                <p>We implement appropriate technical and organizational measures to protect your personal information against unauthorized access, alteration, disclosure, or destruction. This includes:</p>
-                <ul>
-                    <li>Encryption of data in transit and at rest</li>
-                    <li>Secure authentication mechanisms</li>
-                    <li>Regular security audits and updates</li>
-                    <li>Access controls and monitoring</li>
-                </ul>
-
-                <h2>Data Retention</h2>
-                <p>We retain your personal information for as long as necessary to provide our services and fulfill the purposes outlined in this Privacy Policy, unless a longer retention period is required by law.</p>
+                <h2>Data Security & Caching</h2>
+                <p>We implement industry-standard security measures, including HTTPS encryption in transit and secure database rules in Firestore. Local caches (using localStorage) keep your inventory accessible offline and prevent redundant reads from your device.</p>
 
                 <h2>Your Rights</h2>
-                <p>You have the following rights regarding your personal information:</p>
-                <ul>
-                    <li>Access: Request a copy of your personal information</li>
-                    <li>Correction: Request correction of inaccurate information</li>
-                    <li>Deletion: Request deletion of your personal information</li>
-                    <li>Portability: Request transfer of your data</li>
-                    <li>Opt-out: Opt-out of marketing communications</li>
-                </ul>
-
-                <h2>Children's Privacy</h2>
-                <p>Our services are not intended for children under 13 years of age. We do not knowingly collect personal information from children under 13. If we become aware that we have collected personal information from a child under 13, we will take steps to delete such information.</p>
-
-                <h2>Changes to This Privacy Policy</h2>
-                <p>We may update this Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy on this page and updating the "Last updated" date.</p>
+                <p>You have full control over your data. At any time, you can request data correction, export, or choose to delete your account permanently (which deletes your user profile and personal collection documents instantly from our database).</p>
 
                 <h2>Contact Us</h2>
-                <p>If you have any questions about this Privacy Policy or our privacy practices, please contact us at:</p>
+                <p>If you have any questions about this Privacy Policy, please contact us at:</p>
                 <ul>
-                    <li>Email: privacy@smartpantrychef.com</li>
-                    <li>Address: [Your Business Address]</li>
+                    <li>Email: <a href="mailto:smartpantry40@gmail.com" style="color: var(--accent); text-decoration: none;">smartpantry40@gmail.com</a></li>
                 </ul>
             </div>
         </div>
@@ -349,9 +363,9 @@
             <div class="footer-content">
                 <p>&copy; 2026 Stock & Spoon. All rights reserved.</p>
                 <div class="footer-links">
-                    <a href="/privacy">Privacy Policy</a>
-                    <a href="/terms">Terms of Service</a>
-                    <a href="/contact">Contact</a>
+                    <a href="/privacy.html">Privacy Policy</a>
+                    <a href="/terms.html">Terms of Service</a>
+                    <a href="/contact.html">Contact Us</a>
                 </div>
             </div>
         </div>

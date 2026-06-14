@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.resetUsageLimitsNow = exports.resetWeeklyUsageLimits = exports.getNutritionData = exports.migrateHouseholdClaimsHttp = exports.migrateHouseholdClaims = exports.checkInvitation = exports.leaveHouseholdHttp = exports.leaveHousehold = exports.inviteMemberHttp = exports.inviteMember = void 0;
+exports.deleteAccount = exports.verifyPurchase = exports.resetUsageLimitsNow = exports.resetWeeklyUsageLimits = exports.getNutritionData = exports.migrateHouseholdClaimsHttp = exports.migrateHouseholdClaims = exports.checkInvitation = exports.leaveHouseholdHttp = exports.leaveHousehold = exports.inviteMemberHttp = exports.inviteMember = void 0;
 var inviteMember_1 = require("./inviteMember");
 Object.defineProperty(exports, "inviteMember", { enumerable: true, get: function () { return inviteMember_1.inviteMember; } });
 Object.defineProperty(exports, "inviteMemberHttp", { enumerable: true, get: function () { return inviteMember_1.inviteMemberHttp; } });
@@ -17,4 +17,8 @@ Object.defineProperty(exports, "getNutritionData", { enumerable: true, get: func
 var resetUsageLimits_1 = require("./resetUsageLimits");
 Object.defineProperty(exports, "resetWeeklyUsageLimits", { enumerable: true, get: function () { return resetUsageLimits_1.resetWeeklyUsageLimits; } });
 Object.defineProperty(exports, "resetUsageLimitsNow", { enumerable: true, get: function () { return resetUsageLimits_1.resetUsageLimitsNow; } });
+var verifyPurchase_1 = require("./verifyPurchase");
+Object.defineProperty(exports, "verifyPurchase", { enumerable: true, get: function () { return verifyPurchase_1.verifyPurchase; } });
+var deleteAccount_1 = require("./deleteAccount");
+Object.defineProperty(exports, "deleteAccount", { enumerable: true, get: function () { return deleteAccount_1.deleteAccount; } });
 //# sourceMappingURL=index.js.map
