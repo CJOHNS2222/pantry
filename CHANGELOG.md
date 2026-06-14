@@ -1,3 +1,20 @@
+## [2.4.3] - 2026-06-13
+
+### Changed
+- **Suggested Item Label & Wrapping**: Renamed "Suggested item" to "Quick Add" (and optimized other sources to use short text tags like "Manual", "Meal planner", "Scanner") in the shopping list item card, ensuring it never wraps to a second line.
+- **Dotted Meal Planner Placeholder**: Tightened margins, paddings, and font sizes of the "Plan Your Day's Meals" placeholder box to reclaim deadspace.
+
+### Fixed
+- **Bypassing Redundant Search Dropdowns**: Modified the meal planner search flow to immediately schedule a recipe bypassing the redundant day/meal selection modal.
+- **Household Modal Themes**: Aligned the household modal styling to match the application's dynamic theme colors instead of hardcoded burgundy.
+- **Redundant Shopping List Selection Control**: Removed the duplicate batch select/deselect checkbox container from the bottom of the shopping list.
+- **Checkout Expiration Modal Overlap**: Increased the z-index of the expiration modal backdrop so it renders on top of the fixed navigation bar, and added safe area bottom padding to prevent buttons from being hidden.
+- **Smart Shelf-Life Presets**: Integrated smart expiration category defaults (e.g., 1 week for milk/yogurt/produce, 1 month for eggs, shelf-stable for spices) during checkout.
+- **Meal Planner Headers '+' Icon**: Added clickable active "+" buttons next to the meal planner section headers to schedule additional items.
+- **Firestore Read Optimization**: Implemented localized in-memory caches in `recipeService.ts` for popular recipes, community favorites, and cached recipes to prevent duplicate database reads on tab switches.
+
+---
+
 ## [2.4.2] - 2026-06-13
 
 ### Added

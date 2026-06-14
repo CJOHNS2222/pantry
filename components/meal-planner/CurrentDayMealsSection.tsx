@@ -74,31 +74,31 @@ export const CurrentDayMealsSection: React.FC<CurrentDayMealsSectionProps> = ({
 
   if (totalMealsCount === 0) {
     return (
-      <div className="bg-theme-secondary rounded-xl p-6 border border-theme min-h-[400px] flex items-center justify-center">
-        <div className="w-full max-w-md border-2 border-dashed border-theme/50 rounded-2xl p-8 text-center flex flex-col items-center justify-center space-y-4">
-          <div className="p-3 bg-[var(--accent-color)]/10 rounded-full text-[var(--accent-color)]">
-            <Plus className="w-8 h-8" />
+      <div className="bg-theme-secondary rounded-xl p-3 border border-theme min-h-[300px] flex items-center justify-center">
+        <div className="w-full max-w-md border border-dashed border-theme/60 rounded-xl p-5 text-center flex flex-col items-center justify-center space-y-3">
+          <div className="p-2 bg-[var(--accent-color)]/10 rounded-full text-[var(--accent-color)]">
+            <Plus className="w-6 h-6" />
           </div>
           <div>
             <h4 className="font-semibold text-theme-primary text-base">Plan Your Day's Meals</h4>
-            <p className="text-sm text-theme-secondary opacity-70 mt-1">No meals planned yet. Choose a meal type to get started:</p>
+            <p className="text-xs text-theme-secondary opacity-70 mt-0.5">No meals planned yet. Choose a meal type to get started:</p>
           </div>
-          <div className="flex flex-wrap gap-2 justify-center pt-2">
+          <div className="flex flex-wrap gap-1.5 justify-center pt-1">
             <button
               onClick={() => onOpenMealSearch('breakfast')}
-              className="px-4 py-2 bg-theme-secondary hover:bg-theme-primary border border-theme text-theme-primary text-sm font-semibold rounded-xl transition-all hover:border-[var(--accent-color)]"
+              className="px-3.5 py-1.5 bg-theme-secondary hover:bg-theme-primary border border-theme text-theme-primary text-xs font-semibold rounded-lg transition-all hover:border-[var(--accent-color)]"
             >
               🍳 Breakfast
             </button>
             <button
               onClick={() => onOpenMealSearch('lunch')}
-              className="px-4 py-2 bg-theme-secondary hover:bg-theme-primary border border-theme text-theme-primary text-sm font-semibold rounded-xl transition-all hover:border-[var(--accent-color)]"
+              className="px-3.5 py-1.5 bg-theme-secondary hover:bg-theme-primary border border-theme text-theme-primary text-xs font-semibold rounded-lg transition-all hover:border-[var(--accent-color)]"
             >
               🥪 Lunch
             </button>
             <button
               onClick={() => onOpenMealSearch('dinner')}
-              className="px-4 py-2 bg-theme-secondary hover:bg-theme-primary border border-theme text-theme-primary text-sm font-semibold rounded-xl transition-all hover:border-[var(--accent-color)]"
+              className="px-3.5 py-1.5 bg-theme-secondary hover:bg-theme-primary border border-theme text-theme-primary text-xs font-semibold rounded-lg transition-all hover:border-[var(--accent-color)]"
             >
               🥩 Dinner
             </button>
@@ -145,10 +145,22 @@ export const CurrentDayMealsSection: React.FC<CurrentDayMealsSectionProps> = ({
 
             return (
               <div key={mealType} className="space-y-3">
-                <h3 className="text-lg font-semibold text-theme-primary flex items-center gap-2">
-                  {intl.formatMessage({ id: `mealPlanner.${mealTypeKey}` })}
-                  <span className="text-sm opacity-60">({mealsForType.length})</span>
-                </h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-theme-primary flex items-center gap-2">
+                    {intl.formatMessage({ id: `mealPlanner.${mealTypeKey}` })}
+                    <span className="text-sm opacity-60">({mealsForType.length})</span>
+                  </h3>
+                  {mealsForType.length > 0 && (
+                    <button
+                      onClick={() => onOpenMealSearch(mealTypeKey)}
+                      className="p-1 rounded-full hover:bg-[var(--accent-color)]/10 text-[var(--accent-color)] transition-colors"
+                      title={`Add another ${mealType}`}
+                      aria-label={`Add another ${mealType}`}
+                    >
+                      <Plus className="w-5 h-5" />
+                    </button>
+                  )}
+                </div>
 
                 {mealsForType.length === 0 ? (
                   <button

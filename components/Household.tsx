@@ -249,22 +249,22 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
   if (!household && !user?.householdId) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
-        <div className="bg-[#3F1016] border border-amber-500/30 w-full max-w-md rounded-2xl shadow-2xl relative overflow-hidden">
-          <div className="p-4 border-b border-red-900/50 flex justify-between items-center bg-[#2A0A10]">
+        <div className="bg-theme-secondary border border-theme w-full max-w-md rounded-2xl shadow-2xl relative overflow-hidden">
+          <div className="p-4 border-b border-theme flex justify-between items-center bg-theme-primary/30">
             <div className="flex items-center gap-2">
-              <Users className="w-5 h-5 text-amber-500" />
-              <h2 className="font-serif font-bold text-amber-50 text-lg">{intl.formatMessage({ id: 'household.create' })}</h2>
+              <Users className="w-5 h-5 text-[var(--accent-color)]" />
+              <h2 className="font-serif font-bold text-theme-primary text-lg">{intl.formatMessage({ id: 'household.create' })}</h2>
             </div>
-            <button onClick={onClose} className="text-red-200/50 hover:text-white" data-testid="household-close">
+            <button onClick={onClose} className="text-theme-secondary hover:text-theme-primary" data-testid="household-close">
               <X className="w-6 h-6" />
             </button>
           </div>
           
           <div className="p-6 pb-2.5">
             <div className="text-center">
-              <Users className="w-16 h-16 text-amber-500/50 mx-auto mb-4" />
-              <h3 className="text-lg font-bold text-white mb-2">{intl.formatMessage({ id: 'household.createYours' })}</h3>
-              <p className="text-red-200/70 mb-6">
+              <Users className="w-16 h-16 text-[var(--accent-color)]/50 mx-auto mb-4" />
+              <h3 className="text-lg font-bold text-theme-primary mb-2">{intl.formatMessage({ id: 'household.createYours' })}</h3>
+              <p className="text-theme-secondary mb-6">
                 Create a household to start sharing your pantry with family members.
               </p>
               
@@ -275,7 +275,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
                   value={householdName}
                   onChange={(e) => setHouseholdName(e.target.value)}
                   placeholder="Enter household name"
-                  className="w-full bg-[#2A0A10] border border-red-900/50 rounded-lg px-4 py-3 text-white placeholder-red-200/50 focus:border-amber-500 outline-none"
+                  className="w-full bg-theme-primary border border-theme rounded-lg px-4 py-3 text-theme-primary placeholder-theme focus:border-[var(--accent-color)] outline-none"
                   disabled={isCreating}
                   data-testid="household-name-input"
                 />
@@ -284,7 +284,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
               <button 
                 onClick={createHousehold}
                 disabled={!householdName.trim() || isCreating}
-                className="bg-amber-600 hover:bg-amber-500 disabled:bg-gray-500 disabled:cursor-not-allowed text-white px-6 py-3 rounded-lg font-medium transition-colors w-full flex items-center justify-center"
+                className="bg-[var(--accent-color)] hover:bg-[var(--accent-color)]/90 disabled:bg-gray-500 disabled:cursor-not-allowed text-white px-6 py-3 rounded-lg font-medium transition-colors w-full flex items-center justify-center"
                 data-testid="household-create-button"
               >
                 {isCreating ? (
@@ -304,22 +304,22 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
   if (!household && user?.householdId) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
-        <div className="bg-[#3F1016] border border-amber-500/30 w-full max-w-md rounded-2xl shadow-2xl relative overflow-hidden">
-          <div className="p-4 border-b border-red-900/50 flex justify-between items-center bg-[#2A0A10]">
+        <div className="bg-theme-secondary border border-theme w-full max-w-md rounded-2xl shadow-2xl relative overflow-hidden">
+          <div className="p-4 border-b border-theme flex justify-between items-center bg-theme-primary/30">
             <div className="flex items-center gap-2">
-              <Users className="w-5 h-5 text-amber-500" />
-              <h2 className="font-serif font-bold text-amber-50 text-lg">{intl.formatMessage({ id: 'household.loading' })}</h2>
+              <Users className="w-5 h-5 text-[var(--accent-color)]" />
+              <h2 className="font-serif font-bold text-theme-primary text-lg">{intl.formatMessage({ id: 'household.loading' })}</h2>
             </div>
-            <button onClick={onClose} className="text-red-200/50 hover:text-white" data-testid="household-close">
+            <button onClick={onClose} className="text-theme-secondary hover:text-theme-primary" data-testid="household-close">
               <X className="w-6 h-6" />
             </button>
           </div>
           
           <div className="p-6 pb-2.5">
             <div className="text-center">
-              <div className="w-16 h-16 border-4 border-amber-500/30 border-t-amber-500 rounded-full animate-spin mx-auto mb-4"></div>
-              <h3 className="text-lg font-bold text-white mb-2">{intl.formatMessage({ id: 'household.settingUp' })}</h3>
-              <p className="text-red-200/70">
+              <div className="w-16 h-16 border-4 border-[var(--accent-color)]/30 border-t-[var(--accent-color)] rounded-full animate-spin mx-auto mb-4"></div>
+              <h3 className="text-lg font-bold text-theme-primary mb-2">{intl.formatMessage({ id: 'household.settingUp' })}</h3>
+              <p className="text-theme-secondary">
                 Please wait while we load your household data.
               </p>
             </div>
@@ -331,14 +331,14 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
 
   const mainUI = (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm px-4 pt-[var(--safe-area-inset-top,0px)] pb-[var(--safe-area-inset-bottom,0px)] animate-fade-in">
-      <div className="bg-[#3F1016] border border-amber-500/30 w-full max-w-md rounded-2xl shadow-2xl relative overflow-hidden flex flex-col max-h-full">
+      <div className="bg-theme-secondary border border-theme w-full max-w-md rounded-2xl shadow-2xl relative overflow-hidden flex flex-col max-h-full">
         
-        <div className="p-4 border-b border-red-900/50 flex justify-between items-center bg-[#2A0A10]">
+        <div className="p-4 border-b border-theme flex justify-between items-center bg-theme-primary/30">
           <div className="flex items-center gap-2">
-            <Users className="w-5 h-5 text-amber-500" />
-            <h2 className="font-serif font-bold text-amber-50 text-lg">{household?.name || 'Household'}</h2>
+            <Users className="w-5 h-5 text-[var(--accent-color)]" />
+            <h2 className="font-serif font-bold text-theme-primary text-lg">{household?.name || 'Household'}</h2>
             {household?.members && (
-              <span className="text-xs bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full font-medium">
+              <span className="text-xs bg-[var(--accent-color)]/20 text-[var(--accent-color)] px-2 py-0.5 rounded-full font-medium">
                 {household.members.length} member{household.members.length !== 1 ? 's' : ''}
               </span>
             )}
@@ -355,14 +355,13 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
                   }
                 }, 100);
               }}
-              className="text-red-200/50 hover:text-amber-500 p-2 transition-colors"
+              className="text-theme-secondary hover:text-[var(--accent-color)] p-2 transition-colors"
               title="Household Settings"
               data-testid="household-settings-button"
             >
               <Settings className="w-5 h-5" />
             </button>
-
-            <button onClick={onClose} className="text-red-200/50 hover:text-white" data-testid="household-close">
+            <button onClick={onClose} className="text-theme-secondary hover:text-theme-primary" data-testid="household-close">
               <X className="w-6 h-6" />
             </button>
           </div>
@@ -377,42 +376,42 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
             fallbackMessage="Upgrade to Family plan to add more than 3 household members"
             onUpgrade={() => setActiveTab(Tab.SETTINGS)}
           >
-            <div className="bg-[#2A0A10]/50 p-4 rounded-xl border border-red-900/30 mb-6">
-                  <h3 className="text-sm font-bold text-amber-500 uppercase mb-3">{intl.formatMessage({ id: 'household.inviteMember' })}</h3>
-                  <form onSubmit={handleInvite} className="flex gap-2">
-                    <div className="relative flex-1">
-                      <Mail className="absolute left-3 top-3 w-4 h-4 text-red-900/50" />
-                      <input 
-                        type="email" 
-                        value={inviteEmail}
-                        onChange={(e) => setInviteEmail(e.target.value)}
-                        placeholder="Enter email address"
-                        className="w-full bg-[#2A0A10] border border-red-900/50 rounded-lg pl-9 pr-4 py-2 text-sm text-white placeholder-red-200/50 focus:border-amber-500 outline-none"
-                        disabled={isInviting}
-                        data-testid="household-invite-input"
-                      />
-                    </div>
-                    <button 
-                      type="submit"
-                      className="bg-amber-600 hover:bg-amber-500 text-white px-3 py-2 rounded-lg transition-colors disabled:bg-gray-500 disabled:cursor-not-allowed flex items-center justify-center w-12"
-                      disabled={isInviting || householdMemberLimitExceeded}
-                      data-testid="household-invite-submit"
-                    >
-                      {isInviting ? <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div> : <Plus className="w-5 h-5" />}
-                    </button>
-                  </form>
-                  <p className="text-xs text-red-200/40 mt-2">
-                    Invited members can view inventory and edit the meal schedule.
-                  </p>
+            <div className="bg-theme-primary/40 p-4 rounded-xl border border-theme mb-6">
+              <h3 className="text-sm font-bold text-[var(--accent-color)] uppercase mb-3">{intl.formatMessage({ id: 'household.inviteMember' })}</h3>
+              <form onSubmit={handleInvite} className="flex gap-2">
+                <div className="relative flex-1">
+                  <Mail className="absolute left-3 top-3 w-4 h-4 text-theme-secondary" />
+                  <input 
+                    type="email" 
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    placeholder="Enter email address"
+                    className="w-full bg-theme-primary border border-theme rounded-lg pl-9 pr-4 py-2 text-sm text-theme-primary placeholder-theme focus:border-[var(--accent-color)] outline-none"
+                    disabled={isInviting}
+                    data-testid="household-invite-input"
+                  />
                 </div>
-              </PremiumFeature>
+                <button 
+                  type="submit"
+                  className="bg-[var(--accent-color)] hover:bg-[var(--accent-color)]/90 text-white px-3 py-2 rounded-lg transition-colors disabled:bg-gray-500 disabled:cursor-not-allowed flex items-center justify-center w-12"
+                  disabled={isInviting || householdMemberLimitExceeded}
+                  data-testid="household-invite-submit"
+                >
+                  {isInviting ? <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div> : <Plus className="w-5 h-5" />}
+                </button>
+              </form>
+              <p className="text-xs text-theme-secondary mt-2">
+                Invited members can view inventory and edit the meal schedule.
+              </p>
+            </div>
+          </PremiumFeature>
 
           <div className="flex items-center justify-between mb-3 px-1">
-            <h3 className="text-sm font-bold text-amber-500 uppercase">{intl.formatMessage({ id: 'household.groupMembers' })}</h3>
+            <h3 className="text-sm font-bold text-[var(--accent-color)] uppercase">{intl.formatMessage({ id: 'household.groupMembers' })}</h3>
             <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
               (household?.members?.length ?? 0) >= 3
-                ? 'bg-amber-500/20 text-amber-400'
-                : 'bg-red-900/30 text-red-200/60'
+                ? 'bg-[var(--accent-color)]/20 text-[var(--accent-color)]'
+                : 'bg-theme-primary text-theme-secondary'
             }`}>
               {household?.members?.length ?? 0} / 3 members
             </span>
@@ -420,51 +419,51 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
           <div className="space-y-2">
             {household?.members && Array.isArray(household.members) && household.members.map((member) => {
               return (
-              <div key={member.id} className="flex items-center justify-between bg-[#2A0A10] p-3 rounded-lg border border-red-900/30">
-                <div className="flex items-center gap-3 flex-1">
-                  <button 
-                    className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${
-                      member.email === user.email ? 'bg-amber-500 text-[#2A0A10]' : 'bg-red-900/50 text-red-200 hover:bg-red-800/50'
-                    } transition-colors cursor-default`}
-                  >
-                    {member.name.charAt(0).toUpperCase()}
-                  </button>
-                  <div className="flex-1">
-                    <div className="text-sm font-medium text-white flex items-center gap-2">
-                      {member.name && member.name !== 'Unknown' ? member.name : (member.email ? member.email.split('@')[0] : 'Unknown Member')} 
-                      {member.email === user.email && <span className="text-[10px] bg-amber-500/20 text-amber-500 px-1.5 rounded">YOU</span>}
-                    </div>
-                    <div className="text-xs text-red-200/50">{member.role} • {member.status}</div>
-                    {(member.dietaryRestrictions?.length || member.allergies?.length || member.specialNeeds) && (
-                      <div className="text-xs text-amber-400/70 mt-1 flex items-center gap-1">
-                        <ChefHat className="w-3 h-3" />
-                        Has dietary preferences
+                <div key={member.id} className="flex items-center justify-between bg-theme-primary p-3 rounded-lg border border-theme">
+                  <div className="flex items-center gap-3 flex-1">
+                    <button 
+                      className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${
+                        member.email === user.email ? 'bg-[var(--accent-color)] text-white' : 'bg-theme-secondary text-theme-primary hover:bg-theme'
+                      } transition-colors cursor-default`}
+                    >
+                      {member.name.charAt(0).toUpperCase()}
+                    </button>
+                    <div className="flex-1">
+                      <div className="text-sm font-medium text-theme-primary flex items-center gap-2">
+                        {member.name && member.name !== 'Unknown' ? member.name : (member.email ? member.email.split('@')[0] : 'Unknown Member')} 
+                        {member.email === user.email && <span className="text-[10px] bg-[var(--accent-color)]/20 text-[var(--accent-color)] px-1.5 rounded">YOU</span>}
                       </div>
-                    )}
+                      <div className="text-xs text-theme-secondary">{member.role} • {member.status}</div>
+                      {(member.dietaryRestrictions?.length || member.allergies?.length || member.specialNeeds) && (
+                        <div className="text-xs text-[var(--accent-color)]/80 mt-1 flex items-center gap-1">
+                          <ChefHat className="w-3 h-3" />
+                          Has dietary preferences
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {(() => {
+                      const currentUser = household?.members && Array.isArray(household.members) ? household.members.find(m => m.email === user.email) : null;
+                      return member.email !== user.email && currentUser?.role === 'admin' && (
+                        <button 
+                          onClick={() => removeMember(member.id)}
+                          className="text-theme-secondary hover:text-red-400 p-2"
+                          title="Remove member"
+                          data-testid={`household-remove-${member.id}`}
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      );
+                    })()}
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  {(() => {
-                    const currentUser = household?.members && Array.isArray(household.members) ? household.members.find(m => m.email === user.email) : null;
-                    return member.email !== user.email && currentUser?.role === 'admin' && (
-                      <button 
-                        onClick={() => removeMember(member.id)}
-                        className="text-red-900/50 hover:text-red-400 p-2"
-                        title="Remove member"
-                        data-testid={`household-remove-${member.id}`}
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    );
-                  })()}
-                </div>
-              </div>
               );
             })}
           </div>
         </div>
 
-        <div className="p-4 pb-2.5 bg-[#2A0A10] border-t border-red-900/50">
+        <div className="p-4 pb-2.5 bg-theme-primary/30 border-t border-theme">
           <div className="mb-3">
             <button
               onClick={leaveHousehold}
@@ -474,7 +473,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
               Leave Household
             </button>
           </div>
-          <p className="text-xs text-red-200/30 text-center">Changes are saved to your family group instantly.</p>
+          <p className="text-xs text-theme-secondary text-center">Changes are saved to your family group instantly.</p>
         </div>
       </div>
     </div>
@@ -484,22 +483,22 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
   if (!household) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
-        <div className="bg-[#3F1016] border border-amber-500/30 w-full max-w-md rounded-2xl shadow-2xl relative overflow-hidden">
-          <div className="p-4 border-b border-red-900/50 flex justify-between items-center bg-[#2A0A10]">
+        <div className="bg-theme-secondary border border-theme w-full max-w-md rounded-2xl shadow-2xl relative overflow-hidden">
+          <div className="p-4 border-b border-theme flex justify-between items-center bg-theme-primary/30">
             <div className="flex items-center gap-2">
-              <Users className="w-5 h-5 text-amber-500" />
-              <h2 className="font-serif font-bold text-amber-50 text-lg">{intl.formatMessage({ id: 'household.create' })}</h2>
+              <Users className="w-5 h-5 text-[var(--accent-color)]" />
+              <h2 className="font-serif font-bold text-theme-primary text-lg">{intl.formatMessage({ id: 'household.create' })}</h2>
             </div>
-            <button onClick={onClose} className="text-red-200/50 hover:text-white" data-testid="household-close">
+            <button onClick={onClose} className="text-theme-secondary hover:text-theme-primary" data-testid="household-close">
               <X className="w-6 h-6" />
             </button>
           </div>
           
           <div className="p-6 pb-2.5">
             <div className="text-center">
-              <Users className="w-16 h-16 text-amber-500/50 mx-auto mb-4" />
-              <h3 className="text-lg font-bold text-white mb-2">{intl.formatMessage({ id: 'household.createYours' })}</h3>
-              <p className="text-red-200/70 mb-6">
+              <Users className="w-16 h-16 text-[var(--accent-color)]/50 mx-auto mb-4" />
+              <h3 className="text-lg font-bold text-theme-primary mb-2">{intl.formatMessage({ id: 'household.createYours' })}</h3>
+              <p className="text-theme-secondary mb-6">
                 Create a household to start sharing your pantry with family members.
               </p>
               
@@ -509,14 +508,14 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
                   value={householdName}
                   onChange={(e) => setHouseholdName(e.target.value)}
                   placeholder="Household name (e.g., Smith Family)"
-                  className="w-full bg-[#2A0A10] border border-red-900/50 rounded-lg px-4 py-3 text-white placeholder-red-200/50 focus:border-amber-500 outline-none"
+                  className="w-full bg-theme-primary border border-theme rounded-lg px-4 py-3 text-theme-primary placeholder-theme focus:border-[var(--accent-color)] outline-none"
                 />
               </div>
               
               <button
                 onClick={createHousehold}
                 disabled={!householdName.trim() || isCreating}
-                className="w-full bg-amber-600 hover:bg-amber-500 disabled:bg-gray-500 text-white py-3 px-6 rounded-lg font-medium transition-colors flex items-center justify-center"
+                className="w-full bg-[var(--accent-color)] hover:bg-[var(--accent-color)]/90 disabled:bg-gray-500 text-white py-3 px-6 rounded-lg font-medium transition-colors flex items-center justify-center"
               >
                 {isCreating ? (
                   <>
@@ -537,13 +536,13 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
   // Main Household Management Modal (when household exists)
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
-      <div className="bg-[#3F1016] border border-amber-500/30 w-full max-w-md rounded-2xl shadow-2xl relative overflow-hidden">
-        <div className="p-4 border-b border-red-900/50 flex justify-between items-center bg-[#2A0A10]">
+      <div className="bg-theme-secondary border border-theme w-full max-w-md rounded-2xl shadow-2xl relative overflow-hidden">
+        <div className="p-4 border-b border-theme flex justify-between items-center bg-theme-primary/30">
           <div className="flex items-center gap-2">
-            <Users className="w-5 h-5 text-amber-500" />
-            <h2 className="font-serif font-bold text-amber-50 text-lg">{household.name}</h2>
+            <Users className="w-5 h-5 text-[var(--accent-color)]" />
+            <h2 className="font-serif font-bold text-theme-primary text-lg">{household.name}</h2>
           </div>
-          <button onClick={onClose} className="text-red-200/50 hover:text-white" data-testid="household-close">
+          <button onClick={onClose} className="text-theme-secondary hover:text-theme-primary" data-testid="household-close">
             <X className="w-6 h-6" />
           </button>
         </div>
@@ -552,45 +551,45 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
           <PremiumFeature
             feature="householdMembers"
             user={user}
-              limit={3}
-              currentCount={household.members?.length || 0}
-              fallbackMessage="Upgrade to Family plan to add more than 3 household members"
-              onUpgrade={() => setActiveTab(Tab.SETTINGS)}
-              >
-                <div className="bg-[#2A0A10]/50 p-4 rounded-xl border border-red-900/30 mb-6">
-                  <h3 className="text-sm font-bold text-amber-500 uppercase mb-3">{intl.formatMessage({ id: 'household.inviteMember' })}</h3>
-                  <form onSubmit={handleInvite} className="flex gap-2">
-                    <div className="relative flex-1">
-                      <Mail className="absolute left-3 top-3 w-4 h-4 text-red-900/50" />
-                      <input 
-                        type="email" 
-                        value={inviteEmail}
-                        onChange={(e) => setInviteEmail(e.target.value)}
-                        placeholder="Enter email address"
-                        className="w-full bg-[#2A0A10] border border-red-900/50 rounded-lg pl-9 pr-4 py-2 text-sm text-white placeholder-red-200/50 focus:border-amber-500 outline-none"
-                        disabled={isInviting}
-                      />
-                    </div>
-                    <button 
-                      type="submit"
-                      className="bg-amber-600 hover:bg-amber-500 text-white px-3 py-2 rounded-lg transition-colors disabled:bg-gray-500 disabled:cursor-not-allowed flex items-center justify-center w-12"
-                      disabled={isInviting || householdMemberLimitExceeded}
-                    >
-                      {isInviting ? <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div> : <Plus className="w-5 h-5" />}
-                    </button>
-                  </form>
-                  <p className="text-xs text-red-200/40 mt-2">
-                    Invited members can view inventory and edit the meal schedule.
-                  </p>
+            limit={3}
+            currentCount={household.members?.length || 0}
+            fallbackMessage="Upgrade to Family plan to add more than 3 household members"
+            onUpgrade={() => setActiveTab(Tab.SETTINGS)}
+          >
+            <div className="bg-theme-primary/40 p-4 rounded-xl border border-theme mb-6">
+              <h3 className="text-sm font-bold text-[var(--accent-color)] uppercase mb-3">{intl.formatMessage({ id: 'household.inviteMember' })}</h3>
+              <form onSubmit={handleInvite} className="flex gap-2">
+                <div className="relative flex-1">
+                  <Mail className="absolute left-3 top-3 w-4 h-4 text-theme-secondary" />
+                  <input 
+                    type="email" 
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    placeholder="Enter email address"
+                    className="w-full bg-theme-primary border border-theme rounded-lg pl-9 pr-4 py-2 text-sm text-theme-primary placeholder-theme focus:border-[var(--accent-color)] outline-none"
+                    disabled={isInviting}
+                  />
                 </div>
-              </PremiumFeature>
+                <button 
+                  type="submit"
+                  className="bg-[var(--accent-color)] hover:bg-[var(--accent-color)]/90 text-white px-3 py-2 rounded-lg transition-colors disabled:bg-gray-500 disabled:cursor-not-allowed flex items-center justify-center w-12"
+                  disabled={isInviting || householdMemberLimitExceeded}
+                >
+                  {isInviting ? <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div> : <Plus className="w-5 h-5" />}
+                </button>
+              </form>
+              <p className="text-xs text-theme-secondary mt-2">
+                Invited members can view inventory and edit the meal schedule.
+              </p>
+            </div>
+          </PremiumFeature>
 
           <div className="flex items-center justify-between mb-3 px-1">
-            <h3 className="text-sm font-bold text-amber-500 uppercase">{intl.formatMessage({ id: 'household.groupMembers' })}</h3>
+            <h3 className="text-sm font-bold text-[var(--accent-color)] uppercase">{intl.formatMessage({ id: 'household.groupMembers' })}</h3>
             <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
               (household.members?.length ?? 0) >= 3
-                ? 'bg-amber-500/20 text-amber-400'
-                : 'bg-red-900/30 text-red-200/60'
+                ? 'bg-[var(--accent-color)]/20 text-[var(--accent-color)]'
+                : 'bg-theme-primary text-theme-secondary'
             }`}>
               {household.members?.length ?? 0} / 3 members
             </span>
@@ -598,54 +597,54 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
           <div className="space-y-2">
             {household.members && Array.isArray(household.members) && household.members.map((member) => {
               return (
-              <div key={member.id} className="flex items-center justify-between bg-[#2A0A10] p-3 rounded-lg border border-red-900/30">
-                <div className="flex items-center gap-3 flex-1">
-                  <button 
-                    className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${
-                      member.email === user.email ? "bg-amber-500 text-[#2A0A10]" : "bg-red-900/50 text-red-200 hover:bg-red-800/50"
-                    } transition-colors cursor-default`}
-                  >
-                    {member.name.charAt(0).toUpperCase()}
-                  </button>
-                  <div className="flex-1">
-                    <div className="text-sm font-medium text-white flex items-center gap-2">
-                      {member.name} 
-                      {member.email === user.email && <span className="text-[10px] bg-amber-500/20 text-amber-500 px-1.5 rounded">YOU</span>}
-                    </div>
-                    <div className="text-xs text-red-200/50">{member.role}  {member.status}</div>
-                    {(member.dietaryRestrictions?.length || member.allergies?.length || member.specialNeeds) && (
-                      <div className="text-xs text-amber-400/70 mt-1 flex items-center gap-1">
-                        <ChefHat className="w-3 h-3" />
-                        Has dietary preferences
+                <div key={member.id} className="flex items-center justify-between bg-theme-primary p-3 rounded-lg border border-theme">
+                  <div className="flex items-center gap-3 flex-1">
+                    <button 
+                      className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${
+                        member.email === user.email ? 'bg-[var(--accent-color)] text-white' : 'bg-theme-secondary text-theme-primary hover:bg-theme'
+                      } transition-colors cursor-default`}
+                    >
+                      {member.name.charAt(0).toUpperCase()}
+                    </button>
+                    <div className="flex-1">
+                      <div className="text-sm font-medium text-theme-primary flex items-center gap-2">
+                        {member.name} 
+                        {member.email === user.email && <span className="text-[10px] bg-[var(--accent-color)]/20 text-[var(--accent-color)] px-1.5 rounded">YOU</span>}
                       </div>
-                    )}
+                      <div className="text-xs text-theme-secondary">{member.role} {member.status}</div>
+                      {(member.dietaryRestrictions?.length || member.allergies?.length || member.specialNeeds) && (
+                        <div className="text-xs text-[var(--accent-color)]/80 mt-1 flex items-center gap-1">
+                          <ChefHat className="w-3 h-3" />
+                          Has dietary preferences
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {(() => {
+                      const currentUser = household.members && Array.isArray(household.members) ? household.members.find(m => m.email === user.email) : null;
+                      return member.email !== user.email && currentUser?.role === 'admin' && (
+                        <button 
+                          onClick={() => removeMember(member.id)}
+                          className="text-theme-secondary hover:text-red-400 p-2"
+                          title="Remove member"
+                          data-testid={`household-remove-${member.id}`}
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      );
+                    })()}
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  {(() => {
-                    const currentUser = household.members && Array.isArray(household.members) ? household.members.find(m => m.email === user.email) : null;
-                    return member.email !== user.email && currentUser?.role === "admin" && (
-                      <button 
-                        onClick={() => removeMember(member.id)}
-                        className="text-red-900/50 hover:text-red-400 p-2"
-                        title="Remove member"
-                        data-testid={`household-remove-${member.id}`}
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    );
-                  })()}
-                </div>
-              </div>
               );
             })}
           </div>
         </div>
 
-        <div className="p-4 pb-2.5 bg-[#2A0A10] border-t border-red-900/50">
+        <div className="p-4 pb-2.5 bg-theme-primary/30 border-t border-theme">
           {(() => {
             const currentUser = household.members && Array.isArray(household.members) ? household.members.find(m => m.email === user.email) : null;
-            return currentUser?.role !== "admin" && (
+            return currentUser?.role !== 'admin' && (
               <div className="mb-3">
                 <button
                   onClick={leaveHousehold}
@@ -657,7 +656,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
               </div>
             );
           })()}
-          <p className="text-xs text-red-200/30 text-center">Changes are saved to your family group instantly.</p>
+          <p className="text-xs text-theme-secondary text-center">Changes are saved to your family group instantly.</p>
         </div>
       </div>
     </div>

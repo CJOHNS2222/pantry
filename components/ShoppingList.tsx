@@ -10,7 +10,6 @@ import { inferCategoryFromItemName, isHouseholdMember } from '../utils/appUtils'
 import { validateItemName, validateQuantity } from '../src/utils/validation';
 
 // Import new enhancement components
-import { BatchOperations } from './BatchOperations';
 import { HouseholdShoppingShare } from './HouseholdShoppingShare';
 import { QuickAdd } from './QuickAdd';
 import { ShoppingListAnalytics } from './ShoppingListAnalytics';
@@ -895,35 +894,6 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
       />
 
       {/* Multi-selection controls removed — using checked state only */}
-
-      {/* Batch Operations - Quick Actions Only */}
-      {items.length > 0 && (
-        <BatchOperations
-          items={items}
-          onBatchCheck={(itemIds) => {
-            setItems(prev => prev.map(item =>
-              itemIds.includes(item.id) ? { ...item, checked: true } : item
-            ));
-          }}
-          onBatchUncheck={(itemIds) => {
-            setItems(prev => prev.map(item =>
-              itemIds.includes(item.id) ? { ...item, checked: false } : item
-            ));
-          }}
-          onDeleteSelected={async (itemIds) => {
-            const inHousehold = household?.id && user ? isHouseholdMember(household, user) : false;
-            const householdId = inHousehold ? household?.id : undefined;
-            const userId = inHousehold ? undefined : user?.id;
-
-            try {
-              await ShoppingListCacheService.removeItemsFromCache(itemIds, householdId, userId);
-              setItems(prev => prev.filter(item => !itemIds.includes(item.id)));
-            } catch (error) {
-              log.error('Failed to delete selected items from cache:', error);
-            }
-          }}
-        />
-      )}
 
       {/* Screen reader announcement for loading state */}
       <div aria-live="polite" aria-atomic="true" className="sr-only">

@@ -169,12 +169,12 @@ export const EnhancedShoppingListItem: React.FC<ShoppingListItemProps> = ({
               {item.item}
             </span>
             {item.source && (
-              <div className="inline-flex items-center rounded-full border border-theme bg-theme-primary/50 px-2.5 py-1 text-xs font-medium text-theme-secondary">
-                {item.source === 'suggested' && '💡 Suggested item'}
-                {item.source === 'manual' && '✏️ Manually added'}
-                {item.source === 'meal planner' && '📅 From meal planner'}
-                {item.source === 'pantry scanner' && '📷 From pantry scanner'}
-                {item.source === 'scanner suggestion' && '🤖 Scanner suggestion'}
+              <div className="inline-flex items-center rounded-full border border-theme bg-theme-primary/50 px-2 py-0.5 text-[10px] font-medium text-theme-secondary whitespace-nowrap shrink-0">
+                {item.source === 'suggested' && '💡 Quick Add'}
+                {item.source === 'manual' && '✏️ Manual'}
+                {item.source === 'meal planner' && '📅 Meal planner'}
+                {item.source === 'pantry scanner' && '📷 Scanner'}
+                {item.source === 'scanner suggestion' && '🤖 Suggestions'}
                 {item.source?.startsWith('recipe:') && `🍳 ${item.source.substring(8).replace(/^need\s+/, '')}`}
               </div>
             )}

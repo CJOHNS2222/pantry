@@ -17,12 +17,41 @@ export const CheckoutExpiryModal: React.FC<CheckoutExpiryModalProps> = ({
 }) => {
   const [expirySettings, setExpirySettings] = useState<Record<string, { mode: string; date?: string }>>({});
 
-  // Initialize expiry settings when modal opens
+  // Initialize expiry settings when modal opens with smart presets
   useEffect(() => {
     if (isOpen) {
       const initial: Record<string, { mode: string; date?: string }> = {};
       items.forEach(item => {
-        initial[item.id] = { mode: '1w' }; // Default to 1 week
+        const name = (item.item || '').toLowerCase();
+        const cat = (item.category || '').toLowerCase();
+        
+        let defaultMode = '1w'; // Default fallback: 1 week
+
+        if (name.includes('milk') || name.includes('yogurt') || name.includes('yoghurt') || name.includes('cream')) {
+          defaultMode = '1w';
+        } else if (name.includes('egg')) {
+          defaultMode = '1m'; // 1 month for eggs
+        } else if (
+          cat.includes('spice') || cat.includes('herb') || name.includes('pepper') || name.includes('salt') ||
+          cat.includes('canned') || cat.includes('dry') || cat.includes('grain') || cat.includes('pasta') ||
+          name.includes('sauce') || name.includes('oil') || name.includes('vinegar') || name.includes('honey') ||
+          name.includes('flour') || name.includes('sugar')
+        ) {
+          defaultMode = 'stable'; // Shelf stable
+        } else if (name.includes('bread') || name.includes('pastry') || name.includes('muffin')) {
+          defaultMode = '3d'; // 3 days for bread/pastries
+        } else if (name.includes('cheese') || name.includes('butter') || name.includes('sour cream') || name.includes('cream cheese')) {
+          defaultMode = '2w'; // 2 weeks for cheese/butter/sour cream
+        } else if (
+          name.includes('chicken') || name.includes('beef') || name.includes('pork') ||
+          name.includes('turkey') || name.includes('fish') || name.includes('salmon') || name.includes('shrimp')
+        ) {
+          defaultMode = '3d'; // 3 days for fresh meat/poultry/seafood
+        } else if (cat.includes('produce') || cat.includes('vegetable') || cat.includes('fruit')) {
+          defaultMode = '1w'; // 1 week for fresh produce
+        }
+
+        initial[item.id] = { mode: defaultMode };
       });
       setExpirySettings(initial);
     }
@@ -103,9 +132,9 @@ export const CheckoutExpiryModal: React.FC<CheckoutExpiryModalProps> = ({
   ];
 
   return (
-    <div className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in" onClick={onClose}>
+    <div className="fixed inset-0 z-[99999] bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in" onClick={onClose}>
       <div 
-        className="bg-theme-secondary w-full sm:max-w-xl rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[85dvh] sm:max-h-[90dvh] overflow-hidden border border-theme"
+        className="bg-theme-secondary w-full sm:max-w-xl rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[85dvh] sm:max-h-[90dvh] overflow-hidden border border-theme pb-[calc(var(--safe-area-bottom,0px)+76px)] sm:pb-0"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

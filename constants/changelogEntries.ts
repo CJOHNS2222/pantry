@@ -9,6 +9,16 @@ export interface ChangeEntry {
 
 export const RECENT_CHANGES: ChangeEntry[] = [
   {
+    "version": "2.4.3",
+    "date": "Jun 13, 2026",
+    "highlights": [
+      "Suggested Item Label & Wrapping",
+      "Dotted Meal Planner Placeholder",
+      "Bypassing Redundant Search Dropdowns",
+      "Household Modal Themes"
+    ]
+  },
+  {
     "version": "2.4.2",
     "date": "Jun 13, 2026",
     "highlights": [
@@ -26,16 +36,6 @@ export const RECENT_CHANGES: ChangeEntry[] = [
       "Pre-permission educator screen — added pre-permission educator dialog explaining camera privacy before requesting…",
       "Navigation viewport auto-hiding — bottom navigation bar automatically hides when the virtual keyboard is visible.",
       "Haptic feedback improvements — integrated light feedback on checkmark clicks, medium feedback on item long-presses, and…"
-    ]
-  },
-  {
-    "version": "2.4.0",
-    "date": "Jun 3, 2026",
-    "highlights": [
-      "Progressive onboarding milestones — added milestone tracking to stage post-onboarding feature discovery based on user…",
-      "Feature discovery gating — FeatureDiscoveryManager now supports milestone-based eligibility so one-time tips are shown…",
-      "RecipeFinder typing — restored missing Tab type import used by settings navigation actions",
-      "ShoppingList compile breakages — restored missing utility/log imports (log, inferCategoryFromItemName,…"
     ]
   }
 ];

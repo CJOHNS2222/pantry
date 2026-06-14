@@ -1,6 +1,6 @@
 import DatabaseMonitoringService from "./databaseMonitoringService";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { db, storage } from "../firebaseConfig";
+import { storage } from "../firebaseConfig";
 import { StructuredRecipe, SavedRecipe } from "../types";
 import { getPerformance, trace } from "firebase/performance";
 import { withErrorHandling, AppError, ErrorCode } from "../utils/errorUtils";
@@ -12,6 +12,11 @@ import { parseIngredientForShoppingList } from '../utils/appUtils';
 const SPOONACULAR_API_KEY = import.meta.env.VITE_SPOONACULAR_API_KEY;
 const SPOONACULAR_BASE_URL = "https://api.spoonacular.com";
 const performance = getPerformance();
+
+// In-memory caches to reduce Firestore read counts on tab switches and search mounts
+let communityRatedRecipesCache: SavedRecipe[] | null = null;
+let popularRecipesCache: SavedRecipe[] | null = null;
+const recipesCacheByPath: Record<string, SavedRecipe[]> = {};
 
 export interface AnalyzedInstructionStep {
   number: number;
@@ -171,7 +176,7 @@ export const fetchRecipesFromSpoonacular = async (
             }
           }
         }
-      } catch (e) {
+      } catch {
         // fall through to original fetch-based implementation
       }
 
@@ -218,20 +223,25 @@ export const fetchRecipesFromSpoonacular = async (
  * Falls back to loading saved recipes if the cache is missing.
  */
 export const getCachedCommunityRatedRecipes = async (): Promise<SavedRecipe[]> => {
+  if (communityRatedRecipesCache) {
+    return communityRatedRecipesCache;
+  }
   try {
     const ref = DatabaseMonitoringService.doc('system/community_rated_recipes');
     const docSnap = await DatabaseMonitoringService.getDoc(ref);
 
     if (docSnap.exists()) {
       const data = docSnap.data();
-      const recipes = data?.recipes || [];
-      // Loaded community-rated recipes from cache
-      return recipes as SavedRecipe[];
+      const recipes = (data?.recipes || []) as SavedRecipe[];
+      communityRatedRecipesCache = recipes;
+      return recipes;
     }
 
     // Fallback to retrieving saved recipes (not ideal but safe)
     // No community-rated cache found, falling back to saved recipes
-    return await getSavedRecipes(50);
+    const fallback = await getSavedRecipes(50);
+    communityRatedRecipesCache = fallback;
+    return fallback;
   } catch (err: unknown) {
     log.error('Error fetching community-rated cache', err);
     return await getSavedRecipes(50);
@@ -264,7 +274,7 @@ export const rebuildCommunityRatedRecipesFromRatings = async (days: number = 30,
         const dateVal = data?.date ? new Date(data.date as string) : null;
         return dateVal ? dateVal > cutoff : false;
       }) };
-    } catch (e) {
+    } catch {
       // Fallback to empty
       snap = { docs: [] };
     }
@@ -298,7 +308,7 @@ export const rebuildCommunityRatedRecipesFromRatings = async (days: number = 30,
             const d = ds.data() as DocumentData;
             recipeDoc = { id: ds.id, ...d };
           }
-        } catch (e) { /* ignore */ }
+        } catch { /* ignore */ }
       }
 
       if (!recipeDoc) {
@@ -312,7 +322,7 @@ export const rebuildCommunityRatedRecipesFromRatings = async (days: number = 30,
             const d = found.data();
             recipeDoc = { id: found.id, ...d };
           }
-        } catch (e) { /* ignore */ }
+        } catch { /* ignore */ }
       }
 
       const entry: DocumentData & { id: string | null } = recipeDoc ? { ...recipeDoc } : { id: null, title: item.title, description: null, ingredients: [], instructions: [], image: null };
@@ -325,7 +335,7 @@ export const rebuildCommunityRatedRecipesFromRatings = async (days: number = 30,
         const statsRef = DatabaseMonitoringService.doc(`recipeCommunityStats/${item.title}`);
         const statsSnap = await DatabaseMonitoringService.getDoc(statsRef);
         if (statsSnap && statsSnap.exists && typeof statsSnap.exists === 'function' ? statsSnap.exists() : statsSnap.exists) entry.communityStats = statsSnap.data();
-      } catch (e) { /* ignore */ }
+      } catch { /* ignore */ }
 
       results.push(entry);
     }
@@ -375,7 +385,7 @@ export const upsertCommunityRatedRecipeByTitle = async (title: string, recipeId?
           }
         }
       }
-    } catch (e) { /* ignore */ }
+    } catch { /* ignore */ }
 
     if (!recipeDoc && !recipeId) {
       try {
@@ -385,7 +395,7 @@ export const upsertCommunityRatedRecipeByTitle = async (title: string, recipeId?
           const d = (rq.docs[0] as FirestoreDocLike).data();
           recipeDoc = { id: rq.docs[0].id, ...d };
         }
-      } catch (e) { /* ignore */ }
+      } catch { /* ignore */ }
     }
 
     const entry: DocumentData & { id: string | null } = recipeDoc ? { ...recipeDoc } : { id: null, title, description: null, ingredients: [], instructions: [], image: null };
@@ -731,6 +741,9 @@ export const getSavedRecipes = async (limitCount: number = 50): Promise<SavedRec
  * Get cached popular recipes from a single document (much more efficient - 1 read vs 50+ reads)
  */
 export const getCachedPopularRecipes = async (): Promise<SavedRecipe[]> => {
+  if (popularRecipesCache) {
+    return popularRecipesCache;
+  }
   try {
     // Prefer admin-written cache at recipe_caches/popular_recipes (admin scripts use this)
     const cachePaths = ["recipe_caches/popular_recipes", "system/popular_recipes"];
@@ -745,7 +758,7 @@ export const getCachedPopularRecipes = async (): Promise<SavedRecipe[]> => {
           data = docSnap.data();
           break;
         }
-      } catch (e) {
+      } catch {
         // continue to next path
       }
     }
@@ -757,6 +770,7 @@ export const getCachedPopularRecipes = async (): Promise<SavedRecipe[]> => {
         index === self.findIndex(r => r.title === recipe.title)
       );
       // Loaded cached recipes
+      popularRecipesCache = uniqueRecipes;
       return uniqueRecipes;
     }
 
@@ -764,18 +778,22 @@ export const getCachedPopularRecipes = async (): Promise<SavedRecipe[]> => {
     // No cached popular recipes found, falling back to individual recipe loading
     const recipes = await getSavedRecipes(50);
     // Remove duplicates even in fallback
-    return recipes.filter((recipe, index, self) =>
+    const uniqueFallback = recipes.filter((recipe, index, self) =>
       index === self.findIndex(r => r.title === recipe.title)
     );
+    popularRecipesCache = uniqueFallback;
+    return uniqueFallback;
   } catch (err: unknown) {
     log.error("Error fetching cached popular recipes", err);
     // Fall back to direct loading if caching fails
     // Falling back to direct recipe loading
     const recipes = await getSavedRecipes(50);
     // Remove duplicates even in fallback
-    return recipes.filter((recipe, index, self) =>
+    const uniqueFallback = recipes.filter((recipe, index, self) =>
       index === self.findIndex(r => r.title === recipe.title)
     );
+    popularRecipesCache = uniqueFallback;
+    return uniqueFallback;
   }
 };
 
@@ -784,6 +802,9 @@ export const getCachedPopularRecipes = async (): Promise<SavedRecipe[]> => {
  * Example: `recipe_caches/recipes_cache_1` used by MealPlanner to avoid many reads.
  */
 export const getCachedRecipesCache = async (cachePath: string = 'recipe_caches/recipes_cache_1'): Promise<SavedRecipe[]> => {
+  if (recipesCacheByPath[cachePath]) {
+    return recipesCacheByPath[cachePath];
+  }
   // Helper: try to read one doc, returns [] if missing/denied
   const readChunk = async (path: string): Promise<SavedRecipe[]> => {
     try {
@@ -816,7 +837,10 @@ export const getCachedRecipesCache = async (cachePath: string = 'recipe_caches/r
       if (chunkNum > 20) break; // safety limit
     }
 
-    if (allRecipes.length > 0) return allRecipes;
+    if (allRecipes.length > 0) {
+      recipesCacheByPath[cachePath] = allRecipes;
+      return allRecipes;
+    }
 
     // Fallback: try system/ mirror for permission-gated paths
     if (isRecipeCaches) {
@@ -832,6 +856,7 @@ export const getCachedRecipesCache = async (cachePath: string = 'recipe_caches/r
             all.push(...c);
             n++;
           }
+          recipesCacheByPath[cachePath] = all;
           return all;
         }
       } catch (permErr: unknown) {
@@ -839,10 +864,14 @@ export const getCachedRecipesCache = async (cachePath: string = 'recipe_caches/r
       }
     }
 
-    return await getSavedRecipes(50);
+    const fallback = await getSavedRecipes(50);
+    recipesCacheByPath[cachePath] = fallback;
+    return fallback;
   } catch (err: unknown) {
     log.error(`Error fetching cached recipes at ${cachePath}`, err);
-    return await getSavedRecipes(50);
+    const fallback = await getSavedRecipes(50);
+    recipesCacheByPath[cachePath] = fallback;
+    return fallback;
   }
 };
 
