@@ -133,10 +133,8 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
         return [...savedRecipes].sort((a, b) => avgRating(b) - avgRating(a));
     }, [savedRecipes, savedSort, ratings]);
 
-    // Smart default: prefer 'saved' when user has saves but no pantry data yet
-    const [activeView, setActiveView] = useState<'search' | 'saved'>(
-        savedRecipes.length > 0 && inventory.length === 0 ? 'saved' : 'search'
-    );
+    // Extract search logic to custom hook
+    const [activeView, setActiveView] = useState<'search' | 'saved'>('search');
     const [cacheMealTypeFilter, setCacheMealTypeFilter] = useState<CacheMealTypeFilter>('');
     const [cacheCuisineFilter, setCacheCuisineFilter] = useState<string>('');
     
@@ -149,10 +147,8 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
     const measurement = getUserMeasurementSystem(user?.profile);
     const [strictMode, setStrictMode] = useState(false);
     
-    // New smart filters — pre-populate from user profile
-    const [dietaryRestrictions, setDietaryRestrictions] = useState<string[]>(
-        user?.profile?.dietaryRestrictions ?? []
-    );
+    // New smart filters
+    const [dietaryRestrictions, setDietaryRestrictions] = useState<string[]>([]);
     const [maxPrepTime, setMaxPrepTime] = useState<string>('30');
     const [servings, setServings] = useState<string>(user?.profile?.householdSize?.toString() || '4');
     
@@ -205,6 +201,40 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
     const [isListening, setIsListening] = useState(false);
     const [voiceSearchSupported, setVoiceSearchSupported] = useState(false);
 
+    // Token estimation state
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const [estimatedTokens, setEstimatedTokens] = useState<number>(0);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const [estimatedCost, setEstimatedCost] = useState<number>(0);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const [freeTierNote, setFreeTierNote] = useState<string>('');
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const [pendingSearchParams, setPendingSearchParams] = useState<RecipeFinderSearchParams | null>(null);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const [showTokenConfirmation, setShowTokenConfirmation] = useState<boolean>(false);
+
+    // Token estimation function
+    const estimateTokens = (params: RecipeFinderSearchParams) => {
+        // Simple estimation based on ingredients count
+        const ingredients = params.ingredients || '';
+        const ingredientCount = ingredients.split(',').length;
+        const estimatedTokens = Math.max(100, ingredientCount * 50); // Rough estimate
+        const costPerToken = 0.00015; // Approximate cost
+        const estimatedCost = estimatedTokens * costPerToken;
+        
+        let freeTierNote = '';
+        if (estimatedTokens < 1000) {
+            freeTierNote = 'This search is within the free tier limit.';
+        } else {
+            freeTierNote = `This search may incur costs. Estimated: $${estimatedCost.toFixed(4)}`;
+        }
+        
+        return {
+            tokens: estimatedTokens,
+            cost: estimatedCost,
+            freeTierNote
+        };
+    };
 
     // Check for speech recognition support (native on Capacitor, Web Speech API on web)
     useEffect(() => {
@@ -383,7 +413,8 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
         loadFirebaseRecipes();
     }, [user]); // Depend on user authentication
 
-    // Curated fallback recipes — shown in Popular section until Firebase cache loads
+    // Popular recipes from CSV
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const csvRecipes: StructuredRecipe[] = [
         {
             title: "Chicken Parmesan",
@@ -1540,7 +1571,16 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
               onRetry={() => {
                 setSearchError(null);
                 setLoadingState(LoadingState.IDLE);
-                handleGenerate(new Event('submit') as unknown as React.FormEvent);
+                const params = {
+                  ingredients: inventoryString,
+                  strictMode: strictMode,
+                };
+                const estimate = estimateTokens(params);
+                setEstimatedTokens(estimate.tokens);
+                setEstimatedCost(estimate.cost);
+                setFreeTierNote(estimate.freeTierNote);
+                setPendingSearchParams(params);
+                setShowTokenConfirmation(true);
               }}
               onSuggestionClick={setSpecificQuery}
             />
@@ -1556,11 +1596,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
               onAddToPlan={onAddToPlan}
               user={user}
               household={household}
-              filteredFirebaseRecipes={
-                filteredFirebaseRecipes.length > 0
-                  ? filteredFirebaseRecipes
-                  : csvRecipes // Show curated recipes while Firebase cache loads
-              }
+              filteredFirebaseRecipes={filteredFirebaseRecipes}
             />
 
         </>

@@ -13,6 +13,7 @@ import { MealPlannerPremiumContent } from './meal-planner/MealPlannerPremiumCont
 import { LeftoverModals } from './meal-planner/LeftoverModals';
 import { AddMealDialog } from './meal-planner/AddMealDialog';
 import { RecipeSearchOverlay } from './meal-planner/RecipeSearchOverlay';
+import { MealPlanAutoFillModal, AutoFillPreferences } from './meal-planner/MealPlanAutoFillModal';
 import { useMealPlannerModalStack } from './meal-planner/useMealPlannerModalStack';
 import { useIntl } from 'react-intl';
 import { useApp } from '../contexts/AppContext';
@@ -26,13 +27,52 @@ import { getMealPrepSuggestions } from '../utils/searchUtils';
 import CalendarService from '../services/calendarService';
 import type { Settings } from '../types';
 
+// Utility function to generate attractive recipe placeholder images
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const generateRecipePlaceholderImage = (title: string): string => {
+  // Create a simple hash from the title for consistent colors
+  let hash = 0;
+  for (let i = 0; i < title.length; i++) {
+    hash = ((hash << 5) - hash) + title.charCodeAt(i);
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  
+  // Generate colors based on hash
+  const hue = Math.abs(hash) % 360;
+  const saturation = 65 + (Math.abs(hash) % 20); // 65-85%
+  const lightness = 45 + (Math.abs(hash) % 15); // 45-60%
+  
+  // Create SVG with recipe icon
+  const svg = `
+    <svg width="120" height="120" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" style="stop-color:hsl(${hue}, ${saturation}%, ${lightness}%);stop-opacity:1" />
+          <stop offset="100%" style="stop-color:hsl(${(hue + 30) % 360}, ${saturation}%, ${lightness + 10}%);stop-opacity:1" />
+        </linearGradient>
+      </defs>
+      <rect width="120" height="120" fill="url(#bg)" rx="8"/>
+      <g transform="translate(30, 30)">
+        <!-- Recipe icon -->
+        <circle cx="30" cy="25" r="8" fill="white" opacity="0.9"/>
+        <rect x="22" y="35" width="16" height="8" fill="white" opacity="0.9" rx="2"/>
+        <rect x="18" y="45" width="24" height="3" fill="white" opacity="0.7" rx="1"/>
+        <rect x="18" y="50" width="20" height="3" fill="white" opacity="0.7" rx="1"/>
+        <rect x="18" y="55" width="16" height="3" fill="white" opacity="0.7" rx="1"/>
+      </g>
+    </svg>
+  `;
+  
+  // Convert to data URL
+  return `data:image/svg+xml;base64,${btoa(svg)}`;
+};
 
 interface MealPlannerProps {
   mealPlan: DayPlan[];
   updateMealPlan: (newPlan: DayPlan[]) => void;
   inventory: PantryItem[];
   shoppingList: ShoppingItem[];
-  addToShoppingList: (items: (string | { item: string; source: string })[], source?: string) => void;
+  addToShoppingList: (items: (string | { item: string; source: string; notes?: string })[], source?: string) => void;
   onAddToPlan?: (recipe: StructuredRecipe, dayIndex?: number, mealType?: 'breakfast' | 'lunch' | 'dinner') => void;
   onSaveRecipe?: (recipe: StructuredRecipe) => void;
   onMarkAsMade?: (recipe: StructuredRecipe) => void;
@@ -69,6 +109,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [dragOverMealType, setDragOverMealType] = useState<{ dayIndex: number, mealType: string } | null>(null);
   const [missingItemsCount, setMissingItemsCount] = useState(0);
+  const [isAddingToShopping, setIsAddingToShopping] = useState(false);
   const [showRecipeModal, setShowRecipeModal] = useState(false);
   const [modalRecipe, setModalRecipe] = useState<StructuredRecipe | null>(null);
   const [modalContext, setModalContext] = useState<'search' | 'scheduled'>('search');
@@ -77,7 +118,6 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
   const [isEstimatorOpen, setIsEstimatorOpen] = useState(false);
   const [isCalendarExpanded, setIsCalendarExpanded] = useState(false);
   const [currentCalendarMonth, setCurrentCalendarMonth] = useState(new Date());
-  const [isAddingToShopping, setIsAddingToShopping] = useState(false);
 
   // Use prop savedRecipes or local state as fallback
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -89,6 +129,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
   const [showRecipeSearch, setShowRecipeSearch] = useState(false);
   const [searchMealType, setSearchMealType] = useState<'breakfast' | 'lunch' | 'dinner' | null>(null);
   const [showMealPrepPlanner, setShowMealPrepPlanner] = useState(false);
+  const [showAutoFillModal, setShowAutoFillModal] = useState(false);
   const [showAddMealDialog, setShowAddMealDialog] = useState(false);
   const [selectedDayForDialog, setSelectedDayForDialog] = useState<number | null>(null);
   const [pendingRecipe, setPendingRecipe] = useState<StructuredRecipe | null>(null);
@@ -189,14 +230,8 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
 
   // Wrapper for onAddToPlan that shows day/meal selection dialog
   const handleAddToPlan = (recipe: StructuredRecipe) => {
-    if (searchMealType && currentDayIndex !== null && currentDayIndex !== undefined && onAddToPlan) {
-      onAddToPlan(recipe, currentDayIndex, searchMealType);
-      setShowRecipeModal(false);
-      setShowRecipeSearch(false);
-    } else {
-      setPendingRecipe(recipe);
-      setShowAddMealDialog(true);
-    }
+    setPendingRecipe(recipe);
+    setShowAddMealDialog(true);
   };
 
   // Actually add the recipe to the plan
@@ -207,6 +242,8 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
       setShowAddMealDialog(false);
     }
   };
+
+
 
   // Load saved recipes when meal prep planner opens
   useEffect(() => {
@@ -417,32 +454,27 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
   };
 
   const handleAddMissingToShopping = () => {
-    // Debounce: prevent rapid-fire duplicate additions
-    if (isAddingToShopping) return;
-
     const missing = missingIngredients;
     if (missing.length > 0) {
       setIsAddingToShopping(true);
-      const itemsToAdd = missing.flatMap((item: { ingredient: string; quantity: number; unit: string; recipes: { name: string; id: string }[] }) => 
-        item.recipes.map(recipe => ({
-          ingredient: item.unit === 'count' 
-            ? `${item.quantity} ${item.ingredient}` 
-            : `${item.quantity} ${item.unit} ${item.ingredient}`,
-          source: `recipe: need ${item.quantity} ${item.unit} for "${recipe.name}"`
-        }))
-      );
       
-      // Batch add all items at once
-      const allIngredients = itemsToAdd.map(item => ({
+      const itemsToAdd = missing.map(item => ({
         item: item.ingredient,
-        source: item.source
+        source: `recipe: ${item.recipeName}`,
+        notes: `recipe: need for "${item.recipeName}"`
       }));
-      const batchSource = `meal plan: ${missing.length} missing ingredients for planned meals`;
-      addToShoppingList(allIngredients, batchSource);
+      
+      const batchSource = `meal plan: missing ingredients for planned meals`;
+      
+      const doAdd = async () => {
+        try {
+          await addToShoppingList(itemsToAdd, batchSource);
+        } finally {
+          setIsAddingToShopping(false);
+        }
+      };
+      doAdd();
       addToast(`Added ${missing.length} item${missing.length > 1 ? 's' : ''} to your shopping list`, 'success');
-
-      // Re-enable the button after 2 seconds to prevent duplicate adds
-      setTimeout(() => setIsAddingToShopping(false), 2000);
     }
   };
 
@@ -640,6 +672,93 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
     }
   }, [displayPlan, mealPlan, updateMealPlan]);
 
+  const handleAutoFillPlan = useCallback((preferences: AutoFillPreferences) => {
+    if (savedRecipes.length === 0 && (!preferences.useLeftovers || leftovers.length === 0)) {
+      addToast('No saved recipes or leftovers available to auto-fill.', 'info');
+      return;
+    }
+
+    const newPlan = [...mealPlan];
+    const d = new Date();
+    const todayLocal = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    
+    const weekFromNow = Date.now() + 7 * 24 * 60 * 60 * 1000;
+    const expiringNames = inventory
+      .filter(i => i.expirationDate && new Date(i.expirationDate).getTime() <= weekFromNow)
+      .map(i => i.item.toLowerCase());
+
+    const sortedRecipes = [...savedRecipes].sort((a, b) => {
+      // Prioritize by expiring items if selected
+      if (preferences.prioritizeExpiring) {
+        const aExpiring = (a.ingredients || []).some(ing => expiringNames.some(exp => ing.toLowerCase().includes(exp.split(' ')[0])));
+        const bExpiring = (b.ingredients || []).some(ing => expiringNames.some(exp => ing.toLowerCase().includes(exp.split(' ')[0])));
+        if (aExpiring && !bExpiring) return -1;
+        if (!aExpiring && bExpiring) return 1;
+      }
+      return 0; // fallback to stable sort
+    });
+
+    let recipeIndex = Math.floor(Math.random() * Math.max(1, sortedRecipes.length));
+    let leftoversUsed = 0;
+
+    displayPlan.forEach((day) => {
+      if (day.date < todayLocal) return;
+      
+      const dayIndexInMealPlan = newPlan.findIndex(d => d.date === day.date);
+      if (dayIndexInMealPlan === -1) return;
+      
+      const targetDay = newPlan[dayIndexInMealPlan];
+      
+      const mealsToFill: ('breakfast' | 'lunch' | 'dinner')[] = [];
+      if (preferences.mealTypes.breakfast && (!targetDay.breakfast || targetDay.breakfast.length === 0)) mealsToFill.push('breakfast');
+      if (preferences.mealTypes.lunch && (!targetDay.lunch || targetDay.lunch.length === 0)) mealsToFill.push('lunch');
+      if (preferences.mealTypes.dinner && (!targetDay.dinner || targetDay.dinner.length === 0)) mealsToFill.push('dinner');
+      
+      mealsToFill.forEach(mealType => {
+          // Try to use leftover for lunch/dinner
+          if (preferences.useLeftovers && leftovers.length > leftoversUsed && (mealType === 'lunch' || mealType === 'dinner')) {
+             const leftoverItem = leftovers[leftoversUsed];
+             leftoversUsed++;
+             
+             const leftoverRecipe: StructuredRecipe = {
+              id: `leftover-${leftoverItem.id}`,
+              title: `Leftover: ${leftoverItem.item}`,
+              description: 'Auto-filled leftover',
+              ingredients: [leftoverItem.item],
+              instructions: ['Consume before best-before date.'],
+              cookTime: '10 mins',
+              servings: typeof leftoverItem.leftoverMeta?.servings === 'number' ? leftoverItem.leftoverMeta?.servings : undefined,
+              tags: ['leftover']
+            };
+            
+            if (!targetDay[mealType]) targetDay[mealType] = [];
+            targetDay[mealType].push({
+              id: `autofill-leftover-${Date.now()}-${Math.random()}`,
+              mealType,
+              recipe: leftoverRecipe,
+            });
+            return;
+          }
+
+          if (sortedRecipes.length === 0) return;
+          
+          const recipe = sortedRecipes[recipeIndex % sortedRecipes.length];
+          recipeIndex++;
+          
+          if (!targetDay[mealType]) targetDay[mealType] = [];
+          targetDay[mealType].push({
+            id: `autofill-${Date.now()}-${Math.random()}`,
+            mealType,
+            recipe,
+          });
+      });
+    });
+    
+    updateMealPlan(newPlan);
+    addToast('Meal plan auto-filled successfully!', 'success');
+    setShowAutoFillModal(false);
+  }, [mealPlan, displayPlan, savedRecipes, updateMealPlan, addToast, inventory, leftovers]);
+
   const handleClearWeek = useCallback(() => {
     const weekStart = Math.floor(currentDayIndex / 7) * 7;
     const weekDates = new Set(
@@ -713,94 +832,28 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
     
     // Filter out staple items and duplicates (unless user wants staples included)
     const missing = missingWithRecipes.filter(item => {
-      const neededLower = item.ingredient.toLowerCase();
-      if (!includeStaples && STAPLES.some(staple => neededLower.includes(staple))) return false;
+      const parsed = parseIngredientForShoppingList(item.ingredient);
+      const itemNameLower = parsed.itemName.toLowerCase();
+
+      if (!includeStaples && STAPLES.some(staple => itemNameLower.includes(staple))) return false;
       
       // Check if ingredient is already in inventory
       const inInventory = inventory.some(pantryItem => 
-        neededLower.includes(pantryItem.item.toLowerCase()) || 
-        pantryItem.item.toLowerCase().includes(neededLower)
+        itemNameLower === pantryItem.item.toLowerCase() || 
+        pantryItem.item.toLowerCase().includes(itemNameLower) ||
+        itemNameLower.includes(pantryItem.item.toLowerCase())
       );
       
-      // Check if ingredient is already in shopping list
+      // Check if ingredient is already in shopping list for this specific recipe
       const inShoppingList = shoppingList.some(shoppingItem => 
-        neededLower.includes(shoppingItem.item.toLowerCase()) || 
-        shoppingItem.item.toLowerCase().includes(neededLower)
+        shoppingItem.item.toLowerCase() === itemNameLower && 
+        shoppingItem.source?.includes(item.recipeName)
       );
       
       return !inInventory && !inShoppingList;
     });
 
-    // Group by ingredient and aggregate quantities
-    const grouped = missing.reduce((acc, item) => {
-      const parsed = parseIngredientForShoppingList(item.ingredient);
-      const key = parsed.itemName;
-      
-      if (!acc[key]) {
-        // Extract unit from quantity string more intelligently
-        let unit = 'count';
-        const qtyParts = parsed.quantity.split(' ');
-        
-        if (qtyParts.length > 1) {
-          // Check if the second part looks like a unit
-          const potentialUnit = qtyParts[1].toLowerCase();
-          const commonUnits = ['tbs', 'tbsp', 'tsp', 'cup', 'cups', 'oz', 'ounce', 'lb', 'pound', 'g', 'gram', 'kg', 'liter', 'l', 'ml', 'clove', 'cloves', 'bunch', 'bunches', 'sprig', 'sprigs', 'head', 'heads', 'stalk', 'stalks', 'slice', 'slices', 'piece', 'pieces'];
-          
-          if (commonUnits.includes(potentialUnit) || potentialUnit.endsWith('s')) {
-            unit = potentialUnit;
-          } else if (parsed.quantity.match(/\d+\s*(g|kg|ml|l|oz|lb)$/i)) {
-            // Handle cases like "200g" where unit is attached to number
-            const unitMatch = parsed.quantity.match(/\d+\s*(g|kg|ml|l|oz|lb)$/i);
-            if (unitMatch) {
-              unit = unitMatch[1].toLowerCase();
-            }
-          }
-        } else if (parsed.quantity.match(/\d+(g|kg|ml|l|oz|lb)$/i)) {
-          // Handle cases like "200g" without space
-          const unitMatch = parsed.quantity.match(/\d+(g|kg|ml|l|oz|lb)$/i);
-          if (unitMatch) {
-            unit = unitMatch[1].toLowerCase();
-          }
-        }
-        
-        acc[key] = {
-          ingredient: parsed.itemName,
-          quantity: 0, // Will be calculated
-          unit: unit,
-          recipes: []
-        };
-      }
-      
-      // Add quantity (parse numeric value, handling fractions)
-      let qtyValue = 1;
-      const qtyStr = parsed.quantity.split(' ')[0];
-      
-      if (qtyStr.includes('/')) {
-        // Handle fractions like "1/2"
-        const [numerator, denominator] = qtyStr.split('/').map(Number);
-        qtyValue = numerator / denominator;
-      } else {
-        qtyValue = parseFloat(qtyStr) || 1;
-      }
-      
-      acc[key].quantity += qtyValue;
-      
-      // Track recipes
-      if (!acc[key].recipes.some(r => r.id === item.recipeId)) {
-        acc[key].recipes.push({ name: item.recipeName, id: item.recipeId ?? '' });
-      }
-      return acc;
-    }, {} as Record<string, { ingredient: string; quantity: number; unit: string; recipes: { name: string; id: string }[] }>);
-
-    // Format quantities back to strings
-    Object.values(grouped).forEach(item => {
-      if (item.unit === 'count' && item.quantity % 1 === 0) {
-        // Keep as number for count items
-      }
-      // For other units, keep as number for now, will format when displaying
-    });
-
-    return Object.values(grouped);
+    return missing;
   }, [displayPlan, inventory, shoppingList, includeStaples]);
 
   // Initialize current day to today when displayPlan is available
@@ -851,6 +904,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
         title={intl.formatMessage({ id: 'mealPlanner.mealSchedule' })}
         showHelpTooltip={showHelpTooltip}
         onOpenMealPrepPlanner={() => setShowMealPrepPlanner(true)}
+        onOpenAutoFill={() => setShowAutoFillModal(true)}
         onToggleHelpTooltip={() => setShowHelpTooltip(prev => !prev)}
       />
 
@@ -906,10 +960,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
           onAddSuggestionMissingIngredients={(suggestion) => {
             const missingItems = suggestion.missingIngredients
               .filter(match => !match.available)
-              .map(match => ({
-                item: match.ingredient,
-                source: `recipe: needed for "${suggestion.recipe.title}"`
-              }));
+              .map(match => match.ingredient);
             if (missingItems.length > 0) {
               addToShoppingList(missingItems);
               AnalyticsService.trackEvent('meal_prep_add_missing_ingredients', {
@@ -1098,6 +1149,13 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
         onConfirm={confirmAddToPlan}
         onClose={closeAddMealDialog}
       />
+
+      {showAutoFillModal && (
+        <MealPlanAutoFillModal
+          onClose={() => setShowAutoFillModal(false)}
+          onAutoFill={handleAutoFillPlan}
+        />
+      )}
     </div>
   );
 };

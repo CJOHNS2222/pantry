@@ -281,10 +281,10 @@ const App: React.FC = () => {
   }, [activeTab, user]);
 
   // Function to add items to shopping list
-  const addToShoppingList = async (items: (string | { item: string; source: string })[], source: string = 'manual') => {
+  const addToShoppingList = async (items: (string | { item: string; source: string; notes?: string })[], defaultSource: string = 'manual') => {
     PerformanceMonitoringService.mark('shopping_list_add_start');
     
-    trackShoppingListAction('add_item', { count: items.length, source });
+    trackShoppingListAction('add_item', { count: items.length, source: defaultSource });
     HapticService.itemAdded();
     
     const inHousehold = household?.id && isHouseholdMember(household, user);
@@ -292,28 +292,33 @@ const App: React.FC = () => {
     const userId = inHousehold ? undefined : user?.id;
     
     // Fetch prices in parallel
-    const pricePromises = items.map(async (entry) => {
-      const itemStr = typeof entry === 'string' ? entry : entry.item;
+    const pricePromises = items.map(async (inputItem) => {
+      const itemStr = typeof inputItem === 'string' ? inputItem : inputItem.item;
+      const itemSource = typeof inputItem === 'string' ? defaultSource : inputItem.source;
+      const itemNotes = typeof inputItem === 'string' ? undefined : inputItem.notes;
+      
       const parsed = parseIngredientForShoppingList(itemStr);
       const priceData = await groceryPriceService.getIngredientPrice(parsed.itemName).catch(() => null);
       return {
         parsed,
-        estimatedPrice: priceData?.averagePrice || 0,
-        customSource: typeof entry === 'string' ? undefined : entry.source
+        source: itemSource,
+        notes: itemNotes,
+        estimatedPrice: priceData?.averagePrice || 0
       };
     });
     
     const priceResults = await Promise.all(pricePromises);
     
     const newItems: ShoppingItem[] = [];
-    for (const { parsed, estimatedPrice, customSource } of priceResults) {
+    for (const { parsed, estimatedPrice, source: itemSource, notes: itemNotes } of priceResults) {
       newItems.push({
-        id: crypto.randomUUID(),
+        id: Math.random().toString(36).substr(2, 9),
         item: parsed.itemName,
         quantity: parsed.quantity,
         category: inferCategoryFromItemName(parsed.itemName),
         checked: false,
-        source: customSource || source,
+        source: itemSource,
+        notes: itemNotes,
         addedAt: new Date(),
         estimatedPrice
       });

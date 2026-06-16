@@ -105,6 +105,7 @@ export interface ShoppingItem {
     unit?: string;
     expires?: string; // ISO date
     note?: string;
+    is_immortal?: boolean;
   };
   addedAt?: Date; // When the item was added to the shopping list
   completedAt?: Date; // When the item was checked off

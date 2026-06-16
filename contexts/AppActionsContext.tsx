@@ -28,7 +28,7 @@ interface AppActionsContextValue {
 
   // Shopping list operations
   onMoveToPantry: (items: ShoppingItem[]) => void;
-  onAddToShoppingList: (items: (string | { item: string; source: string })[]) => void;
+  onAddToShoppingList: (items: (string | { item: string; source: string; notes?: string })[]) => Promise<void>;
   addShoppingListItem: (item: Omit<ShoppingItem, 'id'>) => void;
 
   // Settings operations

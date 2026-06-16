@@ -1,7 +1,7 @@
 {
   "name": "stockandspoon",
   "private": true,
-  "version": "2.4.5",
+  "version": "2.4.2",
   "type": "module",
   "scripts": {
     "generate:changelog": "node scripts/generate-changelog.cjs",
@@ -46,7 +46,6 @@
   "dependencies": {
     "@capacitor-community/admob": "^8.0.0",
     "@capacitor-community/speech-recognition": "^7.0.1",
-    "@capacitor-firebase/analytics": "^8.3.0",
     "@capacitor-firebase/crashlytics": "^8.2.0",
     "@capacitor/android": "^8.3.1",
     "@capacitor/app": "^8.1.0",
@@ -63,7 +62,6 @@
     "@capacitor/share": "~8.0.1",
     "@capawesome/capacitor-app-review": "^8.0.1",
     "@codetrix-studio/capacitor-google-auth": "^3.4.0-rc.4",
-    "@emailjs/browser": "^4.4.1",
     "@google/genai": "^2.6.0",
     "@opentelemetry/api": "^1.9.1",
     "@sentry/react": "^10.51.0",

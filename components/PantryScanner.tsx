@@ -1071,8 +1071,8 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
       acc[category] = {};
     }
 
-    // Group by item name and expiration date within the category
-    const itemKey = `${item.item}_${item.expirationDate || 'no-expiry'}`;
+    // Group by item ID to keep entries separate
+    const itemKey = item.id;
     if (!acc[category][itemKey]) {
       acc[category][itemKey] = {
         ...item,
@@ -1123,8 +1123,8 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
       acc[location] = {};
     }
 
-    // Group by item name and expiration date within the storage location
-    const itemKey = `${item.item}_${item.expirationDate || 'no-expiry'}`;
+    // Group by item ID to keep entries separate
+    const itemKey = item.id;
     if (!acc[location][itemKey]) {
       acc[location][itemKey] = {
         ...item,

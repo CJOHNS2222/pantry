@@ -65,26 +65,43 @@ export const SmartShoppingListOrganizer: React.FC<SmartShoppingListOrganizerProp
 
     // Group items by aisle based on category
     items.forEach(item => {
-      const category = inferCategoryFromItemName(item.item);
-      let targetGroup = groups.find(g => g.aisle === 'Other');
+      // First try to use the item's explicitly set category if it perfectly matches an aisle
+      let targetGroup = groups.find(g => g.aisle.toLowerCase() === (item.category || '').toLowerCase());
+      
+      if (!targetGroup) {
+        const category = inferCategoryFromItemName(item.item);
+        
+        // Map categories to aisles with fuzzy matching for custom store layouts
+        if (category === 'Fruits & Vegetables') {
+          targetGroup = groups.find(g => g.aisle === 'Produce' || /produce|fruit|veg/i.test(g.aisle));
+        } else if (category === 'Dairy & Eggs') {
+          targetGroup = groups.find(g => g.aisle === 'Dairy' || /dairy|milk|egg/i.test(g.aisle));
+        } else if (category === 'Meat & Poultry' || category === 'Seafood') {
+          targetGroup = groups.find(g => g.aisle === 'Meat & Seafood' || /meat|beef|chicken|poultry|seafood|fish/i.test(g.aisle));
+        } else if (category === 'Grains & Bread' || category === 'Baking Supplies') {
+          targetGroup = groups.find(g => g.aisle === 'Bakery' || /bakery|bread|grain|baking/i.test(g.aisle));
+        } else if (category === 'Frozen Foods') {
+          targetGroup = groups.find(g => g.aisle === 'Frozen' || /frozen|freezer/i.test(g.aisle));
+        } else if (category === 'Canned Goods' || category === 'Condiments & Sauces' || category === 'Spices & Herbs') {
+          targetGroup = groups.find(g => g.aisle === 'Pantry Staples' || /pantry|canned|spice|condiment|sauce/i.test(g.aisle));
+        } else if (category === 'Snacks') {
+          targetGroup = groups.find(g => g.aisle === 'Snacks' || /snack|chip|candy/i.test(g.aisle));
+        } else if (category === 'Beverages') {
+          targetGroup = groups.find(g => g.aisle === 'Beverages' || /beverage|drink|soda|water/i.test(g.aisle));
+        } else if (category === 'Household' || category === 'Personal Care') {
+          targetGroup = groups.find(g => g.aisle === 'Household' || /household|cleaning|paper|personal|health/i.test(g.aisle));
+        }
+      }
 
-      // Map categories to aisles
-      if (category === 'Fruits & Vegetables') {
-        targetGroup = groups.find(g => g.aisle === 'Produce');
-      } else if (category === 'Dairy & Eggs') {
-        targetGroup = groups.find(g => g.aisle === 'Dairy');
-      } else if (category === 'Meat & Poultry' || category === 'Seafood') {
-        targetGroup = groups.find(g => g.aisle === 'Meat & Seafood');
-      } else if (category === 'Grains & Bread' || category === 'Baking Supplies') {
-        targetGroup = groups.find(g => g.aisle === 'Bakery');
-      } else if (category === 'Frozen Foods') {
-        targetGroup = groups.find(g => g.aisle === 'Frozen');
-      } else if (category === 'Canned Goods' || category === 'Condiments & Sauces' || category === 'Spices & Herbs') {
-        targetGroup = groups.find(g => g.aisle === 'Pantry Staples');
-      } else if (category === 'Snacks') {
-        targetGroup = groups.find(g => g.aisle === 'Snacks');
-      } else if (category === 'Beverages') {
-        targetGroup = groups.find(g => g.aisle === 'Beverages');
+      // Fallback
+      if (!targetGroup) {
+        targetGroup = groups.find(g => g.aisle === 'Other' || /other|misc/i.test(g.aisle));
+      }
+      
+      // If "Other" doesn't exist in custom layout, create it dynamically
+      if (!targetGroup && groups.length > 0) {
+         targetGroup = { aisle: 'Other', items: [], icon: '📦', color: 'bg-stone-100 text-stone-800 border-stone-200' };
+         groups.push(targetGroup);
       }
 
       if (targetGroup) {

@@ -35,7 +35,22 @@ export class InventoryCacheService {
     'expirationDate',
     'expirationType',
     'dateAdded',
-    'lastRestocked'
+    'lastRestocked',
+    'batches',
+    'quantity',
+    'notes',
+    'isStaple',
+    'isOpened',
+    'openedAt',
+    'openedExpiry',
+    'visualLevel',
+    'is_frozen',
+    'frozenAt',
+    'freezerExpiry',
+    'is_immortal',
+    'is_leftover',
+    'productRiskLevel',
+    'expiryAlertShown'
   ] as const;
 
   /**
@@ -55,7 +70,22 @@ export class InventoryCacheService {
       item.expirationDate || '',
       item.expirationType || '',
       item.dateAdded || '',
-      item.lastRestocked || ''
+      item.lastRestocked || '',
+      JSON.stringify(item.batches || []),
+      JSON.stringify(item.quantity || null),
+      item.notes || '',
+      item.isStaple ? 'true' : 'false',
+      item.isOpened ? 'true' : 'false',
+      item.openedAt || '',
+      item.openedExpiry || '',
+      item.visualLevel || '',
+      item.is_frozen ? 'true' : 'false',
+      item.frozenAt || '',
+      item.freezerExpiry || '',
+      item.is_immortal ? 'true' : 'false',
+      item.is_leftover ? 'true' : 'false',
+      item.productRiskLevel ? String(item.productRiskLevel) : '',
+      item.expiryAlertShown ? 'true' : 'false'
     ];
   }
 
@@ -76,7 +106,37 @@ export class InventoryCacheService {
       expirationDate: itemArray[8] || '',
       expirationType: itemArray[9] ? itemArray[9] as any : undefined,
       dateAdded: itemArray[10] || '',
-      lastRestocked: itemArray[11] || ''
+      lastRestocked: itemArray[11] || '',
+      batches: (() => {
+        if (!itemArray[12]) return [];
+        try {
+          return JSON.parse(itemArray[12]);
+        } catch {
+          return [];
+        }
+      })(),
+      quantity: (() => {
+        if (!itemArray[13]) return undefined;
+        try {
+          const parsed = JSON.parse(itemArray[13]);
+          return parsed === null ? undefined : parsed;
+        } catch {
+          return undefined;
+        }
+      })(),
+      notes: itemArray[14] || undefined,
+      isStaple: itemArray[15] === 'true',
+      isOpened: itemArray[16] === 'true',
+      openedAt: itemArray[17] || undefined,
+      openedExpiry: itemArray[18] || undefined,
+      visualLevel: itemArray[19] ? itemArray[19] as any : undefined,
+      is_frozen: itemArray[20] === 'true',
+      frozenAt: itemArray[21] || undefined,
+      freezerExpiry: itemArray[22] || undefined,
+      is_immortal: itemArray[23] === 'true',
+      is_leftover: itemArray[24] === 'true',
+      productRiskLevel: itemArray[25] ? Number(itemArray[25]) : undefined,
+      expiryAlertShown: itemArray[26] === 'true'
     };
   }
 
@@ -133,7 +193,7 @@ export class InventoryCacheService {
   /**
    * Load inventory from individual documents and cache it
    */
-  private static async loadAndCacheInventory(householdId?: string, userId?: string): Promise<PantryItem[]> {
+  private static async loadAndCacheInventory(_householdId?: string, _userId?: string): Promise<PantryItem[]> {
     // No longer loading from collections
     return [];
   }
@@ -207,7 +267,7 @@ export class InventoryCacheService {
 
       // Read current cache state once
       const docSnap = await DatabaseMonitoringService.getDoc(cacheRef);
-      let currentItems: PantryItem[] = [];
+      const currentItems: PantryItem[] = [];
 
       if (docSnap.exists()) {
         const data = docSnap.data() as CachedInventoryData & CacheMetadata;

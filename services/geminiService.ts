@@ -70,9 +70,23 @@ export const analyzePantryImage = async (base64Image: string, mimeType: string, 
       },
     });
 
-    const response = await Promise.race([responsePromise, timeoutPromise]) as { text: string };
+    const response = await Promise.race([responsePromise, timeoutPromise]) as any;
     const jsonText = response.text;
     if (!jsonText) throw new Error('No data returned from Gemini.');
+
+    if (typeof window !== 'undefined' && response.usageMetadata) {
+      window.dispatchEvent(
+        new CustomEvent('gemini-token-debug', {
+          detail: {
+            inputTokens: response.usageMetadata.promptTokenCount || 0,
+            outputTokens: response.usageMetadata.candidatesTokenCount || 0,
+            totalTokens: response.usageMetadata.totalTokenCount || 0,
+            type: 'pantry-scan',
+            model: remoteConfig.getString('gemini_model_vision'),
+          },
+        })
+      );
+    }
 
     const items = JSON.parse(
       jsonText.replace(/^```json\s*/i, '').replace(/\s*```$/, '').trim()
@@ -150,9 +164,23 @@ export const analyzeReceiptImage = async (base64Image: string, mimeType: string,
       },
     });
 
-    const response = await Promise.race([responsePromise, timeoutPromise]) as { text: string };
+    const response = await Promise.race([responsePromise, timeoutPromise]) as any;
     const jsonText = response.text;
     if (!jsonText) throw new Error('No data returned from Gemini.');
+
+    if (typeof window !== 'undefined' && response.usageMetadata) {
+      window.dispatchEvent(
+        new CustomEvent('gemini-token-debug', {
+          detail: {
+            inputTokens: response.usageMetadata.promptTokenCount || 0,
+            outputTokens: response.usageMetadata.candidatesTokenCount || 0,
+            totalTokens: response.usageMetadata.totalTokenCount || 0,
+            type: 'receipt-scan',
+            model: remoteConfig.getString('gemini_model_vision'),
+          },
+        })
+      );
+    }
 
     const items = JSON.parse(
       jsonText.replace(/^```json\s*/i, '').replace(/\s*```$/, '').trim()
@@ -275,13 +303,27 @@ const performSearch = async (params: RecipeSearchParams, user: User | undefined,
       },
     });
 
-const response = await Promise.race([responsePromise, timeoutPromise]) as { text: string; candidates?: Array<{ finishReason?: string; groundingMetadata?: { groundingChunks?: unknown[] } }> };
+const response = await Promise.race([responsePromise, timeoutPromise]) as any;
 
     const finishReason = response.candidates?.[0]?.finishReason;
     if (finishReason && finishReason !== 'STOP') {
       log.warn(`Gemini finish_reason: ${finishReason} — response may be truncated`, {}, 'GeminiService');
     }
     const jsonText = response.text;
+
+    if (typeof window !== 'undefined' && response.usageMetadata) {
+      window.dispatchEvent(
+        new CustomEvent('gemini-token-debug', {
+          detail: {
+            inputTokens: response.usageMetadata.promptTokenCount || 0,
+            outputTokens: response.usageMetadata.candidatesTokenCount || 0,
+            totalTokens: response.usageMetadata.totalTokenCount || 0,
+            type: 'recipe-search',
+            model: modelId,
+          },
+        })
+      );
+    }
     let recipes: StructuredRecipe[] = [];
     
     if (jsonText) {

@@ -1,10 +1,11 @@
 import React from 'react';
-import { CalendarClock, HelpCircle } from 'lucide-react';
+import { CalendarClock, HelpCircle, Wand2 } from 'lucide-react';
 
 interface MealPlannerHeaderProps {
   title: string;
   showHelpTooltip: boolean;
   onOpenMealPrepPlanner: () => void;
+  onOpenAutoFill: () => void;
   onToggleHelpTooltip: () => void;
 }
 
@@ -12,6 +13,7 @@ export const MealPlannerHeader: React.FC<MealPlannerHeaderProps> = ({
   title,
   showHelpTooltip,
   onOpenMealPrepPlanner,
+  onOpenAutoFill,
   onToggleHelpTooltip,
 }) => {
   return (
@@ -20,6 +22,15 @@ export const MealPlannerHeader: React.FC<MealPlannerHeaderProps> = ({
         <div className="flex-1" />
         <h2 className="text-3xl font-serif font-bold text-theme-secondary">{title}</h2>
         <div className="flex-1 flex items-center justify-end gap-1">
+          <button
+            onClick={onOpenAutoFill}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--accent-color)]/10 hover:bg-[var(--accent-color)]/20 text-[var(--accent-color)] text-sm font-medium transition-colors shadow-sm"
+            title="Auto-Fill Plan"
+            aria-label="Open auto fill modal"
+          >
+            <Wand2 className="w-4 h-4" />
+            <span className="hidden sm:inline">Auto-Fill</span>
+          </button>
           <button
             onClick={onOpenMealPrepPlanner}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--accent-color)] hover:bg-[var(--accent-color)]/90 active:bg-[var(--accent-color)]/80 text-white text-sm font-medium transition-colors shadow-sm"

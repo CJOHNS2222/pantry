@@ -9,7 +9,6 @@ import { Timestamp } from 'firebase/firestore';
 import { appendNotificationToUser, snoozeNotificationInCache, updateNotificationInCache } from './notificationsService';
 import { formatDangerSummary, DangerItem } from './notificationHelpers';
 import { getFoodRiskLevel, generateExpirationMessage, getNotificationTone, generateNotificationStackMessage, generateWasteNotificationMessage } from '../utils/foodRiskClassification';
-import { log } from './logService';
 
 export interface NotificationItem {
   id: string;
@@ -73,7 +72,9 @@ export class NotificationService {
       await appendNotificationToUser(userId, item as any);
     } catch (err: any) {
       // Log the error but don't fallback to inefficient root collection
-      log.error('Failed to append notification to user cache:', { error: err?.message || err }, 'NotificationService');
+      console.error('Failed to append notification to user cache:', {
+        error: err?.message || err
+      });
       throw err; // Re-throw to prevent silent failures
     }
 
@@ -82,7 +83,7 @@ export class NotificationService {
       try {
         await this.sendPushNotification(userId, notification);
       } catch (err: any) {
-        log.error('Failed to send push notification:', { error: err?.message || err }, 'NotificationService');
+        console.error('Failed to send push notification:', err);
       }
     }
 
@@ -147,7 +148,7 @@ export class NotificationService {
       try {
         await updateNotificationInCache(userId, existingStack.id, updateData as any);
       } catch (err: any) {
-        log.error('Failed to update stack notification:', { error: err?.message || err }, 'NotificationService');
+        console.error('Failed to update stack notification:', err);
       }
 
       return existingStack.id;
@@ -276,11 +277,11 @@ export class NotificationService {
             await updateNotificationInCache(userId, existingNotification.id, updateData as any);
           }
         } catch (err: any) {
-          log.warn('Failed updating top-level notification; falling back to cache update', { error: err?.message || err, userId }, 'NotificationService');
+          console.warn('Failed updating top-level notification; falling back to cache update', { error: err?.message || err, userId });
           try {
             await updateNotificationInCache(userId, existingNotification.id, updateData as any);
           } catch (cacheErr: any) {
-            log.error('Failed to update notification in user cache fallback:', { error: cacheErr?.message || cacheErr, userId, notificationId: existingNotification.id }, 'NotificationService');
+            console.error('Failed to update notification in user cache fallback:', { error: cacheErr?.message || cacheErr, userId, notificationId: existingNotification.id });
           }
         }
       }
@@ -455,7 +456,7 @@ export class NotificationService {
         priority: 'medium'
       });
     } catch (err: any) {
-      log.error('Failed to send daily push notification:', { error: err?.message || err }, 'NotificationService');
+      console.error('Failed to send daily push notification:', err);
     }
 
     return notificationId;
@@ -516,7 +517,7 @@ export class NotificationService {
 
       return sorted;
     } catch (err: any) {
-      log.error('Error getting unread notifications:', { error: err?.message || err }, 'NotificationService');
+      console.error('Error getting unread notifications:', err);
       // Return empty array instead of throwing to prevent UI crashes
       return [];
     }
@@ -563,7 +564,7 @@ export class NotificationService {
       }
     } catch (err: any) {
       // Non-fatal – log and continue so the rest of login flow is unaffected
-      log.warn('migrateRootInviteNotifications failed silently', { error: err?.message }, 'NotificationService');
+      console.warn('migrateRootInviteNotifications failed silently:', err?.message);
     }
   }
 
@@ -573,8 +574,8 @@ export class NotificationService {
   static async markAsRead(userId: string, notificationId: string): Promise<void> {
     try {
       await updateNotificationInCache(userId, notificationId, { read: true });
-    } catch (err: any) {
-      log.error('Failed to mark notification read in cache:', { error: err?.message || err }, 'NotificationService');
+    } catch (err) {
+      console.error('Failed to mark notification read in cache:', err);
     }
   }
 
@@ -584,8 +585,8 @@ export class NotificationService {
   static async snoozeNotification(userId: string, notificationId: string, minutes: number): Promise<void> {
     try {
       await snoozeNotificationInCache(userId, notificationId, minutes);
-    } catch (err: any) {
-      log.error('Failed to snooze notification in cache:', { error: err?.message || err }, 'NotificationService');
+    } catch (err) {
+      console.error('Failed to snooze notification in cache:', err);
     }
   }
 
@@ -607,7 +608,7 @@ export class NotificationService {
       // Check if this notification matches the user's preference
       const daysUntilExpiry = notification.actionData?.daysUntilExpiry;
       if (daysUntilExpiry !== undefined) {
-        if (expirySetting === 'urgent' && daysUntilExpiry > 0) return false;
+        if (expirySetting === 'urgent' && daysUntilExpiry > 1) return false;
         if (expirySetting === 'day_before' && daysUntilExpiry > 1) return false;
         if (expirySetting === 'week_before' && daysUntilExpiry > 7) return false;
       }
@@ -707,7 +708,7 @@ export class NotificationService {
         await DatabaseMonitoringService.setDoc(cacheRef, { items: recentNotifications }, { merge: true });
       }
     } catch (err: any) {
-      log.error('Error cleaning up old notifications:', { error: err?.message || err }, 'NotificationService');
+      console.error('Error cleaning up old notifications:', err);
     }
   }
 
@@ -737,7 +738,7 @@ export class NotificationService {
         await DatabaseMonitoringService.setDoc(cacheRef, { items: filteredNotifications }, { merge: true });
       }
     } catch (err: any) {
-      log.error('Error deleting existing daily notifications:', { error: err?.message || err }, 'NotificationService');
+      console.error('Error deleting existing daily notifications:', err);
     }
   }
 
@@ -847,9 +848,9 @@ export class NotificationService {
   /**
    * Send a push notification (placeholder - push notifications are typically sent server-side)
    */
-  private static async sendPushNotification(userId: string, _notification: any): Promise<void> {
+  private static async sendPushNotification(userId: string, notification: any): Promise<void> {
     // Push notifications are sent server-side via Firebase Cloud Messaging
     // This is a placeholder method for client-side notification creation
-    log.info('Push notification queued for user', { userId }, 'NotificationService');
+    console.log('Push notification would be sent for user:', userId, notification);
   }
 }

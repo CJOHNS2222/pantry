@@ -9,33 +9,31 @@ export interface ChangeEntry {
 
 export const RECENT_CHANGES: ChangeEntry[] = [
   {
-    "version": "2.4.5",
-    "date": "Jun 14, 2026",
+    "version": "2.4.2",
+    "date": "Jun 16, 2026",
     "highlights": [
-      "Single-Member Household Deletion",
-      "Cache Data Preservation",
-      "EmailJS Invitation Support",
-      "Capacitor Firebase Analytics"
+      "Meal Planner missing ingredients quantity — resolved quantity extraction bug where ingredients were combined globally…",
+      "Shopping list recipe notes — updated the shopping list extraction flow to attach recipe-specific source notes (e.g.,…"
     ]
   },
   {
-    "version": "2.4.4",
-    "date": "Jun 13, 2026",
+    "version": "2.4.1",
+    "date": "Jun 12, 2026",
     "highlights": [
-      "Login Screen Themes",
-      "Member Activity Box Header Style",
-      "Recipe Ingredient Source Tags",
-      "Visual Fill Level Quantity Modifier"
+      "Keyboard viewport hook — added new useKeyboard hook that dynamically detects virtual soft keyboard and handles…",
+      "Pre-permission educator screen — added pre-permission educator dialog explaining camera privacy before requesting…",
+      "Navigation viewport auto-hiding — bottom navigation bar automatically hides when the virtual keyboard is visible.",
+      "Haptic feedback improvements — integrated light feedback on checkmark clicks, medium feedback on item long-presses, and…"
     ]
   },
   {
-    "version": "2.4.3",
-    "date": "Jun 13, 2026",
+    "version": "2.4.0",
+    "date": "Jun 3, 2026",
     "highlights": [
-      "Suggested Item Label & Wrapping",
-      "Dotted Meal Planner Placeholder",
-      "Bypassing Redundant Search Dropdowns",
-      "Household Modal Themes"
+      "Progressive onboarding milestones — added milestone tracking to stage post-onboarding feature discovery based on user…",
+      "Feature discovery gating — FeatureDiscoveryManager now supports milestone-based eligibility so one-time tips are shown…",
+      "RecipeFinder typing — restored missing Tab type import used by settings navigation actions",
+      "ShoppingList compile breakages — restored missing utility/log imports (log, inferCategoryFromItemName,…"
     ]
   }
 ];

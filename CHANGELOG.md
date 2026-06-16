@@ -1,63 +1,8 @@
-## [2.4.5] - 2026-06-14
-
-### Changed
-- **Single-Member Household Deletion**: Empty households are now disbanded automatically when a member departs, and the remaining admin's local/remote household associations and custom claims are cleared.
-- **Cache Data Preservation**: Copies all household databases (inventory, shopping lists, and meal plans) directly to the remaining member's personal cache upon household disbanding to prevent data loss.
-- **EmailJS Invitation Support**: Integrated household invitations directly with client-side EmailJS for direct family email notifications.
-- **Capacitor Firebase Analytics**: Added a native Capacitor Firebase Analytics bridge to log app actions and screen view transitions by tab name (e.g. Pantry, Shopping List, Meal Planner) on Android devices instead of generic `MainActivity` group logging.
-
----
-
-## [2.4.4] - 2026-06-13
-
-### Changed
-- **Login Screen Themes**: Redesigned the authentication screen to use modern dark slate themes instead of hardcoded burgundy.
-- **Member Activity Box Header Style**: Aligned the member presence and activity status indicator box in the header with dynamic system theme variables.
-- **Recipe Ingredient Source Tags**: Added custom recipe metadata annotations on shopping list items when they are batch-added from meal planner ingredients, detailing exactly which recipe they belong to.
-- **Visual Fill Level Quantity Modifier**: Fixed the portion fill-level selector on the item detail modal (1/4, 1/2, 3/4, Full) to automatically scale and update the item's local quantity when selected.
-
----
-
-## [2.4.3] - 2026-06-13
-
-### Changed
-- **Suggested Item Label & Wrapping**: Renamed "Suggested item" to "Quick Add" (and optimized other sources to use short text tags like "Manual", "Meal planner", "Scanner") in the shopping list item card, ensuring it never wraps to a second line.
-- **Dotted Meal Planner Placeholder**: Tightened margins, paddings, and font sizes of the "Plan Your Day's Meals" placeholder box to reclaim deadspace.
+## [2.4.2] - 2026-06-16
 
 ### Fixed
-- **Bypassing Redundant Search Dropdowns**: Modified the meal planner search flow to immediately schedule a recipe bypassing the redundant day/meal selection modal.
-- **Household Modal Themes**: Aligned the household modal styling to match the application's dynamic theme colors instead of hardcoded burgundy.
-- **Redundant Shopping List Selection Control**: Removed the duplicate batch select/deselect checkbox container from the bottom of the shopping list.
-- **Checkout Expiration Modal Overlap**: Increased the z-index of the expiration modal backdrop so it renders on top of the fixed navigation bar, and added safe area bottom padding to prevent buttons from being hidden.
-- **Smart Shelf-Life Presets**: Integrated smart expiration category defaults (e.g., 1 week for milk/yogurt/produce, 1 month for eggs, shelf-stable for spices) during checkout.
-- **Meal Planner Headers '+' Icon**: Added clickable active "+" buttons next to the meal planner section headers to schedule additional items.
-- **Firestore Read Optimization**: Implemented localized in-memory caches in `recipeService.ts` for popular recipes, community favorites, and cached recipes to prevent duplicate database reads on tab switches.
-
----
-
-## [2.4.2] - 2026-06-13
-
-### Added
-- **Pantry Health Score** — added interactive letter grade A–F ring in Pantry tab based on 5 health factors (freshness, variety, nutritional balance, item utilization, and waste reduction).
-- **Leftover prompt trigger** — surfaces an action chip asking "Log leftovers?" after a scheduled day's meal has passed, driving engagement with the leftover capture feature.
-- **Household presence strip** — added real-time "Sarah is shopping now 🛒" indicator banner in Shopping List to coordinate active shopping trips.
-- **Settings account hero card** — settings dashboard now displays a premium subscription/membership status card containing total items tracked, tier details, and active contextual CTAs.
-
-### Changed
-- **Expiration date picker chips** — redesigned expiration date inputs to a chips-first layout offering quick presets (3 days, 1 week, 2 weeks, 1 month, 3 months, 1 year, and no expiry).
-- **Voice search visual feedback** — voice mic icon in Recipe Finder is now accented and features a pulse ring animation while active.
-- **Recipe search result scaling** — increased default AI recipe recommendations to 3 results (5 for premium/family tier), replacing the hardcoded 2-recipe limit.
-- **Recipe import CTA highlighting** — highlighted the CSV/URL import button with accent color when the pantry list is empty.
-- **Offline indicator status clarity** — updated the offline status ribbon to describe precisely which local features remain available vs actions needing active network.
-- **Height and weight unit formatting** — Settings now formats height (cm) and weight (kg) measurements contextually depending on active metric vs imperial profile preference.
-- **CSV fallback recipes** — fallback recipes from CSV database are now integrated when the popular recipes cache is empty.
-- **Dietary preferences pre-fill** — Recipe Finder searches now automatically pre-populate restrictions directly from the user's active profile settings.
-
-### Fixed
-- **Structured logging migration** — replaced all 13 direct `console.log`, `console.warn`, and `console.error` calls in `notificationService.ts` with structured logs via `logService`.
-- **Token estimator cleanup** — removed dead `estimateTokens` calls and related state from Recipe Finder.
-- **Placeholder image cleanup** — removed obsolete `generateRecipePlaceholderImage` function from Meal Planner components.
-- **Recipe Finder search retry** — fixed `onRetry` handler to invoke `handleGenerate` directly instead of leaving search stuck in error.
+- **Meal Planner missing ingredients quantity** — resolved quantity extraction bug where ingredients were combined globally but added multiple times with the total aggregated quantity.
+- **Shopping list recipe notes** — updated the shopping list extraction flow to attach recipe-specific source notes (e.g., `recipe: need for "Recipe Name"`) to each ingredient card so users know exactly which planned meals require them.
 
 ---
 
