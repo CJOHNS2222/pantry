@@ -407,8 +407,8 @@ export const ModernOnboarding: React.FC<ModernOnboardingProps> = ({
   );
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-md flex items-center justify-center p-4">
-      <div className="bg-theme-secondary rounded-3xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-hidden relative">
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-md flex flex-col items-center justify-start overflow-y-auto p-4">
+      <div className="bg-theme-secondary rounded-3xl shadow-2xl max-w-lg w-full my-auto relative overflow-hidden">
 
         {/* Close button */}
         <button

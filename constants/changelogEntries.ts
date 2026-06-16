@@ -9,6 +9,14 @@ export interface ChangeEntry {
 
 export const RECENT_CHANGES: ChangeEntry[] = [
   {
+    "version": "2.4.7",
+    "date": "Jun 16, 2026",
+    "highlights": [
+      "Leave Household for Solo Admins — Enabled the \"Leave Household\" button for admins who are the only member in their…",
+      "Unified Household UI — Cleaned up massive amounts of duplicate and dead layout code in the Household Management…"
+    ]
+  },
+  {
     "version": "2.4.6",
     "date": "Jun 16, 2026",
     "highlights": [
@@ -26,16 +34,6 @@ export const RECENT_CHANGES: ChangeEntry[] = [
       "Gemini Token Debugger",
       "Single-Member Household Deletion",
       "Cache Data Preservation"
-    ]
-  },
-  {
-    "version": "2.4.4",
-    "date": "Jun 13, 2026",
-    "highlights": [
-      "Login Screen Themes",
-      "Member Activity Box Header Style",
-      "Recipe Ingredient Source Tags",
-      "Visual Fill Level Quantity Modifier"
     ]
   }
 ];

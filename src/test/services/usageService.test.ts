@@ -364,7 +364,7 @@ describe('UsageService', () => {
       };
       const householdDoc = {
         exists: vi.fn(() => true),
-        data: vi.fn(() => ({ members: ['user123'] })) // Already has 1 member
+        data: vi.fn(() => ({ members: ['user123', 'user456'] })) // Already has 2 members
       };
 
       // Mock doc to return objects with path property

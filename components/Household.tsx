@@ -36,6 +36,9 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
   const [householdName, setHouseholdName] = useState('');
   const [householdMemberLimitExceeded, setHouseholdMemberLimitExceeded] = useState(false);
 
+  const maxMembers = user.subscription?.tier === 'family' ? 5 :
+                    user.subscription?.tier === 'premium' ? 3 : 2;
+
   const checkHouseholdMemberLimit = async () => {
     try {
       log.debug('Checking household member limit', { userId: user.id, householdId: household?.id }, 'Household');
@@ -383,9 +386,9 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
           <PremiumFeature
             feature="householdMembers"
             user={user}
-            limit={3}
+            limit={2}
             currentCount={household?.members?.length ?? 0}
-            fallbackMessage="Upgrade to Family plan to add more than 3 household members"
+            fallbackMessage="Upgrade to Premium plan to add more than 2 household members"
             onUpgrade={() => setActiveTab(Tab.SETTINGS)}
           >
             <div className="bg-theme-primary/40 p-4 rounded-xl border border-theme mb-6">
@@ -421,11 +424,11 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
           <div className="flex items-center justify-between mb-3 px-1">
             <h3 className="text-sm font-bold text-[var(--accent-color)] uppercase">{intl.formatMessage({ id: 'household.groupMembers' })}</h3>
             <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-              (household?.members?.length ?? 0) >= 3
+              (household?.members?.length ?? 0) >= maxMembers
                 ? 'bg-[var(--accent-color)]/20 text-[var(--accent-color)]'
                 : 'bg-theme-primary text-theme-secondary'
             }`}>
-              {household?.members?.length ?? 0} / 3 members
+              {household?.members?.length ?? 0} / {maxMembers} members
             </span>
           </div>
           <div className="space-y-2">

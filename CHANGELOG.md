@@ -1,3 +1,13 @@
+## [2.4.7] - 2026-06-16
+
+### Added
+- **Leave Household for Solo Admins** — Enabled the "Leave Household" button for admins who are the only member in their household, allowing them to leave and disband the group.
+
+### Changed
+- **Unified Household UI** — Cleaned up massive amounts of duplicate and dead layout code in the Household Management component to simplify future maintenance.
+
+---
+
 ## [2.4.6] - 2026-06-16
 
 ### Added

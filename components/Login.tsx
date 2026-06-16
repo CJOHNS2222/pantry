@@ -271,11 +271,11 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
   }, [onLogin]);
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-slate-950 text-white relative overflow-auto">
+    <div className="min-h-screen w-full flex flex-col items-center justify-start overflow-y-auto p-6 bg-slate-950 text-white relative">
       {/* Background Ambience */}
       <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-amber-500/10 via-slate-950 to-slate-950 z-0 pointer-events-none"></div>
 
-      <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl relative z-10">
+      <div className="my-auto w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl relative z-10">
         <div className="flex flex-col items-center mb-8">
           <div className="w-20 h-20 bg-gradient-to-br from-amber-400 to-amber-600 rounded-full flex items-center justify-center shadow-lg mb-4 overflow-hidden">
             <img src="/icons/icon.PNG" alt="App Icon" className="w-16 h-16 object-contain" />
