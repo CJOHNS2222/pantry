@@ -136,6 +136,16 @@ export const Settings: React.FC<SettingsProps> = ({
     if (!user) return;
     UsageService.getUsageLimits(user).then(limits => setUsageLimits(limits)).catch(() => {});
   }, [user?.id]);
+
+  // Load pantry item count for stat card
+  const [pantryItemCount, setPantryItemCount] = useState<number>(0);
+  useEffect(() => {
+    if (!user?.id) return;
+    InventoryCacheService.getCachedInventory(undefined, user.id)
+      .then(items => setPantryItemCount(items?.length ?? 0))
+      .catch(() => {});
+  }, [user?.id]);
+
   const [savingProfile, setSavingProfile] = useState(false);
   const [updatingAvatar, setUpdatingAvatar] = useState(false);
   const [pendingNotifications, setPendingNotifications] = useState(settings?.notifications || defaultSettings.notifications);
@@ -474,7 +484,8 @@ export const Settings: React.FC<SettingsProps> = ({
           name: user.name,
           email: user.email,
           role: 'admin',
-          status: 'active'
+          status: 'active',
+          joinedAt: new Date().toISOString()
         }]
       };
 
@@ -508,9 +519,6 @@ export const Settings: React.FC<SettingsProps> = ({
 
       setHouseholdName('');
       addToast?.('Household created successfully!', 'success');
-
-      // Refresh the page to show the new household
-      window.location.reload();
 
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
@@ -635,6 +643,61 @@ export const Settings: React.FC<SettingsProps> = ({
         onLogout={onLogout}
       />
 
+      {/* ── Account Hero Card ── */}
+      {user && !user.isGuest && (() => {
+        const tierLabel = isFamily ? 'Family' : isPremium ? 'Premium' : 'Free';
+        const tierColor = isFamily ? 'text-purple-500' : isPremium ? 'text-[var(--accent-color)]' : 'text-theme-secondary';
+        const householdCount = household?.members?.length ?? 0;
+
+        // Contextual CTA
+        const ctaContent = !isPremium && !isFamily
+          ? { icon: '⭐', text: 'Upgrade to Premium for AI recipes, unlimited saves & more', accent: true }
+          : !household
+          ? { icon: '👨‍👩‍👧', text: 'Invite family or roommates to share your pantry & shopping list', accent: false }
+          : null;
+
+        return (
+          <div className="rounded-2xl border overflow-hidden bg-theme-secondary border-theme">
+            {/* Stat strip */}
+            <div className="grid grid-cols-3 divide-x divide-theme">
+              {[
+                { value: pantryItemCount, label: 'Pantry Items', icon: '🥫' },
+                { value: tierLabel,       label: 'Plan',         icon: '🏅', valueClass: tierColor },
+                { value: householdCount || '—', label: 'Household', icon: '👥' },
+              ].map(stat => (
+                <div key={stat.label} className="flex flex-col items-center py-4 px-2 gap-0.5">
+                  <span className="text-lg">{stat.icon}</span>
+                  <span className={`text-xl font-black text-theme-primary ${stat.valueClass ?? ''}`}>{stat.value}</span>
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-theme-secondary opacity-60">{stat.label}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Contextual CTA */}
+            {ctaContent && (
+              <div className={`flex items-center gap-3 px-4 py-3 border-t ${
+                ctaContent.accent
+                  ? 'border-[var(--accent-color)]/20 bg-[var(--accent-color)]/5'
+                  : 'border-theme bg-theme-primary'
+              }`}>
+                <span className="text-base shrink-0">{ctaContent.icon}</span>
+                <p className="flex-1 text-xs text-theme-secondary leading-snug">{ctaContent.text}</p>
+                <button
+                  onClick={ctaContent.accent ? () => setActiveSettingsTab('more') : onShowHousehold}
+                  className={`shrink-0 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors ${
+                    ctaContent.accent
+                      ? 'bg-[var(--accent-color)] text-white hover:bg-[var(--accent-color)]/80'
+                      : 'bg-theme-secondary text-theme-primary border border-theme hover:bg-theme-primary'
+                  }`}
+                >
+                  {ctaContent.accent ? 'Upgrade' : 'Invite'}
+                </button>
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
       {/* Profile Section */}
       {user && onLogout && !user.isGuest && (
         <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden" data-section="profile">
@@ -730,50 +793,73 @@ export const Settings: React.FC<SettingsProps> = ({
               
               <div className="grid grid-cols-3 gap-3">
                 {/* Row 1: Height, Weight, Age */}
+                {/* Height — imperial ft+in or metric cm */}
                 <div className="flex flex-col items-center">
-                  <div className="flex gap-1.5 w-full justify-center">
-                    <div className="flex items-center border border-theme rounded-lg bg-white px-2 py-1 w-1/2 focus-within:ring-2 focus-within:ring-[var(--accent-color)] focus-within:border-transparent">
+                  {userProfile?.measurementSystem === 'Metric' ? (
+                    <div className="flex items-center border border-theme rounded-lg bg-white px-2 py-1 w-full focus-within:ring-2 focus-within:ring-[var(--accent-color)] focus-within:border-transparent">
                       <input
-                        id="heightFeet"
-                        name="heightFeet"
+                        id="heightCm"
+                        name="heightCm"
                         type="number"
-                        value={userProfile?.height ? Math.floor(userProfile.height / 12) : ''}
+                        // stored as total inches internally; convert for display
+                        value={userProfile?.height ? Math.round(userProfile.height * 2.54) : ''}
                         onChange={(e) => {
-                          const feet = parseInt(e.target.value) || 0;
-                          const inches = userProfile?.height ? userProfile.height % 12 : 0;
-                          handleProfileChange('height', feet * 12 + inches);
+                          const cm = parseFloat(e.target.value) || 0;
+                          handleProfileChange('height', Math.round(cm / 2.54));
                         }}
-                        placeholder="5"
+                        placeholder="175"
                         className="w-full text-center text-sm font-semibold text-black bg-transparent outline-none border-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         min="0"
-                        max="8"
+                        max="300"
                       />
-                      <span className="text-xs text-gray-500 font-medium ml-1">ft</span>
+                      <span className="text-xs text-gray-500 font-medium ml-1">cm</span>
                     </div>
-                    <div className="flex items-center border border-theme rounded-lg bg-white px-2 py-1 w-1/2 focus-within:ring-2 focus-within:ring-[var(--accent-color)] focus-within:border-transparent">
-                      <input
-                        id="heightInches"
-                        name="heightInches"
-                        type="number"
-                        value={userProfile?.height ? userProfile.height % 12 : ''}
-                        onChange={(e) => {
-                          const feet = userProfile?.height ? Math.floor(userProfile.height / 12) : 0;
-                          const inches = parseInt(e.target.value) || 0;
-                          handleProfileChange('height', feet * 12 + inches);
-                        }}
-                        placeholder="8"
-                        className="w-full text-center text-sm font-semibold text-black bg-transparent outline-none border-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                        min="0"
-                        max="11"
-                      />
-                      <span className="text-xs text-gray-500 font-medium ml-1">in</span>
+                  ) : (
+                    <div className="flex gap-1.5 w-full justify-center">
+                      <div className="flex items-center border border-theme rounded-lg bg-white px-2 py-1 w-1/2 focus-within:ring-2 focus-within:ring-[var(--accent-color)] focus-within:border-transparent">
+                        <input
+                          id="heightFeet"
+                          name="heightFeet"
+                          type="number"
+                          value={userProfile?.height ? Math.floor(userProfile.height / 12) : ''}
+                          onChange={(e) => {
+                            const feet = parseInt(e.target.value) || 0;
+                            const inches = userProfile?.height ? userProfile.height % 12 : 0;
+                            handleProfileChange('height', feet * 12 + inches);
+                          }}
+                          placeholder="5"
+                          className="w-full text-center text-sm font-semibold text-black bg-transparent outline-none border-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          min="0"
+                          max="8"
+                        />
+                        <span className="text-xs text-gray-500 font-medium ml-1">ft</span>
+                      </div>
+                      <div className="flex items-center border border-theme rounded-lg bg-white px-2 py-1 w-1/2 focus-within:ring-2 focus-within:ring-[var(--accent-color)] focus-within:border-transparent">
+                        <input
+                          id="heightInches"
+                          name="heightInches"
+                          type="number"
+                          value={userProfile?.height ? userProfile.height % 12 : ''}
+                          onChange={(e) => {
+                            const feet = userProfile?.height ? Math.floor(userProfile.height / 12) : 0;
+                            const inches = parseInt(e.target.value) || 0;
+                            handleProfileChange('height', feet * 12 + inches);
+                          }}
+                          placeholder="8"
+                          className="w-full text-center text-sm font-semibold text-black bg-transparent outline-none border-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          min="0"
+                          max="11"
+                        />
+                        <span className="text-xs text-gray-500 font-medium ml-1">in</span>
+                      </div>
                     </div>
-                  </div>
+                  )}
                   <label className="text-[10px] text-theme-secondary font-bold uppercase tracking-wider mt-1.5 text-center">
                     {intl.formatMessage({ id: 'settings.height' })}
                   </label>
                 </div>
 
+                {/* Weight — lbs or kg */}
                 <div className="flex flex-col items-center">
                   <div className="flex items-center border border-theme rounded-lg bg-white px-2 py-1 w-full focus-within:ring-2 focus-within:ring-[var(--accent-color)] focus-within:border-transparent">
                     <input
@@ -781,17 +867,30 @@ export const Settings: React.FC<SettingsProps> = ({
                       name="weight"
                       type="number"
                       min="0"
-                      value={userProfile?.weight || ''}
-                      onChange={(e) => handleProfileChange('weight', e.target.value ? parseInt(e.target.value) : undefined)}
-                      placeholder="154"
+                      value={
+                        userProfile?.measurementSystem === 'Metric'
+                          ? userProfile?.weight ? Math.round(userProfile.weight * 0.453592) : ''
+                          : userProfile?.weight || ''
+                      }
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value);
+                        if (isNaN(val)) { handleProfileChange('weight', undefined); return; }
+                        // Always store as lbs internally
+                        const lbs = userProfile?.measurementSystem === 'Metric' ? Math.round(val / 0.453592) : val;
+                        handleProfileChange('weight', lbs);
+                      }}
+                      placeholder={userProfile?.measurementSystem === 'Metric' ? '70' : '154'}
                       className="w-full text-center text-sm font-semibold text-black bg-transparent outline-none border-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     />
-                    <span className="text-xs text-gray-500 font-medium ml-1">lbs</span>
+                    <span className="text-xs text-gray-500 font-medium ml-1">
+                      {userProfile?.measurementSystem === 'Metric' ? 'kg' : 'lbs'}
+                    </span>
                   </div>
                   <label htmlFor="weight" className="text-[10px] text-theme-secondary font-bold uppercase tracking-wider mt-1.5 text-center">
                     {intl.formatMessage({ id: 'settings.weight' })}
                   </label>
                 </div>
+
 
                 <div className="flex flex-col items-center">
                   <div className="flex items-center border border-theme rounded-lg bg-white px-2 py-1 w-full focus-within:ring-2 focus-within:ring-[var(--accent-color)] focus-within:border-transparent">
