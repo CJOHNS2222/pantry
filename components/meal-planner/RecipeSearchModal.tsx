@@ -9,7 +9,7 @@ import { log } from '../../services/logService';
 import { CompactRecipeCardSkeleton } from '../SkeletonLoader';
 import { ProgressiveImage } from '../ProgressiveImage';
 import { getUserMeasurementSystem } from '../../utils/measurementUtils';
-import { rankCachedRecipesByPreferences, recipeMatchesCacheFilters } from '../../utils/preferenceUtils';
+import { rankCachedRecipesByPreferences, recipeMatchesCacheFilters, isRecipeSafeFromAllergies } from '../../utils/preferenceUtils';
 
 interface RecipeSearchModalProps {
   mealType: 'breakfast' | 'lunch' | 'dinner';
@@ -93,7 +93,8 @@ export const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
           index === self.findIndex(r => r.title === recipe.title)
         )
         .filter(recipe => !savedResults.some(saved => saved.title === recipe.title))
-        .filter(recipe => recipeMatchesCacheFilters(recipe, { mealType })),
+        .filter(recipe => recipeMatchesCacheFilters(recipe, { mealType }))
+        .filter(recipe => isRecipeSafeFromAllergies(recipe, household?.members || [], user?.profile)),
         household?.members || [],
         user?.profile
       ); // Avoid duplicates and rank by preferences
@@ -179,18 +180,28 @@ export const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
 
   const filteredCachedRecipes = useMemo(() => 
     rankCachedRecipesByPreferences(
-    searchRecipes(cachedRecipes, searchQuery)
-      .filter((recipe, index, self) =>
-        index === self.findIndex(r => r.title === recipe.title)
-      )
-      .filter(recipe => recipeMatchesCacheFilters(recipe, { mealType }))
-      .filter(recipe => !filteredSavedRecipes.some(saved => saved.title === recipe.title)) // Avoid duplicates with saved recipes
-      .filter(recipe => !searchResults.some(searchResult => searchResult.title === recipe.title)),
+      searchRecipes(cachedRecipes, searchQuery)
+        .filter((recipe, index, self) =>
+          index === self.findIndex(r => r.title === recipe.title)
+        )
+        .filter(recipe => recipeMatchesCacheFilters(recipe, { mealType }))
+        .filter(recipe => !filteredSavedRecipes.some(saved => saved.title === recipe.title)) // Avoid duplicates with saved recipes
+        .filter(recipe => !searchResults.some(searchResult => searchResult.title === recipe.title))
+        .filter(recipe => isRecipeSafeFromAllergies(recipe, household?.members || [], user?.profile)),
       household?.members || [],
       user?.profile
     ), // Avoid duplicates with search results and rank by preferences
     [cachedRecipes, searchQuery, searchResults, filteredSavedRecipes, mealType, household?.members, user?.profile]
   );
+
+  const defaultPopularRecipes = useMemo(() => {
+    if (!cachedRecipesLoaded) return [];
+    return rankCachedRecipesByPreferences(
+      cachedRecipes.filter(recipe => isRecipeSafeFromAllergies(recipe, household?.members || [], user?.profile)),
+      household?.members || [],
+      user?.profile
+    ).slice(0, 12);
+  }, [cachedRecipes, cachedRecipesLoaded, household?.members, user?.profile]);
 
   return (
     <div className="space-y-4">
@@ -381,11 +392,11 @@ export const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
         )}
 
         {/* Cached Recipes Section - Show when no search query */}
-        {!searchQuery && cachedRecipesLoaded && cachedRecipes.length > 0 && (
+        {!searchQuery && cachedRecipesLoaded && defaultPopularRecipes.length > 0 && (
           <div>
             <h4 className="text-sm font-semibold text-theme-secondary mb-2">{intl.formatMessage({ id: 'mealPlanner.popularRecipes' })}</h4>
             <div className="grid grid-cols-3 gap-2">
-              {cachedRecipes.slice(0, 12).map((recipe) => (
+              {defaultPopularRecipes.map((recipe) => (
                 <div
                   key={recipe.id}
                   className="bg-theme-secondary rounded-lg overflow-hidden cursor-pointer hover:shadow-md transition-shadow"

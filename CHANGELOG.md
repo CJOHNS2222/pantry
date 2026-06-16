@@ -1,3 +1,15 @@
+## [2.4.6] - 2026-06-16
+
+### Added
+- **Offline Recipe Classification** — Added rule-based keyword classification script (`classify-recipes-rules.js`) and corresponding npm script shortcut (`classify-recipes`) to classify cached popular recipes offline.
+
+### Changed
+- **Firestore Listener Optimization** — Introduced a global `SubscriptionContext` and `SubscriptionProvider` to establish `onSnapshot` listeners once at login and reuse them, dramatically reducing Firestore read costs. Removed duplicate auth snapshot listeners by sharing user profile state from context.
+- **Meal Planner Auto-Fill** — Updated auto-fill algorithm to strictly exclude recipes containing allergy-violating ingredients and apply dietary/dislike preference scoring penalties. Added duplicate prevention so users do not receive the same suggestions repeatedly.
+- **Popular Recipes Search** — Integrated allergy screening and preference ranking into the popular recipes search modal (`RecipeSearchModal.tsx`) to match the updated meal planning recommendations.
+
+---
+
 ## [2.4.5] - 2026-06-16
 
 ### Added

@@ -9,6 +9,16 @@ export interface ChangeEntry {
 
 export const RECENT_CHANGES: ChangeEntry[] = [
   {
+    "version": "2.4.6",
+    "date": "Jun 16, 2026",
+    "highlights": [
+      "Offline Recipe Classification — Added rule-based keyword classification script (classify-recipes-rules.js) and…",
+      "Firestore Listener Optimization — Introduced a global SubscriptionContext and SubscriptionProvider to establish…",
+      "Meal Planner Auto-Fill — Updated auto-fill algorithm to strictly exclude recipes containing allergy-violating…",
+      "Popular Recipes Search — Integrated allergy screening and preference ranking into the popular recipes search modal…"
+    ]
+  },
+  {
     "version": "2.4.5",
     "date": "Jun 16, 2026",
     "highlights": [
@@ -26,16 +36,6 @@ export const RECENT_CHANGES: ChangeEntry[] = [
       "Member Activity Box Header Style",
       "Recipe Ingredient Source Tags",
       "Visual Fill Level Quantity Modifier"
-    ]
-  },
-  {
-    "version": "2.4.3",
-    "date": "Jun 13, 2026",
-    "highlights": [
-      "Suggested Item Label & Wrapping",
-      "Dotted Meal Planner Placeholder",
-      "Bypassing Redundant Search Dropdowns",
-      "Household Modal Themes"
     ]
   }
 ];

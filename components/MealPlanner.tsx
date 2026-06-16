@@ -26,6 +26,9 @@ import { useAndroidBack } from '../hooks/useAndroidBack';
 import { getMealPrepSuggestions } from '../utils/searchUtils';
 import CalendarService from '../services/calendarService';
 import type { Settings } from '../types';
+import { getCachedPopularRecipes } from '../services/recipeService';
+import { rankCachedRecipesByPreferences, isRecipeSafeFromAllergies } from '../utils/preferenceUtils';
+import { log } from '../services/logService';
 
 // Utility function to generate attractive recipe placeholder images
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -672,12 +675,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
     }
   }, [displayPlan, mealPlan, updateMealPlan]);
 
-  const handleAutoFillPlan = useCallback((preferences: AutoFillPreferences) => {
-    if (savedRecipes.length === 0 && (!preferences.useLeftovers || leftovers.length === 0)) {
-      addToast('No saved recipes or leftovers available to auto-fill.', 'info');
-      return;
-    }
-
+  const handleAutoFillPlan = useCallback(async (preferences: AutoFillPreferences) => {
     const newPlan = [...mealPlan];
     const d = new Date();
     const todayLocal = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -687,22 +685,95 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
       .filter(i => i.expirationDate && new Date(i.expirationDate).getTime() <= weekFromNow)
       .map(i => i.item.toLowerCase());
 
-    const sortedRecipes = [...savedRecipes].sort((a, b) => {
-      // Prioritize by expiring items if selected
-      if (preferences.prioritizeExpiring) {
-        const aExpiring = (a.ingredients || []).some(ing => expiringNames.some(exp => ing.toLowerCase().includes(exp.split(' ')[0])));
-        const bExpiring = (b.ingredients || []).some(ing => expiringNames.some(exp => ing.toLowerCase().includes(exp.split(' ')[0])));
-        if (aExpiring && !bExpiring) return -1;
-        if (!aExpiring && bExpiring) return 1;
-      }
-      return 0; // fallback to stable sort
+    // Load popular recipes from the cache as fallback
+    let backupRecipes: SavedRecipe[] = [];
+    try {
+      backupRecipes = await getCachedPopularRecipes();
+    } catch (err) {
+      log.error('Failed to load backup popular recipes for auto-fill:', err);
+    }
+
+    if (savedRecipes.length === 0 && backupRecipes.length === 0 && (!preferences.useLeftovers || leftovers.length === 0)) {
+      addToast('No saved recipes or database cache recipes available to auto-fill.', 'info');
+      return;
+    }
+
+    const sortedRecipes = [...savedRecipes]
+      .filter(r => isRecipeSafeFromAllergies(r, household?.members || [], user?.profile))
+      .sort((a, b) => {
+        // Prioritize by expiring items if selected
+        if (preferences.prioritizeExpiring) {
+          const aExpiring = (a.ingredients || []).some(ing => expiringNames.some(exp => ing.toLowerCase().includes(exp.split(' ')[0])));
+          const bExpiring = (b.ingredients || []).some(ing => expiringNames.some(exp => ing.toLowerCase().includes(exp.split(' ')[0])));
+          if (aExpiring && !bExpiring) return -1;
+          if (!aExpiring && bExpiring) return 1;
+        }
+        return 0; // fallback to stable sort
+      });
+
+    // Rank the backup recipes by household/user preferences, strictly excluding allergy violations
+    const rankedBackupRecipes = rankCachedRecipesByPreferences(
+      backupRecipes.filter(r => isRecipeSafeFromAllergies(r, household?.members || [], user?.profile)),
+      household?.members || [],
+      user?.profile
+    );
+
+    // Keep track of recipe titles already assigned to avoid repeats
+    const assignedTitles = new Set<string>();
+
+    // Seed the assignedTitles with recipes already in the meal plan for the target days to avoid repeating what's already planned
+    newPlan.forEach(day => {
+      ['breakfast', 'lunch', 'dinner'].forEach(mealType => {
+        const meals = day[mealType as 'breakfast' | 'lunch' | 'dinner'] || [];
+        meals.forEach(m => {
+          if (m.recipe?.title) {
+            assignedTitles.add(m.recipe.title.toLowerCase());
+          }
+        });
+      });
     });
 
-    let recipeIndex = Math.floor(Math.random() * Math.max(1, sortedRecipes.length));
     let leftoversUsed = 0;
+    let daysChecked = 0;
+
+    // Helper to select a recipe
+    const selectRecipe = (): SavedRecipe | null => {
+      // 1. Try to find an unused saved recipe
+      const unusedSaved = sortedRecipes.filter(r => !assignedTitles.has(r.title.toLowerCase()));
+      if (unusedSaved.length > 0) {
+        const selected = unusedSaved[Math.floor(Math.random() * unusedSaved.length)];
+        assignedTitles.add(selected.title.toLowerCase());
+        return selected;
+      }
+
+      // 2. Fall back to unused ranked backup recipes
+      const unusedBackup = rankedBackupRecipes.filter(r => !assignedTitles.has(r.title.toLowerCase()));
+      if (unusedBackup.length > 0) {
+        const candidates = unusedBackup.slice(0, 5);
+        const selected = candidates[Math.floor(Math.random() * candidates.length)];
+        assignedTitles.add(selected.title.toLowerCase());
+        return selected;
+      }
+
+      // 3. Complete fallback: allow repeats from saved recipes first
+      if (sortedRecipes.length > 0) {
+        const selected = sortedRecipes[Math.floor(Math.random() * sortedRecipes.length)];
+        return selected;
+      }
+
+      // 4. Ultimate fallback: repeat from backup recipes
+      if (rankedBackupRecipes.length > 0) {
+        const selected = rankedBackupRecipes[Math.floor(Math.random() * Math.min(10, rankedBackupRecipes.length))];
+        return selected;
+      }
+
+      return null;
+    };
 
     displayPlan.forEach((day) => {
       if (day.date < todayLocal) return;
+      if (daysChecked >= preferences.daysToFill) return;
+      daysChecked++;
       
       const dayIndexInMealPlan = newPlan.findIndex(d => d.date === day.date);
       if (dayIndexInMealPlan === -1) return;
@@ -740,10 +811,8 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
             return;
           }
 
-          if (sortedRecipes.length === 0) return;
-          
-          const recipe = sortedRecipes[recipeIndex % sortedRecipes.length];
-          recipeIndex++;
+          const recipe = selectRecipe();
+          if (!recipe) return;
           
           if (!targetDay[mealType]) targetDay[mealType] = [];
           targetDay[mealType].push({
@@ -757,7 +826,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
     updateMealPlan(newPlan);
     addToast('Meal plan auto-filled successfully!', 'success');
     setShowAutoFillModal(false);
-  }, [mealPlan, displayPlan, savedRecipes, updateMealPlan, addToast, inventory, leftovers]);
+  }, [mealPlan, displayPlan, savedRecipes, updateMealPlan, addToast, inventory, leftovers, household, user]);
 
   const handleClearWeek = useCallback(() => {
     const weekStart = Math.floor(currentDayIndex / 7) * 7;
@@ -1154,6 +1223,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
         <MealPlanAutoFillModal
           onClose={() => setShowAutoFillModal(false)}
           onAutoFill={handleAutoFillPlan}
+          canUseTwoWeekPlanning={canUseTwoWeekPlanning}
         />
       )}
     </div>

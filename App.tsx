@@ -22,6 +22,7 @@ import LeftoversHotZone from './components/LeftoversHotZone';
 import { useHouseholdActivity } from './hooks/useHouseholdActivity';
 import { useOfflineStatus } from './hooks/useOfflineStatus';
 import AnalyticsService from './services/analyticsService';
+import { SubscriptionProvider } from './hooks/useSubscription';
 
 import { isHouseholdMember, inferCategoryFromItemName, inferStorageLocationFromItemName, parseIngredientForShoppingList, getItemImage, fetchExternalItemImage } from './utils/appUtils';
 import { getQuantityAmount } from './utils/quantityUtils';
@@ -1161,7 +1162,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <>
+    <SubscriptionProvider user={user}>
       {(() => {
         if (settings?.theme) {
           setAppContext(
@@ -1491,14 +1492,15 @@ const App: React.FC = () => {
                       unit: i.purchasedBatch.unit || (i.purchasedQuantity?.unit ?? undefined),
                       expires: i.purchasedBatch.expires,
                       purchaseDate: nowIso,
-                      note: i.purchasedBatch.note
+                      note: i.purchasedBatch.note || i.notes || (i.source?.startsWith('recipe:') ? i.source : undefined)
                     });
                   } else if (i.purchasedQuantity) {
                     batches.push({
                       batchId: Math.random().toString(36).substr(2,9),
                       quantity: Math.abs(i.purchasedQuantity.amount) || Math.abs(addQty),
                       unit: i.purchasedQuantity.unit || undefined,
-                      purchaseDate: nowIso
+                      purchaseDate: nowIso,
+                      note: i.notes || (i.source?.startsWith('recipe:') ? i.source : undefined)
                     });
                   } else {
                     // Fallback: create a batch from the generic quantity field.
@@ -1510,7 +1512,8 @@ const App: React.FC = () => {
                       batchId: Math.random().toString(36).substr(2,9),
                       quantity: Math.abs(addQty),
                       unit: fallbackUnit,
-                      purchaseDate: nowIso
+                      purchaseDate: nowIso,
+                      note: i.notes || (i.source?.startsWith('recipe:') ? i.source : undefined)
                     });
                   }
 
@@ -1525,7 +1528,8 @@ const App: React.FC = () => {
                     reservations,
                     batches,
                     dateAdded: nowIso,
-                    lastRestocked: nowIso
+                    lastRestocked: nowIso,
+                    notes: i.notes || (i.source?.startsWith('recipe:') ? i.source : undefined)
                   };
                 }));
                 
@@ -1686,7 +1690,7 @@ const App: React.FC = () => {
           <DatabaseAnalytics />
         </Suspense>
       )}
-    </>
+    </SubscriptionProvider>
   );
 };
 

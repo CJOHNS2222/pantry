@@ -100,8 +100,9 @@ export const EnhancedShoppingListItem: React.FC<ShoppingListItemProps> = ({
   };
 
   return (
-    <div className="relative overflow-hidden rounded-xl">
-      {/* Swipe Actions Drawer - sits underneath the card on the right side */}
+    <div className="relative">
+      <div className="relative overflow-hidden rounded-xl">
+        {/* Swipe Actions Drawer - sits underneath the card on the right side */}
       <div
         className="absolute inset-y-0 right-0 flex items-stretch z-0 overflow-hidden rounded-r-xl"
         style={{ width: `${drawerWidth}px` }}
@@ -272,6 +273,7 @@ export const EnhancedShoppingListItem: React.FC<ShoppingListItemProps> = ({
           </button>
         </div>
       </div>
+      </div>
 
       {/* Assignment Picker */}
       {showAssignPicker && onUpdateItem && householdMembers && householdMembers.length > 0 && (
@@ -314,6 +316,7 @@ export const EnhancedShoppingListItem: React.FC<ShoppingListItemProps> = ({
         <div className="mt-1 p-2 bg-theme-secondary border border-theme rounded-lg">
           <div className="text-xs font-medium text-theme-secondary mb-1">Note:</div>
           <textarea
+            autoFocus
             value={noteText}
             onChange={(e) => setNoteText(e.target.value)}
             onBlur={() => {

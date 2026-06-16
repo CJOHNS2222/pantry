@@ -306,6 +306,7 @@ export function recipeMatchesCacheFilters(
 
 /**
  * Score a recipe by household/user likes/dislikes so callers can rank matches.
+ * Also penalizes dietary restrictions (-15) and disliked ingredients (-8) per violation.
  */
 export function scoreRecipeForPreferences(
   recipe: StructuredRecipe | SavedRecipe,
@@ -322,31 +323,103 @@ export function scoreRecipeForPreferences(
 
   let score = 0;
 
-  const scoreMember = (member: Pick<Member, 'favoriteCuisines' | 'preferredProteins' | 'dislikedIngredients'>) => {
+  // 1. Text-based scoring for cuisines and preferred proteins
+  const scoreMemberText = (member: Pick<Member, 'favoriteCuisines' | 'preferredProteins'>) => {
     for (const cuisine of member.favoriteCuisines || []) {
       if (text.includes(normalizeIngredient(cuisine))) score += 6;
     }
     for (const protein of member.preferredProteins || []) {
       if (text.includes(normalizeIngredient(protein))) score += 4;
     }
-    for (const dislike of member.dislikedIngredients || []) {
-      if (text.includes(normalizeIngredient(dislike))) score -= 8;
+  };
+
+  for (const member of householdMembers) {
+    scoreMemberText(member);
+  }
+  if (userProfile) {
+    scoreMemberText({
+      favoriteCuisines: userProfile.favoriteCuisines,
+      preferredProteins: userProfile.preferredProteins
+    });
+  }
+
+  // 2. Strict ingredient-based checks for restrictions and dislikes using checkRecipeAgainstPreferences
+  const applyDetailedScore = (member: Member) => {
+    const result = checkRecipeAgainstPreferences(recipe, member);
+    // Penalize dietary restrictions (e.g. -15 per violation)
+    if (result.violations.restrictions.length > 0) {
+      score -= result.violations.restrictions.length * 15;
+    }
+    // Penalize disliked ingredients (e.g. -8 per violation)
+    if (result.violations.dislikes.length > 0) {
+      score -= result.violations.dislikes.length * 8;
     }
   };
 
   for (const member of householdMembers) {
-    scoreMember(member);
+    applyDetailedScore(member);
   }
 
   if (userProfile) {
-    scoreMember({
+    const userAsMember: Member = {
+      id: 'user',
+      name: userProfile.name || 'User',
+      email: '',
+      status: 'active',
+      joinedAt: '',
+      allergies: userProfile.allergies,
+      dietaryRestrictions: userProfile.dietaryRestrictions,
       favoriteCuisines: userProfile.favoriteCuisines,
       preferredProteins: userProfile.preferredProteins,
-      dislikedIngredients: userProfile.dislikedIngredients
-    });
+      dislikedIngredients: userProfile.dislikedIngredients,
+      role: 'admin'
+    };
+    applyDetailedScore(userAsMember);
   }
 
   return score;
+}
+
+/**
+ * Check if a recipe is completely safe from allergies for household members and the user.
+ */
+export function isRecipeSafeFromAllergies(
+  recipe: StructuredRecipe | SavedRecipe,
+  householdMembers: Member[] = [],
+  userProfile?: UserProfile
+): boolean {
+  // Check household members' allergies
+  for (const member of householdMembers) {
+    if (member.allergies?.length) {
+      const checkResult = checkRecipeAgainstPreferences(recipe, member);
+      if (checkResult.violations.allergies.length > 0) {
+        return false;
+      }
+    }
+  }
+
+  // Check user's allergies
+  if (userProfile && userProfile.allergies?.length) {
+    const userAsMember: Member = {
+      id: 'user',
+      name: userProfile.name || 'User',
+      email: '',
+      status: 'active',
+      joinedAt: '',
+      allergies: userProfile.allergies,
+      dietaryRestrictions: userProfile.dietaryRestrictions,
+      favoriteCuisines: userProfile.favoriteCuisines,
+      preferredProteins: userProfile.preferredProteins,
+      dislikedIngredients: userProfile.dislikedIngredients,
+      role: 'admin'
+    };
+    const checkResult = checkRecipeAgainstPreferences(recipe, userAsMember);
+    if (checkResult.violations.allergies.length > 0) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 export function rankCachedRecipesByPreferences<T extends StructuredRecipe | SavedRecipe>(

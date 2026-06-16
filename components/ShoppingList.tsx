@@ -27,7 +27,6 @@ import { ShoppingListUndoBanners } from './shopping-list/ShoppingListUndoBanners
 
 // Import hooks and services
 import { useOfflineStatus } from '../hooks/useOfflineStatus';
-import { useAuth } from '../hooks/useAuth';
 import { offlineQueue } from '../services/offlineQueueService';
 import { useAppActions } from '../contexts/AppActionsContext';
 import { useApp } from '../contexts/AppContext';
@@ -266,7 +265,6 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
 
   // Hooks for offline functionality
   const { isOnline } = useOfflineStatus();
-  const { user: authUser } = useAuth();
   const addToQueue = (op: { type: 'add' | 'update' | 'delete' | 'batch'; collection: string; docId?: string; data: unknown }) => offlineQueue.enqueue(op as Parameters<typeof offlineQueue.enqueue>[0]);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const processQueue = () => offlineQueue.processQueue();
@@ -801,14 +799,14 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
           <HouseholdShoppingShare
             householdMembers={householdMembers}
             recentActivity={householdActivity}
-            currentUserId={authUser?.id || user?.id || ''}
+            currentUserId={user?.id || ''}
             onSendMessage={onHouseholdMessage}
           />
       )}
 
       {/* Live presence strip — "Sarah is shopping now 🛒" */}
       {(() => {
-        const currentUserId = authUser?.id || user?.id || '';
+        const currentUserId = user?.id || '';
         const shoppingNow = householdMembers.filter(
           m => m.id !== currentUserId && m.currentActivity === 'shopping'
         );

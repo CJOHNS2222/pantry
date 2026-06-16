@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
+import DatabaseMonitoringService from '../../../services/databaseMonitoringService';
 
 // Mock firebase/firestore
 vi.mock('firebase/firestore', () => ({
@@ -9,10 +10,9 @@ vi.mock('firebase/firestore', () => ({
 }));
 
 // Mock DatabaseMonitoringService
-const mockOnSnapshot = vi.fn();
 vi.mock('../../../services/databaseMonitoringService', () => ({
   default: {
-    onSnapshot: mockOnSnapshot,
+    onSnapshot: vi.fn(),
     doc: vi.fn((collection: string, id: string) => ({ path: `${collection}/${id}` })),
     updateDoc: vi.fn().mockResolvedValue(undefined),
   },
@@ -52,7 +52,7 @@ describe('useSubscription', () => {
 
   it('elevates non-admin member to family tier when household owner has family plan', async () => {
     // Simulate two onSnapshot calls: own subscription doc + household doc
-    mockOnSnapshot.mockImplementation((_ref: any, callback: (doc: any) => void, _errCb?: any) => {
+    vi.mocked(DatabaseMonitoringService.onSnapshot).mockImplementation((_ref: any, callback: (doc: any) => void, _errCb?: any) => {
       const path = _ref?.path ?? '';
       if (path.includes('households')) {
         // Simulate household doc: user is non-admin, owner has family tier
@@ -85,7 +85,7 @@ describe('useSubscription', () => {
   });
 
   it('does not elevate admin — admin uses own subscription tier', async () => {
-    mockOnSnapshot.mockImplementation((_ref: any, callback: (doc: any) => void, _errCb?: any) => {
+    vi.mocked(DatabaseMonitoringService.onSnapshot).mockImplementation((_ref: any, callback: (doc: any) => void, _errCb?: any) => {
       const path = _ref?.path ?? '';
       if (path.includes('households')) {
         callback({
@@ -114,7 +114,7 @@ describe('useSubscription', () => {
   });
 
   it('free member in a free-tier household stays free', async () => {
-    mockOnSnapshot.mockImplementation((_ref: any, callback: (doc: any) => void, _errCb?: any) => {
+    vi.mocked(DatabaseMonitoringService.onSnapshot).mockImplementation((_ref: any, callback: (doc: any) => void, _errCb?: any) => {
       const path = _ref?.path ?? '';
       if (path.includes('households')) {
         callback({

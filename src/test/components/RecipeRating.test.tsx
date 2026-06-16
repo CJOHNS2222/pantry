@@ -146,11 +146,9 @@ describe('RecipeRatingUI', () => {
     (window as any).TEST_USER = undefined;
     render(<RecipeRatingUI {...defaultProps} onRatingSubmitted={mockOnRate} user={undefined} />);
 
-    // Select rating and submit
-    const starButtons = screen.getAllByRole('button').filter(button =>
-      button.querySelector('svg') !== null
-    );
-    fireEvent.click(starButtons[0]!); // 1 star
+    // Select verdict 'skip' which maps to 1-star rating
+    const skipBtn = screen.getByRole('button', { name: /skip/i });
+    fireEvent.click(skipBtn);
 
     const submitButton = screen.getByRole('button', { name: /submit rating/i });
     fireEvent.click(submitButton);

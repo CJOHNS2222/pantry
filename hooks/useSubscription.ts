@@ -1,10 +1,22 @@
-import { useState, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import DatabaseMonitoringService from '../services/databaseMonitoringService';
 import { User, Subscription } from '../types';
 import { UsageService } from '../services/usageService';
 import { log } from '../services/logService';
 
-export function useSubscription(user: User | null) {
+interface SubscriptionContextType {
+  subscription: Subscription | null;
+  loading: boolean;
+  updateSubscription: (updates: Partial<Subscription>) => Promise<void>;
+  isPremium: boolean;
+  isFamily: boolean;
+  isActive: boolean;
+  effectiveTier: 'free' | 'premium' | 'family';
+}
+
+const SubscriptionContext = createContext<SubscriptionContextType | null>(null);
+
+function useSubscriptionInternal(user: User | null, enabled: boolean) {
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [loading, setLoading] = useState(true);
   // Tier inherited from the household owner (non-null only when member is in a family household)
@@ -14,8 +26,10 @@ export function useSubscription(user: User | null) {
 
   // ── Own subscription listener ──────────────────────────────────────────────
   useEffect(() => {
-    if (!user?.id) {
-      setLoading(false);
+    if (!enabled || !user?.id) {
+      if (!user?.id) {
+        setLoading(false);
+      }
       return;
     }
 
@@ -36,7 +50,7 @@ export function useSubscription(user: User | null) {
     });
 
     return unsubscribe;
-  }, [user?.id]);
+  }, [user?.id, enabled]);
 
   // ── Household subscription listener ───────────────────────────────────────
   // Two responsibilities:
@@ -44,7 +58,7 @@ export function useSubscription(user: User | null) {
   //   2. If user is the household admin, keep ownerSubscriptionTier in sync with their tier.
   useEffect(() => {
     const householdId = user?.householdId;
-    if (!householdId || !user?.id || !subscription) {
+    if (!enabled || !householdId || !user?.id || !subscription) {
       setHouseholdOwnerTier(null);
       return;
     }
@@ -91,7 +105,7 @@ export function useSubscription(user: User | null) {
     );
 
     return unsubscribe;
-  }, [user?.id, user?.householdId, subscription]);
+  }, [user?.id, user?.householdId, subscription, enabled]);
 
   const updateSubscription = async (updates: Partial<Subscription>) => {
     if (!user?.id) return;
@@ -125,7 +139,24 @@ export function useSubscription(user: User | null) {
     isPremium,
     isFamily,
     isActive,
-    /** The resolved tier after household inheritance is applied. Use this when passing to UsageService. */
     effectiveTier,
   };
 }
+
+export const SubscriptionProvider: React.FC<{ user: User | null; children: React.ReactNode }> = ({ user, children }) => {
+  const value = useSubscriptionInternal(user, true);
+  return React.createElement(SubscriptionContext.Provider, { value }, children);
+};
+
+export function useSubscription(user: User | null = null) {
+  const context = useContext(SubscriptionContext);
+
+  // Call the internal hook, but disable the listeners if context is present
+  const localVal = useSubscriptionInternal(user, !context);
+
+  if (context) {
+    return context;
+  }
+  return localVal;
+}
+

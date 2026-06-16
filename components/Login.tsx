@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { FormattedMessage, useIntl } from 'react-intl';
-import { ChefHat, LogIn, UserX } from 'lucide-react';
+import { LogIn, UserX } from 'lucide-react';
 import { User } from '../types';
 import { Capacitor } from '@capacitor/core';
 import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
@@ -277,8 +277,8 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
       <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl relative z-10">
         <div className="flex flex-col items-center mb-8">
-          <div className="w-20 h-20 bg-gradient-to-br from-amber-400 to-amber-600 rounded-full flex items-center justify-center shadow-lg mb-4">
-            <ChefHat className="w-10 h-10 text-white" />
+          <div className="w-20 h-20 bg-gradient-to-br from-amber-400 to-amber-600 rounded-full flex items-center justify-center shadow-lg mb-4 overflow-hidden">
+            <img src="/icons/icon.PNG" alt="App Icon" className="w-16 h-16 object-contain" />
           </div>
           <h1 className="text-3xl font-bold font-serif tracking-wide text-amber-50">
             <FormattedMessage id="app.name" />

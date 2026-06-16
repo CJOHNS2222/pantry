@@ -29,7 +29,7 @@ export const MealPlannerHeader: React.FC<MealPlannerHeaderProps> = ({
             aria-label="Open auto fill modal"
           >
             <Wand2 className="w-4 h-4" />
-            <span className="hidden sm:inline">Auto-Fill</span>
+            <span>Auto-Fill Plan</span>
           </button>
           <button
             onClick={onOpenMealPrepPlanner}

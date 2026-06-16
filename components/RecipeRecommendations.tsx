@@ -1,9 +1,9 @@
 import { AppBadge } from './AppBadge';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { Heart, Users, TrendingUp, Clock, ChefHat, Star, Loader2 } from 'lucide-react';
 import { StructuredRecipe } from '../types';
 import { RecipeRecommendationService, RecipeRecommendation } from '../services/recipeRecommendationService';
-import { useAuth } from '../hooks/useAuth';
+import AppContext from '../contexts/AppContext';
 import { useToasts } from '../hooks/useToasts';
 import { log } from '../services/logService';
 
@@ -20,7 +20,8 @@ export const RecipeRecommendations: React.FC<RecipeRecommendationsProps> = ({
   onRecipeSelect,
   onDismissRecommendation
 }) => {
-  const { user } = useAuth();
+  const context = useContext(AppContext);
+  const user = context?.user;
   const { addToast } = useToasts();
   const [recommendations, setRecommendations] = useState<RecipeRecommendation[]>([]);
   const [isLoading, setIsLoading] = useState(true);

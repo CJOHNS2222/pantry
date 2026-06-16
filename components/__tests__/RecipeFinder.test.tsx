@@ -53,7 +53,10 @@ vi.mock('../../utils/debounceUtils', () => ({
 }));
 
 vi.mock('../../utils/preferenceUtils', () => ({
-  filterRecipesByHouseholdPreferences: vi.fn((recipes) => recipes),
+  filterRecipesByHouseholdPreferences: vi.fn((recipes) => ({ safeRecipes: recipes, riskyRecipes: [] })),
+  rankCachedRecipesByPreferences: vi.fn((recipes) => recipes),
+  checkRecipeAgainstPreferences: vi.fn(() => ({ isSafe: true, violations: { allergies: [], restrictions: [], dislikes: [] }, warnings: [] })),
+  recipeMatchesCacheFilters: vi.fn(() => true),
 }));
 
 vi.mock('../hooks/useKeyboardNavigation', () => ({

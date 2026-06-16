@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import { RecipeRatingUI } from './RecipeRating';
 import { RecipeCommunityInsights } from './RecipeCommunityInsights';
 import { RecipeRecommendations } from './RecipeRecommendations';
-import { StructuredRecipe } from '../types';
-import { useAuth } from '../hooks/useAuth';
+import { StructuredRecipe, RecipeRating } from '../types';
+import AppContext from '../contexts/AppContext';
 import { log } from '../services/logService';
 
 // Example recipe for demonstration
@@ -32,7 +32,8 @@ const exampleRecipe: StructuredRecipe = {
 };
 
 export const RecipeRatingPage: React.FC = () => {
-  const { user } = useAuth();
+  const context = useContext(AppContext);
+  const user = context?.user;
   const [selectedRecipe, setSelectedRecipe] = useState<StructuredRecipe | null>(null);
 
   const handleRecipeSelect = (recipe: StructuredRecipe) => {
@@ -40,7 +41,7 @@ export const RecipeRatingPage: React.FC = () => {
     // In a real app, you might navigate to the recipe detail page
   };
 
-  const handleRatingSubmitted = (rating: any) => {
+  const handleRatingSubmitted = (rating: RecipeRating) => {
     log.debug('Rating submitted:', rating);
     // Handle rating submission (analytics, etc.)
   };

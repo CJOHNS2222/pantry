@@ -115,7 +115,8 @@ export const CheckoutExpiryModal: React.FC<CheckoutExpiryModalProps> = ({
           amount,
           unit,
           expires,
-          is_immortal: isImmortal
+          is_immortal: isImmortal,
+          note: item.notes || (item.source?.startsWith('recipe:') ? item.source : undefined)
         }
       };
     });

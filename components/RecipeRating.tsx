@@ -1,9 +1,9 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useContext } from 'react';
 import { Star, MessageSquare, Camera, Heart, X, Users, TrendingUp, ChefHat, Loader2 } from 'lucide-react';
 import { RecipeRating, StructuredRecipe, RecipeFeedback, RecipePhoto, RecipeModification, RecipeCommunityStats } from '../types';
 import { RecipeRatingService } from '../services/recipeRatingService';
 import { RecipePhotoService } from '../services/recipePhotoService';
-import { useAuth } from '../hooks/useAuth';
+import AppContext from '../contexts/AppContext';
 import { useToasts } from '../hooks/useToasts';
 import { log } from '../services/logService';
 
@@ -22,7 +22,8 @@ export const RecipeRatingUI: React.FC<RecipeRatingUIProps> = ({
   communityStats,
   householdId
 }) => {
-  const { user: contextUser } = useAuth();
+  const context = useContext(AppContext);
+  const contextUser = context?.user;
   const { addToast } = useToasts();
   const [existingRating, setExistingRating] = useState<RecipeRating | null>(null);
   // Support prop user override for testing

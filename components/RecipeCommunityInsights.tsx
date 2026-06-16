@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { Users, TrendingUp, ChefHat, MessageSquare, Loader2, ThumbsUp } from 'lucide-react';
 import { RecipeCommunityStats, RecipeModification, RecipeRating } from '../types';
 import { RecipeRatingService } from '../services/recipeRatingService';
 import DatabaseMonitoringService from '../services/databaseMonitoringService';
-import { useAuth } from '../hooks/useAuth';
+import AppContext from '../contexts/AppContext';
 import { useToasts } from '../hooks/useToasts';
 import { log } from '../services/logService';
 
@@ -16,7 +16,8 @@ export const RecipeCommunityInsights: React.FC<RecipeCommunityInsightsProps> = (
   recipeTitle,
   householdId
 }) => {
-  const { user } = useAuth();
+  const context = useContext(AppContext);
+  const user = context?.user;
   const { addToast } = useToasts();
   const [stats, setStats] = useState<RecipeCommunityStats | null>(null);
   const [topModifications, setTopModifications] = useState<RecipeModification[]>([]);

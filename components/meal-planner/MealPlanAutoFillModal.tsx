@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { Wand2, AlertTriangle, Package, CheckSquare, Square, X } from 'lucide-react';
+import { Wand2, AlertTriangle, Package, CheckSquare, Square, X, Lock } from 'lucide-react';
+import { useAppActions } from '../../contexts/AppActionsContext';
+import { Tab } from '../../types/app';
 
 export interface AutoFillPreferences {
   mealTypes: {
@@ -9,17 +11,21 @@ export interface AutoFillPreferences {
   };
   prioritizeExpiring: boolean;
   useLeftovers: boolean;
+  daysToFill: number;
 }
 
 interface MealPlanAutoFillModalProps {
   onClose: () => void;
   onAutoFill: (preferences: AutoFillPreferences) => void;
+  canUseTwoWeekPlanning: boolean;
 }
 
 export const MealPlanAutoFillModal: React.FC<MealPlanAutoFillModalProps> = ({
   onClose,
   onAutoFill,
+  canUseTwoWeekPlanning,
 }) => {
+  const { addToast, setActiveTab } = useAppActions();
   const [preferences, setPreferences] = useState<AutoFillPreferences>({
     mealTypes: {
       breakfast: false,
@@ -28,6 +34,7 @@ export const MealPlanAutoFillModal: React.FC<MealPlanAutoFillModalProps> = ({
     },
     prioritizeExpiring: true,
     useLeftovers: true,
+    daysToFill: 3,
   });
 
   const handleToggleMealType = (type: 'breakfast' | 'lunch' | 'dinner') => {
@@ -101,6 +108,51 @@ export const MealPlanAutoFillModal: React.FC<MealPlanAutoFillModalProps> = ({
             {!isAnyMealTypeSelected && (
               <p className="text-xs text-red-500 mt-2">Please select at least one meal type.</p>
             )}
+          </div>
+
+          {/* Days to Fill Selector */}
+          <div>
+            <h4 className="text-sm font-semibold text-theme-primary mb-3">How many days to fill?</h4>
+            <div className="flex gap-2">
+              {([1, 3, 5, 7, 14] as const).map(days => {
+                const isPremiumOption = days > 7;
+                const isDisabled = isPremiumOption && !canUseTwoWeekPlanning;
+                
+                return (
+                  <button
+                    key={days}
+                    type="button"
+                    onClick={() => {
+                      if (isDisabled) {
+                        addToast('Planning beyond 7 days requires Premium.', 'info', 5000, 'Upgrade', () => {
+                          onClose();
+                          setActiveTab(Tab.SETTINGS);
+                        });
+                        return;
+                      }
+                      setPreferences(prev => ({
+                        ...prev,
+                        daysToFill: days
+                      }));
+                    }}
+                    className={`flex-1 py-2 px-1 rounded-lg border text-sm font-medium transition-all flex flex-col items-center justify-center gap-1 ${
+                      preferences.daysToFill === days
+                        ? 'border-[var(--accent-color)] bg-[var(--accent-color)]/5 text-[var(--accent-color)] font-bold'
+                        : isDisabled
+                          ? 'border-theme opacity-65 text-theme-secondary hover:border-orange-200/50 cursor-pointer'
+                          : 'border-theme hover:border-[var(--accent-color)]/50 text-theme-secondary'
+                    }`}
+                  >
+                    <span className="text-xs text-center leading-none">
+                      {days} {days === 1 ? 'Day' : 'Days'}
+                    </span>
+                    {isDisabled && (
+                      <Lock className="w-3.5 h-3.5 text-orange-500" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {/* Smart Priorities */}
