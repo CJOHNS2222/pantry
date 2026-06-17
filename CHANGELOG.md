@@ -1,3 +1,13 @@
+## [2.4.8] - 2026-06-17
+
+### Added
+- **Unit Test Infrastructure** — Restructured and unified the unit test mocks across the recipe service, usage service, and component search suites to achieve 100% test coverage and pass rate. Added static cache clear utilities to isolate test suites.
+
+### Changed
+- **Gemini API Key Rotation** — Configured and updated the local environment settings with the newly rotated Gemini API Key.
+
+---
+
 ## [2.4.7] - 2026-06-16
 
 ### Added

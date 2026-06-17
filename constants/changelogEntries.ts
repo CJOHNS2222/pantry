@@ -9,6 +9,14 @@ export interface ChangeEntry {
 
 export const RECENT_CHANGES: ChangeEntry[] = [
   {
+    "version": "2.4.8",
+    "date": "Jun 17, 2026",
+    "highlights": [
+      "Unit Test Infrastructure — Restructured and unified the unit test mocks across the recipe service, usage service, and…",
+      "Gemini API Key Rotation — Configured and updated the local environment settings with the newly rotated Gemini API Key."
+    ]
+  },
+  {
     "version": "2.4.7",
     "date": "Jun 16, 2026",
     "highlights": [
@@ -24,16 +32,6 @@ export const RECENT_CHANGES: ChangeEntry[] = [
       "Firestore Listener Optimization — Introduced a global SubscriptionContext and SubscriptionProvider to establish…",
       "Meal Planner Auto-Fill — Updated auto-fill algorithm to strictly exclude recipes containing allergy-violating…",
       "Popular Recipes Search — Integrated allergy screening and preference ranking into the popular recipes search modal…"
-    ]
-  },
-  {
-    "version": "2.4.5",
-    "date": "Jun 16, 2026",
-    "highlights": [
-      "Meal Planner Auto-Fill",
-      "Gemini Token Debugger",
-      "Single-Member Household Deletion",
-      "Cache Data Preservation"
     ]
   }
 ];
