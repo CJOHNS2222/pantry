@@ -3,8 +3,8 @@ import { useIntl } from 'react-intl';
 import { Bookmark, Plus } from 'lucide-react';
 import { SavedRecipe, StructuredRecipe } from '../../types';
 import { Tab } from '../../types/app';
-import ImportModal from '../ImportModal';
-import { RecipeCardSkeleton } from '../SkeletonLoader';
+import ImportModal from '../pantry/ImportModal';
+import { RecipeCardSkeleton } from '../ui/SkeletonLoader';
 
 interface RecipeFinderSavedViewProps {
   showImportModal: boolean;

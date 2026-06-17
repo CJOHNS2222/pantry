@@ -1,7 +1,7 @@
 import React from 'react';
 import { useIntl } from 'react-intl';
 import { Plus, X } from 'lucide-react';
-import QuantityUnitPicker from '../QuantityUnitPicker';
+import QuantityUnitPicker from '../pantry/QuantityUnitPicker';
 
 interface ShoppingListAddItemModalProps {
   isOpen: boolean;
@@ -87,3 +87,4 @@ export const ShoppingListAddItemModal: React.FC<ShoppingListAddItemModalProps> =
     </div>
   );
 };
+

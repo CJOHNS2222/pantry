@@ -1,6 +1,6 @@
 import React from 'react';
 import { Bug } from 'lucide-react';
-import { RemoteConfigDebugPanel } from '../RemoteConfigDebugPanel';
+import { RemoteConfigDebugPanel } from '../admin-analytics/RemoteConfigDebugPanel';
 
 interface SettingsRemoteConfigDebugSectionProps {
   isAdmin: boolean;

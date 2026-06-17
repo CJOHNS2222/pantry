@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { Minus, Plus, Check, AlertTriangle } from 'lucide-react';
 import { Household, RecipeRating, SavedRecipe, StructuredRecipe, PantryItem } from '../../types';
-import { RecipeRatingUI } from '../RecipeRating';
+import { RecipeRatingUI } from '../recipes-meals/RecipeRating';
 
 interface RecipeModalDetailsSectionProps {
   editable: boolean;

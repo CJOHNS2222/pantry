@@ -1,3 +1,14 @@
+## [2.4.9] - 2026-06-17
+
+### Added
+- **Gemini Safety Filter Messages** — Added explicit, user-friendly error handling for when Gemini rejects images containing people, faces, or reflections, making the rejection reason clearer.
+
+### Fixed
+- **Mobile Scrollability** — Fixed an issue where the top of the login and onboarding screens would be cut off and unreachable when scrolling on smaller devices or with the keyboard open.
+- **Android Camera Crash** — Prevented the Android OS from crashing and reloading the app by significantly reducing the memory footprint of photo capturing in the background.
+
+---
+
 ## [2.4.8] - 2026-06-17
 
 ### Added

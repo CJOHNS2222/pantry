@@ -1,7 +1,7 @@
 import React from 'react';
 import { AlertTriangle, Heart, ShieldCheck } from 'lucide-react';
 import { User, UserProfile } from '../../types';
-import LeftoverPersonaQuestionnaire from '../LeftoverPersonaQuestionnaire';
+import LeftoverPersonaQuestionnaire from '../leftovers/LeftoverPersonaQuestionnaire';
 
 interface SettingsFoodSafetySectionProps {
   title: string;

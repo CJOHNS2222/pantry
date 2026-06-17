@@ -1,6 +1,6 @@
 import React from 'react';
 import { Household, RecipeRating, SavedRecipe, StructuredRecipe } from '../../types';
-import { RecipeRatingUI } from '../RecipeRating';
+import { RecipeRatingUI } from '../recipes-meals/RecipeRating';
 
 interface RecipeModalRatingModalProps {
   showRatingModal: boolean;

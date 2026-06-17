@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
-import ComponentErrorBoundary from '../../../components/ComponentErrorBoundary';
+import ComponentErrorBoundary from '../../../components/ui/ComponentErrorBoundary';
 
 // Mock Sentry
 vi.mock('@sentry/react', () => ({

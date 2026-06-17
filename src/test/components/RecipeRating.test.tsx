@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { RecipeRatingUI } from '../../../components/RecipeRating';
+import { RecipeRatingUI } from '../../../components/recipes-meals/RecipeRating';
 import { StructuredRecipe } from '../types';
 
 // Mock RecipeRatingService to avoid real Firestore writes in unit tests

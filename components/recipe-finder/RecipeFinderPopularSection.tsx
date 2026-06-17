@@ -1,7 +1,7 @@
 import React from 'react';
 import { Household, StructuredRecipe, User } from '../../types';
 import type { CacheMealTypeFilter } from '../../utils/preferenceUtils';
-import PopularRecipes from '../PopularRecipes';
+import PopularRecipes from '../recipes-meals/PopularRecipes';
 
 interface RecipeFinderPopularSectionProps {
   title: string;

@@ -1,5 +1,5 @@
 import React from 'react';
-import { ProgressiveImage } from '../ProgressiveImage';
+import { ProgressiveImage } from '../ui/ProgressiveImage';
 import { generateBlurDataURL } from '../../utils/appUtils';
 
 interface RecipeModalImageSectionProps {

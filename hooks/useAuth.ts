@@ -8,7 +8,7 @@ import AnalyticsService from '../services/analyticsService';
 import { setUserContext, clearUserContext, trackAuthEvent } from '../services/sentryService';
 import { PriceDataCacheService } from '../services/priceDataCacheService';
 import { log } from '../services/logService';
-import { GUEST_USER_ID_KEY } from '../components/Login';
+import { GUEST_USER_ID_KEY } from '../components/auth-onboarding/Login';
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);

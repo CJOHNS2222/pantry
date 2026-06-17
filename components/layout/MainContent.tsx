@@ -3,16 +3,16 @@ import { Tab } from '../../types/app';
 import { User, PantryItem, DayPlan, StructuredRecipe } from '../../types';
 
 // Lazy load all major components for better performance
-const PantryScanner = React.lazy(() => import('../PantryScanner').then(module => ({ default: module.PantryScanner })));
-const MealPlanner = React.lazy(() => import('../MealPlanner').then(module => ({ default: module.MealPlanner })));
-const ShoppingList = React.lazy(() => import('../ShoppingList').then(module => ({ default: module.ShoppingList })));
-const RecipeFinder = React.lazy(() => import('../RecipeFinder').then(module => ({ default: module.RecipeFinder })));
-const Community = React.lazy(() => import('../Community').then(module => ({ default: module.Community })));
-const Settings = React.lazy(() => import('../Settings').then(module => ({ default: module.Settings })));
+const PantryScanner = React.lazy(() => import('../pantry/PantryScanner').then(module => ({ default: module.PantryScanner })));
+const MealPlanner = React.lazy(() => import('../recipes-meals/MealPlanner').then(module => ({ default: module.MealPlanner })));
+const ShoppingList = React.lazy(() => import('../shopping-list/ShoppingList').then(module => ({ default: module.ShoppingList })));
+const RecipeFinder = React.lazy(() => import('../recipes-meals/RecipeFinder').then(module => ({ default: module.RecipeFinder })));
+const Community = React.lazy(() => import('../household/Community').then(module => ({ default: module.Community })));
+const Settings = React.lazy(() => import('../settings/Settings').then(module => ({ default: module.Settings })));
 
-import SmartRecommendations from '../SmartRecommendations';
-import { UsageIndicator } from '../UsageIndicator';
-import ComponentErrorBoundary from '../ComponentErrorBoundary';
+import SmartRecommendations from '../pantry/SmartRecommendations';
+import { UsageIndicator } from '../admin-analytics/UsageIndicator';
+import ComponentErrorBoundary from '../ui/ComponentErrorBoundary';
 import { useApp } from '../../contexts/AppContext';
 import { useAppActions } from '../../contexts/AppActionsContext';
 

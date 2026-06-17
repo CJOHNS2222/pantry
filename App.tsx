@@ -2,11 +2,11 @@ import React, { useState, useEffect, useRef, useMemo, Suspense } from 'react';
 import { serverTimestamp } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import DatabaseMonitoringService from './services/databaseMonitoringService';
-import { Login } from './components/Login';
-import { HouseholdManager } from './components/Household';
-import { HouseholdInviteModal } from './components/HouseholdInviteModal';
-import { ModernOnboardingFlow } from './components/ModernOnboardingFlow';
-import ErrorBoundary from './components/ErrorBoundary';
+import { Login } from './components/auth-onboarding/Login';
+import { HouseholdManager } from './components/household/Household';
+import { HouseholdInviteModal } from './components/household/HouseholdInviteModal';
+import { ModernOnboardingFlow } from './components/auth-onboarding/ModernOnboardingFlow';
+import ErrorBoundary from './components/ui/ErrorBoundary';
 import { AppHeader } from './components/layout/AppHeader';
 import { AppNavigation } from './components/layout/AppNavigation';
 import { MainContent } from './components/layout/MainContent';
@@ -17,8 +17,8 @@ import { useTheme } from './hooks/useTheme';
 import { useSettings } from './hooks/useSettings';
 import { useToasts } from './hooks/useToasts';
 import { useDataManagement } from './hooks/useDataManagement';
-import RiskAssessmentQuestionnaire from './components/RiskAssessmentQuestionnaire';
-import LeftoversHotZone from './components/LeftoversHotZone';
+import RiskAssessmentQuestionnaire from './components/ui/RiskAssessmentQuestionnaire';
+import LeftoversHotZone from './components/leftovers/LeftoversHotZone';
 import { useHouseholdActivity } from './hooks/useHouseholdActivity';
 import { useOfflineStatus } from './hooks/useOfflineStatus';
 import AnalyticsService from './services/analyticsService';
@@ -26,7 +26,7 @@ import { SubscriptionProvider } from './hooks/useSubscription';
 
 import { isHouseholdMember, inferCategoryFromItemName, inferStorageLocationFromItemName, parseIngredientForShoppingList, getItemImage, fetchExternalItemImage } from './utils/appUtils';
 import { getQuantityAmount } from './utils/quantityUtils';
-import { NotificationBanner } from './components/NotificationBanner';
+import { NotificationBanner } from './components/ui/NotificationBanner';
 import { NotificationService, NotificationItem, NotificationSettings } from './services/notificationService';
 import { markNotificationRead, deleteNotification, snoozeNotificationInCache, updateNotificationInCache } from './services/notificationsService';
 import { log } from './services/logService';
@@ -37,10 +37,10 @@ import { PluginListenerHandle } from '@capacitor/core';
 import { AppProvider } from './contexts/AppContext';
 import { AppActionsProvider } from './contexts/AppActionsContext';
 import SafeAreaService from './services/safeAreaService';
-import { GlobalUpdatePrompt } from './components/GlobalUpdatePrompt';
-import { WhatsNewModal } from './components/WhatsNewModal';
-import { FeatureDiscoveryManager } from './components/FeatureDiscovery';
-import { ContextualTutorial, useContextualTips } from './components/ContextualTutorial';
+import { GlobalUpdatePrompt } from './components/ui/GlobalUpdatePrompt';
+import { WhatsNewModal } from './components/auth-onboarding/WhatsNewModal';
+import { FeatureDiscoveryManager } from './components/auth-onboarding/FeatureDiscovery';
+import { ContextualTutorial, useContextualTips } from './components/auth-onboarding/ContextualTutorial';
 import { joinHousehold } from './services/householdService';
 import { setAppContext, trackNavigation, trackShoppingListAction } from './services/sentryService';
 import remoteConfig from './services/remoteConfigService';
@@ -52,17 +52,18 @@ import { MealPlanCacheService } from './services/mealPlanCacheService';
 import { RecipesCacheService } from './services/recipesCacheService';
 import { groceryPriceService } from './services/groceryPriceService';
 import { PriceDataCacheService } from './services/priceDataCacheService'; // Import the service
-import ExpiredItemsModal from './components/ExpiredItemsModal';
-import ExpiredItemsLaunchSheet, { getExpiredLaunchEnabled } from './components/ExpiredItemsLaunchSheet';
-import ItemDetailModal from './components/ItemDetailModal';
+import ExpiredItemsModal from './components/pantry/ExpiredItemsModal';
+import ExpiredItemsLaunchSheet, { getExpiredLaunchEnabled } from './components/pantry/ExpiredItemsLaunchSheet';
+import ItemDetailModal from './components/pantry/ItemDetailModal';
 import { InventoryCacheService } from './services/inventoryCacheService';
 import { recordMilestone } from './services/onboardingMilestoneService';
 import { useIntl } from 'react-intl';
 import { useAndroidBack, closeTopAndroidModal } from './hooks/useAndroidBack';
 import { useKeyboard } from './hooks/useKeyboard';
+import { GeminiTokenDebugger } from './components/ui/GeminiTokenDebugger';
 
 // Lazy load monitoring components
-const DatabaseAnalytics = React.lazy(() => import('./components/DatabaseAnalytics').then(module => ({ default: module.default })));
+const DatabaseAnalytics = React.lazy(() => import('./components/admin-analytics/DatabaseAnalytics').then(module => ({ default: module.default })));
 
 // Loading component for lazy-loaded components
 const LoadingSpinner: React.FC = () => (
@@ -1690,6 +1691,7 @@ const App: React.FC = () => {
           <DatabaseAnalytics />
         </Suspense>
       )}
+      <GeminiTokenDebugger isAdmin={isAdmin} />
     </SubscriptionProvider>
   );
 };

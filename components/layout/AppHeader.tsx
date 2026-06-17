@@ -2,10 +2,10 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { Sun, Moon, Undo2, Bell } from 'lucide-react';
 import { User, Household, HouseholdActivity } from '../../types';
 import { log } from '../../services/logService';
-import { HouseholdStatusIndicator } from '../HouseholdStatusIndicator';
-import { HouseholdActivityFeed } from '../HouseholdActivityFeed';
-import { SyncIndicator } from '../SyncIndicator';
-import { OnlineIndicator } from '../OnlineIndicator';
+import { HouseholdStatusIndicator } from '../household/HouseholdStatusIndicator';
+import { HouseholdActivityFeed } from '../household/HouseholdActivityFeed';
+import { SyncIndicator } from '../ui/SyncIndicator';
+import { OnlineIndicator } from '../ui/OnlineIndicator';
 import { SyncStatus } from '../../hooks/useOfflineStatus';
 import useUserNotifications from '../../hooks/useUserNotifications';
 import { markAllNotificationsRead, markNotificationRead, deleteNotification, NotificationItem } from '../../services/notificationsService';

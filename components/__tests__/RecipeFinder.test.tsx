@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { vi, describe, test, expect, beforeEach } from 'vitest';
-import { RecipeFinder } from '../RecipeFinder';
+import { RecipeFinder } from '../recipes-meals/RecipeFinder';
 import { RecipeSearchResult, StructuredRecipe, SavedRecipe, PantryItem, RecipeRating, User, Household } from '../../types';
 import { Tab } from '../../types/app';
 

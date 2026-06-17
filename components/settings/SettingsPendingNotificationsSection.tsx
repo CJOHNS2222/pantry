@@ -1,7 +1,7 @@
 import React from 'react';
 import { BellRing } from 'lucide-react';
 import { User } from '../../types';
-import { PendingNotifications } from '../PendingNotifications';
+import { PendingNotifications } from '../ui/PendingNotifications';
 
 interface SettingsPendingNotificationsSectionProps {
   user: User | null | undefined;

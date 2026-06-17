@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
-import { PremiumFeature, FeatureLimit } from '../../../components/PremiumFeature';
+import { PremiumFeature, FeatureLimit } from '../../../components/settings/PremiumFeature';
 import { User } from '../../../types';
 
 // Mock useSubscription hook

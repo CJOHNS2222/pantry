@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, screen, cleanup, fireEvent, act } from '@testing-library/react';
-import { GeminiTokenDebugger } from '../../../components/GeminiTokenDebugger';
+import { GeminiTokenDebugger } from '../../../components/ui/GeminiTokenDebugger';
 import React from 'react';
 
 describe('GeminiTokenDebugger Component', () => {

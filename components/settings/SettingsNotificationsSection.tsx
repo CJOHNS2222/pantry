@@ -1,6 +1,6 @@
 import React from 'react';
 import { Bell } from 'lucide-react';
-import { NotificationSettingsComponent } from '../NotificationSettings';
+import { NotificationSettingsComponent } from './NotificationSettings';
 import { User } from '../../types';
 import { NotificationSettings } from '../../services/notificationService';
 

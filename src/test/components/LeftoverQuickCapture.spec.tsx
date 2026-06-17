@@ -29,7 +29,7 @@ vi.mock('../../../services/databaseMonitoringService', () => ({
   }
 }))
 
-import LeftoverQuickCapture from '../../../components/LeftoverQuickCapture'
+import LeftoverQuickCapture from '../../../components/leftovers/LeftoverQuickCapture'
 import { LeftoverService } from '../../../services/leftoverService'
 
 const mockedLeftoverService = vi.mocked(LeftoverService)

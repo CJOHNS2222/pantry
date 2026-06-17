@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type, Schema } from "@google/genai";
-import { PantryItem, RecipeSearchResult, RecipeSearchParams, StructuredRecipe, User, GroundingChunk } from "../types";
+import { PantryItem, RecipeSearchResult, RecipeSearchParams, StructuredRecipe, User, GroundingChunk } from '../types';
 // openRouterService removed — all AI calls go directly through Gemini
 import { getPerformance, trace, PerformanceTrace } from "firebase/performance";
 import { UsageService } from './usageService';
@@ -105,6 +105,12 @@ export const analyzePantryImage = async (base64Image: string, mimeType: string, 
       model: remoteConfig.getString('gemini_model_vision'),
       imageSizeKb: Math.round(base64Image.length / 1024),
     });
+    
+    const errMsg = err instanceof Error ? err.message : String(err);
+    if (errMsg.includes('403') || errMsg.includes('Forbidden')) {
+      throw new Error('Photo rejected by AI safety filters. Please ensure no people, faces, hands, or reflections are visible in the image and try again.');
+    }
+    
     throw err;
   } finally {
     perfTrace?.stop();
@@ -199,6 +205,12 @@ export const analyzeReceiptImage = async (base64Image: string, mimeType: string,
       model: remoteConfig.getString('gemini_model_vision'),
       imageSizeKb: Math.round(base64Image.length / 1024),
     });
+    
+    const errMsg = err instanceof Error ? err.message : String(err);
+    if (errMsg.includes('403') || errMsg.includes('Forbidden')) {
+      throw new Error('Photo rejected by AI safety filters. Please ensure no people, faces, hands, or reflections are visible in the image and try again.');
+    }
+    
     throw err;
   } finally {
     perfTrace?.stop();

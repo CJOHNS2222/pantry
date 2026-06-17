@@ -1,6 +1,6 @@
 import React from 'react';
 import { ArrowRight, Camera, ChefHat, ClipboardList, LayoutDashboard, ScanSearch, Sparkles, Users } from 'lucide-react';
-import { AppBadge } from '../../components/AppBadge';
+import { AppBadge } from '../../components/ui/AppBadge';
 
 const features = [
   {

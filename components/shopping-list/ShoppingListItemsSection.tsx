@@ -2,9 +2,9 @@ import React from 'react';
 import { useIntl } from 'react-intl';
 import { ShoppingBasket, Plus } from 'lucide-react';
 import { ShoppingItem } from '../../types';
-import { ShoppingListItemSkeleton } from '../SkeletonLoader';
-import { SmartShoppingListOrganizer } from '../SmartShoppingListOrganizer';
-import { EnhancedShoppingListItem } from '../EnhancedShoppingListItem';
+import { ShoppingListItemSkeleton } from '../ui/SkeletonLoader';
+import { SmartShoppingListOrganizer } from './SmartShoppingListOrganizer';
+import { EnhancedShoppingListItem } from './EnhancedShoppingListItem';
 
 interface ShoppingListItemsSectionProps {
   isLoadingShoppingList: boolean;
@@ -95,3 +95,4 @@ export const ShoppingListItemsSection: React.FC<ShoppingListItemsSectionProps> =
     </div>
   );
 };
+

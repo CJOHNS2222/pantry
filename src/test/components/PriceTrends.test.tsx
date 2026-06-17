@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import PriceTrends from '../../../components/PriceTrends';
+import PriceTrends from '../../../components/pantry/PriceTrends';
 import { groceryPriceService } from '../../../services/groceryPriceService';
 
 // Mock groceryPriceService

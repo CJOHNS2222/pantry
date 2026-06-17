@@ -2,7 +2,7 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 // Explicit Vitest imports to avoid relying on globals in some CI/test setups
 import { vi, describe, test, expect } from 'vitest';
-import { PantryScanner } from '../PantryScanner';
+import { PantryScanner } from '../pantry/PantryScanner';
 import { AppProvider } from '../../contexts/AppContext';
 import { AppActionsProvider } from '../../contexts/AppActionsContext';
 

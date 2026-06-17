@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import ErrorBoundary from '../../../components/ErrorBoundary';
+import ErrorBoundary from '../../../components/ui/ErrorBoundary';
 import AnalyticsService from '../../../services/analyticsService';
 import * as Sentry from '@sentry/react';
 

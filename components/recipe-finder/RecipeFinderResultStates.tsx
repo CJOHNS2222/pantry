@@ -1,10 +1,10 @@
 import React from 'react';
 import { useIntl } from 'react-intl';
 import { Search, Sparkles, Zap } from 'lucide-react';
-import { AppBadge } from '../AppBadge';
-import { GeminiLoadingOverlay, RECIPE_SEARCH_STAGES } from '../GeminiLoadingOverlay';
-import { SectionStatePanel } from '../SectionStatePanel';
-import { RecipeCardSkeleton } from '../SkeletonLoader';
+import { AppBadge } from '../ui/AppBadge';
+import { GeminiLoadingOverlay, RECIPE_SEARCH_STAGES } from '../ui/GeminiLoadingOverlay';
+import { SectionStatePanel } from '../ui/SectionStatePanel';
+import { RecipeCardSkeleton } from '../ui/SkeletonLoader';
 import { LoadingState, RecipeSearchResult, StructuredRecipe } from '../../types';
 
 interface RecipeFinderResultStatesProps {

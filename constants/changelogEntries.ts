@@ -9,6 +9,15 @@ export interface ChangeEntry {
 
 export const RECENT_CHANGES: ChangeEntry[] = [
   {
+    "version": "2.4.9",
+    "date": "Jun 17, 2026",
+    "highlights": [
+      "Gemini Safety Filter Messages — Added explicit, user-friendly error handling for when Gemini rejects images containing…",
+      "Mobile Scrollability — Fixed an issue where the top of the login and onboarding screens would be cut off and…",
+      "Android Camera Crash — Prevented the Android OS from crashing and reloading the app by significantly reducing the…"
+    ]
+  },
+  {
     "version": "2.4.8",
     "date": "Jun 17, 2026",
     "highlights": [
@@ -22,16 +31,6 @@ export const RECENT_CHANGES: ChangeEntry[] = [
     "highlights": [
       "Leave Household for Solo Admins — Enabled the \"Leave Household\" button for admins who are the only member in their…",
       "Unified Household UI — Cleaned up massive amounts of duplicate and dead layout code in the Household Management…"
-    ]
-  },
-  {
-    "version": "2.4.6",
-    "date": "Jun 16, 2026",
-    "highlights": [
-      "Offline Recipe Classification — Added rule-based keyword classification script (classify-recipes-rules.js) and…",
-      "Firestore Listener Optimization — Introduced a global SubscriptionContext and SubscriptionProvider to establish…",
-      "Meal Planner Auto-Fill — Updated auto-fill algorithm to strictly exclude recipes containing allergy-violating…",
-      "Popular Recipes Search — Integrated allergy screening and preference ranking into the popular recipes search modal…"
     ]
   }
 ];

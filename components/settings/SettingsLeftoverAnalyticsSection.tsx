@@ -1,6 +1,6 @@
 import React from 'react';
 import { BarChart2 } from 'lucide-react';
-import { LeftoverAnalytics } from '../LeftoverAnalytics';
+import { LeftoverAnalytics } from '../leftovers/LeftoverAnalytics';
 
 interface SettingsLeftoverAnalyticsSectionProps {
   userId?: string;

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Star } from 'lucide-react';
-import { SubscriptionManager } from '../SubscriptionManager';
+import { SubscriptionManager } from './SubscriptionManager';
 import { User } from '../../types';
 
 interface SettingsSubscriptionSectionProps {

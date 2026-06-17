@@ -1,6 +1,6 @@
 import React from 'react';
 import { PantryItem } from '../../types';
-import LeftoverQuickCapture from '../LeftoverQuickCapture';
+import LeftoverQuickCapture from '../leftovers/LeftoverQuickCapture';
 
 interface LeftoverModalsProps {
   showLeftoverPrompt: boolean;

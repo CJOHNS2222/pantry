@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
-import { GlobalUpdatePrompt } from '../../../components/GlobalUpdatePrompt';
+import { GlobalUpdatePrompt } from '../../../components/ui/GlobalUpdatePrompt';
 import { versionService } from '../../../services/versionService';
 
 // Mock versionService

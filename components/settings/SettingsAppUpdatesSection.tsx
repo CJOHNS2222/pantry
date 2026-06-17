@@ -1,6 +1,6 @@
 import React from 'react';
 import { RefreshCw } from 'lucide-react';
-import { VersionUpdate } from '../VersionUpdate';
+import { VersionUpdate } from '../ui/VersionUpdate';
 
 interface SettingsAppUpdatesSectionProps {
   title: string;

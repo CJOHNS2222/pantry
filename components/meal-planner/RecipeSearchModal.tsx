@@ -6,8 +6,8 @@ import { getCachedPopularRecipes, getCachedRecipesCache } from '../../services/r
 import { searchRecipes } from '../../utils/searchUtils';
 import { debounce } from '../../utils/debounceUtils';
 import { log } from '../../services/logService';
-import { CompactRecipeCardSkeleton } from '../SkeletonLoader';
-import { ProgressiveImage } from '../ProgressiveImage';
+import { CompactRecipeCardSkeleton } from '../ui/SkeletonLoader';
+import { ProgressiveImage } from '../ui/ProgressiveImage';
 import { getUserMeasurementSystem } from '../../utils/measurementUtils';
 import { rankCachedRecipesByPreferences, recipeMatchesCacheFilters, isRecipeSafeFromAllergies } from '../../utils/preferenceUtils';
 

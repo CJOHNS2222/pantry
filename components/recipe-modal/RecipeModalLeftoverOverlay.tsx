@@ -1,5 +1,5 @@
 import React from 'react';
-import LeftoverQuickCapture from '../LeftoverQuickCapture';
+import LeftoverQuickCapture from '../leftovers/LeftoverQuickCapture';
 
 interface RecipeModalLeftoverOverlayProps {
   showLeftoverCapture: boolean;

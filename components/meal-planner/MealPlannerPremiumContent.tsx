@@ -1,11 +1,11 @@
 import React from 'react';
 import { ShoppingBasket } from 'lucide-react';
 import { DayPlan, MealPlanItem, PantryItem } from '../../types';
-import { GroceryCostEstimator } from '../GroceryCostEstimator';
+import { GroceryCostEstimator } from '../shopping-list/GroceryCostEstimator';
 import { MealPlannerHighlightsSection } from './MealPlannerHighlightsSection';
 import { MealPlannerCalendarSection } from './MealPlannerCalendarSection';
 import { CurrentDayMealsSection } from './CurrentDayMealsSection';
-import { MealPlanSkeleton } from '../SkeletonLoader';
+import { MealPlanSkeleton } from '../ui/SkeletonLoader';
 import { MealPlannerDragTrash } from './MealPlannerDragTrash';
 
 interface MealPlannerPremiumContentProps {

@@ -1,10 +1,10 @@
-import DatabaseMonitoringService from "./databaseMonitoringService";
+import DatabaseMonitoringService from './databaseMonitoringService';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { storage } from "../firebaseConfig";
-import { StructuredRecipe, SavedRecipe } from "../types";
+import { storage } from '../firebaseConfig';
+import { StructuredRecipe, SavedRecipe } from '../types';
 import { getPerformance, trace } from "firebase/performance";
-import { withErrorHandling, AppError, ErrorCode } from "../utils/errorUtils";
-import { log } from "./logService";
+import { withErrorHandling, AppError, ErrorCode } from '../utils/errorUtils';
+import { log } from './logService';
 import { serverTimestamp, DocumentData } from 'firebase/firestore';
 import { groceryPriceService } from './groceryPriceService';
 import { parseIngredientForShoppingList } from '../utils/appUtils';

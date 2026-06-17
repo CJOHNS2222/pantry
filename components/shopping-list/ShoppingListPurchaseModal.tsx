@@ -2,7 +2,7 @@ import React from 'react';
 import { useIntl } from 'react-intl';
 import { Calendar } from 'lucide-react';
 import { ShoppingItem } from '../../types';
-import VisualQuantitySelector from '../VisualQuantitySelector';
+import VisualQuantitySelector from '../pantry/VisualQuantitySelector';
 
 interface ShoppingListPurchaseModalProps {
   purchaseModalOpen: boolean;
@@ -100,3 +100,4 @@ export const ShoppingListPurchaseModal: React.FC<ShoppingListPurchaseModalProps>
     </div>
   );
 };
+

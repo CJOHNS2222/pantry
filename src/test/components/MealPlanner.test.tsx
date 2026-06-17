@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
-import { MealPlanner } from '../../../components/MealPlanner';
+import { MealPlanner } from '../../../components/recipes-meals/MealPlanner';
 import { DayPlan, SavedRecipe, PantryItem } from '../../../types';
 
 // Mock react-intl

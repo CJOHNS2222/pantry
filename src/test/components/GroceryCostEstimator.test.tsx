@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
-import { GroceryCostEstimator } from '../../../components/GroceryCostEstimator';
+import { GroceryCostEstimator } from '../../../components/shopping-list/GroceryCostEstimator';
 import { groceryPriceService } from '../../../services/groceryPriceService';
 
 // Mock groceryPriceService

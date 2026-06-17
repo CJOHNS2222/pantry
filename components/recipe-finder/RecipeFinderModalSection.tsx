@@ -1,6 +1,6 @@
 import React from 'react';
 import { RecipeRating, SavedRecipe, StructuredRecipe, User } from '../../types';
-import RecipeModal from '../RecipeModal';
+import RecipeModal from '../recipes-meals/RecipeModal';
 
 interface RecipeFinderModalSectionProps {
   showRecipeModal: boolean;

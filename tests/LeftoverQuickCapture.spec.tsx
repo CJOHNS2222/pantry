@@ -8,7 +8,7 @@ const mockCreate = vi.hoisted(() => vi.fn())
 vi.mock('../services/leftoverService', () => ({ LeftoverService: { create: mockCreate } }))
 vi.mock('../services/leftoverImageService', () => ({ uploadLeftoverImage: vi.fn().mockResolvedValue('https://example.com/photo.jpg') }))
 
-import LeftoverQuickCapture from '../components/LeftoverQuickCapture'
+import LeftoverQuickCapture from '../components/leftovers/LeftoverQuickCapture'
 
 describe('LeftoverQuickCapture', () => {
   beforeEach(() => {

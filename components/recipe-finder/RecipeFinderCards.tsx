@@ -1,9 +1,9 @@
 import React from 'react';
 import { Plus, Clock, List, ChefHat, Star, AlertTriangle, ShieldAlert } from 'lucide-react';
 import { StructuredRecipe, RecipeRating, User } from '../../types';
-import { AppBadge } from '../AppBadge';
-import { RecipeRatingUI } from '../RecipeRating';
-import { ProgressiveImage } from '../ProgressiveImage';
+import { AppBadge } from '../ui/AppBadge';
+import { RecipeRatingUI } from '../recipes-meals/RecipeRating';
+import { ProgressiveImage } from '../ui/ProgressiveImage';
 import { generateBlurDataURL } from '../../utils/appUtils';
 
 interface RatingInfo {

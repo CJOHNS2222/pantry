@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { PantryScanner } from '../../../components/PantryScanner';
+import { PantryScanner } from '../../../components/pantry/PantryScanner';
 import { AppProvider } from '../../../contexts/AppContext';
 import { AppActionsProvider } from '../../../contexts/AppActionsContext';
 import { PantryItem, LoadingState } from '../../../types';

@@ -1,6 +1,6 @@
 import React from 'react';
 import { ShoppingCart } from 'lucide-react';
-import { StoreLayoutEditor } from '../StoreLayoutEditor';
+import { StoreLayoutEditor } from '../shopping-list/StoreLayoutEditor';
 
 interface SettingsStoreLayoutSectionProps {
   userExists: boolean;

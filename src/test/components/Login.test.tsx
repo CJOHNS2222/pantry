@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { Login } from '../../../components/Login';
+import { Login } from '../../../components/auth-onboarding/Login';
 
 // Mock react-intl to return the message id as the text for testing
 vi.mock('react-intl', () => ({
