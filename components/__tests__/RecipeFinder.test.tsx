@@ -166,8 +166,7 @@ describe('RecipeFinder', () => {
 
     const searchInputs = screen.getAllByPlaceholderText('Search e.g. Pasta...');
     const searchInput = searchInputs[0];
-    const searchButtons = screen.getAllByRole('button', { name: /Suggest Recipes/i });
-    const searchButton = searchButtons[0];
+    const searchButton = screen.getAllByTestId('recipefinder-search-button')[0];
 
     fireEvent.change(searchInput, { target: { value: 'chicken' } });
     fireEvent.click(searchButton);

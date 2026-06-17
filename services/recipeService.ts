@@ -1057,3 +1057,15 @@ const searchRecipesInFirestoreFallback = async (searchTerm: string): Promise<Sav
     return [];
   }
 };
+
+/**
+ * Clear all in-memory caches (mainly for testing)
+ */
+export const clearRecipeServiceCaches = () => {
+  communityRatedRecipesCache = null;
+  popularRecipesCache = null;
+  Object.keys(recipesCacheByPath).forEach(key => {
+    delete recipesCacheByPath[key];
+  });
+};
+

@@ -73,7 +73,8 @@ import {
   getSavedRecipes,
   getCachedPopularRecipes,
   cachePopularRecipes,
-  searchRecipesInFirestore
+  searchRecipesInFirestore,
+  clearRecipeServiceCaches
 } from '../../../services/recipeService';
 import { StructuredRecipe, SavedRecipe } from '../../types';
 import DatabaseMonitoringService from '../../../services/databaseMonitoringService';
@@ -81,6 +82,8 @@ import DatabaseMonitoringService from '../../../services/databaseMonitoringServi
 describe('RecipeService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    clearRecipeServiceCaches();
+
 
     // Set up default mock behaviors
     DatabaseMonitoringService.collection.mockReturnValue('mock-collection-ref');
