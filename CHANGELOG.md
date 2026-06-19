@@ -1,3 +1,21 @@
+## [2.4.11] - 2026-06-19
+
+### Added
+- **Local Push Fallback** — Added immediate local device push notifications for urgent expiration alerts so they work without server infrastructure.
+- **Stacked In-App Notifications** — Updated the notification UI to elegantly stack multiple alerts (like 3 expiring items) at once instead of displaying only one.
+
+### Changed
+- **Onboarding Streamlined** — Spaced out setup questions by removing the Food Safety step from initial onboarding. It now triggers only after adding your first pantry item.
+- **Expiration Check Optimization** — Reduced notification checks to run only once per calendar day rather than every 5 minutes while using the app.
+
+### Fixed
+- **Guest Permissions** — Fixed an issue where guest accounts would get stuck on the "Complete Setup" screen due to backend permission errors.
+- **Notification Throttle** — Removed a strict 5-minute cooldown that was preventing multiple valid expiration notifications from showing.
+- **Notification Settings Filter** — Fixed a bug where `daysUntilExpiry` was missing, causing notification filters to silently discard expiration alerts.
+- **UI Overflow** — Updated modal padding so the onboarding and risk assessment screens fit perfectly on smaller mobile screens without clipping.
+
+---
+
 ## [2.4.10] - 2026-06-18
 
 ### Added

@@ -17,8 +17,8 @@ class CameraRestoredStore {
   }
 
   consume(): RestoredCameraResult {
-    const result = {
-      photo: this.photo,
+    const result: RestoredCameraResult = {
+      photo: this.photo as RestoredCameraResult['photo'],
       intent: this.intent,
     };
     // Clear after consuming

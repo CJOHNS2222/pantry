@@ -569,17 +569,27 @@ const App: React.FC = () => {
         );
 
         if (filteredNotifications.length > 0) {
-          const highestPriority = filteredNotifications.reduce((prev, current) =>
-            getPriorityWeight(current.priority) > getPriorityWeight(prev.priority) ? current : prev
-          );
+          // Sort by priority first (urgent > high > medium > low), then by newest
+          const sorted = [...filteredNotifications].sort((a, b) => {
+            const weightDiff = getPriorityWeight(b.priority) - getPriorityWeight(a.priority);
+            if (weightDiff !== 0) return weightDiff;
+            
+            const getTime = (val: unknown) => {
+              if (!val) return 0;
+              if (typeof val === 'object' && val !== null && 'toDate' in val && typeof (val as { toDate: () => Date }).toDate === 'function') return (val as { toDate: () => Date }).toDate().getTime();
+              return new Date(val as string | number | Date).getTime();
+            };
+            
+            const timeA = getTime(a.createdAt);
+            const timeB = getTime(b.createdAt);
+            return timeB - timeA;
+          });
 
-          const lastShown = localStorage.getItem('lastNotificationShown');
-          const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
-
-          if (!lastShown || parseInt(lastShown) < fiveMinutesAgo) {
-            setNotifications([highestPriority]);
-            localStorage.setItem('lastNotificationShown', Date.now().toString());
-          }
+          // Show top 3 notifications
+          setNotifications(sorted.slice(0, 3));
+          localStorage.removeItem('lastNotificationShown'); // Clear legacy throttle
+        } else {
+          setNotifications([]);
         }
       } catch (error) {
         log.error('Error checking notifications', { error }, 'App');
@@ -603,17 +613,16 @@ const App: React.FC = () => {
   };
 
   const handleNotificationDismiss = async (notificationId: string) => {
-    if (user?.id) {
-      await markNotificationRead(user.id, notificationId);
-    } else {
-      await NotificationService.markAsRead('', notificationId);
+    try {
+      if (user?.id) await markNotificationRead(user.id, notificationId);
+      else await NotificationService.markAsRead('', notificationId);
+      setNotifications(prev => prev.filter(n => n.id !== notificationId));
+    } catch (err) {
+      log.error('Failed to mark read', { err }, 'App');
     }
-    setNotifications([]);
   };
 
   const handleNotificationAction = async (notification: NotificationItem) => {
-    setNotifications([]);
-    
     try {
       if (user?.id) {
         try {
@@ -625,6 +634,7 @@ const App: React.FC = () => {
       } else {
         await NotificationService.markAsRead('', notification.id);
       }
+      setNotifications(prev => prev.filter(n => n.id !== notification.id));
 
       switch (notification.actionType) {
         case 'add_to_shopping':
@@ -706,12 +716,13 @@ const App: React.FC = () => {
   };
 
   const handleNotificationSnooze = async (notificationId: string, minutes: number) => {
-    if (user?.id) {
-      await snoozeNotificationInCache(user.id, notificationId, minutes);
-    } else {
-      await NotificationService.snoozeNotification('', notificationId, minutes);
+    try {
+      if (user?.id) await snoozeNotificationInCache(user.id, notificationId, minutes);
+      else await NotificationService.snoozeNotification('', notificationId, minutes);
+      setNotifications(prev => prev.filter(n => n.id !== notificationId));
+    } catch (err) {
+      log.error('Failed to snooze notification', { err }, 'App');
     }
-    setNotifications([]);
   };
 
   /**
@@ -1247,18 +1258,22 @@ const App: React.FC = () => {
         )}
 
         {showRiskQuestionnaire && (
-          <RiskAssessmentQuestionnaire
-            userId={user.id}
-            onComplete={async (level: number, sensitive?: boolean) => {
-              try {
-                await handleRiskQuestionnaireComplete(level, sensitive);
-                // Optimistically update local user object if available
-                setUser(prev => prev ? { ...prev, profile: { ...prev.profile, riskLevel: level, sensitiveHealthMode: !!sensitive } } : prev);
-              } catch {
-                // handler already logs; no-op here
-              }
-            }}
-          />
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-md flex flex-col justify-end sm:justify-center overflow-hidden">
+            <div className="bg-theme-secondary w-full sm:max-w-2xl sm:mx-auto sm:rounded-3xl shadow-2xl relative flex flex-col max-h-[90vh] rounded-t-3xl mt-10 sm:mt-0 overflow-y-auto">
+              <RiskAssessmentQuestionnaire
+                userId={user.id}
+                onComplete={async (level: number, sensitive?: boolean) => {
+                  try {
+                    await handleRiskQuestionnaireComplete(level, sensitive);
+                    // Optimistically update local user object if available
+                    setUser(prev => prev ? { ...prev, profile: { ...prev.profile, riskLevel: level, sensitiveHealthMode: !!sensitive } } : prev);
+                  } catch {
+                    // handler already logs; no-op here
+                  }
+                }}
+              />
+            </div>
+          </div>
         )}
 
         {showHouseholdInviteModal && user && (
@@ -1613,12 +1628,18 @@ const App: React.FC = () => {
         )}
 
         {notifications.length > 0 && (
-          <NotificationBanner
-            notification={notifications[0]}
-            onDismiss={handleNotificationDismiss}
-            onAction={handleNotificationAction}
-            onSnooze={handleNotificationSnooze}
-          />
+          <div className="fixed top-4 left-0 right-0 z-50 flex flex-col items-center gap-2 pointer-events-none pb-4 px-4 overflow-y-auto max-h-[50vh]">
+            {notifications.map((notification) => (
+              <div key={notification.id} className="pointer-events-auto w-full">
+                <NotificationBanner
+                  notification={notification}
+                  onDismiss={handleNotificationDismiss}
+                  onAction={handleNotificationAction}
+                  onSnooze={handleNotificationSnooze}
+                />
+              </div>
+            ))}
+          </div>
         )}
 
         <div className="fixed bottom-4 right-4 mb-safe z-50 space-y-2">

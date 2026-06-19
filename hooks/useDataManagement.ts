@@ -464,7 +464,6 @@ export function useDataManagement(
 
   const prevHouseholdRef = useRef<Household | null>(null);
 
-  const lastExpirationCheckRef = useRef<number>(0);
 
   const lastAllergyCheckRef = useRef<number>(0);
 
@@ -659,8 +658,11 @@ export function useDataManagement(
       // This logic should probably be moved to a service
     }
 
-    const now = Date.now();
-    if (now - lastExpirationCheckRef.current > 5 * 60 * 1000) { // 5 minutes
+    const todayString = new Date().toISOString().slice(0, 10);
+    const lastCheckDate = localStorage.getItem('lastExpirationCheckDate');
+    
+    // Only run expiration checks once per calendar day, or if it's never been checked
+    if (lastCheckDate !== todayString) {
       const runExpirationChecks = async () => {
         // Ensure the currently authenticated user matches the `user` passed
         // into this hook. If they don't match (or auth not ready), bail WITHOUT
@@ -704,7 +706,7 @@ export function useDataManagement(
           log.error('Failed to create expiration notifications', err, 'DataManagement');
         } finally {
           // Only stamp the throttle after the check actually ran (auth matched)
-          lastExpirationCheckRef.current = Date.now();
+          localStorage.setItem('lastExpirationCheckDate', todayString);
         }
       };
 
@@ -755,16 +757,16 @@ export function useDataManagement(
     }
   }, [isOnline]);
 
-  // Show risk questionnaire to new users shortly after first login
+  // Show risk questionnaire once the user adds their first item
   useEffect(() => {
     if (!user) return;
     if (questionnaireShownRef.current) return;
-    // Show when user hasn't set a riskLevel and hasn't seen tutorial yet
-    if (!user.profile?.riskLevel && user.hasSeenTutorial === false) {
+    // Show when user hasn't set a riskLevel and has at least one inventory item
+    if (!user.profile?.riskLevel && inventory.length > 0) {
       setShowRiskQuestionnaire(true);
       questionnaireShownRef.current = true;
     }
-  }, [user]);
+  }, [user, inventory.length]);
 
   // Keep recipes.used Firestore counter in sync with the actual saved-recipe count.
   // When in a household the displayed list contains all members' recipes, so we sync
@@ -978,7 +980,19 @@ export function useDataManagement(
   const handleRiskQuestionnaireComplete = async (level: number, sensitive?: boolean) => {
     if (!user?.id) return;
     try {
-      await RiskProfileService.setUserRiskLevel(user.id, level, sensitive);
+      if (!user.isGuest) {
+        await RiskProfileService.setUserRiskLevel(user.id, level, sensitive);
+      } else {
+        // For guests, we can't save to Firestore. Save locally to bypass permission error.
+        try {
+          const profile = JSON.parse(localStorage.getItem('guestProfile') || '{}');
+          profile.riskLevel = level;
+          profile.sensitiveGroups = !!sensitive;
+          localStorage.setItem('guestProfile', JSON.stringify(profile));
+        } catch (_e) {
+          log.warn('Could not save guest risk profile to local storage', {}, 'DataManagement');
+        }
+      }
       setShowRiskQuestionnaire(false);
       addToast?.('Saved safety preferences.', 'success');
     } catch (err) {

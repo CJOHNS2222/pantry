@@ -31,7 +31,7 @@ interface ModernOnboardingProps {
   onPersonaSelected?: (persona: 'relaxed' | 'normal' | 'strict') => void;
 }
 
-type OnboardingStep = 'welcome' | 'quick-setup' | 'value-demo' | 'food-safety' | 'complete';
+type OnboardingStep = 'welcome' | 'quick-setup' | 'value-demo' | 'complete';
 
 interface QuickSetupOption {
   id: string;
@@ -50,11 +50,9 @@ export const ModernOnboarding: React.FC<ModernOnboardingProps> = ({
   onScanPantry,
   onQuickAddItems,
   onOpenHousehold,
-  onPersonaSelected,
 }) => {
   const [currentStep, setCurrentStep] = useState<OnboardingStep>('welcome');
   const [selectedSetupOption, setSelectedSetupOption] = useState<string | null>(null);
-  const [selectedPersona, setSelectedPersona] = useState<'relaxed' | 'normal' | 'strict'>('normal');
   const [isAnimating, setIsAnimating] = useState(false);
   const onCompleteCalledRef = useRef(false);
 
@@ -107,7 +105,7 @@ export const ModernOnboarding: React.FC<ModernOnboardingProps> = ({
   };
 
   const handleSkip = () => {
-    handleStepTransition('food-safety');
+    handleStepTransition('complete');
   };
 
   // Auto-advance from the complete step — covers all paths (normal flow + skip)
@@ -115,7 +113,7 @@ export const ModernOnboarding: React.FC<ModernOnboardingProps> = ({
     if (currentStep === 'complete' && !onCompleteCalledRef.current) {
       onCompleteCalledRef.current = true;
       const timer = setTimeout(() => {
-        onComplete({ completed: true, selectedSetup: selectedSetupOption, permissions: [], leftoverPersona: selectedPersona });
+        onComplete({ completed: true, selectedSetup: selectedSetupOption, permissions: [], leftoverPersona: 'normal' });
       }, 1500);
       return () => clearTimeout(timer);
     }
@@ -320,63 +318,12 @@ export const ModernOnboarding: React.FC<ModernOnboardingProps> = ({
       </div>
 
       <button
-        onClick={() => handleStepTransition('food-safety')}
+        onClick={() => handleStepTransition('complete')}
         className="w-full bg-gradient-to-r from-[var(--accent-color)] to-[var(--accent-color)]/90 hover:from-[var(--accent-color)]/90 hover:to-[var(--accent-color)]/80 text-white py-4 px-6 rounded-xl font-semibold text-lg transition-all duration-200 transform hover:scale-[1.02] shadow-lg hover:shadow-xl flex items-center justify-center gap-3"
         data-testid="onboard-start-cooking"
       >
         <Sparkles className="w-5 h-5" />
         Start Cooking!
-      </button>
-    </div>
-  );
-
-  const renderFoodSafetyStep = () => (
-    <div className={`transition-all duration-500 ${isAnimating ? 'opacity-0 transform translate-x-4' : 'opacity-100 transform translate-x-0'}`}>
-      <div className="text-center mb-6">
-        <div className="inline-flex items-center justify-center w-16 h-16 bg-amber-100 dark:bg-amber-900/30 rounded-2xl mb-4">
-          <span className="text-3xl" role="img" aria-label="food safety">🛡️</span>
-        </div>
-        <h2 className="text-2xl font-bold text-theme-primary mb-2">Food Safety Preference</h2>
-        <p className="text-theme-secondary text-sm">
-          This controls how the app estimates leftover expiry and surfaces safety warnings.
-          You can always change this later in Settings.
-        </p>
-      </div>
-
-      <div className="space-y-3 mb-6">
-        {(['strict', 'normal', 'relaxed'] as const).map((persona) => {
-          const labels = {
-            strict: { title: 'Strict (safety-first)', desc: 'Shorter recommended windows; great for households with children, pregnant members, or immunocompromised individuals.' },
-            normal: { title: 'Normal', desc: 'Balanced guidance used by most households.' },
-            relaxed: { title: 'Relaxed', desc: 'Slightly more forgiving windows — not recommended for high-risk households.' },
-          };
-          return (
-            <button
-              key={persona}
-              onClick={() => {
-                setSelectedPersona(persona);
-                onPersonaSelected?.(persona);
-              }}
-              className={`w-full text-left p-4 rounded-xl border-2 transition-all duration-200 ${
-                selectedPersona === persona
-                  ? 'border-[var(--accent-color)] bg-[var(--accent-color)]/10'
-                  : 'border-theme hover:border-[var(--accent-color)]/50 hover:bg-theme-primary/5'
-              }`}
-            >
-              <div className="font-semibold text-theme-primary">{labels[persona].title}</div>
-              <div className="text-xs text-theme-secondary mt-0.5">{labels[persona].desc}</div>
-            </button>
-          );
-        })}
-      </div>
-
-      <button
-        onClick={() => handleStepTransition('complete')}
-        className="w-full bg-gradient-to-r from-[var(--accent-color)] to-[var(--accent-color)]/90 hover:from-[var(--accent-color)]/90 hover:to-[var(--accent-color)]/80 text-white py-3 px-6 rounded-xl font-semibold transition-all duration-200 flex items-center justify-center gap-2"
-        data-testid="onboard-food-safety-continue"
-      >
-        <ArrowRight className="w-5 h-5" />
-        Continue
       </button>
     </div>
   );
@@ -407,9 +354,8 @@ export const ModernOnboarding: React.FC<ModernOnboardingProps> = ({
   );
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-md flex flex-col overflow-y-auto px-4">
-      <div className="flex-grow flex-shrink-0"></div>
-      <div className="bg-theme-secondary rounded-3xl shadow-2xl max-w-lg w-full mx-auto my-8 relative overflow-hidden flex-shrink-0">
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-md flex flex-col justify-end sm:justify-center overflow-hidden">
+      <div className="bg-theme-secondary w-full sm:max-w-lg sm:mx-auto sm:rounded-3xl shadow-2xl relative flex flex-col max-h-[90vh] rounded-t-3xl mt-10 sm:mt-0 transition-transform">
         {/* Close button */}
         <button
           onClick={handleSkip}
@@ -420,22 +366,21 @@ export const ModernOnboarding: React.FC<ModernOnboardingProps> = ({
         </button>
 
         {/* Content */}
-        <div className="p-8">
+        <div className="p-6 sm:p-8 overflow-y-auto">
           {currentStep === 'welcome' && renderWelcomeStep()}
           {currentStep === 'quick-setup' && renderQuickSetupStep()}
           {currentStep === 'value-demo' && renderValueDemoStep()}
-          {currentStep === 'food-safety' && renderFoodSafetyStep()}
           {currentStep === 'complete' && renderCompleteStep()}
         </div>
 
         {/* Progress indicator */}
-        <div className="px-8 pb-6">
+        <div className="px-8 pb-6 flex-shrink-0 bg-theme-secondary">
           <div className="flex justify-center gap-2">
-            {(['welcome', 'quick-setup', 'value-demo', 'food-safety', 'complete'] as OnboardingStep[]).map((step, index) => (
+            {(['welcome', 'quick-setup', 'value-demo', 'complete'] as OnboardingStep[]).map((step, index) => (
               <div
                 key={step}
                 className={`w-2 h-2 rounded-full transition-all duration-300 ${
-                  index <= (['welcome', 'quick-setup', 'value-demo', 'food-safety', 'complete'] as OnboardingStep[]).indexOf(currentStep)
+                  index <= (['welcome', 'quick-setup', 'value-demo', 'complete'] as OnboardingStep[]).indexOf(currentStep)
                     ? 'bg-[var(--accent-color)]'
                     : 'bg-theme/30'
                 }`}
@@ -444,7 +389,6 @@ export const ModernOnboarding: React.FC<ModernOnboardingProps> = ({
           </div>
         </div>
       </div>
-      <div className="flex-grow flex-shrink-0"></div>
     </div>
   );
 };

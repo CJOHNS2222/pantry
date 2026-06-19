@@ -36,7 +36,7 @@ export const NotificationBanner: React.FC<NotificationBannerProps> = ({
   };
 
   return (
-    <div className={`fixed top-4 left-4 right-4 max-w-md mx-auto z-50 border-l-4 rounded-lg shadow-lg p-4 ${getPriorityColor(notification.priority)}`}>
+    <div className={`w-full max-w-md mx-auto border-l-4 rounded-lg shadow-lg p-4 ${getPriorityColor(notification.priority)}`}>
       <div className="flex items-start gap-3">
         <Bell className={`w-5 h-5 mt-0.5 ${getPriorityTextColor(notification.priority)}`} />
         <div className="flex-1">

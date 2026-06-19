@@ -9,6 +9,16 @@ export interface ChangeEntry {
 
 export const RECENT_CHANGES: ChangeEntry[] = [
   {
+    "version": "2.4.11",
+    "date": "Jun 19, 2026",
+    "highlights": [
+      "Local Push Fallback — Added immediate local device push notifications for urgent expiration alerts so they work without…",
+      "Stacked In-App Notifications — Updated the notification UI to elegantly stack multiple alerts (like 3 expiring items)…",
+      "Onboarding Streamlined — Spaced out setup questions by removing the Food Safety step from initial onboarding.",
+      "Expiration Check Optimization — Reduced notification checks to run only once per calendar day rather than every 5…"
+    ]
+  },
+  {
     "version": "2.4.10",
     "date": "Jun 18, 2026",
     "highlights": [
@@ -25,14 +35,6 @@ export const RECENT_CHANGES: ChangeEntry[] = [
       "Gemini Safety Filter Messages — Added explicit, user-friendly error handling for when Gemini rejects images containing…",
       "Mobile Scrollability — Fixed an issue where the top of the login and onboarding screens would be cut off and…",
       "Android Camera Crash — Prevented the Android OS from crashing and reloading the app by significantly reducing the…"
-    ]
-  },
-  {
-    "version": "2.4.8",
-    "date": "Jun 17, 2026",
-    "highlights": [
-      "Unit Test Infrastructure — Restructured and unified the unit test mocks across the recipe service, usage service, and…",
-      "Gemini API Key Rotation — Configured and updated the local environment settings with the newly rotated Gemini API Key."
     ]
   }
 ];

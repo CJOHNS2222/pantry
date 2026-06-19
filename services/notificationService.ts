@@ -294,7 +294,7 @@ export class NotificationService {
     // Determine action type based on context
     let actionType: 'add_to_shopping' | 'view_item' = 'view_item';
     let actionLabel = 'View Item';
-    const actionData: any = { itemId, itemName };
+    const actionData: any = { itemId, itemName, daysUntilExpiry };
 
     if (daysUntilExpiry <= 1 || itemRiskLevel >= 4) {
       actionType = 'add_to_shopping';
@@ -850,7 +850,22 @@ export class NotificationService {
    */
   private static async sendPushNotification(userId: string, notification: any): Promise<void> {
     // Push notifications are sent server-side via Firebase Cloud Messaging
-    // This is a placeholder method for client-side notification creation
-    console.log('Push notification would be sent for user:', userId, notification);
+    // Fallback for urgent alerts locally via Capacitor LocalNotifications
+    try {
+      const { LocalNotifications } = await import('@capacitor/local-notifications');
+      await LocalNotifications.schedule({
+        notifications: [
+          {
+            id: Math.floor(Math.random() * 1000000),
+            title: notification.title,
+            body: notification.message,
+            schedule: { at: new Date() }, // show immediately
+            extra: notification.actionData
+          }
+        ]
+      });
+    } catch (err) {
+      console.warn('Failed to schedule local notification for push fallback', err);
+    }
   }
 }
