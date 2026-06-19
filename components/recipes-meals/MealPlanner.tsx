@@ -233,6 +233,26 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
 
   // Wrapper for onAddToPlan that shows day/meal selection dialog
   const handleAddToPlan = (recipe: StructuredRecipe) => {
+    if (showRecipeSearch && searchMealType) {
+      const newPlan = [...mealPlan];
+      const effectiveIndex = mealPlan.findIndex(d => d.date === displayPlan[currentDayIndex].date);
+      if (effectiveIndex >= 0) {
+        if (!newPlan[effectiveIndex][searchMealType]) {
+          newPlan[effectiveIndex][searchMealType] = [];
+        }
+        newPlan[effectiveIndex][searchMealType].push({
+          id: Date.now().toString(),
+          recipe,
+          mealType: searchMealType
+        });
+        updateMealPlan(newPlan);
+        closeRecipeModal();
+        closeRecipeSearch();
+        addToast('Recipe added to schedule successfully!', 'success');
+        return;
+      }
+    }
+    
     setPendingRecipe(recipe);
     setShowAddMealDialog(true);
   };

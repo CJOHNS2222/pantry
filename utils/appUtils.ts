@@ -129,7 +129,7 @@ export function parseItemText(itemText: string): { quantity: number; description
  * @param ingredientText Raw ingredient text (e.g., "1 cup flour", "2 tbsp sugar", "3 eggs")
  * @returns Object with quantity string and cleaned item name
  */
-export function parseIngredientForShoppingList(ingredientText: string): { quantity: string; itemName: string } {
+export function parseIngredientForShoppingList(ingredientText: string): { quantity: string; itemName: string; prepNotes?: string } {
   const perfTrace = trace(performance, 'parse_ingredient_shopping_list');
   perfTrace.start();
 
@@ -269,21 +269,30 @@ export function parseIngredientForShoppingList(ingredientText: string): { quanti
     itemName = itemName
       // Strip parenthetical size/method notes (e.g. "(14.5 oz)", "(optional)", "(or water)")
       .replace(/\s*\([^)]*\)/g, '')
-      // Strip trailing comma + anything after (e.g. "garlic, minced" → "garlic", "oil, divided" → "oil")
-      .replace(/,.*$/, '')
       // Remove common size descriptors
       .replace(/\b(large|medium|small|big|tiny|huge|giant)\s+/gi, '')
       // Remove "of" preposition
       .replace(/\bof\s+/gi, '')
-      // Keep colors for distinguishing items (like red vs green apples)
-      // Keep preparation descriptors for shopping list clarity (user wants to see "chopped", "minced", etc.)
       // Remove common quality descriptors
-      .replace(/\b(ripe|raw|cooked|baked|fried|organic)\s+/gi, '')
-      // Remove trailing/leading whitespace
-      .trim();
+      .replace(/\b(ripe|raw|cooked|baked|fried|organic)\s+/gi, '');
+
+    // Extract preparation words into notes
+    const prepWords = ['finely diced', 'minced', 'chopped', 'diced', 'sliced', 'crushed', 'ground', 'grated', 'finely chopped', 'divided', 'peeled', 'cored', 'beaten', 'melted', 'softened'];
+    const prepNotesList: string[] = [];
+    const prepRegex = new RegExp(`\\b(${prepWords.join('|')})\\b`, 'gi');
+    
+    itemName = itemName.replace(prepRegex, (match) => {
+      prepNotesList.push(match.toLowerCase());
+      return '';
+    });
+
+    // Clean up trailing/leading whitespace and stray commas
+    itemName = itemName.replace(/,\s*$/, '').replace(/\s+,\s+/g, ' ').replace(/^,\s*/, '').trim();
 
     // Capitalize first letter of each word for better display
     itemName = itemName.replace(/\b\w/g, l => l.toUpperCase());
+
+    const prepNotes = prepNotesList.length > 0 ? prepNotesList.join(', ') : undefined;
 
     // If no quantity was found, set default to "1"
     if (!quantity) {
@@ -294,7 +303,7 @@ export function parseIngredientForShoppingList(ingredientText: string): { quanti
     perfTrace.putMetric('output_quantity_length', quantity.length);
     perfTrace.putMetric('output_item_length', itemName.length);
 
-    return { quantity, itemName };
+    return { quantity, itemName, prepNotes };
   } finally {
     perfTrace.stop();
   }

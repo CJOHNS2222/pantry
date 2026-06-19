@@ -61,6 +61,7 @@ import { useIntl } from 'react-intl';
 import { useAndroidBack, closeTopAndroidModal } from './hooks/useAndroidBack';
 import { useKeyboard } from './hooks/useKeyboard';
 import { GeminiTokenDebugger } from './components/ui/GeminiTokenDebugger';
+import { cameraRestoredStore } from './utils/cameraRestoredStore';
 
 // Lazy load monitoring components
 const DatabaseAnalytics = React.lazy(() => import('./components/admin-analytics/DatabaseAnalytics').then(module => ({ default: module.default })));
@@ -301,10 +302,16 @@ const App: React.FC = () => {
       
       const parsed = parseIngredientForShoppingList(itemStr);
       const priceData = await groceryPriceService.getIngredientPrice(parsed.itemName).catch(() => null);
+      
+      let finalNotes = itemNotes || '';
+      if (parsed.prepNotes) {
+        finalNotes = finalNotes ? `${finalNotes} (${parsed.prepNotes})` : parsed.prepNotes;
+      }
+
       return {
         parsed,
         source: itemSource,
-        notes: itemNotes,
+        notes: finalNotes || undefined,
         estimatedPrice: priceData?.averagePrice || 0
       };
     });
@@ -508,6 +515,24 @@ const App: React.FC = () => {
 
   useEffect(() => {
     SafeAreaService.initialize().catch(error => log.error('Failed to initialize safe area service', { error }, 'App'));
+  }, []);
+
+  // Handle Capacitor Camera restore after Android app restart due to low memory
+  useEffect(() => {
+    const handleRestoredResult = (data: import('@capacitor/app').RestoredListenerEvent) => {
+      if (data.pluginId === 'Camera' && data.methodName === 'getPhoto' && data.success) {
+        log.info('Recovered photo from appRestoredResult', undefined, 'App');
+        const intent = localStorage.getItem('camera_intent');
+        localStorage.removeItem('camera_intent');
+        cameraRestoredStore.setRestoredData(data.data as import('@capacitor/camera').Photo, intent);
+        window.dispatchEvent(new CustomEvent('cameraRestored'));
+      }
+    };
+
+    const listener = CapacitorApp.addListener('appRestoredResult', handleRestoredResult);
+    return () => {
+      listener.then(l => l.remove());
+    };
   }, []);
 
   useEffect(() => {

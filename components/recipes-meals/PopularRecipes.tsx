@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Household, StructuredRecipe, User } from '../../types';
+import { ChefHat } from 'lucide-react';
 import { getCachedPopularRecipes } from '../../services/recipeService';
 import { ProgressiveImage } from '../ui/ProgressiveImage';
 
@@ -77,7 +78,11 @@ export const PopularRecipes: React.FC<Props> = ({ openRecipeModal, onAddToPlan: 
               {recipe.image ? (
                 <ProgressiveImage src={recipe.image} alt={recipe.title} className="w-full h-full" lazy />
               ) : (
-                <div className="w-full h-full flex items-center justify-center bg-theme-primary/10" />
+                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-amber-500/10 via-theme-primary to-orange-500/5 dark:from-amber-500/5 dark:to-orange-500/5">
+                  <div className="w-8 h-8 rounded-full bg-white/50 dark:bg-black/20 shadow-sm flex items-center justify-center backdrop-blur-sm border border-white/20 dark:border-white/5">
+                    <ChefHat className="w-4 h-4 text-amber-600/60 dark:text-amber-400/50" />
+                  </div>
+                </div>
               )}
             </div>
             <div className="p-2">

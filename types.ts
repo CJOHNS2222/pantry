@@ -67,6 +67,7 @@ export interface PantryItem {
   openedExpiry?: string; // ISO date for opened-specific expiry
   // Staples: items that auto-reappear on shopping list when depleted
   isStaple?: boolean;
+  estimatedPrice?: number; // Estimated price extracted from receipt or user input
 }
 
 export interface Batch {

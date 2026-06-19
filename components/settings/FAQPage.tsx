@@ -426,6 +426,49 @@ const FAQ_DATA: FAQItem[] = [
     question: 'What are the limits for guest (not signed in) users?',
     answer: 'You can use Stock & Spoon without creating an account, but with reduced limits:\n\n• **Pantry items**: Up to 20 items stored locally on your device\n• **Shopping list items**: Up to 30 items\n• **No cloud sync**: Data is only on the current device — if you uninstall or clear app storage, it is gone\n• **No household sharing**: Multi-device and family features require an account\n• **No undo history**: Undo is tied to your account\'s local storage\n\nWhen you reach the guest limit, the app will prompt you to create a free account to continue. Creating an account is free and all your existing guest data can be migrated across.\n\nSign up via **Settings → Account → Create Account**.',
     keywords: ['guest', 'no account', 'not signed in', 'guest limits', 'offline user', 'without account', 'item limit', 'guest cap']
+  },
+  // Recent Updates (v2.4.x)
+  {
+    id: 'pantry-12',
+    category: 'Pantry Management',
+    question: 'What is the Pantry Health Score?',
+    answer: 'The Pantry Health Score is an interactive letter grade (A–F) displayed in the Pantry tab. It measures the overall "health" of your inventory based on freshness, variety, nutritional balance, item utilization, and waste reduction. Check it regularly to see how well you\'re managing your pantry!',
+    keywords: ['health score', 'pantry health', 'grade', 'freshness', 'utilization', 'waste reduction', 'nutrition', 'variety']
+  },
+  {
+    id: 'meal-planning-7',
+    category: 'Meal Planning',
+    question: 'How does Meal Planner Auto-Fill work?',
+    answer: 'The Auto-Fill feature automatically schedules breakfast, lunch, and dinner options for your week. It prioritizes using up your expiring pantry goods and leftovers, while strictly excluding any allergy-violating ingredients. It also scores recipes based on your dietary and dislike preferences to ensure you get suggestions you\'ll love without duplicates.\n\nTo use it, tap the auto-fill icon in the Meal Planner tab.',
+    keywords: ['auto-fill', 'auto fill', 'schedule', 'suggest meals', 'plan meals automatically', 'expiring goods', 'leftovers']
+  },
+  {
+    id: 'meal-planning-8',
+    category: 'Meal Planning',
+    question: 'How can I quickly schedule a recipe for a specific meal?',
+    answer: 'If you tap the **"+"** button on a specific day and meal (e.g. Friday Dinner) in the Meal Planner, the app remembers where you started. When you search for a recipe and tap **Add to Plan**, it will automatically be scheduled for that exact spot without asking you to select the date and time again.',
+    keywords: ['schedule', 'add to plan', 'quick add', 'specific meal', 'meal planner plus button']
+  },
+  {
+    id: 'household-5',
+    category: 'Household & Sharing',
+    question: 'What happens if I leave a household and I\'m the only member?',
+    answer: 'If you are the only member left in a household and you choose to leave it, the household will be automatically disbanded. Don\'t worry about your data — your personal cache will preserve copies of the inventory, shopping lists, and meal plans so you don\'t lose anything you\'ve set up.',
+    keywords: ['leave household', 'delete household', 'disband', 'solo admin', 'preserve data', 'backup']
+  },
+  {
+    id: 'shopping-6',
+    category: 'Shopping Lists',
+    question: 'Where do the shopping list item notes come from when adding from a recipe?',
+    answer: 'When you add ingredients from a recipe to your shopping list, the app automatically adds a tag to the item\'s notes indicating which recipe it belongs to. Additionally, preparation instructions (like "finely diced", "minced", or "chopped") are intelligently extracted and added to the note so you know exactly how the ingredient will be used.',
+    keywords: ['recipe tag', 'item note', 'shopping list source', 'preparation', 'diced', 'minced']
+  },
+  {
+    id: 'troubleshooting-4',
+    category: 'Troubleshooting',
+    question: 'Why did my image scan get rejected for safety reasons?',
+    answer: 'Stock & Spoon uses Google\'s Gemini AI to analyze pantry photos and receipts. Gemini has strict safety filters and will reject images that contain people, faces, or reflections of people. If your scan is rejected, try taking the photo from an angle that doesn\'t capture any reflections and ensure no people are in the frame.',
+    keywords: ['safety filter', 'rejected', 'image scan', 'people', 'faces', 'reflection', 'gemini error']
   }
 ];
 

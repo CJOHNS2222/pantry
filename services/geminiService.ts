@@ -145,6 +145,7 @@ export const analyzeReceiptImage = async (base64Image: string, mimeType: string,
           quantity_estimate: { type: Type.STRING },
           storageLocation: { type: Type.STRING, enum: ['fridge', 'freezer', 'pantry', 'spices', 'other'] },
           estimatedExpiryDays: { type: Type.INTEGER },
+          estimatedPrice: { type: Type.NUMBER },
         },
         required: ['item', 'category', 'quantity_estimate', 'storageLocation', 'estimatedExpiryDays'],
       },
@@ -159,7 +160,7 @@ export const analyzeReceiptImage = async (base64Image: string, mimeType: string,
       contents: {
         parts: [
           { inlineData: { data: base64Image, mimeType } },
-          { text: 'Extract all grocery/food items from this receipt. For each item provide its name, food category (e.g. Fruits & Vegetables, Dairy & Eggs, Meat & Poultry, Grains & Bread, Canned Goods, Snacks, Beverages, Household, Uncategorized), quantity, typical storage location (fridge, freezer, pantry, spices, or other), and estimated remaining shelf life in days from today (e.g. 7 for milk, 365 for canned soup).' },
+          { text: 'Extract all grocery/food items from this receipt. For each item provide its name, food category (e.g. Fruits & Vegetables, Dairy & Eggs, Meat & Poultry, Grains & Bread, Canned Goods, Snacks, Beverages, Household, Uncategorized), quantity, typical storage location (fridge, freezer, pantry, spices, or other), estimated remaining shelf life in days from today (e.g. 7 for milk, 365 for canned soup), and the exact price or cost as a number if available on the receipt (in estimatedPrice). IMPORTANT: Remove store brand abbreviations or name brands from the item name so it is generic (e.g., use "Milk" instead of "CV Milk" or "GF Milk").' },
         ],
       },
       config: {

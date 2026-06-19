@@ -50,6 +50,7 @@ import { debounce } from '../../utils/debounceUtils';
 import { formatItemQuantity, getExpirationColor, getAllCategories, getPreferredItemDisplayImage } from '../../utils/appUtils';
 import { getQuantityAmount } from '../../utils/quantityUtils';
 import { PantryService } from '../../services/pantryService';
+import { groceryPriceService } from '../../services/groceryPriceService';
 import { useApp } from '../../contexts/AppContext';
 import { useAppActions } from '../../contexts/AppActionsContext';
 import { useKeyboardNavigation } from '../../hooks/useKeyboardNavigation';
@@ -2739,6 +2740,14 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                               }} className="px-2 py-1 text-sm rounded bg-theme-primary border border-theme text-theme-primary">
                                 {getAllCategories(customCategories).map(cat => <option key={cat} value={cat}>{cat}</option>)}
                               </select>
+                              <div className="flex items-center gap-1 bg-theme-primary border border-theme rounded px-2">
+                                <span className="text-theme-secondary text-sm">$</span>
+                                <input type="number" min="0" step="0.01" value={sItem.estimatedPrice || ''} onChange={(e) => {
+                                  const updated = [...scanResults];
+                                  updated[idx] = { ...updated[idx], estimatedPrice: parseFloat(e.target.value) || undefined };
+                                  setScanResults(updated);
+                                }} className="w-16 py-1 text-sm bg-transparent outline-none text-theme-primary" placeholder="Cost" />
+                              </div>
                               {('confidence' in sItem) && (
                                 <div className="text-sm text-theme-secondary opacity-80">Conf: {(sItem as ReceiptScanResult & { confidence?: string | number }).confidence}</div>
                               )}
@@ -2766,6 +2775,18 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                       if (receiptDestination === 'pantry') {
                         // Add to pantry (existing behavior)
                         await onAddItems(scanResults as PantryItem[]);
+                        
+                        // Submit extracted prices to the price database
+                        if (user) {
+                          for (const item of scanResults) {
+                            if (item.estimatedPrice && item.estimatedPrice > 0) {
+                              const unit = 'each'; // default for receipt items
+                              groceryPriceService.submitPriceUpdate(item.item, item.estimatedPrice, unit, user.id).catch(e => {
+                                log.warn('Failed to log price:', { error: e }, 'PantryScanner');
+                              });
+                            }
+                          }
+                        }
                       } else {
                         // Add to shopping list with price options
                         if (!addShoppingListItem) {

@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { Camera as CapacitorCamera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { BrowserMultiFormatReader } from '@zxing/library';
@@ -8,6 +8,7 @@ import { PantryService } from '../services/pantryService';
 import AnalyticsService from '../services/analyticsService';
 import SpoonacularFoodClient from '../services/spoonacularFoodClient';
 import { extractReceiptItems } from '../services/receiptOcrService';
+import { cameraRestoredStore } from '../utils/cameraRestoredStore';
 
 export interface ReceiptScanResult {
   id: string;
@@ -44,6 +45,7 @@ export function usePantryScanner(
     try {
       AnalyticsService.trackFeatureUsage('pantry_scanner', { success: true, itemsScanned: 0, itemsAdded: 0 });
       
+      localStorage.setItem('camera_intent', 'pantry');
       const photo = await CapacitorCamera.getPhoto({
         resultType: CameraResultType.DataUrl,
         source: CameraSource.Camera,
@@ -75,6 +77,7 @@ export function usePantryScanner(
 
   const handleSelectFromGallery = useCallback(async () => {
     try {
+      localStorage.setItem('camera_intent', 'gallery');
       const photo = await CapacitorCamera.getPhoto({
         resultType: CameraResultType.DataUrl,
         source: CameraSource.Photos,
@@ -110,6 +113,7 @@ export function usePantryScanner(
     try {
       AnalyticsService.trackFeatureFirstUse('pantry_scanner_barcode', { method: 'barcode' });
       
+      localStorage.setItem('camera_intent', 'barcode');
       const photo = await CapacitorCamera.getPhoto({
         resultType: CameraResultType.DataUrl,
         source: CameraSource.Camera,
@@ -211,6 +215,7 @@ export function usePantryScanner(
     try {
       AnalyticsService.trackFeatureFirstUse('pantry_scanner_receipt', { method: 'receipt' });
       
+      localStorage.setItem('camera_intent', 'receipt');
       const photo = await CapacitorCamera.getPhoto({
         resultType: CameraResultType.DataUrl,
         source: CameraSource.Camera,
@@ -316,6 +321,73 @@ export function usePantryScanner(
       fileInputRef.current.value = '';
     }
   }, []);
+
+  // Handle restored camera photos from Android memory kills
+  useEffect(() => {
+    const processRestored = () => {
+      const { photo, intent } = cameraRestoredStore.consume();
+      if (!photo || !photo.dataUrl) return;
+
+      if (intent === 'pantry' || intent === 'gallery') {
+        setImagePreview(photo.dataUrl);
+        const base64Data = photo.dataUrl.split(',')[1];
+        setRawBase64(base64Data);
+        setMimeType(photo.format ? `image/${photo.format}` : 'image/jpeg');
+        setIsAddModalOpen(true);
+      } else if (intent === 'receipt') {
+        setImagePreview(photo.dataUrl);
+        const base64Data = photo.dataUrl.split(',')[1];
+        setRawBase64(base64Data);
+        const mime = photo.format ? `image/${photo.format}` : 'image/jpeg';
+        setMimeType(mime);
+        processReceiptImage(base64Data, mime);
+      } else if (intent === 'barcode') {
+        setLoadingState(LoadingState.LOADING);
+        setImagePreview(photo.dataUrl);
+        
+        const img = new window.Image();
+        img.onload = async () => {
+          try {
+            const codeReader = new BrowserMultiFormatReader();
+            const result = await codeReader.decodeFromImage(img);
+            
+            if (result) {
+              const barcode = result.getText();
+              AnalyticsService.trackPantryScan(1, 1);
+
+              try {
+                const product = await SpoonacularFoodClient.searchGroceryProductByUPC(barcode);
+                const p = product as { title?: string; breadcrumbs?: string[] };
+                if (product && p.title) {
+                  setNewItemText(p.title);
+                  appActions.addToast(`Found: ${p.title}`, 'success', 3000);
+                } else {
+                  setNewItemText(`Scanned Item (${barcode})`);
+                  appActions.addToast('Product not found in database. Please edit the name.', 'warning', 4000);
+                }
+              } catch {
+                setNewItemText(`Scanned Item (${barcode})`);
+              }
+
+              setIsAddModalOpen(true);
+            } else {
+              appActions.addToast('No barcode detected. Try taking a clearer photo or use manual entry.', 'error');
+            }
+          } catch (error) {
+            log.error('Barcode detection error', { error });
+            appActions.addToast('Barcode detection failed. Try taking a clearer photo or use manual entry.', 'error');
+          } finally {
+            setLoadingState(LoadingState.IDLE);
+          }
+        };
+        img.src = photo.dataUrl;
+      }
+    };
+
+    processRestored(); // Check on mount
+    window.addEventListener('cameraRestored', processRestored);
+    return () => window.removeEventListener('cameraRestored', processRestored);
+  }, [processReceiptImage, setIsAddModalOpen, setNewItemText, appActions]);
 
   return {
     imagePreview, setImagePreview,

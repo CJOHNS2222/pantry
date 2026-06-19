@@ -9,6 +9,16 @@ export interface ChangeEntry {
 
 export const RECENT_CHANGES: ChangeEntry[] = [
   {
+    "version": "2.4.10",
+    "date": "Jun 18, 2026",
+    "highlights": [
+      "Receipt Price Extraction — Gemini now extracts unit prices and amounts from receipt scans and automatically logs them…",
+      "Gemini Brand Filtering — Improved the Gemini receipt extraction prompt to proactively strip out store abbreviations and…",
+      "Login Validation — Removed the requirement for users to enter a last name when signing up for a new account.",
+      "Android Camera Restart Fix — Resolved an issue where older Android devices (especially Android 13) would crash and…"
+    ]
+  },
+  {
     "version": "2.4.9",
     "date": "Jun 17, 2026",
     "highlights": [
@@ -23,14 +33,6 @@ export const RECENT_CHANGES: ChangeEntry[] = [
     "highlights": [
       "Unit Test Infrastructure — Restructured and unified the unit test mocks across the recipe service, usage service, and…",
       "Gemini API Key Rotation — Configured and updated the local environment settings with the newly rotated Gemini API Key."
-    ]
-  },
-  {
-    "version": "2.4.7",
-    "date": "Jun 16, 2026",
-    "highlights": [
-      "Leave Household for Solo Admins — Enabled the \"Leave Household\" button for admins who are the only member in their…",
-      "Unified Household UI — Cleaned up massive amounts of duplicate and dead layout code in the Household Management…"
     ]
   }
 ];

@@ -1,3 +1,17 @@
+## [2.4.10] - 2026-06-18
+
+### Added
+- **Receipt Price Extraction** — Gemini now extracts unit prices and amounts from receipt scans and automatically logs them to the local grocery price database to improve future cost estimations.
+
+### Changed
+- **Gemini Brand Filtering** — Improved the Gemini receipt extraction prompt to proactively strip out store abbreviations and brand prefixes (e.g., "CV", "GF") for cleaner, more generic pantry item names.
+
+### Fixed
+- **Login Validation** — Removed the requirement for users to enter a last name when signing up for a new account.
+- **Android Camera Restart Fix** — Resolved an issue where older Android devices (especially Android 13) would crash and restart the app when opening the camera due to aggressive memory management. Integrated Capacitor's `appRestoredResult` to seamlessly recover the photo when the app reloads.
+
+---
+
 ## [2.4.9] - 2026-06-17
 
 ### Added

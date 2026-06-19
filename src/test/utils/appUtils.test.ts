@@ -240,7 +240,8 @@ describe('parseIngredientForShoppingList', () => {
   it('strips parenthetical size note', () => {
     const r = parseIngredientForShoppingList('1 can (14.5 oz) diced tomatoes');
     expect(r.quantity).toBe('1 can');
-    expect(r.itemName).toBe('Diced Tomatoes');
+    expect(r.itemName).toBe('Tomatoes');
+    expect(r.prepNotes).toBe('diced');
   });
 
   it('strips parenthetical alternative note', () => {

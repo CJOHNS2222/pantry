@@ -217,8 +217,11 @@ export const Community: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecipe,
                             }}
                         />
                     ) : null}
-                    <div className={`absolute inset-0 flex items-center justify-center text-theme-secondary opacity-10 font-serif text-4xl font-bold bg-theme-primary ${fullRecipe?.image ? 'hidden fallback-text' : ''}`}>
-                        {(stat.title && String(stat.title).charAt ? String(stat.title).charAt(0) : '?')}
+                    <div className={`absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-amber-500/10 via-theme-primary to-orange-500/5 dark:from-amber-500/5 dark:to-orange-500/5 ${fullRecipe?.image ? 'hidden fallback-text' : ''}`}>
+                        <div className="w-12 h-12 rounded-full bg-white/50 dark:bg-black/20 shadow-sm flex items-center justify-center mb-2 backdrop-blur-sm border border-white/20 dark:border-white/5">
+                           <UtensilsCrossed className="w-6 h-6 text-amber-600/60 dark:text-amber-400/50" />
+                        </div>
+                        <span className="font-serif text-amber-700/60 dark:text-amber-300/50 font-medium tracking-wide text-xs px-4 text-center line-clamp-1">{stat.title || 'Recipe'}</span>
                     </div>
                      <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black/80 to-transparent p-4">
                         <h3 className="text-white font-bold font-serif text-lg leading-tight">{stat.title}</h3>

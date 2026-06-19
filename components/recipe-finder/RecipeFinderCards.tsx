@@ -89,8 +89,11 @@ export const RecipeFinderCard: React.FC<RecipeFinderCardProps> = ({
               lazy={true}
             />
           ) : (
-            <div className="w-full h-full bg-theme-primary/10 flex items-center justify-center">
-              <div className="text-theme-secondary/50 text-xs">{noImageLabel}</div>
+            <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-amber-500/10 via-theme-primary to-orange-500/5 dark:from-amber-500/5 dark:to-orange-500/5">
+              <div className="w-10 h-10 rounded-full bg-white/50 dark:bg-black/20 shadow-sm flex items-center justify-center mb-1.5 backdrop-blur-sm border border-white/20 dark:border-white/5">
+                <ChefHat className="w-5 h-5 text-amber-600/60 dark:text-amber-400/50" />
+              </div>
+              <span className="font-serif text-amber-700/60 dark:text-amber-300/50 font-medium tracking-wide text-[10px] px-2 text-center line-clamp-1">{recipe.title || noImageLabel}</span>
             </div>
           )}
         </div>
@@ -246,8 +249,11 @@ export const RecipeFinderTile: React.FC<RecipeFinderTileProps> = ({ recipe, rati
             lazy={true}
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center bg-theme-primary/10">
-            <ChefHat className="w-8 h-8 text-theme-secondary opacity-50" />
+          <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-amber-500/10 via-theme-primary to-orange-500/5 dark:from-amber-500/5 dark:to-orange-500/5">
+            <div className="w-12 h-12 rounded-full bg-white/50 dark:bg-black/20 shadow-sm flex items-center justify-center mb-2 backdrop-blur-sm border border-white/20 dark:border-white/5">
+              <ChefHat className="w-6 h-6 text-amber-600/60 dark:text-amber-400/50" />
+            </div>
+            <span className="font-serif text-amber-700/60 dark:text-amber-300/50 font-medium tracking-wide text-xs px-4 text-center line-clamp-1">{recipe.title || 'Recipe'}</span>
           </div>
         )}
       </div>

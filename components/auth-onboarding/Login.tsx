@@ -55,11 +55,12 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
       }
     }
     
+    const trimmedName = name.trim();
     if (isSignup) {
       // Validate name
-      const nameValidation = validateName(name);
+      const nameValidation = validateName(trimmedName);
       if (!nameValidation.isValid) {
-        setError('Please enter a valid name.');
+        setError(nameValidation.errors[0] || 'Please enter a valid name.');
         return;
       }
       
@@ -79,7 +80,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
         setSuccess('Signup successful! Please check your email to verify your account.');
         onLogin({
           id: user.uid,
-          name: name,
+          name: trimmedName,
           email: user.email || '',
           provider: 'email',
           hasSeenTutorial: false
