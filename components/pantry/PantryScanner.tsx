@@ -182,6 +182,24 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   const [newQty, setNewQty] = useState(1);
   const [newUnit, setNewUnit] = useState('count');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [hasTappedAddButton, setHasTappedAddButton] = useState(() => {
+    try {
+      return sessionStorage.getItem('clicked-pantry-add-button') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const shouldGlowAddButton = useMemo(() => {
+    if (hasTappedAddButton || isAddModalOpen) return false;
+    try {
+      const dismissed = localStorage.getItem('dismissed-tutorial-tips');
+      return dismissed ? JSON.parse(dismissed).includes('tip-pantry-scan') : false;
+    } catch {
+      return false;
+    }
+  }, [hasTappedAddButton, isAddModalOpen]);
+
   const [showImportModal, setShowImportModal] = useState(false);
   const [lastImportedBatch, setLastImportedBatch] = useState<import('../../types').PantryItem[] | null>(null);
   const importedTimerRef = useRef<number | null>(null);
@@ -2394,9 +2412,19 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
 
       {/* Floating Action Button */}
       <button
-        onClick={() => setIsAddModalOpen(true)}
+        onClick={() => {
+          setIsAddModalOpen(true);
+          setHasTappedAddButton(true);
+          try {
+            sessionStorage.setItem('clicked-pantry-add-button', 'true');
+          } catch (e) {
+            log.error('Failed to save clicked-pantry-add-button to sessionStorage', { error: e });
+          }
+        }}
         data-testid="pantry-add-button"
-        className="fixed bottom-28 right-6 z-50 bg-[var(--accent-color)] text-white p-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:ring-offset-2"
+        className={`fixed bottom-28 right-6 z-50 bg-[var(--accent-color)] text-white p-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:ring-offset-2 ${
+          shouldGlowAddButton ? 'tutorial-glow' : ''
+        }`}
         style={{ bottom: 'calc(7rem + 15px)' }}
         aria-label="Add items to pantry"
         data-tutorial="add-item-button"

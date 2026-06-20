@@ -1,3 +1,18 @@
+## [2.4.12] - 2026-06-20
+
+### Added
+- **Changelog Settings Link** — Added a link to view the app's changelog in the Settings tab under App Updates.
+- **Button Glowing Highlight** — Added a glowing visual highlight to the "+" button after exit on scanner tooltip.
+- **Contextual Tips** — Added more helpful contextual tutorial tips when opening different tabs.
+- **Onboarding Milestones** — Added onboarding milestone tips for first leftover logged, first saved recipe, and household collaboration.
+
+### Fixed
+- **App.tsx TypeScript Errors** — Fixed use-before-declaration compiler errors for `setShowHousehold` and prop type mismatch for `onRemoveItems` callback in `App.tsx`.
+- **PantryItem Type Definition** — Restored missing `originalQuantity` property to the `PantryItem` type definition in `types.ts` to support quantity preservation.
+- **Google AdMob Env** — Activated Google AdMob in environment configuration.
+
+---
+
 ## [2.4.11] - 2026-06-19
 
 ### Added

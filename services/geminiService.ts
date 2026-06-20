@@ -8,6 +8,22 @@ import remoteConfig from './remoteConfigService';
 import { reportGeminiError } from './sentryService';
 import { log } from './logService';
 
+// Define typed API response structure
+interface GeminiResponse {
+  text?: string;
+  usageMetadata?: {
+    promptTokenCount?: number;
+    candidatesTokenCount?: number;
+    totalTokenCount?: number;
+  };
+  candidates?: {
+    finishReason?: string;
+    groundingMetadata?: {
+      groundingChunks?: GroundingChunk[];
+    };
+  }[];
+}
+
 // Initialize Gemini Client
 const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
 
@@ -70,7 +86,7 @@ export const analyzePantryImage = async (base64Image: string, mimeType: string, 
       },
     });
 
-    const response = await Promise.race([responsePromise, timeoutPromise]) as any;
+    const response = await Promise.race([responsePromise, timeoutPromise]) as unknown as GeminiResponse;
     const jsonText = response.text;
     if (!jsonText) throw new Error('No data returned from Gemini.');
 
@@ -96,7 +112,11 @@ export const analyzePantryImage = async (base64Image: string, mimeType: string, 
       perfTrace.putMetric('image_size_kb', Math.round(base64Image.length / 1024));
       perfTrace.putMetric('items_detected', items.length);
     }
-    try { if (user) await UsageService.recordGeminiUsage(user); } catch { /* non-fatal */ }
+    try {
+      if (user) await UsageService.recordGeminiUsage(user);
+    } catch (e) {
+      log.debug('Failed to record Gemini usage (non-fatal)', { error: e }, 'GeminiService');
+    }
 
     return items;
   } catch (err: unknown) {
@@ -171,7 +191,7 @@ export const analyzeReceiptImage = async (base64Image: string, mimeType: string,
       },
     });
 
-    const response = await Promise.race([responsePromise, timeoutPromise]) as any;
+    const response = await Promise.race([responsePromise, timeoutPromise]) as unknown as GeminiResponse;
     const jsonText = response.text;
     if (!jsonText) throw new Error('No data returned from Gemini.');
 
@@ -197,7 +217,11 @@ export const analyzeReceiptImage = async (base64Image: string, mimeType: string,
       perfTrace.putMetric('image_size_kb', Math.round(base64Image.length / 1024));
       perfTrace.putMetric('items_detected', items.length);
     }
-    try { if (user) await UsageService.recordGeminiUsage(user); } catch { /* non-fatal */ }
+    try {
+      if (user) await UsageService.recordGeminiUsage(user);
+    } catch (e) {
+      log.debug('Failed to record Gemini usage (non-fatal)', { error: e }, 'GeminiService');
+    }
 
     return items;
   } catch (err: unknown) {
@@ -316,7 +340,7 @@ const performSearch = async (params: RecipeSearchParams, user: User | undefined,
       },
     });
 
-const response = await Promise.race([responsePromise, timeoutPromise]) as any;
+    const response = await Promise.race([responsePromise, timeoutPromise]) as unknown as GeminiResponse;
 
     const finishReason = response.candidates?.[0]?.finishReason;
     if (finishReason && finishReason !== 'STOP') {

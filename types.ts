@@ -23,6 +23,7 @@ export interface PantryItem {
     originalAmount?: number; // Original purchase amount
     originalUnit?: string;   // Original purchase unit
   };
+  originalQuantity?: string; // Preserve recipe quantities (e.g. "1/2 cup", "4 oz")
 
   // Support multiple purchase batches with independent expirations
   batches?: Batch[];

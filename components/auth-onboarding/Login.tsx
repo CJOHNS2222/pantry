@@ -180,22 +180,22 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
           provider: 'google',
           hasSeenTutorial: false
         });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } catch (popupError: any) {
-        log.warn('Google popup failed, trying redirect', { error: popupError.message, code: popupError.code }, 'Login');
-        if (popupError.code === 'auth/popup-blocked' ||
-            popupError.code === 'auth/popup-closed-by-user' ||
-            popupError.code === 'auth/cancelled-popup-request') {
+      } catch (popupError: unknown) {
+        const err = popupError as { message?: string; code?: string };
+        log.warn('Google popup failed, trying redirect', { error: err.message, code: err.code }, 'Login');
+        if (err.code === 'auth/popup-blocked' ||
+            err.code === 'auth/popup-closed-by-user' ||
+            err.code === 'auth/cancelled-popup-request') {
           await signInWithRedirect(auth, googleProvider);
         } else {
           throw popupError;
         }
       }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (error: any) {
-      log.error('Google login error', { code: error.code, message: error.message }, 'Login');
+    } catch (error: unknown) {
+      const err = error as { message?: string; code?: string };
+      log.error('Google login error', { code: err.code, message: err.message }, 'Login');
       const friendlyMessage = (() => {
-        switch (error.code) {
+        switch (err.code) {
           case 'auth/unauthorized-domain':
             return 'This domain is not authorized in Firebase. Add it under Authentication → Settings → Authorized Domains.';
           case 'auth/popup-blocked':
@@ -206,7 +206,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
           case 'auth/popup-closed-by-user':
             return null; // user dismissed — show nothing
           default:
-            return `${error.message}${error.code ? ` (${error.code})` : ''}`;
+            return `${err.message || 'Unknown error'}${err.code ? ` (${err.code})` : ''}`;
         }
       })();
       if (friendlyMessage) setError(friendlyMessage);
@@ -221,7 +221,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
       try {
         log.debug('Checking redirect result', {}, 'Login');
         const result = await getRedirectResult(auth);
-        log.debug('Redirect result received', { hasUser: !!result?.user }, 'Login');
+        log.debug('Redirection result received', { hasUser: !!(result && result.user) }, 'Login');
         if (result && result.user) {
           const user = result.user;
           log.info('User authenticated via redirect', { uid: user.uid, provider: 'google' }, 'Login');
@@ -236,12 +236,12 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
         } else {
           log.debug('No redirect result found', {}, 'Login');
         }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } catch (error: any) {
-        log.warn('Redirect result error', { error: error.message, code: error.code }, 'Login');
+      } catch (error: unknown) {
+        const err = error as { message?: string; code?: string };
+        log.warn('Redirection result error', { error: err.message, code: err.code }, 'Login');
         // Only show error if it's not a "no redirect result" scenario
-        if (error.code !== 'auth/null-user' && error.code !== 'auth/user-cancelled') {
-          setError(`${error.message}${error.code ? ` (${error.code})` : ''}`);
+        if (err.code !== 'auth/null-user' && err.code !== 'auth/user-cancelled') {
+          setError(`${err.message || 'Unknown error'}${err.code ? ` (${err.code})` : ''}`);
         }
       }
     };
@@ -250,10 +250,9 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
     checkRedirect();
 
     // Also listen for auth state changes in case the redirect happens while component is mounted
-    let unsubscribe = () => {};
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    if (auth && typeof (auth as any).onAuthStateChanged === 'function') {
-      unsubscribe = auth.onAuthStateChanged((user) => {
+    let unsubscribe = () => { return; };
+    if (auth && typeof auth.onAuthStateChanged === 'function') {
+      const sub = auth.onAuthStateChanged((user) => {
         if (user && user.providerData.some(provider => provider.providerId === 'google.com')) {
           // User is signed in with Google, trigger login callback
           AnalyticsService.trackLogin('google');
@@ -266,6 +265,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
           });
         }
       });
+      unsubscribe = sub;
     }
 
     return unsubscribe;

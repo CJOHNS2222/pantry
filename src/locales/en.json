@@ -196,6 +196,8 @@
     "subscription": "Subscription",
     "appPreferences": "App Preferences",
     "appUpdates": "App Updates",
+    "viewChangelog": "View Changelog",
+    "changelogDescription": "Want to see what changed in previous versions?",
     "categories": "Categories",
     "feedback": "Feedback",
     "foodSafety": "Food Safety",

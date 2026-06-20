@@ -8,10 +8,22 @@ const CURRENT_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__
 // RECENT_CHANGES is auto-generated from CHANGELOG.md by scripts/generate-changelog.cjs
 // Regenerates automatically on every `npm run build` and `npm run dev` via npm lifecycle hooks.
 
-export const WhatsNewModal: React.FC = () => {
+export interface WhatsNewModalProps {
+  isOpen?: boolean;
+  onClose?: () => void;
+}
+
+export const WhatsNewModal: React.FC<WhatsNewModalProps> = ({ isOpen, onClose }) => {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
+    if (isOpen !== undefined) {
+      setOpen(isOpen);
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen !== undefined) return;
     let cleanup: (() => void) | undefined;
     try {
       const seen = localStorage.getItem(STORAGE_KEY);
@@ -23,15 +35,18 @@ export const WhatsNewModal: React.FC = () => {
       // localStorage unavailable — skip silently
     }
     return cleanup;
-  }, []);
+  }, [isOpen]);
 
   const handleClose = () => {
-    try {
-      localStorage.setItem(STORAGE_KEY, CURRENT_VERSION);
-    } catch {
-      // ignore
+    if (isOpen === undefined) {
+      try {
+        localStorage.setItem(STORAGE_KEY, CURRENT_VERSION);
+      } catch {
+        // ignore
+      }
     }
     setOpen(false);
+    onClose?.();
   };
 
   if (!open) return null;

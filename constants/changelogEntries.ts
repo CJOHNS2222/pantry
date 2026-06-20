@@ -9,6 +9,16 @@ export interface ChangeEntry {
 
 export const RECENT_CHANGES: ChangeEntry[] = [
   {
+    "version": "2.4.12",
+    "date": "Jun 20, 2026",
+    "highlights": [
+      "Changelog Settings Link — Added a link to view the app's changelog in the Settings tab under App Updates.",
+      "Button Glowing Highlight — Added a glowing visual highlight to the \"+\" button after exit on scanner tooltip.",
+      "Contextual Tips — Added more helpful contextual tutorial tips when opening different tabs.",
+      "Onboarding Milestones — Added onboarding milestone tips for first leftover logged, first saved recipe, and household…"
+    ]
+  },
+  {
     "version": "2.4.11",
     "date": "Jun 19, 2026",
     "highlights": [
@@ -26,15 +36,6 @@ export const RECENT_CHANGES: ChangeEntry[] = [
       "Gemini Brand Filtering — Improved the Gemini receipt extraction prompt to proactively strip out store abbreviations and…",
       "Login Validation — Removed the requirement for users to enter a last name when signing up for a new account.",
       "Android Camera Restart Fix — Resolved an issue where older Android devices (especially Android 13) would crash and…"
-    ]
-  },
-  {
-    "version": "2.4.9",
-    "date": "Jun 17, 2026",
-    "highlights": [
-      "Gemini Safety Filter Messages — Added explicit, user-friendly error handling for when Gemini rejects images containing…",
-      "Mobile Scrollability — Fixed an issue where the top of the login and onboarding screens would be cut off and…",
-      "Android Camera Crash — Prevented the Android OS from crashing and reloading the app by significantly reducing the…"
     ]
   }
 ];

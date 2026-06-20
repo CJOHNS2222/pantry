@@ -54,6 +54,7 @@ git commit -m "chore: release v{version}"
 Run `git push` to push the commit to the current remote branch.
 
 ### 10. Build signed bundle
+Run `cd android; .\gradlew bundleRelease` to assemble signedrelease bundle.
 
 ## Parameters
 

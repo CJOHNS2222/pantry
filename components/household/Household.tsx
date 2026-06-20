@@ -110,19 +110,19 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
       }
       log.info('Invitation sent', { email: inviteEmail, householdId: household.id, pending: hasPendingAccount }, 'Household');
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (error: any) {
+    } catch (error: unknown) {
       log.error('Error sending invitation', error, 'Household');
       
+      const err = error as { message?: string; code?: string };
       let message = 'Failed to send invitation';
-      if (error.code === 'functions/permission-denied') {
+      if (err.code === 'functions/permission-denied') {
         message = 'You are not a member of this household';
-      } else if (error.code === 'functions/not-found') {
+      } else if (err.code === 'functions/not-found') {
         message = 'Household not found';
-      } else if (error.code === 'functions/unauthenticated') {
+      } else if (err.code === 'functions/unauthenticated') {
         message = 'Please log in to send invitations';
-      } else if (error.code === 'functions/invalid-argument') {
-        message = error.message || 'Invalid invitation data';
+      } else if (err.code === 'functions/invalid-argument') {
+        message = err.message || 'Invalid invitation data';
       }
       
       addToast(message, 'error');
@@ -136,14 +136,14 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
     try {
       if (!household) return;
       await removeMemberFromHousehold(household.id, id, user.id);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (error: any) {
-      log.error('Error removing member', { error: error?.message, code: error?.code }, 'Household');
+    } catch (error: unknown) {
+      const err = error as { message?: string; code?: string };
+      log.error('Error removing member', { error: err.message, code: err.code }, 'Household');
       
       let message = 'Failed to remove member';
-      if (error.code === 'functions/permission-denied') {
+      if (err.code === 'functions/permission-denied') {
         message = 'You do not have permission to remove this member';
-      } else if (error.code === 'functions/not-found') {
+      } else if (err.code === 'functions/not-found') {
         message = 'Member or household not found';
       }
       
@@ -188,14 +188,14 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
       onClose();
       
       addToast('You have left the household. Your data has been copied to your personal collections.', 'info');
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (error: any) {
-      log.error('Error leaving household', { error: error?.message, code: error?.code }, 'Household');
+    } catch (error: unknown) {
+      const err = error as { message?: string; code?: string };
+      log.error('Error leaving household', { error: err.message, code: err.code }, 'Household');
       
       let message = 'Failed to leave household';
-      if (error.code === 'functions/permission-denied') {
+      if (err.code === 'functions/permission-denied') {
         message = 'You do not have permission to leave this household';
-      } else if (error.code === 'functions/not-found') {
+      } else if (err.code === 'functions/not-found') {
         message = 'Household not found';
       }
       
@@ -214,7 +214,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
         memberIds: [user.id],
         members: [{
           id: user.id,
-          name: user?.profile?.name || user.name,
+          name: user.profile?.name || user.name,
           email: user.email,
           role: 'admin',
           status: 'active'
@@ -354,7 +354,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
             <h2 className="font-serif font-bold text-theme-primary text-lg">{household?.name || 'Household'}</h2>
             {household?.members && (
               <span className="text-xs bg-[var(--accent-color)]/20 text-[var(--accent-color)] px-2 py-0.5 rounded-full font-medium">
-                {household.members.length} member{household.members.length !== 1 ? 's' : ''}
+                {household?.members.length} member{household?.members.length !== 1 ? 's' : ''}
               </span>
             )}
           </div>

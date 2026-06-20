@@ -115,56 +115,6 @@ const App: React.FC = () => {
     PerformanceMonitoringService.measure(`tab_switch_${tab}`, `tab_switch_start_${tab}`, `tab_switch_end_${tab}`);
   };
 
-  // Feature discovery cards — shown once per featureId via localStorage gate,
-  // and only after the user has reached the associated behaviour milestone to
-  // avoid cognitive overload right after sign-up (audit item #18).
-  const featureDiscoveries = useMemo(() => [
-    {
-      featureId: 'ai-scan',
-      title: 'AI-Powered Pantry Scan',
-      description: 'Tap the camera button to instantly identify and add multiple items to your pantry — quantities and expiry dates included.',
-      position: 'bottom-right' as const,
-      actionLabel: 'Open Pantry',
-      onAction: () => setActiveTab(Tab.PANTRY),
-      autoHideDelay: 10000,
-      // Show right after onboarding — no pantry items required yet
-      requiredMilestone: 'onboarding-completed' as const,
-    },
-    {
-      featureId: 'smart-recipe-search',
-      title: 'Smart Recipe Search',
-      description: 'Search by ingredient or cuisine — or let AI suggest meals based on what\'s already in your pantry.',
-      position: 'bottom-right' as const,
-      actionLabel: 'Find Recipes',
-      onAction: () => setActiveTab(Tab.RECIPES),
-      autoHideDelay: 10000,
-      // Only relevant once the user has pantry items to search against
-      requiredMilestone: 'first-pantry-item' as const,
-    },
-    {
-      featureId: 'leftover-tracker',
-      title: 'Track Your Leftovers',
-      description: 'Log leftovers with a tap and get reminders before they expire — cut food waste without any effort.',
-      position: 'bottom-right' as const,
-      actionLabel: 'Add a Leftover',
-      onAction: () => setActiveTab(Tab.PANTRY),
-      autoHideDelay: 10000,
-      // Surfaces naturally once the user is actively managing their pantry
-      requiredMilestone: 'first-pantry-item' as const,
-    },
-    {
-      featureId: 'meal-planner',
-      title: 'Weekly Meal Planner',
-      description: 'Plan meals for the whole week and auto-generate a shopping list for any missing ingredients.',
-      position: 'bottom-right' as const,
-      actionLabel: 'Plan Meals',
-      onAction: () => setActiveTab(Tab.MEALS),
-      autoHideDelay: 10000,
-      // Most useful once the user is tracking their shopping
-      requiredMilestone: 'first-shopping-item' as const,
-    },
-  ], [setActiveTab]);
-
   // UI States
   const [showHousehold, setShowHousehold] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -210,6 +160,86 @@ const App: React.FC = () => {
   const { syncStatus, syncNow, updateSyncStatus } = useOfflineStatus();
   const { isAdmin } = useIsAdmin(user?.id);
 
+  // Feature discovery cards — shown once per featureId via localStorage gate,
+  // and only after the user has reached the associated behaviour milestone to
+  // avoid cognitive overload right after sign-up (audit item #18).
+  const featureDiscoveries = useMemo(() => [
+    {
+      featureId: 'ai-scan',
+      title: 'AI-Powered Pantry Scan',
+      description: 'Tap the "+" button on the Pantry tab and select Photo to instantly identify and add multiple items to your pantry — quantities and expiry dates included.',
+      position: 'bottom-right' as const,
+      actionLabel: 'Open Pantry',
+      onAction: () => setActiveTab(Tab.PANTRY),
+      autoHideDelay: 10000,
+      // Show right after onboarding — no pantry items required yet
+      requiredMilestone: 'onboarding-completed' as const,
+    },
+    {
+      featureId: 'smart-recipe-search',
+      title: 'Smart Recipe Search',
+      description: 'Search by ingredient or cuisine — or let AI suggest meals based on what\'s already in your pantry.',
+      position: 'bottom-right' as const,
+      actionLabel: 'Find Recipes',
+      onAction: () => setActiveTab(Tab.RECIPES),
+      autoHideDelay: 10000,
+      // Only relevant once the user has pantry items to search against
+      requiredMilestone: 'first-pantry-item' as const,
+    },
+    {
+      featureId: 'leftover-tracker',
+      title: 'Track Your Leftovers',
+      description: 'Log leftovers with a tap and get reminders before they expire — cut food waste without any effort.',
+      position: 'bottom-right' as const,
+      actionLabel: 'Add a Leftover',
+      onAction: () => setActiveTab(Tab.PANTRY),
+      autoHideDelay: 10000,
+      // Surfaces naturally once the user is actively managing their pantry
+      requiredMilestone: 'first-pantry-item' as const,
+    },
+    {
+      featureId: 'meal-planner',
+      title: 'Weekly Meal Planner',
+      description: 'Plan meals for the whole week and auto-generate a shopping list for any missing ingredients.',
+      position: 'bottom-right' as const,
+      actionLabel: 'Plan Meals',
+      onAction: () => setActiveTab(Tab.MEALS),
+      autoHideDelay: 10000,
+      // Most useful once the user is tracking their shopping
+      requiredMilestone: 'first-shopping-item' as const,
+    },
+    {
+      featureId: 'leftover-persona-tip',
+      title: 'Leftover Safety Personas',
+      description: 'You logged a leftover! Stock & Spoon tracks expiration based on your safety persona. Check Settings → Food Safety to customize it.',
+      position: 'bottom-right' as const,
+      actionLabel: 'Customize Persona',
+      onAction: () => setActiveTab(Tab.SETTINGS),
+      autoHideDelay: 10000,
+      requiredMilestone: 'first-leftover-logged' as const,
+    },
+    {
+      featureId: 'recipe-badging-tip',
+      title: 'Smart Recipe Badging',
+      description: 'Great choice! The Chef tab displays badge icons on recipes to show if you already have the required ingredients in your pantry.',
+      position: 'bottom-right' as const,
+      actionLabel: 'Browse Recipes',
+      onAction: () => setActiveTab(Tab.RECIPES),
+      autoHideDelay: 10000,
+      requiredMilestone: 'first-recipe-saved' as const,
+    },
+    {
+      featureId: 'household-collab-tip',
+      title: 'Real-time Collaboration',
+      description: 'You are now collaborating! Pantry items, shopping lists, and meal plans are synchronized in real-time across all household members.',
+      position: 'bottom-right' as const,
+      actionLabel: 'View Household',
+      onAction: () => setShowHousehold(true),
+      autoHideDelay: 10000,
+      requiredMilestone: 'household-setup' as const,
+    },
+  ], [setActiveTab, setShowHousehold]);
+
   // Register all App-level modals on the shared LIFO back-button stack so every
   // modal (App-level and sub-component) is handled through the same mechanism.
   useAndroidBack(showOnboarding, () => setShowOnboarding(false));
@@ -225,6 +255,11 @@ const App: React.FC = () => {
 
   // Apply theme to document
   useTheme(settings.theme);
+
+  // Enforce active tab is pantry on load
+  useEffect(() => {
+    setActiveTab(Tab.PANTRY);
+  }, []);
 
   // Load price data once auth is ready and we have a user
   useEffect(() => {
@@ -251,7 +286,7 @@ const App: React.FC = () => {
       [Tab.PANTRY]: {
         id: 'tip-pantry-scan',
         title: 'Scan Your Pantry',
-        description: 'Tap the camera button in the top bar to AI-scan multiple items at once — no barcode needed.',
+        description: 'Tap the "+" button at the bottom right and select Photo to AI-scan multiple items at once — no barcode needed.',
         position: 'bottom',
         autoHideDelay: 10000,
       },
@@ -276,6 +311,20 @@ const App: React.FC = () => {
         position: 'bottom',
         autoHideDelay: 10000,
       },
+      [Tab.COMMUNITY]: {
+        id: 'tip-community-browse',
+        title: 'Community Recipes',
+        description: 'Browse top-rated recipes submitted by other home chefs. Rate and review recipes to share your culinary feedback!',
+        position: 'bottom',
+        autoHideDelay: 10000,
+      },
+      [Tab.SETTINGS]: {
+        id: 'tip-settings-setup',
+        title: 'Preferences & Sharing',
+        description: 'Set up household sharing, adjust diet restrictions under Food Safety, or hide unused bottom tabs.',
+        position: 'bottom',
+        autoHideDelay: 10000,
+      },
     };
 
     const tip = tipsByTab[activeTab];
@@ -291,7 +340,7 @@ const App: React.FC = () => {
     HapticService.itemAdded();
     
     const inHousehold = household?.id && isHouseholdMember(household, user);
-    const householdId = inHousehold ? household.id : undefined;
+    const householdId = inHousehold ? household?.id : undefined;
     const userId = inHousehold ? undefined : user?.id;
     
     // Fetch prices in parallel
@@ -301,7 +350,10 @@ const App: React.FC = () => {
       const itemNotes = typeof inputItem === 'string' ? undefined : inputItem.notes;
       
       const parsed = parseIngredientForShoppingList(itemStr);
-      const priceData = await groceryPriceService.getIngredientPrice(parsed.itemName).catch(() => null);
+      const priceData = await groceryPriceService.getIngredientPrice(parsed.itemName).catch((error) => {
+        log.warn('Failed to fetch ingredient price', { itemName: parsed.itemName, error }, 'App');
+        return null;
+      });
       
       let finalNotes = itemNotes || '';
       if (parsed.prepNotes) {
@@ -473,6 +525,24 @@ const App: React.FC = () => {
     }
   }, [mealPlan]);
 
+  useEffect(() => {
+    if (inventory.some(item => item.is_leftover)) {
+      recordMilestone('first-leftover-logged');
+    }
+  }, [inventory]);
+
+  useEffect(() => {
+    if (savedRecipes.length > 0) {
+      recordMilestone('first-recipe-saved');
+    }
+  }, [savedRecipes.length]);
+
+  useEffect(() => {
+    if (household?.id) {
+      recordMilestone('household-setup');
+    }
+  }, [household?.id]);
+
   // Confirm add to plan from dialog
   const confirmAddToPlan = (dayIndex: number, mealType: 'breakfast' | 'lunch' | 'dinner') => {
     if (pendingRecipeForPlan && handleAddToPlan) {
@@ -624,7 +694,7 @@ const App: React.FC = () => {
 
   const handleNotificationAction = async (notification: NotificationItem) => {
     try {
-      if (user?.id) {
+      if (user && user.id) {
         try {
           await markNotificationRead(user.id, notification.id);
         } catch {
@@ -636,13 +706,14 @@ const App: React.FC = () => {
       }
       setNotifications(prev => prev.filter(n => n.id !== notification.id));
 
+      const actionData = notification.actionData;
       switch (notification.actionType) {
         case 'add_to_shopping':
-          if (notification.actionData?.itemName) {
-            addToShoppingList([notification.actionData.itemName]);
-            addToast(`Added "${notification.actionData.itemName}" to shopping list`, 'success');
-          } else if (notification.actionData?.items?.[0]?.itemName) {
-            const names = notification.actionData.items.map((i: {itemName: string}) => i.itemName) as string[];
+          if (actionData?.itemName) {
+            addToShoppingList([actionData.itemName]);
+            addToast(`Added "${actionData.itemName}" to shopping list`, 'success');
+          } else if (actionData?.items?.[0]?.itemName) {
+            const names = actionData.items.map((i: {itemName: string}) => i.itemName) as string[];
             addToShoppingList(names);
             addToast(`Added ${names.length} item${names.length > 1 ? 's' : ''} to shopping list`, 'success');
           }
@@ -653,7 +724,7 @@ const App: React.FC = () => {
           break;
         case 'view_item': {
           // Check if this notification contains multiple items
-          const notificationItems = notification.actionData?.items;
+          const notificationItems = actionData?.items;
           if (notificationItems && notificationItems.length > 1) {
             // Show ExpiredItemsModal for multiple items
             const specificItems = notificationItems
@@ -669,15 +740,15 @@ const App: React.FC = () => {
             }
           } else {
             // Single item - show ItemDetailModal
-            const itemId = notification.actionData?.items?.[0]?.itemId
-              ?? notification.actionData?.itemId;
+            const itemId = actionData?.items?.[0]?.itemId
+              ?? actionData?.itemId;
             const found = itemId
               ? inventory.findIndex(i => i.id === itemId)
               : -1;
             if (found !== -1) {
               setActiveTab(Tab.PANTRY);
               setNotificationViewItem({ item: inventory[found], index: found });
-            } else if (notification.actionData?.tab === 'shopping') {
+            } else if (actionData?.tab === 'shopping') {
               setActiveTab(Tab.SHOPPING);
             } else {
               setActiveTab(Tab.PANTRY);
@@ -687,12 +758,12 @@ const App: React.FC = () => {
           break;
         }
         case 'join_household':
-          if (notification.actionData?.householdId && user) {
+          if (actionData?.householdId && user) {
             try {
-              const updatedHousehold = await joinHousehold(notification.actionData.householdId, user);
+              const updatedHousehold = await joinHousehold(actionData.householdId, user);
               
               if (updatedHousehold) {
-                setUser({ ...user, householdId: notification.actionData.householdId });
+                setUser({ ...user, householdId: actionData.householdId });
                 setHousehold(updatedHousehold);
                 addToast('Successfully joined household!', 'success');
               } else {
@@ -888,7 +959,7 @@ const App: React.FC = () => {
       
       // Remove from cache
       const inHousehold = household?.id && isHouseholdMember(household, user);
-      const householdId = inHousehold ? household.id : undefined;
+      const householdId = inHousehold ? household?.id : undefined;
       const userId = inHousehold ? undefined : user?.id;
       
       await Promise.all(
@@ -966,11 +1037,15 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
-    import('./services/imageCacheService').then(({ initializeImageCache }) => {
-      initializeImageCache().catch(error => {
-        log.error('Failed to initialize image cache', { error }, 'App');
+    import('./services/imageCacheService')
+      .then(({ initializeImageCache }) => {
+        initializeImageCache().catch(error => {
+          log.error('Failed to initialize image cache', { error }, 'App');
+        });
+      })
+      .catch(error => {
+        log.error('Failed to dynamically import image cache service', { error }, 'App');
       });
-    });
 
     AnalyticsService.trackAppOpen();
 
@@ -1164,6 +1239,35 @@ const App: React.FC = () => {
     return () => clearTimeout(timer);
   }, [user, inventory]);
 
+  const completeOnboarding = async () => {
+    setShowOnboarding(false);
+    localStorage.setItem('onboarding-completed', 'true');
+    recordMilestone('onboarding-completed');
+    if (user?.id) {
+      const userRef = DatabaseMonitoringService.doc('users', user.id);
+      await DatabaseMonitoringService.updateDoc(userRef, { hasSeenTutorial: true });
+      setUser(prev => prev ? { ...prev, hasSeenTutorial: true } : prev);
+    }
+  };
+
+  const savePersona = async (persona: string) => {
+    if (user?.id) {
+      const userRef = DatabaseMonitoringService.doc('users', user.id);
+      await DatabaseMonitoringService.updateDoc(userRef, { 'profile.leftoverPersona': persona });
+    }
+  };
+
+  // Set Sentry App Context on theme change
+  useEffect(() => {
+    if (settings?.theme?.mode) {
+      setAppContext(
+        process.env.npm_package_version || '1.0.0',
+        'web',
+        settings.theme.mode
+      );
+    }
+  }, [settings?.theme?.mode]);
+
   // Show a loading spinner while waiting for auth to be ready
   if (!isAuthReady) {
     return (
@@ -1200,17 +1304,6 @@ const App: React.FC = () => {
 
   return (
     <SubscriptionProvider user={user}>
-      {(() => {
-        if (settings?.theme) {
-          setAppContext(
-            process.env.npm_package_version || '1.0.0',
-            'web',
-            settings.theme.mode
-          );
-        }
-        return null;
-      })()}
-
       <ErrorBoundary>
         <div className="h-screen flex flex-col max-w-md mx-auto shadow-2xl relative border-x border-theme transition-colors duration-300 overflow-x-hidden">
         {showHousehold && (
@@ -1227,30 +1320,15 @@ const App: React.FC = () => {
         {showOnboarding && user && (
           <ModernOnboardingFlow
             user={user}
-            onComplete={async () => {
-              setShowOnboarding(false);
-              try {
-                // Mark onboarding as completed in localStorage and Firestore
-                localStorage.setItem('onboarding-completed', 'true');
-                recordMilestone('onboarding-completed');
-                if (user?.id) {
-                  const userRef = DatabaseMonitoringService.doc('users', user.id);
-                  await DatabaseMonitoringService.updateDoc(userRef, { hasSeenTutorial: true });
-                  setUser(prev => prev ? { ...prev, hasSeenTutorial: true } : prev);
-                }
-              } catch (error) {
+            onComplete={() => {
+              completeOnboarding().catch(error => {
                 log.error('Failed to mark onboarding complete', { error }, 'App');
-              }
+              });
             }}
-            onPersonaSelected={async (persona) => {
-              try {
-                if (user?.id) {
-                  const userRef = DatabaseMonitoringService.doc('users', user.id);
-                  await DatabaseMonitoringService.updateDoc(userRef, { 'profile.leftoverPersona': persona });
-                }
-              } catch (error) {
+            onPersonaSelected={(persona) => {
+              savePersona(persona).catch(error => {
                 log.error('Failed to save leftover persona from onboarding', { error }, 'App');
-              }
+              });
             }}
             onOpenHousehold={() => { setShowOnboarding(false); setShowHousehold(true); }}
             onSkip={() => { recordMilestone('onboarding-completed'); setShowOnboarding(false); }}
@@ -1262,14 +1340,14 @@ const App: React.FC = () => {
             <div className="bg-theme-secondary w-full sm:max-w-2xl sm:mx-auto sm:rounded-3xl shadow-2xl relative flex flex-col max-h-[90vh] rounded-t-3xl mt-10 sm:mt-0 overflow-y-auto">
               <RiskAssessmentQuestionnaire
                 userId={user.id}
-                onComplete={async (level: number, sensitive?: boolean) => {
-                  try {
-                    await handleRiskQuestionnaireComplete(level, sensitive);
-                    // Optimistically update local user object if available
-                    setUser(prev => prev ? { ...prev, profile: { ...prev.profile, riskLevel: level, sensitiveHealthMode: !!sensitive } } : prev);
-                  } catch {
-                    // handler already logs; no-op here
-                  }
+                onComplete={(level: number, sensitive?: boolean) => {
+                  handleRiskQuestionnaireComplete(level, sensitive)
+                    .then(() => {
+                      setUser(prev => prev ? { ...prev, profile: { ...prev.profile, riskLevel: level, sensitiveHealthMode: !!sensitive } } : prev);
+                    })
+                    .catch(error => {
+                      log.debug('Risk questionnaire complete handler failed', { error }, 'App');
+                    });
                 }}
               />
             </div>
@@ -1325,7 +1403,7 @@ const App: React.FC = () => {
                     value={selectedDayForPlan ?? 0}
                   >
                     {mealPlan?.map((day, index) => (
-                      <option key={index} value={index}>
+                      <option key={day.date} value={index}>
                         {day.dayName} ({new Date(day.date).toLocaleDateString()})
                       </option>
                     ))}
@@ -1484,7 +1562,8 @@ const App: React.FC = () => {
               onRateRecipe: submitRating,
               handleMarkAsMade,
               onMoveToPantry: async (items) => {
-                const processedItems = await Promise.all(items.map(async (i) => {
+                const processedItems: PantryItem[] = [];
+                for (const i of items) {
                   const category = inferCategoryFromItemName(i.item);
                   let image = getItemImage(i.item, category);
                   
@@ -1503,7 +1582,7 @@ const App: React.FC = () => {
                   if (addQty < 1) addQty = 1;
                   
                   const reservations: { recipeId: string; recipeName: string; quantity: number; unit: string }[] = [];
-                  if (i.source?.startsWith('recipe: need ')) {
+                  if (i.source && i.source.startsWith('recipe: need ')) {
                     const match = i.source.match(/recipe: need (.+?) for "(.+?)"/);
                     if (match) {
                       const qtyStr = match[1];
@@ -1533,7 +1612,7 @@ const App: React.FC = () => {
                       unit: i.purchasedBatch.unit || (i.purchasedQuantity?.unit ?? undefined),
                       expires: i.purchasedBatch.expires,
                       purchaseDate: nowIso,
-                      note: i.purchasedBatch.note || i.notes || (i.source?.startsWith('recipe:') ? i.source : undefined)
+                      note: i.purchasedBatch.note || i.notes || (i.source && i.source.startsWith('recipe:') ? i.source : undefined)
                     });
                   } else if (i.purchasedQuantity) {
                     batches.push({
@@ -1541,7 +1620,7 @@ const App: React.FC = () => {
                       quantity: Math.abs(i.purchasedQuantity.amount) || Math.abs(addQty),
                       unit: i.purchasedQuantity.unit || undefined,
                       purchaseDate: nowIso,
-                      note: i.notes || (i.source?.startsWith('recipe:') ? i.source : undefined)
+                      note: i.notes || (i.source && i.source.startsWith('recipe:') ? i.source : undefined)
                     });
                   } else {
                     // Fallback: create a batch from the generic quantity field.
@@ -1554,11 +1633,11 @@ const App: React.FC = () => {
                       quantity: Math.abs(addQty),
                       unit: fallbackUnit,
                       purchaseDate: nowIso,
-                      note: i.notes || (i.source?.startsWith('recipe:') ? i.source : undefined)
+                      note: i.notes || (i.source && i.source.startsWith('recipe:') ? i.source : undefined)
                     });
                   }
 
-                  return {
+                  processedItems.push({
                     id: Math.random().toString(36).substr(2,9),
                     item: i.item,
                     category,
@@ -1570,9 +1649,9 @@ const App: React.FC = () => {
                     batches,
                     dateAdded: nowIso,
                     lastRestocked: nowIso,
-                    notes: i.notes || (i.source?.startsWith('recipe:') ? i.source : undefined)
-                  };
-                }));
+                    notes: i.notes || (i.source && i.source.startsWith('recipe:') ? i.source : undefined)
+                  });
+                }
                 
                 const addedItems = await addItems(Object.values(processedItems));
 
@@ -1715,7 +1794,11 @@ const App: React.FC = () => {
           onClose={() => setShowExpiredLaunchSheet(false)}
           expiredItems={expiredLaunchItems}
           onRemoveItems={async (ids) => {
-            await handleRemoveExpiredItems(ids);
+            try {
+              await handleRemoveExpiredItems(ids);
+            } catch (error) {
+              log.error('Failed to remove expired items on launch', { error }, 'App');
+            }
           }}
         />
       )}

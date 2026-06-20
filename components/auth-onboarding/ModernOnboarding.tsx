@@ -1,12 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   Plus,
   SkipForward,
   Sparkles,
   ChefHat,
   Users,
-  ShoppingCart,
-  Calendar,
   ArrowRight,
   CheckCircle,
   X,
@@ -14,6 +12,7 @@ import {
   Camera,
   Heart,
 } from 'lucide-react';
+
 interface OnboardingData {
   completed: boolean;
   selectedSetup?: string | null;
@@ -31,7 +30,7 @@ interface ModernOnboardingProps {
   onPersonaSelected?: (persona: 'relaxed' | 'normal' | 'strict') => void;
 }
 
-type OnboardingStep = 'welcome' | 'quick-setup' | 'value-demo' | 'complete';
+type OnboardingStep = 'welcome' | 'quick-setup';
 
 interface QuickSetupOption {
   id: string;
@@ -92,33 +91,32 @@ export const ModernOnboarding: React.FC<ModernOnboardingProps> = ({
     }, 300);
   };
 
+  const finishOnboarding = (setupOption: string | null) => {
+    if (!onCompleteCalledRef.current) {
+      onCompleteCalledRef.current = true;
+      onComplete({
+        completed: true,
+        selectedSetup: setupOption,
+        permissions: [],
+        leftoverPersona: 'normal'
+      });
+    }
+  };
+
   const handleSetupOptionSelect = (optionId: string) => {
     setSelectedSetupOption(optionId);
     const option = quickSetupOptions.find(opt => opt.id === optionId);
     if (option) {
-      // Execute the action and move to next step
       setTimeout(() => {
         option.action();
-        handleStepTransition('value-demo');
+        finishOnboarding(optionId);
       }, 500);
     }
   };
 
   const handleSkip = () => {
-    handleStepTransition('complete');
+    finishOnboarding(selectedSetupOption);
   };
-
-  // Auto-advance from the complete step — covers all paths (normal flow + skip)
-  useEffect(() => {
-    if (currentStep === 'complete' && !onCompleteCalledRef.current) {
-      onCompleteCalledRef.current = true;
-      const timer = setTimeout(() => {
-        onComplete({ completed: true, selectedSetup: selectedSetupOption, permissions: [], leftoverPersona: 'normal' });
-      }, 1500);
-      return () => clearTimeout(timer);
-    }
-    return undefined;
-  }, [currentStep, selectedSetupOption, selectedPersona, onComplete]);
 
   const renderWelcomeStep = () => (
     <div className={`transition-all duration-500 ${isAnimating ? 'opacity-0 transform translate-x-4' : 'opacity-100 transform translate-x-0'}`}>
@@ -128,8 +126,8 @@ export const ModernOnboarding: React.FC<ModernOnboardingProps> = ({
           <ChefHat className="w-10 h-10 text-white" />
         </div>
 
-          <h1 className="text-3xl font-bold text-theme-primary mb-3 font-serif">
-            Welcome to Stock & Spoon!
+        <h1 className="text-3xl font-bold text-theme-primary mb-3 font-serif">
+          Welcome to Stock & Spoon!
         </h1>
 
         <p className="text-lg text-theme-secondary mb-6 leading-relaxed">
@@ -270,89 +268,6 @@ export const ModernOnboarding: React.FC<ModernOnboardingProps> = ({
     </div>
   );
 
-  const renderValueDemoStep = () => (
-    <div className={`transition-all duration-500 ${isAnimating ? 'opacity-0 transform translate-x-4' : 'opacity-100 transform translate-x-0'}`}>
-      <div className="text-center mb-8">
-        <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-600 rounded-2xl mb-4">
-          <Sparkles className="w-8 h-8 text-white" />
-        </div>
-        <h2 className="text-2xl font-bold text-theme-primary mb-3">
-          You're All Set! 🎉
-        </h2>
-        <p className="text-theme-secondary mb-6">
-          Here's what Stock & Spoon can do for you right now
-        </p>
-      </div>
-
-      {/* Value demonstration */}
-      <div className="space-y-4 mb-8">
-        <div className="p-4 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-200 dark:border-blue-800">
-          <div className="flex items-center gap-3 mb-2">
-            <ShoppingCart className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-            <span className="font-medium text-blue-900 dark:text-blue-100">Smart Shopping</span>
-          </div>
-          <p className="text-sm text-blue-700 dark:text-blue-300">
-            Your shopping list updates automatically when you plan meals
-          </p>
-        </div>
-
-        <div className="p-4 rounded-xl bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border border-green-200 dark:border-green-800">
-          <div className="flex items-center gap-3 mb-2">
-            <ChefHat className="w-5 h-5 text-green-600 dark:text-green-400" />
-            <span className="font-medium text-green-900 dark:text-green-100">AI Recipe Finder</span>
-          </div>
-          <p className="text-sm text-green-700 dark:text-green-300">
-            Find recipes using ingredients you already have
-          </p>
-        </div>
-
-        <div className="p-4 rounded-xl bg-gradient-to-r from-purple-50 to-violet-50 dark:from-purple-900/20 dark:to-violet-900/20 border border-purple-200 dark:border-purple-800">
-          <div className="flex items-center gap-3 mb-2">
-            <Calendar className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-            <span className="font-medium text-purple-900 dark:text-purple-100">Meal Planning</span>
-          </div>
-          <p className="text-sm text-purple-700 dark:text-purple-300">
-            Plan your week and get cooking reminders
-          </p>
-        </div>
-      </div>
-
-      <button
-        onClick={() => handleStepTransition('complete')}
-        className="w-full bg-gradient-to-r from-[var(--accent-color)] to-[var(--accent-color)]/90 hover:from-[var(--accent-color)]/90 hover:to-[var(--accent-color)]/80 text-white py-4 px-6 rounded-xl font-semibold text-lg transition-all duration-200 transform hover:scale-[1.02] shadow-lg hover:shadow-xl flex items-center justify-center gap-3"
-        data-testid="onboard-start-cooking"
-      >
-        <Sparkles className="w-5 h-5" />
-        Start Cooking!
-      </button>
-    </div>
-  );
-
-  const renderCompleteStep = () => (
-    <div className={`transition-all duration-500 ${isAnimating ? 'opacity-0 transform scale-95' : 'opacity-100 transform scale-100'}`}>
-      <div className="text-center">
-        <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl mb-6 shadow-lg">
-          <CheckCircle className="w-10 h-10 text-white" />
-        </div>
-
-        <h2 className="text-3xl font-bold text-theme-primary mb-3 font-serif">
-          Welcome aboard! 🚀
-        </h2>
-
-        <p className="text-lg text-theme-secondary mb-8">
-          You're ready to transform your cooking experience.
-          Let's make something amazing together.
-        </p>
-
-        <div className="animate-pulse">
-          <p className="text-sm text-theme-secondary/70">
-            Taking you to your smart pantry...
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-md flex flex-col justify-end sm:justify-center overflow-hidden">
       <div className="bg-theme-secondary w-full sm:max-w-lg sm:mx-auto sm:rounded-3xl shadow-2xl relative flex flex-col max-h-[90vh] rounded-t-3xl mt-10 sm:mt-0 transition-transform">
@@ -369,18 +284,16 @@ export const ModernOnboarding: React.FC<ModernOnboardingProps> = ({
         <div className="p-6 sm:p-8 overflow-y-auto">
           {currentStep === 'welcome' && renderWelcomeStep()}
           {currentStep === 'quick-setup' && renderQuickSetupStep()}
-          {currentStep === 'value-demo' && renderValueDemoStep()}
-          {currentStep === 'complete' && renderCompleteStep()}
         </div>
 
         {/* Progress indicator */}
         <div className="px-8 pb-6 flex-shrink-0 bg-theme-secondary">
           <div className="flex justify-center gap-2">
-            {(['welcome', 'quick-setup', 'value-demo', 'complete'] as OnboardingStep[]).map((step, index) => (
+            {(['welcome', 'quick-setup'] as OnboardingStep[]).map((step, index) => (
               <div
                 key={step}
                 className={`w-2 h-2 rounded-full transition-all duration-300 ${
-                  index <= (['welcome', 'quick-setup', 'value-demo', 'complete'] as OnboardingStep[]).indexOf(currentStep)
+                  index <= (['welcome', 'quick-setup'] as OnboardingStep[]).indexOf(currentStep)
                     ? 'bg-[var(--accent-color)]'
                     : 'bg-theme/30'
                 }`}

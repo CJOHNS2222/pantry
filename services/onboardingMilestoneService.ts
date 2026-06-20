@@ -16,7 +16,10 @@ export type OnboardingMilestone =
   | 'onboarding-completed'  // user finished (or skipped) the first-run flow
   | 'first-pantry-item'     // at least one pantry item exists
   | 'first-shopping-item'   // at least one shopping list item exists
-  | 'first-meal-planned';   // at least one meal has been added to the plan
+  | 'first-meal-planned'    // at least one meal has been added to the plan
+  | 'first-leftover-logged' // at least one leftover has been added
+  | 'first-recipe-saved'    // at least one recipe has been saved
+  | 'household-setup';      // household has been joined/created
 
 function readMilestones(): Set<OnboardingMilestone> {
   try {

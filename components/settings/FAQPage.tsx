@@ -39,7 +39,7 @@ const FAQ_DATA: FAQItem[] = [
     id: 'getting-started-1',
     category: 'Getting Started',
     question: 'How do I add items to my pantry?',
-    answer: 'You can add items to your pantry in several ways:\n\n1. **Manual Entry**: Tap the "+" button in the Pantry tab and fill in the item details\n2. **Barcode Scanning**: Use the camera button to scan product barcodes\n3. **Voice Input**: Use the microphone button to speak item names\n4. **Bulk Import**: Import multiple items from a CSV file using the Import feature\n\nFor best results, include expiration dates, quantities, and storage locations when adding items.',
+    answer: 'You can add items to your pantry in several ways:\n\n1. **Manual Entry**: Tap the "+" button in the Pantry tab and fill in the item details\n2. **Barcode Scanning**: Tap the "+" button and select Barcode to scan product barcodes\n3. **Voice Input**: Tap the "+" button and use the microphone icon to speak item names\n4. **Bulk Import**: Tap the "+" button and select Import from CSV to upload a file\n\nFor best results, include expiration dates, quantities, and storage locations when adding items.',
     keywords: ['add', 'pantry', 'items', 'scan', 'barcode', 'voice', 'import', 'csv']
   },
   {
@@ -280,14 +280,14 @@ const FAQ_DATA: FAQItem[] = [
     id: 'input-2',
     category: 'Input Methods',
     question: 'How do AI camera scans work — pantry photo vs receipt?',
-    answer: 'Stock & Spoon has two distinct AI scan modes:\n\n**Pantry / Shelf Photo Scan**\n• Tap the **camera icon** in the Pantry tab\n• Point at a shelf, fridge interior, or counter full of food\n• The AI detects individual items and adds them to a review list\n• Confirm, edit, or remove each detected item before saving\n• Works best with good lighting, items facing forward, and the label visible\n\n**Receipt Scan**\n• Tap **Scan Receipt** from the Pantry add menu\n• Photograph a printed or on-screen grocery receipt\n• The app uses OCR to extract item names and quantities\n• Falls back to AI analysis if OCR confidence is low\n• Works best on uncrumpled receipts with clear text in good light\n\nBoth modes count toward your weekly AI scan limit (5 scans/week on Free, 15 on Premium).',
+    answer: 'Stock & Spoon has two distinct AI scan modes:\n\n**Pantry / Shelf Photo Scan**\n• Tap the **"+" button** at the bottom right of the Pantry tab and select **Photo**\n• Point at a shelf, fridge interior, or counter full of food\n• The AI detects individual items and adds them to a review list\n• Confirm, edit, or remove each detected item before saving\n• Works best with good lighting, items facing forward, and the label visible\n\n**Receipt Scan**\n• Tap the **"+" button** and select **Scan Receipt**\n• Photograph a printed or on-screen grocery receipt\n• The app uses OCR to extract item names and quantities\n• Falls back to AI analysis if OCR confidence is low\n• Works best on uncrumpled receipts with clear text in good light\n\nBoth modes count toward your weekly AI scan limit (5 scans/week on Free, 15 on Premium).',
     keywords: ['camera', 'scan', 'receipt', 'photo', 'ai scan', 'shelf', 'fridge', 'ocr', 'barcode', 'image']
   },
   {
     id: 'input-3',
     category: 'Input Methods',
     question: 'How do I import items from a CSV file?',
-    answer: 'CSV import lets you add many items at once:\n\n1. Go to **Pantry tab → + → Import from CSV**\n2. Prepare a CSV file with columns: `name`, `quantity`, `unit`, `category`, `expiry` (YYYY-MM-DD), `location`\n3. Only `name` is required — all other columns are optional\n4. Select your file in the Import dialog and tap **Import**\n5. Review the detected items before confirming\n\n**CSV example:**\n```\nname,quantity,unit,category,expiry\nWhole Milk,2,litres,Dairy,2026-06-01\nChicken Breast,500,g,Meat,2026-05-08\n```\n\nCommon import issues:\n• Dates must be YYYY-MM-DD format\n• Use commas as the delimiter (not semicolons)\n• Save the file as plain text / UTF-8, not Excel .xlsx format',
+    answer: 'CSV import lets you add many items at once:\n\n1. Tap the **"+" button** at the bottom right of the Pantry tab and select **Import from CSV**\n2. Prepare a CSV file with columns: `name`, `quantity`, `unit`, `category`, `expiry` (YYYY-MM-DD), `location`\n3. Only `name` is required — all other columns are optional\n4. Select your file in the Import dialog and tap **Import**\n5. Review the detected items before confirming\n\n**CSV example:**\n```\nname,quantity,unit,category,expiry\nWhole Milk,2,litres,Dairy,2026-06-01\nChicken Breast,500,g,Meat,2026-05-08\n```\n\nCommon import issues:\n• Dates must be YYYY-MM-DD format\n• Use commas as the delimiter (not semicolons)\n• Save the file as plain text / UTF-8, not Excel .xlsx format',
     keywords: ['csv', 'import', 'bulk', 'file', 'upload', 'spreadsheet', 'columns', 'format']
   },
 
