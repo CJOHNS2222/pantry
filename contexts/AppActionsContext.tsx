@@ -24,7 +24,7 @@ interface AppActionsContextValue {
   onSaveRecipe: (recipe: StructuredRecipe) => void;
   onDeleteRecipe: (recipe: SavedRecipe) => void;
   onRateRecipe: (rating: RecipeRatingInput) => void;
-  handleMarkAsMade: (recipe: StructuredRecipe) => void;
+  handleMarkAsMade: (recipe: StructuredRecipe, deductions?: { itemId: string; ingredient: string }[]) => void;
 
   // Shopping list operations
   onMoveToPantry: (items: ShoppingItem[]) => void;

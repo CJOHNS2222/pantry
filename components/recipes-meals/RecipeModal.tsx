@@ -15,6 +15,8 @@ import { RecipeModalImageSection } from '../recipe-modal/RecipeModalImageSection
 import { RecipeModalLeftoverOverlay } from '../recipe-modal/RecipeModalLeftoverOverlay';
 import { RecipeModalRatingModal } from '../recipe-modal/RecipeModalRatingModal';
 import { RecipeModalTimerSubstitutionsSection } from '../recipe-modal/RecipeModalTimerSubstitutionsSection';
+import { RecipeModalDeductPantryModal } from '../recipe-modal/RecipeModalDeductPantryModal';
+import { parseIngredientForShoppingList } from '../../utils/appUtils';
 
 interface RecipeModalProps {
   recipe: StructuredRecipe | SavedRecipe;
@@ -24,7 +26,7 @@ interface RecipeModalProps {
   onSaveRecipe?: (recipe: StructuredRecipe) => void;
   onDeleteRecipe?: (recipe: SavedRecipe) => void;
   onRate?: (rating: RecipeRating) => void;
-  onMarkAsMade?: (recipe: StructuredRecipe, inventory?: PantryItem[]) => void;
+  onMarkAsMade?: (recipe: StructuredRecipe, deductions?: { itemId: string; ingredient: string }[]) => void;
   onRemoveFromMealPlan?: (recipe: StructuredRecipe) => void;
   showSaveButton?: boolean;
   showDeleteButton?: boolean;
@@ -76,6 +78,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
   const ratingRef = useRef<HTMLDivElement>(null);
   const [showReviewPrompt, setShowReviewPrompt] = useState(false);
   const [showRatingModal, setShowRatingModal] = useState(false);
+  const [showDeductPantryModal, setShowDeductPantryModal] = useState(false);
   // Editable fields for recipe creation
   const [editTitle, setEditTitle] = useState('');
   const [editDescription, setEditDescription] = useState('');
@@ -653,6 +656,29 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
   };
 
   const handleMarkAsMadeClick = async () => {
+    if (!editable && recipe.ingredients && recipe.ingredients.length > 0 && inventory && inventory.length > 0) {
+      const matches: { ingredient: string; pantryItem: PantryItem; checked: boolean }[] = [];
+      recipe.ingredients.forEach(ing => {
+        const parsed = parseIngredientForShoppingList(ing);
+        const name = parsed.itemName.toLowerCase().trim();
+        const match = inventory.find(pi => {
+          const piName = pi.item.toLowerCase();
+          return piName.includes(name) || name.includes(piName);
+        });
+        if (match) {
+          matches.push({ ingredient: ing, pantryItem: match, checked: true });
+        }
+      });
+
+      if (matches.length > 0) {
+        setShowDeductPantryModal(true);
+        return;
+      }
+    }
+    completeMarkAsMade([]);
+  };
+
+  const completeMarkAsMade = (deductions: { itemId: string; ingredient: string }[]) => {
     // Track recipe completion
     AnalyticsService.trackRecipeCompleted(
       recipe.id || recipe.title,
@@ -662,7 +688,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
 
     // Call the onMarkAsMade handler with inventory info
     if (onMarkAsMade) {
-      onMarkAsMade(recipe as StructuredRecipe, inventory);
+      onMarkAsMade(recipe as StructuredRecipe, deductions);
     }
 
     // Step 3: If from meal plan, remove it from the meal plan
@@ -685,6 +711,16 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
     setTimeout(() => {
       setShowRatingModal(true);
     }, 100);
+  };
+
+  const handleConfirmDeductions = (deductions: { itemId: string; ingredient: string }[]) => {
+    setShowDeductPantryModal(false);
+    completeMarkAsMade(deductions);
+  };
+
+  const handleSkipDeductions = () => {
+    setShowDeductPantryModal(false);
+    completeMarkAsMade([]);
   };
 
    
@@ -962,6 +998,14 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
           onSaveNonEditable={handleNonEditableSave}
         />
       </div>
+
+      <RecipeModalDeductPantryModal
+        isOpen={showDeductPantryModal}
+        recipe={recipe}
+        inventory={inventory}
+        onClose={handleSkipDeductions}
+        onConfirm={handleConfirmDeductions}
+      />
 
       <RecipeModalRatingModal
         showRatingModal={showRatingModal}

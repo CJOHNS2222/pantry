@@ -6,6 +6,7 @@ import { UsageService } from '../services/usageService';
 import remoteConfig from '../services/remoteConfigService';
 import { ConsumptionSuggestion, ExpirationAlert, RecipeSuggestion, PantryItem, CustomCategory, Member } from '../types';
 import { getQuantityAmount, getQuantityUnit } from './quantityUtils';
+import { convertToMetric, convertToStandard } from './measurementUtils';
 import { getPerformance, trace } from "firebase/performance";
 import { itemImages, ITEM_IMAGE_CDN_BASE } from '../data/item-images';
 
@@ -2105,4 +2106,83 @@ export function generateBlurDataURL(width: number = 400, height: number = 300, c
   // Convert SVG to base64 data URL
   const encoded = btoa(svg);
   return `data:image/svg+xml;base64,${encoded}`;
+}
+
+/**
+ * Parses a numeric quantity string, including fractions (e.g. "1/2", "3/4") and decimals
+ */
+export function parseNumericQuantity(qtyStr: string): number {
+  if (!qtyStr) return 1;
+  const str = qtyStr.trim();
+  if (str.includes('/')) {
+    const parts = str.split('/');
+    if (parts.length === 2) {
+      const num = parseFloat(parts[0]!);
+      const den = parseFloat(parts[1]!);
+      if (!isNaN(num) && !isNaN(den) && den !== 0) {
+        return num / den;
+      }
+    }
+  }
+  const val = parseFloat(str);
+  return isNaN(val) ? 1 : val;
+}
+
+/**
+ * Deducts recipe ingredient quantity from pantry item quantity, taking unit conversions into account
+ */
+export function deductIngredientAmount(pantryQtyObj: any, recipeQtyStr: string): { amount: number; unit: string } {
+  const pantryAmount = getQuantityAmount(pantryQtyObj);
+  const pantryUnit = getQuantityUnit(pantryQtyObj);
+
+  const parsedRecipe = parseIngredientForShoppingList(recipeQtyStr);
+  const recipeParts = parsedRecipe.quantity.trim().split(/\s+/);
+  let recipeAmount = 1;
+  let recipeUnit = 'count';
+
+  if (recipeParts.length > 0) {
+    recipeAmount = parseNumericQuantity(recipeParts[0]!);
+    if (recipeParts.length > 1) {
+      recipeUnit = recipeParts[1]!.toLowerCase();
+    }
+  }
+
+  const pUnitLower = pantryUnit.toLowerCase();
+  const rUnitLower = recipeUnit.toLowerCase();
+
+  // Case 1: Units match
+  if (pUnitLower === rUnitLower) {
+    return {
+      amount: Math.max(0, pantryAmount - recipeAmount),
+      unit: pantryUnit
+    };
+  }
+
+  // Case 2: Standard/Metric conversions
+  const pMetric = convertToMetric(pantryAmount, pantryUnit);
+  const rMetric = convertToMetric(recipeAmount, recipeUnit);
+
+  if (pMetric.unit === rMetric.unit && pMetric.unit !== pantryUnit) {
+    const remainingMetric = Math.max(0, pMetric.amount - rMetric.amount);
+    const backToOriginal = convertToStandard(remainingMetric, pMetric.unit);
+    return {
+      amount: Math.round(backToOriginal.amount * 100) / 100,
+      unit: pantryUnit
+    };
+  }
+
+  // Case 3: Both are countable units (e.g. piece vs count, slices vs pieces)
+  const isCountUnit = (u: string) => ['count', 'pieces', 'cloves', 'slices', 'sticks', 'cans', 'bottles', 'packages', 'bags', 'boxes', 'jars'].includes(u);
+  if (isCountUnit(pUnitLower) && isCountUnit(rUnitLower)) {
+    return {
+      amount: Math.max(0, pantryAmount - recipeAmount),
+      unit: pantryUnit
+    };
+  }
+
+  // Mismatched units that cannot be converted: deplete the item (set to 0)
+  return {
+    amount: 0,
+    unit: pantryUnit
+  };
 }

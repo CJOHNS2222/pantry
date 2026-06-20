@@ -78,7 +78,7 @@ interface MealPlannerProps {
   addToShoppingList: (items: (string | { item: string; source: string; notes?: string })[], source?: string) => void;
   onAddToPlan?: (recipe: StructuredRecipe, dayIndex?: number, mealType?: 'breakfast' | 'lunch' | 'dinner') => void;
   onSaveRecipe?: (recipe: StructuredRecipe) => void;
-  onMarkAsMade?: (recipe: StructuredRecipe) => void;
+  onMarkAsMade?: (recipe: StructuredRecipe, deductions?: { itemId: string; ingredient: string }[]) => void;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onRate?: (rating: any) => void;
   user: User;
@@ -1195,6 +1195,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
           recipeSaveLimitExceeded={recipeSaveLimitExceeded}
           mealPlanLimitExceeded={mealPlanLimitExceeded}
           user={user}
+          inventory={inventory}
         />
       )}
 

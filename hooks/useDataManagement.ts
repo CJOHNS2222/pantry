@@ -3,12 +3,12 @@ import DatabaseMonitoringService from '../services/databaseMonitoringService';
 import AnalyticsService from '../services/analyticsService';
 import { UsageService } from '../services/usageService';
 
-import { User, PantryItem, DayPlan, Household, ShoppingItem, SavedRecipe, RecipeRating, CustomCategory, MealPlanItem, StructuredRecipe } from '../types';
+import { User, PantryItem, DayPlan, Household, ShoppingItem, SavedRecipe, RecipeRating, CustomCategory, MealPlanItem, StructuredRecipe, Settings } from '../types';
 
 import { hasPantryItemsChanged, hasArraysChanged, hasMealPlansChanged } from '../utils/comparisonUtils';
 import { setRemoteInventoryUpdate, setRemoteShoppingListUpdate, setRemoteMealPlanUpdate, setRemoteSavedRecipesUpdate } from '../services/syncStateService';
 import { log } from '../services/logService';
-import { generateConsumptionSuggestions, generateExpirationAlerts, generateRecipeSuggestions, isHouseholdMember, shouldShowExpiryAlert } from '../utils/appUtils';
+import { generateConsumptionSuggestions, generateExpirationAlerts, generateRecipeSuggestions, isHouseholdMember, shouldShowExpiryAlert, deductIngredientAmount } from '../utils/appUtils';
 import { offlineQueue } from '../services/offlineQueueService';
 import { undoService, UndoAction } from '../services/undoService';
 import { NotificationService } from '../services/notificationService';
@@ -69,7 +69,7 @@ function createShoppingListListener(
           for (const [itemId, itemArray] of Object.entries(data.items)) {
             items.push(ShoppingListCacheService.objectToShoppingItem(itemId, itemArray as CachedShoppingListData[string], householdId));
           }
-          const sortedItems = items.sort((a, b) => (b.addedAt?.getTime() || 0) - (a.addedAt?.getTime() || 0));
+          const sortedItems = items.sort((a, b) => a.item.localeCompare(b.item));
           if (hasArraysChanged(sortedItems, prevShoppingListRef.current)) {
             setRemoteShoppingListUpdate(true);
             setShoppingList(sortedItems);
@@ -97,7 +97,7 @@ function createShoppingListListener(
           for (const [itemId, itemArray] of Object.entries(data.items)) {
             items.push(ShoppingListCacheService.objectToShoppingItem(itemId, itemArray as CachedShoppingListData[string], undefined, userId));
           }
-          const sortedItems = items.sort((a, b) => (b.addedAt?.getTime() || 0) - (a.addedAt?.getTime() || 0));
+          const sortedItems = items.sort((a, b) => a.item.localeCompare(b.item));
           if (hasArraysChanged(sortedItems, prevShoppingListRef.current)) {
             setRemoteShoppingListUpdate(true);
             setShoppingList(sortedItems);
@@ -269,6 +269,7 @@ export function useDataManagement(
   options?: {
     disableInventoryListeners?: boolean;
     onShowAddToPlanDialog?: (recipe: StructuredRecipe) => void;
+    settings?: Settings;
   }
 ) {
 
@@ -487,6 +488,22 @@ export function useDataManagement(
     setCustomCategories(user?.customCategories || []);
   }, [user?.customCategories]);
 
+  // Load recent actions from IndexedDB on user change
+  useEffect(() => {
+    if (!user?.id || user.isGuest) {
+      setRecentActions([]);
+      return;
+    }
+    
+    undoService.getRecentActions(user.id)
+      .then(actions => {
+        setRecentActions(actions);
+      })
+      .catch(err => {
+        log.error('Failed to load recent actions:', err, 'DataManagement');
+      });
+  }, [user?.id, user?.isGuest]);
+
   // Firestore synchronization effects
   useEffect(() => {
     if (!user?.id) {
@@ -499,7 +516,7 @@ export function useDataManagement(
         const inv = JSON.parse(localStorage.getItem(GUEST_INVENTORY_KEY) || '[]') as PantryItem[];
         const shop = JSON.parse(localStorage.getItem(GUEST_SHOPPING_KEY) || '[]') as ShoppingItem[];
         setInventory(inv);
-        setShoppingList(shop);
+        setShoppingList(shop.sort((a, b) => a.item.localeCompare(b.item)));
       } catch {
         setInventory([]);
         setShoppingList([]);
@@ -1038,8 +1055,71 @@ export function useDataManagement(
     return generateRecipeSuggestions(inventory);
   }, [inventory]);
 
-  const handleMarkAsMade = async () => {
-    // Omitted for brevity
+  const handleMarkAsMade = async (recipe: StructuredRecipe, deductions?: { itemId: string; ingredient: string }[]) => {
+    if (!user?.id) return;
+    try {
+      if (deductions && deductions.length > 0) {
+        let deductedCount = 0;
+        for (const deduction of deductions) {
+          const index = inventory.findIndex(pi => pi.id === deduction.itemId);
+          if (index !== -1) {
+            const item = inventory[index];
+            const remaining = deductIngredientAmount(item.quantity ?? item.quantity_estimate, deduction.ingredient);
+            
+            const currentAmount = getQuantityValue(item);
+            const remainingAmount = remaining.amount;
+            
+            let newVisualLevel = item.visualLevel;
+            if (remainingAmount <= 0) {
+              newVisualLevel = 'empty';
+            } else if (currentAmount > 0) {
+              const ratio = remainingAmount / currentAmount;
+              if (ratio <= 0.25) {
+                newVisualLevel = 'quarter';
+              } else if (ratio <= 0.5) {
+                newVisualLevel = 'half';
+              } else if (ratio <= 0.75) {
+                newVisualLevel = 'threeQuarter';
+              } else {
+                newVisualLevel = 'full';
+              }
+            } else {
+              newVisualLevel = 'full';
+            }
+
+            const updates: Partial<PantryItem> = {};
+            if (item.quantity && typeof item.quantity === 'object') {
+              updates.quantity = {
+                ...item.quantity,
+                amount: remainingAmount,
+                unit: remaining.unit
+              };
+            } else if (typeof item.quantity === 'number') {
+              updates.quantity = remainingAmount;
+            } else {
+              updates.quantity_estimate = `${remainingAmount} ${remaining.unit}`;
+            }
+
+            if (newVisualLevel !== item.visualLevel) {
+              updates.visualLevel = newVisualLevel;
+            }
+
+            await updateItem(index, updates);
+            deductedCount++;
+          }
+        }
+        if (deductedCount > 0) {
+          addToast?.(`Deducted ${deductedCount} item${deductedCount > 1 ? 's' : ''} from pantry.`, 'success');
+        } else {
+          addToast?.('Recipe marked as cooked.', 'success');
+        }
+      } else {
+        addToast?.('Recipe marked as cooked.', 'success');
+      }
+    } catch (err) {
+      log.error('Error in handleMarkAsMade:', err, 'DataManagement');
+      addToast?.('Failed to deduct items from pantry.', 'error');
+    }
   };
 
   const recordUndo = async (type: string, data: unknown) => {
@@ -1053,8 +1133,39 @@ export function useDataManagement(
     }
   };
 
-  const performUndo = async () => {
-    // Omitted for brevity
+  const performUndo = async (action?: UndoAction) => {
+    if (!user?.id) return;
+    try {
+      const actionToUndo = action || (await undoService.getRecentActions(user.id, 1))[0];
+      if (!actionToUndo) return;
+
+      if (actionToUndo.type === 'delete_item') {
+        const itemToRestore = actionToUndo.data as PantryItem;
+        await addItem(itemToRestore);
+      } else if (actionToUndo.type === 'update_item') {
+        const { itemId, previousState } = actionToUndo.data as { itemId: string; previousState: PantryItem };
+        
+        // Find if the item still exists in inventory
+        const exists = inventoryRef.current.some(item => item.id === itemId);
+        if (exists) {
+          // Update local state
+          setInventory(prev => prev.map(item => item.id === itemId ? previousState : item));
+          // Update cache
+          await InventoryCacheService.updateItemInCache(itemId, previousState, user?.householdId, user?.id);
+        } else {
+          // If it was somehow deleted in the meantime, restore it entirely
+          await addItem(previousState);
+        }
+      }
+
+      await undoService.removeAction(actionToUndo.id);
+      const actions = await undoService.getRecentActions(user.id);
+      setRecentActions(actions);
+      addToast?.('Last action undone', 'success');
+    } catch (err) {
+      log.error('Failed to perform undo:', err, 'DataManagement');
+      addToast?.('Failed to undo last action', 'error');
+    }
   };
 
   const updateItem = async (index: number, updates: Partial<PantryItem>) => {
@@ -1083,13 +1194,14 @@ export function useDataManagement(
     await InventoryCacheService.updateItemInCache(currentItem.id, updates, user?.householdId, user?.id);
 
     // Check if this is a staple item that needs to be re-added to shopping list
-    if (updatedItem.isStaple && addToShoppingList) {
+    if (updatedItem.isStaple && addToShoppingList && (options?.settings?.shopping?.autoReaddStaples !== false)) {
       const currentQuantity = getQuantityValue(updatedItem);
       const previousQuantity = getQuantityValue(currentItem);
 
       // If quantity dropped to zero or very low (and wasn't already zero), add to shopping list
       if (currentQuantity <= 0 && previousQuantity > 0) {
         addToShoppingList([updatedItem.item]);
+        addToast?.(`"${updatedItem.item}" auto-added to shopping list (staple)`, 'info');
       }
     }
   };
@@ -1124,6 +1236,12 @@ export function useDataManagement(
     // Dismiss any notifications that only reference this item
     if (user?.id) {
       pruneNotificationsForDeletedItems(user.id, [itemToDelete.id]).catch(() => {});
+    }
+
+    // Check if this is a staple item that needs to be re-added to shopping list on delete
+    if (itemToDelete.isStaple && addToShoppingList && (options?.settings?.shopping?.autoReaddStaples !== false)) {
+      addToShoppingList([itemToDelete.item]);
+      addToast?.(`"${itemToDelete.item}" auto-added to shopping list (staple)`, 'info');
     }
 
     addToast?.(
@@ -1171,6 +1289,13 @@ export function useDataManagement(
     // Dismiss any notifications that only reference the deleted items
     if (user?.id) {
       pruneNotificationsForDeletedItems(user.id, itemsToDelete.map(i => i.id)).catch(() => {});
+    }
+
+    // Check if any deleted items are staples to auto-readd
+    const staples = itemsToDelete.filter(i => i.isStaple);
+    if (staples.length > 0 && addToShoppingList && (options?.settings?.shopping?.autoReaddStaples !== false)) {
+      addToShoppingList(staples.map(i => i.item));
+      addToast?.(`${staples.length} staple item${staples.length > 1 ? 's' : ''} auto-added to shopping list`, 'info');
     }
 
     addToast?.(
@@ -1242,7 +1367,7 @@ export function useDataManagement(
       let atCap = false;
       setShoppingList(prev => {
         if (prev.length >= GUEST_SHOPPING_CAP) { atCap = true; return prev; }
-        const updated = [...prev, fullItem];
+        const updated = [...prev, fullItem].sort((a, b) => a.item.localeCompare(b.item));
         try { localStorage.setItem(GUEST_SHOPPING_KEY, JSON.stringify(updated)); } catch { /* storage full */ }
         return updated;
       });
@@ -1265,7 +1390,7 @@ export function useDataManagement(
         const remaining = GUEST_SHOPPING_CAP - prev.length;
         if (remaining <= 0) return prev;
         const toAdd = itemsWithIds.slice(0, remaining);
-        const updated = [...prev, ...toAdd];
+        const updated = [...prev, ...toAdd].sort((a, b) => a.item.localeCompare(b.item));
         try { localStorage.setItem(GUEST_SHOPPING_KEY, JSON.stringify(updated)); } catch { /* storage full */ }
         return updated;
       });
@@ -1281,7 +1406,7 @@ export function useDataManagement(
     if (!user?.id) return;
     if (user.isGuest) {
       setShoppingList(prev => {
-        const updated = prev.map(item => item.id === itemId ? { ...item, ...updates } : item);
+        const updated = prev.map(item => item.id === itemId ? { ...item, ...updates } : item).sort((a, b) => a.item.localeCompare(b.item));
         try { localStorage.setItem(GUEST_SHOPPING_KEY, JSON.stringify(updated)); } catch { /* storage full */ }
         return updated;
       });
@@ -1297,7 +1422,7 @@ export function useDataManagement(
         const updated = prev.map(item => {
           const change = itemsToUpdate.find(u => u.id === item.id);
           return change ? { ...item, ...change.updates } : item;
-        });
+        }).sort((a, b) => a.item.localeCompare(b.item));
         try { localStorage.setItem(GUEST_SHOPPING_KEY, JSON.stringify(updated)); } catch { /* storage full */ }
         return updated;
       });

@@ -1,9 +1,56 @@
 import React, { useState, useRef } from 'react';
 import { Check, Trash2, Calculator, MessageSquare, UserCheck, X, ChevronLeft, ChevronRight } from 'lucide-react';
-import { ShoppingItem } from '../../types';
+import { ShoppingItem, StructuredRecipe, SavedRecipe, DayPlan } from '../../types';
+import { Tab } from '../../types/app';
+import { useApp } from '../../contexts/AppContext';
+import { useAppActions } from '../../contexts/AppActionsContext';
 import { comparePriceOptions, formatPricePerUnit, getPriceComparisonSummary } from '../../utils/priceCalculator';
 import { useAndroidBack } from '../../hooks/useAndroidBack';
 import HapticService from '../../services/hapticService';
+
+const getRecipeTitleFromSource = (source: string | undefined): string => {
+  if (!source || !source.startsWith('recipe:')) return '';
+  
+  if (source.startsWith('recipe: need ')) {
+    const match = source.match(/recipe: need .+? for "(.+?)"/);
+    if (match) return match[1];
+  }
+  
+  const content = source.substring(7).trim();
+  const parenMatch = content.match(/^(.+?)\s*\([^)]+\)$/);
+  if (parenMatch) {
+    return parenMatch[1].trim();
+  }
+  
+  return content;
+};
+
+const findRecipeByTitle = (title: string, savedRecipes: SavedRecipe[], mealPlan: DayPlan[]): StructuredRecipe | SavedRecipe | null => {
+  const cleanTitle = title.trim().toLowerCase();
+  
+  const savedMatch = savedRecipes.find(r => r.title.trim().toLowerCase() === cleanTitle);
+  if (savedMatch) return savedMatch;
+  
+  if (mealPlan && Array.isArray(mealPlan)) {
+    for (const day of mealPlan) {
+      const meals = [...(day.breakfast || []), ...(day.lunch || []), ...(day.dinner || []), ...(day.meals || [])];
+      for (const meal of meals) {
+        if (meal.recipe && meal.recipe.title.trim().toLowerCase() === cleanTitle) {
+          return meal.recipe;
+        }
+      }
+    }
+  }
+  
+  return {
+    title: title,
+    description: `Ingredients from this recipe are in your shopping list.`,
+    ingredients: [],
+    instructions: [],
+    cookTime: '',
+    type: 'Dinner',
+  };
+};
 
 interface HouseholdMember {
   id: string;
@@ -43,6 +90,30 @@ export const EnhancedShoppingListItem: React.FC<ShoppingListItemProps> = ({
   const [showNotes, setShowNotes] = useState(false);
   const [noteText, setNoteText] = useState(item.notes ?? '');
   const itemRef = useRef<HTMLDivElement>(null);
+
+  const { savedRecipes, mealPlan } = useApp();
+  const { setActiveTab } = useAppActions();
+
+  const handleRecipeClick = (e: React.MouseEvent, recipeTitle: string) => {
+    e.stopPropagation();
+    e.preventDefault();
+    
+    const foundRecipe = findRecipeByTitle(recipeTitle, savedRecipes || [], mealPlan || []);
+    if (!foundRecipe) return;
+    
+    const isSaved = savedRecipes?.some(r => r.title.trim().toLowerCase() === recipeTitle.trim().toLowerCase()) ?? false;
+    
+    setActiveTab(Tab.RECIPES);
+    
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('openRecipeModal', {
+        detail: {
+          recipe: foundRecipe,
+          isSavedView: isSaved
+        }
+      }));
+    }, 150);
+  };
 
   // Register Android system back button hooks for overlays
   useAndroidBack(showAssignPicker, () => setShowAssignPicker(false));
@@ -170,14 +241,27 @@ export const EnhancedShoppingListItem: React.FC<ShoppingListItemProps> = ({
               {item.item}
             </span>
             {item.source && (
-              <div className={`inline-flex items-center rounded-full border border-theme bg-theme-primary/50 px-2 py-0.5 text-[10px] font-medium text-theme-secondary ${item.source.startsWith('recipe:') ? 'max-w-[200px] truncate' : 'whitespace-nowrap shrink-0'}`}>
-                {item.source === 'suggested' && '💡 Quick Add'}
-                {item.source === 'manual' && '✏️ Manual'}
-                {item.source === 'meal planner' && '📅 Meal planner'}
-                {item.source === 'pantry scanner' && '📷 Scanner'}
-                {item.source === 'scanner suggestion' && '🤖 Suggestions'}
-                {item.source?.startsWith('recipe:') && `🍳 ${item.source.substring(8).replace(/^need\s+/, '')}`}
-              </div>
+              item.source.startsWith('recipe:') ? (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    const title = getRecipeTitleFromSource(item.source);
+                    if (title) handleRecipeClick(e, title);
+                  }}
+                  className="inline-flex items-center rounded-full border border-[var(--accent-color)]/30 bg-[var(--accent-color)]/5 hover:bg-[var(--accent-color)]/15 px-2 py-0.5 text-[10px] font-semibold text-[var(--accent-color)] max-w-[200px] truncate transition-colors cursor-pointer focus:outline-none focus:ring-1 focus:ring-[var(--accent-color)] text-left"
+                  title={`View recipe: ${getRecipeTitleFromSource(item.source)}`}
+                >
+                  🍳 {item.source.substring(8).replace(/^need\s+/, '')}
+                </button>
+              ) : (
+                <div className="inline-flex items-center rounded-full border border-theme bg-theme-primary/50 px-2 py-0.5 text-[10px] font-medium text-theme-secondary whitespace-nowrap shrink-0">
+                  {item.source === 'suggested' && '💡 Quick Add'}
+                  {item.source === 'manual' && '✏️ Manual'}
+                  {item.source === 'meal planner' && '📅 Meal planner'}
+                  {item.source === 'pantry scanner' && '📷 Scanner'}
+                  {item.source === 'scanner suggestion' && '🤖 Suggestions'}
+                </div>
+              )
             )}
             {item.quantity && item.quantity !== '1' && (
               <div className="text-sm text-theme-secondary opacity-80">Needed: {item.quantity}</div>

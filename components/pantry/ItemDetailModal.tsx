@@ -55,7 +55,16 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   const [localNotes, setLocalNotes] = useState<string>(item.notes || '');
   const [localIsStaple, setLocalIsStaple] = useState<boolean>(item.isStaple || false);
   const [localIsOpened, setLocalIsOpened] = useState<boolean>(item.isOpened || false);
-  const [localVisualLevel, setLocalVisualLevel] = useState<PantryItem['visualLevel']>(item.visualLevel);
+  const [localVisualLevel, setLocalVisualLevel] = useState<PantryItem['visualLevel']>(() => {
+    if (item.visualLevel) return item.visualLevel;
+    const qty = getQuantityAmount(item.quantity ?? item.quantity_estimate);
+    if (qty === 0) return 'empty';
+    if (qty === 0.25) return 'quarter';
+    if (qty === 0.5) return 'half';
+    if (qty === 0.75) return 'threeQuarter';
+    if (qty === 1) return 'full';
+    return undefined;
+  });
   // Image upload state
   const intl = useIntl();
   const { household, user, settings } = useApp();
@@ -71,7 +80,8 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
 
   useEffect(() => {
     // Reset local state when item prop changes
-    setLocalQuantity(getQuantityAmount(item.quantity ?? item.quantity_estimate));
+    const qty = getQuantityAmount(item.quantity ?? item.quantity_estimate);
+    setLocalQuantity(qty);
     setLocalUnit(getQuantityUnit(item.quantity ?? item.quantity_estimate));
     setLocalStorageLocation(item.storageLocation || 'pantry');
     setLocalCategory(item.category || 'Manual');
@@ -80,7 +90,13 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
     setLocalNotes(item.notes || '');
     setLocalIsStaple(item.isStaple || false);
     setLocalIsOpened(item.isOpened || false);
-    setLocalVisualLevel(item.visualLevel);
+    setLocalVisualLevel(item.visualLevel || (
+      qty === 0 ? 'empty' :
+      qty === 0.25 ? 'quarter' :
+      qty === 0.5 ? 'half' :
+      qty === 0.75 ? 'threeQuarter' :
+      qty === 1 ? 'full' : undefined
+    ));
   }, [item]);
 
   // Fetch nutrition facts on component mount (only when showNutrition is enabled)
@@ -109,6 +125,36 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
     if (newQuantity >= 0) {
       setLocalQuantity(newQuantity);
       setEditQuantity(newQuantity);
+
+      // Sync visual level based on quantity
+      if (newQuantity === 0) {
+        setLocalVisualLevel('empty');
+      } else if (newQuantity === 0.25) {
+        setLocalVisualLevel('quarter');
+      } else if (newQuantity === 0.5) {
+        setLocalVisualLevel('half');
+      } else if (newQuantity === 0.75) {
+        setLocalVisualLevel('threeQuarter');
+      } else if (newQuantity === 1) {
+        setLocalVisualLevel('full');
+      } else {
+        setLocalVisualLevel(undefined);
+      }
+    }
+  };
+
+  const handleVisualLevelChange = (level: PantryItem['visualLevel']) => {
+    setLocalVisualLevel(level);
+    if (level === 'empty') {
+      handleQuantityChange(0);
+    } else if (level === 'quarter') {
+      handleQuantityChange(0.25);
+    } else if (level === 'half') {
+      handleQuantityChange(0.5);
+    } else if (level === 'threeQuarter') {
+      handleQuantityChange(0.75);
+    } else if (level === 'full') {
+      handleQuantityChange(1);
     }
   };
 
@@ -377,6 +423,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
               <div className="text-xs font-medium text-theme-secondary mb-2">Select Amount Left</div>
               <div className="flex gap-1.5">
                 {([
+                  { value: 'empty',        label: 'Empty', icon: '○', color: '#ef4444' },
                   { value: 'quarter',      label: '¼',  icon: '◔', color: '#f59e0b' },
                   { value: 'half',         label: '½',  icon: '◑', color: '#f97316' },
                   { value: 'threeQuarter', label: '¾',  icon: '◕', color: '#22c55e' },
@@ -387,7 +434,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                     <button
                       key={value}
                       type="button"
-                      onClick={() => setLocalVisualLevel(selected ? undefined : value)}
+                      onClick={() => handleVisualLevelChange(selected ? undefined : value)}
                       className={`flex-1 flex flex-col items-center gap-0.5 px-1 py-1.5 rounded-lg border transition-all duration-150 ${
                         selected
                           ? 'border-[var(--accent-color)] bg-[var(--accent-color)]/10 scale-105'
@@ -395,7 +442,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                       }`}
                       data-testid={`item-visual-${value}`}
                       aria-pressed={selected}
-                      title={`${label} full`}
+                      title={value === 'empty' ? 'Empty' : `${label} full`}
                     >
                       <span
                         className="text-xl leading-none transition-all"
@@ -468,18 +515,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                   </select>
                 </div>
 
-                {/* Notes */}
-                <div className="bg-theme-secondary rounded-lg p-3">
-                  <div className="text-xs text-theme-secondary mb-1">Notes (Private)</div>
-                  <textarea
-                    value={localNotes}
-                    onChange={(e) => setLocalNotes(e.target.value)}
-                    placeholder="Add any notes about this item..."
-                    className="w-full px-2 py-1.5 text-sm border border-theme rounded-lg bg-theme-primary text-theme-primary focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] resize-none"
-                    rows={2}
-                    data-testid="item-notes"
-                  />
-                </div>
+
 
                 {/* Quantity / Unit Picker */}
                 <div className="bg-theme-secondary rounded-lg p-3">
@@ -820,6 +856,21 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                 </div>
               )}
             </div>
+
+          {/* Notes Section */}
+          <div className="px-4 py-4 border-b border-theme">
+            <div className="text-xs font-semibold uppercase tracking-wide text-[var(--accent-color)] mb-2">
+              Notes (Private)
+            </div>
+            <textarea
+              value={localNotes}
+              onChange={(e) => setLocalNotes(e.target.value)}
+              placeholder="Add any notes about this item..."
+              className="w-full px-3 py-2 text-sm border border-theme rounded-xl bg-theme-secondary text-theme-primary focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] resize-none transition-all"
+              rows={2}
+              data-testid="item-notes"
+            />
+          </div>
 
           {/* Bottom padding for safe scrolling */}
           <div className="h-4" />

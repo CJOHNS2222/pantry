@@ -9,6 +9,15 @@ export interface ChangeEntry {
 
 export const RECENT_CHANGES: ChangeEntry[] = [
   {
+    "version": "2.4.13",
+    "date": "Jun 20, 2026",
+    "highlights": [
+      "Pantry Notes Relocated — Moved the private notes text area in ItemDetailModal out of the collapsible product details…",
+      "Staples Deletion Sync — Fixed staple auto-restocking logic so that deleting a staple item (either single delete or bulk…",
+      "Restock Feedback Toasts — Added informative toast notifications when a staple item is auto-added to the shopping list…"
+    ]
+  },
+  {
     "version": "2.4.12",
     "date": "Jun 20, 2026",
     "highlights": [
@@ -26,16 +35,6 @@ export const RECENT_CHANGES: ChangeEntry[] = [
       "Stacked In-App Notifications — Updated the notification UI to elegantly stack multiple alerts (like 3 expiring items)…",
       "Onboarding Streamlined — Spaced out setup questions by removing the Food Safety step from initial onboarding.",
       "Expiration Check Optimization — Reduced notification checks to run only once per calendar day rather than every 5…"
-    ]
-  },
-  {
-    "version": "2.4.10",
-    "date": "Jun 18, 2026",
-    "highlights": [
-      "Receipt Price Extraction — Gemini now extracts unit prices and amounts from receipt scans and automatically logs them…",
-      "Gemini Brand Filtering — Improved the Gemini receipt extraction prompt to proactively strip out store abbreviations and…",
-      "Login Validation — Removed the requirement for users to enter a last name when signing up for a new account.",
-      "Android Camera Restart Fix — Resolved an issue where older Android devices (especially Android 13) would crash and…"
     ]
   }
 ];

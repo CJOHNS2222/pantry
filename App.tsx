@@ -500,7 +500,8 @@ const App: React.FC = () => {
       setSelectedDayForPlan(tomorrowIndex >= 0 ? tomorrowIndex : 0);
       setSelectedMealForPlan('dinner');
       setShowAddToPlanDialog(true);
-    }
+    },
+    settings
   });
 
   // Sync household into activityHousehold so the activity subscription activates

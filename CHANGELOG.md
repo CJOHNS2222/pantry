@@ -1,3 +1,14 @@
+## [2.4.13] - 2026-06-20
+
+### Changed
+- **Pantry Notes Relocated** — Moved the private notes text area in `ItemDetailModal` out of the collapsible product details section and placed it prominently at the bottom of the modal below the history log, making notes immediately visible.
+
+### Fixed
+- **Staples Deletion Sync** — Fixed staple auto-restocking logic so that deleting a staple item (either single delete or bulk delete) now successfully triggers auto-adding it back to the shopping list.
+- **Restock Feedback Toasts** — Added informative toast notifications when a staple item is auto-added to the shopping list after deletion or quantity depletion.
+
+---
+
 ## [2.4.12] - 2026-06-20
 
 ### Added

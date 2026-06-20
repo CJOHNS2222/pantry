@@ -1580,6 +1580,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                 mealPlanLimitExceeded={mealPlanLimitExceeded}
                 savedRecipesCount={savedRecipes.length}
                 user={user}
+                inventory={inventory}
             />
     </div>
   );

@@ -1,5 +1,5 @@
 import React from 'react';
-import { RecipeRating, SavedRecipe, StructuredRecipe, User } from '../../types';
+import { RecipeRating, SavedRecipe, StructuredRecipe, User, PantryItem } from '../../types';
 import RecipeModal from '../recipes-meals/RecipeModal';
 
 interface RecipeFinderModalSectionProps {
@@ -10,12 +10,13 @@ interface RecipeFinderModalSectionProps {
   handleModalSaveRecipe: (recipe: StructuredRecipe & { __imageFile?: File; __submitForInclusion?: boolean }) => Promise<void>;
   onDeleteRecipe: (recipe: SavedRecipe) => void;
   onRate: (rating: RecipeRating) => void;
-  onMarkAsMade?: (recipe: StructuredRecipe) => void;
+  onMarkAsMade?: (recipe: StructuredRecipe, deductions?: { itemId: string; ingredient: string }[]) => void;
   modalIsSavedView: boolean;
   recipeSaveLimitExceeded: boolean;
   mealPlanLimitExceeded: boolean;
   savedRecipesCount: number;
   user: User;
+  inventory?: PantryItem[];
 }
 
 export const RecipeFinderModalSection: React.FC<RecipeFinderModalSectionProps> = ({
@@ -32,6 +33,7 @@ export const RecipeFinderModalSection: React.FC<RecipeFinderModalSectionProps> =
   mealPlanLimitExceeded,
   savedRecipesCount,
   user,
+  inventory = [],
 }) => {
   if (!showRecipeModal || !modalRecipe) return null;
 
@@ -49,8 +51,8 @@ export const RecipeFinderModalSection: React.FC<RecipeFinderModalSectionProps> =
         onDeleteRecipe(recipe);
       }}
       onRate={onRate}
-      onMarkAsMade={(recipe) => {
-        if (onMarkAsMade) onMarkAsMade(recipe);
+      onMarkAsMade={(recipe, deductions) => {
+        if (onMarkAsMade) onMarkAsMade(recipe, deductions);
       }}
       showSaveButton={!modalIsSavedView}
       showDeleteButton={modalIsSavedView}
@@ -60,6 +62,7 @@ export const RecipeFinderModalSection: React.FC<RecipeFinderModalSectionProps> =
       mealPlanLimitExceeded={mealPlanLimitExceeded}
       recipeSavedCount={savedRecipesCount}
       user={user}
+      inventory={inventory}
     />
   );
 };
