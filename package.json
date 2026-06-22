@@ -1,7 +1,7 @@
 {
   "name": "stockandspoon",
   "private": true,
-  "version": "2.4.13",
+  "version": "2.4.14",
   "type": "module",
   "scripts": {
     "generate:changelog": "node scripts/generate-changelog.cjs",
@@ -20,6 +20,8 @@
     "generate:icons": "npx pwa-asset-generator public/icons/icon512.png resources --manifest ./public/manifest.webmanifest --favicon --index --android --ios",
     "sync-release-notes": "node scripts/sync-release-notes.js",
     "bulk-upload-recipes": "node scripts/bulk-upload-recipes.js",
+    "import-csv-recipes": "node scripts/import-csv-recipes.js",
+    "import-enriched-recipes": "node scripts/import-enriched-recipes.js",
     "bulk-delete-incomplete-recipes": "node scripts/bulk-delete-incomplete-recipes.js",
     "postinstall": "patch-package",
     "clean-duplicate-descriptions": "node scripts/clean-duplicate-descriptions.js",

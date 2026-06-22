@@ -488,7 +488,7 @@
         },
         "ads_enabled": {
           "defaultValue": {
-            "value": "true"
+            "value": "false"
           },
           "description": "Master switch for AdMob banner ads",
           "valueType": "BOOLEAN"

@@ -22,7 +22,7 @@ interface ItemDetailModalProps {
   item: PantryItem;
   onClose: () => void;
   onUpdateItem: (index: number, updates: Partial<PantryItem>) => void;
-  onDeleteItem: (index: number) => void;
+  onDeleteItem: (index: number, disposalReason?: 'thrown_away' | 'cooked' | 'remove') => void;
   onAddToShoppingList: (items: string[]) => void;
   customCategories: CustomCategory[];
   originalIndex: number;
@@ -55,14 +55,20 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   const [localNotes, setLocalNotes] = useState<string>(item.notes || '');
   const [localIsStaple, setLocalIsStaple] = useState<boolean>(item.isStaple || false);
   const [localIsOpened, setLocalIsOpened] = useState<boolean>(item.isOpened || false);
+  const initialQty = getQuantityAmount(item.quantity ?? item.quantity_estimate);
+  const baseQuantity = initialQty > 0 ? initialQty : 1;
+  const roundQty = (val: number) => Math.round(val * 100) / 100;
+
   const [localVisualLevel, setLocalVisualLevel] = useState<PantryItem['visualLevel']>(() => {
     if (item.visualLevel) return item.visualLevel;
     const qty = getQuantityAmount(item.quantity ?? item.quantity_estimate);
+    const ratio = qty / baseQuantity;
+    const eps = 0.01;
     if (qty === 0) return 'empty';
-    if (qty === 0.25) return 'quarter';
-    if (qty === 0.5) return 'half';
-    if (qty === 0.75) return 'threeQuarter';
-    if (qty === 1) return 'full';
+    if (Math.abs(ratio - 0.25) < eps) return 'quarter';
+    if (Math.abs(ratio - 0.5) < eps) return 'half';
+    if (Math.abs(ratio - 0.75) < eps) return 'threeQuarter';
+    if (Math.abs(ratio - 1) < eps) return 'full';
     return undefined;
   });
   // Image upload state
@@ -81,6 +87,10 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   useEffect(() => {
     // Reset local state when item prop changes
     const qty = getQuantityAmount(item.quantity ?? item.quantity_estimate);
+    const innerInitialQty = getQuantityAmount(item.quantity ?? item.quantity_estimate);
+    const innerBaseQuantity = innerInitialQty > 0 ? innerInitialQty : 1;
+    const ratio = innerBaseQuantity > 0 ? qty / innerBaseQuantity : 0;
+    const eps = 0.01;
     setLocalQuantity(qty);
     setLocalUnit(getQuantityUnit(item.quantity ?? item.quantity_estimate));
     setLocalStorageLocation(item.storageLocation || 'pantry');
@@ -92,10 +102,10 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
     setLocalIsOpened(item.isOpened || false);
     setLocalVisualLevel(item.visualLevel || (
       qty === 0 ? 'empty' :
-      qty === 0.25 ? 'quarter' :
-      qty === 0.5 ? 'half' :
-      qty === 0.75 ? 'threeQuarter' :
-      qty === 1 ? 'full' : undefined
+      Math.abs(ratio - 0.25) < eps ? 'quarter' :
+      Math.abs(ratio - 0.5) < eps ? 'half' :
+      Math.abs(ratio - 0.75) < eps ? 'threeQuarter' :
+      Math.abs(ratio - 1.0) < eps ? 'full' : undefined
     ));
   }, [item]);
 
@@ -127,15 +137,17 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
       setEditQuantity(newQuantity);
 
       // Sync visual level based on quantity
+      const ratio = baseQuantity > 0 ? newQuantity / baseQuantity : 0;
+      const eps = 0.01;
       if (newQuantity === 0) {
         setLocalVisualLevel('empty');
-      } else if (newQuantity === 0.25) {
+      } else if (Math.abs(ratio - 0.25) < eps) {
         setLocalVisualLevel('quarter');
-      } else if (newQuantity === 0.5) {
+      } else if (Math.abs(ratio - 0.5) < eps) {
         setLocalVisualLevel('half');
-      } else if (newQuantity === 0.75) {
+      } else if (Math.abs(ratio - 0.75) < eps) {
         setLocalVisualLevel('threeQuarter');
-      } else if (newQuantity === 1) {
+      } else if (Math.abs(ratio - 1.0) < eps) {
         setLocalVisualLevel('full');
       } else {
         setLocalVisualLevel(undefined);
@@ -148,13 +160,13 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
     if (level === 'empty') {
       handleQuantityChange(0);
     } else if (level === 'quarter') {
-      handleQuantityChange(0.25);
+      handleQuantityChange(roundQty(baseQuantity * 0.25));
     } else if (level === 'half') {
-      handleQuantityChange(0.5);
+      handleQuantityChange(roundQty(baseQuantity * 0.5));
     } else if (level === 'threeQuarter') {
-      handleQuantityChange(0.75);
+      handleQuantityChange(roundQty(baseQuantity * 0.75));
     } else if (level === 'full') {
-      handleQuantityChange(1);
+      handleQuantityChange(baseQuantity);
     }
   };
 
@@ -225,6 +237,16 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   };
 
   const handleCloseAndPersist = () => {
+    if (localQuantity === 0 || localVisualLevel === 'empty') {
+      const today = new Date().toISOString().slice(0, 10);
+      const isExpired = item.expirationDate && !item.is_immortal && item.expirationDate <= today;
+      const reason = isExpired ? 'thrown_away' : 'cooked';
+      
+      onDeleteItem(originalIndex, reason);
+      onClose();
+      return;
+    }
+
     const updates: Partial<PantryItem> = {};
 
     // Quantity
@@ -400,7 +422,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
             {/* Quantity +/- controls */}
             <div className="flex items-center gap-3 mt-3">
               <button
-                onClick={() => handleQuantityChange(Math.max(0, localQuantity - 1))}
+                onClick={() => handleQuantityChange(Math.max(0, roundQty(localQuantity - 0.25)))}
                 className="w-9 h-9 flex items-center justify-center rounded-full border border-theme text-theme-secondary hover:bg-theme-secondary transition-colors"
                 aria-label="Decrease quantity"
                 data-testid="item-qty-minus"
@@ -409,7 +431,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
               </button>
               <span className="text-lg font-semibold text-theme-primary min-w-[2rem] text-center">{localQuantity}</span>
               <button
-                onClick={() => handleQuantityChange(localQuantity + 1)}
+                onClick={() => handleQuantityChange(roundQty(localQuantity + 0.25))}
                 className="w-9 h-9 flex items-center justify-center rounded-full border border-theme text-theme-secondary hover:bg-theme-secondary transition-colors"
                 aria-label="Increase quantity"
                 data-testid="item-qty-plus"
@@ -470,7 +492,10 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
               </button>
               <button
                 onClick={() => {
-                  onDeleteItem(originalIndex);
+                  const today = new Date().toISOString().slice(0, 10);
+                  const isExpired = item.expirationDate && !item.is_immortal && item.expirationDate <= today;
+                  const reason = isExpired ? 'thrown_away' : 'remove';
+                  onDeleteItem(originalIndex, reason);
                   onClose();
                   addToast(`${item.item} deleted`, 'success');
                 }}

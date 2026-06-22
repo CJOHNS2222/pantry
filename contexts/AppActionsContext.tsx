@@ -10,8 +10,8 @@ interface AppActionsContextValue {
 
   // Data operations
   updateItem: (index: number, updates: Partial<PantryItem>) => Promise<void>;
-  deleteItem: (index: number) => Promise<void>;
-  deleteItems: (indices: number[]) => Promise<void>;
+  deleteItem: (index: number, disposalReason?: 'thrown_away' | 'cooked' | 'remove') => Promise<void>;
+  deleteItems: (indices: number[], disposalReason?: 'thrown_away' | 'cooked' | 'remove') => Promise<void>;
   addItem: (item: PantryItem) => Promise<void>;
   addItems: (items: PantryItem[]) => Promise<void>;
   setInventory: (inventory: PantryItem[]) => void;

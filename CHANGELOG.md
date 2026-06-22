@@ -1,3 +1,14 @@
+## [2.4.14] - 2026-06-21
+
+### Changed
+- **AdMob Ads Disabled by Default** — Disabled Google AdMob ads globally by updating default configs and setting `ads_enabled` to `false` in Firebase Remote Config.
+
+### Fixed
+- **Android AdMob Crash Fix** — Fixed an Android app crash (`NullPointerException` on `ViewGroup.addView` inside the AdMob plugin) by adding layout validation and a 1000ms delay to banner attachment in `AdMobBanner.tsx` and initializing AdMob on startup in `App.tsx`.
+- **Recipe Deductions & Analytics** — Corrected cooked recipe deductions to ensure fully depleted items are completely removed from local state, cache, and Firestore (instead of remaining with 0 quantity), and successfully log them as `'cooked'` in the food waste analytics database.
+
+---
+
 ## [2.4.13] - 2026-06-20
 
 ### Changed

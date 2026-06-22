@@ -25,6 +25,7 @@ import { MealPlanCacheService } from '../services/mealPlanCacheService';
 import { RecipesCacheService, CachedRecipesData, RecipesCacheMetadata } from '../services/recipesCacheService';
 import { ShoppingListCacheService, CachedShoppingListData, ShoppingListCache } from '../services/shoppingListCacheService';
 import HapticService from '../services/hapticService';
+import FoodWasteAnalyticsService from '../services/foodWasteAnalyticsService';
 
 // Helper to normalize quantity from PantryItem
 const getQuantityValue = (item: PantryItem): number => {
@@ -1060,10 +1061,16 @@ export function useDataManagement(
     try {
       if (deductions && deductions.length > 0) {
         let deductedCount = 0;
+        const deletedItems: PantryItem[] = [];
+        const updatedItems: { item: PantryItem; updates: Partial<PantryItem>; finalItem: PantryItem }[] = [];
+        
+        // Start with a snapshot of the current inventory
+        const currentInventory = [...inventory];
+        
         for (const deduction of deductions) {
-          const index = inventory.findIndex(pi => pi.id === deduction.itemId);
+          const index = currentInventory.findIndex(pi => pi.id === deduction.itemId);
           if (index !== -1) {
-            const item = inventory[index];
+            const item = currentInventory[index];
             const remaining = deductIngredientAmount(item.quantity ?? item.quantity_estimate, deduction.ingredient);
             
             const currentAmount = getQuantityValue(item);
@@ -1104,12 +1111,111 @@ export function useDataManagement(
               updates.visualLevel = newVisualLevel;
             }
 
-            await updateItem(index, updates);
+            const finalItem = {
+              ...item,
+              ...updates,
+              expiryAlertShown: shouldShowExpiryAlert({ ...item, ...updates })
+            };
+
+            // Replace in currentInventory so any subsequent deductions in the same recipe use the new quantity
+            currentInventory[index] = finalItem;
+
+            if (remainingAmount <= 0 || newVisualLevel === 'empty') {
+              deletedItems.push(item);
+            } else {
+              updatedItems.push({ item, updates, finalItem });
+            }
+            
             deductedCount++;
           }
         }
+
         if (deductedCount > 0) {
-          addToast?.(`Deducted ${deductedCount} item${deductedCount > 1 ? 's' : ''} from pantry.`, 'success');
+          const deletedIds = new Set(deletedItems.map(i => i.id));
+          const finalInventory = currentInventory.filter(item => !deletedIds.has(item.id));
+
+          if (loggingOptions?.updateActivityStatus) {
+            loggingOptions.updateActivityStatus('managing inventory');
+          }
+
+          if (user?.isGuest) {
+            setInventory(finalInventory);
+            try {
+              localStorage.setItem(GUEST_INVENTORY_KEY, JSON.stringify(finalInventory));
+            } catch {
+              /* storage full */
+            }
+          } else {
+            // Process deletions
+            for (const itemToDelete of deletedItems) {
+              if (loggingOptions?.logItemRemoved) {
+                loggingOptions.logItemRemoved(itemToDelete.item, itemToDelete.id);
+              }
+
+              // Record to food waste analytics
+              try {
+                const daysExpired = itemToDelete.expirationDate
+                  ? Math.max(0, Math.ceil((new Date().getTime() - new Date(itemToDelete.expirationDate).getTime()) / (1000 * 60 * 60 * 24)))
+                  : 0;
+                const estimatedValue = itemToDelete.estimatedPrice || 2.50;
+
+                await FoodWasteAnalyticsService.recordDisposal({
+                  itemId: itemToDelete.id,
+                  itemName: itemToDelete.item,
+                  category: itemToDelete.category,
+                  disposalReason: 'cooked',
+                  daysExpired,
+                  userId: user.id,
+                  userName: user.name,
+                  estimatedValue
+                }, user.householdId);
+              } catch (err) {
+                log.warn('Failed to record waste disposal on recipe deduction delete', { error: err }, 'DataManagement');
+              }
+
+              // Remove from cache
+              await InventoryCacheService.removeItemFromCache(itemToDelete.id, user.householdId, user.id);
+
+              // Record delete undo action
+              await recordUndo('delete_item', itemToDelete);
+            }
+
+            // Process updates
+            for (const updated of updatedItems) {
+              await InventoryCacheService.updateItemInCache(updated.item.id, updated.updates, user.householdId, user.id);
+              
+              // Record update undo action
+              await recordUndo('update_item', {
+                itemId: updated.item.id,
+                previousState: updated.item,
+                updates: updated.updates
+              });
+            }
+
+            // Batch side effects for deleted items
+            if (deletedItems.length > 0) {
+              HapticService.medium();
+
+              // Prune notifications
+              pruneNotificationsForDeletedItems(user.id, Array.from(deletedIds)).catch(() => {});
+
+              // Auto-readd staple items for deleted items
+              const staplesToReadd = deletedItems.filter(i => i.isStaple);
+              if (staplesToReadd.length > 0 && addToShoppingList && (options?.settings?.shopping?.autoReaddStaples !== false)) {
+                addToShoppingList(staplesToReadd.map(i => i.item));
+                addToast?.(`${staplesToReadd.length} staple item${staplesToReadd.length > 1 ? 's' : ''} auto-added to shopping list`, 'info');
+              }
+            }
+
+            // Update local state once
+            setInventory(finalInventory);
+          }
+
+          if (deletedItems.length > 0) {
+            addToast?.(`Deducted ${deductedCount} item${deductedCount > 1 ? 's' : ''} from pantry (${deletedItems.length} finished).`, 'success');
+          } else {
+            addToast?.(`Deducted ${deductedCount} item${deductedCount > 1 ? 's' : ''} from pantry.`, 'success');
+          }
         } else {
           addToast?.('Recipe marked as cooked.', 'success');
         }
@@ -1206,7 +1312,7 @@ export function useDataManagement(
     }
   };
 
-  const deleteItem = async (index: number) => {
+  const deleteItem = async (index: number, disposalReason?: 'thrown_away' | 'cooked' | 'remove') => {
     const itemToDelete = inventory[index];
     if (!itemToDelete) return;
 
@@ -1224,6 +1330,32 @@ export function useDataManagement(
         return updated;
       });
       return;
+    }
+
+    // Record food waste analytics if user is authenticated
+    if (user?.id) {
+      try {
+        const today = new Date().toISOString().slice(0, 10);
+        const isExpired = itemToDelete.expirationDate && !itemToDelete.is_immortal && itemToDelete.expirationDate <= today;
+        const reason = disposalReason || (isExpired ? 'thrown_away' : 'remove');
+        const daysExpired = itemToDelete.expirationDate 
+          ? Math.max(0, Math.ceil((new Date().getTime() - new Date(itemToDelete.expirationDate).getTime()) / (1000 * 60 * 60 * 24)))
+          : 0;
+        const estimatedValue = itemToDelete.estimatedPrice || 2.50;
+
+        await FoodWasteAnalyticsService.recordDisposal({
+          itemId: itemToDelete.id,
+          itemName: itemToDelete.item,
+          category: itemToDelete.category,
+          disposalReason: reason,
+          daysExpired,
+          userId: user.id,
+          userName: user.name,
+          estimatedValue
+        }, user.householdId);
+      } catch (err) {
+        log.warn('Failed to record waste disposal on item delete', { error: err }, 'DataManagement');
+      }
     }
 
     await recordUndo('delete_item', itemToDelete);
@@ -1257,7 +1389,7 @@ export function useDataManagement(
    * Bulk-delete multiple pantry items by index.
    * Uses a single state update and a single cache write instead of N individual operations.
    */
-  const deleteItems = async (indices: number[]) => {
+  const deleteItems = async (indices: number[], disposalReason?: 'thrown_away' | 'cooked' | 'remove') => {
     if (indices.length === 0) return;
 
     const indexSet = new Set(indices);
@@ -1277,6 +1409,34 @@ export function useDataManagement(
         return updated;
       });
       return;
+    }
+
+    // Record food waste analytics if user is authenticated
+    if (user?.id) {
+      try {
+        const today = new Date().toISOString().slice(0, 10);
+        for (const itemToDelete of itemsToDelete) {
+          const isExpired = itemToDelete.expirationDate && !itemToDelete.is_immortal && itemToDelete.expirationDate <= today;
+          const reason = disposalReason || (isExpired ? 'thrown_away' : 'remove');
+          const daysExpired = itemToDelete.expirationDate 
+            ? Math.max(0, Math.ceil((new Date().getTime() - new Date(itemToDelete.expirationDate).getTime()) / (1000 * 60 * 60 * 24)))
+            : 0;
+          const estimatedValue = itemToDelete.estimatedPrice || 2.50;
+
+          await FoodWasteAnalyticsService.recordDisposal({
+            itemId: itemToDelete.id,
+            itemName: itemToDelete.item,
+            category: itemToDelete.category,
+            disposalReason: reason,
+            daysExpired,
+            userId: user.id,
+            userName: user.name,
+            estimatedValue
+          }, user.householdId);
+        }
+      } catch (err) {
+        log.warn('Failed to record waste disposal on bulk delete', { error: err }, 'DataManagement');
+      }
     }
 
     HapticService.medium();

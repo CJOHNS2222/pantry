@@ -141,12 +141,12 @@ const QuantityUnitPicker: React.FC<QuantityUnitPickerProps> = ({
   };
 
   const handleIncrement = () => {
-    const newQuantity = Math.min(quantity + 1, maxQuantity);
+    const newQuantity = Math.min(Math.round((quantity + 0.25) * 100) / 100, maxQuantity);
     onQuantityChange(newQuantity);
   };
 
   const handleDecrement = () => {
-    const newQuantity = Math.max(quantity - 1, 0);
+    const newQuantity = Math.max(Math.round((quantity - 0.25) * 100) / 100, 0);
     onQuantityChange(newQuantity);
   };
 

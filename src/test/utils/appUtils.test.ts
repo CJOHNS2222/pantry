@@ -255,5 +255,37 @@ describe('parseIngredientForShoppingList', () => {
     expect(r.quantity).toBe('1');
     expect(r.itemName).toBe('Fresh Cilantro');
   });
+
+  it('handles user specific cleanup cases (halved, cut into strips, tblsp, seeded and diced, to serve, parts)', () => {
+    // 1) halved
+    const r1 = parseIngredientForShoppingList('1 avocado, halved');
+    expect(r1.itemName).toBe('Avocado');
+    expect(r1.prepNotes).toContain('halved');
+
+    // 2) cut into strips
+    const r2 = parseIngredientForShoppingList('chicken breasts, cut into strips');
+    expect(r2.itemName).toBe('Chicken Breasts');
+    expect(r2.prepNotes).toContain('strips');
+
+    // 3) tblsp unit
+    const r3 = parseIngredientForShoppingList('1 tblsp butter');
+    expect(r3.quantity).toBe('1 tblsp');
+    expect(r3.itemName).toBe('Butter');
+
+    // 4) seeded and diced
+    const r4 = parseIngredientForShoppingList('1 cucumber, seeded and diced');
+    expect(r4.itemName).toBe('Cucumber');
+    expect(r4.prepNotes).toContain('seeded');
+    expect(r4.prepNotes).toContain('diced');
+
+    // 5) to serve
+    const r5 = parseIngredientForShoppingList('fresh cilantro, to serve');
+    expect(r5.itemName).toBe('Fresh Cilantro');
+
+    // 6) parts
+    const r6 = parseIngredientForShoppingList('5 parts of jerk seasoning');
+    expect(r6.quantity).toBe('5 parts');
+    expect(r6.itemName).toBe('Jerk Seasoning');
+  });
 });
 

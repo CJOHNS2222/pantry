@@ -30,16 +30,24 @@ export const AdMobBanner: React.FC = () => {
     }
 
     const AD_UNIT_ID = useTestAds() ? TEST_AD_UNIT : PROD_AD_UNIT;
+    let isMounted = true;
 
-    AdMob.showBanner({
-      adId: AD_UNIT_ID,
-      adSize: BannerAdSize.ADAPTIVE_BANNER,
-      position: BannerAdPosition.BOTTOM_CENTER
-    }).catch((error) => {
-      log.error('AdMob banner failed to show', error);
-    });
+    // Use a small delay to prevent race conditions on layout attachment / Android ViewGroup null pointer crash
+    const timer = setTimeout(() => {
+      if (!isMounted) return;
+
+      AdMob.showBanner({
+        adId: AD_UNIT_ID,
+        adSize: BannerAdSize.ADAPTIVE_BANNER,
+        position: BannerAdPosition.BOTTOM_CENTER
+      }).catch((error) => {
+        log.error('AdMob banner failed to show', error);
+      });
+    }, 1000);
 
     return () => {
+      isMounted = false;
+      clearTimeout(timer);
       AdMob.hideBanner().catch((error) => {
         log.warn('AdMob banner hide failed', error);
       });

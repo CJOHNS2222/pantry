@@ -112,12 +112,19 @@ export function parseItemText(itemText: string): { quantity: number; description
     .replace(/\b(large|medium|small|big|tiny|huge|giant)\s+/g, '')
     // Keep colors for distinguishing items (like red vs green apples)
     // .replace(/\b(red|green|yellow|blue|black|white|brown|orange|purple|pink)\s+/g, '')
+    // Remove common preparation connectors
+    .replace(/\b(cut into|sliced into|torn into|chopped into|finely chopped into)\b/gi, '')
     // Remove common preparation descriptors that don't affect core item identity
-    .replace(/\b(fresh|dried|canned|chopped|sliced|diced|minced|crushed|ground|cubed|grated|finely)\s+/g, '')
+    .replace(/\b(fresh|dried|canned|chopped|sliced|diced|minced|crushed|ground|cubed|grated|finely|halved|seeded|shredded|julienned|torn|plucked|to serve|for serving|strips)\b/gi, '')
     // Remove common quality descriptors
-    .replace(/\b(ripe|raw|cooked|baked|fried|organic)\s+/g, '')
-    // Remove trailing/leading whitespace
-    .trim();
+    .replace(/\b(ripe|raw|cooked|baked|fried|organic)\s+/g, '');
+
+  // Remove dangling conjunctions/prepositions at the end of the item name or before commas
+  description = description.replace(/\s*\b(and|or|with|for|to|into)\b\s*(,|$)/gi, '$2');
+
+  // Clean up trailing/leading whitespace and stray commas
+  description = description.replace(/,\s*$/, '').replace(/\s+,\s+/g, ' ').replace(/^,\s*/, '').trim();
+  description = description.replace(/\s+/g, ' ');
   
   // Capitalize first letter of each word for better display
   description = description.replace(/\b\w/g, l => l.toUpperCase());
@@ -197,7 +204,7 @@ export function parseIngredientForShoppingList(ingredientText: string): { quanti
           const units = [
             // Volume - Imperial/US Customary
             't', 'tsp', 'teaspoon', 'teaspoons',
-            'tbs', 'tb', 'tbl', 'tbsp', 'tablespoon', 'tablespoons',
+            'tbs', 'tb', 'tbl', 'tbsp', 'tblsp', 'tblsps', 'tablespoon', 'tablespoons',
             'c', 'cup', 'cups',
             'fl oz', 'fluid ounce', 'fluid ounces',
             'pt', 'pint', 'pints',
@@ -219,7 +226,7 @@ export function parseIngredientForShoppingList(ingredientText: string): { quanti
             
             // Count/Pieces
             'clove', 'cloves', 'bunch', 'bunches', 'sprig', 'sprigs', 'head', 'heads', 
-            'stalk', 'stalks', 'slice', 'slices', 'piece', 'pieces', 'dozen',
+            'stalk', 'stalks', 'slice', 'slices', 'piece', 'pieces', 'part', 'parts', 'dozen',
             'can', 'cans', 'bottle', 'bottles', 'package', 'packages', 'box', 'boxes', 
             'bag', 'bags', 'jar', 'jars', 'container', 'containers',
             
@@ -270,6 +277,8 @@ export function parseIngredientForShoppingList(ingredientText: string): { quanti
     itemName = itemName
       // Strip parenthetical size/method notes (e.g. "(14.5 oz)", "(optional)", "(or water)")
       .replace(/\s*\([^)]*\)/g, '')
+      // Remove common preparation connectors
+      .replace(/\b(cut into|sliced into|torn into|chopped into|finely chopped into)\b/gi, '')
       // Remove common size descriptors
       .replace(/\b(large|medium|small|big|tiny|huge|giant)\s+/gi, '')
       // Remove "of" preposition
@@ -278,7 +287,33 @@ export function parseIngredientForShoppingList(ingredientText: string): { quanti
       .replace(/\b(ripe|raw|cooked|baked|fried|organic)\s+/gi, '');
 
     // Extract preparation words into notes
-    const prepWords = ['finely diced', 'minced', 'chopped', 'diced', 'sliced', 'crushed', 'ground', 'grated', 'finely chopped', 'divided', 'peeled', 'cored', 'beaten', 'melted', 'softened'];
+    const prepWords = [
+      'finely chopped',
+      'finely diced',
+      'to serve',
+      'for serving',
+      'minced',
+      'chopped',
+      'diced',
+      'sliced',
+      'crushed',
+      'ground',
+      'grated',
+      'divided',
+      'peeled',
+      'cored',
+      'beaten',
+      'melted',
+      'softened',
+      'halved',
+      'strips',
+      'seeded',
+      'shredded',
+      'cubed',
+      'julienned',
+      'torn',
+      'plucked'
+    ];
     const prepNotesList: string[] = [];
     const prepRegex = new RegExp(`\\b(${prepWords.join('|')})\\b`, 'gi');
     
@@ -287,8 +322,12 @@ export function parseIngredientForShoppingList(ingredientText: string): { quanti
       return '';
     });
 
+    // Remove dangling conjunctions/prepositions at the end of the item name or before commas
+    itemName = itemName.replace(/\s*\b(and|or|with|for|to|into)\b\s*(,|$)/gi, '$2');
+
     // Clean up trailing/leading whitespace and stray commas
     itemName = itemName.replace(/,\s*$/, '').replace(/\s+,\s+/g, ' ').replace(/^,\s*/, '').trim();
+    itemName = itemName.replace(/\s+/g, ' ');
 
     // Capitalize first letter of each word for better display
     itemName = itemName.replace(/\b\w/g, l => l.toUpperCase());
@@ -325,12 +364,19 @@ export function cleanItemNameForShopping(itemName: string): string {
     .replace(/\b(large|medium|small|big|tiny|huge|giant)\s+/g, '')
     // Remove common color descriptors
     .replace(/\b(red|green|yellow|blue|black|white|brown|orange|purple|pink)\s+/g, '')
+    // Remove common preparation connectors
+    .replace(/\b(cut into|sliced into|torn into|chopped into|finely chopped into)\b/g, '')
     // Remove common preparation descriptors that don't affect core item identity
-    .replace(/\b(fresh|dried|canned|chopped|sliced|diced|minced|crushed|ground|cubed|grated|finely)\s+/g, '')
+    .replace(/\b(fresh|dried|canned|chopped|sliced|diced|minced|crushed|ground|cubed|grated|finely|halved|seeded|shredded|julienned|torn|plucked|to serve|for serving|strips)\b/g, '')
     // Remove common quality descriptors
-    .replace(/\b(ripe|raw|cooked|baked|fried|organic)\s+/g, '')
-    // Remove trailing/leading whitespace
-    .trim();
+    .replace(/\b(ripe|raw|cooked|baked|fried|organic)\s+/g, '');
+
+  // Remove dangling conjunctions/prepositions at the end of the item name or before commas
+  cleaned = cleaned.replace(/\s*\b(and|or|with|for|to|into)\b\s*(,|$)/g, '$2');
+
+  // Clean up trailing/leading whitespace and stray commas
+  cleaned = cleaned.replace(/,\s*$/, '').replace(/\s+,\s+/g, ' ').replace(/^,\s*/, '').trim();
+  cleaned = cleaned.replace(/\s+/g, ' ');
 
   // Capitalize first letter of each word for better display
   cleaned = cleaned.replace(/\b\w/g, l => l.toUpperCase());
@@ -2131,6 +2177,7 @@ export function parseNumericQuantity(qtyStr: string): number {
 /**
  * Deducts recipe ingredient quantity from pantry item quantity, taking unit conversions into account
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function deductIngredientAmount(pantryQtyObj: any, recipeQtyStr: string): { amount: number; unit: string } {
   const pantryAmount = getQuantityAmount(pantryQtyObj);
   const pantryUnit = getQuantityUnit(pantryQtyObj);

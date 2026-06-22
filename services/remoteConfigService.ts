@@ -100,7 +100,7 @@ const IN_APP_DEFAULTS: Record<string, string | number | boolean> = {
   notifications_max_stored: 200,           // max notifications stored per user
   search_history_max_items: 20,            // max saved search history entries
   undo_max_actions: 20,                    // max undoable actions in IndexedDB
-  ads_enabled: true,                       // master switch for AdMob banner ads
+  ads_enabled: false,                       // master switch for AdMob banner ads
 
   // ── Maintenance / in-app announcements ───────────────────────────────────
   maintenance_mode: false,       // true = show maintenance banner, block writes

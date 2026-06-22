@@ -33,7 +33,8 @@ import { log } from './services/logService';
 import { pushNotificationService } from './services/pushNotificationService';
 import { HouseholdActivityService } from './services/householdActivityService';
 import { App as CapacitorApp } from '@capacitor/app';
-import { PluginListenerHandle } from '@capacitor/core';
+import { Capacitor, PluginListenerHandle } from '@capacitor/core';
+import { AdMob } from '@capacitor-community/admob';
 import { AppProvider } from './contexts/AppContext';
 import { AppActionsProvider } from './contexts/AppActionsContext';
 import SafeAreaService from './services/safeAreaService';
@@ -586,6 +587,18 @@ const App: React.FC = () => {
 
   useEffect(() => {
     SafeAreaService.initialize().catch(error => log.error('Failed to initialize safe area service', { error }, 'App'));
+  }, []);
+
+  // Initialize AdMob on native platforms
+  useEffect(() => {
+    if (Capacitor.getPlatform() !== 'web') {
+      const useTestAds = import.meta.env.MODE !== 'production' || import.meta.env.VITE_ADMOB_USE_TEST === 'true';
+      AdMob.initialize({
+        initializeForTesting: useTestAds,
+      }).catch((error) => {
+        log.warn('AdMob failed to initialize on startup', error);
+      });
+    }
   }, []);
 
   // Handle Capacitor Camera restore after Android app restart due to low memory

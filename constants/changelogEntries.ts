@@ -9,6 +9,15 @@ export interface ChangeEntry {
 
 export const RECENT_CHANGES: ChangeEntry[] = [
   {
+    "version": "2.4.14",
+    "date": "Jun 21, 2026",
+    "highlights": [
+      "AdMob Ads Disabled by Default — Disabled Google AdMob ads globally by updating default configs and setting ads_enabled…",
+      "Android AdMob Crash Fix — Fixed an Android app crash (NullPointerException on ViewGroup.addView inside the AdMob…",
+      "Recipe Deductions & Analytics — Corrected cooked recipe deductions to ensure fully depleted items are completely…"
+    ]
+  },
+  {
     "version": "2.4.13",
     "date": "Jun 20, 2026",
     "highlights": [
@@ -25,16 +34,6 @@ export const RECENT_CHANGES: ChangeEntry[] = [
       "Button Glowing Highlight — Added a glowing visual highlight to the \"+\" button after exit on scanner tooltip.",
       "Contextual Tips — Added more helpful contextual tutorial tips when opening different tabs.",
       "Onboarding Milestones — Added onboarding milestone tips for first leftover logged, first saved recipe, and household…"
-    ]
-  },
-  {
-    "version": "2.4.11",
-    "date": "Jun 19, 2026",
-    "highlights": [
-      "Local Push Fallback — Added immediate local device push notifications for urgent expiration alerts so they work without…",
-      "Stacked In-App Notifications — Updated the notification UI to elegantly stack multiple alerts (like 3 expiring items)…",
-      "Onboarding Streamlined — Spaced out setup questions by removing the Food Safety step from initial onboarding.",
-      "Expiration Check Optimization — Reduced notification checks to run only once per calendar day rather than every 5…"
     ]
   }
 ];
