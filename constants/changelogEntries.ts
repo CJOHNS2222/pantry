@@ -9,6 +9,14 @@ export interface ChangeEntry {
 
 export const RECENT_CHANGES: ChangeEntry[] = [
   {
+    "version": "2.4.16",
+    "date": "Jun 24, 2026",
+    "highlights": [
+      "Google Sign-In Resolution — Integrated the latest google-services.json from the Firebase Console containing all…",
+      "Secure App Verification — Decrypted and finalized the Google Play Integrity response encryption and verification keys…"
+    ]
+  },
+  {
     "version": "2.4.14",
     "date": "Jun 21, 2026",
     "highlights": [
@@ -24,16 +32,6 @@ export const RECENT_CHANGES: ChangeEntry[] = [
       "Pantry Notes Relocated — Moved the private notes text area in ItemDetailModal out of the collapsible product details…",
       "Staples Deletion Sync — Fixed staple auto-restocking logic so that deleting a staple item (either single delete or bulk…",
       "Restock Feedback Toasts — Added informative toast notifications when a staple item is auto-added to the shopping list…"
-    ]
-  },
-  {
-    "version": "2.4.12",
-    "date": "Jun 20, 2026",
-    "highlights": [
-      "Changelog Settings Link — Added a link to view the app's changelog in the Settings tab under App Updates.",
-      "Button Glowing Highlight — Added a glowing visual highlight to the \"+\" button after exit on scanner tooltip.",
-      "Contextual Tips — Added more helpful contextual tutorial tips when opening different tabs.",
-      "Onboarding Milestones — Added onboarding milestone tips for first leftover logged, first saved recipe, and household…"
     ]
   }
 ];

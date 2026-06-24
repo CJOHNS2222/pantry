@@ -1,3 +1,11 @@
+## [2.4.16] - 2026-06-24
+
+### Fixed
+- **Google Sign-In Resolution** — Integrated the latest `google-services.json` from the Firebase Console containing all critical SHA-1 certificate fingerprints (debug, release, and Google Play App Signing). This fixes Google Login / Sign-In failures (including developer errors `10` or `12500`) on Android devices.
+- **Secure App Verification** — Decrypted and finalized the Google Play Integrity response encryption and verification keys (`DECRYPTION_KEY` and `VERIFICATION_KEY`), completing the developer-managed app integrity validation chain.
+
+---
+
 ## [2.4.14] - 2026-06-21
 
 ### Changed
