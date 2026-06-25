@@ -1,7 +1,7 @@
 {
   "name": "stockandspoon",
   "private": true,
-  "version": "2.4.16",
+  "version": "2.4.17",
   "type": "module",
   "scripts": {
     "generate:changelog": "node scripts/generate-changelog.cjs",
@@ -14,7 +14,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest",
-    "type-check": "tsc --noEmit",
+    "type-check": "node --max-old-space-size=8192 ./node_modules/typescript/bin/tsc --noEmit",
     "e2e:playwright": "playwright test",
     "test:ui": "vitest --ui",
     "generate:icons": "npx pwa-asset-generator public/icons/icon512.png resources --manifest ./public/manifest.webmanifest --favicon --index --android --ios",

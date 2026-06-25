@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, ChevronLeft, ChevronRight, UtensilsCrossed, List, BookOpen } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, UtensilsCrossed, List, BookOpen, Clock } from 'lucide-react';
+import { LocalNotifications } from '@capacitor/local-notifications';
+import { Capacitor } from '@capacitor/core';
 import { StructuredRecipe } from '../../types';
+import { log } from '../../services/logService';
 
 interface CookingModeProps {
   recipe: StructuredRecipe;
@@ -25,11 +28,76 @@ function processSteps(instructions: string[]): string[] {
     .filter(Boolean);
 }
 
+/** Parse step text to extract a timer duration in seconds. */
+function parseTimerSeconds(stepText: string): number | null {
+  const text = stepText.toLowerCase();
+  
+  // 1. Check for combined hour + minute: "1 hour and 15 minutes" or "2 hrs 30 mins"
+  const combinedRegex = /(\d+)\s*(?:hour|hr)s?(?:\s+(?:and\s+)?(\d+)\s*(?:minute|min)s?)?/i;
+  const combinedMatch = combinedRegex.exec(text);
+  if (combinedMatch) {
+    const hours = parseInt(combinedMatch[1], 10);
+    const minutes = combinedMatch[2] ? parseInt(combinedMatch[2], 10) : 0;
+    return (hours * 3600) + (minutes * 60);
+  }
+  
+  // 2. Check for minutes only: "25 minutes" or "10 mins"
+  const minuteRegex = /(\d+)\s*(?:minute|min)s?/i;
+  const minuteMatch = minuteRegex.exec(text);
+  if (minuteMatch) {
+    return parseInt(minuteMatch[1], 10) * 60;
+  }
+  
+  // 3. Check for seconds only: "30 seconds" or "10 secs"
+  const secondRegex = /(\d+)\s*(?:second|sec)s?/i;
+  const secondMatch = secondRegex.exec(text);
+  if (secondMatch) {
+    return parseInt(secondMatch[1], 10);
+  }
+  
+  return null;
+}
+
+/** Format seconds into a user-friendly duration string (e.g., "1h 15m" or "25m"). */
+function formatDuration(seconds: number): string {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+
+  if (hours > 0) {
+    return `${hours}h${minutes > 0 ? ` ${minutes}m` : ''}`;
+  }
+  if (minutes > 0) {
+    return `${minutes}m${secs > 0 ? ` ${secs}s` : ''}`;
+  }
+  return `${secs}s`;
+}
+
+/** Format seconds left into a MM:SS or HH:MM:SS countdown string. */
+function formatTimeLeft(seconds: number): string {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+
+  const pad = (num: number) => String(num).padStart(2, '0');
+
+  if (hours > 0) {
+    return `${pad(hours)}:${pad(minutes)}:${pad(secs)}`;
+  }
+  return `${pad(minutes)}:${pad(secs)}`;
+}
+
 export const CookingMode: React.FC<CookingModeProps> = ({ recipe, onExit }) => {
   const steps = processSteps(recipe.instructions || []);
   const [currentStep, setCurrentStep] = useState(0);
   const [showIngredients, setShowIngredients] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const wakeLockRef = useRef<any>(null);
+
+  // Timer states (active globally within CookingMode so it persists across step navigation)
+  const [timerSeconds, setTimerSeconds] = useState<number | null>(null);
+  const [isTimerActive, setIsTimerActive] = useState<boolean>(false);
+  const [notificationId, setNotificationId] = useState<number | null>(null);
 
   // Acquire screen wake lock so the display stays on while cooking
   useEffect(() => {
@@ -39,6 +107,7 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipe, onExit }) => {
       if (released) return;
       if ('wakeLock' in navigator) {
         try {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           wakeLockRef.current = await (navigator as any).wakeLock.request('screen');
         } catch (_) {
           // Wake lock unavailable (older WebView / denied) — silent fail
@@ -61,9 +130,118 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipe, onExit }) => {
     };
   }, []);
 
+  // Timer Countdown Effect
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval> | null = null;
+    if (isTimerActive && timerSeconds !== null && timerSeconds > 0) {
+      interval = setInterval(() => {
+        setTimerSeconds(prev => {
+          if (prev === null || prev <= 1) {
+            handleTimerFinished();
+            return null;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isTimerActive, timerSeconds]);
+
+  // Clean up notifications on unmount
+  useEffect(() => {
+    return () => {
+      if (notificationId) {
+        LocalNotifications.cancel({ notifications: [{ id: notificationId }] }).catch(() => {});
+      }
+    };
+  }, [notificationId]);
+
+  const handleTimerFinished = () => {
+    setIsTimerActive(false);
+    setNotificationId(null);
+    HapticFeedback();
+  };
+
+  const HapticFeedback = () => {
+    if (navigator.vibrate) {
+      navigator.vibrate([200, 100, 200, 100, 400]);
+    }
+  };
+
+  const startTimer = async (seconds: number) => {
+    try {
+      // Cancel any existing timer/notification first
+      if (notificationId) {
+        await LocalNotifications.cancel({ notifications: [{ id: notificationId }] });
+      }
+
+      // Request local notification permissions
+      if (Capacitor.isNativePlatform()) {
+        const perm = await LocalNotifications.requestPermissions();
+        if (perm.display !== 'granted') {
+          log.warn('Notification permission not granted for Cooking Mode timers', 'CookingMode');
+        }
+      }
+
+      const notifId = Math.floor(Math.random() * 1000000);
+      
+      // Schedule local notification to fire in background
+      await LocalNotifications.schedule({
+        notifications: [
+          {
+            id: notifId,
+            title: `Cooking Timer Finished! 🍳`,
+            body: `Your timer for "${recipe.title}" is complete.`,
+            schedule: { at: new Date(Date.now() + seconds * 1000) },
+            sound: 'beep.wav'
+          }
+        ]
+      });
+
+      setNotificationId(notifId);
+      setTimerSeconds(seconds);
+      setIsTimerActive(true);
+    } catch (error) {
+      log.error('Failed to schedule cooking timer notification', { error }, 'CookingMode');
+      // Fallback: start local timer without notification
+      setTimerSeconds(seconds);
+      setIsTimerActive(true);
+    }
+  };
+
+  const togglePauseResume = async () => {
+    if (timerSeconds === null) return;
+
+    if (isTimerActive) {
+      // Pause: Cancel background notification
+      if (notificationId) {
+        await LocalNotifications.cancel({ notifications: [{ id: notificationId }] });
+        setNotificationId(null);
+      }
+      setIsTimerActive(false);
+    } else {
+      // Resume: Schedule new notification for remaining seconds
+      await startTimer(timerSeconds);
+    }
+  };
+
+  const cancelTimer = async () => {
+    if (notificationId) {
+      await LocalNotifications.cancel({ notifications: [{ id: notificationId }] });
+      setNotificationId(null);
+    }
+    setTimerSeconds(null);
+    setIsTimerActive(false);
+  };
+
   const goTo = (i: number) => setCurrentStep(Math.max(0, Math.min(steps.length - 1, i)));
   const isFirst = currentStep === 0;
   const isLast = currentStep === steps.length - 1;
+
+  const currentStepText = steps[currentStep];
+  const parsedSeconds = parseTimerSeconds(currentStepText);
 
   if (steps.length === 0) {
     return (
@@ -142,15 +320,15 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipe, onExit }) => {
       ) : (
         /* ── Step view ── */
         <>
-          <div className="flex-1 flex flex-col items-center justify-center px-6 py-6 overflow-hidden">
+          <div className="flex-1 flex flex-col items-center justify-center px-6 py-6 overflow-y-auto">
             {/* Step counter */}
-            <p className="text-sm text-gray-500 mb-5 font-medium tracking-wide">
+            <p className="text-sm text-gray-500 mb-4 font-medium tracking-wide flex-shrink-0">
               Step {currentStep + 1}{' '}
               <span className="text-gray-700">/ {steps.length}</span>
             </p>
 
             {/* Step dot nav */}
-            <div className="flex gap-1.5 mb-8 flex-wrap justify-center max-w-xs">
+            <div className="flex gap-1.5 mb-6 flex-wrap justify-center max-w-xs flex-shrink-0">
               {steps.map((_, i) => (
                 <button
                   key={i}
@@ -168,10 +346,54 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipe, onExit }) => {
             </div>
 
             {/* Step text — big and readable */}
-            <p className="text-xl sm:text-2xl text-center leading-relaxed font-medium text-white max-w-md">
-              {steps[currentStep]}
+            <p className="text-xl sm:text-2xl text-center leading-relaxed font-medium text-white max-w-md mb-6">
+              {currentStepText}
             </p>
+
+            {/* Inline parsed timer CTA */}
+            {parsedSeconds !== null && timerSeconds === null && (
+              <button
+                onClick={() => startTimer(parsedSeconds)}
+                className="flex items-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-white/20 active:scale-95 text-sm font-semibold rounded-xl text-[var(--accent-color)] border border-white/10 transition-all shadow-md flex-shrink-0"
+              >
+                <Clock className="w-4 h-4 text-[var(--accent-color)]" />
+                <span>Start {formatDuration(parsedSeconds)} Timer</span>
+              </button>
+            )}
           </div>
+
+          {/* Docked Active/Paused Timer Bar */}
+          {timerSeconds !== null && (
+            <div className="mx-5 mb-4 p-4 bg-white/5 backdrop-blur-md rounded-2xl border border-white/10 flex items-center justify-between shadow-lg flex-shrink-0">
+              <div className="flex items-center gap-3">
+                <div className={`p-2.5 rounded-xl ${isTimerActive ? 'bg-[var(--accent-color)] text-white animate-pulse' : 'bg-white/10 text-gray-400'}`}>
+                  <Clock className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">
+                    {isTimerActive ? 'Active Timer' : 'Timer Paused'}
+                  </p>
+                  <p className="text-lg font-mono font-bold leading-tight mt-0.5">
+                    {formatTimeLeft(timerSeconds)}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={togglePauseResume}
+                  className="px-3 py-2 bg-white/10 hover:bg-white/15 active:scale-95 text-xs font-semibold rounded-lg transition-all"
+                >
+                  {isTimerActive ? 'Pause' : 'Resume'}
+                </button>
+                <button
+                  onClick={cancelTimer}
+                  className="px-3 py-2 bg-red-500/20 hover:bg-red-500/30 active:scale-95 text-xs font-semibold text-red-300 rounded-lg transition-all"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Navigation */}
           <div className="flex-shrink-0 flex items-center gap-3 px-5 pb-8">

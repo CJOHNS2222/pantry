@@ -90,15 +90,25 @@ describe('MealPlanner - AutoFill Plan', () => {
     }
   };
 
-  const mockMealPlan: DayPlan[] = [
-    { date: '2026-06-16', dayName: 'Tue', breakfast: [], lunch: [], dinner: [] },
-    { date: '2026-06-17', dayName: 'Wed', breakfast: [], lunch: [], dinner: [] },
-    { date: '2026-06-18', dayName: 'Thu', breakfast: [], lunch: [], dinner: [] },
-    { date: '2026-06-19', dayName: 'Fri', breakfast: [], lunch: [], dinner: [] },
-    { date: '2026-06-20', dayName: 'Sat', breakfast: [], lunch: [], dinner: [] },
-    { date: '2026-06-21', dayName: 'Sun', breakfast: [], lunch: [], dinner: [] },
-    { date: '2026-06-22', dayName: 'Mon', breakfast: [], lunch: [], dinner: [] },
-  ];
+  // Generate a dynamic 7-day meal plan starting from today, so that the auto-fill dates
+  // are never in the past relative to the test runner's execution date.
+  const generateDynamicMockMealPlan = (): DayPlan[] => {
+    const plan: DayPlan[] = [];
+    const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date();
+      d.setDate(d.getDate() + i);
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      const date = `${yyyy}-${mm}-${dd}`;
+      const dayName = weekdays[d.getDay()];
+      plan.push({ date, dayName, breakfast: [], lunch: [], dinner: [] });
+    }
+    return plan;
+  };
+
+  const mockMealPlan: DayPlan[] = generateDynamicMockMealPlan();
 
   const mockSavedRecipes: SavedRecipe[] = [
     {

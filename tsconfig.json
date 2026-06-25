@@ -26,6 +26,8 @@
     "allowImportingTsExtensions": true,
     "noEmit": true,
     "sourceMap": true,
+    "incremental": true,
+    "tsBuildInfoFile": "./node_modules/.cache/tsconfig.tsbuildinfo",
     // Enable strict TypeScript mode for better type safety
     "strict": true,
     "noImplicitAny": true,

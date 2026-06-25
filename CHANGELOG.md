@@ -1,3 +1,18 @@
+## [2.4.17] - 2026-06-25
+
+### Added
+- **Pantry Health Score Leaderboard** — Introduced an opt-in weekly/monthly challenge under the Social tab, computing live rankings based on real-time Pantry Health Scores and cooking streaks against simulated peer households.
+- **Achievement Badges System** — Added a gamified grid of 8 dynamic badges (Waste Warrior, Master Chef, Pantry Architect, Scan Master, Streak Builder, Freshness Guru, Meal Planner, Eco Collaborator) with interactive progress bars, unlock criteria, and social sharing triggers.
+- **Weekly Waste Report** — Integrated a sustainability summary modal detailing Sustainability Scores, used vs. wasted ratios, estimated monetary losses/savings, and actionable waste-reduction recommendations.
+- **Custom Recipe Cookbooks** — Added custom recipe collections in the saved recipes view with a sliding tab layout, hover "+" card triggers, and cookbook details management.
+
+### Fixed
+- **Vitest Test Suite Regressions** — Corrected child component mock paths (for SkeletonLoader, PremiumFeature, RecipeRatingUI, ProgressiveImage, and RecipeModal) and resolved title query ambiguity in `RecipeFinder.test.tsx`.
+- **Dynamic Meal Planner Mock Dates** — Replaced hardcoded dates in `MealPlanner.test.tsx` with dynamic dates starting from the current date to prevent time-bomb test failures.
+- **Recursive Smoke Tests** — Restructured the `smoke-all-components` tests to recursively search subdirectories and fixed parameter reference errors.
+
+---
+
 ## [2.4.16] - 2026-06-24
 
 ### Fixed

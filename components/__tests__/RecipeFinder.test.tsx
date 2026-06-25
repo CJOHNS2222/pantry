@@ -1,6 +1,6 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { vi, describe, test, expect, beforeEach } from 'vitest';
+import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
+import { vi, describe, test, expect, beforeEach, afterEach } from 'vitest';
 import { RecipeFinder } from '../recipes-meals/RecipeFinder';
 import { RecipeSearchResult, StructuredRecipe, SavedRecipe, PantryItem, RecipeRating, User, Household } from '../../types';
 import { Tab } from '../../types/app';
@@ -67,23 +67,23 @@ vi.mock('../hooks/useKeyboardNavigation', () => ({
 }));
 
 // Mock child components
-vi.mock('../SkeletonLoader', () => ({
+vi.mock('../ui/SkeletonLoader', () => ({
   RecipeCardSkeleton: () => <div data-testid="recipe-card-skeleton">Loading...</div>,
 }));
 
-vi.mock('../PremiumFeature', () => ({
+vi.mock('../settings/PremiumFeature', () => ({
   PremiumFeature: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
-vi.mock('../RecipeRating', () => ({
+vi.mock('../recipes-meals/RecipeRating', () => ({
   RecipeRatingUI: () => <div data-testid="recipe-rating">Rating</div>,
 }));
 
-vi.mock('../ProgressiveImage', () => ({
+vi.mock('../ui/ProgressiveImage', () => ({
   ProgressiveImage: ({ alt }: { alt: string }) => <img alt={alt} data-testid="progressive-image" />,
 }));
 
-vi.mock('../RecipeModal', () => ({
+vi.mock('../recipes-meals/RecipeModal', () => ({
   default: () => <div data-testid="recipe-modal">Recipe Modal</div>,
 }));
 
@@ -97,7 +97,11 @@ const mockUser: User = {
   subscription: {
     tier: 'free',
     status: 'active',
+    current_period_end: new Date(),
+    cancel_at_period_end: false,
   },
+  provider: 'email',
+  hasSeenTutorial: true,
 };
 
 const mockInventory: PantryItem[] = [
@@ -105,9 +109,9 @@ const mockInventory: PantryItem[] = [
     id: '1',
     item: 'Chicken Breast',
     category: 'Meat',
-    quantity: '2 lbs',
+    quantity: 2,
     storageLocation: 'fridge',
-    expirationDate: new Date('2026-03-01'),
+    expirationDate: '2026-03-01',
   },
 ];
 
@@ -138,6 +142,10 @@ const defaultProps = {
 describe('RecipeFinder', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    cleanup();
   });
 
   test('renders search input and basic UI elements', () => {
@@ -182,14 +190,8 @@ describe('RecipeFinder', () => {
       id: 'test-recipe',
       title: 'Test Chicken Recipe',
       description: 'A delicious chicken recipe',
-      ingredients: [
-        { item: 'Chicken Breast', quantity: '1 lb', notes: '' },
-        { item: 'Salt', quantity: '1 tsp', notes: '' },
-      ],
-      instructions: [
-        { step: 1, instruction: 'Cook the chicken' },
-        { step: 2, instruction: 'Season with salt' },
-      ],
+      ingredients: ['Chicken Breast', 'Salt'],
+      instructions: ['Cook the chicken', 'Season with salt'],
       servings: 4,
       prepTime: 15,
       cookTime: 30,
@@ -221,7 +223,7 @@ describe('RecipeFinder', () => {
     render(<RecipeFinder {...props} />);
 
     await waitFor(() => {
-      expect(screen.getByText('Test Chicken Recipe')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Test Chicken Recipe' })).toBeInTheDocument();
     });
   });
 
@@ -230,8 +232,8 @@ describe('RecipeFinder', () => {
       id: 'test-recipe',
       title: 'Test Recipe',
       description: 'A test recipe',
-      ingredients: [{ item: 'Test Ingredient', quantity: '1', notes: '' }],
-      instructions: [{ step: 1, instruction: 'Test instruction' }],
+      ingredients: ['Test Ingredient'],
+      instructions: ['Test instruction'],
       servings: 2,
       prepTime: 10,
       cookTime: 20,
@@ -262,7 +264,7 @@ describe('RecipeFinder', () => {
     render(<RecipeFinder {...props} />);
 
     // Click on the recipe to open modal
-    const recipeCard = await screen.findByText('Test Recipe');
+    const recipeCard = await screen.findByRole('heading', { name: 'Test Recipe' });
     fireEvent.click(recipeCard);
 
     // Modal should be opened

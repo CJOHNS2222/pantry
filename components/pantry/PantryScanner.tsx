@@ -62,6 +62,7 @@ import FreezeTransitionModal from './FreezeTransitionModal';
 import { InventoryCacheService } from '../../services/inventoryCacheService';
 import ImportModal from './ImportModal';
 import { PantryHealthScore } from './PantryHealthScore';
+import { hasMilestone } from '../../services/onboardingMilestoneService';
 
 // Constants for virtualization threshold
 
@@ -170,6 +171,80 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
       appActions.addToast('Failed to get meal suggestions. Try again.', 'error');
     } finally {
       setLoadingState(LoadingState.IDLE);
+    }
+  };
+
+  // Onboarding checklist tracking
+  const [isChecklistCollapsed, setIsChecklistCollapsed] = useState(false);
+  const [isChecklistDismissed, setIsChecklistDismissed] = useState(() => {
+    try {
+      return localStorage.getItem('onboarding-checklist-dismissed') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const checklistSteps = useMemo(() => {
+    const pSaved = hasMilestone('first-recipe-saved');
+    const mPlanned = hasMilestone('first-meal-planned');
+    const hSetup = hasMilestone('household-setup');
+    const lLogged = hasMilestone('first-leftover-logged');
+    const pItemsCount = inventory.length;
+    
+    return [
+      {
+        id: 'add-items',
+        label: 'Add 5 Pantry Items',
+        description: `Add ingredients to unlock smart recommendations. (${pItemsCount}/5)`,
+        isCompleted: pItemsCount >= 5,
+        action: () => setIsAddModalOpen(true),
+        actionLabel: 'Add Items'
+      },
+      {
+        id: 'save-recipe',
+        label: 'Save a Recipe',
+        description: 'Explore recipes in the Chef tab and heart one to save it.',
+        isCompleted: pSaved,
+        action: () => { if (setActiveTab) setActiveTab(Tab.RECIPES); },
+        actionLabel: 'Browse Recipes'
+      },
+      {
+        id: 'plan-meal',
+        label: 'Plan a Meal',
+        description: 'Add a planned meal or saved recipe to your weekly calendar.',
+        isCompleted: mPlanned,
+        action: () => { if (setActiveTab) setActiveTab(Tab.MEALS); },
+        actionLabel: 'Open Planner'
+      },
+      {
+        id: 'household-share',
+        label: 'Set up Household Sharing',
+        description: 'Invite family members or roommates to sync in real-time.',
+        isCompleted: hSetup,
+        action: () => { if (setActiveTab) setActiveTab(Tab.SETTINGS); },
+        actionLabel: 'Set up Sharing'
+      },
+      {
+        id: 'log-leftover',
+        label: 'Record a Leftover',
+        description: 'Log leftovers with a tap to track food safety and waste.',
+        isCompleted: lLogged,
+        action: () => setIsAddModalOpen(true),
+        actionLabel: 'Log Leftover'
+      }
+    ];
+  }, [inventory.length, setActiveTab]);
+
+  const completedChecklistCount = useMemo(() => {
+    return checklistSteps.filter(s => s.isCompleted).length;
+  }, [checklistSteps]);
+
+  const dismissChecklist = () => {
+    setIsChecklistDismissed(true);
+    try {
+      localStorage.setItem('onboarding-checklist-dismissed', 'true');
+    } catch (e) {
+      log.error('Failed to save onboarding-checklist-dismissed to localStorage', { error: e });
     }
   };
 
@@ -1907,6 +1982,124 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
         </div>
       </div>
 
+      {/* Onboarding Checklist Card */}
+      {!isChecklistDismissed && (
+        <div className="bg-theme-secondary rounded-2xl border border-theme shadow-lg overflow-hidden transition-all duration-300 mb-6">
+          {/* Header */}
+          <div 
+            onClick={() => setIsChecklistCollapsed(c => !c)}
+            className="px-5 py-4 flex items-center justify-between cursor-pointer hover:bg-theme-primary/5 transition-colors select-none"
+          >
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-8 h-8 bg-gradient-to-tr from-[var(--accent-color)]/20 to-[var(--accent-color)]/5 rounded-lg flex items-center justify-center text-[var(--accent-color)] flex-shrink-0">
+                🍳
+              </div>
+              <div className="min-w-0">
+                <h3 className="font-bold text-theme-primary text-sm sm:text-base truncate">Stock & Spoon Setup Checklist</h3>
+                <p className="text-xs text-theme-secondary opacity-75 truncate">
+                  {completedChecklistCount === 5 
+                    ? '🎉 Setup complete! You are ready to master your kitchen.' 
+                    : `${completedChecklistCount} of 5 steps completed`
+                  }
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-3 ml-3 flex-shrink-0">
+              {/* Progress Bar (mini, shown when collapsed) */}
+              {isChecklistCollapsed && completedChecklistCount < 5 && (
+                <div className="w-16 bg-theme rounded-full h-1.5 hidden sm:block">
+                  <div 
+                    className="bg-[var(--accent-color)] h-1.5 rounded-full transition-all duration-500"
+                    style={{ width: `${(completedChecklistCount / 5) * 100}%` }}
+                  />
+                </div>
+              )}
+              
+              <button 
+                onClick={(e) => { e.stopPropagation(); setIsChecklistCollapsed(c => !c); }}
+                className="p-1 hover:bg-theme rounded text-theme-secondary hover:text-theme-primary transition-colors"
+                aria-label={isChecklistCollapsed ? 'Expand checklist' : 'Collapse checklist'}
+              >
+                {isChecklistCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+              </button>
+              
+              <button 
+                onClick={(e) => { e.stopPropagation(); dismissChecklist(); }}
+                className="p-1 hover:bg-theme rounded text-theme-secondary hover:text-theme-primary transition-colors"
+                aria-label="Dismiss checklist permanently"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Expanded Content */}
+          {!isChecklistCollapsed && (
+            <div className="px-5 pb-5 pt-2 border-t border-theme/40 bg-theme-primary/5">
+              {/* Progress Bar */}
+              <div className="mb-4">
+                <div className="flex justify-between text-xs text-theme-secondary font-medium mb-1">
+                  <span>Activation Progress</span>
+                  <span>{Math.round((completedChecklistCount / 5) * 100)}%</span>
+                </div>
+                <div className="w-full bg-theme rounded-full h-2 overflow-hidden">
+                  <div 
+                    className="bg-gradient-to-r from-[var(--accent-color)] to-[var(--accent-color)]/80 h-2 rounded-full transition-all duration-500"
+                    style={{ width: `${(completedChecklistCount / 5) * 100}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Steps List */}
+              <div className="space-y-3.5">
+                {checklistSteps.map(step => (
+                  <div 
+                    key={step.id} 
+                    className={`flex items-start gap-3 p-3 rounded-xl border transition-all ${
+                      step.isCompleted 
+                        ? 'bg-green-500/5 border-green-500/10 opacity-75' 
+                        : 'bg-theme-secondary/30 border-theme hover:border-theme-primary/20'
+                    }`}
+                  >
+                    <button 
+                      disabled={step.isCompleted}
+                      onClick={step.action}
+                      className={`w-5 h-5 rounded-full border flex items-center justify-center transition-all flex-shrink-0 mt-0.5 ${
+                        step.isCompleted 
+                          ? 'bg-green-500 border-green-500 text-white shadow-sm' 
+                          : 'border-theme-secondary hover:border-[var(--accent-color)]'
+                      }`}
+                      aria-label={step.isCompleted ? `${step.label} (Completed)` : `Start ${step.label}`}
+                    >
+                      {step.isCompleted && <CheckCircle2 className="w-3.5 h-3.5 text-white" />}
+                    </button>
+                    
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-xs sm:text-sm font-bold leading-tight ${step.isCompleted ? 'text-theme-primary/80 line-through' : 'text-theme-primary'}`}>
+                        {step.label}
+                      </p>
+                      <p className="text-[10px] sm:text-xs text-theme-secondary opacity-80 mt-0.5 leading-relaxed">
+                        {step.description}
+                      </p>
+                    </div>
+
+                    {!step.isCompleted && (
+                      <button
+                        onClick={step.action}
+                        className="shrink-0 px-2.5 py-1 bg-theme-primary text-theme-secondary hover:bg-theme-secondary border border-theme text-[10px] sm:text-xs font-semibold rounded-lg transition-all shadow-sm active:scale-95 ml-2"
+                      >
+                        {step.actionLabel}
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Pantry Health Score ring */}
       {inventory.length >= 3 && (
         <PantryHealthScore inventory={inventory} className="mb-2" />
@@ -3135,36 +3328,78 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
               ))}
             </div>
           ) : inventory.length === 0 ? (
-            <div className="text-center py-12 px-6">
-              <div className="bg-theme-secondary rounded-2xl p-8 border border-theme shadow-lg max-w-md mx-auto">
-                <div className="w-16 h-16 bg-gradient-to-br from-[var(--accent-color)]/20 to-[var(--accent-color)]/5 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Plus className="w-8 h-8 text-[var(--accent-color)]" />
+            <div className="text-center py-8 px-4 max-w-2xl mx-auto">
+              <div className="mb-8">
+                <div className="w-20 h-20 bg-gradient-to-tr from-[var(--accent-color)]/20 to-[var(--accent-color)]/5 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
+                  <ChefHat className="w-10 h-10 text-[var(--accent-color)]" />
                 </div>
-                <h3 className="text-xl font-bold text-theme-secondary mb-2">Your pantry is empty</h3>
-                <p className="text-theme-secondary opacity-70 mb-6 text-sm">
-                  Start building your pantry by scanning receipts, taking photos, or manually adding items.
+                <h3 className="text-2xl font-extrabold text-theme-primary mb-3">Let's Stock Your Kitchen</h3>
+                <p className="text-theme-secondary opacity-80 max-w-lg mx-auto text-sm leading-relaxed">
+                  Unlock smart recipe matching, expiration alerts, and automated shopping lists by adding your first ingredients. Choose your preferred setup:
                 </p>
-                <div className="flex flex-col gap-3">
-                  <button
-                    onClick={() => setIsAddModalOpen(true)}
-                    className="w-full py-3 px-4 bg-[var(--accent-color)] text-white rounded-xl font-semibold shadow-lg hover:bg-[var(--accent-color)]/90 transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:ring-offset-2"
-                    aria-label="Open add items modal to start building your pantry"
-                  >
-                    <Plus className="w-4 h-4 inline mr-2" aria-hidden="true" />
-                    Add Your First Items
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (setActiveTab) setActiveTab(Tab.RECIPES);
-                    }}
-                    className="w-full py-3 px-4 bg-theme-secondary text-theme-primary rounded-xl font-medium border border-theme hover:bg-theme-primary transition-colors focus:outline-none focus:ring-2 focus:ring-theme-secondary focus:ring-offset-2"
-                    aria-label="Browse available recipes to get cooking inspiration"
-                  >
-                    <ChefHat className="w-4 h-4 inline mr-2" aria-hidden="true" />
-                    Browse Recipes
-                  </button>
-                </div>
               </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                {/* AI Scanner Card */}
+                <button
+                  onClick={async () => {
+                    setIsAddModalOpen(true);
+                    if (Capacitor.isNativePlatform()) {
+                      await executeCameraActionWithPermissionCheck(handleTakePhoto);
+                    } else {
+                      fileInputRef.current?.click();
+                    }
+                  }}
+                  className="flex flex-col items-center p-5 bg-theme-secondary rounded-2xl border border-theme hover:border-[var(--accent-color)]/50 hover:shadow-md hover:scale-[1.02] transition-all text-center group"
+                >
+                  <div className="w-12 h-12 bg-blue-500/10 rounded-xl flex items-center justify-center mb-3 text-blue-500 group-hover:bg-blue-500 group-hover:text-white transition-all">
+                    <Camera className="w-6 h-6" />
+                  </div>
+                  <h4 className="font-bold text-theme-primary text-sm mb-1">Smart AI Scanner</h4>
+                  <p className="text-xs text-theme-secondary opacity-70 leading-relaxed">
+                    Snap a photo of your shelves or scan a grocery receipt.
+                  </p>
+                </button>
+
+                {/* Quick Add Card */}
+                <button
+                  onClick={() => setIsAddModalOpen(true)}
+                  className="flex flex-col items-center p-5 bg-theme-secondary rounded-2xl border border-theme hover:border-[var(--accent-color)]/50 hover:shadow-md hover:scale-[1.02] transition-all text-center group"
+                >
+                  <div className="w-12 h-12 bg-green-500/10 rounded-xl flex items-center justify-center mb-3 text-green-500 group-hover:bg-green-500 group-hover:text-white transition-all">
+                    <Plus className="w-6 h-6" />
+                  </div>
+                  <h4 className="font-bold text-theme-primary text-sm mb-1">Quick Add Staples</h4>
+                  <p className="text-xs text-theme-secondary opacity-70 leading-relaxed">
+                    Quickly type items or select popular staples in seconds.
+                  </p>
+                </button>
+
+                {/* Import Card */}
+                <button
+                  onClick={() => setShowImportModal(true)}
+                  className="flex flex-col items-center p-5 bg-theme-secondary rounded-2xl border border-theme hover:border-[var(--accent-color)]/50 hover:shadow-md hover:scale-[1.02] transition-all text-center group"
+                >
+                  <div className="w-12 h-12 bg-purple-500/10 rounded-xl flex items-center justify-center mb-3 text-purple-500 group-hover:bg-purple-500 group-hover:text-white transition-all">
+                    <FilePlus className="w-6 h-6" />
+                  </div>
+                  <h4 className="font-bold text-theme-primary text-sm mb-1">Import CSV or URL</h4>
+                  <p className="text-xs text-theme-secondary opacity-70 leading-relaxed">
+                    Upload a spreadsheet or scrape ingredients from recipe links.
+                  </p>
+                </button>
+              </div>
+
+              {/* Secondary CTA */}
+              <button
+                onClick={() => {
+                  if (setActiveTab) setActiveTab(Tab.RECIPES);
+                }}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-theme-secondary hover:text-[var(--accent-color)] hover:underline transition-colors py-2 px-3"
+              >
+                <span>Or browse recipes for inspiration first</span>
+                <ChevronRight className="w-4 h-4" />
+              </button>
             </div>
           ) : inventory.length > VIRTUALIZE_THRESHOLD && displayLayout === 'list' ? (
             <div className="bg-theme-secondary rounded-lg border border-theme overflow-hidden">
