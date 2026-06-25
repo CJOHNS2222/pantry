@@ -34,6 +34,7 @@ import { pushNotificationService } from './services/pushNotificationService';
 import { HouseholdActivityService } from './services/householdActivityService';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Capacitor, PluginListenerHandle } from '@capacitor/core';
+import { PushNotifications } from '@capacitor/push-notifications';
 import { AdMob } from '@capacitor-community/admob';
 import { AppProvider } from './contexts/AppContext';
 import { AppActionsProvider } from './contexts/AppActionsContext';
@@ -238,6 +239,36 @@ const App: React.FC = () => {
       onAction: () => setShowHousehold(true),
       autoHideDelay: 10000,
       requiredMilestone: 'household-setup' as const,
+    },
+    {
+      featureId: 'first-recipe-saved-tip',
+      title: 'Ready to Cook? 🍳',
+      description: 'Great pick! Tap any saved recipe → "Start Cooking" to open our distraction-free, screen-on Cooking Mode with inline timers and step-by-step guidance.',
+      position: 'bottom-right' as const,
+      actionLabel: 'View Saved Recipes',
+      onAction: () => setActiveTab(Tab.RECIPES),
+      autoHideDelay: 10000,
+      requiredMilestone: 'first-recipe-saved' as const,
+    },
+    {
+      featureId: 'first-meal-planned-tip',
+      title: 'Pro Tip: Repeat Weekly Plans',
+      description: 'You planned your first meal! Tap the copy icon in the Meal Planner to easily duplicate this week\'s plan for next week and save meal-prep time.',
+      position: 'bottom-right' as const,
+      actionLabel: 'View Meal Planner',
+      onAction: () => setActiveTab(Tab.MEALS),
+      autoHideDelay: 10000,
+      requiredMilestone: 'first-meal-planned' as const,
+    },
+    {
+      featureId: 'pantry-health-score-tip',
+      title: 'Check Your Pantry Health 📊',
+      description: 'Your Pantry Health Score grades your food freshness, variety, and waste reduction. Tap the score circle on the Pantry tab to see a detailed breakdown!',
+      position: 'bottom-right' as const,
+      actionLabel: 'View Pantry',
+      onAction: () => setActiveTab(Tab.PANTRY),
+      autoHideDelay: 10000,
+      requiredMilestone: 'first-pantry-item' as const,
     },
   ], [setActiveTab, setShowHousehold]);
 
@@ -629,7 +660,24 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (user?.id) {
-      pushNotificationService.initialize().catch(error => log.error('Failed to initialize push notifications', { error }, 'App'));
+      const checkAndInitializePush = async () => {
+        if (Capacitor.isNativePlatform()) {
+          try {
+            const status = await PushNotifications.checkPermissions();
+            if (status.receive === 'granted') {
+              await pushNotificationService.initialize();
+            } else {
+              log.debug('Skipping push notification initialization on startup: permission not granted', { status }, 'App');
+            }
+          } catch (error) {
+            log.error('Failed to check push notification permissions', { error }, 'App');
+          }
+        } else {
+          // Web or other platform
+          await pushNotificationService.initialize();
+        }
+      };
+      checkAndInitializePush();
     }
   }, [user?.id]);
 

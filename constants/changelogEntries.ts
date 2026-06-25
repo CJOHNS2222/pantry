@@ -9,6 +9,16 @@ export interface ChangeEntry {
 
 export const RECENT_CHANGES: ChangeEntry[] = [
   {
+    "version": "2.4.17",
+    "date": "Jun 25, 2026",
+    "highlights": [
+      "Pantry Health Score Leaderboard — Introduced an opt-in weekly/monthly challenge under the Social tab, computing live…",
+      "Achievement Badges System — Added a gamified grid of 8 dynamic badges (Waste Warrior, Master Chef, Pantry Architect,…",
+      "Weekly Waste Report — Integrated a sustainability summary modal detailing Sustainability Scores, used vs.",
+      "Custom Recipe Cookbooks — Added custom recipe collections in the saved recipes view with a sliding tab layout, hover…"
+    ]
+  },
+  {
     "version": "2.4.16",
     "date": "Jun 24, 2026",
     "highlights": [
@@ -23,15 +33,6 @@ export const RECENT_CHANGES: ChangeEntry[] = [
       "AdMob Ads Disabled by Default — Disabled Google AdMob ads globally by updating default configs and setting ads_enabled…",
       "Android AdMob Crash Fix — Fixed an Android app crash (NullPointerException on ViewGroup.addView inside the AdMob…",
       "Recipe Deductions & Analytics — Corrected cooked recipe deductions to ensure fully depleted items are completely…"
-    ]
-  },
-  {
-    "version": "2.4.13",
-    "date": "Jun 20, 2026",
-    "highlights": [
-      "Pantry Notes Relocated — Moved the private notes text area in ItemDetailModal out of the collapsible product details…",
-      "Staples Deletion Sync — Fixed staple auto-restocking logic so that deleting a staple item (either single delete or bulk…",
-      "Restock Feedback Toasts — Added informative toast notifications when a staple item is auto-added to the shopping list…"
     ]
   }
 ];

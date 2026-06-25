@@ -23,8 +23,8 @@ android {
         applicationId "com.smart.pantry"
         minSdk 24
         targetSdk 35
-        versionCode 77
-        versionName "2.4.16"
+        versionCode 78
+        versionName "2.4.17"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         
         buildFeatures {
@@ -53,6 +53,10 @@ android {
             minifyEnabled true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             signingConfig signingConfigs.release
+            
+            ndk {
+                debugSymbolLevel 'SYMBOL_TABLE'
+            }
             
             pluginManager.withPlugin('com.google.firebase.appdistribution') {
                 firebaseAppDistribution {

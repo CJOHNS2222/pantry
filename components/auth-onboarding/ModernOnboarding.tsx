@@ -11,7 +11,9 @@ import {
   Zap,
   Camera,
   Heart,
+  Bell,
 } from 'lucide-react';
+import { pushNotificationService } from '../../services/pushNotificationService';
 
 interface OnboardingData {
   completed: boolean;
@@ -30,7 +32,7 @@ interface ModernOnboardingProps {
   onPersonaSelected?: (persona: 'relaxed' | 'normal' | 'strict') => void;
 }
 
-type OnboardingStep = 'welcome' | 'quick-setup';
+type OnboardingStep = 'welcome' | 'notifications' | 'quick-setup';
 
 interface QuickSetupOption {
   id: string;
@@ -161,7 +163,7 @@ export const ModernOnboarding: React.FC<ModernOnboardingProps> = ({
       {/* CTA Buttons */}
       <div className="space-y-3">
         <button
-          onClick={() => handleStepTransition('quick-setup')}
+          onClick={() => handleStepTransition('notifications')}
           className="w-full bg-gradient-to-r from-[var(--accent-color)] to-[var(--accent-color)]/90 hover:from-[var(--accent-color)]/90 hover:to-[var(--accent-color)]/80 text-white py-4 px-6 rounded-xl font-semibold text-lg transition-all duration-200 transform hover:scale-[1.02] shadow-lg hover:shadow-xl flex items-center justify-center gap-3"
           data-testid="onboard-get-started"
         >
@@ -181,6 +183,98 @@ export const ModernOnboarding: React.FC<ModernOnboardingProps> = ({
       </div>
     </div>
   );
+
+  const renderNotificationsStep = () => {
+    const [isRequesting, setIsRequesting] = useState(false);
+
+    const handleEnableNotifications = async () => {
+      setIsRequesting(true);
+      try {
+        await pushNotificationService.initialize();
+      } catch {
+        // Ignore and proceed
+      } finally {
+        setIsRequesting(false);
+        handleStepTransition('quick-setup');
+      }
+    };
+
+    return (
+      <div className={`transition-all duration-500 ${isAnimating ? 'opacity-0 transform translate-x-4' : 'opacity-100 transform translate-x-0'}`}>
+        {/* Header Section */}
+        <div className="text-center mb-6">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-tr from-purple-500 to-pink-500 rounded-2xl mb-4 shadow-lg text-white">
+            <Bell className="w-8 h-8" />
+          </div>
+
+          <h2 className="text-2xl font-bold text-theme-primary mb-2">
+            Never Waste Food Again!
+          </h2>
+
+          <p className="text-theme-secondary text-sm leading-relaxed mb-6">
+            Get timely alerts to save your ingredients and make your kitchen experience seamless.
+          </p>
+        </div>
+
+        {/* Benefits list */}
+        <div className="bg-theme/5 rounded-xl p-4 mb-8 border border-theme">
+          <h3 className="font-semibold text-theme-primary text-xs mb-3 uppercase tracking-wider">How notifications help you:</h3>
+          <ul className="text-sm text-theme-secondary space-y-3">
+            <li className="flex items-start gap-3">
+              <span className="text-green-500 mt-0.5">✓</span>
+              <div>
+                <strong className="text-theme-primary">Expiration Alerts:</strong>
+                <span className="block text-xs text-theme-secondary/80">Get notified a few days before items expire so you can cook them in time.</span>
+              </div>
+            </li>
+            <li className="flex items-start gap-3">
+              <span className="text-green-500 mt-0.5">✓</span>
+              <div>
+                <strong className="text-theme-primary">Meal Prep Reminders:</strong>
+                <span className="block text-xs text-theme-secondary/80">Receive helpful reminders for planned meals and prep schedules.</span>
+              </div>
+            </li>
+            <li className="flex items-start gap-3">
+              <span className="text-green-500 mt-0.5">✓</span>
+              <div>
+                <strong className="text-theme-primary">Household Updates:</strong>
+                <span className="block text-xs text-theme-secondary/80">See instantly when someone adds a shared item or completes the shopping list.</span>
+              </div>
+            </li>
+          </ul>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="space-y-3">
+          <button
+            onClick={handleEnableNotifications}
+            disabled={isRequesting}
+            className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:opacity-90 text-white py-4 px-6 rounded-xl font-semibold text-lg transition-all duration-200 transform hover:scale-[1.02] shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
+          >
+            {isRequesting ? (
+              <>
+                <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+                Enabling...
+              </>
+            ) : (
+              <>
+                Enable Alerts
+                <ArrowRight className="w-5 h-5" />
+              </>
+            )}
+          </button>
+
+          <button
+            onClick={() => handleStepTransition('quick-setup')}
+            disabled={isRequesting}
+            className="w-full bg-theme/10 hover:bg-theme/20 text-theme-secondary py-3 px-6 rounded-xl font-medium transition-all duration-200"
+          >
+            Not now, maybe later
+          </button>
+        </div>
+      </div>
+    );
+  };
 
   const renderQuickSetupStep = () => (
     <div className={`transition-all duration-500 ${isAnimating ? 'opacity-0 transform translate-x-4' : 'opacity-100 transform translate-x-0'}`}>
@@ -283,17 +377,18 @@ export const ModernOnboarding: React.FC<ModernOnboardingProps> = ({
         {/* Content */}
         <div className="p-6 sm:p-8 overflow-y-auto">
           {currentStep === 'welcome' && renderWelcomeStep()}
+          {currentStep === 'notifications' && renderNotificationsStep()}
           {currentStep === 'quick-setup' && renderQuickSetupStep()}
         </div>
 
         {/* Progress indicator */}
         <div className="px-8 pb-6 flex-shrink-0 bg-theme-secondary">
           <div className="flex justify-center gap-2">
-            {(['welcome', 'quick-setup'] as OnboardingStep[]).map((step, index) => (
+            {(['welcome', 'notifications', 'quick-setup'] as OnboardingStep[]).map((step, index) => (
               <div
                 key={step}
                 className={`w-2 h-2 rounded-full transition-all duration-300 ${
-                  index <= (['welcome', 'quick-setup'] as OnboardingStep[]).indexOf(currentStep)
+                  index <= (['welcome', 'notifications', 'quick-setup'] as OnboardingStep[]).indexOf(currentStep)
                     ? 'bg-[var(--accent-color)]'
                     : 'bg-theme/30'
                 }`}

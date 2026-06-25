@@ -27,7 +27,7 @@ export const SettingsFeedbackSection: React.FC<SettingsFeedbackSectionProps> = (
               value={feedback}
               onChange={(e) => setFeedback(e.target.value)}
               placeholder="Let us know your thoughts..."
-              className="w-full p-3 border rounded resize-none text-black bg-white text-sm"
+              className="w-full p-3 border border-theme rounded-lg resize-none text-theme-primary bg-theme-primary text-sm focus:border-[var(--accent-color)] focus:outline-none transition-colors"
               rows={3}
               disabled={sending}
             />

@@ -8,7 +8,7 @@ interface SettingsNotificationsSectionProps {
   title: string;
   user?: User;
   notificationSettings: NotificationSettings;
-  setNotificationSettings: React.Dispatch<React.SetStateAction<NotificationSettings>>;
+  setNotificationSettings: (settings: NotificationSettings) => void;
 }
 
 export const SettingsNotificationsSection: React.FC<SettingsNotificationsSectionProps> = ({

@@ -18,6 +18,24 @@ function render(ui: React.ReactElement) {
 
 const componentsDir = path.resolve(__dirname, '..', 'components');
 
+function getFilesRecursively(dir: string): string[] {
+  const results: string[] = [];
+  if (!fs.existsSync(dir)) return results;
+  const list = fs.readdirSync(dir);
+  list.forEach(file => {
+    const fullPath = path.join(dir, file);
+    const stat = fs.statSync(fullPath);
+    if (stat && stat.isDirectory()) {
+      if (file !== '__tests__') {
+        results.push(...getFilesRecursively(fullPath));
+      }
+    } else if (file.endsWith('.tsx')) {
+      results.push(fullPath);
+    }
+  });
+  return results;
+}
+
 // Fake setInterval once for the whole suite so polling loops in Login,
 // MonitoringDashboard, etc. never hold the event loop open.
 // We never call useRealTimers() between tests – toggling mid-suite caused hangs
@@ -45,12 +63,12 @@ describe('Smoke tests: render components', () => {
 
   // Split A–Q: each half runs in its own worker so the module cache never hits OOM.
   // smoke-all-components-2.test.tsx covers R–Z.
-  const files = fs.readdirSync(componentsDir)
-    .filter(f => f.endsWith('.tsx'))
-    .filter(f => f.toLowerCase() < 'r');
+  const files = getFilesRecursively(componentsDir)
+    .filter(f => path.basename(f).toLowerCase() < 'r');
 
   files.forEach(file => {
-    const name = file.replace(/\.tsx$/, '');
+    const name = path.basename(file).replace(/\.tsx$/, '');
+    const fullPath = file;
 
     if (SKIP_COMPONENTS.has(name)) {
       test.skip(`${name} should render without throwing`, () => {});
@@ -58,14 +76,13 @@ describe('Smoke tests: render components', () => {
     }
 
     test(`${name} should render without throwing`, async () => {
-      const fullPath = path.join(componentsDir, file);
       // Dynamic import; use file URL
       let mod: any;
       try {
         mod = await import(fullPath);
       } catch (err) {
         // If import fails (syntax, SSR-only code), skip but record
-        console.warn(`Skipping import of ${file}:`, err?.message || err);
+        console.warn(`Skipping import of ${name}:`, err?.message || err);
         return;
       }
 

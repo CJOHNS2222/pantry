@@ -469,14 +469,85 @@ const FAQ_DATA: FAQItem[] = [
     question: 'Why did my image scan get rejected for safety reasons?',
     answer: 'Stock & Spoon uses Google\'s Gemini AI to analyze pantry photos and receipts. Gemini has strict safety filters and will reject images that contain people, faces, or reflections of people. If your scan is rejected, try taking the photo from an angle that doesn\'t capture any reflections and ensure no people are in the frame.',
     keywords: ['safety filter', 'rejected', 'image scan', 'people', 'faces', 'reflection', 'gemini error']
+  },
+  {
+    id: 'plans-4',
+    category: 'Plans & Limits',
+    question: 'How do I cancel or change my subscription?',
+    answer: 'Since all subscriptions are billed through Google Play, you must manage your subscription directly in the Google Play Store:\n\n• Open the **Google Play Store** app on your Android device.\n• Tap your profile icon at the top right.\n• Tap **Payments & subscriptions** → **Subscriptions**.\n• Select **Stock & Spoon**.\n• Tap **Cancel subscription** or **Update** to change plans.\n\nOnce canceled, you will retain Premium features until the end of your current billing cycle. On iOS or Web, subscriptions must be managed via the platform on which you purchased.',
+    keywords: ['cancel subscription', 'unsubscribe', 'billing', 'change plan', 'refund', 'google play', 'payment']
+  },
+  {
+    id: 'getting-started-5',
+    category: 'Getting Started',
+    question: 'How do I reset my password or change my email?',
+    answer: 'If you signed in with an email and password:\n\n• **Reset Password**: Go to the login screen, tap **Forgot Password?**, and enter your email address. We will send you a password reset link.\n• **Change Email**: Go to **Settings → Account → Profile Settings** to update your email address. You will need to verify the new email address before it becomes active.\n\nIf you signed in using **Google Sign-In**, your account credentials are managed securely by Google. To change your login method, please contact support or sign out and link a new account.',
+    keywords: ['password reset', 'change email', 'forgot password', 'credentials', 'account', 'login', 'sign in']
+  },
+  {
+    id: 'settings-7',
+    category: 'Settings & Preferences',
+    question: 'What data does the app collect and how is it used?',
+    answer: 'Stock & Spoon is designed with privacy first. We collect:\n\n• **Pantry Inventory & Meal Plans**: Stored securely in Firestore to sync across your devices and household.\n• **Camera/Photos**: Used locally for scanning barcodes, receipt OCR, and optional pantry item photos. Photos are analyzed using Google\'s Gemini AI API and are never stored or sold.\n• **Diagnostics & Analytics**: Crashlytics and Sentry log anonymous errors to help us fix bugs.\n\nYou can review our complete Privacy Policy under **Settings → More → Privacy & Legal**.',
+    keywords: ['privacy', 'data collection', 'tracking', 'safety', 'camera', 'security', 'gdpr', 'selling data']
+  },
+  {
+    id: 'recipes-4',
+    category: 'Recipes & Cooking',
+    question: 'How do I use Cooking Mode?',
+    answer: 'Cooking Mode provides a distraction-free, step-by-step cooking interface:\n\n1. Go to the **Chef** (Recipes) tab and select any recipe.\n2. Tap the heart icon to save it if you haven\'t already.\n3. Tap **Start Cooking** at the bottom of the recipe card.\n4. Swipe left/right or tap the progress dots to navigate steps.\n5. Tap ingredients in the step text to see their quantities, or toggle the ingredients overlay.\n\nCooking Mode automatically activates a **Wake Lock** to keep your screen on while you cook, and integrates inline step timers for hands-free tracking.',
+    keywords: ['cooking mode', 'screen on', 'wake lock', 'step by step', 'chef', 'start cooking', 'timer']
+  },
+  {
+    id: 'troubleshooting-5',
+    category: 'Troubleshooting',
+    question: 'How do I export or import my data to a new device?',
+    answer: 'Your data is automatically backed up and synchronized in real-time:\n\n• **Automatic Sync**: Simply sign in to the same account (Email or Google) on your new device, and all your pantry items, shopping lists, saved recipes, and meal plans will load instantly.\n• **CSV Export**: You can export your pantry data at any time. Go to the **Pantry** tab, tap **Select Multiple** or click the CSV option under **Import/URL** to download your database.\n• **CSV Import**: On your new device, go to **Pantry → Import/URL → Import from CSV** to upload your saved inventory.',
+    keywords: ['export data', 'import data', 'backup', 'new phone', 'transfer data', 'migration', 'csv', 'sync']
+  },
+  {
+    id: 'plans-5',
+    category: 'Plans & Limits',
+    question: 'How does the Family plan differ from Premium?',
+    answer: 'While Premium is designed for individuals or small households, the **Family Plan** unlocks full household sharing capabilities:\n\n• **Unlimited Household Members**: Invite as many family members or roommates as you want to your shared household.\n• **Shared Premium Limits**: All invited members automatically get access to Premium features (unlimited meal plans, 15 AI scans/week, custom categories) without needing separate subscriptions.\n• **Synchronized Shopping & Prep**: Real-time collaborative shopping list editing and household cooking statistics.',
+    keywords: ['family plan', 'premium', 'sharing', 'household', 'invite members', 'collaborative', 'roommate']
+  },
+  {
+    id: 'troubleshooting-6',
+    category: 'Troubleshooting',
+    question: 'Why is my barcode item showing the wrong product?',
+    answer: 'We query Open Food Facts—a crowdsourced global database—to identify products from barcodes. If you scan an item and it shows the wrong product:\n\n1. Tap the item in your pantry to open details.\n2. Tap **Edit** (pencil icon).\n3. Correct the name, category, and storage location, and tap **Save**.\n\nYour correction is saved locally and synced to your household. You can also submit the correction to help improve the global database for everyone.',
+    keywords: ['barcode error', 'wrong item', 'scanner mistake', 'open food facts', 'barcode database', 'mismatch']
+  },
+  {
+    id: 'pantry-13',
+    category: 'Pantry Management',
+    question: 'How do I delete an item from my pantry?',
+    answer: 'To delete items from your pantry:\n\n• **Single Item**: Tap the item in the pantry list to open its details, then tap the red **Delete Item** button at the bottom.\n• **Swipe to Delete**: Swipe left on any item in the list to quickly remove it (features an undo toast option).\n• **Batch Delete**: Tap **Select Multiple** in the top right, select all the items you want to remove, and tap **Delete Selected**.',
+    keywords: ['delete item', 'remove', 'trash', 'clean pantry', 'swipe to delete', 'batch delete', 'select multiple']
+  },
+  {
+    id: 'community-2',
+    category: 'Community',
+    question: 'How do I share a recipe with someone outside my household?',
+    answer: 'To share a recipe outside your household:\n\n1. Select any recipe in the **Chef** tab.\n2. Tap the **Share** icon (top right corner of the recipe details).\n3. Choose your sharing method: copy the direct recipe URL to your clipboard, or share it directly via messaging apps, email, or social media.\n\nAnyone clicking the link can view the recipe ingredients, instructions, and open it in Cooking Mode on their own device.',
+    keywords: ['share recipe', 'external share', 'copy link', 'send recipe', 'recipe link', 'community sharing']
+  },
+  {
+    id: 'plans-6',
+    category: 'Plans & Limits',
+    question: 'What happens to my data if my subscription expires?',
+    answer: 'If your Premium or Family subscription expires, your account will be transitioned back to the **Free Plan**:\n\n• **Data Preservation**: You will **never lose any data** (pantry items, meal plans, or saved recipes) you have already created.\n• **Feature Restrictions**: You will not be able to add new items if you are over the Free limits (e.g. more than 10 saved recipes). To add more, you will need to either delete older entries or renew your subscription.\n• **Household Sharing**: If you revert to Free, you will lose real-time sync with household members beyond the Free plan limit.',
+    keywords: ['subscription expired', 'lapse', 'renewal', 'free plan', 'data loss', 'limits exceeded', 'billing lapse']
   }
 ];
 
 interface FAQPageProps {
   onBack: () => void;
+  onNavigateToFeedback?: () => void;
 }
 
-export const FAQPage: React.FC<FAQPageProps> = ({ onBack }) => {
+export const FAQPage: React.FC<FAQPageProps> = ({ onBack, onNavigateToFeedback }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
 
@@ -635,7 +706,10 @@ export const FAQPage: React.FC<FAQPageProps> = ({ onBack }) => {
               <p className="text-theme-secondary mb-4 leading-relaxed">
                 Can't find what you're looking for? Our support team is here to help with any questions or issues you might have.
               </p>
-              <button className="inline-flex items-center gap-2 bg-theme-primary text-theme-secondary px-6 py-3 rounded-lg font-semibold hover:bg-theme-primary/90 transition-colors">
+              <button
+                onClick={onNavigateToFeedback}
+                className="inline-flex items-center gap-2 bg-theme-primary text-theme-secondary px-6 py-3 rounded-lg font-semibold hover:bg-theme-primary/90 transition-colors"
+              >
                 <span>Contact Support</span>
               </button>
             </div>

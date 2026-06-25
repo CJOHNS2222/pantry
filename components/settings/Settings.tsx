@@ -368,6 +368,30 @@ export const Settings: React.FC<SettingsProps> = ({
     }
   }, [user?.profile]);
 
+  // Update notificationSettings when user data loads
+  useEffect(() => {
+    const ns = (user as User & { profile?: UserProfile & { notificationSettings?: NotificationSettings } })?.profile?.notificationSettings;
+    if (ns) {
+      setNotificationSettings(ns);
+    }
+  }, [user]);
+
+  const handleNotificationSettingsChange = async (newSettings: NotificationSettings) => {
+    setNotificationSettings(newSettings);
+    if (user) {
+      try {
+        const userRef = DatabaseMonitoringService.doc('users', user.id);
+        await DatabaseMonitoringService.updateDoc(userRef, {
+          'profile.notificationSettings': newSettings
+        });
+        log.info('Notification settings saved to Firestore', { userId: user.id }, 'Settings');
+      } catch (error) {
+        log.error('Failed to save notification settings', { error }, 'Settings');
+        addToast?.('Failed to save notification settings', 'error');
+      }
+    }
+  };
+
   // Use the notifications hook
   useNotifications(settings.notifications, user?.email, mealPlan);
 
@@ -1136,7 +1160,7 @@ export const Settings: React.FC<SettingsProps> = ({
         title={intl.formatMessage({ id: 'settings.notifications' })}
         user={user}
         notificationSettings={notificationSettings}
-        setNotificationSettings={setNotificationSettings}
+        setNotificationSettings={handleNotificationSettingsChange}
       />
 
       </>}
@@ -1464,6 +1488,10 @@ export const Settings: React.FC<SettingsProps> = ({
           const privacyUrl = (window as Window & { PRIVACY_POLICY_URL?: string }).PRIVACY_POLICY_URL || 'https://smartpantrymobile.page.gd/privacy.html';
           window.open(privacyUrl, '_blank');
         }}
+        onViewTermsOfService={() => {
+          const termsUrl = (window as Window & { TERMS_OF_SERVICE_URL?: string }).TERMS_OF_SERVICE_URL || 'https://ornate-compass-478504-e1.web.app/terms.html';
+          window.open(termsUrl, '_blank');
+        }}
         onCopyPrivacyUrl={() => {
           const privacyUrl = (window as Window & { PRIVACY_POLICY_URL?: string }).PRIVACY_POLICY_URL || 'https://smartpantrymobile.page.gd/privacy.html';
           if (navigator.clipboard) navigator.clipboard.writeText(privacyUrl);
@@ -1494,7 +1522,13 @@ export const Settings: React.FC<SettingsProps> = ({
           </div>
 
           <div className="flex-1 p-6 overflow-y-auto min-h-0">
-            <FAQPage onBack={() => setShowFAQModal(false)} />
+            <FAQPage 
+              onBack={() => setShowFAQModal(false)} 
+              onNavigateToFeedback={() => {
+                setShowFAQModal(false);
+                setActiveSettingsTab('more');
+              }}
+            />
           </div>
         </div>
       </div>
