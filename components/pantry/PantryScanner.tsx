@@ -1395,8 +1395,6 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
     );
   });
 
-  // Virtualized flat list renderer for large inventories
-  const VIRTUALIZE_THRESHOLD = 50;
 
   // Virtualized category item renderer
   const renderCategoryItem = ({ index, style, category }: { index: number; style: React.CSSProperties; category: string }) => {
@@ -1867,86 +1865,6 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
     );
   }
 
-  const renderRow = ({ index, style }: { index: number; style: React.CSSProperties }) => {
-    const item = sortedInventory[index];
-    if (!item) return null;
-    const daysRemaining = item.expirationDate ? Math.ceil((new Date(item.expirationDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : undefined;
-    const expirationBorderClass = (d?: number) => {
-      if (d == null) return ''
-      const c = getExpirationColor(d, item.expirationType)
-      return c === 'red' ? 'ring-2 ring-red-300/40' : c === 'yellow' ? 'ring-2 ring-yellow-300/30' : 'ring-2 ring-green-300/15'
-    }
-
-    return (
-      <div
-        style={style}
-        key={item.originalIndex}
-        className={`flex items-center justify-between px-2 py-1 border-b border-theme last:border-b-0 transition-all cursor-pointer ${expirationBorderClass(daysRemaining)} ${
-        bulkMode && selectedItems.has(item.originalIndex)
-          ? 'bg-[var(--accent-color)]/10 border-[var(--accent-color)]/30'
-          : 'hover:bg-theme-primary/50'
-      }`}
-        onClick={() => !bulkMode && setSelectedItemIndex(item.originalIndex)}
-        role={!bulkMode ? 'button' : undefined}
-        tabIndex={!bulkMode ? 0 : -1}
-        aria-label={!bulkMode ? `Open details for ${item.item}` : undefined}
-        onKeyDown={(e) => {
-          if (bulkMode) return;
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            setSelectedItemIndex(item.originalIndex);
-          }
-        }}
-      >
-        {bulkMode && (
-          <input
-            type="checkbox"
-            checked={selectedItems.has(item.originalIndex)}
-            onChange={() => toggleItemSelection(item.originalIndex)}
-            className="mr-3 w-4 h-4 text-[var(--accent-color)] bg-theme-primary border-theme rounded focus:ring-[var(--accent-color)]"
-          />
-        )}
-
-        <div className="flex items-center gap-1 flex-1">
-          <img src={getPreferredItemDisplayImage(item.item, item.category, item.image)} alt={item.item} className="w-10 h-10 rounded-lg object-cover bg-theme-primary border border-theme" onError={(e) => { (e.target as HTMLImageElement).src = '/images/placeholder.svg'; }} />
-          <div className="flex-1">
-            <div className="flex items-center gap-2">
-              <div className="font-medium text-theme-primary">{item.item}</div>
-              <div className="text-xs text-theme-secondary opacity-70 bg-theme-secondary px-1 py-0.5 rounded">Qty: {formatItemQuantity(item)}</div>
-              {item.expirationDate && (() => {
-                const daysRemaining = Math.ceil((new Date(item.expirationDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-                const color = getExpirationColor(daysRemaining, item.expirationType);
-                const expiryLabel = daysRemaining <= 0
-                  ? `${item.item} has expired`
-                  : `${item.item} expires in ${daysRemaining} day${daysRemaining === 1 ? '' : 's'} — ${color === 'red' ? 'critical' : color === 'yellow' ? 'warning' : 'ok'}`;
-                return (
-                  <div
-                    className={`text-xs px-1 py-0.5 rounded font-medium ${
-                      color === 'red' ? 'bg-red-100 text-red-800' :
-                      color === 'yellow' ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-green-100 text-green-800'
-                    }`}
-                    aria-label={expiryLabel}
-                  >
-                    {daysRemaining}d
-                  </div>
-                );
-              })()}
-              {item.expiryAlertShown && (
-                <Clock className="w-4 h-4 text-orange-500" aria-label="Expires within 7 days" />
-              )}
-            </div>
-          </div>
-        </div>
-
-        {!bulkMode && (
-          <div className="text-theme-secondary opacity-50">
-            <ChevronRight className="w-5 h-5" />
-          </div>
-        )}
-      </div>
-    );
-  };
 
   return (
     <div className="space-y-6 pb-24 max-w-2xl mx-auto animate-fade-in relative">
@@ -3400,17 +3318,6 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                 <span>Or browse recipes for inspiration first</span>
                 <ChevronRight className="w-4 h-4" />
               </button>
-            </div>
-          ) : inventory.length > VIRTUALIZE_THRESHOLD && displayLayout === 'list' ? (
-            <div className="bg-theme-secondary rounded-lg border border-theme overflow-hidden">
-              <List
-                height={Math.min(600, window.innerHeight - 300)}
-                itemCount={sortedInventory.length}
-                itemSize={64}
-                width={'100%'}
-              >
-                {renderRow}
-              </List>
             </div>
           ) : (
             (viewMode === 'category' ? categoryViewContent : storageViewContent)

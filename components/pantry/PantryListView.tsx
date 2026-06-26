@@ -5,6 +5,7 @@ import StorageLocationIndicator from './StorageLocationIndicator';
 import { PantryGridItem } from './PantryGridItem';
 import { PantryListItem } from './PantryListItem';
 import { DisplayedPantryItem } from '../../hooks/usePantryFilters';
+import { PantryItem } from '../../types';
 
 interface PantryListViewProps {
   viewMode: 'category' | 'storage';
@@ -22,12 +23,12 @@ interface PantryListViewProps {
   setSelectedItemIndex: (index: number) => void;
   setFreezeTargetIndex: (index: number) => void;
   householdId?: string;
-  onUpdateItem: (index: number, updates: Partial<any>) => Promise<void>;
+  onUpdateItem: (index: number, updates: Partial<PantryItem>) => Promise<void>;
+  /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
   getRowActionHandlers: (item: DisplayedPantryItem) => any;
+  /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
   appActions: any;
   onDeleteItem: (index: number) => void;
-  VIRTUALIZE_THRESHOLD?: number;
-  sortedInventory: DisplayedPantryItem[];
 }
 
 export const PantryListView: React.FC<PantryListViewProps> = ({
@@ -49,9 +50,7 @@ export const PantryListView: React.FC<PantryListViewProps> = ({
   onUpdateItem,
   getRowActionHandlers,
   appActions,
-  onDeleteItem,
-  VIRTUALIZE_THRESHOLD = 50,
-  sortedInventory
+  onDeleteItem
 }) => {
   const storageLabels: Record<string, string> = {
     pantry: 'Pantry',
@@ -63,27 +62,6 @@ export const PantryListView: React.FC<PantryListViewProps> = ({
 
   const CATEGORY_VIRTUALIZE_THRESHOLD = 20;
 
-  // Virtualized row for flat list
-  const renderRow = ({ index, style }: { index: number; style: React.CSSProperties }) => {
-    const item = sortedInventory[index];
-    if (!item) return null;
-    return (
-      <PantryListItem
-        item={item}
-        style={style}
-        bulkMode={bulkMode}
-        selectedItems={selectedItems}
-        toggleItemSelection={toggleItemSelection}
-        setSelectedItems={setSelectedItems}
-        setSelectedItemIndex={setSelectedItemIndex}
-        setFreezeTargetIndex={setFreezeTargetIndex}
-        householdId={householdId}
-        onUpdateItem={onUpdateItem}
-        getRowActionHandlers={getRowActionHandlers}
-        appActions={appActions}
-      />
-    );
-  };
 
   // Virtualized row for category view
   const renderCategoryItem = ({ index, style, category }: { index: number; style: React.CSSProperties; category: string }) => {
@@ -280,21 +258,6 @@ export const PantryListView: React.FC<PantryListViewProps> = ({
       </div>
     );
   });
-
-  if (sortedInventory.length > VIRTUALIZE_THRESHOLD && displayLayout === 'list') {
-    return (
-      <div className="bg-theme-secondary rounded-lg border border-theme overflow-hidden">
-        <List
-          height={Math.min(600, window.innerHeight - 300)}
-          itemCount={sortedInventory.length}
-          itemSize={64}
-          width={'100%'}
-        >
-          {renderRow}
-        </List>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-4">

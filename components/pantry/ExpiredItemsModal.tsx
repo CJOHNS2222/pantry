@@ -7,7 +7,6 @@ import { PantryItem } from '../../types';
 import { getQuantityAmount } from '../../utils/quantityUtils';
 import AnalyticsService from '../../services/analyticsService';
 import HapticService from '../../services/hapticService';
-import FoodWasteAnalyticsService from '../../services/foodWasteAnalyticsService';
 import { log } from '../../services/logService';
 import { useIntl } from 'react-intl';
 
@@ -29,9 +28,9 @@ const ExpiredItemsModal: React.FC<ExpiredItemsModalProps> = ({
   onClose,
   inventory,
   onRemoveItems,
-  householdId,
-  userId,
-  userName,
+  householdId: _householdId,
+  userId: _userId,
+  userName: _userName,
   specificItems
 }) => {
   useModalOpen(isOpen);
@@ -111,26 +110,6 @@ const ExpiredItemsModal: React.FC<ExpiredItemsModalProps> = ({
     try {
       const reason = disposalReason;
       await onRemoveItems(Array.from(selectedItems), reason);
-
-      // Record analytics for each disposed item
-      for (const itemId of selectedItems) {
-        const item = expiredItems.find(i => i.id === itemId);
-        if (item && userId) {
-          const daysExpired = getDaysExpired(item.expirationDate!);
-          const estimatedValue = 2.50; // Rough estimate per item
-
-          await FoodWasteAnalyticsService.recordDisposal({
-            itemId: item.id,
-            itemName: item.item,
-            category: item.category,
-            disposalReason: reason,
-            daysExpired,
-            userId,
-            userName,
-            estimatedValue
-          }, householdId);
-        }
-      }
 
       // Track removal analytics
       AnalyticsService.trackEvent('expired_items_removed', {

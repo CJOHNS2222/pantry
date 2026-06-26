@@ -1,4 +1,4 @@
-import { collection, doc, setDoc, getDoc, updateDoc, arrayUnion, Timestamp } from 'firebase/firestore';
+import { doc, setDoc, getDoc, Timestamp } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 import { log } from './logService';
 
