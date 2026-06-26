@@ -9,6 +9,16 @@ export interface ChangeEntry {
 
 export const RECENT_CHANGES: ChangeEntry[] = [
   {
+    "version": "2.4.19",
+    "date": "Jun 26, 2026",
+    "highlights": [
+      "Curated Food Storage Tips — Added 11 detailed food tips for commonly used items (watermelon, maple syrup, cottage…",
+      "Leftovers Category & Badges — Introduced a built-in Leftovers category with a deep purple theme, customized placeholder…",
+      "Ingredient Icon Library — Extracted and integrated 1,952 new ingredient icons, supporting a total of 2,973 active icons…",
+      "Pantry Mobile UX & Layout — Integrated search, filter, and sort into a single compact sticky row; collapsed setup…"
+    ]
+  },
+  {
     "version": "2.4.17",
     "date": "Jun 25, 2026",
     "highlights": [
@@ -24,15 +34,6 @@ export const RECENT_CHANGES: ChangeEntry[] = [
     "highlights": [
       "Google Sign-In Resolution — Integrated the latest google-services.json from the Firebase Console containing all…",
       "Secure App Verification — Decrypted and finalized the Google Play Integrity response encryption and verification keys…"
-    ]
-  },
-  {
-    "version": "2.4.14",
-    "date": "Jun 21, 2026",
-    "highlights": [
-      "AdMob Ads Disabled by Default — Disabled Google AdMob ads globally by updating default configs and setting ads_enabled…",
-      "Android AdMob Crash Fix — Fixed an Android app crash (NullPointerException on ViewGroup.addView inside the AdMob…",
-      "Recipe Deductions & Analytics — Corrected cooked recipe deductions to ensure fully depleted items are completely…"
     ]
   }
 ];
