@@ -15,7 +15,9 @@ interface PantryListItemProps {
   setFreezeTargetIndex: (index: number) => void;
   householdId?: string;
   onUpdateItem: (index: number, updates: Partial<PantryItem>) => Promise<void>;
+  /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
   getRowActionHandlers: (item: DisplayedPantryItem) => any;
+  /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
   appActions: any;
   style?: React.CSSProperties;
 }

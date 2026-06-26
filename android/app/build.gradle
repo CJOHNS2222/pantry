@@ -23,8 +23,8 @@ android {
         applicationId "com.smart.pantry"
         minSdk 24
         targetSdk 35
-        versionCode 78
-        versionName "2.4.17"
+        versionCode 79
+        versionName "2.4.18"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         
         buildFeatures {
