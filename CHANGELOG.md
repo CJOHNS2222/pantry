@@ -1,3 +1,19 @@
+## [2.4.19] - 2026-06-26
+
+### Added
+- **Curated Food Storage Tips** — Added 11 detailed food tips for commonly used items (watermelon, maple syrup, cottage cheese, yeast, dates) to enrich the details modal.
+- **Leftovers Category & Badges** — Introduced a built-in Leftovers category with a deep purple theme, customized placeholder image, and "🥡 Leftover" badge.
+- **Ingredient Icon Library** — Extracted and integrated 1,952 new ingredient icons, supporting a total of 2,973 active icons in the application.
+
+### Changed
+- **Pantry Mobile UX & Layout** — Integrated search, filter, and sort into a single compact sticky row; collapsed setup checklist by default; eliminated scroll deadspace.
+- **Scoring Tooltips** — Replaced hover-only tooltips in Pantry Health Score with a mobile-friendly click-to-toggle design and auto-dismiss on outside clicks.
+
+### Fixed
+- **Food Waste Analytics** — Resolved React state race condition on mount and added guest local storage fallback for tracking waste analytics.
+
+---
+
 ## [2.4.17] - 2026-06-25
 
 ### Added
