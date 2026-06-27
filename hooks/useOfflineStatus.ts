@@ -1,9 +1,10 @@
-// Note: The custom offline queue is intentionally not used here — Firebase SDK
-// handles offline persistence and write queuing natively. This hook's sole job
-// is to track real network connectivity so the UI can reflect offline state.
+// Wires up the offline status hook to use the custom offlineQueue service
+// to track pending counts, conflicts, and trigger manual synchronization.
 import { useState, useEffect } from 'react';
 import { Network } from '@capacitor/network';
 import { Capacitor } from '@capacitor/core';
+import { offlineQueue } from '../services/offlineQueueService';
+import { log } from '../services/logService';
 
 export interface SyncStatus {
   isOnline: boolean;
@@ -60,14 +61,74 @@ export const useOfflineStatus = () => {
     }
   }, []);
 
-  // These are kept for API compatibility but are no-ops. Firebase SDK manages
-  // its own write queue — no manual sync needed.
+  // Poll IndexedDB offline queue status and conflicts
+  useEffect(() => {
+    let active = true;
+
+    const checkQueue = async () => {
+      try {
+        const count = await offlineQueue.getPendingCount();
+        const conflicts = await offlineQueue.getConflicts();
+        const isSyncing = offlineQueue.getProcessingStatus();
+
+        if (active) {
+          setSyncStatus(prev => ({
+            ...prev,
+            pendingOperations: count,
+            hasConflicts: conflicts.length > 0,
+            isSyncing,
+            lastSyncTime: count === 0 && prev.pendingOperations > 0 ? new Date() : prev.lastSyncTime
+          }));
+        }
+      } catch (err) {
+        log.error('Failed to query offline queue status', { err }, 'useOfflineStatus');
+      }
+    };
+
+    // Run immediately and then on interval
+    checkQueue();
+    const interval = setInterval(checkQueue, 4000);
+
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, []);
+
   const updateSyncStatus = (updates: Partial<SyncStatus>) =>
     setSyncStatus(prev => ({ ...prev, ...updates }));
-  const startSync = () => {};
-  const endSync = (_success?: boolean, _error?: string) => {};
-  const setPendingOperations = (_count: number) => {};
-  const syncNow = async () => {};
+
+  const startSync = () => setSyncStatus(prev => ({ ...prev, isSyncing: true }));
+  const endSync = (success = true, error: string | null = null) => 
+    setSyncStatus(prev => ({ 
+      ...prev, 
+      isSyncing: false, 
+      syncError: error,
+      lastSyncTime: success ? new Date() : prev.lastSyncTime
+    }));
+
+  const setPendingOperations = (count: number) =>
+    setSyncStatus(prev => ({ ...prev, pendingOperations: count }));
+
+  const syncNow = async () => {
+    try {
+      startSync();
+      await offlineQueue.processQueue();
+      const count = await offlineQueue.getPendingCount();
+      const conflicts = await offlineQueue.getConflicts();
+      setSyncStatus(prev => ({
+        ...prev,
+        pendingOperations: count,
+        hasConflicts: conflicts.length > 0,
+        isSyncing: false,
+        syncError: null,
+        lastSyncTime: count === 0 ? new Date() : prev.lastSyncTime
+      }));
+    } catch (err) {
+      log.error('Manual queue sync failed', { err }, 'useOfflineStatus');
+      endSync(false, err instanceof Error ? err.message : String(err));
+    }
+  };
 
   return {
     syncStatus,

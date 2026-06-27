@@ -308,6 +308,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
     const [modalRecipe, setModalRecipe] = useState<StructuredRecipe | null>(null);
     const [modalIsSavedView, setModalIsSavedView] = useState(false);
     useAndroidBack(showRecipeModal, () => setShowRecipeModal(false));
+    useAndroidBack(showRecipeAutocomplete, () => setShowRecipeAutocomplete(false));
 
     // Stable ref so window event handler can call the latest openRecipeModal closure
     const openRecipeModalRef = useRef<((recipe: StructuredRecipe | SavedRecipe, isSavedView?: boolean) => void) | null>(null);

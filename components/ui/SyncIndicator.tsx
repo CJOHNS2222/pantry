@@ -15,7 +15,15 @@ export const SyncIndicator: React.FC<SyncIndicatorProps> = ({
   className = '',
   onSyncClick
 }) => {
-  const { isOnline, isSyncing, lastSyncTime, pendingOperations, syncError, syncProgress, hasConflicts } = syncStatus;
+  const {
+    isOnline = navigator.onLine,
+    isSyncing = false,
+    lastSyncTime = null,
+    pendingOperations = 0,
+    syncError = null,
+    syncProgress = null,
+    hasConflicts = false
+  } = syncStatus || {};
 
   const getStatusColor = () => {
     if (syncError) return 'text-red-500';

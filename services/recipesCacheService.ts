@@ -1,5 +1,6 @@
 import DatabaseMonitoringService from './databaseMonitoringService';
 import { SavedRecipe } from '../types';
+import { log } from './logService';
 
 export interface CachedRecipesData {
   // Recipe ID -> [title, description, ingredients(JSON), instructions(JSON), cookTime, type, image, dateSaved, imagePlaceholder]
@@ -87,17 +88,17 @@ export class RecipesCacheService {
             }
           }
 
-          console.log(`✅ Loaded ${recipes.length} cached saved recipes (1 database read)`);
+          log.debug('Loaded cached saved recipes', { count: recipes.length }, 'RecipesCacheService');
           return recipes.sort((a, b) => b.dateSaved.localeCompare(a.dateSaved)); // Most recent first
         }
       }
 
-      console.log('📭 No valid recipes cache found, will load from individual documents');
+      log.debug('No valid recipes cache found, will load from individual documents', undefined, 'RecipesCacheService');
       return [];
     } catch (err: any) {
       // Don't log permission errors as they may be expected
       if (!err.message.includes('Missing or insufficient permissions')) {
-        console.warn('Failed to load recipes cache:', err);
+        log.warn('Failed to load recipes cache', { error: err }, 'RecipesCacheService');
       }
       return [];
     }
@@ -123,9 +124,9 @@ export class RecipesCacheService {
       });
 
       await DatabaseMonitoringService.setDoc(cacheRef, cachedData);
-      console.log(`💾 Updated saved recipes cache with ${recipes.length} recipes`);
+      log.debug('Updated saved recipes cache', { count: recipes.length }, 'RecipesCacheService');
     } catch (err: any) {
-      console.error('Failed to update saved recipes cache:', err);
+      log.error('Failed to update saved recipes cache', { error: err }, 'RecipesCacheService');
     }
   }
 
@@ -145,7 +146,7 @@ export class RecipesCacheService {
       // First try to update existing cache
       try {
         await DatabaseMonitoringService.updateDoc(cacheRef, updateData);
-      } catch (err: any) {
+      } catch {
         // If cache doesn't exist, create it
         const cachedData: CachedRecipesData & RecipesCacheMetadata = {
           lastUpdated: new Date(),
@@ -156,9 +157,9 @@ export class RecipesCacheService {
         await DatabaseMonitoringService.setDoc(cacheRef, cachedData);
       }
 
-      console.log(`➕ Added recipe to cache: ${recipe.title}`);
+      log.debug('Added recipe to cache', { title: recipe.title }, 'RecipesCacheService');
     } catch (err: any) {
-      console.error('Failed to add recipe to cache:', err);
+      log.error('Failed to add recipe to cache', { error: err, title: recipe.title }, 'RecipesCacheService');
     }
   }
 
@@ -167,17 +168,28 @@ export class RecipesCacheService {
    */
   static async updateRecipeInCache(recipeId: string, updates: Partial<SavedRecipe>, householdId?: string, userId?: string): Promise<void> {
     try {
-      // For updates, we need to get the current recipe first, then update it
-      const currentRecipes = await this.getCachedRecipes( householdId, userId);
-      const currentRecipe = currentRecipes.find(r => r.id === recipeId);
+      const cachePath = this.getCachePath(householdId, userId);
+      const cacheRef = DatabaseMonitoringService.doc(cachePath);
+      const docSnap = await DatabaseMonitoringService.getDoc(cacheRef);
 
-      if (currentRecipe) {
-        const updatedRecipe = { ...currentRecipe, ...updates };
-        await this.addRecipeToCache(updatedRecipe, householdId, userId);
-        console.log(`🔄 Updated recipe in cache: ${updatedRecipe.title}`);
+      if (docSnap.exists()) {
+        const data = docSnap.data() as CachedRecipesData & RecipesCacheMetadata;
+        const recipeArray = data[recipeId];
+        if (recipeArray) {
+          const currentRecipe = this.arrayToSavedRecipe(recipeId, recipeArray);
+          const updatedRecipe = { ...currentRecipe, ...updates };
+
+          const updateData: any = {
+            lastUpdated: new Date(),
+          };
+          updateData[recipeId] = this.savedRecipeToArray(updatedRecipe);
+
+          await DatabaseMonitoringService.updateDoc(cacheRef, updateData);
+          log.debug('Updated recipe in cache', { title: updatedRecipe.title }, 'RecipesCacheService');
+        }
       }
     } catch (err: any) {
-      console.error('Failed to update recipe in cache:', err);
+      log.error('Failed to update recipe in cache', { error: err, recipeId }, 'RecipesCacheService');
     }
   }
 
@@ -195,9 +207,9 @@ export class RecipesCacheService {
       (updateData as any)[recipeId] = DatabaseMonitoringService.deleteField();
 
       await DatabaseMonitoringService.updateDoc(cacheRef, updateData);
-      console.log(`🗑️ Removed recipe from cache: ${recipeId}`);
+      log.debug('Removed recipe from cache', { recipeId }, 'RecipesCacheService');
     } catch (err: any) {
-      console.error('Failed to remove recipe from cache:', err);
+      log.error('Failed to remove recipe from cache', { error: err, recipeId }, 'RecipesCacheService');
     }
   }
 
@@ -209,9 +221,9 @@ export class RecipesCacheService {
       const cachePath = this.getCachePath(householdId, userId);
       const cacheRef = DatabaseMonitoringService.doc(cachePath);
       await DatabaseMonitoringService.deleteDoc(cacheRef);
-      console.log('🧹 Cleared saved recipes cache');
+      log.debug('Cleared saved recipes cache', undefined, 'RecipesCacheService');
     } catch (err: any) {
-      console.error('Failed to clear saved recipes cache:', err);
+      log.error('Failed to clear saved recipes cache', { error: err }, 'RecipesCacheService');
     }
   }
 }

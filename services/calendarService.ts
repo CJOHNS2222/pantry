@@ -1,20 +1,7 @@
 import { Capacitor } from '@capacitor/core';
+import { CapacitorCalendar, CalendarPermissionScope } from '@ebarooni/capacitor-calendar';
 import { DayPlan } from '../types';
 import { log } from './logService';
-
-/**
- * CalendarEvent interface for Capacitor Calendar plugin
- */
-interface CalendarEvent {
-  id?: string;
-  title?: string;
-  location?: string;
-  notes?: string;
-  startDate?: number;
-  endDate?: number;
-  calendarId?: string;
-  allDay?: boolean;
-}
 
 /**
  * CalendarService provides calendar integration for meal planning and reminders.
@@ -37,7 +24,6 @@ class CalendarService {
 
   /**
    * Request calendar permissions from the user
-   * Note: This plugin handles permissions automatically, so this is a placeholder
    * @returns {Promise<boolean>} True if permissions are granted
    */
   async requestPermissions(): Promise<boolean> {
@@ -47,10 +33,9 @@ class CalendarService {
     }
 
     try {
-      // This plugin doesn't seem to have explicit permission methods
-      // Permissions are handled automatically by the native platforms
-      return true;
-    } catch (err: any) {
+      const permission = await CapacitorCalendar.requestFullCalendarAccess();
+      return permission.result === 'granted';
+    } catch (err: unknown) {
       log.error('Error requesting calendar permissions', err, 'CalendarService');
       return false;
     }
@@ -58,7 +43,6 @@ class CalendarService {
 
   /**
    * Check if calendar permissions are granted
-   * Note: This plugin handles permissions automatically, so this assumes granted
    * @returns {Promise<boolean>} True if permissions are available
    */
   async checkPermissions(): Promise<boolean> {
@@ -67,10 +51,10 @@ class CalendarService {
     }
 
     try {
-      // This plugin doesn't seem to have explicit permission checking
-      // We'll assume permissions are granted if the plugin is available
-      return true;
-    } catch (err: any) {
+      const { result } = await CapacitorCalendar.checkAllPermissions();
+      return result[CalendarPermissionScope.READ_CALENDAR] === 'granted' && 
+             result[CalendarPermissionScope.WRITE_CALENDAR] === 'granted';
+    } catch (err: unknown) {
       log.error('Error checking calendar permissions', err, 'CalendarService');
       return false;
     }
@@ -99,7 +83,7 @@ class CalendarService {
 
       const mealTitles = (dayPlan.meals || [])
         .filter(meal => meal.recipe)
-        .map(meal => `${(meal as any).mealType || (meal as any).type}: ${meal.recipe!.title}`)
+        .map(meal => `${(meal as any).mealType || (meal as any).type || 'Meal'}: ${meal.recipe!.title}`)
         .join('\n');
 
       if (!mealTitles) {
@@ -107,24 +91,15 @@ class CalendarService {
         return false;
       }
 
-      const event: CalendarEvent = {
+      await CapacitorCalendar.createEvent({
         title: `Meal Plan - ${date.toLocaleDateString()}`,
-        notes: `Smart Pantry Meal Plan\n\n${mealTitles}\n\nTotal calories: ${(dayPlan as any).totalCalories || 'Not calculated'}`,
+        description: `Smart Pantry Meal Plan\n\n${mealTitles}\n\nTotal calories: ${(dayPlan as any).totalCalories || 'Not calculated'}`,
         startDate: date.getTime(),
         endDate: new Date(date.getTime() + 24 * 60 * 60 * 1000).getTime(), // Next day
-        allDay: true
-      };
-      // Use plugin via Capacitor Plugins to avoid import/type issues
-      const plugin = (Capacitor as any).Plugins?.CapacitorCalendar || (globalThis as any).CapacitorCalendar;
-      if (plugin && typeof plugin.createEvent === 'function') {
-        await plugin.createEvent(event);
-      } else if ((Capacitor as any).createEvent) {
-        await (Capacitor as any).createEvent(event);
-      } else {
-        log.warn('CapacitorCalendar plugin not available to create event', {}, 'CalendarService');
-      }
+        isAllDay: true
+      });
       return true;
-    } catch (err: any) {
+    } catch (err: unknown) {
       log.error('Error creating calendar event', err, 'CalendarService');
       return false;
     }
@@ -151,24 +126,15 @@ class CalendarService {
         }
       }
 
-      const event: CalendarEvent = {
+      await CapacitorCalendar.createEvent({
         title: `Cook: ${recipeTitle}`,
-        notes: `Time to prepare ${recipeTitle} from your Smart Pantry meal plan.`,
+        description: `Time to prepare ${recipeTitle} from your Smart Pantry meal plan.`,
         startDate: scheduledTime.getTime(),
         endDate: new Date(scheduledTime.getTime() + 60 * 60 * 1000).getTime(), // 1 hour duration
-        allDay: false
-      };
-
-      const plugin = (Capacitor as any).Plugins?.CapacitorCalendar || (globalThis as any).CapacitorCalendar;
-      if (plugin && typeof plugin.createEvent === 'function') {
-        await plugin.createEvent(event);
-      } else if ((Capacitor as any).createEvent) {
-        await (Capacitor as any).createEvent(event);
-      } else {
-        log.warn('CapacitorCalendar plugin not available to create event', {}, 'CalendarService');
-      }
+        isAllDay: false
+      });
       return true;
-    } catch (err: any) {
+    } catch (err: unknown) {
       log.error('Error creating cooking reminder', err, 'CalendarService');
       return false;
     }
@@ -186,15 +152,8 @@ class CalendarService {
     }
 
     try {
-      const plugin = (Capacitor as any).Plugins?.CapacitorCalendar || (globalThis as any).CapacitorCalendar;
-      if (plugin && typeof plugin.openCalendar === 'function') {
-        await plugin.openCalendar({ date: date.getTime() });
-      } else if ((Capacitor as any).openCalendar) {
-        await (Capacitor as any).openCalendar({ date: date.getTime() });
-      } else {
-        log.warn('CapacitorCalendar plugin not available to open calendar', {}, 'CalendarService');
-      }
-    } catch (err: any) {
+      await CapacitorCalendar.openCalendar({ date: date.getTime() });
+    } catch (err: unknown) {
       log.error('Error opening calendar', err, 'CalendarService');
     }
   }

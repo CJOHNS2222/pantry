@@ -7,7 +7,7 @@ import { visualizer } from 'rollup-plugin-visualizer';
 import checker from 'vite-plugin-checker';
 
 export default defineConfig(({ mode }) => {
-    const env = loadEnv(mode, '.', '');
+    const _env = loadEnv(mode, '.', '');
     return {
       server: {
         port: 3000,
@@ -16,7 +16,7 @@ export default defineConfig(({ mode }) => {
       plugins: [
         react(),
         // TypeScript type-checking in the browser overlay during dev (errors surface without running tsc separately)
-        checker({ typescript: true }),
+        ...(mode !== 'production' ? [checker({ typescript: true })] : []),
         VitePWA({
           registerType: 'autoUpdate',
           manifest: {

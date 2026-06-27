@@ -2233,3 +2233,20 @@ export function deductIngredientAmount(pantryQtyObj: any, recipeQtyStr: string):
     unit: pantryUnit
   };
 }
+
+/**
+ * Checks if a food item is immortal (e.g., honey, salt, sugar) and doesn't expire
+ */
+export function isImmortalItem(itemName: string): boolean {
+  const low = itemName.toLowerCase();
+  return low.includes('honey') || low.includes('salt') || low.includes('sugar');
+}
+
+/**
+ * Checks if a food item contains cooked rice
+ */
+export function isCookedRiceItem(itemName: string): boolean {
+  const low = itemName.toLowerCase();
+  return (low.includes('rice') && low.includes('cooked')) ||
+         (low.includes('rice') && low.includes('leftover'));
+}

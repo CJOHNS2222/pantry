@@ -5,6 +5,7 @@
  * Uses localStorage for persistent caching across sessions
  */
 
+import { log } from './logService';
 export interface NutritionFacts {
   calories: number | null;
   protein: number | null;
@@ -34,7 +35,7 @@ const getCache = (): Map<string, CachedNutrition> => {
     const obj = JSON.parse(cached);
     return new Map(Object.entries(obj) as [string, CachedNutrition][]);
   } catch (err: any) {
-    console.warn('Failed to load nutrition cache from localStorage:', err);
+    log.warn('Failed to load nutrition cache from localStorage', { error: err?.message }, 'NutritionService');
     return new Map();
   }
 };
@@ -47,7 +48,7 @@ const saveCache = (cache: Map<string, CachedNutrition>) => {
     const obj = Object.fromEntries(cache);
     localStorage.setItem(NUTRITION_CACHE_KEY, JSON.stringify(obj));
   } catch (err: any) {
-    console.warn('Failed to save nutrition cache to localStorage:', err);
+    log.warn('Failed to save nutrition cache to localStorage', { error: err?.message }, 'NutritionService');
   }
 };
 
@@ -95,7 +96,7 @@ const searchWithFallbacks = async (itemName: string): Promise<any[] | null> => {
   const USDA_API_KEY = import.meta.env.VITE_USDA_API_KEY || '';
 
   if (!USDA_API_KEY) {
-    console.warn('USDA API key not found. Please set VITE_USDA_API_KEY environment variable.');
+    log.warn('USDA API key not configured. Set VITE_USDA_API_KEY in environment', undefined, 'NutritionService');
     return null;
   }
 
@@ -115,7 +116,7 @@ const searchWithFallbacks = async (itemName: string): Promise<any[] | null> => {
       });
 
       if (!response.ok) {
-        console.warn('USDA API error:', response.status, response.statusText);
+        log.warn('USDA API search error', { status: response.status, statusText: response.statusText, term }, 'NutritionService');
         continue;
       }
 
@@ -144,7 +145,7 @@ const searchWithFallbacks = async (itemName: string): Promise<any[] | null> => {
         return data.foods;
       }
     } catch (err: any) {
-      console.warn('Error fetching nutrition data from USDA API:', err);
+      log.warn('Error fetching nutrition data from USDA API', { error: err?.message, term }, 'NutritionService');
       continue; // Try next term
     }
   }
@@ -177,7 +178,7 @@ export const getNutritionFacts = async (itemName: string): Promise<NutritionFact
     const foods = await searchWithFallbacks(itemName);
     
     if (!foods || foods.length === 0) {
-      console.warn(`No nutrition data found for: ${itemName}`);
+      log.debug('No nutrition data found', { itemName }, 'NutritionService');
       // Cache the negative result for 7 days to avoid repeated API calls
       cache.set(cacheKey, { data: null, timestamp: Date.now() });
       saveCache(cache);
@@ -193,7 +194,7 @@ export const getNutritionFacts = async (itemName: string): Promise<NutritionFact
       const USDA_API_KEY = import.meta.env.VITE_USDA_API_KEY || '';
 
       if (!USDA_API_KEY) {
-        console.warn('USDA API key not found. Please set VITE_USDA_API_KEY environment variable.');
+        log.warn('USDA API key not configured. Set VITE_USDA_API_KEY in environment', undefined, 'NutritionService');
         return null;
       }
 
@@ -208,13 +209,13 @@ export const getNutritionFacts = async (itemName: string): Promise<NutritionFact
       });
 
       if (!response.ok) {
-        console.warn('USDA API detail error:', response.status, response.statusText);
+        log.warn('USDA API detail error', { status: response.status, fdcId: foodFdcId }, 'NutritionService');
         return null;
       }
 
       foodDetail = await response.json();
     } catch (err: any) {
-      console.warn('Error fetching nutrition details from USDA API:', err);
+      log.warn('Error fetching nutrition details from USDA API', { error: err?.message }, 'NutritionService');
       return null;
     }
     const nutrients = foodDetail.foodNutrients || [];
@@ -243,7 +244,7 @@ export const getNutritionFacts = async (itemName: string): Promise<NutritionFact
     saveCache(cache);
     return nutritionData;
   } catch (err: any) {
-    console.warn(`Error fetching nutrition for ${itemName}:`, err);
+    log.warn('Error fetching nutrition', { itemName, error: err?.message }, 'NutritionService');
     return null;
   }
 };
@@ -260,10 +261,10 @@ export const getNutritionFactsWithFallback = async (itemName: string, category: 
     }
 
     // If not found, try broader search by category
-    console.log(`Nutrition not found for ${itemName}, trying category: ${category}`);
+    log.debug('Nutrition not found for item, falling back to category', { itemName, category }, 'NutritionService');
     return await getNutritionFacts(category);
   } catch (err: any) {
-    console.warn('Error in nutrition fallback:', err);
+    log.warn('Error in nutrition fallback', { itemName, error: err?.message }, 'NutritionService');
     return null;
   }
 };
@@ -296,6 +297,6 @@ export const clearNutritionCache = () => {
   try {
     localStorage.removeItem(NUTRITION_CACHE_KEY);
   } catch (err: any) {
-    console.warn('Failed to clear nutrition cache:', err);
+    log.warn('Failed to clear nutrition cache', { error: err?.message }, 'NutritionService');
   }
 };

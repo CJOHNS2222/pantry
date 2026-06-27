@@ -1,3 +1,5 @@
+import { log } from './logService';
+
 export async function fetchRecipeImage(recipeTitle: string): Promise<string | null> {
   const apiKey = (import.meta as any)?.env?.VITE_GOOGLE_CSE_API_KEY;
   const cseId = (import.meta as any)?.env?.VITE_GOOGLE_CSE_ID;
@@ -8,11 +10,11 @@ export async function fetchRecipeImage(recipeTitle: string): Promise<string | nu
     const res = await fetch(url);
     const data = await res.json();
     return data.items?.[0]?.link || null;
-  } catch {
+  } catch (err: any) {
+    log.error('Error fetching recipe image', { error: err?.message }, 'imageService');
     return null;
   }
 }
-
 export async function fetchGroceryItemImage(itemName: string): Promise<string | null> {
   try {
     // Check cache first
@@ -46,8 +48,7 @@ export async function fetchGroceryItemImage(itemName: string): Promise<string | 
       // Handle CORS or other fetch errors gracefully
       if (!response.ok) {
         if (response.status === 0 || response.type === 'opaque') {
-          // CORS error or network error - skip to fallback
-          console.log(`Open Food Facts API blocked (CORS), trying fallback for: ${cleanName}`);
+          log.debug('Open Food Facts API blocked (CORS), trying fallback', { itemName: cleanName }, 'imageService');
         } else {
           throw new Error(`Open Food Facts API error: ${response.status}`);
         }
@@ -77,11 +78,11 @@ export async function fetchGroceryItemImage(itemName: string): Promise<string | 
       }
     } catch (fetchError: any) {
       if (fetchError.message === 'Request timeout') {
-        console.log(`Open Food Facts API timeout, trying fallback for: ${cleanName}`);
+        log.debug('Open Food Facts API timeout, trying fallback', { itemName: cleanName }, 'imageService');
       } else if (fetchError.message?.includes('Failed to fetch') || fetchError.message?.includes('CORS')) {
-        console.log(`Open Food Facts API blocked (CORS), trying fallback for: ${cleanName}`);
+        log.debug('Open Food Facts API blocked (CORS), trying fallback', { itemName: cleanName }, 'imageService');
       } else {
-        console.log(`Open Food Facts API error (${fetchError.message}), trying fallback for: ${cleanName}`);
+        log.debug('Open Food Facts API error, trying fallback', { itemName: cleanName, error: fetchError.message }, 'imageService');
       }
     }
 
@@ -96,7 +97,7 @@ export async function fetchGroceryItemImage(itemName: string): Promise<string | 
 
     return null;
   } catch (err: any) {
-    console.error('Error fetching grocery item image:', err);
+    log.error('Error fetching grocery item image', { error: err?.message }, 'imageService');
     return null;
   }
 }
@@ -107,7 +108,7 @@ export { uploadItemImage } from './leftoverImageService';
 async function fetchUnsplashImage(query: string): Promise<string | null> {
   const accessKey = (import.meta as any)?.env?.VITE_UNSPLASH_ACCESS_KEY;
   if (!accessKey) {
-    console.log('No Unsplash API key provided, skipping Unsplash search');
+    log.debug('No Unsplash API key provided, skipping Unsplash search', undefined, 'imageService');
     return null;
   }
 
@@ -128,7 +129,7 @@ async function fetchUnsplashImage(query: string): Promise<string | null> {
       return cachedUrl || imageUrl;
     }
   } catch (err: any) {
-    console.error('Error fetching from Unsplash:', err);
+    log.warn('Error fetching from Unsplash', { error: err?.message, query }, 'imageService');
   }
 
   return null;

@@ -8,17 +8,22 @@ export function useKeyboard(): boolean {
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
 
   useEffect(() => {
-    if (!window.visualViewport) return;
-
     const handleResize = () => {
       if (!window.visualViewport) return;
       const screenHeight = window.screen.height;
       const currentHeight = window.visualViewport.height;
       
-      // If the visual viewport size is less than 75% of screen height,
-      // it indicates the soft keyboard is visible.
-      const isVisible = currentHeight < screenHeight * 0.75;
-      setIsKeyboardVisible(isVisible);
+      // If the visual viewport size is less than 85% of screen height,
+      // and an input is focused, it indicates the soft keyboard is visible.
+      const activeEl = document.activeElement;
+      const isInputActive = activeEl && (
+        activeEl.tagName === 'INPUT' ||
+        activeEl.tagName === 'TEXTAREA' ||
+        activeEl.getAttribute('contenteditable') === 'true'
+      );
+      
+      const isVisible = (currentHeight < screenHeight * 0.85) && isInputActive;
+      setIsKeyboardVisible(!!isVisible);
     };
 
     const handleFocusIn = (e: FocusEvent) => {
@@ -29,6 +34,7 @@ export function useKeyboard(): boolean {
           target.tagName === 'TEXTAREA' ||
           target.getAttribute('contenteditable') === 'true')
       ) {
+        setIsKeyboardVisible(true);
         // Delay slightly to let the keyboard animation complete,
         // then scroll the input into the center of the visual viewport.
         setTimeout(() => {
@@ -37,8 +43,26 @@ export function useKeyboard(): boolean {
       }
     };
 
-    window.visualViewport.addEventListener('resize', handleResize);
+    const handleFocusOut = () => {
+      // Delay slightly to check if focus moved to another input
+      setTimeout(() => {
+        const activeEl = document.activeElement;
+        const isInputActive = activeEl && (
+          activeEl.tagName === 'INPUT' ||
+          activeEl.tagName === 'TEXTAREA' ||
+          activeEl.getAttribute('contenteditable') === 'true'
+        );
+        if (!isInputActive) {
+          setIsKeyboardVisible(false);
+        }
+      }, 100);
+    };
+
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleResize);
+    }
     document.addEventListener('focusin', handleFocusIn);
+    document.addEventListener('focusout', handleFocusOut);
 
     // Initial check
     handleResize();
@@ -46,6 +70,7 @@ export function useKeyboard(): boolean {
     return () => {
       window.visualViewport?.removeEventListener('resize', handleResize);
       document.removeEventListener('focusin', handleFocusIn);
+      document.removeEventListener('focusout', handleFocusOut);
     };
   }, []);
 

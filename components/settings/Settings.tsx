@@ -163,6 +163,15 @@ export const Settings: React.FC<SettingsProps> = ({
   );
   const [activeSettingsTab, setActiveSettingsTab] = useState<'account' | 'preferences' | 'organization' | 'more'>('account');
 
+  // Redirect to requested settings tab if set in sessionStorage (e.g. from SmartRecommendations)
+  useEffect(() => {
+    const redirectTab = sessionStorage.getItem('settings_redirect_tab');
+    if (redirectTab === 'more' || redirectTab === 'account' || redirectTab === 'preferences' || redirectTab === 'organization') {
+      setActiveSettingsTab(redirectTab);
+      sessionStorage.removeItem('settings_redirect_tab');
+    }
+  }, []);
+
   // Member preferences state
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [memberPreferences, setMemberPreferences] = useState<Partial<MemberPreferences>>({});

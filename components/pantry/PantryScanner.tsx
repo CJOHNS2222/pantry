@@ -269,7 +269,9 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
     if (hasTappedAddButton || isAddModalOpen) return false;
     try {
       const dismissed = localStorage.getItem('dismissed-tutorial-tips');
-      return dismissed ? JSON.parse(dismissed).includes('tip-pantry-scan') : false;
+      if (!dismissed) return false;
+      const parsed = JSON.parse(dismissed);
+      return Array.isArray(parsed) ? parsed.includes('tip-pantry-scan') : false;
     } catch {
       return false;
     }
@@ -413,6 +415,8 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   const [modalContext, setModalContext] = useState<'search' | 'scheduled'>('search');
   const [freezeTargetIndex, setFreezeTargetIndex] = useState<number | null>(null);
   useAndroidBack(showRecipeModal, () => setShowRecipeModal(false));
+  useAndroidBack(showFilters, () => setShowFilters(false));
+  useAndroidBack(searchQuery.length > 0, () => setSearchQuery(''));
 
   // Auto-set smart unit when item name changes in the quick-add form
   useEffect(() => {
@@ -3054,7 +3058,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                 {inventory.length} / 20 items used
               </span>
               <span className="text-[var(--accent-color)] font-medium cursor-pointer hover:underline"
-                onClick={() => {/* sign-in prompt handled by parent */}}>
+                onClick={() => appActions.addToast('Please go to the Settings tab to sign in or create an account for unlimited pantry items!', 'info', 6000)}>
                 Sign in for unlimited
               </span>
             </div>
@@ -3520,7 +3524,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
 
       {/* Camera Pre-Permission Educator Modal */}
       {showPermissionEducator && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4 pt-[var(--safe-area-inset-top,0px)] pb-[var(--safe-area-inset-bottom,0px)]">
           <div className="bg-theme-secondary rounded-2xl shadow-2xl max-w-sm w-full relative overflow-hidden border border-theme">
             {/* Header banner */}
             <div className="h-20 bg-gradient-to-r from-blue-500 to-cyan-500 relative flex items-center justify-center">
@@ -3580,7 +3584,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
 
       {/* Settings Denied Fallback Dialog */}
       {showSettingsFallback && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4 pt-[var(--safe-area-inset-top,0px)] pb-[var(--safe-area-inset-bottom,0px)]">
           <div className="bg-theme-secondary rounded-2xl shadow-2xl max-w-sm w-full relative overflow-hidden border border-theme">
             <div className="h-20 bg-gradient-to-r from-red-500 to-orange-500 relative flex items-center justify-center">
               <Camera className="w-8 h-8 text-white" />

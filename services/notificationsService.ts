@@ -1,6 +1,7 @@
 import { db } from '../firebaseConfig';
 import { doc, runTransaction, onSnapshot, DocumentReference } from 'firebase/firestore';
 import remoteConfig from './remoteConfigService';
+import { log } from './logService';
 
 export interface NotificationItem {
   id: string;
@@ -110,11 +111,10 @@ async function _appendWithRetry(uid: string, notification: NotificationItem, max
       return _appendWithRetry(uid, notification, maxItems, attempt + 1);
     }
     // Provide contextual debug info to help troubleshoot permission errors
-    console.error('appendNotificationToUser failed', {
+    log.error('appendNotificationToUser failed after retries', {
       error: err?.message || err,
-      targetUid: uid,
-      notification
-    });
+      notificationId: notification?.id
+    }, 'notificationsService');
     throw err;
   }
 }

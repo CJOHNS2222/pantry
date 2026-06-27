@@ -4,6 +4,7 @@ import { LocalNotifications } from '@capacitor/local-notifications';
 import { Capacitor } from '@capacitor/core';
 import { StructuredRecipe } from '../../types';
 import { log } from '../../services/logService';
+import HapticService from '../../services/hapticService';
 
 interface CookingModeProps {
   recipe: StructuredRecipe;
@@ -91,8 +92,8 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipe, onExit }) => {
   const steps = processSteps(recipe.instructions || []);
   const [currentStep, setCurrentStep] = useState(0);
   const [showIngredients, setShowIngredients] = useState(false);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const wakeLockRef = useRef<any>(null);
+   
+  const wakeLockRef = useRef<{ release: () => Promise<void> } | null>(null);
 
   // Timer states (active globally within CookingMode so it persists across step navigation)
   const [timerSeconds, setTimerSeconds] = useState<number | null>(null);
@@ -107,10 +108,16 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipe, onExit }) => {
       if (released) return;
       if ('wakeLock' in navigator) {
         try {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          wakeLockRef.current = await (navigator as any).wakeLock.request('screen');
-        } catch (_) {
-          // Wake lock unavailable (older WebView / denied) — silent fail
+          const navWithWakeLock = navigator as typeof navigator & {
+            wakeLock?: {
+              request: (type: 'screen') => Promise<{ release: () => Promise<void> }>;
+            };
+          };
+          if (navWithWakeLock.wakeLock) {
+            wakeLockRef.current = await navWithWakeLock.wakeLock.request('screen');
+          }
+        } catch (error) {
+          log.info('Wake lock request failed or unsupported', { error });
         }
       }
     };
@@ -125,7 +132,7 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipe, onExit }) => {
 
     return () => {
       released = true;
-      wakeLockRef.current?.release().catch(() => {});
+      wakeLockRef.current?.release().catch((err: unknown) => log.info('Wake lock release skipped or failed', { error: err }));
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []);
@@ -153,7 +160,7 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipe, onExit }) => {
   useEffect(() => {
     return () => {
       if (notificationId) {
-        LocalNotifications.cancel({ notifications: [{ id: notificationId }] }).catch(() => {});
+        LocalNotifications.cancel({ notifications: [{ id: notificationId }] }).catch((err: unknown) => log.info('Notification cancellation skipped or failed', { error: err }));
       }
     };
   }, [notificationId]);
@@ -304,7 +311,7 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipe, onExit }) => {
           </h3>
           <ul className="space-y-4">
             {(recipe.ingredients || []).map((ing, i) => (
-              <li key={i} className="flex items-start gap-3 text-base text-gray-200 leading-snug">
+              <li key={`ing_${i}_${ing.slice(0, 10)}`} className="flex items-start gap-3 text-base text-gray-200 leading-snug">
                 <span className="mt-1.5 w-2 h-2 rounded-full bg-[var(--accent-color)] flex-shrink-0" />
                 {ing}
               </li>
@@ -331,7 +338,7 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipe, onExit }) => {
             <div className="flex gap-1.5 mb-6 flex-wrap justify-center max-w-xs flex-shrink-0">
               {steps.map((_, i) => (
                 <button
-                  key={i}
+                  key={`step_${i}`}
                   onClick={() => goTo(i)}
                   aria-label={`Go to step ${i + 1}`}
                   className={`rounded-full transition-all duration-200 ${
@@ -398,7 +405,12 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipe, onExit }) => {
           {/* Navigation */}
           <div className="flex-shrink-0 flex items-center gap-3 px-5 pb-8">
             <button
-              onClick={() => goTo(currentStep - 1)}
+              onClick={() => {
+                if (!isFirst) {
+                  HapticService.light();
+                  goTo(currentStep - 1);
+                }
+              }}
               disabled={isFirst}
               className={`flex-1 py-4 rounded-2xl font-bold text-base flex items-center justify-center gap-1.5 transition-all ${
                 isFirst
@@ -411,14 +423,22 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipe, onExit }) => {
 
             {isLast ? (
               <button
-                onClick={onExit}
+                onClick={() => {
+                  HapticService.success();
+                  onExit();
+                }}
                 className="flex-1 py-4 rounded-2xl font-bold text-base bg-[var(--accent-color)] text-white flex items-center justify-center gap-1.5 active:opacity-80"
               >
                 <UtensilsCrossed className="w-5 h-5" /> Done!
               </button>
             ) : (
               <button
-                onClick={() => goTo(currentStep + 1)}
+                onClick={() => {
+                  if (!isLast) {
+                    HapticService.light();
+                    goTo(currentStep + 1);
+                  }
+                }}
                 className="flex-1 py-4 rounded-2xl font-bold text-base bg-[var(--accent-color)] text-white flex items-center justify-center gap-1.5 active:opacity-80"
               >
                 Next <ChevronRight className="w-5 h-5" />

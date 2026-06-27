@@ -1184,7 +1184,7 @@ export const Community: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecipe,
                         title: `I unlocked ${selectedBadge.title}!`,
                         text: `I just earned the ${selectedBadge.title} badge on Stock & Spoon! My pantry score is ${userScore}/100. Can you beat me?`,
                         url: window.location.origin
-                      }).catch(() => {});
+                      }).catch(err => log.info('User cancelled sharing or sharing failed', { error: err }));
                     } else {
                       navigator.clipboard.writeText(`I just earned the ${selectedBadge.title} badge on Stock & Spoon! My pantry score is ${userScore}/100. Can you beat me?`);
                       alert('Share text copied to clipboard!');

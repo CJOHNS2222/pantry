@@ -19,8 +19,6 @@ import {
   SetOptions,
   Query,
   DocumentData,
-  QuerySnapshot,
-  DocumentSnapshot,
   Unsubscribe
 } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
@@ -60,6 +58,10 @@ class DatabaseMonitoringService {
   private static readonly PERFORMANCE_THRESHOLD = 5000; // 5 seconds
   private static isInitialized = false;
   private static metricsInterval: NodeJS.Timeout | null = null;
+
+  private static get shouldLog(): boolean {
+    return !!(import.meta as any).env?.DEV;
+  }
 
   // Track write patterns for heavy write detection
   private static trackWritePattern(collection: string): void {
@@ -214,7 +216,7 @@ class DatabaseMonitoringService {
       const durationFallback = Date.now() - startTime;
       this.metrics.queries++;
       AnalyticsService.trackQueryPerformance('unknown', 'getDocs', 0, durationFallback);
-      return { size: 0, docs: [], forEach: (fn: any) => {}, empty: true } as any;
+      return { size: 0, docs: [], forEach: (_fn: any) => {}, empty: true } as any;
     }
 
     try {
@@ -226,8 +228,10 @@ class DatabaseMonitoringService {
 
       // Detailed logging for query tracking
       const queryPath = this.getQueryPath(queryRef as any);
-      console.log(`🔍 QUERY: ${queryPath} | Results: ${result.size} | Duration: ${duration}ms | Total Queries: ${this.metrics.queries}`);
-      console.trace('Query call stack:');
+      if (this.shouldLog) {
+        console.log(`🔍 QUERY: ${queryPath} | Results: ${result.size} | Duration: ${duration}ms | Total Queries: ${this.metrics.queries}`);
+        console.trace('Query call stack:');
+      }
 
       AnalyticsService.trackQueryPerformance(
         (queryRef as any).parent?.id || 'unknown',
@@ -239,7 +243,9 @@ class DatabaseMonitoringService {
       return result;
     } catch (err: any) {
       const queryPath = this.getQueryPath(queryRef as any);
-      console.error(`❌ QUERY FAILED: ${queryPath} | Error: ${err.message}`);
+      if (this.shouldLog) {
+        console.error(`❌ QUERY FAILED: ${queryPath} | Error: ${err.message}`);
+      }
 
       AnalyticsService.trackDatabaseOperation('read', 'unknown', 0, {
         operation: 'getDocs',
@@ -252,7 +258,7 @@ class DatabaseMonitoringService {
       // of access without crashing the UI.
       if (err?.code === 'permission-denied' || /permission/i.test(err?.message || '')) {
         console.warn(`Permission denied for query ${queryPath}; returning empty snapshot.`);
-        return { size: 0, docs: [], forEach: (fn: any) => {}, empty: true } as any;
+        return { size: 0, docs: [], forEach: (_fn: any) => {}, empty: true } as any;
       }
 
       throw err;
@@ -260,7 +266,7 @@ class DatabaseMonitoringService {
   }
 
   // Helper method to extract query path for logging
-  private static getQueryPath<T = DocumentData>(queryRef: any): string {
+  private static getQueryPath(queryRef: any): string {
     try {
       // Try multiple ways to get the path
       if ((queryRef as any).parent?.path) {
@@ -284,7 +290,7 @@ class DatabaseMonitoringService {
       }
 
       return 'unknown';
-    } catch (err: any) {
+    } catch {
       return 'unknown';
     }
   }
@@ -503,7 +509,9 @@ class DatabaseMonitoringService {
     this.metrics.realtimeSubscriptions++;
 
     const path = ref.path || 'unknown';
-    console.log(`📡 SUBSCRIPTION: ${path} | Total Subscriptions: ${this.metrics.realtimeSubscriptions}`);
+    if (this.shouldLog) {
+      console.log(`📡 SUBSCRIPTION: ${path} | Total Subscriptions: ${this.metrics.realtimeSubscriptions}`);
+    }
 
     AnalyticsService.trackDatabaseOperation('read', ref.parent?.id || 'unknown', 0, {
       operation: 'onSnapshot',
@@ -519,7 +527,9 @@ class DatabaseMonitoringService {
         const changedDocs = snapshot.docChanges().length;
         this.metrics.reads += changedDocs;
         if (changedDocs > 0) {
-          console.log(`📡 SUBSCRIPTION UPDATE: ${path} | Reads: ${changedDocs} | Total Reads: ${this.metrics.reads}`);
+          if (this.shouldLog) {
+            console.log(`📡 SUBSCRIPTION UPDATE: ${path} | Reads: ${changedDocs} | Total Reads: ${this.metrics.reads}`);
+          }
         }
         AnalyticsService.trackDatabaseOperation('read', ref.parent?.id || 'unknown', changedDocs, {
           operation: 'onSnapshot_update'
@@ -527,7 +537,9 @@ class DatabaseMonitoringService {
       } else {
         // Document snapshot: 1 read per delivery
         this.metrics.reads++;
-        console.log(`📡 SNAPSHOT READ: ${path} | Total Reads: ${this.metrics.reads}`);
+        if (this.shouldLog) {
+          console.log(`📡 SNAPSHOT READ: ${path} | Total Reads: ${this.metrics.reads}`);
+        }
         AnalyticsService.trackDatabaseOperation('read', ref.parent?.id || 'unknown', 1, {
           operation: 'onSnapshot_read'
         });
@@ -553,12 +565,14 @@ class DatabaseMonitoringService {
 
     const metrics = this.getMetrics();
     const timestamp = new Date().toLocaleTimeString();
-    console.log(`🔥 [${timestamp}] Firestore Database Metrics:`, {
-      ...metrics,
-      readsPerMinute: Math.round((metrics.reads / metrics.sessionDuration) * 60000),
-      writesPerMinute: Math.round((metrics.writes / metrics.sessionDuration) * 60000),
-      activeWritePatterns: this.writePatterns.size
-    });
+    if (this.shouldLog) {
+      console.log(`🔥 [${timestamp}] Firestore Database Metrics:`, {
+        ...metrics,
+        readsPerMinute: Math.round((metrics.reads / metrics.sessionDuration) * 60000),
+        writesPerMinute: Math.round((metrics.writes / metrics.sessionDuration) * 60000),
+        activeWritePatterns: this.writePatterns.size
+      });
+    }
   }
 
   // Export metrics for external monitoring
@@ -573,6 +587,10 @@ class DatabaseMonitoringService {
   // Initialize monitoring by monkey-patching Firestore functions
   static initializeMonitoring() {
     if (this.isInitialized) return;
+    if (!this.shouldLog) {
+      this.isInitialized = true;
+      return;
+    }
 
     try {
       // Store original functions
@@ -583,7 +601,6 @@ class DatabaseMonitoringService {
       const originalAddDoc = addDoc;
       const originalDeleteDoc = deleteDoc;
       const originalOnSnapshot = onSnapshot;
-      const originalWriteBatch = writeBatch;
 
       // Monkey-patch getDoc
       (globalThis as any).getDoc = async (ref: any) => {
@@ -793,9 +810,13 @@ class DatabaseMonitoringService {
       }, 30000);
 
       this.isInitialized = true;
-      console.log('🔥 Database monitoring initialized with function overrides');
+      if (this.shouldLog) {
+        console.log('🔥 Database monitoring initialized with function overrides');
+      }
     } catch (err: any) {
-      console.error('Failed to initialize database monitoring:', err);
+      if (this.shouldLog) {
+        console.error('Failed to initialize database monitoring:', err);
+      }
     }
   }
 

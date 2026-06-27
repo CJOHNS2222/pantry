@@ -1,3 +1,16 @@
+## [2.5.0] - 2026-06-27
+
+### Added
+- **Native Calendar Support** — Integrated Capacitor Calendar for scheduling meals and meal prep reminders on native devices.
+
+### Changed
+- **Leftover Waste Disclosures** — Added clear estimations disclaimer indicating a 30% assumed waste rate for leftovers over 7 days old.
+
+### Fixed
+- **Recipe Ratings Type-Safety** — Refactored database rating service to eliminate all pervasive `any` types and improve runtime validation.
+
+---
+
 ## [2.4.19] - 2026-06-26
 
 ### Added
