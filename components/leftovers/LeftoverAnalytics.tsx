@@ -42,7 +42,7 @@ export const LeftoverAnalytics: React.FC<LeftoverAnalyticsProps> = ({ householdI
         setFoodWasteAnalytics(foodWasteData);
 
         // Calculate leftover analytics (keeping existing logic for now)
-        await calculateLeftoverAnalytics();
+        await calculateLeftoverAnalytics(foodWasteData);
       } catch (err) {
         log.error('Error fetching analytics', { error: err }, 'LeftoverAnalytics');
         setError('Failed to load analytics data');
@@ -54,18 +54,14 @@ export const LeftoverAnalytics: React.FC<LeftoverAnalyticsProps> = ({ householdI
     fetchAnalytics();
   }, [householdId, userId]);
 
-  const calculateLeftoverAnalytics = async () => {
+  const calculateLeftoverAnalytics = async (currentFoodWasteAnalytics?: FoodWasteAnalytics | null) => {
     try {
-      setLoading(true);
-      setError(null);
-
       // Get all current leftovers
       const leftovers = await LeftoverService.getLeftovers(householdId, userId);
 
-      // For now, we'll calculate based on current leftovers
-      // In a real implementation, you'd want to track historical data
+      // Calculate based on original quantity_estimate vs current remaining servings
       const totalServingsConsumed = leftovers.reduce((sum, leftover) => {
-        const originalServings = leftover.leftoverMeta?.servings || 1;
+        const originalServings = Number(leftover.quantity_estimate) || leftover.leftoverMeta?.servings || 1;
         const consumedServings = originalServings - (leftover.leftoverMeta?.servings || 0);
         return sum + Math.max(0, consumedServings);
       }, 0);
@@ -96,6 +92,8 @@ export const LeftoverAnalytics: React.FC<LeftoverAnalyticsProps> = ({ householdI
         ? Math.max(0, ((potentialWasteWithoutLeftovers - actualWaste) / potentialWasteWithoutLeftovers) * 100)
         : 0;
 
+      const wasteData = currentFoodWasteAnalytics !== undefined ? currentFoodWasteAnalytics : foodWasteAnalytics;
+
       setAnalytics({
         totalServingsConsumed,
         totalServingsWasted,
@@ -104,17 +102,15 @@ export const LeftoverAnalytics: React.FC<LeftoverAnalyticsProps> = ({ householdI
         mealsReplaced,
         wasteReductionPercentage,
         // Include food waste analytics
-        totalItemsDisposed: foodWasteAnalytics?.totalItemsDisposed || 0,
-        itemsThrownAway: foodWasteAnalytics?.itemsByReason.thrown_away || 0,
-        itemsCooked: foodWasteAnalytics?.itemsByReason.cooked || 0,
-        itemsRemoved: foodWasteAnalytics?.itemsByReason.remove || 0,
-        averageDaysExpired: foodWasteAnalytics?.averageDaysExpired || 0,
-        totalWasteValue: foodWasteAnalytics?.totalEstimatedValue || 0
+        totalItemsDisposed: wasteData?.totalItemsDisposed || 0,
+        itemsThrownAway: wasteData?.itemsByReason?.thrown_away || 0,
+        itemsCooked: wasteData?.itemsByReason?.cooked || 0,
+        itemsRemoved: wasteData?.itemsByReason?.remove || 0,
+        averageDaysExpired: wasteData?.averageDaysExpired || 0,
+        totalWasteValue: wasteData?.totalEstimatedValue || 0
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to calculate analytics');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -175,15 +171,18 @@ export const LeftoverAnalytics: React.FC<LeftoverAnalyticsProps> = ({ householdI
           </h4>
           <div className="space-y-2">
             <div className="flex justify-between">
-              <span className="text-green-400">Value Saved:</span>
+              <span className="text-green-400">Value Saved (Est.):</span>
               <span className="font-semibold text-green-400">${analytics.estimatedValueSaved.toFixed(2)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-red-400">Potential Waste:</span>
+              <span className="text-red-400 flex items-center gap-1">
+                Potential Waste (Est.):
+                <span className="text-xs text-red-400/70" title="Assumes a 30% waste rate for leftovers older than 7 days">(30% over 7d old)</span>
+              </span>
               <span className="font-semibold text-red-400">${analytics.estimatedValueWasted.toFixed(2)}</span>
             </div>
             <div className="flex justify-between border-t border-theme pt-2">
-              <span className="text-theme-primary">Net Savings:</span>
+              <span className="text-theme-primary">Net Savings (Est.):</span>
               <span className="font-semibold text-theme-primary">
                 ${(analytics.estimatedValueSaved - analytics.estimatedValueWasted).toFixed(2)}
               </span>
@@ -227,7 +226,7 @@ export const LeftoverAnalytics: React.FC<LeftoverAnalyticsProps> = ({ householdI
 
       <div className="text-center text-sm text-theme-secondary">
         <p>Analytics based on current leftover data and disposal history</p>
-        <p>Values are estimates and may vary based on actual food costs</p>
+        <p>Values are estimates (assuming a 30% waste rate for leftovers older than 7 days) and may vary based on actual food costs</p>
       </div>
     </div>
   );

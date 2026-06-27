@@ -179,13 +179,12 @@ export async function searchRecipesViaOpenRouter(
   }
 
   log.debug('OpenRouter response', { model, contentLength: content.length }, 'OpenRouterService');
-  console.log(`[OpenRouter] Model: ${model} | Response length: ${content.length}`);
-  console.log(`[OpenRouter] Raw: ${content.substring(0, 300)}`);
+  log.debug(`OpenRouter raw response`, { model, preview: content.substring(0, 300) }, 'OpenRouterService');
 
   const recipes = parseRecipesFromText(content);
 
   if (recipes.length === 0) {
-    console.warn('[OpenRouter] Could not parse any recipes from response. Raw:', content.substring(0, 500));
+    log.warn('OpenRouter could not parse any recipes from response', { preview: content.substring(0, 500) }, 'OpenRouterService');
     throw new Error('AI returned a response that could not be parsed into recipes. Try rephrasing your search or adjusting your ingredients.');
   }
 
@@ -268,8 +267,7 @@ async function callVisionModel(
   const content = data.choices?.[0]?.message?.content ?? '';
   if (!content) throw new Error('OpenRouter vision returned an empty response.');
 
-  console.log(`[OpenRouter/${logTag}] Model: ${model} | Response length: ${content.length}`);
-  console.log(`[OpenRouter/${logTag}] Raw: ${content.substring(0, 300)}`);
+  log.debug(`${logTag}: vision model response`, { model, contentLength: content.length, preview: content.substring(0, 300) }, 'OpenRouterService');
 
   return content;
 }
@@ -313,10 +311,10 @@ export async function analyzePantryImageViaOpenRouter(
   const items = parseJsonArray<PantryItem>(text);
 
   if (items.length === 0) {
-    console.warn('[OpenRouter/analyzePantry] No items parsed. Raw:', text.substring(0, 500));
+    log.warn('OpenRouter/analyzePantry: no items parsed', { preview: text.substring(0, 500) }, 'OpenRouterService');
     throw new Error('No pantry items could be identified from the image. Try a clearer photo with better lighting.');
   }
-  console.log(`[OpenRouter/analyzePantry] Parsed ${items.length} items`);
+  log.debug('OpenRouter/analyzePantry: parsed items', { count: items.length }, 'OpenRouterService');
 
   return items;
 }
@@ -342,10 +340,10 @@ export async function analyzeReceiptImageViaOpenRouter(
   const items = parseJsonArray<PantryItem>(text);
 
   if (items.length === 0) {
-    console.warn('[OpenRouter/analyzeReceipt] No items parsed. Raw:', text.substring(0, 500));
+    log.warn('OpenRouter/analyzeReceipt: no items parsed', { preview: text.substring(0, 500) }, 'OpenRouterService');
     throw new Error('No receipt items could be identified from the image. Try a clearer, well-lit photo of the receipt.');
   }
-  console.log(`[OpenRouter/analyzeReceipt] Parsed ${items.length} items`);
+  log.debug('OpenRouter/analyzeReceipt: parsed items', { count: items.length }, 'OpenRouterService');
 
   return items;
 }

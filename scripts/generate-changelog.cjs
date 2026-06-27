@@ -76,6 +76,53 @@ function parseChangelog(content) {
   return entries;
 }
 
+/**
+ * Parses all versions in detail, splitting by section (Added, Changed, Fixed)
+ * and extracting all bullet points for the comprehensive ChangelogPage.
+ */
+function parseDetailedChangelog(content) {
+  const blocks = content.split(/^## \[/m).slice(1);
+  const entries = [];
+
+  for (const block of blocks) {
+    const headerMatch = block.match(/^([\d.]+)\] - (\d{4}-\d{2}-\d{2})/);
+    if (!headerMatch) continue;
+
+    const version = headerMatch[1];
+    const date = formatDate(headerMatch[2]);
+
+    const sections = [];
+    // Split block by "### " to get sections (Added, Changed, Fixed, etc.)
+    const sectionParts = block.split(/^### /m).slice(1);
+    
+    for (const part of sectionParts) {
+      const lines = part.split('\n');
+      const title = lines[0].trim();
+      const bullets = [];
+      
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (line.startsWith('- ')) {
+          const bulletText = line.slice(2).trim();
+          if (bulletText) {
+            bullets.push(bulletText);
+          }
+        }
+      }
+      
+      if (bullets.length > 0) {
+        sections.push({ title, bullets });
+      }
+    }
+
+    if (sections.length > 0) {
+      entries.push({ version, date, sections });
+    }
+  }
+
+  return entries;
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 let content;
@@ -87,6 +134,7 @@ try {
 }
 
 const entries = parseChangelog(content);
+const detailedEntries = parseDetailedChangelog(content);
 
 if (entries.length === 0) {
   console.warn('generate-changelog: no entries parsed — check CHANGELOG.md format');
@@ -102,9 +150,22 @@ export interface ChangeEntry {
   highlights: string[];
 }
 
+export interface DetailedSection {
+  title: string;
+  bullets: string[];
+}
+
+export interface DetailedChangeEntry {
+  version: string;
+  date: string;
+  sections: DetailedSection[];
+}
+
 export const RECENT_CHANGES: ChangeEntry[] = ${JSON.stringify(entries, null, 2)};
+
+export const ALL_CHANGES: DetailedChangeEntry[] = ${JSON.stringify(detailedEntries, null, 2)};
 `;
 
 fs.mkdirSync(path.dirname(OUTPUT_PATH), { recursive: true });
 fs.writeFileSync(OUTPUT_PATH, output, 'utf8');
-console.log(`✅  changelogEntries.ts generated (${entries.length} version${entries.length !== 1 ? 's' : ''})`);
+console.log(`✅  changelogEntries.ts generated (${entries.length} recent, ${detailedEntries.length} total versions)`);

@@ -646,7 +646,7 @@ const App: React.FC = () => {
 
     const listener = CapacitorApp.addListener('appRestoredResult', handleRestoredResult);
     return () => {
-      listener.then(l => l.remove());
+      listener.then(l => l.remove()).catch(() => {});
     };
   }, []);
 
@@ -835,7 +835,7 @@ const App: React.FC = () => {
               log.error('Error joining household', { error }, 'App');
               let message = 'Failed to join household';
               if (error instanceof Error && error.message?.includes('not invited')) {
-                message = 'Unable to join 9: You are not invited to this household or have already joined';
+                message = 'Unable to join: You are not invited to this household or have already joined';
               }
               addToast(message, 'error');
             }
@@ -1011,31 +1011,23 @@ const App: React.FC = () => {
     }
   };
 
-  const handleRemoveExpiredItems = async (itemIds: string[]) => {
+  const handleRemoveExpiredItems = async (itemIds: string[], disposalReason?: string) => {
     try {
-      // Find items to remove
-      const itemsToRemove = inventory.filter(item => itemIds.includes(item.id));
-      
-      // Remove from inventory
-      setInventory(prev => prev.filter(item => !itemIds.includes(item.id)));
-      
-      // Remove from cache
-      const inHousehold = household?.id && isHouseholdMember(household, user);
-      const householdId = inHousehold ? household?.id : undefined;
-      const userId = inHousehold ? undefined : user?.id;
-      
-      await Promise.all(
-        itemIds.map(itemId => 
-          InventoryCacheService.removeItemFromCache(itemId, householdId, userId)
-        )
-      );
-      
-      // Log activity for each removed item
-      for (const item of itemsToRemove) {
-        logItemRemoved(item.item, item.id);
+      // Find the indices of the items in the current inventory array
+      const indices = itemIds
+        .map(id => inventory.findIndex(item => item.id === id))
+        .filter(index => index !== -1);
+
+      if (indices.length > 0) {
+        // Map the string disposalReason safely to the expected literal union
+        const reason = (disposalReason === 'cooked' || disposalReason === 'remove')
+          ? disposalReason
+          : 'thrown_away';
+
+        // Delegate to the core deleteItems hook, which handles state updates,
+        // cache sync, activity logging, and food waste analytics recording
+        await deleteItems(indices, reason);
       }
-      
-      addToast(`${itemIds.length} expired item${itemIds.length !== 1 ? 's' : ''} removed`, 'success');
     } catch (error) {
       log.error('Failed to remove expired items', { error }, 'App');
       addToast('Failed to remove expired items', 'error');
@@ -1126,7 +1118,7 @@ const App: React.FC = () => {
     };
   }, []);
 
-  const [lastBackPress, setLastBackPress] = useState<number>(0);
+  const lastBackPressRef = useRef<number>(0);
   useEffect(() => {
     const handleBackButton = () => {
       // Delegate to the shared LIFO modal stack first.
@@ -1143,13 +1135,13 @@ const App: React.FC = () => {
       }
 
       const currentTime = Date.now();
-      const timeDiff = currentTime - lastBackPress;
+      const timeDiff = currentTime - lastBackPressRef.current;
 
       if (timeDiff < 2000) {
         CapacitorApp.exitApp();
       } else {
         addToast('Press back again to exit', 'info', 2000);
-        setLastBackPress(currentTime);
+        lastBackPressRef.current = currentTime;
       }
     };
 
@@ -1184,7 +1176,7 @@ const App: React.FC = () => {
         appUrlOpenListenerRef.current = null;
       }
     };
-  }, [activeTab, lastBackPress, addToast]);
+  }, [addToast]);
 
   const [previousTab, setPreviousTab] = useState<Tab>(Tab.PANTRY);
   useEffect(() => {

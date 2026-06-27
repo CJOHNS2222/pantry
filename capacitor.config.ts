@@ -19,12 +19,9 @@ const config: CapacitorConfig = {
     PushNotifications: {
       presentationOptions: ["badge", "sound", "alert"],
     },
-    // Calendar: {
-    //   // capacitor-calendar plugin is NOT installed.
-    //   // ICS file export (exportWeekAsICS) works without it.
-    //   // To restore native calendar push, install @howljs/capacitor-calendar
-    //   // (Capacitor 8 compatible) and uncomment this block.
-    // },
+    Calendar: {
+      // Installed @ebarooni/capacitor-calendar
+    },
     SafeArea: {
       // Safe area plugin configuration
     },

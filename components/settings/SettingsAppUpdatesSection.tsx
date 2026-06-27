@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { RefreshCw, FileText } from 'lucide-react';
 import { VersionUpdate } from '../ui/VersionUpdate';
-import { WhatsNewModal } from '../auth-onboarding/WhatsNewModal';
+import { ChangelogPage } from './ChangelogPage';
 import { useIntl } from 'react-intl';
 
 interface SettingsAppUpdatesSectionProps {
@@ -45,7 +45,7 @@ export const SettingsAppUpdatesSection: React.FC<SettingsAppUpdatesSectionProps>
       </div>
 
       {showChangelog && (
-        <WhatsNewModal isOpen={true} onClose={() => setShowChangelog(false)} />
+        <ChangelogPage onBack={() => setShowChangelog(false)} />
       )}
     </div>
   );

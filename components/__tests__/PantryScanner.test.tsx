@@ -1,10 +1,20 @@
-﻿import React from 'react';
+import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 // Explicit Vitest imports to avoid relying on globals in some CI/test setups
-import { vi, describe, test, expect } from 'vitest';
+import { vi, describe, test, expect, beforeEach } from 'vitest';
 import { PantryScanner } from '../pantry/PantryScanner';
 import { AppProvider } from '../../contexts/AppContext';
 import { AppActionsProvider } from '../../contexts/AppActionsContext';
+
+// Mock IntersectionObserver for JSDOM
+beforeEach(() => {
+  class MockIntersectionObserver {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  }
+  window.IntersectionObserver = MockIntersectionObserver as any;
+});
 
 function makeItem(i: number) {
   return {

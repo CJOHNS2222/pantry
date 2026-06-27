@@ -1,4 +1,4 @@
-import { increment, arrayUnion, Timestamp, serverTimestamp } from 'firebase/firestore';
+import { increment, arrayUnion, Timestamp, serverTimestamp, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
 import DatabaseMonitoringService from './databaseMonitoringService';
 import {
   RecipeRating,
@@ -12,18 +12,22 @@ import { upsertCommunityRatedRecipeByTitle, saveRecipeToFirestore, getCachedReci
 import type { RecipeRecommendation } from './recipeRecommendationService';
 
 // Recursively remove undefined properties (preserve Timestamp and other non-plain values)
-const sanitizeForFirestore = (obj: any): any => {
+const sanitizeForFirestore = <T>(obj: T): T => {
   if (obj === null || typeof obj !== 'object') return obj;
-  if (Array.isArray(obj)) return obj.map(item => sanitizeForFirestore(item)).filter(i => i !== undefined);
-  // Keep Firebase Timestamps and special types as-is (they usually have toDate or _seconds/_nanoseconds)
-  if (obj.constructor && obj.constructor.name && ['Timestamp'].includes(obj.constructor.name)) return obj;
+  if (Array.isArray(obj)) {
+    return obj.map(item => sanitizeForFirestore(item)).filter(i => i !== undefined) as unknown as T;
+  }
+  
+  const constructorName = obj.constructor?.name;
+  if (constructorName && ['Timestamp', 'FieldValue'].includes(constructorName)) return obj;
 
-  const out: any = {};
-  for (const key of Object.keys(obj)) {
-    const v = sanitizeForFirestore(obj[key]);
+  const out: Record<string, unknown> = {};
+  const record = obj as Record<string, unknown>;
+  for (const key of Object.keys(record)) {
+    const v = sanitizeForFirestore(record[key]);
     if (v !== undefined) out[key] = v;
   }
-  return out;
+  return out as T;
 };
 
 export class RecipeRatingService {
@@ -76,7 +80,7 @@ export class RecipeRatingService {
       }
 
       log.info('Recipe rating submitted', { recipeTitle: rating.recipeTitle, userId });
-    } catch (err: any) {
+    } catch (err: unknown) {
       log.error('Failed to submit recipe rating', { err, recipeTitle: rating.recipeTitle });
       throw err;
     }
@@ -109,7 +113,7 @@ export class RecipeRatingService {
 
       log.info('Recipe ensured to exist during rating', { recipeTitle: recipe.title, recipeId, userId });
       return recipeId;
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Don't fail the rating if recipe saving fails
       log.warn('Failed to ensure recipe exists during rating', { error: err, recipeTitle: recipe.title });
       throw err;
@@ -124,7 +128,7 @@ export class RecipeRatingService {
       const cacheRef = DatabaseMonitoringService.doc('system/community_rated_recipes');
       const cacheSnap = await DatabaseMonitoringService.getDoc(cacheRef);
 
-      let arr: any[] = [];
+      let arr: Array<StructuredRecipe & Record<string, unknown>> = [];
       if (cacheSnap && cacheSnap.exists && typeof cacheSnap.exists === 'function' ? cacheSnap.exists() : cacheSnap.exists) {
         const data = cacheSnap.data();
         arr = Array.isArray(data.recipes) ? data.recipes : [];
@@ -157,7 +161,7 @@ export class RecipeRatingService {
 
       await DatabaseMonitoringService.setDoc(cacheRef, { recipes: arr, lastUpdated: serverTimestamp(), version: 1 });
       log.info('Updated community cache with recipe data', { recipeTitle: recipe.title, recipeId });
-    } catch (err: any) {
+    } catch (err: unknown) {
       log.warn('Failed to update community cache with recipe', { error: err, recipeTitle: recipe.title });
     }
   }
@@ -167,8 +171,8 @@ export class RecipeRatingService {
       const statsDoc = await DatabaseMonitoringService.getDoc(statsRef);
 
       if (statsDoc.exists()) {
-        const data = statsDoc.data() as any;
-        let householdStats = undefined;
+        const data = statsDoc.data() as RecipeCommunityStats;
+        let householdStats: RecipeCommunityStats['householdStats'] = undefined;
 
         if (householdId) {
           // Get household-specific stats
@@ -180,12 +184,12 @@ export class RecipeRatingService {
           const householdRatings = await DatabaseMonitoringService.getDocs(householdRatingsQuery);
 
             if (!householdRatings.empty) {
-            const ratings = householdRatings.docs.map((doc: any) => doc.data() as any);
-            const wouldMakeAgainCount = ratings.filter((r: any) => r.wouldMakeAgain).length;
+            const ratings = householdRatings.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => doc.data() as RecipeRating);
+            const wouldMakeAgainCount = ratings.filter((r: RecipeRating) => r.wouldMakeAgain).length;
 
             householdStats = {
               householdRatings: ratings.length,
-              householdAverageRating: ratings.reduce((sum: number, r: any) => sum + r.rating, 0) / ratings.length,
+              householdAverageRating: ratings.reduce((sum: number, r: RecipeRating) => sum + r.rating, 0) / ratings.length,
               householdWouldMakeAgain: (wouldMakeAgainCount / ratings.length) * 100
             };
           }
@@ -194,7 +198,7 @@ export class RecipeRatingService {
         return {
           ...data,
           householdStats
-        } as RecipeCommunityStats;
+        };
       }
 
       // Return default stats if none exist
@@ -210,7 +214,7 @@ export class RecipeRatingService {
           householdWouldMakeAgain: 0
         } : undefined
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
       log.error('Failed to get community stats', { err, recipeTitle });
       throw err;
     }
@@ -226,19 +230,19 @@ export class RecipeRatingService {
         DatabaseMonitoringService.where('recipeTitle', '==', recipeTitle)
       );
       const ratingsSnapshot = await DatabaseMonitoringService.getDocs(ratingsQuery);
-      const ratings = ratingsSnapshot.docs.map((doc: any) => doc.data() as any);
+      const ratings = ratingsSnapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => doc.data() as RecipeRating);
 
       if (ratings.length === 0) return;
 
       // Calculate stats
       const totalRatings = ratings.length;
-      const averageRating = ratings.reduce((sum: number, r: any) => sum + r.rating, 0) / totalRatings;
-      const wouldMakeAgainCount = ratings.filter((r: any) => r.wouldMakeAgain).length;
+      const averageRating = ratings.reduce((sum: number, r: RecipeRating) => sum + r.rating, 0) / totalRatings;
+      const wouldMakeAgainCount = ratings.filter((r: RecipeRating) => r.wouldMakeAgain).length;
       const wouldMakeAgainPercentage = (wouldMakeAgainCount / totalRatings) * 100;
 
       // Calculate top feedback
       const feedbackCount: Record<string, number> = {};
-      ratings.forEach((rating: any) => {
+      ratings.forEach((rating: RecipeRating) => {
         if (rating.feedback) {
           rating.feedback.forEach((fb: RecipeFeedback) => {
             feedbackCount[fb.type] = (feedbackCount[fb.type] || 0) + 1;
@@ -261,7 +265,7 @@ export class RecipeRatingService {
         lastUpdated: Timestamp.now()
       });
 
-    } catch (err: any) {
+    } catch (err: unknown) {
       log.error('Failed to update community stats', { err, recipeTitle });
     }
   }
@@ -288,7 +292,7 @@ export class RecipeRatingService {
       });
 
       log.info('Recipe modification added', { recipeTitle, userId });
-    } catch (err: any) {
+    } catch (err: unknown) {
       log.error('Failed to add recipe modification', { err, recipeTitle });
       throw err;
     }
@@ -306,7 +310,7 @@ export class RecipeRatingService {
       });
 
       log.info('Modification marked as helpful', { modificationId, userId });
-    } catch (err: any) {
+    } catch (err: unknown) {
       log.error('Failed to mark modification as helpful', { err, modificationId });
       throw err;
     }
@@ -326,14 +330,14 @@ export class RecipeRatingService {
       );
 
       const modsSnapshot = await DatabaseMonitoringService.getDocs(modsQuery);
-      return modsSnapshot.docs.map((doc: any) => {
-        const d = doc.data() as any;
+      return modsSnapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => {
+        const d = doc.data() as Omit<RecipeModification, 'date'> & { date: unknown };
         return {
           ...d,
-          date: normalizeDate(d.date)
+          date: normalizeDate(d.date) || ''
         } as RecipeModification;
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       log.error('Failed to get top modifications', { err, recipeTitle });
       return [];
     }
@@ -353,14 +357,14 @@ export class RecipeRatingService {
 
       const ratingSnapshot = await DatabaseMonitoringService.getDocs(ratingQuery);
       if (!ratingSnapshot.empty) {
-        const data = ratingSnapshot.docs[0].data() as any;
+        const data = ratingSnapshot.docs[0].data() as Omit<RecipeRating, 'date'> & { date: unknown };
         return {
           ...data,
-          date: normalizeDate(data.date)
+          date: normalizeDate(data.date) || ''
         } as RecipeRating;
       }
       return null;
-    } catch (err: any) {
+    } catch (err: unknown) {
       log.error('Failed to get user rating', { err, recipeTitle, userId });
       return null;
     }
@@ -380,14 +384,14 @@ export class RecipeRatingService {
       );
 
       const ratingsSnapshot = await DatabaseMonitoringService.getDocs(ratingsQuery);
-      return ratingsSnapshot.docs.map((doc: any) => {
-        const data = doc.data() as any;
+      return ratingsSnapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => {
+        const data = doc.data() as Omit<RecipeRating, 'date'> & { date: unknown };
         return {
           ...data,
-          date: normalizeDate(data.date)
+          date: normalizeDate(data.date) || ''
         } as RecipeRating;
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       log.error('Failed to get household ratings', { err, recipeTitle, householdId });
       return [];
     }
@@ -411,10 +415,10 @@ export class RecipeRatingService {
         DatabaseMonitoringService.limit(20)
       );
       const userRatings = await DatabaseMonitoringService.getDocs(userRatingsQuery);
-      const userRatingData = userRatings.docs.map((doc: any) => doc.data());
+      const userRatingData = userRatings.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => doc.data() as RecipeRating);
 
       // Get household preferences
-      let householdRatings: any[] = [];
+      let householdRatings: RecipeRating[] = [];
       if (householdId) {
         const householdQuery = DatabaseMonitoringService.query(
           DatabaseMonitoringService.collection(this.RATINGS_COLLECTION),
@@ -423,7 +427,7 @@ export class RecipeRatingService {
           DatabaseMonitoringService.limit(50)
         );
         const householdSnapshot = await DatabaseMonitoringService.getDocs(householdQuery);
-        householdRatings = householdSnapshot.docs.map((doc: any) => doc.data());
+        householdRatings = householdSnapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => doc.data() as RecipeRating);
       }
 
       // Simple recommendation logic (can be enhanced with ML)
@@ -436,28 +440,51 @@ export class RecipeRatingService {
       // Household-loved recipes that user hasn't rated
       if (householdRatings.length > 0) {
         const householdLoved = householdRatings
-          .filter((r: any) => r.wouldMakeAgain)
-            .filter((r: any) => !userRatingData.some((ur: any) => ur.recipeTitle === r.recipeTitle))
-            .reduce((acc: Record<string, number>, rating: any) => {
+          .filter((r: RecipeRating) => r.wouldMakeAgain)
+            .filter((r: RecipeRating) => !userRatingData.some((ur: RecipeRating) => ur.recipeTitle === r.recipeTitle))
+            .reduce((acc: Record<string, number>, rating: RecipeRating) => {
               const title = rating.recipeTitle || 'unknown';
               acc[title] = (acc[title] || 0) + 1;
               return acc;
             }, {} as Record<string, number>);
 
-        Object.entries(householdLoved)
-              .sort(([,a]: any, [,b]: any) => (b as number) - (a as number))
-              .slice(0, 2)
-              .forEach(([recipeTitle, count]: [string, number]) => {
-                const c = Number(count || 0);
-                const fullRecipe = recipeByTitle.get(recipeTitle.toLowerCase());
-                if (!fullRecipe) return; // skip titles not found in cache
-                recommendations.push({
-                  recipe: fullRecipe,
-                  reason: `${c} household member${c === 1 ? '' : 's'} loved this`,
-                  confidence: Math.min(0.9, c / 5),
-                  type: 'household-loved'
-                });
-              });
+        const sortedLoved = Object.entries(householdLoved)
+              .sort(([, a], [, b]) => b - a)
+              .slice(0, 2);
+
+        for (const [recipeTitle, count] of sortedLoved) {
+          const c = Number(count || 0);
+          let fullRecipe: StructuredRecipe | undefined = recipeByTitle.get(recipeTitle.toLowerCase());
+          
+          if (!fullRecipe) {
+            try {
+              const existingQuery = DatabaseMonitoringService.query(
+                DatabaseMonitoringService.collection('recipes'),
+                DatabaseMonitoringService.where('title', '==', recipeTitle),
+                DatabaseMonitoringService.limit(1)
+              );
+              const existingDocs = await DatabaseMonitoringService.getDocs(existingQuery);
+              if (!existingDocs.empty) {
+                const data = existingDocs.docs[0].data() as StructuredRecipe;
+                fullRecipe = {
+                  id: existingDocs.docs[0].id,
+                  ...data
+                };
+              }
+            } catch (err) {
+              log.warn('Failed to fetch recipe from database for recommendation', { recipeTitle, error: err });
+            }
+          }
+
+          if (!fullRecipe) continue;
+
+          recommendations.push({
+            recipe: fullRecipe,
+            reason: `${c} household member${c === 1 ? '' : 's'} loved this`,
+            confidence: Math.min(0.9, c / 5),
+            type: 'household-loved'
+          });
+        }
       }
 
       // Pantry-ingredient matching: recipes whose ingredients overlap with pantry items
@@ -488,7 +515,7 @@ export class RecipeRatingService {
       }
 
       return recommendations.slice(0, limitCount);
-    } catch (err: any) {
+    } catch (err: unknown) {
       log.error('Failed to get personalized recommendations', { err, userId });
       return [];
     }
@@ -496,18 +523,26 @@ export class RecipeRatingService {
 }
 
 // Helper to normalize Firestore date fields that may be Timestamp, string, or plain object
-const normalizeDate = (dateField: any): string | null => {
+const normalizeDate = (dateField: unknown): string | null => {
   if (!dateField) return null;
-  // Firestore Timestamp
-  if (typeof dateField.toDate === 'function') {
-    try { return dateField.toDate().toISOString(); } catch { /* fallthrough */ }
-  }
-  // Legacy proto-like object with seconds
-  if (typeof dateField.seconds === 'number') {
-    return new Date(dateField.seconds * 1000).toISOString();
-  }
-  if (typeof dateField._seconds === 'number') {
-    return new Date(dateField._seconds * 1000).toISOString();
+  
+  if (dateField && typeof dateField === 'object') {
+    const record = dateField as Record<string, unknown>;
+    // Firestore Timestamp
+    if (typeof record.toDate === 'function') {
+      try {
+        return (record.toDate as () => Date)().toISOString();
+      } catch {
+        /* fallthrough */
+      }
+    }
+    // Legacy proto-like object with seconds
+    if (typeof record.seconds === 'number') {
+      return new Date(record.seconds * 1000).toISOString();
+    }
+    if (typeof record._seconds === 'number') {
+      return new Date(record._seconds * 1000).toISOString();
+    }
   }
   // Already a string
   if (typeof dateField === 'string') return dateField;

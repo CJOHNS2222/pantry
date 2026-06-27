@@ -186,7 +186,10 @@ const SmartRecommendations: React.FC<SmartRecommendationsProps> = ({ inventory, 
         }
         break;
       case 'feature':
-        if (rec.actionText.includes('Upgrade Now') || rec.actionText.includes('Create Meal Plan')) {
+        if (rec.actionText.includes('Upgrade Now')) {
+          sessionStorage.setItem('settings_redirect_tab', 'more');
+          setActiveTab(Tab.SETTINGS);
+        } else if (rec.actionText.includes('Create Meal Plan')) {
           setActiveTab(Tab.SETTINGS);
         } else if (rec.actionText.includes('Add First Item')) {
           setActiveTab(Tab.PANTRY);

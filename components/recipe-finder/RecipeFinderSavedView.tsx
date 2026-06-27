@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useIntl } from 'react-intl';
 import { 
   Bookmark, 
@@ -51,7 +51,10 @@ export const RecipeFinderSavedView: React.FC<RecipeFinderSavedViewProps> = ({
   const [viewMode, setViewMode] = useState<'all' | 'collections'>('all');
   const [collections, setCollections] = useState<Record<string, string[]>>(() => {
     try {
-      return JSON.parse(localStorage.getItem('recipeCollections') || '{}');
+      const raw = localStorage.getItem('recipeCollections');
+      if (!raw) return {};
+      const parsed = JSON.parse(raw);
+      return (parsed && typeof parsed === 'object') ? parsed : {};
     } catch {
       return {};
     }
@@ -124,9 +127,11 @@ export const RecipeFinderSavedView: React.FC<RecipeFinderSavedViewProps> = ({
   };
 
   // Filter saved recipes for the active collection
-  const collectionRecipes = selectedCollection 
-    ? sortedSavedRecipes.filter(r => (collections[selectedCollection] || []).includes(r.title))
-    : [];
+  const collectionRecipes = useMemo(() => {
+    return selectedCollection 
+      ? sortedSavedRecipes.filter(r => (collections[selectedCollection] || []).includes(r.title))
+      : [];
+  }, [selectedCollection, sortedSavedRecipes, collections]);
 
   return (
     <div className="space-y-4">
@@ -172,8 +177,8 @@ export const RecipeFinderSavedView: React.FC<RecipeFinderSavedViewProps> = ({
 
       {isLoadingSavedRecipes ? (
         <div className="grid grid-cols-3 gap-4">
-          {Array.from({ length: 8 }).map((_, index) => (
-            <RecipeCardSkeleton key={index} />
+          {['sk_1', 'sk_2', 'sk_3', 'sk_4', 'sk_5', 'sk_6', 'sk_7', 'sk_8'].map((id) => (
+            <RecipeCardSkeleton key={id} />
           ))}
         </div>
       ) : savedRecipes.length === 0 ? (

@@ -1,5 +1,6 @@
 import * as Sentry from '@sentry/react';
 import crashlytics from './crashlyticsService';
+import { log } from './logService';
 
 // Initialize Sentry
 export const initSentry = () => {
@@ -7,7 +8,7 @@ export const initSentry = () => {
   const environment = import.meta.env.VITE_SENTRY_ENVIRONMENT || 'development';
 
   if (!dsn || dsn === 'https://your-sentry-dsn-here@sentry.io/project-id') {
-    console.warn('Sentry DSN not configured. Error reporting disabled.');
+    log.warn('Sentry DSN not configured. Error reporting disabled.', undefined, 'SentryService');
     return;
   }
 
@@ -71,7 +72,7 @@ export const initSentry = () => {
     }
   });
 
-  console.log(`Sentry initialized for ${environment} environment`);
+  log.info('Sentry initialized', { environment }, 'SentryService');
 };
 
 // Enhanced error reporting for database operations

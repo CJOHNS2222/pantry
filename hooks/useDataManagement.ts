@@ -31,8 +31,8 @@ import FoodWasteAnalyticsService from '../services/foodWasteAnalyticsService';
 const getQuantityValue = (item: PantryItem): number => {
   if (typeof item.quantity === 'number') return item.quantity;
   if (item.quantity && typeof item.quantity === 'object') return (
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (item.quantity as any).amount || 0
+     
+    (item.quantity as { amount: number }).amount || 0
   );
   // Fallback to legacy estimate string
   const est = parseFloat(item.quantity_estimate || '0');
@@ -74,7 +74,7 @@ function createShoppingListListener(
           if (hasArraysChanged(sortedItems, prevShoppingListRef.current)) {
             setRemoteShoppingListUpdate(true);
             setShoppingList(sortedItems);
-            prevShoppingListRef.current = sortedItems.map(item => ({...item}));
+            prevShoppingListRef.current = JSON.parse(JSON.stringify(sortedItems));
           }
         }
       } else {
@@ -102,7 +102,7 @@ function createShoppingListListener(
           if (hasArraysChanged(sortedItems, prevShoppingListRef.current)) {
             setRemoteShoppingListUpdate(true);
             setShoppingList(sortedItems);
-            prevShoppingListRef.current = sortedItems.map(item => ({...item}));
+            prevShoppingListRef.current = JSON.parse(JSON.stringify(sortedItems));
           }
         }
       } else {
@@ -146,7 +146,7 @@ function createSavedRecipesListener(
         if (hasArraysChanged(sortedRecipes, prevSavedRecipesRef.current)) {
           setRemoteSavedRecipesUpdate(true);
           setSavedRecipes(sortedRecipes);
-          prevSavedRecipesRef.current = sortedRecipes.map(recipe => ({...recipe}));
+          prevSavedRecipesRef.current = JSON.parse(JSON.stringify(sortedRecipes));
         }
       }
     } else {
@@ -423,9 +423,9 @@ export function useDataManagement(
       })
       .map(day => {
         const cleanMeal = (meal: unknown) => {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const m = meal as any;
-          return m && m.id && m.recipe && m.recipe.title;
+           
+          const m = meal as { id?: string; recipe?: { title?: string } } | null | undefined;
+          return !!(m && m.id && m.recipe && m.recipe.title);
         };
 
         return {
@@ -587,8 +587,8 @@ export function useDataManagement(
             for (const itemId in data) {
               if (itemId !== 'lastUpdated' && itemId !== 'version' && itemId !== 'itemCount') {
                 const item = InventoryCacheService.arrayToPantryItem(itemId,
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                data[itemId] as any
+                 
+                data[itemId] as string[]
               );
                 // W: Read-time FEFO normalisation — keep item.expirationDate in sync with
                 // the soonest batch expiry so filters and alerts always use the correct date.
@@ -644,7 +644,7 @@ export function useDataManagement(
         } else {
           setPersonalRecipeCount(0);
         }
-      }, () => { /* permission errors are non-fatal here */ }));
+      }, err => { log.info('Personal recipe count snapshot permission error (non-fatal)', { error: err }); }));
     } else {
       // Solo user: personal count mirrors the main savedRecipes state
       setPersonalRecipeCount(0); // will be set via savedRecipes.length in the effect below
@@ -709,8 +709,8 @@ export function useDataManagement(
         try {
           if (dangerCandidates.length >= 2) {
             // Create a single aggregated Danger Zone notification
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            await NotificationService.createDangerZoneAlert(user.id, dangerCandidates as any);
+             
+            await NotificationService.createDangerZoneAlert(user.id, dangerCandidates as Parameters<typeof NotificationService.createDangerZoneAlert>[1]);
           } else {
             // Fetch once and reuse for all items to avoid redundant Firestore queries
             const cachedNotifications = await NotificationService.getUnreadNotifications(user.id);
@@ -1197,7 +1197,7 @@ export function useDataManagement(
               HapticService.medium();
 
               // Prune notifications
-              pruneNotificationsForDeletedItems(user.id, Array.from(deletedIds)).catch(() => {});
+              pruneNotificationsForDeletedItems(user.id, Array.from(deletedIds)).catch((err: unknown) => log.info('Failed to prune notifications on recipe deduction', { error: err }));
 
               // Auto-readd staple items for deleted items
               const staplesToReadd = deletedItems.filter(i => i.isStaple);
@@ -1367,7 +1367,7 @@ export function useDataManagement(
 
     // Dismiss any notifications that only reference this item
     if (user?.id) {
-      pruneNotificationsForDeletedItems(user.id, [itemToDelete.id]).catch(() => {});
+      pruneNotificationsForDeletedItems(user.id, [itemToDelete.id]).catch((err: unknown) => log.info('Failed to prune notification on delete', { error: err }));
     }
 
     // Check if this is a staple item that needs to be re-added to shopping list on delete
@@ -1400,6 +1400,12 @@ export function useDataManagement(
 
     if (loggingOptions?.updateActivityStatus) {
       loggingOptions.updateActivityStatus('managing inventory');
+    }
+
+    if (loggingOptions?.logItemRemoved) {
+      for (const itemToDelete of itemsToDelete) {
+        loggingOptions.logItemRemoved(itemToDelete.item, itemToDelete.id);
+      }
     }
 
     if (user?.isGuest) {
@@ -1448,7 +1454,7 @@ export function useDataManagement(
 
     // Dismiss any notifications that only reference the deleted items
     if (user?.id) {
-      pruneNotificationsForDeletedItems(user.id, itemsToDelete.map(i => i.id)).catch(() => {});
+      pruneNotificationsForDeletedItems(user.id, itemsToDelete.map(i => i.id)).catch((err: unknown) => log.info('Failed to prune notifications on bulk delete', { error: err }));
     }
 
     // Check if any deleted items are staples to auto-readd
@@ -1566,7 +1572,7 @@ export function useDataManagement(
     if (!user?.id) return;
     if (user.isGuest) {
       setShoppingList(prev => {
-        const updated = prev.map(item => item.id === itemId ? { ...item, ...updates } : item).sort((a, b) => a.item.localeCompare(b.item));
+        const updated = prev.map(item => item.id === itemId ? Object.assign({}, item, updates) : item).sort((a, b) => a.item.localeCompare(b.item));
         try { localStorage.setItem(GUEST_SHOPPING_KEY, JSON.stringify(updated)); } catch { /* storage full */ }
         return updated;
       });
@@ -1581,7 +1587,7 @@ export function useDataManagement(
       setShoppingList(prev => {
         const updated = prev.map(item => {
           const change = itemsToUpdate.find(u => u.id === item.id);
-          return change ? { ...item, ...change.updates } : item;
+          return change ? Object.assign({}, item, change.updates) : item;
         }).sort((a, b) => a.item.localeCompare(b.item));
         try { localStorage.setItem(GUEST_SHOPPING_KEY, JSON.stringify(updated)); } catch { /* storage full */ }
         return updated;
@@ -1629,7 +1635,7 @@ export function useDataManagement(
       if (snap.empty) return [];
       return snap.docs.map((d: unknown) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const doc = d as any;
+        const doc = d as { id: string; data: () => Record<string, any> };
         const data = doc.data();
         const dateField = data.date;
         let dateStr: string | null = null;
@@ -1681,7 +1687,7 @@ export function useDataManagement(
 
       const mapped: RecipeRating[] = snap.docs.map((d: unknown) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const doc = d as any;
+        const doc = d as { id: string; data: () => Record<string, any> };
         const data = doc.data();
         const dateField = data.date;
         let dateStr: string | null = null;

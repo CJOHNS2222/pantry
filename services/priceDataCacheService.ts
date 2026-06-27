@@ -100,7 +100,7 @@ export class PriceDataCacheService {
   static async savePriceData() {
     // Ensure we only try to save if a user is logged in
     if (!auth.currentUser) {
-      console.log('User not authenticated, skipping price data save.');
+      log.debug('User not authenticated, skipping price data save', undefined, 'PriceDataCacheService');
       return;
     }
 
@@ -108,7 +108,7 @@ export class PriceDataCacheService {
       const cacheRef = this.getCacheRef();
       await DatabaseMonitoringService.setDoc(cacheRef, this.priceData);
     } catch (err: any) {
-      console.error("Failed to save price data cache:", err);
+      log.error('Failed to save price data cache', { error: err?.message }, 'PriceDataCacheService');
     }
   }
 

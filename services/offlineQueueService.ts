@@ -1,4 +1,3 @@
-import { db } from '../firebaseConfig';
 import DatabaseMonitoringService from './databaseMonitoringService';
 import { serverTimestamp } from 'firebase/firestore';
 import { log } from './logService';
@@ -194,11 +193,11 @@ class OfflineQueueService {
 
       if (docSnap.exists()) {
         const serverData = docSnap.data();
-        const serverTimestamp = serverData.updatedAt || serverData.timestamp;
+        const serverTimestampValue = serverData.updatedAt || serverData.timestamp;
 
         // Simple conflict detection: if server data is newer than our operation
-        if (serverTimestamp && serverTimestamp.toMillis() > op.timestamp) {
-          throw new Error(`Conflict detected for ${coll}/${docId}`);
+        if (serverTimestampValue && serverTimestampValue.toMillis() > op.timestamp) {
+          throw Object.assign(new Error(`Conflict detected for ${coll}/${docId}`), { _serverData: serverData });
         }
       }
 
@@ -221,7 +220,7 @@ class OfflineQueueService {
     const conflict: ConflictResolution = {
       id: `conflict_${op.id}`,
       operation: op,
-      serverData: null, // Would need to fetch server data
+      serverData: error?._serverData || null,
       localData: op.data,
       resolved: false,
       timestamp: Date.now()
@@ -331,12 +330,16 @@ class OfflineQueueService {
   // Legacy method for backward compatibility
   async processQueue(): Promise<void> {
     if (this.isProcessing) {
-      console.log('🔥 [OfflineQueueService] Sync already in progress, skipping');
+      log.debug('Sync already in progress, skipping', undefined, 'OfflineQueueService');
       return;
     }
-    console.log('🔥 [OfflineQueueService] Starting to process offline queue');
+    log.debug('Starting to process offline queue', undefined, 'OfflineQueueService');
     const result = await this.processQueueWithSync();
-    console.log(`🔥 [OfflineQueueService] Processed ${result.total} operations: ${result.completed} completed, ${result.failed} failed, ${result.conflicts} conflicts`);
+    log.info('Processed offline queue', { total: result.total, completed: result.completed, failed: result.failed, conflicts: result.conflicts }, 'OfflineQueueService');
+  }
+
+  getProcessingStatus(): boolean {
+    return this.isProcessing;
   }
 }
 

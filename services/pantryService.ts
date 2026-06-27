@@ -1,7 +1,7 @@
 // services/pantryService.ts
 import { PantryItem, User } from '../types';
 import { analyzePantryImage, analyzeReceiptImage } from './geminiService';
-import { getItemImage, inferCategoryFromItemName, inferStorageLocationFromItemName, getAutoExpirationDate, parseItemText, fetchExternalItemImage, combineQuantities } from '../utils/appUtils';
+import { getItemImage, inferCategoryFromItemName, inferStorageLocationFromItemName, getAutoExpirationDate, parseItemText, fetchExternalItemImage, combineQuantities, isImmortalItem, isCookedRiceItem } from '../utils/appUtils';
 import { getQuantityAmount, getQuantityUnit } from '../utils/quantityUtils';
 import { validatePantryItem } from '../utils/validationUtils';
 import AnalyticsService from './analyticsService';
@@ -96,7 +96,7 @@ export class PantryService {
           image = externalImage;
         }
       } catch (err: any) {
-        console.log('Failed to fetch external image for', description, err);
+        log.warn('Failed to fetch external image for', { description, error: err }, 'PantryService');
       }
     }
 
@@ -125,23 +125,14 @@ export class PantryService {
       // Denormalized safety hints for item-level expiry logic
       ,tags: (() => {
         const t: string[] = [];
-        const low = description.toLowerCase();
-        if (low.includes('rice') && low.includes('cooked')) t.push('cooked-rice');
-        if (low.includes('rice') && !t.includes('cooked-rice') && low.includes('leftover')) t.push('cooked-rice');
+        if (isCookedRiceItem(description)) t.push('cooked-rice');
         return t.length ? t : undefined;
       })(),
       productRiskLevel: (() => {
         return getFoodRiskLevel(description, category);
       })(),
-      cooked_rice: (() => {
-        const low = description.toLowerCase();
-        return (low.includes('rice') && low.includes('cooked')) || undefined;
-      })(),
-      is_immortal: (() => {
-        const low = description.toLowerCase();
-        if (low.includes('honey') || low.includes('salt') || low.includes('sugar')) return true;
-        return undefined;
-      })()
+      cooked_rice: isCookedRiceItem(description) || undefined,
+      is_immortal: isImmortalItem(description) || undefined
     };
   }
 
@@ -220,25 +211,16 @@ export class PantryService {
       // Denormalized safety hints for item-level expiry logic
       tags: (() => {
         const t: string[] = [];
-        const low = itemName.toLowerCase();
-        if (low.includes('rice') && low.includes('cooked')) t.push('cooked-rice');
-        if (low.includes('honey') || low.includes('salt') || low.includes('sugar')) t.push('shelf-stable');
+        if (isCookedRiceItem(itemName)) t.push('cooked-rice');
+        if (isImmortalItem(itemName)) t.push('shelf-stable');
         return t.length ? t : undefined;
       })(),
       productRiskLevel: (() => {
-        const low = itemName.toLowerCase();
-        if (low.includes('rice') && low.includes('cooked')) return 4;
+        if (isCookedRiceItem(itemName)) return 4;
         return undefined;
       })(),
-      is_immortal: (() => {
-        const low = itemName.toLowerCase();
-        if (low.includes('honey') || low.includes('salt') || low.includes('sugar')) return true;
-        return undefined;
-      })()
-      ,cooked_rice: (() => {
-        const low = itemName.toLowerCase();
-        return (low.includes('rice') && low.includes('cooked')) || undefined;
-      })()
+      is_immortal: isImmortalItem(itemName) || undefined,
+      cooked_rice: isCookedRiceItem(itemName) || undefined
     };
   }
 
