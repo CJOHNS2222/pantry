@@ -20,6 +20,16 @@ export interface DetailedChangeEntry {
 
 export const RECENT_CHANGES: ChangeEntry[] = [
   {
+    "version": "2.5.1",
+    "date": "Jun 28, 2026",
+    "highlights": [
+      "Leftover & Food Waste Achievements — Added a premium interactive \"View & Share Achievements\" dashboard.",
+      "Dynamic Waste Range Filtering — Added a time-period selector (7 Days, 30 Days, All Time) to the food waste analytics…",
+      "Improved Toast Navigation — Repositioned toast notifications from bottom-4 to bottom-20 to ensure they never block or…",
+      "Leftover Analytics Placement — Moved the Leftover & Food Waste Analytics section to the top of the Organization tab in…"
+    ]
+  },
+  {
     "version": "2.5.0",
     "date": "Jun 27, 2026",
     "highlights": [
@@ -37,20 +47,44 @@ export const RECENT_CHANGES: ChangeEntry[] = [
       "Ingredient Icon Library — Extracted and integrated 1,952 new ingredient icons, supporting a total of 2,973 active icons…",
       "Pantry Mobile UX & Layout — Integrated search, filter, and sort into a single compact sticky row; collapsed setup…"
     ]
-  },
-  {
-    "version": "2.4.17",
-    "date": "Jun 25, 2026",
-    "highlights": [
-      "Pantry Health Score Leaderboard — Introduced an opt-in weekly/monthly challenge under the Social tab, computing live…",
-      "Achievement Badges System — Added a gamified grid of 8 dynamic badges (Waste Warrior, Master Chef, Pantry Architect,…",
-      "Weekly Waste Report — Integrated a sustainability summary modal detailing Sustainability Scores, used vs.",
-      "Custom Recipe Cookbooks — Added custom recipe collections in the saved recipes view with a sliding tab layout, hover…"
-    ]
   }
 ];
 
 export const ALL_CHANGES: DetailedChangeEntry[] = [
+  {
+    "version": "2.5.1",
+    "date": "Jun 28, 2026",
+    "sections": [
+      {
+        "title": "Added",
+        "bullets": [
+          "**Leftover & Food Waste Achievements** — Added a premium interactive \"View & Share Achievements\" dashboard. It displays key positive metrics (Pantry Items, Smart Meals Cooked, and Money Saved) on a beautifully styled gradient screen with App Store and Play Store badges, excluding negative food waste data for sharing.",
+          "**Dynamic Waste Range Filtering** — Added a time-period selector (7 Days, 30 Days, All Time) to the food waste analytics section in Settings, dynamically recalculating waste value and average days expired on the client side."
+        ]
+      },
+      {
+        "title": "Changed",
+        "bullets": [
+          "**Improved Toast Navigation** — Repositioned toast notifications from `bottom-4` to `bottom-20` to ensure they never block or overlap the bottom navigation bar.",
+          "**Leftover Analytics Placement** — Moved the Leftover & Food Waste Analytics section to the top of the Organization tab in Settings."
+        ]
+      },
+      {
+        "title": "Fixed",
+        "bullets": [
+          "**Clean Ingredient Suggestions** — Integrated `cleanItemNameForShopping` in the Quick Add menu to strip preparation words (e.g., \"chopped\", \"sliced\", \"whole\"), measurement units (\"tbsp\", \"pinch\", \"tablespoon\"), and standalone numbers from suggestions.",
+          "**Fresh Pepper Image Mapping** — Resolved a bug where color-stripping collapsed \"red pepper\" and \"green pepper\" into \"pepper\" (inheriting the ground black pepper shaker image). Fresh bell peppers are now mapped to their correct fresh pepper image.",
+          "**Household Analytics Sync** — Resolved a bug where food waste disposals were written using `user.householdId` (which was undefined), causing them to be saved to user documents but read from household documents. They are now correctly written using `household?.id`."
+        ]
+      },
+      {
+        "title": "Removed",
+        "bullets": [
+          "**Settings Clean-up** — Removed the unused \"Power Features\" card from the Preferences tab."
+        ]
+      }
+    ]
+  },
   {
     "version": "2.5.0",
     "date": "Jun 27, 2026",

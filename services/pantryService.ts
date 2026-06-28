@@ -38,6 +38,15 @@ export class PantryService {
       throw new Error('No items detected in the image.');
     }
 
+    // Bulk lookup cached images first to populate the cache and avoid N Firestore reads
+    const descriptions = items.map(item => parseItemText(item.item).description);
+    try {
+      const { getCachedImageUrls } = await import('./imageCacheService');
+      await getCachedImageUrls(descriptions);
+    } catch (error) {
+      log.error('Failed to pre-fetch cached image URLs', { error }, 'PantryService');
+    }
+
     // Process items and fetch external images for placeholders
     const processedItems = await Promise.all(items.map(async (item) => {
       return this.processDetectedItem(item);
@@ -65,6 +74,15 @@ export class PantryService {
     const items = await analyzeReceiptImage(base64Data, mimeType, user as any);
     if (items.length === 0) {
       throw new Error('No items detected in the receipt.');
+    }
+
+    // Bulk lookup cached images first to populate the cache and avoid N Firestore reads
+    const descriptions = items.map(item => parseItemText(item.item).description);
+    try {
+      const { getCachedImageUrls } = await import('./imageCacheService');
+      await getCachedImageUrls(descriptions);
+    } catch (error) {
+      log.error('Failed to pre-fetch cached image URLs', { error }, 'PantryService');
     }
 
     // Process items and fetch external images for placeholders

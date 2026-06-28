@@ -1616,8 +1616,15 @@ const App: React.FC = () => {
               onRateRecipe: submitRating,
               handleMarkAsMade,
               onMoveToPantry: async (items) => {
-                const processedItems: PantryItem[] = [];
-                for (const i of items) {
+                // Bulk lookup cached images first to populate the cache and avoid N Firestore reads
+                try {
+                  const { getCachedImageUrls } = await import('./services/imageCacheService');
+                  await getCachedImageUrls(items.map(i => i.item));
+                } catch (error) {
+                  log.error('Failed to pre-fetch cached image URLs', { error }, 'App');
+                }
+
+                const processedItems = await Promise.all(items.map(async (i) => {
                   const category = inferCategoryFromItemName(i.item);
                   let image = getItemImage(i.item, category);
                   
@@ -1691,7 +1698,7 @@ const App: React.FC = () => {
                     });
                   }
 
-                  processedItems.push({
+                  return {
                     id: Math.random().toString(36).substr(2,9),
                     item: i.item,
                     category,
@@ -1704,10 +1711,10 @@ const App: React.FC = () => {
                     dateAdded: nowIso,
                     lastRestocked: nowIso,
                     notes: i.notes || (i.source && i.source.startsWith('recipe:') ? i.source : undefined)
-                  });
-                }
+                  };
+                }));
                 
-                const addedItems = await addItems(Object.values(processedItems));
+                const addedItems = await addItems(processedItems);
 
                 setShoppingList(prev => prev.filter(item => !items.find(moved => moved.id === item.id)));
                 await removeShoppingListItems(items.map(i => i.id));
@@ -1775,7 +1782,7 @@ const App: React.FC = () => {
           </div>
         )}
 
-        <div className="fixed bottom-4 right-4 mb-safe z-50 space-y-2">
+        <div className="fixed bottom-20 right-4 mb-safe z-50 space-y-2">
           {toasts.map((toast) => (
             <div
               key={toast.id}

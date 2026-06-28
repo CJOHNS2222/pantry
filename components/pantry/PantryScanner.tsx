@@ -22,6 +22,10 @@ import AnalyticsService from '../../services/analyticsService';
 import { GeminiLoadingOverlay, IMAGE_ANALYSIS_STAGES } from '../ui/GeminiLoadingOverlay';
 import { log } from '../../services/logService';
 
+const VirtualizedRow = ({ index, style, data }: { index: number; style: React.CSSProperties; data: { renderRow: (index: number, style: React.CSSProperties) => React.ReactElement } }) => {
+  return data.renderRow(index, style);
+};
+
 // Temporary interface for receipt scan results that may include price data
 interface ReceiptScanResult {
   id: string;
@@ -291,7 +295,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   const [sortBy, setSortBy] = useState<'name' | 'lastAdded' | 'expiration' | 'category' | 'location'>('location');
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [storageOrder, setStorageOrder] = useState<string[]>(['pantry', 'fridge', 'freezer', 'spices', 'other']);
-  const [storageSectionOrder, setStorageSectionOrder] = useState<string[]>(['pantry', 'fridge', 'freezer', 'spices', 'other']);
+  const [storageSectionOrder, setStorageSectionOrder] = useState<string[]>(['leftovers', 'pantry', 'fridge', 'freezer', 'spices', 'other']);
   const [showPriceTrends, setShowPriceTrends] = useState<string | null>(null);
   const [selectedItemIndex, setSelectedItemIndex] = useState<number | null>(null);
   const [scanResults, setScanResults] = useState<ReceiptScanResult[] | null>(null);
@@ -1224,7 +1228,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
 
   // Group inventory by storage location (combine like items within locations)
   const groupedByStorage = sortedInventory.reduce((acc, item) => {
-    const location = item.storageLocation || 'pantry'; // Default to pantry if not set
+    const location = item.is_leftover ? 'leftovers' : (item.storageLocation || 'pantry'); // Default to pantry if not set
     if (!acc[location]) {
       acc[location] = {};
     }
@@ -1275,8 +1279,9 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   }, {} as Record<string, (PantryItem & { combinedItems: PantryItem[]; totalQuantity: number; originalIndices: number[]; originalIndex: number })[]>);
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const storageLocations = ['pantry', 'fridge', 'freezer', 'spices', 'other'] as const;
+  const storageLocations = ['leftovers', 'pantry', 'fridge', 'freezer', 'spices', 'other'] as const;
   const storageLabels = {
+    leftovers: 'Leftovers',
     pantry: 'Pantry',
     fridge: 'Refrigerator', 
     freezer: 'Freezer',
@@ -1344,8 +1349,14 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                 itemCount={items.length}
                 itemSize={64}
                 width={'100%'}
+                itemData={{
+                  selectedItems,
+                  bulkMode,
+                  items,
+                  renderRow: (index: number, style: React.CSSProperties) => renderCategoryItem({ index, style, category })
+                }}
               >
-                {(props: { index: number; style: React.CSSProperties }) => renderCategoryItem({ index: props.index, style: props.style, category })}
+                {VirtualizedRow}
               </List>
             ) : (
               items.map(renderListItem)
@@ -1365,7 +1376,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
         <div className="w-full flex items-center px-4 py-2 bg-theme-primary">
           <div className="flex items-center gap-3">
             <StorageLocationIndicator
-              location={location as 'pantry' | 'freezer' | 'fridge' | 'spices' | 'other'}
+              location={location as 'pantry' | 'freezer' | 'fridge' | 'spices' | 'other' | 'leftovers'}
               size="md"
             />
             <h4 className="font-semibold text-theme-primary">{locationLabel}</h4>
@@ -1388,8 +1399,14 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
               itemCount={items.length}
               itemSize={64}
               width={'100%'}
+              itemData={{
+                selectedItems,
+                bulkMode,
+                items,
+                renderRow: (index: number, style: React.CSSProperties) => renderStorageItem({ index, style, location })
+              }}
             >
-              {(props: { index: number; style: React.CSSProperties }) => renderStorageItem({ index: props.index, style: props.style, location })}
+              {VirtualizedRow}
             </List>
           ) : (
             items.map(renderListItem)
@@ -1872,35 +1889,60 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
 
   return (
     <div className="space-y-6 pb-24 max-w-2xl mx-auto animate-fade-in relative">
-      <div className="flex items-center justify-between mb-6">
-        <div className="text-center flex-1">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
+        <div className="text-center sm:text-left flex-1">
           <h2 className="text-3xl font-serif font-bold text-theme-secondary">My Pantry</h2>
           <p className="text-theme-secondary opacity-60 text-sm mt-1">Items currently in stock</p>
         </div>
-        {/* Sort Dropdown */}
-        <div className="relative">
-          <select
-            value={sortBy}
-            onChange={(e) => {
-              const value = e.target.value as typeof sortBy;
-              setSortBy(value);
-              // Also change view mode for category/location sorts
-              if (value === 'category') {
-                setViewMode('category');
-              } else if (value === 'location') {
-                setViewMode('storage');
-              }
-            }}
-            className="appearance-none bg-theme-secondary border-2 border-[var(--accent-color)] rounded-lg px-3 py-2 pr-8 text-sm font-medium text-theme-primary shadow-lg focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/50"
-          >
-            <option value="name">Sort by Name</option>
-            <option value="lastAdded">Sort by Last Added</option>
-            <option value="expiration">Sort by Expiration</option>
-            <option value="category">Sort by Category</option>
-            <option value="location">Sort by Location</option>
-          </select>
-          <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-theme-primary pointer-events-none" />
-          <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-theme-primary pointer-events-none" />
+        <div className="flex items-center gap-3">
+          {/* View Mode Toggle */}
+          <div className="flex bg-theme-secondary p-1 rounded-lg border border-theme">
+            <button
+              onClick={() => setViewMode('storage')}
+              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                viewMode === 'storage'
+                  ? 'bg-[var(--accent-color)] text-white shadow'
+                  : 'text-theme-secondary hover:text-theme-primary'
+              }`}
+            >
+              By Location
+            </button>
+            <button
+              onClick={() => setViewMode('category')}
+              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                viewMode === 'category'
+                  ? 'bg-[var(--accent-color)] text-white shadow'
+                  : 'text-theme-secondary hover:text-theme-primary'
+              }`}
+            >
+              By Category
+            </button>
+          </div>
+
+          {/* Sort Dropdown */}
+          <div className="relative">
+            <select
+              value={sortBy}
+              onChange={(e) => {
+                const value = e.target.value as typeof sortBy;
+                setSortBy(value);
+                // Also change view mode for category/location sorts
+                if (value === 'category') {
+                  setViewMode('category');
+                } else if (value === 'location') {
+                  setViewMode('storage');
+                }
+              }}
+              className="appearance-none bg-theme-secondary border-2 border-[var(--accent-color)] rounded-lg px-3 py-2 pr-8 text-sm font-medium text-theme-primary shadow-lg focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/50"
+            >
+              <option value="name">Sort by Name</option>
+              <option value="lastAdded">Sort by Last Added</option>
+              <option value="expiration">Sort by Expiration</option>
+              <option value="category">Sort by Category</option>
+              <option value="location">Sort by Location</option>
+            </select>
+            <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-theme-primary pointer-events-none" />
+          </div>
         </div>
       </div>
 
@@ -2442,7 +2484,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
             <div>
               <label className="block text-sm font-medium text-theme-primary mb-2">Locations</label>
               <div className="flex flex-wrap gap-2">
-                {['pantry', 'fridge', 'freezer', 'spices', 'other'].map(location => (
+                {['leftovers', 'pantry', 'fridge', 'freezer', 'spices', 'other'].map(location => (
                   <button
                     key={location}
                     onClick={() => {
@@ -3176,15 +3218,17 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                   Collapse All
                 </button>
               )}
+              {bulkMode && (
+                <button
+                  onClick={selectAllItems}
+                  className="px-3 py-1 rounded-lg text-sm font-medium bg-theme-secondary text-theme-primary hover:bg-theme-primary border border-theme transition-colors"
+                  aria-label={selectedItems.size === inventory.length ? 'Deselect all items' : 'Select all items'}
+                >
+                  {selectedItems.size === inventory.length ? 'Deselect All' : 'Select All'}
+                </button>
+              )}
               {bulkMode && selectedItems.size > 0 && (
                 <>
-                  <button
-                    onClick={selectAllItems}
-                    className="px-3 py-1 rounded-lg text-sm font-medium bg-theme-secondary text-theme-primary hover:bg-theme-primary border border-theme transition-colors"
-                    aria-label={selectedItems.size === inventory.length ? 'Deselect all items' : 'Select all items'}
-                  >
-                    {selectedItems.size === inventory.length ? 'Deselect All' : 'Select All'}
-                  </button>
                   <button
                     onClick={bulkDelete}
                     className="px-3 py-1 rounded-lg text-sm font-medium bg-red-500 text-white hover:bg-red-600 transition-colors"

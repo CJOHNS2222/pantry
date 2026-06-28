@@ -326,13 +326,7 @@ export function parseIngredientForShoppingList(ingredientText: string): { quanti
     itemName = itemName.replace(/\s*\b(and|or|with|for|to|into)\b\s*(,|$)/gi, '$2');
 
     // Clean up trailing/leading whitespace and stray commas
-    itemName = itemName.replace(/,\s*$/, '').replace(/\s+,\s+/g, ' ').replace(/^,\s*/, '').trim();
-    itemName = itemName.replace(/\s+/g, ' ');
-
-    // Capitalize first letter of each word for better display
-    itemName = itemName.replace(/\b\w/g, l => l.toUpperCase());
-
-    const prepNotes = prepNotesList.length > 0 ? prepNotesList.join(', ') : undefined;
+     const prepNotes = prepNotesList.length > 0 ? prepNotesList.join(', ') : undefined;
 
     // If no quantity was found, set default to "1"
     if (!quantity) {
@@ -358,21 +352,25 @@ export function cleanItemNameForShopping(itemName: string): string {
   let cleaned = itemName.toLowerCase()
     // Remove quantities at the beginning (e.g., "1 ", "2 ", "3 ", etc.)
     .replace(/^\d+\s+/, '')
-    // Remove leading store-brand abbreviations (CV = Clover Valley, GV = Great Value)
+    // Remove leading store-brand abbreviations (cv = Clover Valley, gv = Great Value)
     .replace(/^(cv|gv)\s+/, '')
     // Remove common size descriptors
     .replace(/\b(large|medium|small|big|tiny|huge|giant)\s+/g, '')
-    // Remove common color descriptors
-    .replace(/\b(red|green|yellow|blue|black|white|brown|orange|purple|pink)\s+/g, '')
+    // Keep color descriptors (like red, green, yellow, black) so items like Red Pepper, Green Beans, Black Beans are distinguished
     // Remove common preparation connectors
     .replace(/\b(cut into|sliced into|torn into|chopped into|finely chopped into)\b/g, '')
     // Remove common preparation descriptors that don't affect core item identity
-    .replace(/\b(fresh|dried|canned|chopped|sliced|diced|minced|crushed|ground|cubed|grated|finely|halved|seeded|shredded|julienned|torn|plucked|to serve|for serving|strips)\b/g, '')
+    .replace(/\b(fresh|dried|canned|chopped|sliced|diced|minced|crushed|ground|cubed|grated|finely|halved|seeded|shredded|julienned|torn|plucked|to serve|for serving|strips|whole)\b/g, '')
+    // Remove units, measurements, and recipe-specific descriptors
+    .replace(/\b(tbs|tblsp|tbsp|tbsps|tsp|tsps|tablespoons?|teaspoons?|pinch(es)?|zest and juice|zest|juice|cups?|ounces?|oz|pounds?|lbs?|grams?|g|milliliters?|ml|liters?|l|cloves?|pieces?|slices?|can(ned)?s?|jars?|bottles?|packets?|packs?|bags?|tins?|containers?|tubs?|heads?|bunches?|sprigs?|stalks?|loaves|loaf|tostaste|to taste)\b/g, '')
+    // Remove standalone numbers (e.g., "1", "2", "1/2")
+    .replace(/\b\d+(\/\d+)?\b/g, '')
     // Remove common quality descriptors
     .replace(/\b(ripe|raw|cooked|baked|fried|organic)\s+/g, '');
 
-  // Remove dangling conjunctions/prepositions at the end of the item name or before commas
-  cleaned = cleaned.replace(/\s*\b(and|or|with|for|to|into)\b\s*(,|$)/g, '$2');
+  // Remove dangling conjunctions/prepositions/articles at the end or start of the item name or before commas
+  cleaned = cleaned.replace(/\s*\b(and|or|with|for|to|into|of|a|an|the)\b\s*(,|$)/g, '$2');
+  cleaned = cleaned.replace(/^\s*\b(and|or|with|for|to|into|of|a|an|the)\b\s*/g, '');
 
   // Clean up trailing/leading whitespace and stray commas
   cleaned = cleaned.replace(/,\s*$/, '').replace(/\s+,\s+/g, ' ').replace(/^,\s*/, '').trim();
@@ -423,27 +421,30 @@ export async function canShowAds(user?: User | null): Promise<boolean> {
   }
 }
 
+const isFreshPepper = (name: string): boolean => {
+  const low = name.toLowerCase();
+  return (low.includes('pepper') || low.includes('peppers')) && 
+         !low.includes('black') && 
+         !low.includes('white') && 
+         !low.includes('cayenne') && 
+         !low.includes('szechuan') && 
+         !low.includes('peppercorn') && 
+         !low.includes('lemon') && 
+         !low.includes('chili') && 
+         !low.includes('seasoning');
+};
+
 export function getItemImage(itemName: string, category: string): string {
   const name = itemName.toLowerCase().trim();
   const cat = category.toLowerCase();
 
+  if (isFreshPepper(name)) {
+    return '/images/items/bell_pepper.webp';
+  }
+
   // Clean the item name by removing quantities and common descriptors
   const cleanItemName = (itemName: string): string => {
-    const cleaned = itemName.toLowerCase()
-      // Remove quantities at the beginning (e.g., "1 ", "2 ", "3 ", etc.)
-      .replace(/^\d+\s+/, '')
-      // Remove common size descriptors
-      .replace(/\b(large|medium|small|big|tiny|huge|giant)\s+/g, '')
-      // Remove common color descriptors
-      .replace(/\b(red|green|yellow|blue|black|white|brown|orange|purple|pink)\s+/g, '')
-      // Remove common preparation descriptors that don't affect core item identity
-      .replace(/\b(fresh|dried|canned|chopped|sliced|diced|minced|crushed|ground|cubed|grated|finely)\s+/g, '')
-      // Remove common quality descriptors
-      .replace(/\b(ripe|raw|cooked|baked|fried|organic)\s+/g, '')
-      // Remove trailing/leading whitespace
-      .trim();
-
-    return cleaned;
+    return cleanItemNameForShopping(itemName).toLowerCase();
   };
 
   const cleanedName = cleanItemName(name);
@@ -1745,7 +1746,8 @@ export function getAllCategories(customCategories: CustomCategory[] = []): strin
     'Frozen Foods',
     'Baking Supplies',
     'Breakfast Foods',
-    'Canned Goods'
+    'Canned Goods',
+    'Leftovers'
   ];
 
   const customCategoryNames = customCategories.map(cat => cat.name);
@@ -1815,7 +1817,8 @@ export function getCategoryColor(categoryName: string, customCategories: CustomC
     'Frozen Foods': '#00ACC1',
     'Baking Supplies': '#E91E63',
     'Breakfast Foods': '#FF5722',
-    'Canned Goods': '#607D8B'
+    'Canned Goods': '#607D8B',
+    'Leftovers': '#FF8F00'
   };
 
   return defaultColors[categoryName] || '#9E9E9E';

@@ -6,7 +6,7 @@ import { ShoppingItem, User, Household, Settings, PantryItem } from '../../types
 import HapticService from '../../services/hapticService';
 import { ShoppingListCacheService } from '../../services/shoppingListCacheService';
 import { log } from '../../services/logService';
-import { inferCategoryFromItemName, isHouseholdMember } from '../../utils/appUtils';
+import { inferCategoryFromItemName, isHouseholdMember, cleanItemNameForShopping } from '../../utils/appUtils';
 import { validateItemName, validateQuantity } from '../../src/utils/validation';
 
 // Import new enhancement components
@@ -328,7 +328,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
         .replace(/^[\d\/\s\.\-]+(cups?|tbsps?|tsps?|g|oz|lbs?|ml|pack(et)?s?|cans?|pieces?|cloves?|slices?|jars?|bottles?)?\s+/i, '')
         .trim();
       if (!name) return '';
-      return name.charAt(0).toUpperCase() + name.slice(1);
+      return cleanItemNameForShopping(name);
     };
 
     if (Array.isArray(mealPlan)) {

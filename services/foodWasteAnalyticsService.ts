@@ -47,6 +47,42 @@ class FoodWasteAnalyticsService {
         disposalDate: new Date()
       };
 
+      if (disposal.userId === 'guest') {
+        const localData = localStorage.getItem('guest_food_waste_analytics');
+        let analytics: FoodWasteAnalytics;
+        if (localData) {
+          try {
+            analytics = JSON.parse(localData);
+            analytics.lastUpdated = new Date(analytics.lastUpdated);
+            analytics.disposalHistory = (analytics.disposalHistory || []).map((r: any) => ({
+              ...r,
+              disposalDate: new Date(r.disposalDate)
+            }));
+          } catch {
+            analytics = this.createNewAnalyticsObject();
+          }
+        } else {
+          analytics = this.createNewAnalyticsObject();
+        }
+
+        // Update analytics
+        analytics.totalItemsDisposed += 1;
+        analytics.itemsByReason[disposalRecord.disposalReason] += 1;
+        analytics.totalEstimatedValue += disposalRecord.estimatedValue || 0;
+        analytics.lastUpdated = new Date();
+
+        const allDaysExpired = [...(analytics.disposalHistory || []).map(d => d.daysExpired), disposalRecord.daysExpired];
+        analytics.averageDaysExpired = allDaysExpired.reduce((sum, days) => sum + days, 0) / Math.max(1, allDaysExpired.length);
+
+        analytics.disposalHistory.push(disposalRecord);
+        if (analytics.disposalHistory.length > 1000) {
+          analytics.disposalHistory = analytics.disposalHistory.slice(-1000);
+        }
+
+        localStorage.setItem('guest_food_waste_analytics', JSON.stringify(analytics));
+        return;
+      }
+
       const collectionPath = householdId ? this.HOUSEHOLD_COLLECTION : this.USER_COLLECTION;
       const docId = householdId || disposal.userId;
       const analyticsRef = doc(db, collectionPath, docId, 'analytics', this.ANALYTICS_DOC);
@@ -58,18 +94,7 @@ class FoodWasteAnalyticsService {
       if (analyticsSnap.exists()) {
         analytics = analyticsSnap.data() as FoodWasteAnalytics;
       } else {
-        analytics = {
-          totalItemsDisposed: 0,
-          itemsByReason: {
-            thrown_away: 0,
-            cooked: 0,
-            remove: 0
-          },
-          averageDaysExpired: 0,
-          totalEstimatedValue: 0,
-          disposalHistory: [],
-          lastUpdated: new Date()
-        };
+        analytics = this.createNewAnalyticsObject();
       }
 
       // Update analytics
@@ -79,8 +104,8 @@ class FoodWasteAnalyticsService {
       analytics.lastUpdated = new Date();
 
       // Recalculate average days expired
-      const allDaysExpired = [...analytics.disposalHistory.map(d => d.daysExpired), disposalRecord.daysExpired];
-      analytics.averageDaysExpired = allDaysExpired.reduce((sum, days) => sum + days, 0) / allDaysExpired.length;
+      const allDaysExpired = [...(analytics.disposalHistory || []).map(d => d.daysExpired), disposalRecord.daysExpired];
+      analytics.averageDaysExpired = allDaysExpired.reduce((sum, days) => sum + days, 0) / Math.max(1, allDaysExpired.length);
 
       // Add to history (keep last 1000 records)
       analytics.disposalHistory.push(disposalRecord);
@@ -104,11 +129,44 @@ class FoodWasteAnalyticsService {
     }
   }
 
+  private static createNewAnalyticsObject(): FoodWasteAnalytics {
+    return {
+      totalItemsDisposed: 0,
+      itemsByReason: {
+        thrown_away: 0,
+        cooked: 0,
+        remove: 0
+      },
+      averageDaysExpired: 0,
+      totalEstimatedValue: 0,
+      disposalHistory: [],
+      lastUpdated: new Date()
+    };
+  }
+
   /**
    * Get food waste analytics for household or user
    */
   static async getAnalytics(householdId?: string, userId?: string): Promise<FoodWasteAnalytics | null> {
     try {
+      if (userId === 'guest') {
+        const localData = localStorage.getItem('guest_food_waste_analytics');
+        if (!localData) return null;
+        try {
+          const data = JSON.parse(localData);
+          return {
+            ...data,
+            disposalHistory: data.disposalHistory?.map((record: any) => ({
+              ...record,
+              disposalDate: new Date(record.disposalDate)
+            })) || [],
+            lastUpdated: new Date(data.lastUpdated)
+          } as FoodWasteAnalytics;
+        } catch {
+          return null;
+        }
+      }
+
       if (!householdId && !userId) return null;
 
       const collectionPath = householdId ? this.HOUSEHOLD_COLLECTION : this.USER_COLLECTION;
