@@ -20,6 +20,16 @@ export interface DetailedChangeEntry {
 
 export const RECENT_CHANGES: ChangeEntry[] = [
   {
+    "version": "2.5.2",
+    "date": "Jun 28, 2026",
+    "highlights": [
+      "Achievements Fireworks & Celebrations — Added a premium canvas-based fireworks animation on the Community tab,…",
+      "High-Fidelity Accomplishments Sharing — The Leftovers Analytics modal now generates a beautiful custom Instagram-format…",
+      "Android Status Bar Safe Area — Added dynamic status bar padding to the Achievements modal to prevent it from…",
+      "Pantry Search & Filter Repositioning — Replaced the \"My Pantry\" title header with the Search and Filter bar, making it…"
+    ]
+  },
+  {
     "version": "2.5.1",
     "date": "Jun 28, 2026",
     "highlights": [
@@ -37,20 +47,44 @@ export const RECENT_CHANGES: ChangeEntry[] = [
       "Leftover Waste Disclosures — Added clear estimations disclaimer indicating a 30% assumed waste rate for leftovers over…",
       "Recipe Ratings Type-Safety — Refactored database rating service to eliminate all pervasive any types and improve…"
     ]
-  },
-  {
-    "version": "2.4.19",
-    "date": "Jun 26, 2026",
-    "highlights": [
-      "Curated Food Storage Tips — Added 11 detailed food tips for commonly used items (watermelon, maple syrup, cottage…",
-      "Leftovers Category & Badges — Introduced a built-in Leftovers category with a deep purple theme, customized placeholder…",
-      "Ingredient Icon Library — Extracted and integrated 1,952 new ingredient icons, supporting a total of 2,973 active icons…",
-      "Pantry Mobile UX & Layout — Integrated search, filter, and sort into a single compact sticky row; collapsed setup…"
-    ]
   }
 ];
 
 export const ALL_CHANGES: DetailedChangeEntry[] = [
+  {
+    "version": "2.5.2",
+    "date": "Jun 28, 2026",
+    "sections": [
+      {
+        "title": "Added",
+        "bullets": [
+          "**Achievements Fireworks & Celebrations** — Added a premium canvas-based fireworks animation on the Community tab, triggered along with a congratulations toast when tapping any unlocked achievement badge or sharing an accomplishment."
+        ]
+      },
+      {
+        "title": "Changed",
+        "bullets": [
+          "**High-Fidelity Accomplishments Sharing** — The Leftovers Analytics modal now generates a beautiful custom Instagram-format (4:5) image card using HTML5 Canvas, which is shared natively via the device share sheet or downloaded.",
+          "**Android Status Bar Safe Area** — Added dynamic status bar padding to the Achievements modal to prevent it from overlapping with Android system notifications.",
+          "**Pantry Search & Filter Repositioning** — Replaced the \"My Pantry\" title header with the Search and Filter bar, making it stick cleanly to the top of the screen during scroll.",
+          "**Collapsed Setup Checklist** — The onboarding setup checklist on the pantry page is now collapsed by default to keep the interface clean.",
+          "**Restored Google Play Store Link** — Restored the Google Play Store button to the accomplishments sharing page."
+        ]
+      },
+      {
+        "title": "Fixed",
+        "bullets": [
+          "**Recipe URL Web Scraper** — Bypassed CORS blocks on the client-side fallback scraper using a proxy, and added robust JSON-LD schema parsing to extract title, ingredients, instructions, and images from any recipe website."
+        ]
+      },
+      {
+        "title": "Removed",
+        "bullets": [
+          "**Redundant Leftovers Cards** — Removed the redundant leftovers horizontal scrolling cards from the top of the pantry page."
+        ]
+      }
+    ]
+  },
   {
     "version": "2.5.1",
     "date": "Jun 28, 2026",

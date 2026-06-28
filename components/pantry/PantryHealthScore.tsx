@@ -2,6 +2,7 @@
 // Gamified pantry health ring + badge. No external deps.
 import React, { useMemo } from 'react';
 import type { PantryItem } from '../../types';
+import { useAppActions } from '../../contexts/AppActionsContext';
 
 interface PantryHealthScoreProps {
   inventory: PantryItem[];
@@ -31,6 +32,8 @@ function getGrade(score: number): { letter: string; color: string; glow: string;
 }
 
 export const PantryHealthScore: React.FC<PantryHealthScoreProps> = ({ inventory, className = '' }) => {
+  const { addToast } = useAppActions();
+
   const { score, factors } = useMemo(() => {
     if (!inventory.length) return { score: 0, factors: [] };
 
@@ -126,10 +129,22 @@ export const PantryHealthScore: React.FC<PantryHealthScoreProps> = ({ inventory,
   const circ = 2 * Math.PI * radius;
   const dash = (score / 100) * circ;
 
+  const handleScoreClick = () => {
+    addToast(
+      'Scoring: 🥬 Freshness (30 pts max) • 🌈 Variety (25 pts max) • 📦 In Stock (20 pts max) • 📅 Expiry Tracking (15 pts max) • 🔄 Up to Date (10 pts max)',
+      'info',
+      8000
+    );
+  };
+
   if (inventory.length === 0) return null;
 
   return (
-    <div className={`bg-theme-secondary border border-theme rounded-2xl p-4 ${className}`}>
+    <div 
+      onClick={handleScoreClick}
+      className={`bg-theme-secondary border border-theme rounded-2xl p-4 cursor-pointer hover:bg-theme-secondary/80 transition-all duration-200 ${className}`}
+      title="Click to view scoring categories explanation"
+    >
       <div className="flex items-center gap-4">
         {/* Animated SVG ring */}
         <div className="relative shrink-0">
@@ -155,7 +170,10 @@ export const PantryHealthScore: React.FC<PantryHealthScoreProps> = ({ inventory,
         {/* Details */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <h3 className="text-sm font-bold text-theme-primary">Pantry Health</h3>
+            <h3 className="text-sm font-bold text-theme-primary flex items-center gap-1">
+              Pantry Health
+              <span className="text-[10px] opacity-60 font-normal">(Tap for details)</span>
+            </h3>
             <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full bg-theme-primary text-theme-secondary">{score}/100</span>
           </div>
           <div className="space-y-1">

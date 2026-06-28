@@ -1,3 +1,23 @@
+## [2.5.2] - 2026-06-28
+
+### Added
+- **Achievements Fireworks & Celebrations** — Added a premium canvas-based fireworks animation on the Community tab, triggered along with a congratulations toast when tapping any unlocked achievement badge or sharing an accomplishment.
+
+### Changed
+- **High-Fidelity Accomplishments Sharing** — The Leftovers Analytics modal now generates a beautiful custom Instagram-format (4:5) image card using HTML5 Canvas, which is shared natively via the device share sheet or downloaded.
+- **Android Status Bar Safe Area** — Added dynamic status bar padding to the Achievements modal to prevent it from overlapping with Android system notifications.
+- **Pantry Search & Filter Repositioning** — Replaced the "My Pantry" title header with the Search and Filter bar, making it stick cleanly to the top of the screen during scroll.
+- **Collapsed Setup Checklist** — The onboarding setup checklist on the pantry page is now collapsed by default to keep the interface clean.
+- **Restored Google Play Store Link** — Restored the Google Play Store button to the accomplishments sharing page.
+
+### Fixed
+- **Recipe URL Web Scraper** — Bypassed CORS blocks on the client-side fallback scraper using a proxy, and added robust JSON-LD schema parsing to extract title, ingredients, instructions, and images from any recipe website.
+
+### Removed
+- **Redundant Leftovers Cards** — Removed the redundant leftovers horizontal scrolling cards from the top of the pantry page.
+
+---
+
 ## [2.5.1] - 2026-06-28
 
 ### Added
