@@ -751,7 +751,7 @@ class GroceryPriceService {
       const startDateStr = thirtyDaysAgo.toISOString().split('T')[0]; // YYYY-MM-DD format
 
       const params = new URLSearchParams();
-      params.append('product_name__like', ingredient);
+      params.append('product_name', ingredient);
       params.append('date__gte', startDateStr);
       params.append('currency', 'USD');
       params.append('limit', '50');

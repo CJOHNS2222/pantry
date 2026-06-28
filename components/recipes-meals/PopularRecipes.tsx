@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Household, StructuredRecipe, User } from '../../types';
 import { ChefHat } from 'lucide-react';
-import { getCachedPopularRecipes } from '../../services/recipeService';
+import { getCachedRecipesCache } from '../../services/recipeService';
 import { ProgressiveImage } from '../ui/ProgressiveImage';
 
 interface Props {
@@ -32,7 +32,7 @@ export const PopularRecipes: React.FC<Props> = ({ openRecipeModal, onAddToPlan: 
       if (!user) return;
       setLoading(true);
       try {
-        const r = await getCachedPopularRecipes();
+        const r = await getCachedRecipesCache('recipe_caches/recipes_cache_1');
         setRecipes(r);
         setVisible(25);
       } catch (_e) {

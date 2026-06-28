@@ -19,6 +19,7 @@ vi.mock('../../services/geminiService', () => ({
 vi.mock('../../services/recipeService', () => ({
   getSavedRecipes: vi.fn(() => Promise.resolve([])),
   getCachedPopularRecipes: vi.fn(() => Promise.resolve([])),
+  getCachedRecipesCache: vi.fn(() => Promise.resolve([])),
 }));
 
 vi.mock('../../services/analyticsService', () => ({
@@ -279,5 +280,38 @@ describe('RecipeFinder', () => {
     const mains = screen.getAllByRole('main');
     expect(mains.length).toBeGreaterThan(0);
     expect(mains.some(m => m.getAttribute('aria-label') === 'Recipe finder')).toBe(true);
+  });
+
+  test('handles popular section search without AI-driven search', async () => {
+    const mockRecipe: SavedRecipe = {
+      id: 'popular-recipe',
+      title: 'Popular Chicken',
+      description: 'A popular chicken recipe',
+      ingredients: ['Chicken'],
+      instructions: ['Cook it'],
+      cookTime: '20 mins',
+      type: 'Dinner',
+    };
+
+    const { getCachedRecipesCache } = await import('../../services/recipeService');
+    const { searchRecipes } = await import('../../services/geminiService');
+    vi.mocked(getCachedRecipesCache).mockResolvedValue([mockRecipe]);
+
+    render(<RecipeFinder {...defaultProps} />);
+
+    // Trigger the meal filter in the popular section
+    const dinnerFilterBtn = screen.getByRole('button', { name: /dinner/i });
+    fireEvent.click(dinnerFilterBtn);
+
+    const searchAllBtn = screen.getByRole('button', { name: /Search All.*Dinner/i });
+    expect(searchAllBtn).toBeInTheDocument();
+    fireEvent.click(searchAllBtn);
+
+    // It should load and display the cached recipe without calling searchRecipes (AI)
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Popular Chicken' })).toBeInTheDocument();
+    });
+
+    expect(searchRecipes).not.toHaveBeenCalled();
   });
 });

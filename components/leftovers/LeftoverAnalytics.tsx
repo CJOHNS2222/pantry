@@ -355,7 +355,7 @@ export const LeftoverAnalytics: React.FC<LeftoverAnalyticsProps> = ({ householdI
     const totalMoneySaved = analytics.moneySaved;
     const itemsCooked = analytics.itemsCooked + analytics.mealsReplaced;
 
-    const shareText = `I have ${totalItemsInPantry} active ingredients, cooked ${itemsCooked} waste-free meals, and saved $${totalMoneySaved.toFixed(2)} on food waste using Stock & Spoon!`;
+    const shareText = `I have ${totalItemsInPantry} active ingredients, cooked ${itemsCooked} waste-free meals, and saved $${totalMoneySaved.toFixed(2)} on food waste using Stock & Spoon!\n\nGet the app on Google Play: https://play.google.com/store/apps/details?id=com.smart.pantry`;
 
     try {
       addToast('Generating accomplishments card...', 'info', 2500);

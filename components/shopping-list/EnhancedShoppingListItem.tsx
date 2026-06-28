@@ -7,6 +7,7 @@ import { useAppActions } from '../../contexts/AppActionsContext';
 import { comparePriceOptions, formatPricePerUnit, getPriceComparisonSummary } from '../../utils/priceCalculator';
 import { useAndroidBack } from '../../hooks/useAndroidBack';
 import HapticService from '../../services/hapticService';
+import { getItemImageCdnUrl } from '../../utils/appUtils';
 
 const getRecipeTitleFromSource = (source: string | undefined): string => {
   if (!source || !source.startsWith('recipe:')) return '';
@@ -231,11 +232,30 @@ export const EnhancedShoppingListItem: React.FC<ShoppingListItemProps> = ({
         }}
       >
         <div className="flex items-start gap-3 flex-1 min-w-0">
-          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all mt-0.5 flex-shrink-0 ${
+          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all mt-2.5 flex-shrink-0 ${
             isSelected ? 'bg-[var(--accent-color)] border-[var(--accent-color)]' : 'border-theme'
           }`}>
             {isSelected && <Check className="w-3 h-3 text-white" />}
           </div>
+
+          {(() => {
+            const imageUrl = getItemImageCdnUrl(item.item);
+            return imageUrl ? (
+              <img
+                src={imageUrl}
+                alt={item.item}
+                className="w-10 h-10 rounded-full object-cover border border-theme bg-white flex-shrink-0"
+                onError={(e) => {
+                  (e.target as HTMLElement).style.display = 'none';
+                }}
+              />
+            ) : (
+              <div className="w-10 h-10 rounded-full bg-theme-secondary flex items-center justify-center text-lg text-theme-secondary border border-theme flex-shrink-0">
+                📦
+              </div>
+            );
+          })()}
+
           <div className="flex-1 min-w-0 space-y-1">
             <span className="block text-base font-semibold text-theme-primary leading-snug">
               {item.item}
