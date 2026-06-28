@@ -2195,7 +2195,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
       </div>
 
       {/* Onboarding Checklist Card */}
-      {!isChecklistDismissed && (
+      {!isChecklistDismissed && completedChecklistCount < 5 && (
         <div className="bg-theme-secondary rounded-2xl border border-theme shadow-lg overflow-hidden transition-all duration-300 mb-6">
           {/* Header */}
           <div 

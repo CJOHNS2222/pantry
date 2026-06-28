@@ -7,7 +7,7 @@ import { useAppActions } from '../../contexts/AppActionsContext';
 import { comparePriceOptions, formatPricePerUnit, getPriceComparisonSummary } from '../../utils/priceCalculator';
 import { useAndroidBack } from '../../hooks/useAndroidBack';
 import HapticService from '../../services/hapticService';
-import { getItemImageCdnUrl } from '../../utils/appUtils';
+import { getItemImageLocalPath } from '../../utils/appUtils';
 
 const getRecipeTitleFromSource = (source: string | undefined): string => {
   if (!source || !source.startsWith('recipe:')) return '';
@@ -239,7 +239,7 @@ export const EnhancedShoppingListItem: React.FC<ShoppingListItemProps> = ({
           </div>
 
           {(() => {
-            const imageUrl = getItemImageCdnUrl(item.item);
+            const imageUrl = getItemImageLocalPath(item.item);
             return imageUrl ? (
               <img
                 src={imageUrl}

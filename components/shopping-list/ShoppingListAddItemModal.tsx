@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useIntl } from 'react-intl';
 import { Plus, X } from 'lucide-react';
 import QuantityUnitPicker from '../pantry/QuantityUnitPicker';
-import { itemImages, ITEM_IMAGE_CDN_BASE } from '../../data/item-images';
+import { itemImages } from '../../data/item-images';
 
 interface ShoppingListAddItemModalProps {
   isOpen: boolean;
@@ -71,19 +71,26 @@ export const ShoppingListAddItemModal: React.FC<ShoppingListAddItemModalProps> =
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-theme-primary rounded-t-3xl max-w-md w-full modal-safe-h overflow-y-auto shadow-xl animate-slide-up">
-        <div className="p-6 pb-2.5">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-xl font-bold text-theme-secondary">{intl.formatMessage({ id: 'shoppingList.addToList' })}</h3>
-            <button onClick={closeModal} className="p-2 hover:bg-theme-secondary rounded-full transition-colors">
-              <X className="w-5 h-5 text-theme-secondary" />
-            </button>
-          </div>
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <div className="bg-theme-primary w-full h-full sm:h-auto sm:max-h-[90vh] sm:rounded-2xl flex flex-col overflow-hidden shadow-xl animate-slide-up">
+        {/* Header */}
+        <div className="p-6 pb-3 border-b border-theme flex items-center justify-between flex-shrink-0">
+          <h3 className="text-xl font-bold text-theme-primary">
+            {intl.formatMessage({ id: 'shoppingList.addToList' })}
+          </h3>
+          <button onClick={closeModal} className="p-2 hover:bg-theme-secondary rounded-full transition-colors">
+            <X className="w-5 h-5 text-theme-secondary" />
+          </button>
+        </div>
 
-          <form onSubmit={addItem} className="space-y-4">
+        {/* Form Content */}
+        <form onSubmit={addItem} className="flex-1 flex flex-col overflow-hidden">
+          <div className="flex-1 overflow-y-auto p-6 space-y-6">
             <div className="space-y-4">
               <div className="relative">
+                <label htmlFor="newItem" className="block text-sm font-semibold text-theme-secondary mb-1.5">
+                  Item Name
+                </label>
                 <input
                   id="newItem"
                   name="newItem"
@@ -102,16 +109,16 @@ export const ShoppingListAddItemModal: React.FC<ShoppingListAddItemModalProps> =
                 )}
 
                 {suggestions.length > 0 && (
-                  <div className="absolute left-0 right-0 z-10 mt-1 bg-theme-secondary border border-theme rounded-lg shadow-lg max-h-48 overflow-y-auto divide-y divide-theme">
+                  <div className="mt-2 bg-theme-secondary border border-theme rounded-lg divide-y divide-theme max-h-60 overflow-y-auto shadow-sm">
                     {suggestions.map((suggestion) => {
                       const filename = itemImages[suggestion];
-                      const imageUrl = filename ? `${ITEM_IMAGE_CDN_BASE}${filename}` : null;
+                      const imageUrl = filename ? `/images/items/${filename}` : null;
                       return (
                         <button
                           key={suggestion}
                           type="button"
                           onClick={() => handleSelectSuggestion(suggestion)}
-                          className="w-full text-left px-4 py-2.5 text-sm text-theme-primary hover:bg-[var(--accent-color)] hover:text-white transition-colors duration-150 flex items-center justify-between font-semibold"
+                          className="w-full text-left px-4 py-3 text-sm text-theme-primary hover:bg-[var(--accent-color)] hover:text-white transition-colors duration-150 flex items-center justify-between font-semibold"
                         >
                           <div className="flex items-center gap-3">
                             {imageUrl ? (
@@ -137,25 +144,35 @@ export const ShoppingListAddItemModal: React.FC<ShoppingListAddItemModalProps> =
                   </div>
                 )}
               </div>
-              <QuantityUnitPicker
-                quantity={parseFloat(newQty) || 1}
-                unit={newUnit}
-                onQuantityChange={(qty) => setNewQty(qty.toString())}
-                onUnitChange={setNewUnit}
-                itemName={newItem}
-                showControls={true}
-                maxQuantity={999}
-              />
+
+              <div className="pt-2">
+                <label className="block text-sm font-semibold text-theme-secondary mb-2">
+                  Quantity &amp; Unit
+                </label>
+                <QuantityUnitPicker
+                  quantity={parseFloat(newQty) || 1}
+                  unit={newUnit}
+                  onQuantityChange={(qty) => setNewQty(qty.toString())}
+                  onUnitChange={setNewUnit}
+                  itemName={newItem}
+                  showControls={true}
+                  maxQuantity={999}
+                />
+              </div>
             </div>
+          </div>
+
+          {/* Footer - Fixed at the bottom */}
+          <div className="p-6 border-t border-theme bg-theme-secondary/30 flex-shrink-0">
             <button
               type="submit"
-              className="w-full py-3 rounded-lg font-bold text-sm uppercase tracking-wider flex items-center justify-center gap-2 bg-[var(--accent-color)] text-white shadow-lg hover:bg-[var(--accent-color)]/90 transition-colors"
+              className="w-full py-3.5 rounded-xl font-bold text-sm uppercase tracking-wider flex items-center justify-center gap-2 bg-[var(--accent-color)] text-white shadow-lg hover:bg-[var(--accent-color)]/90 transition-colors"
             >
               <Plus className="w-4 h-4" />
               Add Item
             </button>
-          </form>
-        </div>
+          </div>
+        </form>
       </div>
     </div>
   );

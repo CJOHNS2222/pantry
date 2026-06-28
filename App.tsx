@@ -1683,6 +1683,7 @@ const App: React.FC = () => {
           </div>
         )}
         
+        <SubscriptionProvider user={user}>
         <AppProvider
           value={{
             activeTab,
@@ -1876,6 +1877,7 @@ const App: React.FC = () => {
             <MainContent />
           </AppActionsProvider>
         </AppProvider>
+        </SubscriptionProvider>
         <AppNavigation activeTab={activeTab} setActiveTab={switchTab} hiddenTabs={settings.navigation?.hiddenTabs} isKeyboardVisible={isKeyboardVisible} />
         
         {showHousehold && (

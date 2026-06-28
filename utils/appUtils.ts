@@ -860,6 +860,11 @@ export function getItemImageCdnUrl(itemName: string): string | null {
   return filename ? `${ITEM_IMAGE_CDN_BASE}${filename}` : null;
 }
 
+export function getItemImageLocalPath(itemName: string): string | null {
+  const filename = resolveSeededItemImageFilename(itemName);
+  return filename ? `/images/items/${filename}` : null;
+}
+
 export async function fetchExternalItemImage(itemName: string): Promise<string | null> {
   // Import the service dynamically to avoid circular dependencies
   const { fetchGroceryItemImage } = await import('../services/imageService');

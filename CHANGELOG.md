@@ -1,3 +1,18 @@
+## [2.5.4] - 2026-06-28
+
+### Added
+- **Expanded Price Database** — Added 200 new high-quality grocery items and mid-2026 national average prices to the Firestore price cache and local fallback mapping, covering items 101 to 300 (expanded produce, meat, dairy, baking, frozen foods, beverages, household staples, and cereals).
+- **Interactive Shopping List Actions** — Added a "Select All" option next to "Deselect All" in the shopping list action bar when there are still unchecked items.
+
+### Changed
+- **Optimized Firestore Database Reads** — Consolidated user and household subscriptions under a single root-level `SubscriptionProvider` listener, completely eliminating redundant Firestore reads when switching tabs.
+- **Auto-Hiding Onboarding Checklist** — Modified the onboarding setup checklist on the pantry tab to automatically hide and remove itself once it reaches 100% completion.
+
+### Fixed
+- **Shopping List Add Modal Syntax** — Fixed a duplicate closing bracket syntax error in the shopping list add-item modal.
+
+---
+
 ## [2.5.3] - 2026-06-28
 
 ### Added

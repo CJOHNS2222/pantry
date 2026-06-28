@@ -20,6 +20,16 @@ export interface DetailedChangeEntry {
 
 export const RECENT_CHANGES: ChangeEntry[] = [
   {
+    "version": "2.5.4",
+    "date": "Jun 28, 2026",
+    "highlights": [
+      "Expanded Price Database — Added 200 new high-quality grocery items and mid-2026 national average prices to the…",
+      "Interactive Shopping List Actions — Added a \"Select All\" option next to \"Deselect All\" in the shopping list action bar…",
+      "Optimized Firestore Database Reads — Consolidated user and household subscriptions under a single root-level…",
+      "Auto-Hiding Onboarding Checklist — Modified the onboarding setup checklist on the pantry tab to automatically hide and…"
+    ]
+  },
+  {
     "version": "2.5.3",
     "date": "Jun 28, 2026",
     "highlights": [
@@ -38,20 +48,36 @@ export const RECENT_CHANGES: ChangeEntry[] = [
       "Android Status Bar Safe Area — Added dynamic status bar padding to the Achievements modal to prevent it from…",
       "Pantry Search & Filter Repositioning — Replaced the \"My Pantry\" title header with the Search and Filter bar, making it…"
     ]
-  },
-  {
-    "version": "2.5.1",
-    "date": "Jun 28, 2026",
-    "highlights": [
-      "Leftover & Food Waste Achievements — Added a premium interactive \"View & Share Achievements\" dashboard.",
-      "Dynamic Waste Range Filtering — Added a time-period selector (7 Days, 30 Days, All Time) to the food waste analytics…",
-      "Improved Toast Navigation — Repositioned toast notifications from bottom-4 to bottom-20 to ensure they never block or…",
-      "Leftover Analytics Placement — Moved the Leftover & Food Waste Analytics section to the top of the Organization tab in…"
-    ]
   }
 ];
 
 export const ALL_CHANGES: DetailedChangeEntry[] = [
+  {
+    "version": "2.5.4",
+    "date": "Jun 28, 2026",
+    "sections": [
+      {
+        "title": "Added",
+        "bullets": [
+          "**Expanded Price Database** — Added 200 new high-quality grocery items and mid-2026 national average prices to the Firestore price cache and local fallback mapping, covering items 101 to 300 (expanded produce, meat, dairy, baking, frozen foods, beverages, household staples, and cereals).",
+          "**Interactive Shopping List Actions** — Added a \"Select All\" option next to \"Deselect All\" in the shopping list action bar when there are still unchecked items."
+        ]
+      },
+      {
+        "title": "Changed",
+        "bullets": [
+          "**Optimized Firestore Database Reads** — Consolidated user and household subscriptions under a single root-level `SubscriptionProvider` listener, completely eliminating redundant Firestore reads when switching tabs.",
+          "**Auto-Hiding Onboarding Checklist** — Modified the onboarding setup checklist on the pantry tab to automatically hide and remove itself once it reaches 100% completion."
+        ]
+      },
+      {
+        "title": "Fixed",
+        "bullets": [
+          "**Shopping List Add Modal Syntax** — Fixed a duplicate closing bracket syntax error in the shopping list add-item modal."
+        ]
+      }
+    ]
+  },
   {
     "version": "2.5.3",
     "date": "Jun 28, 2026",
