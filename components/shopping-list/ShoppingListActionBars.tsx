@@ -60,6 +60,17 @@ export const ShoppingListActionBars: React.FC<ShoppingListActionBarsProps> = ({
             >
               Deselect All
             </button>
+            {hasUncheckedItems && (
+              <>
+                <span className="text-theme-secondary opacity-30 text-xs">|</span>
+                <button
+                  onClick={onSelectAll}
+                  className="text-xs font-medium text-[var(--accent-color)] hover:underline focus:outline-none"
+                >
+                  Select All
+                </button>
+              </>
+            )}
           </div>
 
           {/* Right side: Actions */}
