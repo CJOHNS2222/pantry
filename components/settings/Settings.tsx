@@ -44,7 +44,7 @@ import { SettingsPendingNotificationsSection } from './SettingsPendingNotificati
 import { SettingsPrivacyLegalSection } from './SettingsPrivacyLegalSection';
 import { SettingsRemoteConfigDebugSection } from './SettingsRemoteConfigDebugSection';
 import { SettingsResetUsageSection } from './SettingsResetUsageSection';
-import { SettingsPowerFeaturesSection } from './SettingsPowerFeaturesSection';
+
 import { SettingsStoreLayoutSection } from './SettingsStoreLayoutSection';
 import { SettingsSubscriptionSection } from './SettingsSubscriptionSection';
 import { SettingsTabPills } from './SettingsTabPills';
@@ -1080,21 +1080,7 @@ export const Settings: React.FC<SettingsProps> = ({
 
       {activeSettingsTab === 'preferences' && <>
 
-      <SettingsPowerFeaturesSection
-        onOpenCategories={() => {
-          setActiveSettingsTab('organization');
-          setShowCategoryManager(true);
-        }}
-        onOpenStoreLayout={() => setActiveSettingsTab('organization')}
-        onOpenFoodSafety={() => {
-          const el = document.querySelector('[data-section="food-safety"]');
-          el?.scrollIntoView({ behavior: 'smooth' });
-        }}
-        onOpenAppPreferences={() => {
-          const el = document.querySelector('[data-section="app-preferences"]');
-          el?.scrollIntoView({ behavior: 'smooth' });
-        }}
-      />
+
 
       <SettingsAppPreferencesSection
         title={intl.formatMessage({ id: 'settings.appPreferences' })}
@@ -1176,6 +1162,12 @@ export const Settings: React.FC<SettingsProps> = ({
 
       {activeSettingsTab === 'organization' && <>
 
+      <SettingsLeftoverAnalyticsSection
+        userId={user?.id}
+        householdId={household?.id}
+        title={intl.formatMessage({ id: 'settings.leftoverAnalytics' })}
+      />
+
       <SettingsCategoriesSection
         userExists={!!user}
         title={intl.formatMessage({ id: 'settings.categories' })}
@@ -1204,12 +1196,6 @@ export const Settings: React.FC<SettingsProps> = ({
             activeStoreProfile: active,
           },
         }))}
-      />
-
-      <SettingsLeftoverAnalyticsSection
-        userId={user?.id}
-        householdId={household?.id}
-        title={intl.formatMessage({ id: 'settings.leftoverAnalytics' })}
       />
 
       </>}

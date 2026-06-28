@@ -19,7 +19,7 @@ export function usePantryFilters(inventory: PantryItem[], recipes: any[], initia
   const [sortBy, setSortBy] = useState<'name' | 'lastAdded' | 'expiration' | 'category' | 'location'>('location');
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [categoryOrder, setCategoryOrder] = useState<string[]>([]);
-  const [storageSectionOrder, setStorageSectionOrder] = useState<string[]>(['pantry', 'fridge', 'freezer', 'spices', 'other']);
+  const [storageSectionOrder, setStorageSectionOrder] = useState<string[]>(['leftovers', 'pantry', 'fridge', 'freezer', 'spices', 'other']);
   const [mealPrepSuggestions, setMealPrepSuggestions] = useState<RecipeIngredientMatch[]>([]);
 
   // Update debounced search
@@ -36,7 +36,7 @@ export function usePantryFilters(inventory: PantryItem[], recipes: any[], initia
       try {
         const suggestions = getMealPrepSuggestions(recipes, inventory, 60);
         setMealPrepSuggestions(suggestions);
-      } catch (e) {
+      } catch (_e) {
         setMealPrepSuggestions([]);
       }
     } else {
@@ -187,7 +187,7 @@ export function usePantryFilters(inventory: PantryItem[], recipes: any[], initia
   // Group inventory by storage location
   const groupedByStorage = useMemo(() => {
     return sortedInventory.reduce((acc, item) => {
-      const location = item.storageLocation || 'pantry';
+      const location = item.is_leftover ? 'leftovers' : (item.storageLocation || 'pantry');
       if (!acc[location]) {
         acc[location] = {};
       }

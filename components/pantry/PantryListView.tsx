@@ -7,6 +7,10 @@ import { PantryListItem } from './PantryListItem';
 import { DisplayedPantryItem } from '../../hooks/usePantryFilters';
 import { PantryItem } from '../../types';
 
+const VirtualizedRow = ({ index, style, data }: { index: number; style: React.CSSProperties; data: { renderRow: (index: number, style: React.CSSProperties) => React.ReactElement } }) => {
+  return data.renderRow(index, style);
+};
+
 interface PantryListViewProps {
   viewMode: 'category' | 'storage';
   displayLayout: 'list' | 'grid';
@@ -53,6 +57,7 @@ export const PantryListView: React.FC<PantryListViewProps> = ({
   onDeleteItem
 }) => {
   const storageLabels: Record<string, string> = {
+    leftovers: 'Leftovers',
     pantry: 'Pantry',
     fridge: 'Refrigerator', 
     freezer: 'Freezer',
@@ -161,8 +166,14 @@ export const PantryListView: React.FC<PantryListViewProps> = ({
                 itemCount={items.length}
                 itemSize={64}
                 width={'100%'}
+                itemData={{
+                  selectedItems,
+                  bulkMode,
+                  items,
+                  renderRow: (index: number, style: React.CSSProperties) => renderCategoryItem({ index, style, category })
+                }}
               >
-                {(props) => renderCategoryItem({ ...props, category })}
+                {VirtualizedRow}
               </List>
             ) : (
               items.map(item => (
@@ -197,7 +208,7 @@ export const PantryListView: React.FC<PantryListViewProps> = ({
         <div className="w-full flex items-center px-4 py-2 bg-theme-primary">
           <div className="flex items-center gap-3">
             <StorageLocationIndicator
-              location={location as 'pantry' | 'freezer' | 'fridge' | 'spices' | 'other'}
+              location={location as 'pantry' | 'freezer' | 'fridge' | 'spices' | 'other' | 'leftovers'}
               size="md"
             />
             <h4 className="font-semibold text-theme-primary">{locationLabel}</h4>
@@ -233,8 +244,14 @@ export const PantryListView: React.FC<PantryListViewProps> = ({
               itemCount={items.length}
               itemSize={64}
               width={'100%'}
+              itemData={{
+                selectedItems,
+                bulkMode,
+                items,
+                renderRow: (index: number, style: React.CSSProperties) => renderStorageItem({ index, style, location })
+              }}
             >
-              {(props) => renderStorageItem({ ...props, location })}
+              {VirtualizedRow}
             </List>
           ) : (
             items.map(item => (

@@ -1,3 +1,23 @@
+## [2.5.1] - 2026-06-28
+
+### Added
+- **Leftover & Food Waste Achievements** — Added a premium interactive "View & Share Achievements" dashboard. It displays key positive metrics (Pantry Items, Smart Meals Cooked, and Money Saved) on a beautifully styled gradient screen with App Store and Play Store badges, excluding negative food waste data for sharing.
+- **Dynamic Waste Range Filtering** — Added a time-period selector (7 Days, 30 Days, All Time) to the food waste analytics section in Settings, dynamically recalculating waste value and average days expired on the client side.
+
+### Changed
+- **Improved Toast Navigation** — Repositioned toast notifications from `bottom-4` to `bottom-20` to ensure they never block or overlap the bottom navigation bar.
+- **Leftover Analytics Placement** — Moved the Leftover & Food Waste Analytics section to the top of the Organization tab in Settings.
+
+### Fixed
+- **Clean Ingredient Suggestions** — Integrated `cleanItemNameForShopping` in the Quick Add menu to strip preparation words (e.g., "chopped", "sliced", "whole"), measurement units ("tbsp", "pinch", "tablespoon"), and standalone numbers from suggestions.
+- **Fresh Pepper Image Mapping** — Resolved a bug where color-stripping collapsed "red pepper" and "green pepper" into "pepper" (inheriting the ground black pepper shaker image). Fresh bell peppers are now mapped to their correct fresh pepper image.
+- **Household Analytics Sync** — Resolved a bug where food waste disposals were written using `user.householdId` (which was undefined), causing them to be saved to user documents but read from household documents. They are now correctly written using `household?.id`.
+
+### Removed
+- **Settings Clean-up** — Removed the unused "Power Features" card from the Preferences tab.
+
+---
+
 ## [2.5.0] - 2026-06-27
 
 ### Added

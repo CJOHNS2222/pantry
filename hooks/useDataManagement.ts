@@ -1139,6 +1139,29 @@ export function useDataManagement(
           }
 
           if (user?.isGuest) {
+            // Record to food waste analytics for guest
+            for (const itemToDelete of deletedItems) {
+              try {
+                const daysExpired = itemToDelete.expirationDate
+                  ? Math.max(0, Math.ceil((new Date().getTime() - new Date(itemToDelete.expirationDate).getTime()) / (1000 * 60 * 60 * 24)))
+                  : 0;
+                const estimatedValue = itemToDelete.estimatedPrice || 2.50;
+
+                await FoodWasteAnalyticsService.recordDisposal({
+                  itemId: itemToDelete.id,
+                  itemName: itemToDelete.item,
+                  category: itemToDelete.category,
+                  disposalReason: 'cooked',
+                  daysExpired,
+                  userId: 'guest',
+                  userName: 'Guest',
+                  estimatedValue
+                });
+              } catch (err) {
+                log.warn('Failed to record guest waste disposal on recipe deduction', { error: err }, 'DataManagement');
+              }
+            }
+
             setInventory(finalInventory);
             try {
               localStorage.setItem(GUEST_INVENTORY_KEY, JSON.stringify(finalInventory));
@@ -1168,7 +1191,7 @@ export function useDataManagement(
                   userId: user.id,
                   userName: user.name,
                   estimatedValue
-                }, user.householdId);
+                }, household?.id);
               } catch (err) {
                 log.warn('Failed to record waste disposal on recipe deduction delete', { error: err }, 'DataManagement');
               }
@@ -1324,6 +1347,30 @@ export function useDataManagement(
     }
 
     if (user?.isGuest) {
+      // Record to food waste analytics for guest
+      try {
+        const today = new Date().toISOString().slice(0, 10);
+        const isExpired = itemToDelete.expirationDate && !itemToDelete.is_immortal && itemToDelete.expirationDate <= today;
+        const reason = disposalReason || (isExpired ? 'thrown_away' : 'remove');
+        const daysExpired = itemToDelete.expirationDate 
+          ? Math.max(0, Math.ceil((new Date().getTime() - new Date(itemToDelete.expirationDate).getTime()) / (1000 * 60 * 60 * 24)))
+          : 0;
+        const estimatedValue = itemToDelete.estimatedPrice || 2.50;
+
+        await FoodWasteAnalyticsService.recordDisposal({
+          itemId: itemToDelete.id,
+          itemName: itemToDelete.item,
+          category: itemToDelete.category,
+          disposalReason: reason,
+          daysExpired,
+          userId: 'guest',
+          userName: 'Guest',
+          estimatedValue
+        });
+      } catch (err) {
+        log.warn('Failed to record guest waste disposal on item delete', { error: err }, 'DataManagement');
+      }
+
       setInventory(prev => {
         const updated = prev.filter((_, i) => i !== index);
         try { localStorage.setItem(GUEST_INVENTORY_KEY, JSON.stringify(updated)); } catch { /* storage full */ }
@@ -1352,7 +1399,7 @@ export function useDataManagement(
           userId: user.id,
           userName: user.name,
           estimatedValue
-        }, user.householdId);
+        }, household?.id);
       } catch (err) {
         log.warn('Failed to record waste disposal on item delete', { error: err }, 'DataManagement');
       }
@@ -1409,6 +1456,32 @@ export function useDataManagement(
     }
 
     if (user?.isGuest) {
+      // Record to food waste analytics for guest
+      try {
+        const today = new Date().toISOString().slice(0, 10);
+        for (const itemToDelete of itemsToDelete) {
+          const isExpired = itemToDelete.expirationDate && !itemToDelete.is_immortal && itemToDelete.expirationDate <= today;
+          const reason = disposalReason || (isExpired ? 'thrown_away' : 'remove');
+          const daysExpired = itemToDelete.expirationDate 
+            ? Math.max(0, Math.ceil((new Date().getTime() - new Date(itemToDelete.expirationDate).getTime()) / (1000 * 60 * 60 * 24)))
+            : 0;
+          const estimatedValue = itemToDelete.estimatedPrice || 2.50;
+
+          await FoodWasteAnalyticsService.recordDisposal({
+            itemId: itemToDelete.id,
+            itemName: itemToDelete.item,
+            category: itemToDelete.category,
+            disposalReason: reason,
+            daysExpired,
+            userId: 'guest',
+            userName: 'Guest',
+            estimatedValue
+          });
+        }
+      } catch (err) {
+        log.warn('Failed to record guest waste disposal on bulk delete', { error: err }, 'DataManagement');
+      }
+
       setInventory(prev => {
         const updated = prev.filter((_, i) => !indexSet.has(i));
         try { localStorage.setItem(GUEST_INVENTORY_KEY, JSON.stringify(updated)); } catch { /* storage full */ }
@@ -1438,7 +1511,7 @@ export function useDataManagement(
             userId: user.id,
             userName: user.name,
             estimatedValue
-          }, user.householdId);
+          }, household?.id);
         }
       } catch (err) {
         log.warn('Failed to record waste disposal on bulk delete', { error: err }, 'DataManagement');

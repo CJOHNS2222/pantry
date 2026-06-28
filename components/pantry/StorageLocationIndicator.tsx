@@ -1,8 +1,8 @@
 import React from 'react';
-import { Home, Snowflake, Refrigerator, ChefHat, Package } from 'lucide-react';
+import { Home, Snowflake, Refrigerator, ChefHat, Package, Utensils } from 'lucide-react';
 
 interface StorageLocationIndicatorProps {
-  location: 'pantry' | 'freezer' | 'fridge' | 'spices' | 'other';
+  location: 'pantry' | 'freezer' | 'fridge' | 'spices' | 'other' | 'leftovers';
   size?: 'sm' | 'md' | 'lg';
   showLabel?: boolean;
   className?: string;
@@ -16,6 +16,13 @@ export const StorageLocationIndicator: React.FC<StorageLocationIndicatorProps> =
 }) => {
   const getLocationConfig = (location: string) => {
     switch (location) {
+      case 'leftovers':
+        return {
+          icon: Utensils,
+          label: 'Leftovers',
+          color: 'bg-purple-100 text-purple-800 border-purple-200',
+          bgColor: 'bg-purple-50'
+        };
       case 'pantry':
         return {
           icon: Home,
