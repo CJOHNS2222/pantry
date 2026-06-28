@@ -1,3 +1,19 @@
+## [2.5.3] - 2026-06-28
+
+### Added
+- **Global Achievements Celebrations** — Moved the canvas-based achievements celebration and congratulations modal to the App root level so they trigger instantly on any tab the moment a milestone is reached.
+- **Enhanced Shopping List Visuals** — Added item thumbnails next to names in both the search suggestions dropdown and the active shopping list items.
+
+### Changed
+- **Fixed Subscription Downgrades** — Enabled the Free plan downgrade button to look active and properly redirect users to the Google Play Store subscription management page, and updated the trial duration text from 14 to 7 days.
+- **Google Play Store Sharing Link** — Appended the Google Play Store download link to the end of the shareable achievements text.
+
+### Fixed
+- **Database-Only Recipe Sorting** — Modified the popular recipe section on the Chef tab to sort and filter locally using the cached recipes from the database instead of calling the AI service.
+- **Accurate Grocery Prices** — Resolved a bug where all shopping list items defaulted to `$137.42` by fixing the Open Prices API query parameter and cleaning up the Firestore cache.
+
+---
+
 ## [2.5.2] - 2026-06-28
 
 ### Added

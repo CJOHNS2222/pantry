@@ -6,6 +6,7 @@ import { User } from '../../types';
 import { UsageService, UsageLimits } from '../../services/usageService';
 import { log } from '../../services/logService';
 import AnalyticsService from '../../services/analyticsService';
+import { useAppActions } from '../../contexts/AppActionsContext';
 import {
   initializePurchaseStore,
   purchaseProduct,
@@ -25,7 +26,8 @@ const PLAN_PRODUCT_MAP: Record<string, ProductId> = {
 };
 
 export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }) => {
-  const { subscription, isPremium, isFamily, isActive } = useSubscription(user);
+  const { subscription, isPremium, isActive } = useSubscription(user);
+  const { addToast } = useAppActions();
   const [showPlans, setShowPlans] = useState(false);
   const [usageLimits, setUsageLimits] = useState<UsageLimits | null>(null);
   const [purchaseLoading, setPurchaseLoading] = useState<string | null>(null);
@@ -55,8 +57,8 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }
             [PRODUCT_IDS.FAMILY_MONTHLY]: getProductPrice(PRODUCT_IDS.FAMILY_MONTHLY) ?? '',
           });
         })
-        .catch((err: any) =>
-          log.error('IAP store init error', { error: err?.message }, 'SubscriptionManager')
+        .catch((err: unknown) =>
+          log.error('IAP store init error', { error: err instanceof Error ? err.message : String(err) }, 'SubscriptionManager')
         );
     }
 
@@ -67,8 +69,18 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }
     });
   }, [user, subscription?.tier, isActive]);
 
-  const handleUpgrade = async (plan: any) => {
-    if (plan.id === 'free') return;
+  const handleUpgrade = async (plan: { id: string; name?: string; price?: string }) => {
+    if (plan.id === 'free') {
+      addToast('Redirecting to Google Play Store to manage your subscription.', 'info');
+      setTimeout(() => {
+        if (Capacitor.isNativePlatform()) {
+          window.open('https://play.google.com/store/account/subscriptions', '_system');
+        } else {
+          window.open('https://play.google.com/store/account/subscriptions', '_blank');
+        }
+      }, 1000);
+      return;
+    }
     const productId = PLAN_PRODUCT_MAP[plan.id];
     if (!productId) return;
 
@@ -327,7 +339,7 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }
                     subscription?.tier === plan.id
                       ? 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 cursor-not-allowed'
                       : plan.id === 'free'
-                      ? 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      ? 'border border-blue-500 text-blue-500 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30'
                       : 'bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-60'
                   }`}
                   disabled={
@@ -355,7 +367,7 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }
               Need help choosing?
             </h4>
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-              All plans include a 14-day free trial. Cancel anytime.
+              All plans include a 7-day free trial. Cancel anytime.
             </p>
             <div className="flex gap-2">
               <button className="text-blue-500 hover:text-blue-600 text-sm font-medium">

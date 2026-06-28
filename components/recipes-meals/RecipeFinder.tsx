@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { searchRecipes } from '../../services/geminiService';
 import { setUserGeminiOptIn } from '../../services/featureFlags';
-import { getCachedPopularRecipes, submitRecipeForReview } from '../../services/recipeService';
+import { getCachedRecipesCache, submitRecipeForReview } from '../../services/recipeService';
 import { RecipeSearchResult, LoadingState, RecipeRating, StructuredRecipe, PantryItem, SavedRecipe, User, Household, RecipeSearchParams } from '../../types';
 import { PremiumFeature } from '../settings/PremiumFeature';
 import { log } from '../../services/logService';
@@ -27,7 +27,12 @@ import { RecipeFinderModalSection } from '../recipe-finder/RecipeFinderModalSect
 import { Tab } from '../../types/app';
 
 /** Internal search params — partial RecipeSearchParams plus component-local filter fields */
-type RecipeFinderSearchParams = Partial<RecipeSearchParams> & { type?: string };
+type RecipeFinderSearchParams = Partial<RecipeSearchParams> & {
+    type?: string;
+    isCacheOnly?: boolean;
+    mealTypeFilter?: string;
+    cuisineFilter?: string;
+};
 
 interface RecipeFinderProps {
     onAddToPlan: (recipe: StructuredRecipe) => void;
@@ -298,8 +303,9 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
             measurementSystem: params.measurementSystem || 'Standard',
             type: params.type || '',
             strictMode: params.strictMode || false,
-            cacheMealTypeFilter,
-            cacheCuisineFilter
+            cacheMealTypeFilter: params.mealTypeFilter || cacheMealTypeFilter,
+            cacheCuisineFilter: params.cuisineFilter || cacheCuisineFilter,
+            isCacheOnly: params.isCacheOnly || false
         });
     };
     
@@ -371,7 +377,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
 
             try {
                 setFirebaseRecipesLoading(true);
-                const recipes = await getCachedPopularRecipes(); // Uses cached recipes (1 read vs 50+ reads)
+                const recipes = await getCachedRecipesCache('recipe_caches/recipes_cache_1'); // Uses cached recipes (1 read vs 50+ reads)
                 setFirebaseRecipes(recipes);
                 // reset visible count when new recipes arrive
                 setVisibleFirebaseCount(25);
@@ -981,12 +987,18 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
       setSpecificQuery(query);
       saveSearchToHistory(query, 'recipe');
 
-      const params = { query, ingredients: '' };
+      const params = {
+          query,
+          ingredients: '',
+          isCacheOnly: true,
+          mealTypeFilter: mealType,
+          cuisineFilter: cuisine
+      };
       await performSearch(params);
 
       // Scroll to the search input / results section
       const element = document.getElementById('specificQuery');
-      if (element) {
+      if (element && typeof element.scrollIntoView === 'function') {
           element.scrollIntoView({ behavior: 'smooth', block: 'center' });
       } else {
           window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1060,13 +1072,35 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
         setIsResultFromCache(false);
         setSearchError(null);
         if (setPersistedResult) setPersistedResult(null);
+        let wasFromCache = false;
         try {
             log.debug('Recipe search params:', params);
             // First, if there's a text query, try the cached popular recipes document
             let data: RecipeSearchResult | null = null;
-            if (params.query && String(params.query).trim()) {
+            
+            if (params.isCacheOnly) {
                 try {
-                    const cachedList = await getCachedPopularRecipes();
+                    const cachedList = await getCachedRecipesCache('recipe_caches/recipes_cache_1');
+                    const filteredMatches = cachedList.filter((r: SavedRecipe) =>
+                        recipeMatchesCacheFilters(r, {
+                            mealType: params.mealTypeFilter as CacheMealTypeFilter,
+                            cuisine: params.cuisineFilter
+                        })
+                    );
+
+                    const rankedMatches = rankCachedRecipesByPreferences(filteredMatches, household?.members || [], user?.profile);
+
+                    data = { recipes: rankedMatches };
+                    wasFromCache = true;
+                    AnalyticsService.trackRecipeSearch(params.query || 'cache_only', rankedMatches.length);
+                } catch (e) {
+                    log.error('Cached-only recipe search failed', { error: e });
+                    data = { recipes: [] };
+                    wasFromCache = true;
+                }
+            } else if (params.query && String(params.query).trim()) {
+                try {
+                    const cachedList = await getCachedRecipesCache('recipe_caches/recipes_cache_1');
                     const q = String(params.query).toLowerCase();
                     const matches = cachedList.filter((r: SavedRecipe) => {
                         const title = (r.title || '').toLowerCase();
@@ -1087,7 +1121,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
 
                     if (rankedMatches.length > 0) {
                         data = { recipes: rankedMatches };
-                        setIsResultFromCache(true);
+                        wasFromCache = true;
                         AnalyticsService.trackRecipeSearch(params.query, rankedMatches.length);
                     }
                 } catch (e) {
@@ -1109,7 +1143,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                     userId: user?.id,
                     userProfile: user?.profile
                 } as RecipeSearchParams, user);
-                setIsResultFromCache(false);
+                wasFromCache = false;
             }
             // Filter results by type (quick meal, dinner, dessert)
             let filteredRecipes = data.recipes;
@@ -1169,7 +1203,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
             setRecipeWarnings(warningsMap);
 
             setResult({ ...data, recipes: filteredRecipes });
-            setIsResultFromCache(false);
+            setIsResultFromCache(wasFromCache);
             if (setPersistedResult) setPersistedResult({ ...data, recipes: filteredRecipes });
             
             // Save search to history

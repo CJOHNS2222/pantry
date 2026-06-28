@@ -19,7 +19,7 @@ import {
   Info, 
   DollarSign 
 } from 'lucide-react';
-import { RecipeRating, StructuredRecipe, PantryItem } from '../../types';
+import { RecipeRating, StructuredRecipe } from '../../types';
 import RecipeModal from '../recipes-meals/RecipeModal';
 import { getCachedCommunityRatedRecipes } from '../../services/recipeService';
 import { log } from '../../services/logService';
@@ -59,100 +59,7 @@ interface LeaderboardEntry {
   isHousehold: boolean;
 }
 
-interface AchievementBadge {
-  id: string;
-  title: string;
-  description: string;
-  icon: string;
-  color: string;
-  targetValue: number;
-  currentValue: number;
-  unit: string;
-  isUnlocked: boolean;
-  tip: string;
-}
-
-// Pantry Score Calculation Helper (Mirrors PantryHealthScore.tsx)
-const calculatePantryScore = (items: PantryItem[]) => {
-  if (!items.length) return 0;
-  const total = items.length;
-
-  // Factor 1: Freshness (no expired items)
-  const expiredCount = items.filter(i => {
-    if (!i.expirationDate) return false;
-    return new Date(i.expirationDate).getTime() < Date.now();
-  }).length;
-  const expiringSoonCount = items.filter(i => {
-    if (!i.expirationDate) return false;
-    const diff = Math.ceil((new Date(i.expirationDate).getTime() - Date.now()) / 86400000);
-    return diff >= 0 && diff <= 3;
-  }).length;
-  const freshnessPoints = Math.max(0, 30 - expiredCount * 10 - expiringSoonCount * 3);
-
-  // Factor 2: Variety (different categories)
-  const categories = new Set(items.map(i => i.category || 'other'));
-  const varietyPoints = Math.min(25, categories.size * 3);
-
-  // Factor 3: Stock level
-  const inStockCount = items.filter(i => {
-    const q = i.quantity;
-    if (q == null) return true;
-    if (typeof q === 'number') return q > 0;
-    return q.amount > 0;
-  }).length;
-  const stockPoints = Math.round((inStockCount / total) * 20);
-
-  // Factor 4: Expiry tracking
-  const trackedCount = items.filter(i => !!i.expirationDate).length;
-  const trackingPoints = Math.round((trackedCount / total) * 15);
-
-  // Factor 5: Recency
-  const thirtyDaysAgo = Date.now() - 30 * 86400000;
-  const recentCount = items.filter(i => {
-    const t = i.lastRestocked ? new Date(i.lastRestocked).getTime()
-            : i.dateAdded   ? new Date(i.dateAdded).getTime()
-            : 0;
-    return t > thirtyDaysAgo;
-  }).length;
-  const recencyPoints = Math.round((recentCount / total) * 10);
-
-  const rawScore = freshnessPoints + varietyPoints + stockPoints + trackingPoints + recencyPoints;
-  return Math.min(100, Math.max(0, rawScore));
-};
-
-// Cooking Streak Calculation Helper
-const getCookingStreak = (): number => {
-  const STREAK_KEY = 'cookingStreakDates';
-  const raw = localStorage.getItem(STREAK_KEY);
-  if (!raw) return 0;
-  try {
-    const dates: string[] = JSON.parse(raw);
-    if (!Array.isArray(dates) || dates.length === 0) return 0;
-    
-    const sorted = [...dates].sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
-    const todayStr = new Date().toISOString().split('T')[0];
-    const yesterdayStr = new Date(Date.now() - 86400000).toISOString().split('T')[0];
-    
-    const latest = sorted[0];
-    if (latest !== todayStr && latest !== yesterdayStr) return 0;
-    
-    let streak = 1;
-    for (let i = 0; i < sorted.length - 1; i++) {
-      const d1 = new Date(sorted[i]);
-      const d2 = new Date(sorted[i + 1]);
-      const diffTime = Math.abs(d1.getTime() - d2.getTime());
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      if (diffDays === 1) {
-        streak++;
-      } else if (diffDays > 1) {
-        break;
-      }
-    }
-    return streak;
-  } catch {
-    return 0;
-  }
-};
+import { calculatePantryScore, getCookingStreak, AchievementBadge } from '../../utils/achievementUtils';
 
 export const Community: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecipe, user }) => {
   const app = useApp();

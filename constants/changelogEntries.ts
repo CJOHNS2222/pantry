@@ -20,6 +20,16 @@ export interface DetailedChangeEntry {
 
 export const RECENT_CHANGES: ChangeEntry[] = [
   {
+    "version": "2.5.3",
+    "date": "Jun 28, 2026",
+    "highlights": [
+      "Global Achievements Celebrations — Moved the canvas-based achievements celebration and congratulations modal to the App…",
+      "Enhanced Shopping List Visuals — Added item thumbnails next to names in both the search suggestions dropdown and the…",
+      "Fixed Subscription Downgrades — Enabled the Free plan downgrade button to look active and properly redirect users to…",
+      "Google Play Store Sharing Link — Appended the Google Play Store download link to the end of the shareable achievements…"
+    ]
+  },
+  {
     "version": "2.5.2",
     "date": "Jun 28, 2026",
     "highlights": [
@@ -38,19 +48,37 @@ export const RECENT_CHANGES: ChangeEntry[] = [
       "Improved Toast Navigation — Repositioned toast notifications from bottom-4 to bottom-20 to ensure they never block or…",
       "Leftover Analytics Placement — Moved the Leftover & Food Waste Analytics section to the top of the Organization tab in…"
     ]
-  },
-  {
-    "version": "2.5.0",
-    "date": "Jun 27, 2026",
-    "highlights": [
-      "Native Calendar Support — Integrated Capacitor Calendar for scheduling meals and meal prep reminders on native devices.",
-      "Leftover Waste Disclosures — Added clear estimations disclaimer indicating a 30% assumed waste rate for leftovers over…",
-      "Recipe Ratings Type-Safety — Refactored database rating service to eliminate all pervasive any types and improve…"
-    ]
   }
 ];
 
 export const ALL_CHANGES: DetailedChangeEntry[] = [
+  {
+    "version": "2.5.3",
+    "date": "Jun 28, 2026",
+    "sections": [
+      {
+        "title": "Added",
+        "bullets": [
+          "**Global Achievements Celebrations** — Moved the canvas-based achievements celebration and congratulations modal to the App root level so they trigger instantly on any tab the moment a milestone is reached.",
+          "**Enhanced Shopping List Visuals** — Added item thumbnails next to names in both the search suggestions dropdown and the active shopping list items."
+        ]
+      },
+      {
+        "title": "Changed",
+        "bullets": [
+          "**Fixed Subscription Downgrades** — Enabled the Free plan downgrade button to look active and properly redirect users to the Google Play Store subscription management page, and updated the trial duration text from 14 to 7 days.",
+          "**Google Play Store Sharing Link** — Appended the Google Play Store download link to the end of the shareable achievements text."
+        ]
+      },
+      {
+        "title": "Fixed",
+        "bullets": [
+          "**Database-Only Recipe Sorting** — Modified the popular recipe section on the Chef tab to sort and filter locally using the cached recipes from the database instead of calling the AI service.",
+          "**Accurate Grocery Prices** — Resolved a bug where all shopping list items defaulted to `$137.42` by fixing the Open Prices API query parameter and cleaning up the Firestore cache."
+        ]
+      }
+    ]
+  },
   {
     "version": "2.5.2",
     "date": "Jun 28, 2026",

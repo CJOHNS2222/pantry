@@ -63,6 +63,7 @@ import { useAndroidBack, closeTopAndroidModal } from './hooks/useAndroidBack';
 import { useKeyboard } from './hooks/useKeyboard';
 import { GeminiTokenDebugger } from './components/ui/GeminiTokenDebugger';
 import { cameraRestoredStore } from './utils/cameraRestoredStore';
+import { getUnlockedBadges } from './utils/achievementUtils';
 
 // Lazy load monitoring components
 const DatabaseAnalytics = React.lazy(() => import('./components/admin-analytics/DatabaseAnalytics').then(module => ({ default: module.default })));
@@ -88,6 +89,95 @@ const App: React.FC = () => {
   const [persistedRecipeResult, setPersistedRecipeResult] = useState<RecipeSearchResult | null>(null);
   const [initialSearchQuery, setInitialSearchQuery] = useState<string>('');
   const isKeyboardVisible = useKeyboard();
+
+  // Global achievement state and celebration ref
+  const [newlyUnlockedBadge, setNewlyUnlockedBadge] = useState<{ id: string; title: string; icon: string; description: string; color: string } | null>(null);
+  const fireworksCanvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  const triggerCelebration = () => {
+    const canvas = fireworksCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    interface Particle {
+      x: number;
+      y: number;
+      vx: number;
+      vy: number;
+      color: string;
+      size: number;
+      alpha: number;
+      decay: number;
+      gravity: number;
+    }
+
+    const particles: Particle[] = [];
+    const colors = ['#ff0055', '#00ffcc', '#ffcc00', '#ff6600', '#9900ff', '#33ccff', '#ff33aa', '#00ff66'];
+
+    const createExplosion = (x: number, y: number) => {
+      const count = 50 + Math.random() * 30;
+      for (let i = 0; i < count; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 1.5 + Math.random() * 6;
+        particles.push({
+          x,
+          y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed - (0.5 + Math.random() * 1.5),
+          color: colors[Math.floor(Math.random() * colors.length)],
+          size: 2 + Math.random() * 3,
+          alpha: 1,
+          decay: 0.012 + Math.random() * 0.015,
+          gravity: 0.12,
+        });
+      }
+    };
+
+    const w = canvas.width;
+    const h = canvas.height;
+    
+    createExplosion(w / 2, h / 2);
+    setTimeout(() => createExplosion(w * 0.25, h * 0.45), 200);
+    setTimeout(() => createExplosion(w * 0.75, h * 0.45), 400);
+    setTimeout(() => createExplosion(w * 0.5, h * 0.35), 600);
+
+    const render = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += p.gravity;
+        p.alpha -= p.decay;
+
+        if (p.alpha <= 0) {
+          particles.splice(i, 1);
+          continue;
+        }
+
+        ctx.save();
+        ctx.globalAlpha = p.alpha;
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      if (particles.length > 0) {
+        requestAnimationFrame(render);
+      } else {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+    };
+
+    render();
+  };
 
   // Custom tab switching function that resets scroll position
   const switchTab = (tab: Tab) => {
@@ -281,6 +371,7 @@ const App: React.FC = () => {
   useAndroidBack(showExpiredItemsModal, () => setShowExpiredItemsModal(false));
   useAndroidBack(showExpiredLaunchSheet, () => setShowExpiredLaunchSheet(false));
   useAndroidBack(showHousehold, () => setShowHousehold(false));
+  useAndroidBack(newlyUnlockedBadge !== null, () => setNewlyUnlockedBadge(null));
   const maintenanceInfo = remoteConfig.getMaintenanceInfo();
   const announcementInfo = remoteConfig.getAnnouncementInfo();
 
@@ -574,6 +665,39 @@ const App: React.FC = () => {
       recordMilestone('household-setup');
     }
   }, [household?.id]);
+
+  // Effect to monitor and trigger new achievements instantly
+  useEffect(() => {
+    if (!user || isLoadingInventory || isLoadingSavedRecipes || isLoadingMealPlan || isLoadingHousehold) return;
+
+    const unlocked = getUnlockedBadges(inventory, savedRecipes, mealPlan, household);
+    const unlockedIds = unlocked.map(b => b.id);
+
+    const savedUnlockedRaw = localStorage.getItem('pantry_unlocked_achievements');
+    let savedUnlockedIds: string[] = [];
+    if (savedUnlockedRaw) {
+      try {
+        savedUnlockedIds = JSON.parse(savedUnlockedRaw);
+      } catch {
+        savedUnlockedIds = [];
+      }
+    } else {
+      // Initialize on first load with current state to prevent spamming historic achievements
+      localStorage.setItem('pantry_unlocked_achievements', JSON.stringify(unlockedIds));
+      return;
+    }
+
+    // Find any badge that is in unlockedIds but not in savedUnlockedIds
+    const newlyUnlocked = unlocked.find(b => !savedUnlockedIds.includes(b.id));
+
+    if (newlyUnlocked) {
+      setNewlyUnlockedBadge(newlyUnlocked);
+      localStorage.setItem('pantry_unlocked_achievements', JSON.stringify([...savedUnlockedIds, newlyUnlocked.id]));
+      setTimeout(() => {
+        triggerCelebration();
+      }, 300);
+    }
+  }, [inventory, savedRecipes, mealPlan, household, user, isLoadingInventory, isLoadingSavedRecipes, isLoadingMealPlan, isLoadingHousehold]);
 
   // Confirm add to plan from dialog
   const confirmAddToPlan = (dayIndex: number, mealType: 'breakfast' | 'lunch' | 'dinner') => {
@@ -1880,6 +2004,48 @@ const App: React.FC = () => {
         </Suspense>
       )}
       <GeminiTokenDebugger isAdmin={isAdmin} />
+
+      {/* Canvas for global achievement fireworks */}
+      <canvas
+        ref={fireworksCanvasRef}
+        className="pointer-events-none fixed inset-0 z-[9999] w-full h-full"
+      />
+
+      {/* Global Achievement Unlocked Modal */}
+      {newlyUnlockedBadge && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-theme-secondary border border-theme rounded-2xl p-6 max-w-sm w-full text-center shadow-2xl relative overflow-hidden animate-scale-in">
+            {/* Elegant glowing background element */}
+            <div className={`absolute -top-24 -left-24 w-48 h-48 rounded-full bg-gradient-to-br ${newlyUnlockedBadge.color} opacity-20 blur-2xl`} />
+            <div className={`absolute -bottom-24 -right-24 w-48 h-48 rounded-full bg-gradient-to-br ${newlyUnlockedBadge.color} opacity-20 blur-2xl`} />
+
+            <div className="relative z-10">
+              {/* Badge Icon */}
+              <div className={`w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br ${newlyUnlockedBadge.color} flex items-center justify-center text-4xl shadow-lg mb-4 animate-bounce`}>
+                {newlyUnlockedBadge.icon}
+              </div>
+
+              {/* Congratulations Text */}
+              <span className="text-xs font-bold uppercase tracking-wider text-[var(--accent-color)]">Achievement Unlocked!</span>
+              <h3 className="text-2xl font-extrabold text-theme-primary mt-1 mb-2">{newlyUnlockedBadge.title}</h3>
+              <p className="text-sm text-theme-secondary opacity-95 mb-6">{newlyUnlockedBadge.description}</p>
+
+              {/* Action Buttons */}
+              <div className="space-y-2">
+                <button
+                  onClick={() => {
+                    setNewlyUnlockedBadge(null);
+                    HapticService.light();
+                  }}
+                  className="w-full py-3 bg-[var(--accent-color)] hover:opacity-95 text-white font-semibold rounded-xl shadow-md transition-opacity"
+                >
+                  Awesome! 🚀
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </SubscriptionProvider>
   );
 };

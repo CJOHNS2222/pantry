@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useIntl } from 'react-intl';
 import { Plus, X } from 'lucide-react';
 import QuantityUnitPicker from '../pantry/QuantityUnitPicker';
-import { itemImages } from '../../data/item-images';
+import { itemImages, ITEM_IMAGE_CDN_BASE } from '../../data/item-images';
 
 interface ShoppingListAddItemModalProps {
   isOpen: boolean;
@@ -103,17 +103,37 @@ export const ShoppingListAddItemModal: React.FC<ShoppingListAddItemModalProps> =
 
                 {suggestions.length > 0 && (
                   <div className="absolute left-0 right-0 z-10 mt-1 bg-theme-secondary border border-theme rounded-lg shadow-lg max-h-48 overflow-y-auto divide-y divide-theme">
-                    {suggestions.map((suggestion) => (
-                      <button
-                        key={suggestion}
-                        type="button"
-                        onClick={() => handleSelectSuggestion(suggestion)}
-                        className="w-full text-left px-4 py-2.5 text-sm text-theme-primary hover:bg-[var(--accent-color)] hover:text-white transition-colors duration-150 flex items-center justify-between font-semibold"
-                      >
-                        <span>{capitalizeWords(suggestion)}</span>
-                        <span className="text-[10px] opacity-60 uppercase font-bold tracking-wider">Select</span>
-                      </button>
-                    ))}
+                    {suggestions.map((suggestion) => {
+                      const filename = itemImages[suggestion];
+                      const imageUrl = filename ? `${ITEM_IMAGE_CDN_BASE}${filename}` : null;
+                      return (
+                        <button
+                          key={suggestion}
+                          type="button"
+                          onClick={() => handleSelectSuggestion(suggestion)}
+                          className="w-full text-left px-4 py-2.5 text-sm text-theme-primary hover:bg-[var(--accent-color)] hover:text-white transition-colors duration-150 flex items-center justify-between font-semibold"
+                        >
+                          <div className="flex items-center gap-3">
+                            {imageUrl ? (
+                              <img
+                                src={imageUrl}
+                                alt={suggestion}
+                                className="w-8 h-8 rounded-full object-cover border border-theme bg-white"
+                                onError={(e) => {
+                                  (e.target as HTMLElement).style.display = 'none';
+                                }}
+                              />
+                            ) : (
+                              <div className="w-8 h-8 rounded-full bg-theme-secondary flex items-center justify-center text-xs text-theme-secondary border border-theme">
+                                📦
+                              </div>
+                            )}
+                            <span>{capitalizeWords(suggestion)}</span>
+                          </div>
+                          <span className="text-[10px] opacity-65 bg-theme-secondary/20 px-2 py-0.5 rounded uppercase font-bold tracking-wider">Select</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
               </div>
