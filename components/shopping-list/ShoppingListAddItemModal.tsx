@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useIntl } from 'react-intl';
 import { Plus, X } from 'lucide-react';
 import QuantityUnitPicker from '../pantry/QuantityUnitPicker';
+import { itemImages } from '../../data/item-images';
 
 interface ShoppingListAddItemModalProps {
   isOpen: boolean;
@@ -29,6 +30,41 @@ export const ShoppingListAddItemModal: React.FC<ShoppingListAddItemModalProps> =
   validationErrors,
 }) => {
   const intl = useIntl();
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+
+  useEffect(() => {
+    const query = newItem.toLowerCase().trim();
+    if (query.length < 2) {
+      setSuggestions([]);
+      return;
+    }
+
+    const keys = Object.keys(itemImages);
+    const matches = keys.filter(key => key.toLowerCase().includes(query));
+    
+    // Sort: prefix matches first, then alphabetical
+    matches.sort((a, b) => {
+      const aStarts = a.toLowerCase().startsWith(query);
+      const bStarts = b.toLowerCase().startsWith(query);
+      if (aStarts && !bStarts) return -1;
+      if (!aStarts && bStarts) return 1;
+      return a.localeCompare(b);
+    });
+
+    setSuggestions(matches.slice(0, 6));
+  }, [newItem]);
+
+  const capitalizeWords = (str: string) => {
+    return str
+      .split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  };
+
+  const handleSelectSuggestion = (suggestion: string) => {
+    setNewItem(capitalizeWords(suggestion));
+    setSuggestions([]);
+  };
 
   if (!isOpen) {
     return null;
@@ -47,7 +83,7 @@ export const ShoppingListAddItemModal: React.FC<ShoppingListAddItemModalProps> =
 
           <form onSubmit={addItem} className="space-y-4">
             <div className="space-y-4">
-              <div>
+              <div className="relative">
                 <input
                   id="newItem"
                   name="newItem"
@@ -57,11 +93,28 @@ export const ShoppingListAddItemModal: React.FC<ShoppingListAddItemModalProps> =
                   placeholder="Enter item name..."
                   className={`w-full bg-theme-secondary border rounded-lg px-4 py-3 text-theme-primary shadow-sm outline-none focus:border-[var(--accent-color)] ${validationErrors.item ? 'border-red-500' : 'border-theme'}`}
                   autoFocus
+                  autoComplete="off"
                 />
                 {validationErrors.item && (
                   <p className="text-red-500 text-xs mt-1" aria-live="polite">
                     {validationErrors.item}
                   </p>
+                )}
+
+                {suggestions.length > 0 && (
+                  <div className="absolute left-0 right-0 z-10 mt-1 bg-theme-secondary border border-theme rounded-lg shadow-lg max-h-48 overflow-y-auto divide-y divide-theme">
+                    {suggestions.map((suggestion) => (
+                      <button
+                        key={suggestion}
+                        type="button"
+                        onClick={() => handleSelectSuggestion(suggestion)}
+                        className="w-full text-left px-4 py-2.5 text-sm text-theme-primary hover:bg-[var(--accent-color)] hover:text-white transition-colors duration-150 flex items-center justify-between font-semibold"
+                      >
+                        <span>{capitalizeWords(suggestion)}</span>
+                        <span className="text-[10px] opacity-60 uppercase font-bold tracking-wider">Select</span>
+                      </button>
+                    ))}
+                  </div>
                 )}
               </div>
               <QuantityUnitPicker

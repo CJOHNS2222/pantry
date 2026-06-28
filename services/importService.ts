@@ -1,6 +1,5 @@
 import { PantryItem, StructuredRecipe } from '../types';
 import { InventoryCacheService } from './inventoryCacheService';
-import DatabaseMonitoringService from './databaseMonitoringService';
 import { log } from './logService';
 
 /**
@@ -59,14 +58,16 @@ export async function fetchRecipeFromUrl(url: string): Promise<StructuredRecipe 
       } as any;
       return recipe;
     }
-  } catch (err) {
+  } catch {
     // adapter failed or not present — fall back to naive parser
   }
 
-  // Fallback naive HTML parsing
+  // Fallback naive HTML parsing using a CORS proxy to bypass browser restrictions
   try {
-    const res = await fetch(url);
+    const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(url)}`;
+    const res = await fetch(proxyUrl);
     if (!res.ok) return null;
+    
     // Some test mocks return an object with `json()` but not `text()`.
     // Prefer `json()` when available and shape looks like a Spoonacular extract response.
     let text = '';
@@ -88,14 +89,12 @@ export async function fetchRecipeFromUrl(url: string): Promise<StructuredRecipe 
           } as any;
           return recipe;
         }
-        // Not Spoonacular-shaped JSON; fall back to reading text if available
         if (typeof (res as any).text === 'function') {
           text = await (res as any).text();
         } else {
           text = JSON.stringify(maybeJson || '');
         }
-      } catch (err) {
-        // If json() throws, try text()
+      } catch {
         if (typeof (res as any).text === 'function') {
           text = await (res as any).text();
         } else {
@@ -106,6 +105,108 @@ export async function fetchRecipeFromUrl(url: string): Promise<StructuredRecipe 
       text = typeof (res as any).text === 'function' ? await (res as any).text() : '';
     }
 
+    // Try to extract and parse JSON-LD Schema.org Recipe data
+    try {
+      const jsonLdMatches = Array.from(text.matchAll(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi));
+      for (const match of jsonLdMatches) {
+        try {
+          const parsed = JSON.parse(match[1].trim());
+          
+          const findRecipe = (obj: any): any => {
+            if (!obj) return null;
+            if (obj['@type'] === 'Recipe' || (Array.isArray(obj['@type']) && obj['@type'].includes('Recipe'))) return obj;
+            if (Array.isArray(obj)) {
+              for (const item of obj) {
+                const r = findRecipe(item);
+                if (r) return r;
+              }
+            }
+            if (obj['@graph'] && Array.isArray(obj['@graph'])) {
+              for (const item of obj['@graph']) {
+                const r = findRecipe(item);
+                if (r) return r;
+              }
+            }
+            return null;
+          };
+
+          const recipeData = findRecipe(parsed);
+          if (recipeData) {
+            const title = recipeData.name || recipeData.headline;
+            const description = recipeData.description ? recipeData.description.replace(/<[^>]+>/g, '') : undefined;
+            
+            let ingredients: string[] = [];
+            if (Array.isArray(recipeData.recipeIngredient)) {
+              ingredients = recipeData.recipeIngredient;
+            } else if (Array.isArray(recipeData.ingredients)) {
+              ingredients = recipeData.ingredients;
+            }
+
+            let instructions: string[] = [];
+            if (Array.isArray(recipeData.recipeInstructions)) {
+              instructions = recipeData.recipeInstructions.map((step: any) => {
+                if (typeof step === 'string') return step;
+                if (step && typeof step === 'object') {
+                  return step.text || step.name || '';
+                }
+                return '';
+              }).filter(Boolean);
+            } else if (typeof recipeData.recipeInstructions === 'string') {
+              instructions = recipeData.recipeInstructions.split(/\n|<br>|<\/p>/).map((s: string) => s.trim()).filter(Boolean);
+            }
+
+            let image: string | undefined = undefined;
+            if (recipeData.image) {
+              if (typeof recipeData.image === 'string') {
+                image = recipeData.image;
+              } else if (Array.isArray(recipeData.image)) {
+                image = recipeData.image[0];
+              } else if (recipeData.image.url) {
+                image = recipeData.image.url;
+              }
+            }
+
+            let servings: number | undefined = undefined;
+            if (recipeData.recipeYield) {
+              const yieldStr = String(recipeData.recipeYield);
+              const match = /\d+/.exec(yieldStr);
+              if (match) servings = parseInt(match[0]);
+            }
+
+            let cookTimeMinutes: number | undefined = undefined;
+            if (recipeData.cookTime) {
+              const match = /PT(?:(\d+)H)?(?:(\d+)M)?/.exec(recipeData.cookTime);
+              if (match) {
+                const hours = parseInt(match[1] || '0');
+                const minutes = parseInt(match[2] || '0');
+                cookTimeMinutes = hours * 60 + minutes;
+              }
+            }
+
+            if (title && (ingredients.length > 0 || instructions.length > 0)) {
+              return {
+                title,
+                description,
+                ingredients: ingredients.map(i => i.trim()).filter(Boolean),
+                instructions: instructions.map(i => i.trim()).filter(Boolean),
+                url,
+                image,
+                servings,
+                cookTimeMinutes,
+                cookTime: cookTimeMinutes ? `${cookTimeMinutes} mins` : '',
+                prepTimeMinutes: undefined
+              } as any;
+            }
+          }
+        } catch {
+          // Ignore individual JSON-LD parse errors
+        }
+      }
+    } catch {
+      // Ignore JSON-LD extraction errors
+    }
+
+    // Fallback to regex-based HTML parsing if no JSON-LD Recipe is found
     const titleMatch = /<title>(.*?)<\/title>/i.exec(text);
     const title = titleMatch ? titleMatch[1].trim() : url;
     const liMatches = Array.from(text.matchAll(/<li[^>]*>(.*?)<\/li>/gi)).map(m => m[1].replace(/<[^>]+>/g, '').trim());

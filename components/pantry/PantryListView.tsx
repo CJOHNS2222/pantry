@@ -7,7 +7,8 @@ import { PantryListItem } from './PantryListItem';
 import { DisplayedPantryItem } from '../../hooks/usePantryFilters';
 import { PantryItem } from '../../types';
 
-const VirtualizedRow = ({ index, style, data }: { index: number; style: React.CSSProperties; data: { renderRow: (index: number, style: React.CSSProperties) => React.ReactElement } }) => {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const VirtualizedRow = ({ index, style, data }: { index: number; style: React.CSSProperties; data: any }) => {
   return data.renderRow(index, style);
 };
 

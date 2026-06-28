@@ -22,7 +22,8 @@ import AnalyticsService from '../../services/analyticsService';
 import { GeminiLoadingOverlay, IMAGE_ANALYSIS_STAGES } from '../ui/GeminiLoadingOverlay';
 import { log } from '../../services/logService';
 
-const VirtualizedRow = ({ index, style, data }: { index: number; style: React.CSSProperties; data: { renderRow: (index: number, style: React.CSSProperties) => React.ReactElement } }) => {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const VirtualizedRow = ({ index, style, data }: { index: number; style: React.CSSProperties; data: any }) => {
   return data.renderRow(index, style);
 };
 
@@ -179,7 +180,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   };
 
   // Onboarding checklist tracking
-  const [isChecklistCollapsed, setIsChecklistCollapsed] = useState(false);
+  const [isChecklistCollapsed, setIsChecklistCollapsed] = useState(true);
   const [isChecklistDismissed, setIsChecklistDismissed] = useState(() => {
     try {
       return localStorage.getItem('onboarding-checklist-dismissed') === 'true';
@@ -1889,11 +1890,258 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
 
   return (
     <div className="space-y-6 pb-24 max-w-2xl mx-auto animate-fade-in relative">
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
-        <div className="text-center sm:text-left flex-1">
-          <h2 className="text-3xl font-serif font-bold text-theme-secondary">My Pantry</h2>
-          <p className="text-theme-secondary opacity-60 text-sm mt-1">Items currently in stock</p>
+      {/* Search and Filter Bar at the very top */}
+      <div className="bg-theme-secondary p-4 rounded-2xl border border-theme shadow-lg mb-6 sticky top-0 z-20">
+        <div className="flex gap-3 items-center">
+          {/* Search Input */}
+          <div className="flex-1 relative">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-theme-secondary opacity-50" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onFocus={() => {
+                  if (searchQuery.length >= 1 && autocompleteSuggestions.length > 0) {
+                    setShowAutocomplete(true);
+                  } else if (searchQuery.length === 0 && recentSearches.length > 0) {
+                    setShowAutocomplete(true);
+                  }
+                }}
+                onBlur={() => setTimeout(() => setShowAutocomplete(false), 200)}
+                placeholder="Search pantry items..."
+                className="w-full pl-10 pr-4 py-2 bg-theme-primary border border-theme rounded-lg text-theme-primary placeholder-theme-primary/50 focus:border-[var(--accent-color)] focus:outline-none"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-theme-secondary opacity-50 hover:opacity-100"
+                  aria-label="Clear search"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+            
+            {/* Autocomplete Suggestions */}
+            {showAutocomplete && (
+              <div className="absolute top-full left-0 right-0 bg-theme-primary border border-theme rounded-lg shadow-lg mt-1 z-10 max-h-60 overflow-y-auto">
+                {/* Recent Searches */}
+                {searchQuery.length === 0 && recentSearches.length > 0 && (
+                  <>
+                    <div className="px-4 py-2 text-xs font-semibold text-theme-secondary opacity-70 uppercase tracking-wider border-b border-theme">
+                      Recent Searches
+                    </div>
+                    {recentSearches.map((recentQuery, index) => (
+                      <button
+                        key={`recent-${index}`}
+                        onClick={() => {
+                          setSearchQuery(recentQuery);
+                          setShowAutocomplete(false);
+                        }}
+                        className="w-full text-left px-4 py-2 hover:bg-theme-secondary text-theme-primary flex items-center gap-2"
+                      >
+                        <Clock className="w-3 h-3 text-theme-secondary opacity-50" />
+                        <span>{recentQuery}</span>
+                      </button>
+                    ))}
+                    {autocompleteSuggestions.length > 0 && (
+                      <div className="px-4 py-2 text-xs font-semibold text-theme-secondary opacity-70 uppercase tracking-wider border-b border-theme">
+                        Suggestions
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* Enhanced Suggestions */}
+                {autocompleteSuggestions.map((suggestion, index) => (
+                  <button
+                    key={`suggestion-${index}`}
+                    onClick={() => {
+                      setSearchQuery(suggestion.text);
+                      saveSearchToHistory(suggestion.text, 'pantry');
+                      setShowAutocomplete(false);
+                    }}
+                    className="w-full text-left px-4 py-2 hover:bg-theme-secondary text-theme-primary flex items-center gap-2"
+                  >
+                    <div className="flex items-center gap-1 min-w-0 flex-1">
+                      {suggestion.type === 'recent' && (
+                        <Clock className="w-3 h-3 text-blue-500 flex-shrink-0" />
+                      )}
+                      {suggestion.type === 'popular' && (
+                        <TrendingUp className="w-3 h-3 text-green-500 flex-shrink-0" />
+                      )}
+                      {suggestion.type === 'category' && (
+                        <Tag className="w-3 h-3 text-purple-500 flex-shrink-0" />
+                      )}
+                      {suggestion.type === 'match' && (
+                        <Search className="w-3 h-3 text-theme-secondary opacity-50 flex-shrink-0" />
+                      )}
+                      <span className="truncate">{suggestion.text}</span>
+                    </div>
+
+                    <div className="flex items-center gap-1 text-xs text-theme-secondary opacity-60">
+                      {suggestion.category && suggestion.type !== 'category' && (
+                        <span className="bg-theme-secondary px-1.5 py-0.5 rounded text-[10px]">
+                          {suggestion.category}
+                        </span>
+                      )}
+                      {suggestion.count && suggestion.count > 1 && (
+                        <span className="text-[10px]">
+                          ×{suggestion.count}
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Filter Button */}
+          {(() => {
+            const activeFilterCount =
+              (pantryFilter.categories.length > 0 ? 1 : 0) +
+              (pantryFilter.locations.length > 0 ? 1 : 0) +
+              (pantryFilter.expirationStatus !== 'all' ? 1 : 0) +
+              (pantryFilter.quantityStatus !== 'all' ? 1 : 0);
+            const isFilterActive = activeFilterCount > 0;
+            return (
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                aria-label={showFilters ? 'Hide filters' : `Show filters${isFilterActive ? `, ${activeFilterCount} active` : ''}`}
+                aria-expanded={showFilters}
+                className={`relative p-2 rounded-lg border transition-colors ${
+                  showFilters || isFilterActive
+                    ? 'bg-[var(--accent-color)] text-white border-[var(--accent-color)]'
+                    : 'bg-theme-primary border-theme text-theme-secondary hover:bg-theme-secondary'
+                }`}
+              >
+                <Filter className="w-4 h-4" />
+                {isFilterActive && (
+                  <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-0.5 rounded-full bg-white text-[var(--accent-color)] text-[10px] font-bold leading-4 flex items-center justify-center border border-[var(--accent-color)]">
+                    {activeFilterCount}
+                  </span>
+                )}
+              </button>
+            );
+          })()}
         </div>
+
+        {/* Filter Options */}
+        {showFilters && (
+          <div className="mt-4 pt-4 border-t border-theme space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-theme-primary mb-2">Categories</label>
+              <div className="flex flex-wrap gap-2">
+                {Array.from(new Set(inventory.map(item => item.category).filter(Boolean))).map(category => (
+                  <button
+                    key={category}
+                    onClick={() => {
+                      const newFilter = { ...pantryFilter };
+                      if (newFilter.categories.includes(category!)) {
+                        newFilter.categories = newFilter.categories.filter(c => c !== category);
+                      } else {
+                        newFilter.categories.push(category!);
+                      }
+                      setPantryFilter(newFilter);
+                      savePantryFilter(newFilter);
+                    }}
+                    className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                      pantryFilter.categories.includes(category!)
+                        ? 'bg-[var(--accent-color)] text-white'
+                        : 'bg-theme-primary text-theme-secondary border border-theme hover:bg-theme-secondary'
+                    }`}
+                    aria-label={`${pantryFilter.categories.includes(category!) ? 'Remove' : 'Add'} ${category} filter`}
+                  >
+                    {category}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-theme-primary mb-2">Locations</label>
+              <div className="flex flex-wrap gap-2">
+                {['leftovers', 'pantry', 'fridge', 'freezer', 'spices', 'other'].map(location => (
+                  <button
+                    key={location}
+                    onClick={() => {
+                      const newFilter = { ...pantryFilter };
+                      if (newFilter.locations.includes(location)) {
+                        newFilter.locations = newFilter.locations.filter(l => l !== location);
+                      } else {
+                        newFilter.locations.push(location);
+                      }
+                      setPantryFilter(newFilter);
+                      savePantryFilter(newFilter);
+                    }}
+                    className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                      pantryFilter.locations.includes(location)
+                        ? 'bg-[var(--accent-color)] text-white'
+                        : 'bg-theme-primary text-theme-secondary border border-theme hover:bg-theme-secondary'
+                    }`}
+                    aria-label={`${pantryFilter.locations.includes(location) ? 'Remove' : 'Add'} ${location.charAt(0).toUpperCase() + location.slice(1)} location filter`}
+                  >
+                    {location.charAt(0).toUpperCase() + location.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-theme-primary mb-2">Expiration Status</label>
+              <select
+                value={pantryFilter.expirationStatus}
+                onChange={(e) => {
+                  const newFilter = { ...pantryFilter, expirationStatus: e.target.value as PantryFilter['expirationStatus'] };
+                  setPantryFilter(newFilter);
+                  savePantryFilter(newFilter);
+                }}
+                className="w-full px-3 py-2 bg-theme-primary border border-theme rounded-lg text-theme-primary focus:border-[var(--accent-color)] focus:outline-none"
+              >
+                <option value="all">All Items</option>
+                <option value="expiring-soon">Expiring Soon (7 days)</option>
+                <option value="expired">Expired</option>
+                <option value="fresh">Fresh</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-theme-primary mb-2">Stock Status</label>
+              <select
+                value={pantryFilter.quantityStatus}
+                onChange={(e) => {
+                  const newFilter = { ...pantryFilter, quantityStatus: e.target.value as PantryFilter['quantityStatus'] };
+                  setPantryFilter(newFilter);
+                  savePantryFilter(newFilter);
+                }}
+                className="w-full px-3 py-2 bg-theme-primary border border-theme rounded-lg text-theme-primary focus:border-[var(--accent-color)] focus:outline-none"
+              >
+                <option value="all">All Items</option>
+                <option value="low-stock">Low Stock (&lt;1)</option>
+                <option value="out-of-stock">Out of Stock</option>
+                <option value="in-stock">In Stock (≥1)</option>
+              </select>
+            </div>
+
+            <div className="flex justify-end">
+              <button
+                onClick={() => {
+                  setPantryFilter(defaultPantryFilter);
+                  savePantryFilter(defaultPantryFilter);
+                }}
+                className="px-4 py-2 bg-theme-primary border border-theme rounded-lg text-theme-secondary hover:bg-theme-secondary transition-colors"
+                aria-label="Clear all applied filters"
+              >
+                Clear Filters
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="flex flex-col sm:flex-row items-center justify-end gap-4 mb-6">
         <div className="flex items-center gap-3">
           {/* View Mode Toggle */}
           <div className="flex bg-theme-secondary p-1 rounded-lg border border-theme">
@@ -2305,265 +2553,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
         />
       )}
 
-      {/* Search and Filter Bar */}
-      <div className="bg-theme-secondary p-4 rounded-2xl border border-theme shadow-lg mb-6 sticky top-0 z-10">
-        <div className="flex gap-3 items-center">
-          {/* Search Input */}
-          <div className="flex-1 relative">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-theme-secondary opacity-50" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onFocus={() => {
-                  // Show recent searches if available, or autocomplete suggestions if there's a query
-                  if (searchQuery.length >= 1 && autocompleteSuggestions.length > 0) {
-                    setShowAutocomplete(true);
-                  } else if (searchQuery.length === 0 && recentSearches.length > 0) {
-                    setShowAutocomplete(true);
-                  }
-                }}
-                onBlur={() => setTimeout(() => setShowAutocomplete(false), 200)}
-                placeholder="Search pantry items..."
-                className="w-full pl-10 pr-4 py-2 bg-theme-primary border border-theme rounded-lg text-theme-primary placeholder-theme-primary/50 focus:border-[var(--accent-color)] focus:outline-none"
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-theme-secondary opacity-50 hover:opacity-100"
-                  aria-label="Clear search"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              )}
-            </div>
-            
-            {/* Autocomplete Suggestions */}
-            {showAutocomplete && (
-              <div className="absolute top-full left-0 right-0 bg-theme-primary border border-theme rounded-lg shadow-lg mt-1 z-10 max-h-60 overflow-y-auto">
-                {/* Recent Searches */}
-                {searchQuery.length === 0 && recentSearches.length > 0 && (
-                  <>
-                    <div className="px-4 py-2 text-xs font-semibold text-theme-secondary opacity-70 uppercase tracking-wider border-b border-theme">
-                      Recent Searches
-                    </div>
-                    {recentSearches.map((recentQuery, index) => (
-                      <button
-                        key={`recent-${index}`}
-                        onClick={() => {
-                          setSearchQuery(recentQuery);
-                          setShowAutocomplete(false);
-                        }}
-                        className="w-full text-left px-4 py-2 hover:bg-theme-secondary text-theme-primary flex items-center gap-2"
-                      >
-                        <Clock className="w-3 h-3 text-theme-secondary opacity-50" />
-                        <span>{recentQuery}</span>
-                      </button>
-                    ))}
-                    {autocompleteSuggestions.length > 0 && (
-                      <div className="px-4 py-2 text-xs font-semibold text-theme-secondary opacity-70 uppercase tracking-wider border-b border-theme">
-                        Suggestions
-                      </div>
-                    )}
-                  </>
-                )}
 
-                {/* Enhanced Suggestions */}
-                {autocompleteSuggestions.map((suggestion, index) => (
-                  <button
-                    key={`suggestion-${index}`}
-                    onClick={() => {
-                      setSearchQuery(suggestion.text);
-                      saveSearchToHistory(suggestion.text, 'pantry');
-                      setShowAutocomplete(false);
-                    }}
-                    className="w-full text-left px-4 py-2 hover:bg-theme-secondary text-theme-primary flex items-center gap-2"
-                  >
-                    {/* Type indicator */}
-                    <div className="flex items-center gap-1 min-w-0 flex-1">
-                      {suggestion.type === 'recent' && (
-                        <Clock className="w-3 h-3 text-blue-500 flex-shrink-0" />
-                      )}
-                      {suggestion.type === 'popular' && (
-                        <TrendingUp className="w-3 h-3 text-green-500 flex-shrink-0" />
-                      )}
-                      {suggestion.type === 'category' && (
-                        <Tag className="w-3 h-3 text-purple-500 flex-shrink-0" />
-                      )}
-                      {suggestion.type === 'match' && (
-                        <Search className="w-3 h-3 text-theme-secondary opacity-50 flex-shrink-0" />
-                      )}
-
-                      <span className="truncate">{suggestion.text}</span>
-                    </div>
-
-                    {/* Additional info */}
-                    <div className="flex items-center gap-1 text-xs text-theme-secondary opacity-60">
-                      {suggestion.category && suggestion.type !== 'category' && (
-                        <span className="bg-theme-secondary px-1.5 py-0.5 rounded text-[10px]">
-                          {suggestion.category}
-                        </span>
-                      )}
-                      {suggestion.count && suggestion.count > 1 && (
-                        <span className="text-[10px]">
-                          ×{suggestion.count}
-                        </span>
-                      )}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Filter Button */}
-          {(() => {
-            const activeFilterCount =
-              (pantryFilter.categories.length > 0 ? 1 : 0) +
-              (pantryFilter.locations.length > 0 ? 1 : 0) +
-              (pantryFilter.expirationStatus !== 'all' ? 1 : 0) +
-              (pantryFilter.quantityStatus !== 'all' ? 1 : 0);
-            const isFilterActive = activeFilterCount > 0;
-            return (
-              <button
-                onClick={() => setShowFilters(!showFilters)}
-                aria-label={showFilters ? 'Hide filters' : `Show filters${isFilterActive ? `, ${activeFilterCount} active` : ''}`}
-                aria-expanded={showFilters}
-                className={`relative p-2 rounded-lg border transition-colors ${
-                  showFilters || isFilterActive
-                    ? 'bg-[var(--accent-color)] text-white border-[var(--accent-color)]'
-                    : 'bg-theme-primary border-theme text-theme-secondary hover:bg-theme-secondary'
-                }`}
-              >
-                <Filter className="w-4 h-4" />
-                {isFilterActive && (
-                  <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-0.5 rounded-full bg-white text-[var(--accent-color)] text-[10px] font-bold leading-4 flex items-center justify-center border border-[var(--accent-color)]">
-                    {activeFilterCount}
-                  </span>
-                )}
-              </button>
-            );
-          })()}
-        </div>
-
-        {/* Filter Options */}
-        {showFilters && (
-          <div className="mt-4 pt-4 border-t border-theme space-y-4">
-            {/* Categories Filter */}
-            <div>
-              <label className="block text-sm font-medium text-theme-primary mb-2">Categories</label>
-              <div className="flex flex-wrap gap-2">
-                {Array.from(new Set(inventory.map(item => item.category).filter(Boolean))).map(category => (
-                  <button
-                    key={category}
-                    onClick={() => {
-                      const newFilter = { ...pantryFilter };
-                      if (newFilter.categories.includes(category!)) {
-                        newFilter.categories = newFilter.categories.filter(c => c !== category);
-                      } else {
-                        newFilter.categories.push(category!);
-                      }
-                      setPantryFilter(newFilter);
-                      savePantryFilter(newFilter);
-                    }}
-                    className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                      pantryFilter.categories.includes(category!)
-                        ? 'bg-[var(--accent-color)] text-white'
-                        : 'bg-theme-primary text-theme-secondary border border-theme hover:bg-theme-secondary'
-                    }`}
-                    aria-label={`${pantryFilter.categories.includes(category!) ? 'Remove' : 'Add'} ${category} filter`}
-                  >
-                    {category}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Locations Filter */}
-            <div>
-              <label className="block text-sm font-medium text-theme-primary mb-2">Locations</label>
-              <div className="flex flex-wrap gap-2">
-                {['leftovers', 'pantry', 'fridge', 'freezer', 'spices', 'other'].map(location => (
-                  <button
-                    key={location}
-                    onClick={() => {
-                      const newFilter = { ...pantryFilter };
-                      if (newFilter.locations.includes(location)) {
-                        newFilter.locations = newFilter.locations.filter(l => l !== location);
-                      } else {
-                        newFilter.locations.push(location);
-                      }
-                      setPantryFilter(newFilter);
-                      savePantryFilter(newFilter);
-                    }}
-                    className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                      pantryFilter.locations.includes(location)
-                        ? 'bg-[var(--accent-color)] text-white'
-                        : 'bg-theme-primary text-theme-secondary border border-theme hover:bg-theme-secondary'
-                    }`}
-                    aria-label={`${pantryFilter.locations.includes(location) ? 'Remove' : 'Add'} ${location.charAt(0).toUpperCase() + location.slice(1)} location filter`}
-                  >
-                    {location.charAt(0).toUpperCase() + location.slice(1)}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Expiration Status Filter */}
-            <div>
-              <label className="block text-sm font-medium text-theme-primary mb-2">Expiration Status</label>
-              <select
-                value={pantryFilter.expirationStatus}
-                onChange={(e) => {
-                  const newFilter = { ...pantryFilter, expirationStatus: e.target.value as PantryFilter['expirationStatus'] };
-                  setPantryFilter(newFilter);
-                  savePantryFilter(newFilter);
-                }}
-                className="w-full px-3 py-2 bg-theme-primary border border-theme rounded-lg text-theme-primary focus:border-[var(--accent-color)] focus:outline-none"
-              >
-                <option value="all">All Items</option>
-                <option value="expiring-soon">Expiring Soon (7 days)</option>
-                <option value="expired">Expired</option>
-                <option value="fresh">Fresh</option>
-              </select>
-            </div>
-
-            {/* Quantity Status Filter */}
-            <div>
-              <label className="block text-sm font-medium text-theme-primary mb-2">Stock Status</label>
-              <select
-                value={pantryFilter.quantityStatus}
-                onChange={(e) => {
-                  const newFilter = { ...pantryFilter, quantityStatus: e.target.value as PantryFilter['quantityStatus'] };
-                  setPantryFilter(newFilter);
-                  savePantryFilter(newFilter);
-                }}
-                className="w-full px-3 py-2 bg-theme-primary border border-theme rounded-lg text-theme-primary focus:border-[var(--accent-color)] focus:outline-none"
-              >
-                <option value="all">All Items</option>
-                <option value="low-stock">Low Stock (&lt;1)</option>
-                <option value="out-of-stock">Out of Stock</option>
-                <option value="in-stock">In Stock (≥1)</option>
-              </select>
-            </div>
-
-            {/* Clear Filters Button */}
-            <div className="flex justify-end">
-              <button
-                onClick={() => {
-                  setPantryFilter(defaultPantryFilter);
-                  savePantryFilter(defaultPantryFilter);
-                }}
-                className="px-4 py-2 bg-theme-primary border border-theme rounded-lg text-theme-secondary hover:bg-theme-secondary transition-colors"
-                aria-label="Clear all applied filters"
-              >
-                Clear Filters
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
 
 
 

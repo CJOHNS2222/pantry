@@ -967,7 +967,31 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
     await performSearch(params);
   };
 
+  const handleSearchEntireDatabase = async (mealType: string, cuisine: string) => {
+      let query = '';
+      if (cuisine) {
+          query += `${cuisine.charAt(0).toUpperCase() + cuisine.slice(1)} `;
+      }
+      if (mealType) {
+          query += `${mealType.charAt(0).toUpperCase() + mealType.slice(1)} `;
+      }
+      query += 'Recipes';
+      query = query.trim();
 
+      setSpecificQuery(query);
+      saveSearchToHistory(query, 'recipe');
+
+      const params = { query, ingredients: '' };
+      await performSearch(params);
+
+      // Scroll to the search input / results section
+      const element = document.getElementById('specificQuery');
+      if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } else {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+  };
 
     const performSearch = async (params: RecipeFinderSearchParams) => {
         // Debounce: prevent searches within 2 seconds of each other
@@ -1562,6 +1586,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                   ? filteredFirebaseRecipes
                   : csvRecipes // Show curated recipes while Firebase cache loads
               }
+              onSearchEntireDatabase={handleSearchEntireDatabase}
             />
 
         </>

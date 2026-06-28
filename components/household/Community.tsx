@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useApp } from '../../contexts/AppContext';
 import { useAppActions } from '../../contexts/AppActionsContext';
 import { Tab } from '../../types/app';
@@ -157,7 +157,7 @@ const getCookingStreak = (): number => {
 export const Community: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecipe, user }) => {
   const app = useApp();
   const { isLoadingRatings, setLoadingRatingsComplete, inventory = [], savedRecipes = [], mealPlan = [], household = null } = app;
-  const { setActiveTab, onRateRecipe } = useAppActions();
+  const { setActiveTab, onRateRecipe, addToast } = useAppActions();
   
   // Navigation & Toggle State
   const [subTab, setSubTab] = useState<'recipes' | 'leaderboard' | 'achievements'>('recipes');
@@ -177,6 +177,103 @@ export const Community: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecipe,
 
   const [localLoading, setLocalLoading] = useState(false);
   const [ratingsState, setRatingsState] = useState<RecipeRating[]>([]);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  const triggerCelebration = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    interface Particle {
+      x: number;
+      y: number;
+      vx: number;
+      vy: number;
+      color: string;
+      size: number;
+      alpha: number;
+      decay: number;
+      gravity: number;
+    }
+
+    const particles: Particle[] = [];
+    const colors = ['#ff0055', '#00ffcc', '#ffcc00', '#ff6600', '#9900ff', '#33ccff', '#ff33aa', '#00ff66'];
+
+    const createExplosion = (x: number, y: number) => {
+      const count = 50 + Math.random() * 30;
+      for (let i = 0; i < count; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 1.5 + Math.random() * 6;
+        particles.push({
+          x,
+          y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed - (0.5 + Math.random() * 1.5),
+          color: colors[Math.floor(Math.random() * colors.length)],
+          size: 2 + Math.random() * 3,
+          alpha: 1,
+          decay: 0.012 + Math.random() * 0.015,
+          gravity: 0.12,
+        });
+      }
+    };
+
+    const w = canvas.width;
+    const h = canvas.height;
+    
+    // Burst fireworks in a sequence
+    createExplosion(w / 2, h / 2);
+    setTimeout(() => createExplosion(w * 0.25, h * 0.45), 200);
+    setTimeout(() => createExplosion(w * 0.75, h * 0.45), 400);
+    setTimeout(() => createExplosion(w * 0.5, h * 0.35), 600);
+
+    const render = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += p.gravity;
+        p.alpha -= p.decay;
+
+        if (p.alpha <= 0) {
+          particles.splice(i, 1);
+          continue;
+        }
+
+        ctx.save();
+        ctx.globalAlpha = p.alpha;
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      if (particles.length > 0) {
+        requestAnimationFrame(render);
+      } else {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+    };
+
+    render();
+  };
+
+  const handleBadgeClick = (badge: AchievementBadge) => {
+    setSelectedBadge(badge);
+    if (badge.isUnlocked) {
+      addToast(`🎉 Achievement Unlocked: ${badge.title}! ${badge.icon}`, 'success', 5000);
+      setTimeout(() => {
+        triggerCelebration();
+      }, 100);
+    }
+  };
 
   useAndroidBack(showModal || !!selectedBadge || showWasteReport, () => {
     setShowModal(false);
@@ -1041,7 +1138,7 @@ export const Community: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecipe,
             {achievementsList.map((badge) => (
               <div
                 key={badge.id}
-                onClick={() => setSelectedBadge(badge)}
+                onClick={() => handleBadgeClick(badge)}
                 className={`bg-theme-secondary border rounded-2xl p-4 flex flex-col items-center justify-between text-center shadow-md hover:shadow-lg transition-all duration-200 cursor-pointer relative overflow-hidden group ${
                   badge.isUnlocked
                     ? 'border-[var(--accent-color)]/30 hover:scale-[1.03]'
@@ -1179,6 +1276,7 @@ export const Community: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecipe,
               {selectedBadge.isUnlocked ? (
                 <button
                   onClick={() => {
+                    triggerCelebration();
                     if (navigator.share) {
                       navigator.share({
                         title: `I unlocked ${selectedBadge.title}!`,
@@ -1337,6 +1435,7 @@ export const Community: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecipe,
           />
         );
       })()}
+      <canvas ref={canvasRef} className="fixed inset-0 pointer-events-none z-50" />
     </div>
   );
 };

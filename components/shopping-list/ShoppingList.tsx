@@ -255,15 +255,11 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     }
   }, [items, currentSessionId, previousSessions]);
 
-  // Save session and auto-trigger checkout when all items become completed
+  // Save session when all items become completed
   useEffect(() => {
     const allItemsCompleted = items.length > 0 && items.every(item => item.checked);
     if (allItemsCompleted) {
       saveCurrentSession();
-      // Auto-trigger checkout prompt!
-      const checkedItems = items.filter(i => i.checked);
-      setCheckoutItems(checkedItems);
-      setCheckoutExpiryOpen(true);
     }
   }, [items, saveCurrentSession]);
 

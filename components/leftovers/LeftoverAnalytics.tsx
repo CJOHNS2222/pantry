@@ -4,14 +4,14 @@ import FoodWasteAnalyticsService, { FoodWasteAnalytics } from '../../services/fo
 import { InventoryCacheService } from '../../services/inventoryCacheService';
 import { Capacitor } from '@capacitor/core';
 import { Share } from '@capacitor/share';
+import { Filesystem, Directory } from '@capacitor/filesystem';
+import { useAppActions } from '../../contexts/AppActionsContext';
 import { 
   TrendingUp, 
   TrendingDown, 
   DollarSign, 
   AlertTriangle, 
   Trash2, 
-  ArrowLeft, 
-  MessageSquare, 
   Share2, 
   Calendar, 
   ShoppingBasket, 
@@ -51,13 +51,155 @@ const PlayStoreIcon = (props: React.SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
-const AppleIcon = (props: React.SVGProps<SVGSVGElement>) => (
-  <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
-    <path d="M18.71,19.5C17.88,20.74 17,21.95 15.66,21.97C14.32,22 13.89,21.18 12.37,21.18C10.84,21.18 10.37,21.95 9.1,22C7.79,22.05 6.8,20.68 5.96,19.47C4.25,17 2.94,12.45 4.7,9.39C5.57,7.87 7.13,6.91 8.82,6.88C10.1,6.86 11.32,7.75 12.11,7.75C12.89,7.75 14.37,6.68 15.92,6.84C16.57,6.87 18.39,7.1 19.56,8.82C19.47,8.88 17.39,10.1 17.41,12.63C17.44,15.65 20.06,16.66 20.1,16.67C20.08,16.74 19.67,18.11 18.71,19.5M15.97,4.17C16.63,3.37 17.07,2.28 16.95,1C16,1.04 14.9,1.6 14.24,2.38C13.68,3.04 13.19,4.14 13.34,5.39C14.39,5.47 15.4,4.88 15.97,4.17Z" />
-  </svg>
-);
+
+
+const generateAchievementImage = (
+  pantryCount: number,
+  mealsCount: number,
+  savings: number
+): Promise<string> => {
+  return new Promise((resolve) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1080;
+    canvas.height = 1350; // Instagram portrait ratio (4:5)
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      resolve('');
+      return;
+    }
+
+    // 1. Background Gradient (Deep elegant dark slate with a subtle emerald glow)
+    const bgGrad = ctx.createRadialGradient(540, 675, 100, 540, 675, 800);
+    bgGrad.addColorStop(0, '#0f172a');
+    bgGrad.addColorStop(1, '#020617');
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, 1080, 1350);
+
+    // Glow effect
+    const glowGrad = ctx.createRadialGradient(540, 400, 50, 540, 400, 500);
+    glowGrad.addColorStop(0, 'rgba(16, 185, 129, 0.08)');
+    glowGrad.addColorStop(1, 'rgba(16, 185, 129, 0)');
+    ctx.fillStyle = glowGrad;
+    ctx.beginPath();
+    ctx.arc(540, 400, 500, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 2. Branding & Typography
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    ctx.fillStyle = '#10b981';
+    ctx.font = 'bold 36px Georgia, serif';
+    ctx.fillText('STOCK & SPOON', 540, 100);
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 64px Georgia, serif';
+    ctx.fillText('My Sustainable Kitchen', 540, 200);
+
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '30px sans-serif';
+    ctx.fillText("Here's the positive impact I've made by planning meals:", 540, 270);
+
+    // 3. Helper to draw rounded cards
+    const drawCard = (
+      y: number,
+      title: string,
+      value: string,
+      description: string,
+      accentColor: string,
+      bgAccent: string
+    ) => {
+      ctx.fillStyle = '#1e293b';
+      ctx.beginPath();
+      const x = 140;
+      const w = 800;
+      const h = 200;
+      const r = 24;
+      if (ctx.roundRect) {
+        ctx.roundRect(x, y, w, h, r);
+      } else {
+        ctx.rect(x, y, w, h);
+      }
+      ctx.fill();
+
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      ctx.fillStyle = accentColor;
+      ctx.beginPath();
+      if (ctx.roundRect) {
+        ctx.roundRect(x, y, 16, h, [r, 0, 0, r]);
+      } else {
+        ctx.rect(x, y, 16, h);
+      }
+      ctx.fill();
+
+      ctx.fillStyle = bgAccent;
+      ctx.beginPath();
+      ctx.arc(240, y + 100, 50, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 60px sans-serif';
+      ctx.fillText(value, 330, y + 70);
+
+      ctx.fillStyle = '#f8fafc';
+      ctx.font = 'bold 30px sans-serif';
+      ctx.fillText(title, 330, y + 115);
+
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '24px sans-serif';
+      ctx.fillText(description, 330, y + 155);
+    };
+
+    // Active Ingredients
+    drawCard(
+      360,
+      'Active Ingredients',
+      pantryCount.toString(),
+      'Currently tracked and managed in my kitchen',
+      '#f97316',
+      'rgba(249, 115, 22, 0.15)'
+    );
+
+    // Waste-Free Meals
+    drawCard(
+      600,
+      'Waste-Free Meals',
+      mealsCount.toString(),
+      'Delicious meals saved from going to waste',
+      '#ec4899',
+      'rgba(236, 72, 153, 0.15)'
+    );
+
+    // Eco Savings
+    drawCard(
+      840,
+      'Eco Savings',
+      `$${savings.toFixed(2)}`,
+      'Estimated budget saved by preventing food waste',
+      '#10b981',
+      'rgba(16, 185, 129, 0.15)'
+    );
+
+    // 4. Footer
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#10b981';
+    ctx.font = 'bold 32px sans-serif';
+    ctx.fillText('Join the movement at stockandspoon.com', 540, 1150);
+
+    ctx.fillStyle = '#64748b';
+    ctx.font = '24px sans-serif';
+    ctx.fillText('Preventing food waste, one meal at a time.', 540, 1210);
+
+    resolve(canvas.toDataURL('image/png'));
+  });
+};
 
 export const LeftoverAnalytics: React.FC<LeftoverAnalyticsProps> = ({ householdId, userId }) => {
+  const { addToast } = useAppActions();
   const [analytics, setAnalytics] = useState<LeftoverSavings | null>(null);
   const [foodWasteAnalytics, setFoodWasteAnalytics] = useState<FoodWasteAnalytics | null>(null);
   const [timePeriod, setTimePeriod] = useState<'week' | 'month' | 'all'>('week');
@@ -213,28 +355,65 @@ export const LeftoverAnalytics: React.FC<LeftoverAnalyticsProps> = ({ householdI
     const totalMoneySaved = analytics.moneySaved;
     const itemsCooked = analytics.itemsCooked + analytics.mealsReplaced;
 
-    const shareText = `I have ${totalItemsInPantry} pantry items, cooked ${itemsCooked} smart meals, and saved $${totalMoneySaved.toFixed(2)} on food waste using Stock & Spoon! Join me in reducing food waste!`;
+    const shareText = `I have ${totalItemsInPantry} active ingredients, cooked ${itemsCooked} waste-free meals, and saved $${totalMoneySaved.toFixed(2)} on food waste using Stock & Spoon!`;
 
     try {
+      addToast('Generating accomplishments card...', 'info', 2500);
+      const dataUrl = await generateAchievementImage(totalItemsInPantry, itemsCooked, totalMoneySaved);
+      if (!dataUrl) throw new Error('Failed to generate image');
+
       if (Capacitor.isNativePlatform()) {
+        const base64Data = dataUrl.split(',')[1];
+        const fileName = `achievements_${Date.now()}.png`;
+
+        const fileResult = await Filesystem.writeFile({
+          path: fileName,
+          data: base64Data,
+          directory: Directory.Cache
+        });
+
         await Share.share({
-          title: 'My Stock & Spoon Achievements',
+          title: 'My Stock & Spoon Impact',
           text: shareText,
-          url: 'https://stockandspoon.com',
+          url: fileResult.uri,
           dialogTitle: 'Share Achievements'
         });
       } else if (navigator.share) {
-        await navigator.share({
-          title: 'My Stock & Spoon Achievements',
-          text: shareText,
-          url: window.location.origin
-        });
+        const res = await fetch(dataUrl);
+        const blob = await res.blob();
+        const file = new File([blob], 'achievements.png', { type: 'image/png' });
+
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          await navigator.share({
+            title: 'My Stock & Spoon Impact',
+            text: shareText,
+            files: [file]
+          });
+        } else {
+          await navigator.share({
+            title: 'My Stock & Spoon Impact',
+            text: shareText,
+            url: window.location.origin
+          });
+        }
       } else {
+        const link = document.createElement('a');
+        link.href = dataUrl;
+        link.download = 'stock_and_spoon_impact.png';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        addToast('Accomplishments image downloaded! Description copied to clipboard.', 'success', 5000);
         await navigator.clipboard.writeText(shareText);
-        alert('Achievements copied to clipboard!');
       }
     } catch (err) {
       log.error('Error sharing achievements', { error: err }, 'LeftoverAnalytics');
+      addToast('Failed to share image. Copied text to clipboard instead.', 'info', 4000);
+      try {
+        await navigator.clipboard.writeText(shareText);
+      } catch {
+        // Clipboard write failed or is unsupported
+      }
     }
   };
 
@@ -395,117 +574,116 @@ export const LeftoverAnalytics: React.FC<LeftoverAnalyticsProps> = ({ householdI
 
       {/* Achievements Modal Overlay */}
       {showAchievements && (
-        <div className="fixed inset-0 z-50 bg-slate-900/90 flex flex-col animate-fade-in">
-          {/* Header */}
-          <div className="bg-[#e65100] text-white px-4 py-3.5 flex items-center justify-between shadow-md">
-            <button 
-              onClick={() => setShowAchievements(false)} 
-              className="p-1 hover:bg-white/10 rounded-full transition-colors"
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-theme-secondary border border-theme rounded-3xl w-full max-w-md overflow-hidden shadow-2xl flex flex-col max-h-[90vh] animate-slide-up relative">
+            
+            {/* Decorative background glows */}
+            <div className="absolute -top-24 -left-24 w-48 h-48 bg-[var(--accent-color)]/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+
+            {/* Header with status-bar padding for Android/iOS */}
+            <div 
+              className="border-b border-theme px-6 pb-4 flex items-center justify-between relative z-10"
+              style={{ paddingTop: 'calc(var(--safe-area-inset-top, env(safe-area-inset-top, 0px)) + 1rem)' }}
             >
-              <ArrowLeft className="w-6 h-6" />
-            </button>
-            <span className="font-bold text-lg tracking-wide">Achievements</span>
-            <div className="flex items-center gap-3">
-              <button className="p-1 hover:bg-white/10 rounded-full transition-colors">
-                <MessageSquare className="w-5 h-5" />
-              </button>
-              <button 
-                onClick={handleShare}
-                className="p-1 hover:bg-white/10 rounded-full transition-colors"
-              >
-                <Share2 className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
-
-          {/* Content */}
-          <div className="flex-1 overflow-y-auto bg-[#f8fafc] text-slate-800 p-6 space-y-6 pb-12">
-            <div className="text-center space-y-2 mt-2">
-              <h2 className="text-2xl font-black text-[#0f172a] leading-tight">Food Waste Data Updated!</h2>
-              <p className="text-sm text-slate-500 font-semibold px-4">
-                Check out how much money I've saved by reducing food waste!
-              </p>
-              <div className="inline-flex items-center gap-1.5 text-xs text-slate-400 font-bold mt-1">
-                <Calendar className="w-3.5 h-3.5" />
-                <span>{getDateRangeLabel(timePeriod)}</span>
+              <span className="font-bold text-lg text-theme-primary font-serif">My Kitchen Impact</span>
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={handleShare}
+                  className="p-2 hover:bg-theme-primary rounded-full transition-colors text-theme-secondary hover:text-theme-primary"
+                  title="Share accomplishments"
+                >
+                  <Share2 className="w-5 h-5" />
+                </button>
+                <button 
+                  onClick={() => setShowAchievements(false)} 
+                  className="p-2 hover:bg-theme-primary rounded-full transition-colors text-theme-secondary hover:text-theme-primary font-bold text-xl leading-none"
+                  aria-label="Close"
+                >
+                  ×
+                </button>
               </div>
             </div>
 
-            {/* Gradient Cards */}
-            <div className="space-y-4 max-w-md mx-auto">
-              {/* Card 1: Pantry Items */}
-              <div className="bg-gradient-to-br from-[#ff5e62] to-[#ff9966] text-white rounded-2xl p-6 shadow-lg flex flex-col items-center justify-center text-center space-y-3 relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-full -mr-6 -mt-6 transform rotate-45" />
-                <ShoppingBasket className="w-10 h-10 drop-shadow" />
-                <span className="text-4xl font-black tracking-tight">{totalItemsInPantry}</span>
-                <div className="space-y-0.5">
-                  <h3 className="font-bold text-lg">Pantry Items</h3>
-                  <p className="text-xs text-white/80 font-medium">Currently in the kitchen</p>
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6 relative z-10">
+              <div className="text-center space-y-2">
+                <h2 className="text-2xl font-serif font-bold text-theme-primary">Sustainable Cooking Wins! 🎉</h2>
+                <p className="text-sm text-theme-secondary opacity-80 px-2">
+                  Here is the positive impact I've made by planning meals and reducing waste.
+                </p>
+                <div className="inline-flex items-center gap-1.5 text-xs text-[var(--accent-color)] font-semibold mt-1 bg-[var(--accent-color)]/10 px-2.5 py-1 rounded-full">
+                  <Calendar className="w-3.5 h-3.5" />
+                  <span>{getDateRangeLabel(timePeriod)}</span>
                 </div>
               </div>
 
-              {/* Card 2: Smart Meals Cooked */}
-              <div className="bg-gradient-to-br from-[#ec008c] to-[#fc6767] text-white rounded-2xl p-6 shadow-lg flex flex-col items-center justify-center text-center space-y-3 relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-full -mr-6 -mt-6 transform rotate-45" />
-                <Utensils className="w-10 h-10 drop-shadow" />
-                <span className="text-4xl font-black tracking-tight">{itemsCookedCount}</span>
-                <div className="space-y-0.5">
-                  <h3 className="font-bold text-lg">Smart Meals Cooked</h3>
-                  <p className="text-xs text-white/80 font-medium">Meals saved from waste</p>
+              {/* Grid of Stats */}
+              <div className="grid grid-cols-1 gap-4">
+                {/* Stat 1: Active Ingredients */}
+                <div className="bg-theme-primary border border-theme rounded-2xl p-5 flex items-center gap-4 hover:border-[var(--accent-color)]/35 transition-all duration-300">
+                  <div className="w-12 h-12 rounded-xl bg-orange-500/15 flex items-center justify-center text-orange-500 shrink-0">
+                    <ShoppingBasket className="w-6 h-6" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-2xl font-black text-theme-primary block leading-none mb-1">{totalItemsInPantry}</span>
+                    <h3 className="font-bold text-sm text-theme-primary">Active Ingredients</h3>
+                    <p className="text-xs text-theme-secondary opacity-75">Currently tracked and managed in my kitchen</p>
+                  </div>
+                </div>
+
+                {/* Stat 2: Waste-Free Meals */}
+                <div className="bg-theme-primary border border-theme rounded-2xl p-5 flex items-center gap-4 hover:border-[var(--accent-color)]/35 transition-all duration-300">
+                  <div className="w-12 h-12 rounded-xl bg-pink-500/15 flex items-center justify-center text-pink-500 shrink-0">
+                    <Utensils className="w-6 h-6 animate-pulse" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-2xl font-black text-theme-primary block leading-none mb-1">{itemsCookedCount}</span>
+                    <h3 className="font-bold text-sm text-theme-primary">Waste-Free Meals</h3>
+                    <p className="text-xs text-theme-secondary opacity-75">Delicious meals saved from going to waste</p>
+                  </div>
+                </div>
+
+                {/* Stat 3: Eco Savings */}
+                <div className="bg-theme-primary border border-theme rounded-2xl p-5 flex items-center gap-4 hover:border-[var(--accent-color)]/35 transition-all duration-300">
+                  <div className="w-12 h-12 rounded-xl bg-emerald-500/15 flex items-center justify-center text-emerald-500 shrink-0">
+                    <PiggyBank className="w-6 h-6" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-2xl font-black text-theme-primary block leading-none mb-1">${analytics.moneySaved.toFixed(2)}</span>
+                    <h3 className="font-bold text-sm text-theme-primary">Eco Savings</h3>
+                    <p className="text-xs text-theme-secondary opacity-75">Estimated budget saved by preventing food waste</p>
+                  </div>
                 </div>
               </div>
 
-              {/* Card 3: Money Saved */}
-              <div className="bg-gradient-to-br from-[#11998e] to-[#38ef7d] text-white rounded-2xl p-6 shadow-lg flex flex-col items-center justify-center text-center space-y-3 relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-full -mr-6 -mt-6 transform rotate-45" />
-                <PiggyBank className="w-10 h-10 drop-shadow" />
-                <span className="text-4xl font-black tracking-tight">${analytics.moneySaved.toFixed(2)}</span>
-                <div className="space-y-0.5">
-                  <h3 className="font-bold text-lg">Money Saved</h3>
-                  <p className="text-xs text-white/80 font-medium">Through smart cooking</p>
-                </div>
-              </div>
-
-              {/* CTA Card */}
-              <div className="bg-gradient-to-br from-[#642b73] to-[#c6426e] text-white rounded-2xl p-6 shadow-lg text-center space-y-4 max-w-md mx-auto mt-6">
-                <h3 className="text-lg font-black leading-snug">
-                  Start Your Own Food Waste Reduction Journey Today!
-                </h3>
-                <p className="text-xs text-white/80 leading-relaxed font-medium">
-                  Join hundreds of thousands of other users making a difference with the Stock & Spoon app.
+              {/* Elegant Footer Branding */}
+              <div className="text-center pt-4 border-t border-theme space-y-3">
+                <p className="text-xs text-theme-secondary font-medium">
+                  Cooking sustainably with <strong className="text-theme-primary">Stock & Spoon</strong>
+                </p>
+                <p className="text-[10px] text-theme-secondary opacity-60">
+                  Preventing food waste, one meal at a time.
                 </p>
                 
-                <div className="flex items-center justify-center gap-3 pt-1">
+                <div className="flex justify-center pt-1">
                   {/* Google Play Button */}
                   <a 
                     href="https://play.google.com/store" 
                     target="_blank" 
                     rel="noreferrer"
-                    className="bg-black border border-white/20 rounded-lg px-3 py-1.5 flex items-center gap-2 hover:bg-slate-950 transition-all active:scale-95"
+                    className="bg-black border border-white/20 rounded-lg px-3 py-1.5 flex items-center gap-2 hover:bg-slate-950 transition-all active:scale-95 inline-flex"
                   >
-                    <PlayStoreIcon className="w-5 h-5 text-white" />
+                    <PlayStoreIcon className="w-4 h-4 text-white" />
                     <div className="text-left">
-                      <p className="text-[8px] uppercase tracking-wider text-white/60 font-semibold leading-none">Get it on</p>
-                      <p className="text-[11px] text-white font-bold leading-tight">Google Play</p>
-                    </div>
-                  </a>
-
-                  {/* App Store Button */}
-                  <a 
-                    href="https://www.apple.com/app-store" 
-                    target="_blank" 
-                    rel="noreferrer"
-                    className="bg-black border border-white/20 rounded-lg px-3 py-1.5 flex items-center gap-2 hover:bg-slate-950 transition-all active:scale-95"
-                  >
-                    <AppleIcon className="w-5 h-5 text-white" />
-                    <div className="text-left">
-                      <p className="text-[8px] uppercase tracking-wider text-white/60 font-semibold leading-none">Download on the</p>
-                      <p className="text-[11px] text-white font-bold leading-tight">App Store</p>
+                      <p className="text-[7px] uppercase tracking-wider text-white/60 font-semibold leading-none">Get it on</p>
+                      <p className="text-[10px] text-white font-bold leading-tight">Google Play</p>
                     </div>
                   </a>
                 </div>
               </div>
             </div>
+
           </div>
         </div>
       )}

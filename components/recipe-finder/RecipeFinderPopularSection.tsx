@@ -1,4 +1,5 @@
 import React from 'react';
+import { Search } from 'lucide-react';
 import { Household, StructuredRecipe, User } from '../../types';
 import type { CacheMealTypeFilter } from '../../utils/preferenceUtils';
 import PopularRecipes from '../recipes-meals/PopularRecipes';
@@ -15,6 +16,7 @@ interface RecipeFinderPopularSectionProps {
   user: User;
   household?: Household | null;
   filteredFirebaseRecipes: StructuredRecipe[];
+  onSearchEntireDatabase: (mealType: string, cuisine: string) => void;
 }
 
 export const RecipeFinderPopularSection: React.FC<RecipeFinderPopularSectionProps> = ({
@@ -29,7 +31,13 @@ export const RecipeFinderPopularSection: React.FC<RecipeFinderPopularSectionProp
   user,
   household,
   filteredFirebaseRecipes,
+  onSearchEntireDatabase,
 }) => {
+  const capitalize = (str: string) => {
+    if (!str) return '';
+    return str.charAt(0).toUpperCase() + str.slice(1);
+  };
+
   return (
     <div className="mt-12">
       <h2 className="text-xl font-bold text-theme-primary mb-6">{title}</h2>
@@ -62,6 +70,17 @@ export const RecipeFinderPopularSection: React.FC<RecipeFinderPopularSectionProp
             </option>
           ))}
         </select>
+
+        {(cacheMealTypeFilter || cacheCuisineFilter) && (
+          <button
+            type="button"
+            onClick={() => onSearchEntireDatabase(cacheMealTypeFilter, cacheCuisineFilter)}
+            className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--accent-color)] text-white text-xs font-semibold hover:opacity-95 transition-opacity shadow-md animate-fade-in"
+          >
+            <Search className="w-3.5 h-3.5" />
+            Search All {cacheCuisineFilter ? capitalize(cacheCuisineFilter) : ''} {cacheMealTypeFilter ? capitalize(cacheMealTypeFilter) : 'Recipes'}
+          </button>
+        )}
       </div>
 
       <PopularRecipes openRecipeModal={openRecipeModal} onAddToPlan={onAddToPlan} user={user} household={household} recipes={filteredFirebaseRecipes} />
