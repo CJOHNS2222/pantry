@@ -206,16 +206,31 @@ export class InventoryCacheService {
       const cachePath = this.getCachePath(householdId, userId);
       const cacheRef = DatabaseMonitoringService.doc(cachePath);
 
+      // Preserve the _foodWaste field if it exists to prevent setDoc from wiping it out
+      let existingFoodWaste: any = undefined;
+      try {
+        const docSnap = await DatabaseMonitoringService.getDoc(cacheRef);
+        if (docSnap.exists()) {
+          existingFoodWaste = docSnap.data()?._foodWaste;
+        }
+      } catch (readErr) {
+        log.warn("Failed to read existing cache to preserve food waste analytics", { readErr });
+      }
+
       // Convert items to the cached format
-      const cachedData: CachedInventoryData & CacheMetadata = {
+      const cachedData: any = {
         lastUpdated: new Date(),
         version: this.CACHE_VERSION,
         itemCount: items.length,
-      } as any;
+      };
+
+      if (existingFoodWaste !== undefined) {
+        cachedData._foodWaste = existingFoodWaste;
+      }
 
       // Add each item as itemId -> itemArray
       items.forEach(item => {
-        (cachedData as any)[item.id] = this.pantryItemToArray(item);
+        cachedData[item.id] = this.pantryItemToArray(item);
       });
 
       await DatabaseMonitoringService.setDoc(cacheRef, cachedData);
@@ -381,11 +396,29 @@ export class InventoryCacheService {
     try {
       const cachePath = this.getCachePath(householdId, userId);
       const cacheRef = DatabaseMonitoringService.doc(cachePath);
-      await DatabaseMonitoringService.setDoc(cacheRef, {
+
+      // Preserve the _foodWaste field if it exists to prevent setDoc from wiping it out
+      let existingFoodWaste: any = undefined;
+      try {
+        const docSnap = await DatabaseMonitoringService.getDoc(cacheRef);
+        if (docSnap.exists()) {
+          existingFoodWaste = docSnap.data()?._foodWaste;
+        }
+      } catch (readErr) {
+        log.warn("Failed to read existing cache to preserve food waste analytics on clear", { readErr });
+      }
+
+      const cachedData: any = {
         lastUpdated: new Date(),
         version: this.CACHE_VERSION,
         itemCount: 0
-      });
+      };
+
+      if (existingFoodWaste !== undefined) {
+        cachedData._foodWaste = existingFoodWaste;
+      }
+
+      await DatabaseMonitoringService.setDoc(cacheRef, cachedData);
       // Cleared inventory cache
     } catch (err: any) {
       log.error("Error clearing inventory cache", { err });
