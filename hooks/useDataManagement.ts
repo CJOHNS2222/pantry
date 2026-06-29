@@ -585,24 +585,23 @@ export function useDataManagement(
           if (data.version === InventoryCacheService.CACHE_VERSION) {
             const items: PantryItem[] = [];
             for (const itemId in data) {
-              if (itemId !== 'lastUpdated' && itemId !== 'version' && itemId !== 'itemCount') {
-                const item = InventoryCacheService.arrayToPantryItem(itemId,
-                 
-                data[itemId] as string[]
-              );
-                // W: Read-time FEFO normalisation — keep item.expirationDate in sync with
-                // the soonest batch expiry so filters and alerts always use the correct date.
-                if (item.batches && item.batches.length > 0) {
-                  const batchExpiries = item.batches
-                    .map(b => b.expires)
-                    .filter((e): e is string => !!e)
-                    .sort();
-                  if (batchExpiries.length > 0) {
-                    item.expirationDate = batchExpiries[0];
-                  }
-                }
-                items.push(item);
+              // Skip metadata and the embedded food waste counters field
+              if (itemId === 'lastUpdated' || itemId === 'version' || itemId === 'itemCount' || itemId === '_foodWaste') {
+                continue;
               }
+              const item = InventoryCacheService.arrayToPantryItem(itemId, data[itemId] as string[]);
+              // W: Read-time FEFO normalisation — keep item.expirationDate in sync with
+              // the soonest batch expiry so filters and alerts always use the correct date.
+              if (item.batches && item.batches.length > 0) {
+                const batchExpiries = item.batches
+                  .map(b => b.expires)
+                  .filter((e): e is string => !!e)
+                  .sort();
+                if (batchExpiries.length > 0) {
+                  item.expirationDate = batchExpiries[0];
+                }
+              }
+              items.push(item);
             }
             if (hasPantryItemsChanged(items, inventoryRef.current)) {
               setRemoteInventoryUpdate(true);
@@ -1191,7 +1190,7 @@ export function useDataManagement(
                   userId: user.id,
                   userName: user.name,
                   estimatedValue
-                }, household?.id);
+                }, user.householdId);
               } catch (err) {
                 log.warn('Failed to record waste disposal on recipe deduction delete', { error: err }, 'DataManagement');
               }
@@ -1399,7 +1398,7 @@ export function useDataManagement(
           userId: user.id,
           userName: user.name,
           estimatedValue
-        }, household?.id);
+        }, user?.householdId);
       } catch (err) {
         log.warn('Failed to record waste disposal on item delete', { error: err }, 'DataManagement');
       }
@@ -1490,29 +1489,28 @@ export function useDataManagement(
       return;
     }
 
-    // Record food waste analytics if user is authenticated
+    // Record food waste analytics for all deleted items in a single atomic write
     if (user?.id) {
       try {
         const today = new Date().toISOString().slice(0, 10);
-        for (const itemToDelete of itemsToDelete) {
+        const disposalPayloads = itemsToDelete.map(itemToDelete => {
           const isExpired = itemToDelete.expirationDate && !itemToDelete.is_immortal && itemToDelete.expirationDate <= today;
           const reason = disposalReason || (isExpired ? 'thrown_away' : 'remove');
-          const daysExpired = itemToDelete.expirationDate 
+          const daysExpired = itemToDelete.expirationDate
             ? Math.max(0, Math.ceil((new Date().getTime() - new Date(itemToDelete.expirationDate).getTime()) / (1000 * 60 * 60 * 24)))
             : 0;
-          const estimatedValue = itemToDelete.estimatedPrice || 2.50;
-
-          await FoodWasteAnalyticsService.recordDisposal({
+          return {
             itemId: itemToDelete.id,
             itemName: itemToDelete.item,
             category: itemToDelete.category,
-            disposalReason: reason,
+            disposalReason: reason as 'thrown_away' | 'cooked' | 'remove',
             daysExpired,
             userId: user.id,
             userName: user.name,
-            estimatedValue
-          }, household?.id);
-        }
+            estimatedValue: itemToDelete.estimatedPrice || 2.50
+          };
+        });
+        await FoodWasteAnalyticsService.recordBulkDisposals(disposalPayloads, user?.householdId);
       } catch (err) {
         log.warn('Failed to record waste disposal on bulk delete', { error: err }, 'DataManagement');
       }

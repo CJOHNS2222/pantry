@@ -378,7 +378,15 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
             try {
                 setFirebaseRecipesLoading(true);
                 const recipes = await getCachedRecipesCache('recipe_caches/recipes_cache_1'); // Uses cached recipes (1 read vs 50+ reads)
-                setFirebaseRecipes(recipes);
+                
+                // Shuffle the recipes array to randomize their order
+                const shuffled = [...recipes];
+                for (let i = shuffled.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+                }
+                
+                setFirebaseRecipes(shuffled);
                 // reset visible count when new recipes arrive
                 setVisibleFirebaseCount(25);
             } catch (error) {
@@ -1618,7 +1626,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
               filteredFirebaseRecipes={
                 filteredFirebaseRecipes.length > 0
                   ? filteredFirebaseRecipes
-                  : csvRecipes // Show curated recipes while Firebase cache loads
+                  : rankCachedRecipesByPreferences(csvRecipes, household?.members || [], user?.profile)
               }
               onSearchEntireDatabase={handleSearchEntireDatabase}
             />

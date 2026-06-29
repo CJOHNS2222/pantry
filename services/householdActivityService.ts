@@ -5,18 +5,38 @@
 
 import DatabaseMonitoringService from './databaseMonitoringService';
 import { serverTimestamp } from 'firebase/firestore';
-import { db } from '../firebaseConfig';
-import { User, Household } from '../types';
-import { Tab } from '../types/app';
 import { log } from './logService';
 
 export class HouseholdActivityService {
   // Throttle logActivity writes: at most one write per user per household per 30 seconds
   private static lastWriteTime: Record<string, number> = {};
+  private static lastMemberActivityWrite: Record<string, { time: number; activity: string }> = {};
+
   /**
    * Update member's current activity and last seen
    */
   static async updateMemberActivity(userId: string, householdId: string, activity: string) {
+    const key = `${householdId}:${userId}`;
+    const now = Date.now();
+    const lastWrite = HouseholdActivityService.lastMemberActivityWrite[key];
+
+    // Throttle: 
+    // 1. If it's the exact same activity, throttle to once every 30 seconds (to update lastSeen/online status).
+    // 2. If it's a different activity, throttle to once every 10 seconds to prevent rapid tab-switching writes.
+    if (lastWrite) {
+      const timeDiff = now - lastWrite.time;
+      const isSameActivity = lastWrite.activity === activity;
+      if (isSameActivity && timeDiff < 30_000) {
+        return;
+      }
+      if (!isSameActivity && timeDiff < 10_000) {
+        return;
+      }
+    }
+
+    // Update the cache before the async write to prevent concurrent calls from bypassing the check
+    HouseholdActivityService.lastMemberActivityWrite[key] = { time: now, activity };
+
     try {
       const householdRef = DatabaseMonitoringService.doc('households', householdId);
       const memberPath = `memberActivity.${userId}`;

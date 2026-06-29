@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { Sun, Moon, Undo2, Bell } from 'lucide-react';
 import { User, Household, HouseholdActivity } from '../../types';
 import { log } from '../../services/logService';
-import { HouseholdStatusIndicator } from '../household/HouseholdStatusIndicator';
 import { HouseholdActivityFeed } from '../household/HouseholdActivityFeed';
 import { SyncIndicator } from '../ui/SyncIndicator';
 import { OnlineIndicator } from '../ui/OnlineIndicator';
@@ -261,6 +260,76 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
       </span>
     );
   };
+  const activityText = useMemo(() => {
+    if (!household) return '';
+    
+    // Filter out current user and get other active members
+    const otherMembers = household.members.filter(m => m.id !== user.id && m.status === 'active');
+    if (otherMembers.length === 0) return '';
+
+    const getActivity = (memberId: string) => household.memberActivity?.[memberId] ?? {};
+    
+    const ONLINE_WINDOW_MS = 5 * 60 * 1000;
+    const isConsideredOnline = (memberId: string) => {
+      const activity = getActivity(memberId);
+      if (!activity.isOnline) return false;
+      const rawLastSeen = activity.lastSeen;
+      if (!rawLastSeen) return false;
+      const lastSeen = typeof rawLastSeen === 'object' && rawLastSeen?.toDate
+        ? rawLastSeen.toDate()
+        : new Date(rawLastSeen as string);
+      return lastSeen > new Date(Date.now() - ONLINE_WINDOW_MS);
+    };
+
+    const onlineMembersWithActivity = otherMembers
+      .filter(m => isConsideredOnline(m.id))
+      .map(m => {
+        const activity = getActivity(m.id);
+        const activityStr = activity.currentActivity || 'using app';
+        return {
+          name: m.name.split(' ')[0],
+          activity: activityStr
+        };
+      });
+
+    if (onlineMembersWithActivity.length === 0) {
+      // Find recently active member
+      const recentlyActive = otherMembers
+        .map(m => {
+          const activity = getActivity(m.id);
+          const rawLastSeen = activity.lastSeen;
+          const lastSeen = rawLastSeen
+            ? (typeof rawLastSeen === 'object' && rawLastSeen?.toDate ? rawLastSeen.toDate() : new Date(rawLastSeen as string))
+            : null;
+          return { member: m, lastSeen };
+        })
+        .filter(item => item.lastSeen !== null)
+        .sort((a, b) => (b.lastSeen?.getTime() || 0) - (a.lastSeen?.getTime() || 0))[0];
+
+      if (recentlyActive && recentlyActive.lastSeen) {
+        const diffMs = Date.now() - recentlyActive.lastSeen.getTime();
+        const diffMins = Math.floor(diffMs / (1000 * 60));
+        if (diffMins < 30) {
+          const name = recentlyActive.member.name.split(' ')[0];
+          return `${name} was active recently`;
+        }
+      }
+      return '';
+    }
+
+    // Format online members' activity
+    if (onlineMembersWithActivity.length === 1) {
+      const m = onlineMembersWithActivity[0];
+      return `${m.name} is ${m.activity}`;
+    } else if (onlineMembersWithActivity.length === 2) {
+      const m1 = onlineMembersWithActivity[0];
+      const m2 = onlineMembersWithActivity[1];
+      return `${m1.name} & ${m2.name} are active`;
+    } else {
+      return `${onlineMembersWithActivity.length} members are active`;
+    }
+  }, [household, user.id]);
+
   return (
     <header 
       className="bg-theme-secondary p-3 fixed top-0 left-0 right-0 max-w-md mx-auto z-20 shadow-md border-b border-theme transition-colors duration-300"
@@ -315,7 +384,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                     </span>
                   )}
                 </button>
-
+ 
                 {/* Notification bell */}
                 {showNotifications && (
                   <div
@@ -401,14 +470,14 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                                 >✕</button>
                               </div>
                             </div>
-
+ 
                             {/* Body — collapsed = 1 line, expanded = full */}
                             {bodyText && (
                               <div className={`text-xs text-theme-secondary mt-0.5 leading-snug ${isExpanded ? '' : 'line-clamp-1'}`}>
                                 {bodyText}
                               </div>
                             )}
-
+ 
                             {/* Expanded details */}
                             {isExpanded && (
                               <div className="mt-1.5 space-y-1 border-t border-theme/40 pt-1.5">
@@ -429,7 +498,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                                 )}
                               </div>
                             )}
-
+ 
                             {/* Timestamp */}
                             <div className="text-[10px] text-theme-secondary mt-1 opacity-70">
                               {getNotifTimeAgo(n.createdAt)}
@@ -463,17 +532,25 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             Stock & Spoon
           </h1>
           {household && household.members.length > 1 && (
-            <div className="relative mt-1">
+            <div className="relative mt-0.5">
               <button
                 onClick={handleToggleActivityFeed}
-                className="focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:ring-offset-2 rounded"
+                className="flex items-center gap-1 px-2 py-0.5 rounded-full hover:bg-black/5 dark:hover:bg-white/5 transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]"
                 aria-label="View household activity feed"
                 title="Tap to view household activity"
               >
-                <HouseholdStatusIndicator
-                  household={household}
-                  currentUserId={user.id}
-                />
+                {activityText ? (
+                  <>
+                    <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
+                    <span className="text-[10px] sm:text-xs text-green-500 font-medium tracking-wide truncate max-w-[160px]">
+                      {activityText}
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-[10px] sm:text-xs text-theme-secondary opacity-60">
+                    No active members
+                  </span>
+                )}
               </button>
 
               {showActivityFeed && (

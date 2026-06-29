@@ -202,7 +202,7 @@ export const LeftoverAnalytics: React.FC<LeftoverAnalyticsProps> = ({ householdI
   const { addToast } = useAppActions();
   const [analytics, setAnalytics] = useState<LeftoverSavings | null>(null);
   const [foodWasteAnalytics, setFoodWasteAnalytics] = useState<FoodWasteAnalytics | null>(null);
-  const [timePeriod, setTimePeriod] = useState<'week' | 'month' | 'all'>('week');
+  const timePeriod = 'all';
   const [totalItemsInPantry, setTotalItemsInPantry] = useState(0);
   const [showAchievements, setShowAchievements] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -239,7 +239,7 @@ export const LeftoverAnalytics: React.FC<LeftoverAnalyticsProps> = ({ householdI
         }
 
         // Calculate leftover analytics
-        await calculateLeftoverAnalytics(foodWasteData, timePeriod);
+        await calculateLeftoverAnalytics(foodWasteData);
       } catch (err) {
         log.error('Error fetching analytics', { error: err }, 'LeftoverAnalytics');
         setError('Failed to load analytics data');
@@ -251,7 +251,7 @@ export const LeftoverAnalytics: React.FC<LeftoverAnalyticsProps> = ({ householdI
     fetchAnalytics();
   }, [householdId, userId]);
 
-  const calculateLeftoverAnalytics = async (currentFoodWasteAnalytics?: FoodWasteAnalytics | null, period: 'week' | 'month' | 'all' = 'week') => {
+  const calculateLeftoverAnalytics = async (currentFoodWasteAnalytics?: FoodWasteAnalytics | null) => {
     try {
       // Get all current leftovers
       const leftovers = await LeftoverService.getLeftovers(householdId, userId);
@@ -290,30 +290,15 @@ export const LeftoverAnalytics: React.FC<LeftoverAnalyticsProps> = ({ householdI
 
       const wasteData = currentFoodWasteAnalytics !== undefined ? currentFoodWasteAnalytics : foodWasteAnalytics;
 
-      // Filter disposal history by time period
-      let filteredHistory = wasteData?.disposalHistory || [];
-      const now = new Date();
-      if (period === 'week') {
-        const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        filteredHistory = filteredHistory.filter(r => r.disposalDate >= oneWeekAgo);
-      } else if (period === 'month') {
-        const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-        filteredHistory = filteredHistory.filter(r => r.disposalDate >= oneMonthAgo);
-      }
-
-      const totalItemsDisposed = filteredHistory.length;
-      const itemsThrownAway = filteredHistory.filter(r => r.disposalReason === 'thrown_away').length;
-      const itemsCooked = filteredHistory.filter(r => r.disposalReason === 'cooked').length;
-      const itemsRemoved = filteredHistory.filter(r => r.disposalReason === 'remove').length;
-      const averageDaysExpired = filteredHistory.length > 0
-        ? filteredHistory.reduce((sum, r) => sum + r.daysExpired, 0) / filteredHistory.length
-        : 0;
-      const totalWasteValue = filteredHistory.reduce((sum, r) => sum + (r.estimatedValue || 0), 0);
+      const totalItemsDisposed = wasteData?.totalItemsDisposed || 0;
+      const itemsThrownAway = wasteData?.itemsByReason?.thrown_away || 0;
+      const itemsCooked = wasteData?.itemsByReason?.cooked || 0;
+      const itemsRemoved = wasteData?.itemsByReason?.remove || 0;
+      const averageDaysExpired = wasteData?.averageDaysExpired || 0;
+      const totalWasteValue = Math.max(0, (wasteData?.totalEstimatedValue || 0) - (wasteData?.totalCookedValue || 0));
 
       // Money Saved = Value of items cooked instead of wasted + estimated value saved from leftovers
-      const moneySavedFromCooking = filteredHistory
-        .filter(r => r.disposalReason === 'cooked')
-        .reduce((sum, r) => sum + (r.estimatedValue || 2.50), 0);
+      const moneySavedFromCooking = wasteData?.totalCookedValue || 0;
       const moneySaved = moneySavedFromCooking + estimatedValueSaved;
 
       setAnalytics({
@@ -518,25 +503,9 @@ export const LeftoverAnalytics: React.FC<LeftoverAnalyticsProps> = ({ householdI
               <Trash2 className="w-4 h-4" />
               Food Waste Analytics
             </h4>
-            {/* Time Period Selector */}
-            <div className="flex bg-theme-primary p-0.5 rounded-md border border-theme self-start sm:self-auto">
-              {(['week', 'month', 'all'] as const).map((period) => (
-                <button
-                  key={period}
-                  onClick={() => {
-                    setTimePeriod(period);
-                    calculateLeftoverAnalytics(foodWasteAnalytics, period);
-                  }}
-                  className={`px-2.5 py-0.5 rounded text-[10px] font-bold transition-all uppercase ${
-                    timePeriod === period
-                      ? 'bg-[var(--accent-color)] text-white shadow'
-                      : 'text-theme-secondary hover:text-theme-primary'
-                  }`}
-                >
-                  {period === 'week' ? '7 Days' : period === 'month' ? '30 Days' : 'All Time'}
-                </button>
-              ))}
-            </div>
+            <span className="text-[10px] bg-theme-primary text-theme-secondary border border-theme px-2.5 py-1 rounded font-bold uppercase tracking-wider">
+              All Time
+            </span>
           </div>
           <div className="space-y-2">
             <div className="flex justify-between">
