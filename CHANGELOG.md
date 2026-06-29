@@ -1,3 +1,15 @@
+## [2.5.5] - 2026-06-29
+
+### Added
+- **Live Household Presence in Header** — Added live household member activity text (e.g. `Chris is viewing pantry`) under the Stock & Spoon title in the main header, which also toggles the activity feed.
+
+### Changed
+- **Optimized Food Waste Analytics** — Replaced heavy history array document reads/writes with atomic `increment` summary counters directly inside the inventory cache document (under `_foodWaste`), fixing the Firestore Timestamp serialization bug.
+- **Improved Shopping List UI Alignment** — Reordered right-side controls, sized the price box to match the quantity input box (`w-16 h-[30px]`), added dashed mockup placeholder boxes for items with missing price data, wrapped source badge emojis in spans for vertical alignment, and reduced mobile page padding to `px-2` to make card boxes larger.
+- **Randomized Popular Recipes** — Implemented a Fisher-Yates shuffle on popular recipes on load and removed the alphabetical title fallback in `rankCachedRecipesByPreferences` to preserve shuffled/original order when preference scores are equal.
+
+---
+
 ## [2.5.4] - 2026-06-28
 
 ### Added

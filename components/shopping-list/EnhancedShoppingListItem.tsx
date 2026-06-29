@@ -268,18 +268,44 @@ export const EnhancedShoppingListItem: React.FC<ShoppingListItemProps> = ({
                     const title = getRecipeTitleFromSource(item.source);
                     if (title) handleRecipeClick(e, title);
                   }}
-                  className="inline-flex items-center rounded-full border border-[var(--accent-color)]/30 bg-[var(--accent-color)]/5 hover:bg-[var(--accent-color)]/15 px-2 py-0.5 text-[10px] font-semibold text-[var(--accent-color)] max-w-[200px] truncate transition-colors cursor-pointer focus:outline-none focus:ring-1 focus:ring-[var(--accent-color)] text-left"
+                  className="inline-flex items-center gap-1 rounded-full border border-[var(--accent-color)]/30 bg-[var(--accent-color)]/5 hover:bg-[var(--accent-color)]/15 px-2 py-0.5 text-[10px] font-semibold text-[var(--accent-color)] max-w-[200px] truncate transition-colors cursor-pointer focus:outline-none focus:ring-1 focus:ring-[var(--accent-color)] text-left"
                   title={`View recipe: ${getRecipeTitleFromSource(item.source)}`}
                 >
-                  🍳 {item.source.substring(8).replace(/^need\s+/, '')}
+                  <span className="text-xs">🍳</span>
+                  <span className="truncate">{item.source.substring(8).replace(/^need\s+/, '')}</span>
                 </button>
               ) : (
-                <div className="inline-flex items-center rounded-full border border-theme bg-theme-primary/50 px-2 py-0.5 text-[10px] font-medium text-theme-secondary whitespace-nowrap shrink-0">
-                  {item.source === 'suggested' && '💡 Quick Add'}
-                  {item.source === 'manual' && '✏️ Manual'}
-                  {item.source === 'meal planner' && '📅 Meal planner'}
-                  {item.source === 'pantry scanner' && '📷 Scanner'}
-                  {item.source === 'scanner suggestion' && '🤖 Suggestions'}
+                <div className="inline-flex items-center gap-1 rounded-full border border-theme bg-theme-primary/50 px-2 py-0.5 text-[10px] font-medium text-theme-secondary whitespace-nowrap shrink-0">
+                  {item.source === 'suggested' && (
+                    <>
+                      <span className="text-xs">💡</span>
+                      <span>Quick Add</span>
+                    </>
+                  )}
+                  {item.source === 'manual' && (
+                    <>
+                      <span className="text-xs">✏️</span>
+                      <span>Manual</span>
+                    </>
+                  )}
+                  {item.source === 'meal planner' && (
+                    <>
+                      <span className="text-xs">📅</span>
+                      <span>Meal planner</span>
+                    </>
+                  )}
+                  {item.source === 'pantry scanner' && (
+                    <>
+                      <span className="text-xs">📷</span>
+                      <span>Scanner</span>
+                    </>
+                  )}
+                  {item.source === 'scanner suggestion' && (
+                    <>
+                      <span className="text-xs">🤖</span>
+                      <span>Suggestions</span>
+                    </>
+                  )}
                 </div>
               )
             )}
@@ -332,22 +358,6 @@ export const EnhancedShoppingListItem: React.FC<ShoppingListItemProps> = ({
             </div>
           )}
 
-          {onQuantityChange && (
-            <input
-              type="text"
-              value={item.quantity || ''}
-              onChange={(e) => onQuantityChange(item.id, e.target.value)}
-              onClick={(e) => e.stopPropagation()}
-              className="w-16 px-2 py-1 text-sm border border-theme rounded bg-theme-primary text-theme-primary focus:outline-none focus:ring-1 focus:ring-[var(--accent-color)]"
-              placeholder="qty"
-            />
-          )}
-          {showPriceData && item.estimatedPrice && item.estimatedPrice > 0 && (
-            <div className="text-sm font-medium text-green-600 opacity-80 bg-green-50 px-2 py-1 rounded border border-green-200">
-              ~${item.estimatedPrice.toFixed(2)}
-            </div>
-          )}
-
           {/* Price Comparison */}
           {showPriceData && item.priceOptions && item.priceOptions.length > 1 && (
             <button
@@ -361,6 +371,29 @@ export const EnhancedShoppingListItem: React.FC<ShoppingListItemProps> = ({
             >
               <Calculator className="w-4 h-4" />
             </button>
+          )}
+
+          {onQuantityChange && (
+            <input
+              type="text"
+              value={item.quantity || ''}
+              onChange={(e) => onQuantityChange(item.id, e.target.value)}
+              onClick={(e) => e.stopPropagation()}
+              className="w-16 h-[30px] px-2 py-1 text-sm border border-theme rounded bg-theme-primary text-theme-primary focus:outline-none focus:ring-1 focus:ring-[var(--accent-color)] text-center"
+              placeholder="qty"
+            />
+          )}
+
+          {showPriceData && (
+            item.estimatedPrice && item.estimatedPrice > 0 ? (
+              <div className="w-16 h-[30px] flex items-center justify-center text-xs font-medium text-green-600 dark:text-green-400 bg-green-500/10 dark:bg-green-500/20 px-1 rounded border border-green-500/20 text-center truncate" title={`~$${item.estimatedPrice.toFixed(2)}`}>
+                ~${item.estimatedPrice.toFixed(2)}
+              </div>
+            ) : (
+              <div className="w-16 h-[30px] rounded border border-dashed border-theme/40 bg-theme-primary/20 flex items-center justify-center text-[10px] text-theme-secondary opacity-40">
+                —
+              </div>
+            )
           )}
 
           {/* Chevron Reveal Tab */}

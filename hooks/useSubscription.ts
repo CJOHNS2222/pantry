@@ -52,13 +52,18 @@ function useSubscriptionInternal(user: User | null, enabled: boolean) {
     return unsubscribe;
   }, [user?.id, enabled]);
 
+  const subscriptionRef = useRef(subscription);
+  useEffect(() => {
+    subscriptionRef.current = subscription;
+  }, [subscription]);
+
   // ── Household subscription listener ───────────────────────────────────────
   // Two responsibilities:
   //   1. If user is a non-admin member in a household whose owner has 'family', elevate.
   //   2. If user is the household admin, keep ownerSubscriptionTier in sync with their tier.
   useEffect(() => {
     const householdId = user?.householdId;
-    if (!enabled || !householdId || !user?.id || !subscription) {
+    if (!enabled || !householdId || !user?.id || !subscriptionRef.current) {
       setHouseholdOwnerTier(null);
       return;
     }
@@ -78,7 +83,7 @@ function useSubscriptionInternal(user: User | null, enabled: boolean) {
 
         if (isAdmin) {
           // Owner: keep ownerSubscriptionTier on the household doc in sync with own tier
-          const ownTier = subscription.tier ?? 'free';
+          const ownTier = subscriptionRef.current?.tier ?? 'free';
           if (ownTier !== lastSyncedOwnerTier.current) {
             lastSyncedOwnerTier.current = ownTier;
             DatabaseMonitoringService.updateDoc(
@@ -105,7 +110,7 @@ function useSubscriptionInternal(user: User | null, enabled: boolean) {
     );
 
     return unsubscribe;
-  }, [user?.id, user?.householdId, subscription, enabled]);
+  }, [user?.id, user?.householdId, enabled]);
 
   const updateSubscription = async (updates: Partial<Subscription>) => {
     if (!user?.id) return;

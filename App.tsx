@@ -30,7 +30,6 @@ import { NotificationService, NotificationItem, NotificationSettings } from './s
 import { markNotificationRead, deleteNotification, snoozeNotificationInCache, updateNotificationInCache } from './services/notificationsService';
 import { log } from './services/logService';
 import { pushNotificationService } from './services/pushNotificationService';
-import { HouseholdActivityService } from './services/householdActivityService';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Capacitor, PluginListenerHandle } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
@@ -389,7 +388,7 @@ const App: React.FC = () => {
       log.debug("Auth is ready and user is logged in, loading price data...");
       PriceDataCacheService.loadPriceData();
     }
-  }, [isAuthReady, user]);
+  }, [isAuthReady, user?.id]);
 
   // Load notification settings from user profile
   useEffect(() => {
@@ -735,9 +734,9 @@ const App: React.FC = () => {
       };
 
       const currentActivity = activityMap[activeTab] || 'using app';
-      HouseholdActivityService.updateMemberActivity(user.id, household.id, currentActivity);
+      updateActivityStatus(currentActivity);
     }
-  }, [user?.id, household?.id, activeTab]);
+  }, [user?.id, household?.id, activeTab, updateActivityStatus]);
 
   useEffect(() => {
     SafeAreaService.initialize().catch(error => log.error('Failed to initialize safe area service', { error }, 'App'));

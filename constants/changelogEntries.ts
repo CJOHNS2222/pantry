@@ -20,6 +20,16 @@ export interface DetailedChangeEntry {
 
 export const RECENT_CHANGES: ChangeEntry[] = [
   {
+    "version": "2.5.5",
+    "date": "Jun 29, 2026",
+    "highlights": [
+      "Live Household Presence in Header — Added live household member activity text (e.g.",
+      "Optimized Food Waste Analytics — Replaced heavy history array document reads/writes with atomic increment summary…",
+      "Improved Shopping List UI Alignment — Reordered right-side controls, sized the price box to match the quantity input…",
+      "Randomized Popular Recipes — Implemented a Fisher-Yates shuffle on popular recipes on load and removed the alphabetical…"
+    ]
+  },
+  {
     "version": "2.5.4",
     "date": "Jun 28, 2026",
     "highlights": [
@@ -38,20 +48,30 @@ export const RECENT_CHANGES: ChangeEntry[] = [
       "Fixed Subscription Downgrades — Enabled the Free plan downgrade button to look active and properly redirect users to…",
       "Google Play Store Sharing Link — Appended the Google Play Store download link to the end of the shareable achievements…"
     ]
-  },
-  {
-    "version": "2.5.2",
-    "date": "Jun 28, 2026",
-    "highlights": [
-      "Achievements Fireworks & Celebrations — Added a premium canvas-based fireworks animation on the Community tab,…",
-      "High-Fidelity Accomplishments Sharing — The Leftovers Analytics modal now generates a beautiful custom Instagram-format…",
-      "Android Status Bar Safe Area — Added dynamic status bar padding to the Achievements modal to prevent it from…",
-      "Pantry Search & Filter Repositioning — Replaced the \"My Pantry\" title header with the Search and Filter bar, making it…"
-    ]
   }
 ];
 
 export const ALL_CHANGES: DetailedChangeEntry[] = [
+  {
+    "version": "2.5.5",
+    "date": "Jun 29, 2026",
+    "sections": [
+      {
+        "title": "Added",
+        "bullets": [
+          "**Live Household Presence in Header** — Added live household member activity text (e.g. `Chris is viewing pantry`) under the Stock & Spoon title in the main header, which also toggles the activity feed."
+        ]
+      },
+      {
+        "title": "Changed",
+        "bullets": [
+          "**Optimized Food Waste Analytics** — Replaced heavy history array document reads/writes with atomic `increment` summary counters directly inside the inventory cache document (under `_foodWaste`), fixing the Firestore Timestamp serialization bug.",
+          "**Improved Shopping List UI Alignment** — Reordered right-side controls, sized the price box to match the quantity input box (`w-16 h-[30px]`), added dashed mockup placeholder boxes for items with missing price data, wrapped source badge emojis in spans for vertical alignment, and reduced mobile page padding to `px-2` to make card boxes larger.",
+          "**Randomized Popular Recipes** — Implemented a Fisher-Yates shuffle on popular recipes on load and removed the alphabetical title fallback in `rankCachedRecipesByPreferences` to preserve shuffled/original order when preference scores are equal."
+        ]
+      }
+    ]
+  },
   {
     "version": "2.5.4",
     "date": "Jun 28, 2026",

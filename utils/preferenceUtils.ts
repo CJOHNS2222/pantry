@@ -430,8 +430,7 @@ export function rankCachedRecipesByPreferences<T extends StructuredRecipe | Save
   return [...recipes].sort((a, b) => {
     const bScore = scoreRecipeForPreferences(b, householdMembers, userProfile);
     const aScore = scoreRecipeForPreferences(a, householdMembers, userProfile);
-    if (bScore !== aScore) return bScore - aScore;
-    return (a.title || '').localeCompare(b.title || '');
+    return bScore - aScore;
   });
 }
 
