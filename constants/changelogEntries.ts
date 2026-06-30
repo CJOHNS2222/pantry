@@ -20,6 +20,13 @@ export interface DetailedChangeEntry {
 
 export const RECENT_CHANGES: ChangeEntry[] = [
   {
+    "version": "2.5.7",
+    "date": "Jun 30, 2026",
+    "highlights": [
+      "Auto-Exit on Update — Configured the app to automatically close/terminate 1 second after redirecting the user to the…"
+    ]
+  },
+  {
     "version": "2.5.6",
     "date": "Jun 30, 2026",
     "highlights": [
@@ -37,20 +44,22 @@ export const RECENT_CHANGES: ChangeEntry[] = [
       "Improved Shopping List UI Alignment — Reordered right-side controls, sized the price box to match the quantity input…",
       "Randomized Popular Recipes — Implemented a Fisher-Yates shuffle on popular recipes on load and removed the alphabetical…"
     ]
-  },
-  {
-    "version": "2.5.4",
-    "date": "Jun 28, 2026",
-    "highlights": [
-      "Expanded Price Database — Added 200 new high-quality grocery items and mid-2026 national average prices to the…",
-      "Interactive Shopping List Actions — Added a \"Select All\" option next to \"Deselect All\" in the shopping list action bar…",
-      "Optimized Firestore Database Reads — Consolidated user and household subscriptions under a single root-level…",
-      "Auto-Hiding Onboarding Checklist — Modified the onboarding setup checklist on the pantry tab to automatically hide and…"
-    ]
   }
 ];
 
 export const ALL_CHANGES: DetailedChangeEntry[] = [
+  {
+    "version": "2.5.7",
+    "date": "Jun 30, 2026",
+    "sections": [
+      {
+        "title": "Added",
+        "bullets": [
+          "**Auto-Exit on Update** — Configured the app to automatically close/terminate 1 second after redirecting the user to the Google Play Store for an update, ensuring a completely clean app launch when they reopen it."
+        ]
+      }
+    ]
+  },
   {
     "version": "2.5.6",
     "date": "Jun 30, 2026",
