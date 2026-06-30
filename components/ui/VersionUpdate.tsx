@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { App as CapacitorApp } from '@capacitor/app';
 import { versionService, VersionCheckResult } from '../../services/versionService';
 import { RefreshCw, Download, AlertTriangle, CheckCircle, ExternalLink } from 'lucide-react';
 import { log } from '../../services/logService';
@@ -82,6 +83,13 @@ export const VersionUpdate: React.FC<VersionUpdateProps> = ({ onUpdateAvailable,
 
     // Open download URL in new tab/window
     window.open(versionCheck.downloadUrl, '_blank');
+
+    // Terminate the app so it does a clean launch after the update
+    setTimeout(() => {
+      CapacitorApp.exitApp().catch((err) => {
+        log.error('Failed to exit app on update redirect', { err }, 'VersionUpdate');
+      });
+    }, 1000);
   };
 
   const dismissUpdate = () => {

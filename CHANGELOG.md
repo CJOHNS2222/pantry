@@ -1,3 +1,10 @@
+## [2.5.7] - 2026-06-30
+
+### Added
+- **Auto-Exit on Update** — Configured the app to automatically close/terminate 1 second after redirecting the user to the Google Play Store for an update, ensuring a completely clean app launch when they reopen it.
+
+---
+
 ## [2.5.6] - 2026-06-30
 
 ### Fixed

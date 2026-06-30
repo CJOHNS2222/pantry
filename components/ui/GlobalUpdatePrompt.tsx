@@ -57,6 +57,13 @@ export const GlobalUpdatePrompt: React.FC<GlobalUpdatePromptProps> = ({ onDismis
   const handleUpdate = () => {
     const url = versionCheck?.downloadUrl || PLAY_STORE_URL;
     window.open(url, '_blank');
+
+    // Terminate the app so it does a clean launch after the update
+    setTimeout(() => {
+      CapacitorApp.exitApp().catch((err) => {
+        log.error('Failed to exit app on update redirect', { err }, 'GlobalUpdatePrompt');
+      });
+    }, 1000);
   };
 
   const dismissPrompt = () => {
