@@ -87,7 +87,7 @@
     "react-intl": "^10.1.9",
     "react-router-dom": "^7.15.0",
     "react-swipeable": "^7.0.2",
-    "react-window": "^1.8.11",
+    "react-window": "^2.2.7",
     "tesseract.js": "^7.0.0",
     "zod": "^4.4.3"
   },
@@ -102,7 +102,7 @@
     "@types/node": "^25.6.0",
     "@types/nodemailer": "^8.0.0",
     "@types/react-dom": "^19.2.3",
-    "@types/react-window": "^1.8.8",
+    "@types/react-window": "^2.0.0",
     "@vitejs/plugin-react": "^6.0.1",
     "@vitest/ui": "^4.1.5",
     "autoprefixer": "^10.5.0",
