@@ -201,20 +201,22 @@ export class InventoryCacheService {
   /**
    * Update the cached inventory document
    */
-  static async updateCache(items: PantryItem[], householdId?: string, userId?: string): Promise<void> {
+  static async updateCache(items: PantryItem[], householdId?: string, userId?: string, existingFoodWaste?: any): Promise<void> {
     try {
       const cachePath = this.getCachePath(householdId, userId);
       const cacheRef = DatabaseMonitoringService.doc(cachePath);
 
       // Preserve the _foodWaste field if it exists to prevent setDoc from wiping it out
-      let existingFoodWaste: any = undefined;
-      try {
-        const docSnap = await DatabaseMonitoringService.getDoc(cacheRef);
-        if (docSnap.exists()) {
-          existingFoodWaste = docSnap.data()?._foodWaste;
+      let foodWaste = existingFoodWaste;
+      if (foodWaste === undefined) {
+        try {
+          const docSnap = await DatabaseMonitoringService.getDoc(cacheRef);
+          if (docSnap.exists()) {
+            foodWaste = docSnap.data()?._foodWaste;
+          }
+        } catch (readErr) {
+          log.warn("Failed to read existing cache to preserve food waste analytics", { readErr });
         }
-      } catch (readErr) {
-        log.warn("Failed to read existing cache to preserve food waste analytics", { readErr });
       }
 
       // Convert items to the cached format
@@ -224,8 +226,8 @@ export class InventoryCacheService {
         itemCount: items.length,
       };
 
-      if (existingFoodWaste !== undefined) {
-        cachedData._foodWaste = existingFoodWaste;
+      if (foodWaste !== undefined) {
+        cachedData._foodWaste = foodWaste;
       }
 
       // Add each item as itemId -> itemArray
@@ -283,9 +285,11 @@ export class InventoryCacheService {
       // Read current cache state once
       const docSnap = await DatabaseMonitoringService.getDoc(cacheRef);
       const currentItems: PantryItem[] = [];
+      let existingFoodWaste: any = undefined;
 
       if (docSnap.exists()) {
         const data = docSnap.data() as CachedInventoryData & CacheMetadata;
+        existingFoodWaste = data._foodWaste;
         // Convert existing cached items back to PantryItem objects
         for (const [itemId, itemArray] of Object.entries(data)) {
           if (typeof itemArray === 'object' && Array.isArray(itemArray)) {
@@ -299,7 +303,7 @@ export class InventoryCacheService {
       const allItems = [...currentItems, ...items];
 
       // Update cache with all items at once (1 write operation)
-      await this.updateCache(allItems, householdId, userId);
+      await this.updateCache(allItems, householdId, userId, existingFoodWaste);
       // Added items to cache in 1 batch operation
     } catch (err: any) {
       log.error("Error adding items to cache", { err });

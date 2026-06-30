@@ -38,14 +38,16 @@ export class HouseholdActivityService {
     HouseholdActivityService.lastMemberActivityWrite[key] = { time: now, activity };
 
     try {
-      const householdRef = DatabaseMonitoringService.doc('households', householdId);
-      const memberPath = `memberActivity.${userId}`;
+      const presenceRef = DatabaseMonitoringService.doc(`households/${householdId}/presence/members`);
+      const memberPath = `${userId}`;
 
-      await DatabaseMonitoringService.updateDoc(householdRef, {
-        [memberPath + '.lastSeen']: serverTimestamp(),
-        [memberPath + '.currentActivity']: activity,
-        [memberPath + '.isOnline']: true
-      });
+      await DatabaseMonitoringService.setDoc(presenceRef, {
+        [memberPath]: {
+          lastSeen: serverTimestamp(),
+          currentActivity: activity,
+          isOnline: true
+        }
+      }, { merge: true });
     } catch (err: any) {
       log.error('Error updating member activity:', { err }, 'HouseholdActivityService');
     }
@@ -56,12 +58,14 @@ export class HouseholdActivityService {
    */
   static async markMemberOffline(userId: string, householdId: string) {
     try {
-      const householdRef = DatabaseMonitoringService.doc('households', householdId);
-      const memberPath = `memberActivity.${userId}`;
+      const presenceRef = DatabaseMonitoringService.doc(`households/${householdId}/presence/members`);
+      const memberPath = `${userId}`;
 
-      await DatabaseMonitoringService.updateDoc(householdRef, {
-        [memberPath + '.isOnline']: false
-      });
+      await DatabaseMonitoringService.setDoc(presenceRef, {
+        [memberPath]: {
+          isOnline: false
+        }
+      }, { merge: true });
     } catch (err: any) {
       log.error('Error marking member offline:', { err }, 'HouseholdActivityService');
     }
