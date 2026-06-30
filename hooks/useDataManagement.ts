@@ -533,21 +533,33 @@ export function useDataManagement(
     const unsubs: (()=>void)[] = [];
 
     if (user?.householdId) {
+      let householdData: Household | null = null;
+      let presenceData: any = null;
+
+      const updateHouseholdState = () => {
+        if (!householdData) return;
+        const merged: Household = {
+          ...householdData,
+          memberActivity: presenceData || {}
+        };
+        const hasChanged = JSON.stringify(merged) !== JSON.stringify(prevHouseholdRef.current);
+
+        if (hasChanged) {
+          prevHouseholdRef.current = merged;
+          setHousehold(merged);
+          
+          // Start leftover notification checks for the new household
+          if (leftoverNotificationCleanupRef.current) {
+            leftoverNotificationCleanupRef.current();
+          }
+          leftoverNotificationCleanupRef.current = LeftoverNotificationService.startPeriodicChecks(merged.id, user.id);
+        }
+      };
+
       unsubs.push(DatabaseMonitoringService.onSnapshot(DatabaseMonitoringService.doc('households', user.householdId), snap => {
         if (snap.exists()) {
-          const householdData = { id: snap.id, ...snap.data() } as Household;
-          const hasChanged = JSON.stringify(householdData) !== JSON.stringify(prevHouseholdRef.current);
-
-          if (hasChanged) {
-            prevHouseholdRef.current = householdData;
-            setHousehold(householdData);
-            
-            // Start leftover notification checks for the new household
-            if (leftoverNotificationCleanupRef.current) {
-              leftoverNotificationCleanupRef.current();
-            }
-            leftoverNotificationCleanupRef.current = LeftoverNotificationService.startPeriodicChecks(householdData.id, user.id);
-          }
+          householdData = { id: snap.id, ...snap.data() } as Household;
+          updateHouseholdState();
         }
         setIsLoadingHousehold(false);
         householdClearedDueToPermissionsRef.current = false; // Reset on success
@@ -563,6 +575,17 @@ export function useDataManagement(
           }
         }
         setIsLoadingHousehold(false);
+      }));
+
+      unsubs.push(DatabaseMonitoringService.onSnapshot(DatabaseMonitoringService.doc(`households/${user.householdId}/presence/members`), snap => {
+        if (snap.exists()) {
+          presenceData = snap.data();
+          updateHouseholdState();
+        }
+      }, err => {
+        if (err.code !== 'permission-denied') {
+          log.warn('Failed to listen to household presence:', err, 'DataManagement');
+        }
       }));
     } else {
       setHousehold(null);
