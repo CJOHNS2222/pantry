@@ -20,6 +20,15 @@ export interface DetailedChangeEntry {
 
 export const RECENT_CHANGES: ChangeEntry[] = [
   {
+    "version": "2.5.6",
+    "date": "Jun 30, 2026",
+    "highlights": [
+      "Preserved Food Waste Cache — Fixed a bug where bulk updates or cache clears would overwrite and erase the _foodWaste…",
+      "Optimized Firestore Reads — Moved member activity tracking to a separate presence/members subcollection document,…",
+      "De-duplicated Cache Reads — Reused the pre-fetched cache snapshot during bulk item additions, saving an extra Firestore…"
+    ]
+  },
+  {
     "version": "2.5.5",
     "date": "Jun 29, 2026",
     "highlights": [
@@ -38,20 +47,29 @@ export const RECENT_CHANGES: ChangeEntry[] = [
       "Optimized Firestore Database Reads — Consolidated user and household subscriptions under a single root-level…",
       "Auto-Hiding Onboarding Checklist — Modified the onboarding setup checklist on the pantry tab to automatically hide and…"
     ]
-  },
-  {
-    "version": "2.5.3",
-    "date": "Jun 28, 2026",
-    "highlights": [
-      "Global Achievements Celebrations — Moved the canvas-based achievements celebration and congratulations modal to the App…",
-      "Enhanced Shopping List Visuals — Added item thumbnails next to names in both the search suggestions dropdown and the…",
-      "Fixed Subscription Downgrades — Enabled the Free plan downgrade button to look active and properly redirect users to…",
-      "Google Play Store Sharing Link — Appended the Google Play Store download link to the end of the shareable achievements…"
-    ]
   }
 ];
 
 export const ALL_CHANGES: DetailedChangeEntry[] = [
+  {
+    "version": "2.5.6",
+    "date": "Jun 30, 2026",
+    "sections": [
+      {
+        "title": "Fixed",
+        "bullets": [
+          "**Preserved Food Waste Cache** — Fixed a bug where bulk updates or cache clears would overwrite and erase the `_foodWaste` summary counters in Firestore."
+        ]
+      },
+      {
+        "title": "Changed",
+        "bullets": [
+          "**Optimized Firestore Reads** — Moved member activity tracking to a separate `presence/members` subcollection document, preventing tab changes from triggering document reads for other household listeners.",
+          "**De-duplicated Cache Reads** — Reused the pre-fetched cache snapshot during bulk item additions, saving an extra Firestore read on checkout."
+        ]
+      }
+    ]
+  },
   {
     "version": "2.5.5",
     "date": "Jun 29, 2026",

@@ -1,3 +1,14 @@
+## [2.5.6] - 2026-06-30
+
+### Fixed
+- **Preserved Food Waste Cache** — Fixed a bug where bulk updates or cache clears would overwrite and erase the `_foodWaste` summary counters in Firestore.
+
+### Changed
+- **Optimized Firestore Reads** — Moved member activity tracking to a separate `presence/members` subcollection document, preventing tab changes from triggering document reads for other household listeners.
+- **De-duplicated Cache Reads** — Reused the pre-fetched cache snapshot during bulk item additions, saving an extra Firestore read on checkout.
+
+---
+
 ## [2.5.5] - 2026-06-29
 
 ### Added
