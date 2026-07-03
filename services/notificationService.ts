@@ -750,8 +750,15 @@ export class NotificationService {
     leftoverName: string,
     daysUntilExpiry: number,
     leftoverId: string,
-    isCookedRice: boolean = false
+    isCookedRice: boolean = false,
+    cachedNotifications?: NotificationItem[]
   ): Promise<string> {
+    const existingNotifications = cachedNotifications ?? await NotificationService.getUnreadNotifications(userId);
+    const existingNotification = existingNotifications.find(n =>
+      n.type === 'expiration' &&
+      n.actionData?.leftoverId === leftoverId
+    );
+
     let priority: 'low' | 'medium' | 'high' | 'urgent' = 'low'
     let title = ''
     let message = ''
@@ -781,6 +788,30 @@ export class NotificationService {
       actionLabel = 'View Leftovers'
     }
 
+    if (existingNotification) {
+      // Update existing notification if priority or content changed
+      if (existingNotification.priority !== priority || existingNotification.title !== title || existingNotification.message !== message) {
+        const updateData = { priority, title, message, read: false };
+        try {
+          const docRef = DatabaseMonitoringService.doc(this.COLLECTION + '/' + existingNotification.id);
+          const topSnap = await DatabaseMonitoringService.getDoc(docRef);
+          if (topSnap && topSnap.exists()) {
+            await DatabaseMonitoringService.updateDoc(docRef, updateData as any);
+          } else {
+            await updateNotificationInCache(userId, existingNotification.id, updateData as any);
+          }
+        } catch (err: any) {
+          console.warn('Failed updating top-level leftover notification; falling back to cache update', { error: err?.message || err, userId });
+          try {
+            await updateNotificationInCache(userId, existingNotification.id, updateData as any);
+          } catch (cacheErr: any) {
+            console.error('Failed to update leftover notification in cache fallback:', cacheErr);
+          }
+        }
+      }
+      return existingNotification.id;
+    }
+
     return this.createNotification(userId, {
       type: 'expiration',
       title,
@@ -789,6 +820,7 @@ export class NotificationService {
       actionType: 'view_item',
       actionData: { leftoverId, itemName: leftoverName, tab: 'pantry' },
       priority,
+      dedupeKey: `leftover_expiry_${leftoverId}`,
       expiresAt: Timestamp.fromDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)) // Expire in 7 days
     })
   }
@@ -798,9 +830,16 @@ export class NotificationService {
    */
   static async createLeftoverAttentionAlert(
     userId: string,
-    urgentLeftovers: Array<{ id: string; name: string; daysUntilExpiry: number; isCookedRice: boolean }>
+    urgentLeftovers: Array<{ id: string; name: string; daysUntilExpiry: number; isCookedRice: boolean }>,
+    cachedNotifications?: NotificationItem[]
   ): Promise<string> {
     if (!urgentLeftovers || urgentLeftovers.length === 0) return ''
+
+    const existingNotifications = cachedNotifications ?? await NotificationService.getUnreadNotifications(userId);
+    const existingNotification = existingNotifications.find(n =>
+      n.type === 'expiration' &&
+      n.dedupeKey === 'leftover_attention_aggregated'
+    );
 
     const urgentCount = urgentLeftovers.filter(l => l.daysUntilExpiry <= 0).length
     const expiringSoonCount = urgentLeftovers.filter(l => l.daysUntilExpiry > 0 && l.daysUntilExpiry <= 3).length
@@ -830,6 +869,40 @@ export class NotificationService {
       priority = 'high'
     }
 
+    if (existingNotification) {
+      // If priority, title, or message changed, update it and reset read status.
+      // Also update the leftovers list in actionData.
+      if (existingNotification.priority !== priority || existingNotification.title !== title || existingNotification.message !== message) {
+        const updateData = {
+          priority,
+          title,
+          message,
+          read: false,
+          actionData: {
+            tab: 'pantry',
+            leftovers: urgentLeftovers.map(l => ({ id: l.id, name: l.name }))
+          }
+        };
+        try {
+          const docRef = DatabaseMonitoringService.doc(this.COLLECTION + '/' + existingNotification.id);
+          const topSnap = await DatabaseMonitoringService.getDoc(docRef);
+          if (topSnap && topSnap.exists()) {
+            await DatabaseMonitoringService.updateDoc(docRef, updateData as any);
+          } else {
+            await updateNotificationInCache(userId, existingNotification.id, updateData as any);
+          }
+        } catch (err: any) {
+          console.warn('Failed updating top-level leftover attention notification; falling back to cache update', { error: err?.message || err, userId });
+          try {
+            await updateNotificationInCache(userId, existingNotification.id, updateData as any);
+          } catch (cacheErr: any) {
+            console.error('Failed to update leftover attention notification in cache fallback:', cacheErr);
+          }
+        }
+      }
+      return existingNotification.id;
+    }
+
     return this.createNotification(userId, {
       type: 'expiration',
       title,
@@ -841,6 +914,7 @@ export class NotificationService {
         leftovers: urgentLeftovers.map(l => ({ id: l.id, name: l.name }))
       },
       priority,
+      dedupeKey: 'leftover_attention_aggregated',
       expiresAt: Timestamp.fromDate(new Date(Date.now() + 3 * 24 * 60 * 60 * 1000)) // Expire in 3 days
     })
   }

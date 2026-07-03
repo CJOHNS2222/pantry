@@ -545,14 +545,17 @@ export function useDataManagement(
         const hasChanged = JSON.stringify(merged) !== JSON.stringify(prevHouseholdRef.current);
 
         if (hasChanged) {
+          const householdIdChanged = !prevHouseholdRef.current || prevHouseholdRef.current.id !== merged.id;
           prevHouseholdRef.current = merged;
           setHousehold(merged);
           
-          // Start leftover notification checks for the new household
-          if (leftoverNotificationCleanupRef.current) {
-            leftoverNotificationCleanupRef.current();
+          // Start leftover notification checks ONLY when the household ID actually changes
+          if (householdIdChanged) {
+            if (leftoverNotificationCleanupRef.current) {
+              leftoverNotificationCleanupRef.current();
+            }
+            leftoverNotificationCleanupRef.current = LeftoverNotificationService.startPeriodicChecks(merged.id, user.id);
           }
-          leftoverNotificationCleanupRef.current = LeftoverNotificationService.startPeriodicChecks(merged.id, user.id);
         }
       };
 
@@ -626,12 +629,14 @@ export function useDataManagement(
               }
               items.push(item);
             }
+            InventoryCacheService.setLocalInventoryCache(inventoryPath, items);
             if (hasPantryItemsChanged(items, inventoryRef.current)) {
               setRemoteInventoryUpdate(true);
               setInventory(items);
             }
           }
         } else {
+          InventoryCacheService.setLocalInventoryCache(inventoryPath, []);
           setInventory([]);
         }
         setIsLoadingInventory(false);
@@ -1570,7 +1575,16 @@ export function useDataManagement(
 
     if (user?.isGuest) {
       let atCap = false;
+      let alreadyExists = false;
       setInventory(prev => {
+        const idx = prev.findIndex(p => p.id === itemWithAlert.id);
+        if (idx !== -1) {
+          alreadyExists = true;
+          const updated = [...prev];
+          updated[idx] = itemWithAlert;
+          try { localStorage.setItem(GUEST_INVENTORY_KEY, JSON.stringify(updated)); } catch {}
+          return updated;
+        }
         if (prev.length >= GUEST_ITEM_CAP) {
           atCap = true;
           return prev;
@@ -1583,11 +1597,23 @@ export function useDataManagement(
         addToast?.(`Guest pantry is full (${GUEST_ITEM_CAP} items). Sign in for unlimited items.`, 'warning');
         return;
       }
-      HapticService.itemAdded();
+      if (!alreadyExists) {
+        HapticService.itemAdded();
+      }
       return;
     }
 
-    setInventory(prev => [...prev, itemWithAlert]);
+    let alreadyExists = false;
+    setInventory(prev => {
+      const idx = prev.findIndex(p => p.id === itemWithAlert.id);
+      if (idx !== -1) {
+        alreadyExists = true;
+        const updated = [...prev];
+        updated[idx] = itemWithAlert;
+        return updated;
+      }
+      return [...prev, itemWithAlert];
+    });
 
     if (loggingOptions?.logItemAdded) {
       loggingOptions.logItemAdded(item.item, item.id);
@@ -1597,7 +1623,9 @@ export function useDataManagement(
     }
 
     await InventoryCacheService.addItemToCache(itemWithAlert, user?.householdId, user?.id);
-    HapticService.itemAdded();
+    if (!alreadyExists) {
+      HapticService.itemAdded();
+    }
   };
 
   const addItems = async (items: PantryItem[]) => {

@@ -152,12 +152,21 @@ export class InventoryCacheService {
     throw new Error('Either householdId or userId must be provided');
   }
 
+  private static localInventoryCache: { path: string; items: PantryItem[] } | null = null;
+
+  static setLocalInventoryCache(path: string, items: PantryItem[]) {
+    this.localInventoryCache = { path, items };
+  }
+
   /**
    * Get cached inventory data (1 read instead of N reads)
    */
   static async getCachedInventory(householdId?: string, userId?: string): Promise<PantryItem[]> {
     try {
       const cachePath = this.getCachePath(householdId, userId);
+      if (this.localInventoryCache && this.localInventoryCache.path === cachePath) {
+        return this.localInventoryCache.items;
+      }
       const cacheRef = DatabaseMonitoringService.doc(cachePath);
       const docSnap = await DatabaseMonitoringService.getDoc(cacheRef);
 

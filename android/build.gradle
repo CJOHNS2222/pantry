@@ -8,14 +8,14 @@ buildscript {
     }
     dependencies {
         // Use AGP version from libs.versions.toml
-        classpath 'com.android.tools.build:gradle:8.7.2'
-        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:2.0.21"
+        classpath 'com.android.tools.build:gradle:9.2.1'
 
     }
 }
 
 plugins {
     alias(libs.plugins.android.application) apply false
+    alias(libs.plugins.kotlin.android) apply false
     alias(libs.plugins.google.services) apply false
     alias(libs.plugins.firebase.appdistribution) apply false
     alias(libs.plugins.firebase.crashlytics) apply false
@@ -47,7 +47,7 @@ allprojects {
         resolutionStrategy {
             eachDependency { DependencyResolveDetails details ->
                 if (details.requested.group == 'org.jetbrains.kotlin' && details.requested.name.startsWith('kotlin-stdlib')) {
-                    details.useVersion '2.0.21'
+                    details.useVersion '2.2.10'
                 }
             }
             force 'androidx.core:core:1.15.0'

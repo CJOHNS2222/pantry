@@ -60,6 +60,8 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   const swipeLocked = useRef<'h' | 'v' | null>(null);
   const notifTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const notifPanelActiveRef = useRef(false);
+  const notificationsContainerRef = useRef<HTMLDivElement>(null);
+  const activityFeedContainerRef = useRef<HTMLDivElement>(null);
   const throttleMs = 5000; // UI update throttle for notifications
   const { items } = useUserNotifications(user?.id, throttleMs);
   const unreadNotificationsCount = (items || []).filter(i => !i.read).length;
@@ -227,8 +229,32 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
       }
     };
 
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
+      if (
+        showNotifications &&
+        notificationsContainerRef.current &&
+        !notificationsContainerRef.current.contains(event.target as Node)
+      ) {
+        closeNotifications();
+      }
+      if (
+        showActivityFeed &&
+        activityFeedContainerRef.current &&
+        !activityFeedContainerRef.current.contains(event.target as Node)
+      ) {
+        closeActivityFeed();
+      }
+    };
+
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
   }, [showNotifications, showActivityFeed, closeNotifications, closeActivityFeed]);
 
   const getNotifTimeAgo = (ts: unknown): string => {
@@ -369,7 +395,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
               )}
             </button>
             {user?.id && (
-              <div className="relative">
+              <div className="relative" ref={notificationsContainerRef}>
                 <button
                   onClick={handleToggleNotifications}
                   onDoubleClick={handleNotificationBellDoubleClick}
@@ -532,7 +558,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             Stock & Spoon
           </h1>
           {household && household.members.length > 1 && (
-            <div className="relative mt-0.5">
+            <div className="relative mt-0.5" ref={activityFeedContainerRef}>
               <button
                 onClick={handleToggleActivityFeed}
                 className="flex items-center gap-1 px-2 py-0.5 rounded-full hover:bg-black/5 dark:hover:bg-white/5 transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]"
