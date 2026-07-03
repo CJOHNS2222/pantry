@@ -1,16 +1,3 @@
-diff --git a/node_modules/capacitor-plugin-safe-area/android/build.gradle b/node_modules/capacitor-plugin-safe-area/android/build.gradle
-index 98c6fb9..57bd8b4 100644
---- a/node_modules/capacitor-plugin-safe-area/android/build.gradle
-+++ b/node_modules/capacitor-plugin-safe-area/android/build.gradle
-@@ -30,7 +30,7 @@ android {
-     buildTypes {
-         release {
-             minifyEnabled false
--            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-         }
-     }
-     lintOptions {
 diff --git a/node_modules/capacitor-plugin-safe-area/android/build/.transforms/f0f051fbefed37ff5be8c8f55c41f025/results.bin b/node_modules/capacitor-plugin-safe-area/android/build/.transforms/f0f051fbefed37ff5be8c8f55c41f025/results.bin
 new file mode 100644
 index 0000000..0d259dd
@@ -20,15 +7,13 @@ index 0000000..0d259dd
 +o/classes
 diff --git a/node_modules/capacitor-plugin-safe-area/android/build/.transforms/f0f051fbefed37ff5be8c8f55c41f025/transformed/classes/classes_dex/classes.dex b/node_modules/capacitor-plugin-safe-area/android/build/.transforms/f0f051fbefed37ff5be8c8f55c41f025/transformed/classes/classes_dex/classes.dex
 new file mode 100644
-index 0000000..5e52524
-Binary files /dev/null and b/node_modules/capacitor-plugin-safe-area/android/build/.transforms/f0f051fbefed37ff5be8c8f55c41f025/transformed/classes/classes_dex/classes.dex differ
+index 0000000..e69de29
 diff --git a/node_modules/capacitor-plugin-safe-area/android/build/.transforms/f0f051fbefed37ff5be8c8f55c41f025/transformed/classes/classes_global-synthetics/global.globals b/node_modules/capacitor-plugin-safe-area/android/build/.transforms/f0f051fbefed37ff5be8c8f55c41f025/transformed/classes/classes_global-synthetics/global.globals
 new file mode 100644
-index 0000000..e87b511
-Binary files /dev/null and b/node_modules/capacitor-plugin-safe-area/android/build/.transforms/f0f051fbefed37ff5be8c8f55c41f025/transformed/classes/classes_global-synthetics/global.globals differ
+index 0000000..e69de29
 diff --git a/node_modules/capacitor-plugin-safe-area/android/build/intermediates/aapt_friendly_merged_manifests/debug/processDebugManifest/aapt/AndroidManifest.xml b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/aapt_friendly_merged_manifests/debug/processDebugManifest/aapt/AndroidManifest.xml
 new file mode 100644
-index 0000000..ce1d7f1
+index 0000000..0cf8e7b
 --- /dev/null
 +++ b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/aapt_friendly_merged_manifests/debug/processDebugManifest/aapt/AndroidManifest.xml
 @@ -0,0 +1,7 @@
@@ -42,7 +27,7 @@ index 0000000..ce1d7f1
 \ No newline at end of file
 diff --git a/node_modules/capacitor-plugin-safe-area/android/build/intermediates/aapt_friendly_merged_manifests/debug/processDebugManifest/aapt/output-metadata.json b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/aapt_friendly_merged_manifests/debug/processDebugManifest/aapt/output-metadata.json
 new file mode 100644
-index 0000000..536a414
+index 0000000..e8da79e
 --- /dev/null
 +++ b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/aapt_friendly_merged_manifests/debug/processDebugManifest/aapt/output-metadata.json
 @@ -0,0 +1,18 @@
@@ -67,8 +52,7 @@ index 0000000..536a414
 \ No newline at end of file
 diff --git a/node_modules/capacitor-plugin-safe-area/android/build/intermediates/aar_main_jar/debug/syncDebugLibJars/classes.jar b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/aar_main_jar/debug/syncDebugLibJars/classes.jar
 new file mode 100644
-index 0000000..982deea
-Binary files /dev/null and b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/aar_main_jar/debug/syncDebugLibJars/classes.jar differ
+index 0000000..e69de29
 diff --git a/node_modules/capacitor-plugin-safe-area/android/build/intermediates/aar_metadata/debug/writeDebugAarMetadata/aar-metadata.properties b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/aar_metadata/debug/writeDebugAarMetadata/aar-metadata.properties
 new file mode 100644
 index 0000000..ba000c0
@@ -97,7 +81,7 @@ index 0000000..b228352
 +com.capacitor.safearea.capacitor-plugin-safe-area-main-7 C:\Users\cjohn\pantry\node_modules\capacitor-plugin-safe-area\android\src\main\res
 diff --git a/node_modules/capacitor-plugin-safe-area/android/build/intermediates/annotation_processor_list/debug/javaPreCompileDebug/annotationProcessors.json b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/annotation_processor_list/debug/javaPreCompileDebug/annotationProcessors.json
 new file mode 100644
-index 0000000..9e26dfe
+index 0000000..8372b41
 --- /dev/null
 +++ b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/annotation_processor_list/debug/javaPreCompileDebug/annotationProcessors.json
 @@ -0,0 +1 @@
@@ -108,19 +92,16 @@ new file mode 100644
 index 0000000..e69de29
 diff --git a/node_modules/capacitor-plugin-safe-area/android/build/intermediates/compile_library_classes_jar/debug/bundleLibCompileToJarDebug/classes.jar b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/compile_library_classes_jar/debug/bundleLibCompileToJarDebug/classes.jar
 new file mode 100644
-index 0000000..6dfa097
-Binary files /dev/null and b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/compile_library_classes_jar/debug/bundleLibCompileToJarDebug/classes.jar differ
+index 0000000..e69de29
 diff --git a/node_modules/capacitor-plugin-safe-area/android/build/intermediates/compile_r_class_jar/debug/generateDebugRFile/R.jar b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/compile_r_class_jar/debug/generateDebugRFile/R.jar
 new file mode 100644
-index 0000000..344e197
-Binary files /dev/null and b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/compile_r_class_jar/debug/generateDebugRFile/R.jar differ
+index 0000000..e69de29
 diff --git a/node_modules/capacitor-plugin-safe-area/android/build/intermediates/compile_symbol_list/debug/generateDebugRFile/R.txt b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/compile_symbol_list/debug/generateDebugRFile/R.txt
 new file mode 100644
 index 0000000..e69de29
 diff --git a/node_modules/capacitor-plugin-safe-area/android/build/intermediates/incremental/debug-mergeJavaRes/merge-state b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/incremental/debug-mergeJavaRes/merge-state
 new file mode 100644
-index 0000000..1c983fc
-Binary files /dev/null and b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/incremental/debug-mergeJavaRes/merge-state differ
+index 0000000..e69de29
 diff --git a/node_modules/capacitor-plugin-safe-area/android/build/intermediates/incremental/debug/packageDebugResources/compile-file-map.properties b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/incremental/debug/packageDebugResources/compile-file-map.properties
 new file mode 100644
 index 0000000..123dd8e
@@ -130,7 +111,7 @@ index 0000000..123dd8e
 +#Tue Mar 17 01:03:53 CDT 2026
 diff --git a/node_modules/capacitor-plugin-safe-area/android/build/intermediates/incremental/debug/packageDebugResources/merger.xml b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/incremental/debug/packageDebugResources/merger.xml
 new file mode 100644
-index 0000000..ffe44e9
+index 0000000..b418b59
 --- /dev/null
 +++ b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/incremental/debug/packageDebugResources/merger.xml
 @@ -0,0 +1,2 @@
@@ -139,7 +120,7 @@ index 0000000..ffe44e9
 \ No newline at end of file
 diff --git a/node_modules/capacitor-plugin-safe-area/android/build/intermediates/incremental/mergeDebugAssets/merger.xml b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/incremental/mergeDebugAssets/merger.xml
 new file mode 100644
-index 0000000..7395b10
+index 0000000..767b651
 --- /dev/null
 +++ b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/incremental/mergeDebugAssets/merger.xml
 @@ -0,0 +1,2 @@
@@ -148,7 +129,7 @@ index 0000000..7395b10
 \ No newline at end of file
 diff --git a/node_modules/capacitor-plugin-safe-area/android/build/intermediates/incremental/mergeDebugJniLibFolders/merger.xml b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/incremental/mergeDebugJniLibFolders/merger.xml
 new file mode 100644
-index 0000000..d229a0a
+index 0000000..5fdf28b
 --- /dev/null
 +++ b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/incremental/mergeDebugJniLibFolders/merger.xml
 @@ -0,0 +1,2 @@
@@ -157,16 +138,13 @@ index 0000000..d229a0a
 \ No newline at end of file
 diff --git a/node_modules/capacitor-plugin-safe-area/android/build/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/capacitor/safearea/SafeArea.class b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/capacitor/safearea/SafeArea.class
 new file mode 100644
-index 0000000..52800f4
-Binary files /dev/null and b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/capacitor/safearea/SafeArea.class differ
+index 0000000..e69de29
 diff --git a/node_modules/capacitor-plugin-safe-area/android/build/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/capacitor/safearea/SafeAreaPlugin$1.class b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/capacitor/safearea/SafeAreaPlugin$1.class
 new file mode 100644
-index 0000000..dfa8a33
-Binary files /dev/null and b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/capacitor/safearea/SafeAreaPlugin$1.class differ
+index 0000000..e69de29
 diff --git a/node_modules/capacitor-plugin-safe-area/android/build/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/capacitor/safearea/SafeAreaPlugin.class b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/capacitor/safearea/SafeAreaPlugin.class
 new file mode 100644
-index 0000000..a2f491f
-Binary files /dev/null and b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/capacitor/safearea/SafeAreaPlugin.class differ
+index 0000000..e69de29
 diff --git a/node_modules/capacitor-plugin-safe-area/android/build/intermediates/local_only_symbol_list/debug/parseDebugLocalResources/R-def.txt b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/local_only_symbol_list/debug/parseDebugLocalResources/R-def.txt
 new file mode 100644
 index 0000000..78ac5b8
@@ -192,11 +170,10 @@ index 0000000..0cfebe2
 +7</manifest>
 diff --git a/node_modules/capacitor-plugin-safe-area/android/build/intermediates/merged_java_res/debug/mergeDebugJavaResource/feature-capacitor-plugin-safe-area.jar b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/merged_java_res/debug/mergeDebugJavaResource/feature-capacitor-plugin-safe-area.jar
 new file mode 100644
-index 0000000..15cb0ec
-Binary files /dev/null and b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/merged_java_res/debug/mergeDebugJavaResource/feature-capacitor-plugin-safe-area.jar differ
+index 0000000..e69de29
 diff --git a/node_modules/capacitor-plugin-safe-area/android/build/intermediates/merged_manifest/debug/processDebugManifest/AndroidManifest.xml b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/merged_manifest/debug/processDebugManifest/AndroidManifest.xml
 new file mode 100644
-index 0000000..ce1d7f1
+index 0000000..0cf8e7b
 --- /dev/null
 +++ b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/merged_manifest/debug/processDebugManifest/AndroidManifest.xml
 @@ -0,0 +1,7 @@
@@ -210,7 +187,7 @@ index 0000000..ce1d7f1
 \ No newline at end of file
 diff --git a/node_modules/capacitor-plugin-safe-area/android/build/intermediates/navigation_json/debug/extractDeepLinksDebug/navigation.json b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/navigation_json/debug/extractDeepLinksDebug/navigation.json
 new file mode 100644
-index 0000000..0637a08
+index 0000000..8d3f940
 --- /dev/null
 +++ b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/navigation_json/debug/extractDeepLinksDebug/navigation.json
 @@ -0,0 +1 @@
@@ -218,7 +195,7 @@ index 0000000..0637a08
 \ No newline at end of file
 diff --git a/node_modules/capacitor-plugin-safe-area/android/build/intermediates/nested_resources_validation_report/debug/generateDebugResources/nestedResourcesValidationReport.txt b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/nested_resources_validation_report/debug/generateDebugResources/nestedResourcesValidationReport.txt
 new file mode 100644
-index 0000000..08f4ebe
+index 0000000..c1c7878
 --- /dev/null
 +++ b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/nested_resources_validation_report/debug/generateDebugResources/nestedResourcesValidationReport.txt
 @@ -0,0 +1 @@
@@ -226,8 +203,7 @@ index 0000000..08f4ebe
 \ No newline at end of file
 diff --git a/node_modules/capacitor-plugin-safe-area/android/build/intermediates/runtime_library_classes_jar/debug/bundleLibRuntimeToJarDebug/classes.jar b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/runtime_library_classes_jar/debug/bundleLibRuntimeToJarDebug/classes.jar
 new file mode 100644
-index 0000000..d911170
-Binary files /dev/null and b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/runtime_library_classes_jar/debug/bundleLibRuntimeToJarDebug/classes.jar differ
+index 0000000..e69de29
 diff --git a/node_modules/capacitor-plugin-safe-area/android/build/intermediates/symbol_list_with_package_name/debug/generateDebugRFile/package-aware-r.txt b/node_modules/capacitor-plugin-safe-area/android/build/intermediates/symbol_list_with_package_name/debug/generateDebugRFile/package-aware-r.txt
 new file mode 100644
 index 0000000..c942cd7
@@ -237,8 +213,7 @@ index 0000000..c942cd7
 +com.capacitor.safearea
 diff --git a/node_modules/capacitor-plugin-safe-area/android/build/outputs/aar/capacitor-plugin-safe-area-debug.aar b/node_modules/capacitor-plugin-safe-area/android/build/outputs/aar/capacitor-plugin-safe-area-debug.aar
 new file mode 100644
-index 0000000..7560671
-Binary files /dev/null and b/node_modules/capacitor-plugin-safe-area/android/build/outputs/aar/capacitor-plugin-safe-area-debug.aar differ
+index 0000000..e69de29
 diff --git a/node_modules/capacitor-plugin-safe-area/android/build/outputs/logs/manifest-merger-debug-report.txt b/node_modules/capacitor-plugin-safe-area/android/build/outputs/logs/manifest-merger-debug-report.txt
 new file mode 100644
 index 0000000..46743b4
@@ -263,8 +238,7 @@ index 0000000..46743b4
 +		INJECTED from C:\Users\cjohn\pantry\node_modules\capacitor-plugin-safe-area\android\src\main\AndroidManifest.xml
 diff --git a/node_modules/capacitor-plugin-safe-area/android/build/tmp/compileDebugJavaWithJavac/previous-compilation-data.bin b/node_modules/capacitor-plugin-safe-area/android/build/tmp/compileDebugJavaWithJavac/previous-compilation-data.bin
 new file mode 100644
-index 0000000..94db4c6
-Binary files /dev/null and b/node_modules/capacitor-plugin-safe-area/android/build/tmp/compileDebugJavaWithJavac/previous-compilation-data.bin differ
+index 0000000..e69de29
 diff --git a/node_modules/capacitor-plugin-safe-area/dist/esm/definitions.d.ts b/node_modules/capacitor-plugin-safe-area/dist/esm/definitions.d.ts
 index b7eae2e..44c13eb 100644
 --- a/node_modules/capacitor-plugin-safe-area/dist/esm/definitions.d.ts
@@ -279,7 +253,7 @@ index b7eae2e..44c13eb 100644
       * unset navigation bar immersive on Android , not implemented on IOS
       * @param options.statusBarBg - statusbar background color, default is transparent
 diff --git a/node_modules/capacitor-plugin-safe-area/dist/esm/definitions.js.map b/node_modules/capacitor-plugin-safe-area/dist/esm/definitions.js.map
-index 6f2bb03..7c2543f 100644
+index 6f2bb03..9eef3cb 100644
 --- a/node_modules/capacitor-plugin-safe-area/dist/esm/definitions.js.map
 +++ b/node_modules/capacitor-plugin-safe-area/dist/esm/definitions.js.map
 @@ -1 +1 @@
@@ -300,7 +274,7 @@ index 4ad01b3..aae7fc7 100644
  export * from './definitions';
  export { SafeArea };
 diff --git a/node_modules/capacitor-plugin-safe-area/dist/esm/index.js.map b/node_modules/capacitor-plugin-safe-area/dist/esm/index.js.map
-index 8a00821..c1ee50b 100644
+index 8a00821..290efd1 100644
 --- a/node_modules/capacitor-plugin-safe-area/dist/esm/index.js.map
 +++ b/node_modules/capacitor-plugin-safe-area/dist/esm/index.js.map
 @@ -1 +1 @@
@@ -329,7 +303,7 @@ index 1c18eba..eb5b959 100644
      }
      setImmersiveNavigationBar() {
 diff --git a/node_modules/capacitor-plugin-safe-area/dist/esm/web.js.map b/node_modules/capacitor-plugin-safe-area/dist/esm/web.js.map
-index a3f421c..95e493d 100644
+index a3f421c..45cfa39 100644
 --- a/node_modules/capacitor-plugin-safe-area/dist/esm/web.js.map
 +++ b/node_modules/capacitor-plugin-safe-area/dist/esm/web.js.map
 @@ -1 +1 @@
@@ -367,7 +341,7 @@ index 0330629..d0ced04 100644
      }
      setImmersiveNavigationBar() {
 diff --git a/node_modules/capacitor-plugin-safe-area/dist/plugin.cjs.js.map b/node_modules/capacitor-plugin-safe-area/dist/plugin.cjs.js.map
-index 8e0cffa..1eb47d1 100644
+index 8e0cffa..92fb052 100644
 --- a/node_modules/capacitor-plugin-safe-area/dist/plugin.cjs.js.map
 +++ b/node_modules/capacitor-plugin-safe-area/dist/plugin.cjs.js.map
 @@ -1 +1 @@
@@ -405,7 +379,7 @@ index 871e259..bd1aa3b 100644
          }
          setImmersiveNavigationBar() {
 diff --git a/node_modules/capacitor-plugin-safe-area/dist/plugin.js.map b/node_modules/capacitor-plugin-safe-area/dist/plugin.js.map
-index 962d74b..32e0d9e 100644
+index 962d74b..598e8b8 100644
 --- a/node_modules/capacitor-plugin-safe-area/dist/plugin.js.map
 +++ b/node_modules/capacitor-plugin-safe-area/dist/plugin.js.map
 @@ -1 +1 @@

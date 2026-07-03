@@ -54,7 +54,7 @@ describe('ItemDetailModal Component', () => {
     quantity: { amount: 6, unit: 'pieces' },
     quantity_estimate: '6',
     storageLocation: 'fridge',
-    expirationDate: '2026-06-30' // future date (not expired)
+    expirationDate: '2035-12-31' // future date (not expired)
   };
 
   beforeEach(() => {
@@ -131,7 +131,7 @@ describe('ItemDetailModal Component', () => {
   it('closing modal when empty or 0 quantity deletes the item with thrown_away reason (if expired)', () => {
     const expiredItem = {
       ...mockItem,
-      expirationDate: '2026-06-10' // past date (expired relative to June 21, 2026)
+      expirationDate: '2020-01-01' // past date
     };
     renderModal(expiredItem);
     const emptyButton = screen.getByTestId('item-visual-empty');
@@ -157,7 +157,7 @@ describe('ItemDetailModal Component', () => {
   it('clicking trash button deletes item immediately with thrown_away reason (if expired)', () => {
     const expiredItem = {
       ...mockItem,
-      expirationDate: '2026-06-10' // past date
+      expirationDate: '2020-01-01' // past date
     };
     renderModal(expiredItem);
     const deleteButton = screen.getByTestId('item-delete');

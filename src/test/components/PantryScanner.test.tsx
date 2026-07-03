@@ -60,7 +60,7 @@ describe('PantryScanner Component', () => {
     expect(screen.getAllByText('Bread')[0]).toBeInTheDocument();
   });
 
-  it('renders the component title', () => {
+  it('renders the search input placeholder', () => {
     render(
       <AppProvider>
         <AppActionsProvider>
@@ -76,7 +76,7 @@ describe('PantryScanner Component', () => {
       </AppProvider>
     );
 
-    expect(screen.getAllByText('My Pantry')[0]).toBeInTheDocument();
+    expect(screen.getAllByPlaceholderText('Search pantry items...')[0]).toBeInTheDocument();
   });
 
   it('shows the scan prompt', () => {

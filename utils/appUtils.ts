@@ -326,7 +326,13 @@ export function parseIngredientForShoppingList(ingredientText: string): { quanti
     itemName = itemName.replace(/\s*\b(and|or|with|for|to|into)\b\s*(,|$)/gi, '$2');
 
     // Clean up trailing/leading whitespace and stray commas
-     const prepNotes = prepNotesList.length > 0 ? prepNotesList.join(', ') : undefined;
+    itemName = itemName.replace(/,\s*$/, '').replace(/\s+,\s+/g, ' ').replace(/^,\s*/, '').trim();
+    itemName = itemName.replace(/\s+/g, ' ');
+
+    // Capitalize first letter of each word for better display
+    itemName = itemName.replace(/\b\w/g, l => l.toUpperCase());
+
+    const prepNotes = prepNotesList.length > 0 ? prepNotesList.join(', ') : undefined;
 
     // If no quantity was found, set default to "1"
     if (!quantity) {
