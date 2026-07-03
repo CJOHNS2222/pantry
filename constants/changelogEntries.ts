@@ -20,6 +20,13 @@ export interface DetailedChangeEntry {
 
 export const RECENT_CHANGES: ChangeEntry[] = [
   {
+    "version": "2.5.9",
+    "date": "Jul 3, 2026",
+    "highlights": [
+      "Release Build Crash on Launch — Added ProGuard keep rules for Room Database, WorkManager, and Startup initialization…"
+    ]
+  },
+  {
     "version": "2.5.8",
     "date": "Jul 3, 2026",
     "highlights": [
@@ -35,19 +42,22 @@ export const RECENT_CHANGES: ChangeEntry[] = [
     "highlights": [
       "Auto-Exit on Update — Configured the app to automatically close/terminate 1 second after redirecting the user to the…"
     ]
-  },
-  {
-    "version": "2.5.6",
-    "date": "Jun 30, 2026",
-    "highlights": [
-      "Preserved Food Waste Cache — Fixed a bug where bulk updates or cache clears would overwrite and erase the _foodWaste…",
-      "Optimized Firestore Reads — Moved member activity tracking to a separate presence/members subcollection document,…",
-      "De-duplicated Cache Reads — Reused the pre-fetched cache snapshot during bulk item additions, saving an extra Firestore…"
-    ]
   }
 ];
 
 export const ALL_CHANGES: DetailedChangeEntry[] = [
+  {
+    "version": "2.5.9",
+    "date": "Jul 3, 2026",
+    "sections": [
+      {
+        "title": "Fixed",
+        "bullets": [
+          "**Release Build Crash on Launch** — Added ProGuard keep rules for Room Database, WorkManager, and Startup initialization provider to prevent them from being obfuscated or stripped by R8 during release builds."
+        ]
+      }
+    ]
+  },
   {
     "version": "2.5.8",
     "date": "Jul 3, 2026",
