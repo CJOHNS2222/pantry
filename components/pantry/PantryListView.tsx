@@ -1,6 +1,6 @@
 import React from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
-import { FixedSizeList as List } from 'react-window';
+import { List } from 'react-window';
 import StorageLocationIndicator from './StorageLocationIndicator';
 import { PantryGridItem } from './PantryGridItem';
 import { PantryListItem } from './PantryListItem';

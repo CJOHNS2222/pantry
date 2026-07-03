@@ -1342,9 +1342,12 @@ export function getAutoExpirationDate(itemName: string, category: string, storag
       name.includes('potato') || name.includes('cabbage') || name.includes('zucchini') ||
       name.includes('eggplant') || name.includes('mushroom')) {
     const expirationDate = new Date();
-    // Leafy greens: 3-5 days, root vegetables: 7-14 days
+    // Leafy greens: 3-5 days, root vegetables: carrots (30 days), potatoes (60 days), onions (90 days), garlic (180 days)
     const days = (name.includes('lettuce') || name.includes('spinach') || name.includes('kale')) ? 4 :
-                 (name.includes('carrot') || name.includes('potato') || name.includes('onion')) ? 14 : 7;
+                 name.includes('garlic') ? 180 :
+                 name.includes('onion') ? 90 :
+                 name.includes('potato') ? 60 :
+                 name.includes('carrot') ? 30 : 7;
     expirationDate.setDate(expirationDate.getDate() + days);
     return expirationDate.toISOString().slice(0, 10);
   }

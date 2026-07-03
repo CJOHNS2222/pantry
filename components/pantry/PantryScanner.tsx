@@ -4,7 +4,7 @@ import { useAndroidBack } from '../../hooks/useAndroidBack';
 import { Camera as CapacitorCamera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { Camera, Upload, Loader2, Plus, Trash2, CheckCircle2, ShoppingBasket, X, Barcode, ChevronDown, ChevronRight, ChevronUp, Image, ChefHat, TrendingUp, Search, Filter, Clock, Tag, FilePlus, Receipt, LayoutGrid, LayoutList } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
-import { FixedSizeList as List } from 'react-window';
+import { List } from 'react-window';
 import { extractReceiptItems } from '../../services/receiptOcrService';
 import { setUserGeminiOptIn } from '../../services/featureFlags';
 import StorageLocationIndicator from './StorageLocationIndicator';

@@ -1,8 +1,9 @@
 import { LeftoverService } from './leftoverService'
-import { NotificationService } from './notificationService'
+import { NotificationService, NotificationItem } from './notificationService'
 import { PantryItem } from '../types'
 import AnalyticsService from './analyticsService'
 import { log } from './logService'
+import DatabaseMonitoringService from './databaseMonitoringService'
 
 export class LeftoverNotificationService {
   /**
@@ -10,6 +11,59 @@ export class LeftoverNotificationService {
    */
   static async checkAndNotifyLeftovers(householdId: string, userId: string): Promise<void> {
     try {
+      // 1. Fetch user's notifications cache and clean up any pre-existing duplicates
+      const cacheRef = DatabaseMonitoringService.doc(`users/${userId}/cache/notifications`);
+      const cacheSnap = await DatabaseMonitoringService.getDoc(cacheRef);
+      let allNotifications: any[] = [];
+      if (cacheSnap.exists()) {
+        const data = cacheSnap.data() as any;
+        allNotifications = Array.isArray(data.items) ? data.items : [];
+      }
+
+      const uniqueNotifications: any[] = [];
+      const seenKeys = new Set<string>();
+      let hasDuplicates = false;
+
+      for (const n of allNotifications) {
+        const isLeftoverAlert = n.type === 'expiration' && (
+          n.actionData?.leftoverId || 
+          n.actionData?.leftovers || 
+          n.title?.includes('Leftover') || 
+          n.dedupeKey?.startsWith('leftover_')
+        );
+
+        if (isLeftoverAlert) {
+          const key = n.dedupeKey || `${n.title}_${n.message}_${n.actionData?.leftoverId || ''}`;
+          if (seenKeys.has(key)) {
+            hasDuplicates = true;
+            continue;
+          }
+          seenKeys.add(key);
+        }
+        uniqueNotifications.push(n);
+      }
+
+      if (hasDuplicates) {
+        await DatabaseMonitoringService.setDoc(cacheRef, { items: uniqueNotifications }, { merge: true });
+        allNotifications = uniqueNotifications;
+      }
+
+      // Filter unread notifications from the last 30 days
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const cachedNotifications: NotificationItem[] = allNotifications.filter((n: any) => {
+        if (n.read) return false;
+        let createdAt: Date | null = null;
+        if (n.createdAt) {
+          if (typeof n.createdAt === 'string') {
+            createdAt = new Date(n.createdAt);
+          } else if (n.createdAt && typeof n.createdAt.toDate === 'function') {
+            createdAt = n.createdAt.toDate();
+          }
+        }
+        return createdAt && createdAt >= thirtyDaysAgo;
+      });
+
       const leftovers = await LeftoverService.getLeftovers(householdId)
 
       if (leftovers.length === 0) return
@@ -32,20 +86,8 @@ export class LeftoverNotificationService {
 
         const daysUntilExpiry = Math.ceil((bestBefore.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
         const isCookedRice = leftover.leftoverMeta?.notes?.toLowerCase().includes('rice') ||
-                            leftover.tags?.includes('cooked-rice') ||
-                            leftover.item.toLowerCase().includes('rice')
-
-        // Create individual notification for urgent items
-        if (attentionLevel === 'urgent') {
-          await NotificationService.createLeftoverExpirationAlert(
-            userId,
-            leftover.item,
-            daysUntilExpiry,
-            leftover.id,
-            isCookedRice
-          )
-          AnalyticsService.trackLeftoverNotificationSent(userId, 'expiration', 1)
-        }
+                             leftover.tags?.includes('cooked-rice') ||
+                             leftover.item.toLowerCase().includes('rice')
 
         // Collect for aggregated notification
         if (attentionLevel === 'urgent' || attentionLevel === 'warning') {
@@ -58,10 +100,25 @@ export class LeftoverNotificationService {
         }
       }
 
-      // Create aggregated notification if multiple items need attention
+      // Create aggregated notification if multiple items need attention,
+      // otherwise fallback to individual notification if only one item is urgent.
       if (urgentLeftovers.length > 1) {
-        await NotificationService.createLeftoverAttentionAlert(userId, urgentLeftovers)
+        await NotificationService.createLeftoverAttentionAlert(userId, urgentLeftovers, cachedNotifications)
         AnalyticsService.trackLeftoverNotificationSent(userId, 'attention', urgentLeftovers.length)
+      } else if (urgentLeftovers.length === 1) {
+        const item = urgentLeftovers[0]
+        const leftover = leftovers.find(l => l.id === item.id)
+        if (leftover && LeftoverService.needsAttention(leftover) === 'urgent') {
+          await NotificationService.createLeftoverExpirationAlert(
+            userId,
+            item.name,
+            item.daysUntilExpiry,
+            item.id,
+            item.isCookedRice,
+            cachedNotifications
+          )
+          AnalyticsService.trackLeftoverNotificationSent(userId, 'expiration', 1)
+        }
       }
 
     } catch (error) {
@@ -77,10 +134,10 @@ export class LeftoverNotificationService {
     // Check immediately
     this.checkAndNotifyLeftovers(householdId, userId)
 
-    // Set up periodic checks every 6 hours
+    // Set up periodic checks every 24 hours
     const intervalId = setInterval(() => {
       this.checkAndNotifyLeftovers(householdId, userId)
-    }, 6 * 60 * 60 * 1000) // 6 hours
+    }, 24 * 60 * 60 * 1000) // 24 hours
 
     // Return cleanup function
     return () => clearInterval(intervalId)

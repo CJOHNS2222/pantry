@@ -15,6 +15,7 @@
  */
 
 const admin = require('firebase-admin');
+const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const fs = require('fs');
 const path = require('path');
 
@@ -29,21 +30,22 @@ const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'
 const version = argVersion || pkg.version;
 const releaseNotes = argNotes || `Version ${version} — see CHANGELOG.md for details.`;
 
-// --- Initialize Firebase Admin ---
-if (!admin.apps.length) {
+const apps = admin.getApps ? admin.getApps() : (admin.apps || []);
+if (!apps.length) {
   const credPath = process.env.GOOGLE_APPLICATION_CREDENTIALS
     || require('path').join(__dirname, 'ornate-compass-478504-e1-firebase-adminsdk-fbsvc-b421e3c5e1.json');
   const fs = require('fs');
   if (fs.existsSync(credPath)) {
+    const credential = admin.credential ? admin.credential.cert(credPath) : admin.cert(credPath);
     admin.initializeApp({
-      credential: admin.credential.cert(credPath),
+      credential,
       projectId: 'ornate-compass-478504-e1',
     });
   } else {
     admin.initializeApp({ projectId: 'ornate-compass-478504-e1' });
   }
 }
-const db = admin.firestore();
+const db = admin.firestore ? admin.firestore() : getFirestore();
 
 const PLATFORM_URLS = {
   android: 'https://play.google.com/store/apps/details?id=com.smart.pantry',
@@ -61,7 +63,7 @@ async function publishVersion() {
       releaseNotes,
       forceUpdate,
       downloadUrl: downloadUrl ?? null,
-      publishedAt: admin.firestore.FieldValue.serverTimestamp(),
+      publishedAt: FieldValue.serverTimestamp(),
     };
 
     await db.collection('app_versions').doc(platform).set(data, { merge: true });
@@ -76,4 +78,13 @@ publishVersion()
     console.error('❌ Failed to publish version:', err.message);
     process.exit(1);
   })
-  .finally(() => admin.app().delete());
+  .finally(() => {
+    const apps = admin.getApps ? admin.getApps() : (admin.apps || []);
+    if (apps.length > 0) {
+      if (admin.deleteApp) {
+        admin.deleteApp(apps[0]);
+      } else if (apps[0].delete) {
+        apps[0].delete();
+      }
+    }
+  });

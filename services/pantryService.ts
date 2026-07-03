@@ -175,7 +175,17 @@ export class PantryService {
     );
 
     if (existingItem) {
-      throw new Error(`"${itemName}" already exists in your pantry.`);
+      const category = existingItem.category || inferCategoryFromItemName(itemName);
+      const storageLocation = existingItem.storageLocation || inferStorageLocationFromItemName(itemName);
+      const expires = getAutoExpirationDate(itemName, category, storageLocation);
+      const updated = this.addBatchToItem(existingItem, {
+        quantity,
+        unit,
+        expires
+      });
+      // Track pantry item addition
+      AnalyticsService.trackPantryItemAdd(itemName, 'Manual', quantity, 'manual');
+      return updated;
     }
 
     // Prepare the new item data
@@ -297,6 +307,7 @@ export class PantryService {
         }
       }
 
+      this.updateExpirationDateFromBatches(existingItem);
       existingItem.lastRestocked = now;
       updated[idx] = existingItem;
       return updated;
@@ -306,6 +317,9 @@ export class PantryService {
     }
   }
 
+  /**
+   * Append a batch to a single PantryItem and return the updated item
+   */
   /**
    * Append a batch to a single PantryItem and return the updated item
    */
@@ -338,6 +352,7 @@ export class PantryService {
       }
     }
 
+    this.updateExpirationDateFromBatches(updated);
     return updated;
   }
 
@@ -354,6 +369,7 @@ export class PantryService {
       updated.quantity = { amount: total, unit };
     }
 
+    this.updateExpirationDateFromBatches(updated);
     return updated;
   }
 
@@ -375,6 +391,7 @@ export class PantryService {
       }
     }
 
+    this.updateExpirationDateFromBatches(updated);
     return updated;
   }
 
@@ -434,6 +451,7 @@ export class PantryService {
       updated.quantity = { amount: total, unit };
     }
 
+    this.updateExpirationDateFromBatches(updated);
     return { updatedItem: updated, consumed };
   }
 
@@ -537,5 +555,29 @@ export class PantryService {
       }
       return item;
     });
+  }
+
+  static updateExpirationDateFromBatches(item: PantryItem): PantryItem {
+    if (!item.batches || item.batches.length === 0) {
+      return item;
+    }
+    // Find all batches with valid expires dates
+    const batchesWithExpiry = item.batches.filter(b => b.expires);
+    if (batchesWithExpiry.length === 0) {
+      item.expirationDate = undefined;
+      item.expiryDate = undefined;
+      return item;
+    }
+    // Sort to find the earliest expiration date
+    const sorted = [...batchesWithExpiry].sort((a, b) => {
+      if (!a.expires && !b.expires) return 0;
+      if (!a.expires) return 1;
+      if (!b.expires) return -1;
+      return new Date(a.expires).getTime() - new Date(b.expires).getTime();
+    });
+    const earliestExpiry = sorted[0].expires;
+    item.expirationDate = earliestExpiry;
+    item.expiryDate = earliestExpiry;
+    return item;
   }
 }

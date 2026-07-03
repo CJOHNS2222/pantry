@@ -1,3 +1,19 @@
+## [2.5.8] - 2026-07-03
+
+### Added
+- **Manual Duplicate Add as Expiry Batches** — Adding an existing pantry item manually now appends it as a new batch under the same item instead of throwing an error.
+- **FEFO Expiry Date Takeover** — The overall item expiration date is automatically set to the earliest active batch expiration, and updates dynamically as batches are consumed or removed.
+
+### Changed
+- **Extended Root Vegetable Shelf Life** — Adjusted default auto-expiration days based on USDA maximum usable shelf life: garlic (180 days), onions (90 days), potatoes (60 days), carrots (30 days).
+- **Reduced Firestore Reads** — Prevented redundant leftover notification check restarts on member presence/heartbeat updates, cached inventory in memory, and decreased leftover check frequency to 24 hours.
+
+### Fixed
+- **Dropdown Auto-Dismiss** — Configured notification and household activity dropdowns to close instantly when clicking or tapping outside.
+- **Leftover Notification Deduplication** — Implemented deduplication keys and read-state retention to prevent duplicate leftover alerts.
+
+---
+
 ## [2.5.7] - 2026-06-30
 
 ### Added

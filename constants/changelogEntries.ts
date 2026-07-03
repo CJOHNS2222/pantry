@@ -20,6 +20,16 @@ export interface DetailedChangeEntry {
 
 export const RECENT_CHANGES: ChangeEntry[] = [
   {
+    "version": "2.5.8",
+    "date": "Jul 3, 2026",
+    "highlights": [
+      "Manual Duplicate Add as Expiry Batches — Adding an existing pantry item manually now appends it as a new batch under…",
+      "FEFO Expiry Date Takeover — The overall item expiration date is automatically set to the earliest active batch…",
+      "Extended Root Vegetable Shelf Life — Adjusted default auto-expiration days based on USDA maximum usable shelf life:…",
+      "Reduced Firestore Reads — Prevented redundant leftover notification check restarts on member presence/heartbeat…"
+    ]
+  },
+  {
     "version": "2.5.7",
     "date": "Jun 30, 2026",
     "highlights": [
@@ -34,20 +44,37 @@ export const RECENT_CHANGES: ChangeEntry[] = [
       "Optimized Firestore Reads — Moved member activity tracking to a separate presence/members subcollection document,…",
       "De-duplicated Cache Reads — Reused the pre-fetched cache snapshot during bulk item additions, saving an extra Firestore…"
     ]
-  },
-  {
-    "version": "2.5.5",
-    "date": "Jun 29, 2026",
-    "highlights": [
-      "Live Household Presence in Header — Added live household member activity text (e.g.",
-      "Optimized Food Waste Analytics — Replaced heavy history array document reads/writes with atomic increment summary…",
-      "Improved Shopping List UI Alignment — Reordered right-side controls, sized the price box to match the quantity input…",
-      "Randomized Popular Recipes — Implemented a Fisher-Yates shuffle on popular recipes on load and removed the alphabetical…"
-    ]
   }
 ];
 
 export const ALL_CHANGES: DetailedChangeEntry[] = [
+  {
+    "version": "2.5.8",
+    "date": "Jul 3, 2026",
+    "sections": [
+      {
+        "title": "Added",
+        "bullets": [
+          "**Manual Duplicate Add as Expiry Batches** — Adding an existing pantry item manually now appends it as a new batch under the same item instead of throwing an error.",
+          "**FEFO Expiry Date Takeover** — The overall item expiration date is automatically set to the earliest active batch expiration, and updates dynamically as batches are consumed or removed."
+        ]
+      },
+      {
+        "title": "Changed",
+        "bullets": [
+          "**Extended Root Vegetable Shelf Life** — Adjusted default auto-expiration days based on USDA maximum usable shelf life: garlic (180 days), onions (90 days), potatoes (60 days), carrots (30 days).",
+          "**Reduced Firestore Reads** — Prevented redundant leftover notification check restarts on member presence/heartbeat updates, cached inventory in memory, and decreased leftover check frequency to 24 hours."
+        ]
+      },
+      {
+        "title": "Fixed",
+        "bullets": [
+          "**Dropdown Auto-Dismiss** — Configured notification and household activity dropdowns to close instantly when clicking or tapping outside.",
+          "**Leftover Notification Deduplication** — Implemented deduplication keys and read-state retention to prevent duplicate leftover alerts."
+        ]
+      }
+    ]
+  },
   {
     "version": "2.5.7",
     "date": "Jun 30, 2026",
