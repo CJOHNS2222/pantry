@@ -32,3 +32,15 @@
 -dontwarn kotlin.uuid.ExperimentalUuidApi
 -dontwarn kotlin.uuid.Uuid$Companion
 -dontwarn kotlin.uuid.Uuid
+
+# Keep WorkManager & Startup
+-keep class androidx.work.** { *; }
+-dontwarn androidx.work.**
+-keep class androidx.startup.** { *; }
+-dontwarn androidx.startup.**
+-keep class * extends androidx.work.ListenableWorker { *; }
+
+# Keep Room (used by WorkManager internally)
+-keep class androidx.room.** { *; }
+-dontwarn androidx.room.**
+-keep class * extends androidx.room.RoomDatabase { *; }

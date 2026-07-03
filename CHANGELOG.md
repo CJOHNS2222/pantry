@@ -1,3 +1,10 @@
+## [2.5.9] - 2026-07-03
+
+### Fixed
+- **Release Build Crash on Launch** — Added ProGuard keep rules for Room Database, WorkManager, and Startup initialization provider to prevent them from being obfuscated or stripped by R8 during release builds.
+
+---
+
 ## [2.5.8] - 2026-07-03
 
 ### Added
