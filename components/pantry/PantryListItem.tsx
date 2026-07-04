@@ -109,7 +109,7 @@ export const PantryListItem: React.FC<PantryListItemProps> = ({
       <div className="flex items-center gap-3 flex-shrink-0 ml-4">
         {/* Expiration date */}
         <div className="flex items-center gap-1.5">
-          {item.expirationDate && (() => {
+          {item.expirationDate && !item.is_immortal && (() => {
             const color = getExpirationColor(daysRemaining as number, item.expirationType);
             const expiryLabel = (daysRemaining as number) <= 0
               ? `${item.item} has expired`
