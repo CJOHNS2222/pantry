@@ -14,7 +14,7 @@ import type { Settings as AppSettings } from '../../types';
 type MemberPreferences = Pick<Member, 'dietaryRestrictions' | 'allergies' | 'dietGoal' | 'favoriteCuisines' | 'specialNeeds' | 'preferredProteins' | 'dislikedIngredients'>;
 import { NotificationService, NotificationSettings } from '../../services/notificationService';
 import { DayPlan } from '../../types';
-import { Loader2, Heart, AlertTriangle, X, Settings as SettingsIcon, User as UserIcon } from 'lucide-react';
+import { Loader2, Heart, AlertTriangle, X, Settings as SettingsIcon, User as UserIcon, ChevronLeft, ChevronRight, Sliders, Bell, TrendingDown, MessageSquare, HelpCircle, RefreshCw } from 'lucide-react';
 import { userOptedInToGemini, setUserGeminiOptIn, getGeminiUsage } from '../../services/featureFlags';
 
 import { Household } from '../../types';
@@ -47,7 +47,6 @@ import { SettingsResetUsageSection } from './SettingsResetUsageSection';
 
 import { SettingsStoreLayoutSection } from './SettingsStoreLayoutSection';
 import { SettingsSubscriptionSection } from './SettingsSubscriptionSection';
-import { SettingsTabPills } from './SettingsTabPills';
 import { SettingsThemeSection } from './SettingsThemeSection';
 import { SettingsUsageLimitsSection } from './SettingsUsageLimitsSection';
 import { SettingsTabVisibilitySection } from './SettingsTabVisibilitySection';
@@ -161,13 +160,19 @@ export const Settings: React.FC<SettingsProps> = ({
   const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>(
     NotificationService.getDefaultSettings()
   );
-  const [activeSettingsTab, setActiveSettingsTab] = useState<'account' | 'preferences' | 'organization' | 'more'>('account');
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
 
-  // Redirect to requested settings tab if set in sessionStorage (e.g. from SmartRecommendations)
+  // Redirect to requested settings category if set in sessionStorage
   useEffect(() => {
     const redirectTab = sessionStorage.getItem('settings_redirect_tab');
-    if (redirectTab === 'more' || redirectTab === 'account' || redirectTab === 'preferences' || redirectTab === 'organization') {
-      setActiveSettingsTab(redirectTab);
+    if (redirectTab === 'account' || redirectTab === 'more') {
+      setActiveCategory('account_info');
+      sessionStorage.removeItem('settings_redirect_tab');
+    } else if (redirectTab === 'preferences') {
+      setActiveCategory('preferences');
+      sessionStorage.removeItem('settings_redirect_tab');
+    } else if (redirectTab === 'organization') {
+      setActiveCategory('food_waste');
       sessionStorage.removeItem('settings_redirect_tab');
     }
   }, []);
@@ -662,588 +667,740 @@ export const Settings: React.FC<SettingsProps> = ({
     <>
 
       <div className="pb-24 max-w-md mx-auto">
-      <SettingsTabPills
-        activeTab={activeSettingsTab}
-        onTabChange={setActiveSettingsTab}
-      />
-
-      <div className="pt-2 pb-6 px-6 space-y-6">
-
-      {activeSettingsTab === 'account' && <>
-
-      <SettingsGuestBanner
-        isGuest={!!user?.isGuest}
-        onLogout={onLogout}
-      />
-
-      {/* ── Account Hero Card ── */}
-      {user && !user.isGuest && (() => {
-        const tierLabel = isFamily ? 'Family' : isPremium ? 'Premium' : 'Free';
-        const tierColor = isFamily ? 'text-purple-500' : isPremium ? 'text-[var(--accent-color)]' : 'text-theme-secondary';
-        const householdCount = household?.members?.length ?? 0;
-
-        // Contextual CTA
-        const ctaContent = !isPremium && !isFamily
-          ? { icon: '⭐', text: 'Upgrade to Premium for AI recipes, unlimited saves & more', accent: true }
-          : !household
-          ? { icon: '👨‍👩‍👧', text: 'Invite family or roommates to share your pantry & shopping list', accent: false }
-          : null;
-
-        return (
-          <div className="rounded-2xl border overflow-hidden bg-theme-secondary border-theme">
-            {/* Stat strip */}
-            <div className="grid grid-cols-3 divide-x divide-theme">
-              {[
-                { value: pantryItemCount, label: 'Pantry Items', icon: '🥫' },
-                { value: tierLabel,       label: 'Plan',         icon: '🏅', valueClass: tierColor },
-                { value: householdCount || '—', label: 'Household', icon: '👥' },
-              ].map(stat => (
-                <div key={stat.label} className="flex flex-col items-center py-4 px-2 gap-0.5">
-                  <span className="text-lg">{stat.icon}</span>
-                  <span className={`text-xl font-black text-theme-primary ${stat.valueClass ?? ''}`}>{stat.value}</span>
-                  <span className="text-[10px] font-semibold uppercase tracking-wide text-theme-secondary opacity-60">{stat.label}</span>
-                </div>
-              ))}
-            </div>
-
-            {/* Contextual CTA */}
-            {ctaContent && (
-              <div className={`flex items-center gap-3 px-4 py-3 border-t ${
-                ctaContent.accent
-                  ? 'border-[var(--accent-color)]/20 bg-[var(--accent-color)]/5'
-                  : 'border-theme bg-theme-primary'
-              }`}>
-                <span className="text-base shrink-0">{ctaContent.icon}</span>
-                <p className="flex-1 text-xs text-theme-secondary leading-snug">{ctaContent.text}</p>
-                <button
-                  onClick={ctaContent.accent ? () => setActiveSettingsTab('more') : onShowHousehold}
-                  className={`shrink-0 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors ${
-                    ctaContent.accent
-                      ? 'bg-[var(--accent-color)] text-white hover:bg-[var(--accent-color)]/80'
-                      : 'bg-theme-secondary text-theme-primary border border-theme hover:bg-theme-primary'
-                  }`}
-                >
-                  {ctaContent.accent ? 'Upgrade' : 'Invite'}
-                </button>
-              </div>
-            )}
-          </div>
-        );
-      })()}
-
-      {/* Profile Section */}
-      {user && onLogout && !user.isGuest && (
-        <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden" data-section="profile">
-          <div className="w-full flex items-center justify-between p-4 border-b border-theme bg-theme-primary/20">
-            <div className="flex items-center gap-3">
-              <UserIcon className="w-5 h-5 text-[var(--accent-color)]" />
-              <h3 className="font-semibold text-theme-primary">{intl.formatMessage({ id: 'settings.profile' })}</h3>
-            </div>
+      
+      {activeCategory === null ? (
+        <div className="pt-4 px-6 space-y-6">
+          <div className="text-center pb-4">
+            <h2 className="text-3xl font-serif font-bold text-theme-primary">Settings</h2>
+            <p className="text-xs text-theme-secondary mt-1">Configure your app and manage your kitchen data</p>
           </div>
 
-          <div className="p-4">
-            {/* Avatar Section */}
-            <div className="mb-4">
-              <div className="flex items-center gap-4 mb-3">
-                <div className="w-16 h-16 rounded-full overflow-hidden bg-gray-200 flex items-center justify-center">
-                  {user.avatar ? (
-                    <img src={user.avatar} alt="Avatar" className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="text-2xl text-gray-500">{user.name.charAt(0).toUpperCase()}</div>
-                  )}
-                </div>
-                <div className="flex-1">
-                  <p className="font-medium text-theme-primary">{userProfile?.name || user.name}</p>
-                  <p className="text-sm text-theme-secondary">{user.email}</p>
-                </div>
-              </div>
-              
-              <div className="flex gap-2 mb-4">
-                <button
-                  onClick={() => setShowAvatarSelection(!showAvatarSelection)}
-                  className="bg-blue-500 text-white px-3 py-2 rounded text-sm font-medium hover:bg-blue-600 flex-1 text-center"
-                >
-                  {showAvatarSelection ? 'Cancel' : 'Change Avatar'}
-                </button>
-                {user.avatar && (
-                  <button
-                    onClick={handleRemoveAvatar}
-                    disabled={updatingAvatar}
-                    className="bg-red-500 text-white px-3 py-2 rounded text-sm font-medium hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                  >
-                    {updatingAvatar && <Loader2 className="w-4 h-4 animate-spin" />}
-                    {updatingAvatar ? 'Removing...' : 'Remove'}
-                  </button>
-                )}
-              </div>
-
-              {showAvatarSelection && (
-                <div className="mb-4">
-                  <h4 className="text-sm font-medium mb-2 text-theme-primary">{intl.formatMessage({ id: 'settings.chooseAvatar' })}</h4>
-                  <div className="grid grid-cols-5 gap-2 max-h-48 overflow-y-auto">
-                    {avatarOptions.map((avatarPath) => (
-                      <button
-                        key={avatarPath}
-                        onClick={() => handleAvatarSelect(avatarPath)}
-                        disabled={updatingAvatar}
-                        className="w-12 h-12 rounded-full overflow-hidden border-2 border-gray-300 hover:border-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed relative"
-                      >
-                        <img
-                          src={avatarPath}
-                          alt={`Avatar ${avatarPath.split('/').pop()?.split('.')[0]}`}
-                          className="w-full h-full object-cover"
-                        />
-                        {updatingAvatar && (
-                          <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                            <Loader2 className="w-4 h-4 animate-spin text-white" />
-                          </div>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Name Field */}
-              <div className="mb-4">
-                <label htmlFor="userName" className="block text-sm font-medium text-theme-primary mb-2">{intl.formatMessage({ id: 'settings.displayName' })}</label>
-                <input
-                  id="userName"
-                  name="userName"
-                  type="text"
-                  value={userProfile?.name ?? user.name ?? ''}
-                  onChange={(e) => handleProfileChange('name', e.target.value)}
-                  placeholder="Enter your display name"
-                  className="w-full px-3 py-2 border border-theme rounded-lg bg-theme-primary text-theme-secondary placeholder-theme-secondary/50 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:border-transparent"
-                />
-                <p className="text-xs text-theme-secondary mt-1">This name will be used throughout the app to personalize your experience.</p>
-              </div>
-            </div>
-            
-            {/* User Profile Information */}
-            <div className="space-y-4 mb-4">
-              <h4 className="text-sm font-medium mb-3 text-theme-primary">{intl.formatMessage({ id: 'settings.personalInfo' })}</h4>
-              
-              <div className="grid grid-cols-3 gap-3">
-                {/* Row 1: Height, Weight, Age */}
-                {/* Height — imperial ft+in or metric cm */}
-                <div className="flex flex-col items-center">
-                  {userProfile?.measurementSystem === 'Metric' ? (
-                    <div className="flex items-center border border-theme rounded-lg bg-white px-2 py-1 w-full focus-within:ring-2 focus-within:ring-[var(--accent-color)] focus-within:border-transparent">
-                      <input
-                        id="heightCm"
-                        name="heightCm"
-                        type="number"
-                        // stored as total inches internally; convert for display
-                        value={userProfile?.height ? Math.round(userProfile.height * 2.54) : ''}
-                        onChange={(e) => {
-                          const cm = parseFloat(e.target.value) || 0;
-                          handleProfileChange('height', Math.round(cm / 2.54));
-                        }}
-                        placeholder="175"
-                        className="w-full text-center text-sm font-semibold text-black bg-transparent outline-none border-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                        min="0"
-                        max="300"
-                      />
-                      <span className="text-xs text-gray-500 font-medium ml-1">cm</span>
-                    </div>
-                  ) : (
-                    <div className="flex gap-1.5 w-full justify-center">
-                      <div className="flex items-center border border-theme rounded-lg bg-white px-2 py-1 w-1/2 focus-within:ring-2 focus-within:ring-[var(--accent-color)] focus-within:border-transparent">
-                        <input
-                          id="heightFeet"
-                          name="heightFeet"
-                          type="number"
-                          value={userProfile?.height ? Math.floor(userProfile.height / 12) : ''}
-                          onChange={(e) => {
-                            const feet = parseInt(e.target.value) || 0;
-                            const inches = userProfile?.height ? userProfile.height % 12 : 0;
-                            handleProfileChange('height', feet * 12 + inches);
-                          }}
-                          placeholder="5"
-                          className="w-full text-center text-sm font-semibold text-black bg-transparent outline-none border-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                          min="0"
-                          max="8"
-                        />
-                        <span className="text-xs text-gray-500 font-medium ml-1">ft</span>
-                      </div>
-                      <div className="flex items-center border border-theme rounded-lg bg-white px-2 py-1 w-1/2 focus-within:ring-2 focus-within:ring-[var(--accent-color)] focus-within:border-transparent">
-                        <input
-                          id="heightInches"
-                          name="heightInches"
-                          type="number"
-                          value={userProfile?.height ? userProfile.height % 12 : ''}
-                          onChange={(e) => {
-                            const feet = userProfile?.height ? Math.floor(userProfile.height / 12) : 0;
-                            const inches = parseInt(e.target.value) || 0;
-                            handleProfileChange('height', feet * 12 + inches);
-                          }}
-                          placeholder="8"
-                          className="w-full text-center text-sm font-semibold text-black bg-transparent outline-none border-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                          min="0"
-                          max="11"
-                        />
-                        <span className="text-xs text-gray-500 font-medium ml-1">in</span>
-                      </div>
-                    </div>
-                  )}
-                  <label className="text-[10px] text-theme-secondary font-bold uppercase tracking-wider mt-1.5 text-center">
-                    {intl.formatMessage({ id: 'settings.height' })}
-                  </label>
-                </div>
-
-                {/* Weight — lbs or kg */}
-                <div className="flex flex-col items-center">
-                  <div className="flex items-center border border-theme rounded-lg bg-white px-2 py-1 w-full focus-within:ring-2 focus-within:ring-[var(--accent-color)] focus-within:border-transparent">
-                    <input
-                      id="weight"
-                      name="weight"
-                      type="number"
-                      min="0"
-                      value={
-                        userProfile?.measurementSystem === 'Metric'
-                          ? userProfile?.weight ? Math.round(userProfile.weight * 0.453592) : ''
-                          : userProfile?.weight || ''
-                      }
-                      onChange={(e) => {
-                        const val = parseFloat(e.target.value);
-                        if (isNaN(val)) { handleProfileChange('weight', undefined); return; }
-                        // Always store as lbs internally
-                        const lbs = userProfile?.measurementSystem === 'Metric' ? Math.round(val / 0.453592) : val;
-                        handleProfileChange('weight', lbs);
-                      }}
-                      placeholder={userProfile?.measurementSystem === 'Metric' ? '70' : '154'}
-                      className="w-full text-center text-sm font-semibold text-black bg-transparent outline-none border-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                    />
-                    <span className="text-xs text-gray-500 font-medium ml-1">
-                      {userProfile?.measurementSystem === 'Metric' ? 'kg' : 'lbs'}
-                    </span>
-                  </div>
-                  <label htmlFor="weight" className="text-[10px] text-theme-secondary font-bold uppercase tracking-wider mt-1.5 text-center">
-                    {intl.formatMessage({ id: 'settings.weight' })}
-                  </label>
-                </div>
-
-
-                <div className="flex flex-col items-center">
-                  <div className="flex items-center border border-theme rounded-lg bg-white px-2 py-1 w-full focus-within:ring-2 focus-within:ring-[var(--accent-color)] focus-within:border-transparent">
-                    <input
-                      id="age"
-                      name="age"
-                      type="number"
-                      min="0"
-                      value={userProfile?.age || ''}
-                      onChange={(e) => handleProfileChange('age', e.target.value ? parseInt(e.target.value) : undefined)}
-                      placeholder="30"
-                      className="w-full text-center text-sm font-semibold text-black bg-transparent outline-none border-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                    />
-                    <span className="text-xs text-gray-500 font-medium ml-1">yrs</span>
-                  </div>
-                  <label htmlFor="age" className="text-[10px] text-theme-secondary font-bold uppercase tracking-wider mt-1.5 text-center">
-                    Age
-                  </label>
-                </div>
-
-                {/* Row 2: Gender (spans 2) and Household Size (spans 1) */}
-                <div className="col-span-2 flex flex-col items-center">
-                  <div className="w-full border border-theme rounded-lg bg-white px-2 py-1 focus-within:ring-2 focus-within:ring-[var(--accent-color)] focus-within:border-transparent">
-                    <select
-                      id="gender"
-                      name="gender"
-                      value={userProfile?.gender || ''}
-                      onChange={(e) => handleProfileChange('gender', e.target.value || undefined)}
-                      className="w-full text-center text-sm font-semibold text-black bg-transparent outline-none border-none cursor-pointer"
-                    >
-                      <option value="">{intl.formatMessage({ id: 'settings.selectGender' })}</option>
-                      <option value="male">{intl.formatMessage({ id: 'settings.genders.male' })}</option>
-                      <option value="female">{intl.formatMessage({ id: 'settings.genders.female' })}</option>
-                      <option value="other">{intl.formatMessage({ id: 'settings.genders.other' })}</option>
-                      <option value="prefer-not-to-say">{intl.formatMessage({ id: 'settings.genders.preferNotToSay' })}</option>
-                    </select>
-                  </div>
-                  <label htmlFor="gender" className="text-[10px] text-theme-secondary font-bold uppercase tracking-wider mt-1.5 text-center">
-                    {intl.formatMessage({ id: 'settings.gender' })}
-                  </label>
-                </div>
-
-                <div className="flex flex-col items-center">
-                  <div className="flex items-center border border-theme rounded-lg bg-white px-2 py-1 w-full focus-within:ring-2 focus-within:ring-[var(--accent-color)] focus-within:border-transparent">
-                    <input
-                      id="householdSize"
-                      name="householdSize"
-                      type="number"
-                      value={userProfile?.householdSize || ''}
-                      onChange={(e) => handleProfileChange('householdSize', e.target.value ? parseInt(e.target.value) : undefined)}
-                      placeholder="4"
-                      className="w-full text-center text-sm font-semibold text-black bg-transparent outline-none border-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                      min="1"
-                      max="20"
-                    />
-                    <span className="text-xs text-gray-500 font-medium ml-1">people</span>
-                  </div>
-                  <label htmlFor="householdSize" className="text-[10px] text-theme-secondary font-bold uppercase tracking-wider mt-1.5 text-center">
-                    {intl.formatMessage({ id: 'settings.household' })}
-                  </label>
-                </div>
-              </div>
-
-              {/* Diet Goal and Activity Level - combine into 2 columns */}
-              <div className="grid grid-cols-2 gap-3 mt-4">
-                <div>
-                  <label htmlFor="dietGoal" className="block text-xs text-theme-secondary mb-1">{intl.formatMessage({ id: 'settings.dietGoal' })}</label>
-                  <select
-                    id="dietGoal"
-                    name="dietGoal"
-                    value={userProfile?.dietGoal || ''}
-                    onChange={(e) => handleProfileChange('dietGoal', e.target.value || undefined)}
-                    className="w-full p-2 border rounded text-sm text-black bg-white"
-                  >
-                    <option value="">{intl.formatMessage({ id: 'settings.selectDietGoal' })}</option>
-                    <option value="lose-weight">{intl.formatMessage({ id: 'settings.dietGoals.loseWeight' })}</option>
-                    <option value="maintain-weight">{intl.formatMessage({ id: 'settings.dietGoals.maintainWeight' })}</option>
-                    <option value="gain-weight">{intl.formatMessage({ id: 'settings.dietGoals.gainWeight' })}</option>
-                    <option value="build-muscle">{intl.formatMessage({ id: 'settings.dietGoals.buildMuscle' })}</option>
-                    <option value="improve-health">{intl.formatMessage({ id: 'settings.dietGoals.improveHealth' })}</option>
-                  </select>
-                </div>
-                <div>
-                  <label htmlFor="activityLevel" className="block text-xs text-theme-secondary mb-1">{intl.formatMessage({ id: 'settings.activityLevel' })}</label>
-                  <select
-                    id="activityLevel"
-                    name="activityLevel"
-                    value={userProfile?.activityLevel || ''}
-                    onChange={(e) => handleProfileChange('activityLevel', e.target.value || undefined)}
-                    className="w-full p-2 border rounded text-sm text-black bg-white"
-                  >
-                    <option value="">{intl.formatMessage({ id: 'settings.selectActivityLevel' })}</option>
-                    <option value="sedentary">{intl.formatMessage({ id: 'settings.activityLevels.sedentary' })}</option>
-                    <option value="lightly-active">{intl.formatMessage({ id: 'settings.activityLevels.lightlyActive' })}</option>
-                    <option value="moderately-active">{intl.formatMessage({ id: 'settings.activityLevels.moderatelyActive' })}</option>
-                    <option value="very-active">{intl.formatMessage({ id: 'settings.activityLevels.veryActive' })}</option>
-                    <option value="extremely-active">{intl.formatMessage({ id: 'settings.activityLevels.extremelyActive' })}</option>
-                  </select>
-                </div>
-              </div>
-
-              {profileChanged && (
-                <button
-                  onClick={saveProfile}
-                  disabled={savingProfile}
-                  className="w-full bg-green-500 text-white px-4 py-2 rounded text-sm font-medium hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-4"
-                >
-                  {savingProfile && <Loader2 className="w-4 h-4 animate-spin" />}
-                  {savingProfile ? 'Saving...' : intl.formatMessage({ id: 'settings.saveProfile' })}
-                </button>
-              )}
-            </div>
-
-            {/* Logout Button */}
+          <div className="bg-theme-secondary border border-theme rounded-2xl overflow-hidden divide-y divide-theme shadow-sm">
+            {/* Account Info */}
             <button
-              onClick={onLogout}
-              className="w-full bg-red-500 text-white px-4 py-2 rounded font-medium hover:bg-red-600 mt-4"
+              onClick={() => setActiveCategory('account_info')}
+              className="w-full flex items-center justify-between p-4 hover:bg-theme-primary/5 transition-colors text-left focus:outline-none"
+              data-category="account-info"
             >
-              Logout
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[var(--accent-color)]/10 flex items-center justify-center text-[var(--accent-color)]">
+                  <UserIcon className="w-5 h-5" />
+                </div>
+                <div>
+                  <span className="font-semibold text-theme-primary block text-sm">Account Info</span>
+                  <span className="text-[11px] text-theme-secondary opacity-70">Profile, subscription details, household sharing</span>
+                </div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-theme-secondary" />
+            </button>
+
+            {/* Preferences */}
+            <button
+              onClick={() => setActiveCategory('preferences')}
+              className="w-full flex items-center justify-between p-4 hover:bg-theme-primary/5 transition-colors text-left focus:outline-none"
+              data-category="preferences"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[var(--accent-color)]/10 flex items-center justify-center text-[var(--accent-color)]">
+                  <Sliders className="w-5 h-5" />
+                </div>
+                <div>
+                  <span className="font-semibold text-theme-primary block text-sm">Preferences</span>
+                  <span className="text-[11px] text-theme-secondary opacity-70">Theme, unit system, categories, store layout</span>
+                </div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-theme-secondary" />
+            </button>
+
+            {/* Notifications */}
+            <button
+              onClick={() => setActiveCategory('notifications')}
+              className="w-full flex items-center justify-between p-4 hover:bg-theme-primary/5 transition-colors text-left focus:outline-none"
+              data-category="notifications"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[var(--accent-color)]/10 flex items-center justify-center text-[var(--accent-color)]">
+                  <Bell className="w-5 h-5" />
+                </div>
+                <div>
+                  <span className="font-semibold text-theme-primary block text-sm">Notifications</span>
+                  <span className="text-[11px] text-theme-secondary opacity-70">Snoozed notifications, quiet hours, alert settings</span>
+                </div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-theme-secondary" />
+            </button>
+
+            {/* Food Waste Savings */}
+            <button
+              onClick={() => setActiveCategory('food_waste')}
+              className="w-full flex items-center justify-between p-4 hover:bg-theme-primary/5 transition-colors text-left focus:outline-none"
+              data-category="food-waste"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[var(--accent-color)]/10 flex items-center justify-center text-[var(--accent-color)]">
+                  <TrendingDown className="w-5 h-5" />
+                </div>
+                <div>
+                  <span className="font-semibold text-theme-primary block text-sm">Food Waste Savings</span>
+                  <span className="text-[11px] text-theme-secondary opacity-70">Leftover statistics and waste analytics</span>
+                </div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-theme-secondary" />
+            </button>
+
+            {/* Contact Us */}
+            <button
+              onClick={() => setActiveCategory('contact_us')}
+              className="w-full flex items-center justify-between p-4 hover:bg-theme-primary/5 transition-colors text-left focus:outline-none"
+              data-category="contact-us"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[var(--accent-color)]/10 flex items-center justify-center text-[var(--accent-color)]">
+                  <MessageSquare className="w-5 h-5" />
+                </div>
+                <div>
+                  <span className="font-semibold text-theme-primary block text-sm">Contact Us</span>
+                  <span className="text-[11px] text-theme-secondary opacity-70">Send feedback, privacy policy, terms of service</span>
+                </div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-theme-secondary" />
+            </button>
+
+            {/* Help */}
+            <button
+              onClick={() => setActiveCategory('help')}
+              className="w-full flex items-center justify-between p-4 hover:bg-theme-primary/5 transition-colors text-left focus:outline-none"
+              data-category="help"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[var(--accent-color)]/10 flex items-center justify-center text-[var(--accent-color)]">
+                  <HelpCircle className="w-5 h-5" />
+                </div>
+                <div>
+                  <span className="font-semibold text-theme-primary block text-sm">Help</span>
+                  <span className="text-[11px] text-theme-secondary opacity-70">App documentation, guides, and FAQs</span>
+                </div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-theme-secondary" />
+            </button>
+
+            {/* Update */}
+            <button
+              onClick={() => setActiveCategory('update')}
+              className="w-full flex items-center justify-between p-4 hover:bg-theme-primary/5 transition-colors text-left focus:outline-none"
+              data-category="update"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[var(--accent-color)]/10 flex items-center justify-center text-[var(--accent-color)]">
+                  <RefreshCw className="w-5 h-5" />
+                </div>
+                <div>
+                  <span className="font-semibold text-theme-primary block text-sm">Update</span>
+                  <span className="text-[11px] text-theme-secondary opacity-70">App updates and version details</span>
+                </div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-theme-secondary" />
             </button>
           </div>
         </div>
+      ) : (
+        <div className="pt-4 pb-6 px-6 space-y-6">
+          <button
+            onClick={() => setActiveCategory(null)}
+            className="flex items-center gap-2 text-theme-secondary hover:text-theme-primary transition-colors mb-4 text-sm font-semibold focus:outline-none"
+          >
+            <ChevronLeft className="w-4 h-4" /> Back to Settings
+          </button>
+
+          {activeCategory === 'account_info' && <>
+            <SettingsGuestBanner
+              isGuest={!!user?.isGuest}
+              onLogout={onLogout}
+            />
+
+            {/* ── Account Hero Card ── */}
+            {user && !user.isGuest && (() => {
+              const tierLabel = isFamily ? 'Family' : isPremium ? 'Premium' : 'Free';
+              const tierColor = isFamily ? 'text-purple-500' : isPremium ? 'text-[var(--accent-color)]' : 'text-theme-secondary';
+              const householdCount = household?.members?.length ?? 0;
+
+              // Contextual CTA
+              const ctaContent = !isPremium && !isFamily
+                ? { icon: '⭐', text: 'Upgrade to Premium for AI recipes, unlimited saves & more', accent: true }
+                : !household
+                ? { icon: '👥', text: 'Invite family or roommates to share your pantry & shopping list', accent: false }
+                : null;
+
+              return (
+                <div className="rounded-2xl border overflow-hidden bg-theme-secondary border-theme shadow-sm">
+                  {/* Stat strip */}
+                  <div className="grid grid-cols-3 divide-x divide-theme">
+                    {[
+                      { value: pantryItemCount, label: 'Pantry Items', icon: '🥫' },
+                      { value: tierLabel,       label: 'Plan',         icon: '🏅', valueClass: tierColor },
+                      { value: householdCount || '—', label: 'Household', icon: '👥' },
+                    ].map(stat => (
+                      <div key={stat.label} className="flex flex-col items-center py-4 px-2 gap-0.5">
+                        <span className="text-lg">{stat.icon}</span>
+                        <span className={`text-xl font-black text-theme-primary ${stat.valueClass ?? ''}`}>{stat.value}</span>
+                        <span className="text-[10px] font-semibold uppercase tracking-wide text-theme-secondary opacity-60">{stat.label}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Contextual CTA */}
+                  {ctaContent && (
+                    <div className={`flex items-center gap-3 px-4 py-3 border-t ${
+                      ctaContent.accent
+                        ? 'border-[var(--accent-color)]/20 bg-[var(--accent-color)]/5'
+                        : 'border-theme bg-theme-primary'
+                    }`}>
+                      <span className="text-base shrink-0">{ctaContent.icon}</span>
+                      <p className="flex-1 text-xs text-theme-secondary leading-snug">{ctaContent.text}</p>
+                      <button
+                        onClick={ctaContent.accent ? () => setActiveCategory('account_info') : onShowHousehold}
+                        className={`shrink-0 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors ${
+                          ctaContent.accent
+                            ? 'bg-[var(--accent-color)] text-white hover:bg-[var(--accent-color)]/80'
+                            : 'bg-theme-secondary text-theme-primary border border-theme hover:bg-theme-primary'
+                        }`}
+                      >
+                        {ctaContent.accent ? 'Upgrade' : 'Invite'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+            {/* Profile Section */}
+            {user && onLogout && !user.isGuest && (
+              <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden shadow-sm" data-section="profile">
+                <div className="w-full flex items-center justify-between p-4 border-b border-theme bg-theme-primary/20">
+                  <div className="flex items-center gap-3">
+                    <UserIcon className="w-5 h-5 text-[var(--accent-color)]" />
+                    <h3 className="font-semibold text-theme-primary">{intl.formatMessage({ id: 'settings.profile' })}</h3>
+                  </div>
+                </div>
+
+                <div className="p-4">
+                  {/* Avatar Section */}
+                  <div className="mb-4">
+                    <div className="flex items-center gap-4 mb-3">
+                      <div className="w-16 h-16 rounded-full overflow-hidden bg-gray-200 flex items-center justify-center border border-theme">
+                        {user.avatar ? (
+                          <img src={user.avatar} alt="Avatar" className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="text-2xl text-gray-500">{user.name.charAt(0).toUpperCase()}</div>
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-medium text-theme-primary">{userProfile?.name || user.name}</p>
+                        <p className="text-sm text-theme-secondary">{user.email}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex gap-2 mb-4">
+                      <button
+                        onClick={() => setShowAvatarSelection(!showAvatarSelection)}
+                        className="bg-blue-500 text-white px-3 py-2 rounded text-sm font-medium hover:bg-blue-600 flex-1 text-center"
+                      >
+                        {showAvatarSelection ? 'Cancel' : 'Change Avatar'}
+                      </button>
+                      {user.avatar && (
+                        <button
+                          onClick={handleRemoveAvatar}
+                          disabled={updatingAvatar}
+                          className="bg-red-500 text-white px-3 py-2 rounded text-sm font-medium hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        >
+                          {updatingAvatar && <Loader2 className="w-4 h-4 animate-spin" />}
+                          {updatingAvatar ? 'Removing...' : 'Remove'}
+                        </button>
+                      )}
+                    </div>
+
+                    {showAvatarSelection && (
+                      <div className="mb-4">
+                        <h4 className="text-sm font-medium mb-2 text-theme-primary">{intl.formatMessage({ id: 'settings.chooseAvatar' })}</h4>
+                        <div className="grid grid-cols-5 gap-2 max-h-48 overflow-y-auto">
+                          {avatarOptions.map((avatarPath) => (
+                            <button
+                              key={avatarPath}
+                              onClick={() => handleAvatarSelect(avatarPath)}
+                              disabled={updatingAvatar}
+                              className="w-12 h-12 rounded-full overflow-hidden border-2 border-gray-300 hover:border-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed relative"
+                            >
+                              <img
+                                src={avatarPath}
+                                alt={`Avatar ${avatarPath.split('/').pop()?.split('.')[0]}`}
+                                className="w-full h-full object-cover"
+                              />
+                              {updatingAvatar && (
+                                <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                                  <Loader2 className="w-4 h-4 animate-spin text-white" />
+                                </div>
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Name Field */}
+                    <div className="mb-4">
+                      <label htmlFor="userName" className="block text-sm font-medium text-theme-primary mb-2">{intl.formatMessage({ id: 'settings.displayName' })}</label>
+                      <input
+                        id="userName"
+                        name="userName"
+                        type="text"
+                        value={userProfile?.name ?? user.name ?? ''}
+                        onChange={(e) => handleProfileChange('name', e.target.value)}
+                        placeholder="Enter your display name"
+                        className="w-full px-3 py-2 border border-theme rounded-lg bg-theme-primary text-theme-secondary placeholder-theme-secondary/50 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:border-transparent"
+                      />
+                      <p className="text-xs text-theme-secondary mt-1">This name will be used throughout the app to personalize your experience.</p>
+                    </div>
+                  </div>
+                  
+                  {/* User Profile Information */}
+                  <div className="space-y-4 mb-4">
+                    <h4 className="text-sm font-medium mb-3 text-theme-primary">{intl.formatMessage({ id: 'settings.personalInfo' })}</h4>
+                    
+                    <div className="grid grid-cols-3 gap-3">
+                      {/* Row 1: Height, Weight, Age */}
+                      <div className="flex flex-col items-center">
+                        {userProfile?.measurementSystem === 'Metric' ? (
+                          <div className="flex items-center border border-theme rounded-lg bg-white px-2 py-1 w-full focus-within:ring-2 focus-within:ring-[var(--accent-color)] focus-within:border-transparent">
+                            <input
+                              id="heightCm"
+                              name="heightCm"
+                              type="number"
+                              value={userProfile?.height ? Math.round(userProfile.height * 2.54) : ''}
+                              onChange={(e) => {
+                                const cm = parseFloat(e.target.value) || 0;
+                                handleProfileChange('height', Math.round(cm / 2.54));
+                              }}
+                              placeholder="175"
+                              className="w-full text-center text-sm font-semibold text-black bg-transparent outline-none border-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              min="0"
+                              max="300"
+                            />
+                            <span className="text-xs text-gray-500 font-medium ml-1">cm</span>
+                          </div>
+                        ) : (
+                          <div className="flex gap-1.5 w-full justify-center">
+                            <div className="flex items-center border border-theme rounded-lg bg-white px-2 py-1 w-1/2 focus-within:ring-2 focus-within:ring-[var(--accent-color)] focus-within:border-transparent">
+                              <input
+                                id="heightFeet"
+                                name="heightFeet"
+                                type="number"
+                                value={userProfile?.height ? Math.floor(userProfile.height / 12) : ''}
+                                onChange={(e) => {
+                                  const feet = parseInt(e.target.value) || 0;
+                                  const inches = userProfile?.height ? userProfile.height % 12 : 0;
+                                  handleProfileChange('height', feet * 12 + inches);
+                                }}
+                                placeholder="5"
+                                className="w-full text-center text-sm font-semibold text-black bg-transparent outline-none border-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                min="0"
+                                max="8"
+                              />
+                              <span className="text-xs text-gray-500 font-medium ml-1">ft</span>
+                            </div>
+                            <div className="flex items-center border border-theme rounded-lg bg-white px-2 py-1 w-1/2 focus-within:ring-2 focus-within:ring-[var(--accent-color)] focus-within:border-transparent">
+                              <input
+                                id="heightInches"
+                                name="heightInches"
+                                type="number"
+                                value={userProfile?.height ? userProfile.height % 12 : ''}
+                                onChange={(e) => {
+                                  const feet = userProfile?.height ? Math.floor(userProfile.height / 12) : 0;
+                                  const inches = parseInt(e.target.value) || 0;
+                                  handleProfileChange('height', feet * 12 + inches);
+                                }}
+                                placeholder="8"
+                                className="w-full text-center text-sm font-semibold text-black bg-transparent outline-none border-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                min="0"
+                                max="11"
+                              />
+                              <span className="text-xs text-gray-500 font-medium ml-1">in</span>
+                            </div>
+                          </div>
+                        )}
+                        <label className="text-[10px] text-theme-secondary font-bold uppercase tracking-wider mt-1.5 text-center">
+                          {intl.formatMessage({ id: 'settings.height' })}
+                        </label>
+                      </div>
+
+                      {/* Weight — lbs or kg */}
+                      <div className="flex flex-col items-center">
+                        <div className="flex items-center border border-theme rounded-lg bg-white px-2 py-1 w-full focus-within:ring-2 focus-within:ring-[var(--accent-color)] focus-within:border-transparent">
+                          <input
+                            id="weight"
+                            name="weight"
+                            type="number"
+                            min="0"
+                            value={
+                              userProfile?.measurementSystem === 'Metric'
+                                ? userProfile?.weight ? Math.round(userProfile.weight * 0.453592) : ''
+                                : userProfile?.weight || ''
+                            }
+                            onChange={(e) => {
+                              const val = parseFloat(e.target.value);
+                              if (isNaN(val)) { handleProfileChange('weight', undefined); return; }
+                              const lbs = userProfile?.measurementSystem === 'Metric' ? Math.round(val / 0.453592) : val;
+                              handleProfileChange('weight', lbs);
+                            }}
+                            placeholder={userProfile?.measurementSystem === 'Metric' ? '70' : '154'}
+                            className="w-full text-center text-sm font-semibold text-black bg-transparent outline-none border-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          />
+                          <span className="text-xs text-gray-500 font-medium ml-1">
+                            {userProfile?.measurementSystem === 'Metric' ? 'kg' : 'lbs'}
+                          </span>
+                        </div>
+                        <label htmlFor="weight" className="text-[10px] text-theme-secondary font-bold uppercase tracking-wider mt-1.5 text-center">
+                          {intl.formatMessage({ id: 'settings.weight' })}
+                        </label>
+                      </div>
+
+                      <div className="flex flex-col items-center">
+                        <div className="flex items-center border border-theme rounded-lg bg-white px-2 py-1 w-full focus-within:ring-2 focus-within:ring-[var(--accent-color)] focus-within:border-transparent">
+                          <input
+                            id="age"
+                            name="age"
+                            type="number"
+                            min="0"
+                            value={userProfile?.age || ''}
+                            onChange={(e) => handleProfileChange('age', e.target.value ? parseInt(e.target.value) : undefined)}
+                            placeholder="30"
+                            className="w-full text-center text-sm font-semibold text-black bg-transparent outline-none border-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          />
+                          <span className="text-xs text-gray-500 font-medium ml-1">yrs</span>
+                        </div>
+                        <label htmlFor="age" className="text-[10px] text-theme-secondary font-bold uppercase tracking-wider mt-1.5 text-center">
+                          Age
+                        </label>
+                      </div>
+
+                      {/* Row 2: Gender and Household Size */}
+                      <div className="col-span-2 flex flex-col items-center">
+                        <div className="w-full border border-theme rounded-lg bg-white px-2 py-1 focus-within:ring-2 focus-within:ring-[var(--accent-color)] focus-within:border-transparent">
+                          <select
+                            id="gender"
+                            name="gender"
+                            value={userProfile?.gender || ''}
+                            onChange={(e) => handleProfileChange('gender', e.target.value || undefined)}
+                            className="w-full text-center text-sm font-semibold text-black bg-transparent outline-none border-none cursor-pointer"
+                          >
+                            <option value="">{intl.formatMessage({ id: 'settings.selectGender' })}</option>
+                            <option value="male">{intl.formatMessage({ id: 'settings.genders.male' })}</option>
+                            <option value="female">{intl.formatMessage({ id: 'settings.genders.female' })}</option>
+                            <option value="other">{intl.formatMessage({ id: 'settings.genders.other' })}</option>
+                            <option value="prefer-not-to-say">{intl.formatMessage({ id: 'settings.genders.preferNotToSay' })}</option>
+                          </select>
+                        </div>
+                        <label htmlFor="gender" className="text-[10px] text-theme-secondary font-bold uppercase tracking-wider mt-1.5 text-center">
+                          {intl.formatMessage({ id: 'settings.gender' })}
+                        </label>
+                      </div>
+
+                      <div className="flex flex-col items-center">
+                        <div className="flex items-center border border-theme rounded-lg bg-white px-2 py-1 w-full focus-within:ring-2 focus-within:ring-[var(--accent-color)] focus-within:border-transparent">
+                          <input
+                            id="householdSize"
+                            name="householdSize"
+                            type="number"
+                            value={userProfile?.householdSize || ''}
+                            onChange={(e) => handleProfileChange('householdSize', e.target.value ? parseInt(e.target.value) : undefined)}
+                            placeholder="4"
+                            className="w-full text-center text-sm font-semibold text-black bg-transparent outline-none border-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            min="1"
+                            max="20"
+                          />
+                          <span className="text-xs text-gray-500 font-medium ml-1">people</span>
+                        </div>
+                        <label htmlFor="householdSize" className="text-[10px] text-theme-secondary font-bold uppercase tracking-wider mt-1.5 text-center">
+                          {intl.formatMessage({ id: 'settings.household' })}
+                        </label>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 mt-4">
+                      <div>
+                        <label htmlFor="dietGoal" className="block text-xs text-theme-secondary mb-1">{intl.formatMessage({ id: 'settings.dietGoal' })}</label>
+                        <select
+                          id="dietGoal"
+                          name="dietGoal"
+                          value={userProfile?.dietGoal || ''}
+                          onChange={(e) => handleProfileChange('dietGoal', e.target.value || undefined)}
+                          className="w-full p-2 border rounded text-sm text-black bg-white"
+                        >
+                          <option value="">{intl.formatMessage({ id: 'settings.selectDietGoal' })}</option>
+                          <option value="lose-weight">{intl.formatMessage({ id: 'settings.dietGoals.loseWeight' })}</option>
+                          <option value="maintain-weight">{intl.formatMessage({ id: 'settings.dietGoals.maintainWeight' })}</option>
+                          <option value="gain-weight">{intl.formatMessage({ id: 'settings.dietGoals.gainWeight' })}</option>
+                          <option value="build-muscle">{intl.formatMessage({ id: 'settings.dietGoals.buildMuscle' })}</option>
+                          <option value="improve-health">{intl.formatMessage({ id: 'settings.dietGoals.improveHealth' })}</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label htmlFor="activityLevel" className="block text-xs text-theme-secondary mb-1">{intl.formatMessage({ id: 'settings.activityLevel' })}</label>
+                        <select
+                          id="activityLevel"
+                          name="activityLevel"
+                          value={userProfile?.activityLevel || ''}
+                          onChange={(e) => handleProfileChange('activityLevel', e.target.value || undefined)}
+                          className="w-full p-2 border rounded text-sm text-black bg-white"
+                        >
+                          <option value="">{intl.formatMessage({ id: 'settings.selectActivityLevel' })}</option>
+                          <option value="sedentary">{intl.formatMessage({ id: 'settings.activityLevels.sedentary' })}</option>
+                          <option value="lightly-active">{intl.formatMessage({ id: 'settings.activityLevels.lightlyActive' })}</option>
+                          <option value="moderately-active">{intl.formatMessage({ id: 'settings.activityLevels.moderatelyActive' })}</option>
+                          <option value="very-active">{intl.formatMessage({ id: 'settings.activityLevels.veryActive' })}</option>
+                          <option value="extremely-active">{intl.formatMessage({ id: 'settings.activityLevels.extremelyActive' })}</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {profileChanged && (
+                    <button
+                      onClick={saveProfile}
+                      disabled={savingProfile}
+                      className="w-full bg-green-500 text-white px-4 py-2 rounded text-sm font-medium hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-4"
+                    >
+                      {savingProfile && <Loader2 className="w-4 h-4 animate-spin" />}
+                      {savingProfile ? 'Saving...' : intl.formatMessage({ id: 'settings.saveProfile' })}
+                    </button>
+                  )}
+                </div>
+
+                {/* Logout Button */}
+                <div className="px-4 pb-4">
+                  <button
+                    onClick={onLogout}
+                    className="w-full bg-red-500 text-white px-4 py-2 rounded font-medium hover:bg-red-600 mt-4"
+                  >
+                    Logout
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <SettingsUsageLimitsSection
+              userExists={!!user}
+              title={intl.formatMessage({ id: 'settings.usageLimits' })}
+              isPremium={isPremium}
+              isFamily={isFamily}
+              usageLimits={usageLimits}
+              onOpenUpgrade={() => setActiveCategory('account_info')}
+            />
+
+            <SettingsSubscriptionSection
+              user={user}
+              title={intl.formatMessage({ id: 'settings.subscription' })}
+            />
+
+            <SettingsHouseholdSection
+              user={user}
+              household={household}
+              title={intl.formatMessage({ id: 'settings.household' })}
+              onShowHousehold={onShowHousehold}
+              openMemberPreferences={openMemberPreferences}
+              removeMemberFromHousehold={removeMemberFromHousehold}
+              householdName={householdName}
+              setHouseholdName={setHouseholdName}
+              isCreatingHousehold={isCreatingHousehold}
+              createHousehold={createHousehold}
+              manageHouseholdLabel={intl.formatMessage({ id: 'settings.manageHousehold' })}
+            />
+          </>}
+
+          {activeCategory === 'preferences' && <>
+            <SettingsThemeSection
+              title={intl.formatMessage({ id: 'settings.themeSettings' })}
+              settings={settings}
+              onResetTheme={() => {
+                setSettings((previous) => ({
+                  ...previous,
+                  theme: {
+                    mode: 'dark',
+                    accentColor: '#4CAF50',
+                    backgroundColor: undefined,
+                    textColor: undefined,
+                  },
+                }));
+              }}
+              onThemeModeChange={(mode) => handleChange('theme', { mode })}
+              onAccentColorChange={(accentColor) => handleChange('theme', { accentColor })}
+              onBackgroundColorChange={(backgroundColor) => handleChange('theme', { backgroundColor })}
+              onTextColorChange={(textColor) => handleChange('theme', { textColor })}
+              labels={{
+                theme: intl.formatMessage({ id: 'settings.theme' }),
+                accent: intl.formatMessage({ id: 'settings.accent' }),
+                background: intl.formatMessage({ id: 'settings.background' }),
+                textColor: intl.formatMessage({ id: 'settings.textColor' }),
+                language: intl.formatMessage({ id: 'settings.language' }),
+                dark: intl.formatMessage({ id: 'settings.themes.dark' }),
+                light: intl.formatMessage({ id: 'settings.themes.light' }),
+              }}
+            />
+
+            <SettingsAppPreferencesSection
+              title={intl.formatMessage({ id: 'settings.appPreferences' })}
+              settings={settings}
+              setSettings={setSettings}
+              userProfile={userProfile}
+              onMeasurementSystemChange={(value) => handleProfileChange('measurementSystem', value)}
+              geminiOptedIn={geminiOptedIn}
+              onGeminiOptInChange={handleGeminiOptIn}
+              labels={{
+                enableNotifications: intl.formatMessage({ id: 'settings.enableNotifications' }),
+                measurementSystem: intl.formatMessage({ id: 'settings.measurementSystem' }),
+                enableAiFeatures: intl.formatMessage({ id: 'settings.enableAiFeatures' }),
+                includeStaples: intl.formatMessage({ id: 'settings.includeStaples' }),
+                autoRestockStaples: intl.formatMessage({ id: 'settings.autoRestockStaples' }),
+                showNutrition: intl.formatMessage({ id: 'settings.showNutrition' }),
+                showPriceData: intl.formatMessage({ id: 'settings.showPriceData' }),
+              }}
+            />
+
+            <SettingsTabVisibilitySection
+              hiddenTabs={settings.navigation?.hiddenTabs}
+              onTabVisibilityChange={(tab, isVisible) => {
+                const hidden = settings.navigation?.hiddenTabs ?? [];
+                const newHidden = isVisible ? hidden.filter((currentTab: string) => currentTab !== tab) : [...hidden, tab];
+                setSettings((previous) => ({
+                  ...previous,
+                  navigation: { ...previous.navigation, hiddenTabs: newHidden },
+                }));
+              }}
+            />
+
+            <SettingsFoodSafetySection
+              title={intl.formatMessage({ id: 'settings.foodSafety' })}
+              user={user}
+              userProfile={userProfile}
+              setUserProfile={setUserProfile}
+              debouncedSaveProfile={debouncedSaveProfile}
+              saveProfileData={saveProfileData}
+            />
+
+            <SettingsCategoriesSection
+              userExists={!!user}
+              title={intl.formatMessage({ id: 'settings.categories' })}
+              customCategoryCount={customCategories.length}
+              onManageCategories={() => setShowCategoryManager(true)}
+            />
+
+            <SettingsStoreLayoutSection
+              userExists={!!user}
+              title={intl.formatMessage({ id: 'settings.storeLayout' })}
+              storeLayout={settings.shopping?.storeLayout || defaultStoreLayout}
+              onStoreLayoutChange={(newLayout) => setSettings((previous) => ({
+                ...previous,
+                shopping: {
+                  ...previous.shopping,
+                  storeLayout: newLayout,
+                },
+              }))}
+              storeProfiles={settings.shopping?.storeProfiles ?? {}}
+              activeStoreProfile={settings.shopping?.activeStoreProfile}
+              onStoreProfilesChange={(profiles, active) => setSettings((previous) => ({
+                ...previous,
+                shopping: {
+                  ...previous.shopping,
+                  storeProfiles: profiles,
+                  activeStoreProfile: active,
+                },
+              }))}
+            />
+
+            <SettingsPantryImagesSection
+              user={user}
+              title={intl.formatMessage({ id: 'settings.pantryImages' })}
+              updatingBulkImages={updatingBulkImages}
+              onBulkUpdate={handleBulkImageUpdate}
+            />
+
+            <SettingsResetUsageSection
+              isAdmin={isAdmin}
+              onReset={handleResetUsageCounters}
+            />
+
+            <SettingsRemoteConfigDebugSection
+              isAdmin={isAdmin}
+              addToast={addToast}
+            />
+          </>}
+
+          {activeCategory === 'notifications' && <>
+            <SettingsNotificationsSection
+              title={intl.formatMessage({ id: 'settings.notifications' })}
+              user={user}
+              notificationSettings={notificationSettings}
+              setNotificationSettings={handleNotificationSettingsChange}
+            />
+
+            <SettingsPendingNotificationsSection
+              user={user}
+              title={intl.formatMessage({ id: 'settings.pendingNotifications' })}
+            />
+          </>}
+
+          {activeCategory === 'food_waste' && <>
+            <SettingsLeftoverAnalyticsSection
+              userId={user?.id}
+              householdId={household?.id}
+              title={intl.formatMessage({ id: 'settings.leftoverAnalytics' })}
+            />
+          </>}
+
+          {activeCategory === 'contact_us' && <>
+            <SettingsFeedbackSection
+              title={intl.formatMessage({ id: 'settings.feedback' })}
+              feedback={feedback}
+              setFeedback={setFeedback}
+              sending={sending}
+              onSubmit={handleFeedbackSubmit}
+            />
+
+            <SettingsPrivacyLegalSection
+              title={intl.formatMessage({ id: 'settings.privacy' })}
+              onViewPrivacyPolicy={() => {
+                const privacyUrl = (window as Window & { PRIVACY_POLICY_URL?: string }).PRIVACY_POLICY_URL || 'https://smartpantrymobile.page.gd/privacy.html';
+                window.open(privacyUrl, '_blank');
+              }}
+              onViewTermsOfService={() => {
+                const termsUrl = (window as Window & { TERMS_OF_SERVICE_URL?: string }).TERMS_OF_SERVICE_URL || 'https://ornate-compass-478504-e1.web.app/terms.html';
+                window.open(termsUrl, '_blank');
+              }}
+              onCopyPrivacyUrl={() => {
+                const privacyUrl = (window as Window & { PRIVACY_POLICY_URL?: string }).PRIVACY_POLICY_URL || 'https://smartpantrymobile.page.gd/privacy.html';
+                if (navigator.clipboard) navigator.clipboard.writeText(privacyUrl);
+                addToast?.('Privacy policy URL copied to clipboard', 'success');
+              }}
+              canDeleteAccount={!!user && !user.isGuest}
+              onDeleteAccount={() => setShowDeleteConfirm(true)}
+            />
+          </>}
+
+          {activeCategory === 'help' && (
+            <div className="bg-theme-secondary border border-theme rounded-2xl p-4 overflow-hidden shadow-sm">
+              <FAQPage 
+                onBack={() => setActiveCategory(null)} 
+                onNavigateToFeedback={() => setActiveCategory('contact_us')}
+              />
+            </div>
+          )}
+
+          {activeCategory === 'update' && <>
+            <SettingsAppUpdatesSection
+              title={intl.formatMessage({ id: 'settings.appUpdates' })}
+            />
+          </>}
+        </div>
       )}
-
-      <SettingsPendingNotificationsSection
-        user={user}
-        title={intl.formatMessage({ id: 'settings.pendingNotifications' })}
-      />
-
-      <SettingsUsageLimitsSection
-        userExists={!!user}
-        title={intl.formatMessage({ id: 'settings.usageLimits' })}
-        isPremium={isPremium}
-        isFamily={isFamily}
-        usageLimits={usageLimits}
-        onOpenUpgrade={() => setActiveSettingsTab('more')}
-      />
-
-      <SettingsHouseholdSection
-        user={user}
-        household={household}
-        title={intl.formatMessage({ id: 'settings.household' })}
-        onShowHousehold={onShowHousehold}
-        openMemberPreferences={openMemberPreferences}
-        removeMemberFromHousehold={removeMemberFromHousehold}
-        householdName={householdName}
-        setHouseholdName={setHouseholdName}
-        isCreatingHousehold={isCreatingHousehold}
-        createHousehold={createHousehold}
-        manageHouseholdLabel={intl.formatMessage({ id: 'settings.manageHousehold' })}
-      />
-
-      </>}
-
-      {activeSettingsTab === 'preferences' && <>
-
-
-
-      <SettingsAppPreferencesSection
-        title={intl.formatMessage({ id: 'settings.appPreferences' })}
-        settings={settings}
-        setSettings={setSettings}
-        userProfile={userProfile}
-        onMeasurementSystemChange={(value) => handleProfileChange('measurementSystem', value)}
-        geminiOptedIn={geminiOptedIn}
-        onGeminiOptInChange={handleGeminiOptIn}
-        labels={{
-          enableNotifications: intl.formatMessage({ id: 'settings.enableNotifications' }),
-          measurementSystem: intl.formatMessage({ id: 'settings.measurementSystem' }),
-          enableAiFeatures: intl.formatMessage({ id: 'settings.enableAiFeatures' }),
-          includeStaples: intl.formatMessage({ id: 'settings.includeStaples' }),
-          autoRestockStaples: intl.formatMessage({ id: 'settings.autoRestockStaples' }),
-          showNutrition: intl.formatMessage({ id: 'settings.showNutrition' }),
-          showPriceData: intl.formatMessage({ id: 'settings.showPriceData' }),
-        }}
-      />
-
-      <SettingsTabVisibilitySection
-        hiddenTabs={settings.navigation?.hiddenTabs}
-        onTabVisibilityChange={(tab, isVisible) => {
-          const hidden = settings.navigation?.hiddenTabs ?? [];
-          const newHidden = isVisible ? hidden.filter((currentTab: string) => currentTab !== tab) : [...hidden, tab];
-          setSettings((previous) => ({
-            ...previous,
-            navigation: { ...previous.navigation, hiddenTabs: newHidden },
-          }));
-        }}
-      />
-
-      <SettingsFoodSafetySection
-        title={intl.formatMessage({ id: 'settings.foodSafety' })}
-        user={user}
-        userProfile={userProfile}
-        setUserProfile={setUserProfile}
-        debouncedSaveProfile={debouncedSaveProfile}
-        saveProfileData={saveProfileData}
-      />
-
-      <SettingsThemeSection
-        title={intl.formatMessage({ id: 'settings.themeSettings' })}
-        settings={settings}
-        onResetTheme={() => {
-          setSettings((previous) => ({
-            ...previous,
-            theme: {
-              mode: 'dark',
-              accentColor: '#4CAF50',
-              backgroundColor: undefined,
-              textColor: undefined,
-            },
-          }));
-        }}
-        onThemeModeChange={(mode) => handleChange('theme', { mode })}
-        onAccentColorChange={(accentColor) => handleChange('theme', { accentColor })}
-        onBackgroundColorChange={(backgroundColor) => handleChange('theme', { backgroundColor })}
-        onTextColorChange={(textColor) => handleChange('theme', { textColor })}
-        labels={{
-          theme: intl.formatMessage({ id: 'settings.theme' }),
-          accent: intl.formatMessage({ id: 'settings.accent' }),
-          background: intl.formatMessage({ id: 'settings.background' }),
-          textColor: intl.formatMessage({ id: 'settings.textColor' }),
-          language: intl.formatMessage({ id: 'settings.language' }),
-          dark: intl.formatMessage({ id: 'settings.themes.dark' }),
-          light: intl.formatMessage({ id: 'settings.themes.light' }),
-        }}
-      />
-
-      <SettingsNotificationsSection
-        title={intl.formatMessage({ id: 'settings.notifications' })}
-        user={user}
-        notificationSettings={notificationSettings}
-        setNotificationSettings={handleNotificationSettingsChange}
-      />
-
-      </>}
-
-      {activeSettingsTab === 'organization' && <>
-
-      <SettingsLeftoverAnalyticsSection
-        userId={user?.id}
-        householdId={household?.id}
-        title={intl.formatMessage({ id: 'settings.leftoverAnalytics' })}
-      />
-
-      <SettingsCategoriesSection
-        userExists={!!user}
-        title={intl.formatMessage({ id: 'settings.categories' })}
-        customCategoryCount={customCategories.length}
-        onManageCategories={() => setShowCategoryManager(true)}
-      />
-
-      <SettingsStoreLayoutSection
-        userExists={!!user}
-        title={intl.formatMessage({ id: 'settings.storeLayout' })}
-        storeLayout={settings.shopping?.storeLayout || defaultStoreLayout}
-        onStoreLayoutChange={(newLayout) => setSettings((previous) => ({
-          ...previous,
-          shopping: {
-            ...previous.shopping,
-            storeLayout: newLayout,
-          },
-        }))}
-        storeProfiles={settings.shopping?.storeProfiles ?? {}}
-        activeStoreProfile={settings.shopping?.activeStoreProfile}
-        onStoreProfilesChange={(profiles, active) => setSettings((previous) => ({
-          ...previous,
-          shopping: {
-            ...previous.shopping,
-            storeProfiles: profiles,
-            activeStoreProfile: active,
-          },
-        }))}
-      />
-
-      </>}
-
-      {activeSettingsTab === 'more' && <>
-
-      <SettingsFeedbackSection
-        title={intl.formatMessage({ id: 'settings.feedback' })}
-        feedback={feedback}
-        setFeedback={setFeedback}
-        sending={sending}
-        onSubmit={handleFeedbackSubmit}
-      />
-
-      <SettingsSubscriptionSection
-        user={user}
-        title={intl.formatMessage({ id: 'settings.subscription' })}
-      />
-
-      <SettingsPantryImagesSection
-        user={user}
-        title={intl.formatMessage({ id: 'settings.pantryImages' })}
-        updatingBulkImages={updatingBulkImages}
-        onBulkUpdate={handleBulkImageUpdate}
-      />
-
-      <SettingsHelpSection
-        title={intl.formatMessage({ id: 'settings.help' })}
-        description="Need help? Check out our FAQ or contact our support team for assistance."
-        onOpenFAQ={() => setShowFAQModal(true)}
-        buttonLabel="View FAQ & Help"
-      />
-
-      <SettingsAppUpdatesSection
-        title={intl.formatMessage({ id: 'settings.appUpdates' })}
-      />
-
-      <SettingsResetUsageSection
-        isAdmin={isAdmin}
-        onReset={handleResetUsageCounters}
-      />
-
-      <SettingsRemoteConfigDebugSection
-        isAdmin={isAdmin}
-        addToast={addToast}
-      />
-
-      </>}
 
       </div> {/* end tab content */}
 
@@ -1475,30 +1632,7 @@ export const Settings: React.FC<SettingsProps> = ({
         </div>
       )}
 
-      {activeSettingsTab === 'more' && <>
 
-      <SettingsPrivacyLegalSection
-        title={intl.formatMessage({ id: 'settings.privacy' })}
-        onViewPrivacyPolicy={() => {
-          const privacyUrl = (window as Window & { PRIVACY_POLICY_URL?: string }).PRIVACY_POLICY_URL || 'https://smartpantrymobile.page.gd/privacy.html';
-          window.open(privacyUrl, '_blank');
-        }}
-        onViewTermsOfService={() => {
-          const termsUrl = (window as Window & { TERMS_OF_SERVICE_URL?: string }).TERMS_OF_SERVICE_URL || 'https://ornate-compass-478504-e1.web.app/terms.html';
-          window.open(termsUrl, '_blank');
-        }}
-        onCopyPrivacyUrl={() => {
-          const privacyUrl = (window as Window & { PRIVACY_POLICY_URL?: string }).PRIVACY_POLICY_URL || 'https://smartpantrymobile.page.gd/privacy.html';
-          if (navigator.clipboard) navigator.clipboard.writeText(privacyUrl);
-          addToast?.('Privacy policy URL copied to clipboard', 'success');
-        }}
-        canDeleteAccount={!!user && !user.isGuest}
-        onDeleteAccount={() => setShowDeleteConfirm(true)}
-      />
-
-      </>}
-
-    </div>
 
     {/* FAQ Modal */}
     {showFAQModal && (
@@ -1521,7 +1655,7 @@ export const Settings: React.FC<SettingsProps> = ({
               onBack={() => setShowFAQModal(false)} 
               onNavigateToFeedback={() => {
                 setShowFAQModal(false);
-                setActiveSettingsTab('more');
+                setActiveCategory('contact_us');
               }}
             />
           </div>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useIntl } from 'react-intl';
 import { Plus, X } from 'lucide-react';
-import QuantityUnitPicker from '../pantry/QuantityUnitPicker';
+import QuantityUnitPicker, { getSmartUnits } from '../pantry/QuantityUnitPicker';
 import { itemImages } from '../../data/item-images';
 
 interface ShoppingListAddItemModalProps {
@@ -64,6 +64,10 @@ export const ShoppingListAddItemModal: React.FC<ShoppingListAddItemModalProps> =
   const handleSelectSuggestion = (suggestion: string) => {
     setNewItem(capitalizeWords(suggestion));
     setSuggestions([]);
+    const smartUnits = getSmartUnits(suggestion);
+    if (smartUnits && smartUnits.length > 0) {
+      setNewUnit(smartUnits[0]);
+    }
   };
 
   if (!isOpen) {

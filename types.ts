@@ -97,6 +97,7 @@ export interface ShoppingItem {
   category: string;
   checked: boolean;
   quantity?: number | string; // Can be a number or string like "2 cups", "1 tbsp"
+  unit?: string; // Unit of measurement
   source?: string; // How the item was added (e.g., "suggested", "recipe: Chicken Stir Fry")
   purchasedQuantity?: {
     amount: number;

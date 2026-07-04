@@ -5,6 +5,7 @@ import { Camera as CapacitorCamera, CameraResultType, CameraSource } from '@capa
 import { Camera, Upload, Loader2, Plus, Trash2, CheckCircle2, ShoppingBasket, X, Barcode, ChevronDown, ChevronRight, ChevronUp, Image, ChefHat, TrendingUp, Search, Filter, Clock, Tag, FilePlus, Receipt, LayoutGrid, LayoutList } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { List } from 'react-window';
+const ReactWindowList = List as any;
 import { extractReceiptItems } from '../../services/receiptOcrService';
 import { setUserGeminiOptIn } from '../../services/featureFlags';
 import StorageLocationIndicator from './StorageLocationIndicator';
@@ -262,6 +263,17 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   const [newQty, setNewQty] = useState(1);
   const [newUnit, setNewUnit] = useState('count');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+
+  // Auto-suggest unit based on item name
+  useEffect(() => {
+    if (newItemText) {
+      const smartUnits = getSmartUnits(newItemText);
+      if (smartUnits && smartUnits.length > 0) {
+        setNewUnit(smartUnits[0]);
+      }
+    }
+  }, [newItemText]);
+
   const [hasTappedAddButton, setHasTappedAddButton] = useState(() => {
     try {
       return sessionStorage.getItem('clicked-pantry-add-button') === 'true';
@@ -1345,7 +1357,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
             {displayLayout === 'grid' ? (
               <div className="grid grid-cols-3 gap-2 p-2">{items.map(renderTileItem)}</div>
             ) : items.length > CATEGORY_VIRTUALIZE_THRESHOLD ? (
-              <List
+              <ReactWindowList
                 height={Math.min(400, items.length * 64)}
                 itemCount={items.length}
                 itemSize={64}
@@ -1357,8 +1369,8 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                   renderRow: (index: number, style: React.CSSProperties) => renderCategoryItem({ index, style, category })
                 }}
               >
-                {VirtualizedRow}
-              </List>
+                {VirtualizedRow as any}
+              </ReactWindowList>
             ) : (
               items.map(renderListItem)
             )}
@@ -1395,7 +1407,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
           ) : displayLayout === 'grid' ? (
             <div className="grid grid-cols-3 gap-2 p-2">{items.map(renderTileItem)}</div>
           ) : items.length > CATEGORY_VIRTUALIZE_THRESHOLD ? (
-            <List
+            <ReactWindowList
               height={Math.min(400, items.length * 64)}
               itemCount={items.length}
               itemSize={64}
@@ -1407,8 +1419,8 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                 renderRow: (index: number, style: React.CSSProperties) => renderStorageItem({ index, style, location })
               }}
             >
-              {VirtualizedRow}
-            </List>
+              {VirtualizedRow as any}
+            </ReactWindowList>
           ) : (
             items.map(renderListItem)
           )}
