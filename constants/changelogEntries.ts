@@ -20,6 +20,16 @@ export interface DetailedChangeEntry {
 
 export const RECENT_CHANGES: ChangeEntry[] = [
   {
+    "version": "2.5.11",
+    "date": "Jul 4, 2026",
+    "highlights": [
+      "Direct Unit Editing in Pantry Details — Added unit dropdown next to quantity controls in ItemDetailModal for immediate…",
+      "Smart Unit Auto-Suggestions — Automated smart unit suggestions during manual additions or typing in both Shopping List…",
+      "Ingredient Parsing & Normalization — Created parseQuantityAndUnit to automatically split inputs (e.g.",
+      "Unified Card Selection — Removed circular checkboxes in EnhancedShoppingListItem; selection is indicated by card…"
+    ]
+  },
+  {
     "version": "2.5.10",
     "date": "Jul 4, 2026",
     "highlights": [
@@ -35,20 +45,40 @@ export const RECENT_CHANGES: ChangeEntry[] = [
     "highlights": [
       "Release Build Crash on Launch — Added ProGuard keep rules for Room Database, WorkManager, and Startup initialization…"
     ]
-  },
-  {
-    "version": "2.5.8",
-    "date": "Jul 3, 2026",
-    "highlights": [
-      "Manual Duplicate Add as Expiry Batches — Adding an existing pantry item manually now appends it as a new batch under…",
-      "FEFO Expiry Date Takeover — The overall item expiration date is automatically set to the earliest active batch…",
-      "Extended Root Vegetable Shelf Life — Adjusted default auto-expiration days based on USDA maximum usable shelf life:…",
-      "Reduced Firestore Reads — Prevented redundant leftover notification check restarts on member presence/heartbeat…"
-    ]
   }
 ];
 
 export const ALL_CHANGES: DetailedChangeEntry[] = [
+  {
+    "version": "2.5.11",
+    "date": "Jul 4, 2026",
+    "sections": [
+      {
+        "title": "Added",
+        "bullets": [
+          "**Direct Unit Editing in Pantry Details** — Added unit dropdown next to quantity controls in `ItemDetailModal` for immediate unit editing.",
+          "**Smart Unit Auto-Suggestions** — Automated smart unit suggestions during manual additions or typing in both Shopping List and Pantry.",
+          "**Ingredient Parsing & Normalization** — Created `parseQuantityAndUnit` to automatically split inputs (e.g. \"1 tbsp chopped onion\" becomes Onion, qty 1, unit tbsp, note \"chopped\")."
+        ]
+      },
+      {
+        "title": "Changed",
+        "bullets": [
+          "**Unified Card Selection** — Removed circular checkboxes in `EnhancedShoppingListItem`; selection is indicated by card background tint, visual strike-through, and grayscale image filter.",
+          "**Vertical Inline Action Buttons** — Removed slide drawer on chevron click. Note/Delete buttons now render vertically inline in place of the chevron, auto-retracting when clicking anywhere else.",
+          "**Compact Notes & Badges** — Repositioned recipe link to bottom of the card, limited note display to 30 characters, and horizontalized note editor actions to save card space.",
+          "**Right-Aligned Pantry Scanner Columns** — Shifted Quantity to the rightmost edge next to the chevron with Expiration badge placed immediately to its left.",
+          "**Global Recipe Modal Navigation** — Rendered recipe modals globally from App.tsx root level, opening them over any current tab without switching active tabs."
+        ]
+      },
+      {
+        "title": "Fixed",
+        "bullets": [
+          "**Shelf-Stable Expiration Hide** — Hides expiration date badges (e.g. \"715d\") if an item is marked as shelf-stable."
+        ]
+      }
+    ]
+  },
   {
     "version": "2.5.10",
     "date": "Jul 4, 2026",

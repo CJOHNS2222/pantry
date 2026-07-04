@@ -55,6 +55,7 @@ import { PriceDataCacheService } from './services/priceDataCacheService'; // Imp
 import ExpiredItemsModal from './components/pantry/ExpiredItemsModal';
 import ExpiredItemsLaunchSheet, { getExpiredLaunchEnabled } from './components/pantry/ExpiredItemsLaunchSheet';
 import ItemDetailModal from './components/pantry/ItemDetailModal';
+import { RecipeFinderModalSection } from './components/recipe-finder/RecipeFinderModalSection';
 import { InventoryCacheService } from './services/inventoryCacheService';
 import { recordMilestone } from './services/onboardingMilestoneService';
 import { useIntl } from 'react-intl';
@@ -699,6 +700,23 @@ const App: React.FC = () => {
       }, 300);
     }
   }, [inventory, savedRecipes, mealPlan, household, user, isLoadingInventory, isLoadingSavedRecipes, isLoadingMealPlan, isLoadingHousehold]);
+
+  // Global Recipe Modal states
+  const [globalModalRecipe, setGlobalModalRecipe] = useState<StructuredRecipe | null>(null);
+  const [showGlobalRecipeModal, setShowGlobalRecipeModal] = useState(false);
+  const [globalModalIsSavedView, setGlobalModalIsSavedView] = useState(false);
+
+  // Global handler to open recipe modal from anywhere without switching tabs
+  useEffect(() => {
+    const handleOpenRecipeModal = (event: CustomEvent) => {
+      const { recipe, isSavedView } = event.detail;
+      setGlobalModalRecipe(recipe);
+      setGlobalModalIsSavedView(Boolean(isSavedView));
+      setShowGlobalRecipeModal(true);
+    };
+    window.addEventListener('openRecipeModal', handleOpenRecipeModal as EventListener);
+    return () => window.removeEventListener('openRecipeModal', handleOpenRecipeModal as EventListener);
+  }, []);
 
   // Confirm add to plan from dialog
   const confirmAddToPlan = (dayIndex: number, mealType: 'breakfast' | 'lunch' | 'dinner') => {
@@ -2000,6 +2018,23 @@ const App: React.FC = () => {
           originalIndex={notificationViewItem.index}
         />
       )}
+
+      <RecipeFinderModalSection
+        showRecipeModal={showGlobalRecipeModal}
+        modalRecipe={globalModalRecipe}
+        setShowRecipeModal={setShowGlobalRecipeModal}
+        onAddToPlan={handleAddToPlan}
+        handleModalSaveRecipe={handleSaveRecipe}
+        onDeleteRecipe={handleDeleteRecipe}
+        onRate={submitRating}
+        onMarkAsMade={handleMarkAsMade}
+        modalIsSavedView={globalModalIsSavedView}
+        recipeSaveLimitExceeded={recipeSaveLimitExceeded}
+        mealPlanLimitExceeded={mealPlanLimitExceeded}
+        savedRecipesCount={savedRecipes.length}
+        user={user}
+        inventory={inventory}
+      />
 
       {isAdmin && (
         <Suspense fallback={<LoadingSpinner />}>

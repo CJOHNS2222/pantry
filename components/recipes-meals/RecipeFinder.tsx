@@ -313,6 +313,8 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
     const [showRecipeModal, setShowRecipeModal] = useState(false);
     const [modalRecipe, setModalRecipe] = useState<StructuredRecipe | null>(null);
     const [modalIsSavedView, setModalIsSavedView] = useState(false);
+
+
     useAndroidBack(showRecipeModal, () => setShowRecipeModal(false));
     useAndroidBack(showRecipeAutocomplete, () => setShowRecipeAutocomplete(false));
 
@@ -337,15 +339,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
         }
     }, [initialSearchQuery]);
 
-    // Allow sibling components (e.g. SmartRecommendations) to open a recipe via window event
-    useEffect(() => {
-        const handleOpenRecipeModal = (event: CustomEvent) => {
-            const { recipe, isSavedView } = event.detail;
-            openRecipeModalRef.current?.(recipe, isSavedView ?? true);
-        };
-        window.addEventListener('openRecipeModal', handleOpenRecipeModal as EventListener);
-        return () => window.removeEventListener('openRecipeModal', handleOpenRecipeModal as EventListener);
-    }, []);
+
 
     // Surprise me feature
     // eslint-disable-next-line @typescript-eslint/no-unused-vars

@@ -8,7 +8,7 @@ import { getQuantityAmount, getQuantityUnit } from '../../utils/quantityUtils';
 import { getNutritionFactsWithFallback, NutritionFacts } from '../../services/nutritionService';
 import { getItemTips } from '../../data/itemTips';
 import { useKeyboardNavigation } from '../../hooks/useKeyboardNavigation';
-import QuantityUnitPicker from './QuantityUnitPicker';
+import QuantityUnitPicker, { COMMON_UNITS, getSmartUnits } from './QuantityUnitPicker';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { useModalOpen } from '../../utils/useModalOpen';
 import { useAndroidBack } from '../../hooks/useAndroidBack';
@@ -419,25 +419,46 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
               </button>
             </div>
 
-            {/* Quantity +/- controls */}
-            <div className="flex items-center gap-3 mt-3">
-              <button
-                onClick={() => handleQuantityChange(Math.max(0, roundQty(localQuantity - 0.25)))}
-                className="w-9 h-9 flex items-center justify-center rounded-full border border-theme text-theme-secondary hover:bg-theme-secondary transition-colors"
-                aria-label="Decrease quantity"
-                data-testid="item-qty-minus"
+            {/* Quantity +/- controls & Unit dropdown */}
+            <div className="flex items-center gap-4 mt-3">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => handleQuantityChange(Math.max(0, roundQty(localQuantity - 0.25)))}
+                  className="w-9 h-9 flex items-center justify-center rounded-full border border-theme text-theme-secondary hover:bg-theme-secondary transition-colors"
+                  aria-label="Decrease quantity"
+                  data-testid="item-qty-minus"
+                >
+                  <Minus className="w-4 h-4" />
+                </button>
+                <span className="text-lg font-semibold text-theme-primary min-w-[2rem] text-center">{localQuantity}</span>
+                <button
+                  onClick={() => handleQuantityChange(roundQty(localQuantity + 0.25))}
+                  className="w-9 h-9 flex items-center justify-center rounded-full border border-theme text-theme-secondary hover:bg-theme-secondary transition-colors"
+                  aria-label="Increase quantity"
+                  data-testid="item-qty-plus"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Unit Dropdown */}
+              <select
+                value={localUnit}
+                onChange={(e) => handleUnitChange(e.target.value)}
+                aria-label="Unit of measurement"
+                className="px-3 py-1.5 bg-theme-secondary border border-theme rounded-lg text-theme-primary focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:border-transparent text-sm font-medium"
               >
-                <Minus className="w-4 h-4" />
-              </button>
-              <span className="text-lg font-semibold text-theme-primary min-w-[2rem] text-center">{localQuantity}</span>
-              <button
-                onClick={() => handleQuantityChange(roundQty(localQuantity + 0.25))}
-                className="w-9 h-9 flex items-center justify-center rounded-full border border-theme text-theme-secondary hover:bg-theme-secondary transition-colors"
-                aria-label="Increase quantity"
-                data-testid="item-qty-plus"
-              >
-                <Plus className="w-4 h-4" />
-              </button>
+                {getSmartUnits(item.item).map(unitOption => (
+                  <option key={unitOption} value={unitOption}>
+                    {unitOption}
+                  </option>
+                ))}
+                {COMMON_UNITS.filter(u => !getSmartUnits(item.item).includes(u)).map(unitOption => (
+                  <option key={unitOption} value={unitOption}>
+                    {unitOption}
+                  </option>
+                ))}
+              </select>
             </div>
 
             {/* Fill Level - Portion Selector */}

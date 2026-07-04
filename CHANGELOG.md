@@ -1,3 +1,22 @@
+## [2.5.11] - 2026-07-04
+
+### Added
+- **Direct Unit Editing in Pantry Details** — Added unit dropdown next to quantity controls in `ItemDetailModal` for immediate unit editing.
+- **Smart Unit Auto-Suggestions** — Automated smart unit suggestions during manual additions or typing in both Shopping List and Pantry.
+- **Ingredient Parsing & Normalization** — Created `parseQuantityAndUnit` to automatically split inputs (e.g. "1 tbsp chopped onion" becomes Onion, qty 1, unit tbsp, note "chopped").
+
+### Changed
+- **Unified Card Selection** — Removed circular checkboxes in `EnhancedShoppingListItem`; selection is indicated by card background tint, visual strike-through, and grayscale image filter.
+- **Vertical Inline Action Buttons** — Removed slide drawer on chevron click. Note/Delete buttons now render vertically inline in place of the chevron, auto-retracting when clicking anywhere else.
+- **Compact Notes & Badges** — Repositioned recipe link to bottom of the card, limited note display to 30 characters, and horizontalized note editor actions to save card space.
+- **Right-Aligned Pantry Scanner Columns** — Shifted Quantity to the rightmost edge next to the chevron with Expiration badge placed immediately to its left.
+- **Global Recipe Modal Navigation** — Rendered recipe modals globally from App.tsx root level, opening them over any current tab without switching active tabs.
+
+### Fixed
+- **Shelf-Stable Expiration Hide** — Hides expiration date badges (e.g. "715d") if an item is marked as shelf-stable.
+
+---
+
 ## [2.5.10] - 2026-07-04
 
 ### Changed
