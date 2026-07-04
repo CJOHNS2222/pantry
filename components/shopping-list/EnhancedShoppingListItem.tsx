@@ -7,7 +7,8 @@ import { useAppActions } from '../../contexts/AppActionsContext';
 import { comparePriceOptions, formatPricePerUnit, getPriceComparisonSummary } from '../../utils/priceCalculator';
 import { useAndroidBack } from '../../hooks/useAndroidBack';
 import HapticService from '../../services/hapticService';
-import { getItemImageLocalPath } from '../../utils/appUtils';
+import { getItemImageLocalPath, parseQuantityAndUnit } from '../../utils/appUtils';
+import { getSmartUnits } from '../pantry/QuantityUnitPicker';
 
 const getRecipeTitleFromSource = (source: string | undefined): string => {
   if (!source || !source.startsWith('recipe:')) return '';
@@ -373,16 +374,51 @@ export const EnhancedShoppingListItem: React.FC<ShoppingListItemProps> = ({
             </button>
           )}
 
-          {onQuantityChange && (
-            <input
-              type="text"
-              value={item.quantity || ''}
-              onChange={(e) => onQuantityChange(item.id, e.target.value)}
-              onClick={(e) => e.stopPropagation()}
-              className="w-16 h-[30px] px-2 py-1 text-sm border border-theme rounded bg-theme-primary text-theme-primary focus:outline-none focus:ring-1 focus:ring-[var(--accent-color)] text-center"
-              placeholder="qty"
-            />
-          )}
+          {onQuantityChange && (() => {
+            const { amount, unit } = parseQuantityAndUnit(item.quantity, item.item);
+            const smartUnits = getSmartUnits(item.item);
+            const commonUnits = ['pcs', 'dozen', 'lbs', 'kg', 'oz', 'g', 'cups', 'tbsp', 'tsp', 'ml', 'l', 'cans', 'bottles', 'packages', 'boxes', 'bags'];
+            const allUnits = Array.from(new Set([...smartUnits, ...commonUnits]));
+            
+            return (
+              <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.25"
+                  value={amount}
+                  onChange={(e) => {
+                    const newAmount = parseFloat(e.target.value) || 0;
+                    const newQuantityStr = unit === 'pcs' || unit === 'pieces' || unit === 'count' || unit === 'each'
+                      ? newAmount.toString()
+                      : `${newAmount} ${unit}`;
+                    onQuantityChange(item.id, newQuantityStr);
+                    onUpdateItem?.(item.id, { quantity: newQuantityStr, unit });
+                  }}
+                  className="w-12 h-[30px] px-1 py-1 text-sm border border-theme rounded bg-theme-primary text-theme-primary focus:outline-none focus:ring-1 focus:ring-[var(--accent-color)] text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  placeholder="qty"
+                />
+                <select
+                  value={unit}
+                  onChange={(e) => {
+                    const newUnit = e.target.value;
+                    const newQuantityStr = newUnit === 'pcs' || newUnit === 'pieces' || newUnit === 'count' || newUnit === 'each'
+                      ? amount.toString()
+                      : `${amount} ${newUnit}`;
+                    onQuantityChange(item.id, newQuantityStr);
+                    onUpdateItem?.(item.id, { quantity: newQuantityStr, unit: newUnit });
+                  }}
+                  className="w-18 h-[30px] px-1 text-xs border border-theme rounded bg-theme-primary text-theme-primary focus:outline-none focus:ring-1 focus:ring-[var(--accent-color)]"
+                >
+                  {allUnits.map((u) => (
+                    <option key={u} value={u}>
+                      {u}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            );
+          })()}
 
           {showPriceData && (
             item.estimatedPrice && item.estimatedPrice > 0 ? (

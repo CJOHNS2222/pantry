@@ -24,6 +24,7 @@ import { ShoppingListFooterActions } from './ShoppingListFooterActions';
 import { ShoppingListActionBars } from './ShoppingListActionBars';
 import { ShoppingListAddFab } from './ShoppingListAddFab';
 import { ShoppingListUndoBanners } from './ShoppingListUndoBanners';
+import { getSmartUnits } from '../pantry/QuantityUnitPicker';
 
 // Import hooks and services
 import { useOfflineStatus } from '../../hooks/useOfflineStatus';
@@ -96,6 +97,17 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     });
     return () => { mounted = false; };
   }, [user]);
+
+  // Auto-suggest unit based on item name
+  useEffect(() => {
+    if (newItem) {
+      const smartUnits = getSmartUnits(newItem);
+      if (smartUnits && smartUnits.length > 0) {
+        setNewUnit(smartUnits[0]);
+      }
+    }
+  }, [newItem]);
+
   const [newQty, setNewQty] = React.useState<string>('1');
   const [newUnit, setNewUnit] = React.useState<string>('count');
   const [isAddModalOpen, setIsAddModalOpen] = React.useState(false);
@@ -627,7 +639,8 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
       item: newItem,
       category: inferCategoryFromItemName(newItem),
       checked: false,
-      quantity: newUnit === 'count' ? newQty : `${newQty} ${newUnit}`,
+      quantity: newUnit === 'count' || newUnit === 'pcs' || newUnit === 'pieces' || newUnit === 'each' ? newQty : `${newQty} ${newUnit}`,
+      unit: newUnit,
       source: 'manual',
       addedAt: new Date(),
       estimatedPrice,

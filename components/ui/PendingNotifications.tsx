@@ -1,16 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Bell, Clock, Check, X, AlertCircle } from 'lucide-react';
 import { NotificationService, NotificationItem } from '../../services/notificationService';
 import { markNotificationRead, snoozeNotificationInCache, updateNotificationInCache } from '../../services/notificationsService';
 import { User } from '../../types';
 import { serverTimestamp } from 'firebase/firestore';
 import DatabaseMonitoringService from '../../services/databaseMonitoringService';
-import { getNotificationsOnce } from '../../services/notificationsService';
-import { Timestamp } from 'firebase/firestore';
 import { useApp } from '../../contexts/AppContext';
 import { useAppActions } from '../../contexts/AppActionsContext';
 import { Tab } from '../../types/app';
 import { log } from '../../services/logService';
+import { useUserNotifications } from '../../hooks/useUserNotifications';
 
 interface PendingNotificationsProps {
   user: User;
@@ -21,71 +20,39 @@ export const PendingNotifications: React.FC<PendingNotificationsProps> = ({
   user,
   onNavigateToSettings: _onNavigateToSettings
 }) => {
-  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
-  const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState<string | null>(null);
   const { inventory } = useApp();
   const { setActiveTab, onAddToShoppingList, addToast } = useAppActions();
 
-  useEffect(() => {
-    loadNotifications();
-  }, [user.id]);
+  // Stream notifications in realtime
+  const { items: rawNotifications } = useUserNotifications(user.id, 500);
 
-  const loadNotifications = async () => {
-    try {
-      setLoading(true);
-      
-      // Get notifications from both sources
-      const [topLevelNotifications, cachedNotifications] = await Promise.all([
-        NotificationService.getUnreadNotifications(user.id, user.email),
-        getNotificationsOnce(user.id)
-      ]);
-      
-      // Combine and deduplicate notifications
-      const allNotifications = [...topLevelNotifications];
-      
-      // Add unread cached notifications that aren't already in the top-level list.
-      // Skip read ones so the count here stays in sync with the header bell badge.
-      /* eslint-disable @typescript-eslint/no-explicit-any */
-      for (const cached of cachedNotifications) {
-        if (cached.read) continue;
-        if (!allNotifications.find(n => n.id === cached.id)) {
-          // Convert cached notification format to NotificationItem format
-          allNotifications.push({
-            id: cached.id,
-            userId: user.id,
-            type: (cached as any).type || 'system',
-            title: cached.title,
-            message: (cached as any).body || cached.title,
-            actionLabel: (cached as any).actionLabel,
-            actionType: (cached as any).actionType,
-            actionData: (cached as any).actionData,
-            priority: (cached as any).priority || 'low',
-            read: cached.read || false,
-            createdAt: (cached as any).createdAt instanceof Date ? Timestamp.fromDate((cached as any).createdAt) : 
-                      typeof (cached as any).createdAt === 'string' ? Timestamp.fromDate(new Date((cached as any).createdAt)) :
-                      Timestamp.now(),
-            expiresAt: (cached as any).expiresAt,
-            snoozedUntil: (cached as any).snoozedUntil
-          });
-        }
-      }
-      
-      // Sort by createdAt desc and limit to 20
-      const sorted = allNotifications.slice().sort((a: any, b: any) => {
-        const aTime = a.createdAt && a.createdAt.toMillis ? a.createdAt.toMillis() : (a.createdAt ? new Date(a.createdAt).getTime() : 0);
-        const bTime = b.createdAt && b.createdAt.toMillis ? b.createdAt.toMillis() : (b.createdAt ? new Date(b.createdAt).getTime() : 0);
+  // Filter for unread and format/sort them
+  const notifications = useMemo(() => {
+    return (rawNotifications || [])
+      .filter(n => !n.read)
+      .map(n => ({
+        id: n.id,
+        userId: user.id,
+        type: (n as any).type || 'system',
+        title: n.title,
+        message: n.message || n.body || n.title,
+        actionLabel: n.actionLabel,
+        actionType: n.actionType as any,
+        actionData: n.actionData,
+        priority: n.priority || 'low',
+        read: n.read || false,
+        createdAt: n.createdAt,
+        expiresAt: n.expiresAt,
+        snoozedUntil: n.snoozedUntil
+      }))
+      .sort((a: any, b: any) => {
+        const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
         return bTime - aTime;
-      }).slice(0, 20);
-      /* eslint-enable @typescript-eslint/no-explicit-any */
-      
-      setNotifications(sorted);
-    } catch (error) {
-      log.error('Error loading notifications', { error }, 'PendingNotifications');
-    } finally {
-      setLoading(false);
-    }
-  };
+      })
+      .slice(0, 20);
+  }, [rawNotifications, user.id]);
 
   const handleAcceptNotification = async (notification: NotificationItem) => {
     setProcessing(notification.id);
@@ -183,8 +150,6 @@ export const PendingNotifications: React.FC<PendingNotificationsProps> = ({
         // If top-level update fails, try updating in cache
         await updateNotificationInCache(user.id, notification.id, { read: true });
       }
-      
-      await loadNotifications(); // Refresh the list
     } catch (error) {
       log.error('Error accepting notification', { error }, 'PendingNotifications');
     } finally {
@@ -198,7 +163,6 @@ export const PendingNotifications: React.FC<PendingNotificationsProps> = ({
       if (user?.id) {
         await snoozeNotificationInCache(user.id, notification.id, minutes);
       }
-      await loadNotifications(); // Refresh the list
     } catch (error) {
       log.error('Error snoozing notification', { error }, 'PendingNotifications');
     } finally {
@@ -216,7 +180,6 @@ export const PendingNotifications: React.FC<PendingNotificationsProps> = ({
         // If top-level update fails, try updating in cache
         await updateNotificationInCache(user.id, notification.id, { read: true });
       }
-      await loadNotifications(); // Refresh the list
     } catch (error) {
       log.error('Error dismissing notification', { error }, 'PendingNotifications');
     } finally {
@@ -244,14 +207,6 @@ export const PendingNotifications: React.FC<PendingNotificationsProps> = ({
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-8">
-        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-amber-500"></div>
-        <span className="ml-2 text-theme-secondary">Loading notifications...</span>
-      </div>
-    );
-  }
 
   return (
     <>

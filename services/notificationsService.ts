@@ -261,6 +261,19 @@ export async function pruneNotificationsForDeletedItems(uid: string, deletedItem
       if (n.actionData?.itemId) {
         return !deletedSet.has(n.actionData.itemId);
       }
+      // Single leftover notification: actionData.leftoverId
+      if (n.actionData?.leftoverId) {
+        return !deletedSet.has(n.actionData.leftoverId);
+      }
+      // Aggregated leftover notification: actionData.leftovers[].id
+      if (Array.isArray(n.actionData?.leftovers) && n.actionData.leftovers.length > 0) {
+        const referencedIds: string[] = n.actionData.leftovers
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .map((l: any) => l.id)
+          .filter(Boolean);
+        // Keep if at least one referenced leftover is NOT deleted
+        return referencedIds.length === 0 || !referencedIds.every(id => deletedSet.has(id));
+      }
       return true; // no item reference — keep
     });
 

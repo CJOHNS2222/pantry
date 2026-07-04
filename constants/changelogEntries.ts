@@ -20,6 +20,16 @@ export interface DetailedChangeEntry {
 
 export const RECENT_CHANGES: ChangeEntry[] = [
   {
+    "version": "2.5.10",
+    "date": "Jul 4, 2026",
+    "highlights": [
+      "Refactored Settings Tab — Redesigned the Settings screen into a premium list-based category options screen.",
+      "Normalized Quantities & Measurements — Refactored quantity entry in both the Shopping List and Pantry Tab to handle…",
+      "Split Shopping List Inputs — Replaced the single quantity text input in the Shopping List rows with a Numeric Input and…",
+      "Smart Unit Auto-Suggestions — Automatically suggests and pre-selects smart units (like dozen for Eggs, lbs for Apples,…"
+    ]
+  },
+  {
     "version": "2.5.9",
     "date": "Jul 3, 2026",
     "highlights": [
@@ -35,17 +45,33 @@ export const RECENT_CHANGES: ChangeEntry[] = [
       "Extended Root Vegetable Shelf Life — Adjusted default auto-expiration days based on USDA maximum usable shelf life:…",
       "Reduced Firestore Reads — Prevented redundant leftover notification check restarts on member presence/heartbeat…"
     ]
-  },
-  {
-    "version": "2.5.7",
-    "date": "Jun 30, 2026",
-    "highlights": [
-      "Auto-Exit on Update — Configured the app to automatically close/terminate 1 second after redirecting the user to the…"
-    ]
   }
 ];
 
 export const ALL_CHANGES: DetailedChangeEntry[] = [
+  {
+    "version": "2.5.10",
+    "date": "Jul 4, 2026",
+    "sections": [
+      {
+        "title": "Changed",
+        "bullets": [
+          "**Refactored Settings Tab** — Redesigned the Settings screen into a premium list-based category options screen. Divided options into 7 categories: Account Info, Preferences, Notifications, Food Waste Savings, Contact Us, Help, and Update.",
+          "**Normalized Quantities & Measurements** — Refactored quantity entry in both the Shopping List and Pantry Tab to handle amounts and unit measurements separately.",
+          "**Split Shopping List Inputs** — Replaced the single quantity text input in the Shopping List rows with a Numeric Input and a unit dropdown/dropdown selector with smart defaults.",
+          "**Smart Unit Auto-Suggestions** — Automatically suggests and pre-selects smart units (like `dozen` for Eggs, `lbs` for Apples, etc.) as the user types manual item names."
+        ]
+      },
+      {
+        "title": "Fixed",
+        "bullets": [
+          "**Realtime Notifications in Settings** — Integrated the realtime notification stream hook into the settings view so pending notifications stay synchronized with the header bell icon badge.",
+          "**Notifications Settings Panel Theme** — Rewrote styles for the Notification Settings component to eliminate duplicate headers and align background/border colors with the application grey theme.",
+          "**React 19 Virtualized List Type Mismatch** — Resolved TypeScript JSX children/props compilation errors in `react-window` virtualized pantry list views."
+        ]
+      }
+    ]
+  },
   {
     "version": "2.5.9",
     "date": "Jul 3, 2026",

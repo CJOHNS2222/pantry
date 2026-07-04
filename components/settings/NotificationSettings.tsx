@@ -145,21 +145,16 @@ export const NotificationSettingsComponent: React.FC<NotificationSettingsProps> 
 
   return (
     <>
-      <div className="bg-[#2A0A10]/50 p-6 rounded-xl border border-red-900/30">
-        <div className="flex items-center gap-2 mb-6">
-          <Bell className="w-5 h-5 text-amber-500" />
-          <h3 className="text-lg font-bold text-white">Notifications</h3>
-        </div>
-
+      <div className="space-y-6">
         {/* Presets */}
-        <div className="mb-6">
-          <p className="text-xs text-red-200/60 mb-2">Quick presets</p>
+        <div>
+          <p className="text-xs text-theme-secondary mb-2">Quick presets</p>
           <div className="flex gap-2">
             {(Object.keys(PRESETS) as Array<keyof typeof PRESETS>).map((preset) => (
               <button
                 key={preset}
                 onClick={() => applySettingsWithPermissionCheck(PRESETS[preset])}
-                className="flex-1 px-3 py-1.5 rounded-lg text-sm font-semibold bg-[#1A0508]/70 border border-red-900/30 text-red-200/80 hover:border-amber-500/60 hover:text-amber-400 transition-colors"
+                className="flex-1 px-3 py-1.5 rounded-lg text-sm font-semibold bg-theme-primary/10 border border-theme text-theme-secondary hover:bg-[var(--accent-color)]/20 hover:text-theme-primary transition-colors cursor-pointer"
               >
                 {preset}
               </button>
@@ -168,56 +163,56 @@ export const NotificationSettingsComponent: React.FC<NotificationSettingsProps> 
         </div>
 
         {/* Master toggle */}
-        <div className="mb-6">
-          <label className="flex items-center justify-between">
-            <span className="text-white font-medium">Enable Notifications</span>
+        <div>
+          <label className="flex items-center justify-between cursor-pointer">
+            <span className="text-theme-primary font-medium">Enable Notifications</span>
             <input
               type="checkbox"
               checked={settings.enabled}
               onChange={(e) => updateSettings({ enabled: e.target.checked })}
-              className="w-4 h-4 text-amber-600 bg-gray-100 border-gray-300 rounded focus:ring-amber-500"
+              className="w-4 h-4 text-[var(--accent-color)] border-theme rounded focus:ring-[var(--accent-color)] bg-theme-secondary"
             />
           </label>
-          <p className="text-xs text-red-200/60 mt-1">
+          <p className="text-xs text-theme-secondary mt-1">
             Receive alerts about expiring items, recipe suggestions, and household activity
           </p>
         </div>
 
         {/* Quiet hours */}
-        <div className="mb-6 p-4 bg-[#1A0508]/50 rounded-lg border border-red-900/20">
+        <div className="p-4 bg-theme-primary/5 rounded-xl border border-theme">
           <div className="flex items-center gap-2 mb-3">
-            <Clock className="w-4 h-4 text-amber-500" />
-            <span className="text-white font-medium">Quiet Hours</span>
+            <Clock className="w-4 h-4 text-[var(--accent-color)]" />
+            <span className="text-theme-primary font-medium">Quiet Hours</span>
           </div>
 
-          <label className="flex items-center justify-between mb-3">
-            <span className="text-red-200/80">Enable quiet hours</span>
+          <label className="flex items-center justify-between mb-3 cursor-pointer">
+            <span className="text-theme-secondary text-sm">Enable quiet hours</span>
             <input
               type="checkbox"
               checked={settings.quietHours.enabled}
               onChange={(e) => updateQuietHours('enabled', e.target.checked)}
-              className="w-4 h-4 text-amber-600 bg-gray-100 border-gray-300 rounded focus:ring-amber-500"
+              className="w-4 h-4 text-[var(--accent-color)] border-theme rounded focus:ring-[var(--accent-color)] bg-theme-secondary"
             />
           </label>
 
           {settings.quietHours.enabled && (
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs text-red-200/60 mb-1">Start Time</label>
+                <label className="block text-xs text-theme-secondary mb-1">Start Time</label>
                 <input
                   type="time"
                   value={settings.quietHours.start}
                   onChange={(e) => updateQuietHours('start', e.target.value)}
-                  className="w-full bg-[#2A0A10] border border-red-900/50 rounded px-3 py-2 text-white text-sm focus:border-amber-500 outline-none"
+                  className="w-full bg-theme-secondary border border-theme rounded-lg px-3 py-2 text-theme-primary text-sm focus:border-theme-primary outline-none"
                 />
               </div>
               <div>
-                <label className="block text-xs text-red-200/60 mb-1">End Time</label>
+                <label className="block text-xs text-theme-secondary mb-1">End Time</label>
                 <input
                   type="time"
                   value={settings.quietHours.end}
                   onChange={(e) => updateQuietHours('end', e.target.value)}
-                  className="w-full bg-[#2A0A10] border border-red-900/50 rounded px-3 py-2 text-white text-sm focus:border-amber-500 outline-none"
+                  className="w-full bg-theme-secondary border border-theme rounded-lg px-3 py-2 text-theme-primary text-sm focus:border-theme-primary outline-none"
                 />
               </div>
             </div>
@@ -225,22 +220,22 @@ export const NotificationSettingsComponent: React.FC<NotificationSettingsProps> 
         </div>
 
         {/* Notification types */}
-        <div className="space-y-4">
-          <h4 className="text-white font-medium flex items-center gap-2">
-            <SettingsIcon className="w-4 h-4" />
+        <div className="space-y-4 border-t border-theme pt-4">
+          <h4 className="text-theme-primary font-medium flex items-center gap-2 text-sm">
+            <SettingsIcon className="w-4 h-4 text-[var(--accent-color)]" />
             Notification Types
           </h4>
 
           {/* Expiration alerts */}
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-4">
             <div>
-              <span className="text-white text-sm font-medium">Expiration Alerts</span>
-              <p className="text-xs text-red-200/60">Get notified when items are about to expire</p>
+              <span className="text-theme-primary text-sm font-medium">Expiration Alerts</span>
+              <p className="text-xs text-theme-secondary">Get notified when items are about to expire</p>
             </div>
             <select
               value={settings.types.expiration}
               onChange={(e) => updateTypeSetting('expiration', e.target.value)}
-              className="bg-[#2A0A10] border border-red-900/50 rounded px-3 py-1 text-white text-sm focus:border-amber-500 outline-none"
+              className="bg-theme-secondary border border-theme rounded-lg px-3 py-1.5 text-theme-primary text-sm focus:border-theme-primary outline-none"
             >
               <option value="never">Never</option>
               <option value="urgent">Only urgent (expired/expiring today)</option>
@@ -252,84 +247,84 @@ export const NotificationSettingsComponent: React.FC<NotificationSettingsProps> 
           {/* Allergy alerts */}
           <div className="flex items-center justify-between">
             <div>
-              <span className="text-white text-sm font-medium">Allergy Alerts</span>
-              <p className="text-xs text-red-200/60">High-priority alerts for potential allergen exposure</p>
+              <span className="text-theme-primary text-sm font-medium">Allergy Alerts</span>
+              <p className="text-xs text-theme-secondary">High-priority alerts for potential allergen exposure</p>
             </div>
             <input
               type="checkbox"
               checked={settings.types.allergy_alert}
               onChange={(e) => updateTypeSetting('allergy_alert', e.target.checked)}
-              className="w-4 h-4 text-amber-600 bg-gray-100 border-gray-300 rounded focus:ring-amber-500"
+              className="w-4 h-4 text-[var(--accent-color)] border-theme rounded focus:ring-[var(--accent-color)] bg-theme-secondary cursor-pointer"
             />
           </div>
 
           {/* Recipe suggestions */}
           <div className="flex items-center justify-between">
             <div>
-              <span className="text-white text-sm font-medium">Recipe Suggestions</span>
-              <p className="text-xs text-red-200/60">Suggestions based on your pantry items</p>
+              <span className="text-theme-primary text-sm font-medium">Recipe Suggestions</span>
+              <p className="text-xs text-theme-secondary">Suggestions based on your pantry items</p>
             </div>
             <input
               type="checkbox"
               checked={settings.types.recipe_suggestion}
               onChange={(e) => updateTypeSetting('recipe_suggestion', e.target.checked)}
-              className="w-4 h-4 text-amber-600 bg-gray-100 border-gray-300 rounded focus:ring-amber-500"
+              className="w-4 h-4 text-[var(--accent-color)] border-theme rounded focus:ring-[var(--accent-color)] bg-theme-secondary cursor-pointer"
             />
           </div>
 
           {/* Household activity */}
           <div className="flex items-center justify-between">
             <div>
-              <span className="text-white text-sm font-medium">Household Activity</span>
-              <p className="text-xs text-red-200/60">When family members add/remove items</p>
+              <span className="text-theme-primary text-sm font-medium">Household Activity</span>
+              <p className="text-xs text-theme-secondary">When family members add/remove items</p>
             </div>
             <input
               type="checkbox"
               checked={settings.types.household_activity}
               onChange={(e) => updateTypeSetting('household_activity', e.target.checked)}
-              className="w-4 h-4 text-amber-600 bg-gray-100 border-gray-300 rounded focus:ring-amber-500"
+              className="w-4 h-4 text-[var(--accent-color)] border-theme rounded focus:ring-[var(--accent-color)] bg-theme-secondary cursor-pointer"
             />
           </div>
 
-          {/* Expired items modal */}
+          {/* Expired items check */}
           <div className="flex items-center justify-between">
             <div>
-              <span className="text-white text-sm font-medium">Expired Items Check</span>
-              <p className="text-xs text-red-200/60">Show expired items list on app load</p>
+              <span className="text-theme-primary text-sm font-medium">Expired Items Check</span>
+              <p className="text-xs text-theme-secondary">Show expired items list on app load</p>
             </div>
             <input
               type="checkbox"
               checked={settings.types.expired_items_check}
               onChange={(e) => updateTypeSetting('expired_items_check', e.target.checked)}
-              className="w-4 h-4 text-amber-600 bg-gray-100 border-gray-300 rounded focus:ring-amber-500"
+              className="w-4 h-4 text-[var(--accent-color)] border-theme rounded focus:ring-[var(--accent-color)] bg-theme-secondary cursor-pointer"
             />
           </div>
 
           {/* Shopping reminders */}
           <div className="flex items-center justify-between">
             <div>
-              <span className="text-white text-sm font-medium">Shopping Reminders</span>
-              <p className="text-xs text-red-200/60">Weekly reminders to check your shopping list</p>
+              <span className="text-theme-primary text-sm font-medium">Shopping Reminders</span>
+              <p className="text-xs text-theme-secondary">Weekly reminders to check your shopping list</p>
             </div>
             <input
               type="checkbox"
               checked={settings.types.shopping_reminder}
               onChange={(e) => updateTypeSetting('shopping_reminder', e.target.checked)}
-              className="w-4 h-4 text-amber-600 bg-gray-100 border-gray-300 rounded focus:ring-amber-500"
+              className="w-4 h-4 text-[var(--accent-color)] border-theme rounded focus:ring-[var(--accent-color)] bg-theme-secondary cursor-pointer"
             />
           </div>
 
-          {/* System notifications */}
+          {/* System updates */}
           <div className="flex items-center justify-between">
             <div>
-              <span className="text-white text-sm font-medium">System Updates</span>
-              <p className="text-xs text-red-200/60">App updates, new features, and maintenance</p>
+              <span className="text-theme-primary text-sm font-medium">System Updates</span>
+              <p className="text-xs text-theme-secondary">App updates, new features, and maintenance</p>
             </div>
             <input
               type="checkbox"
               checked={settings.types.system}
               onChange={(e) => updateTypeSetting('system', e.target.checked)}
-              className="w-4 h-4 text-amber-600 bg-gray-100 border-gray-300 rounded focus:ring-amber-500"
+              className="w-4 h-4 text-[var(--accent-color)] border-theme rounded focus:ring-[var(--accent-color)] bg-theme-secondary cursor-pointer"
             />
           </div>
         </div>

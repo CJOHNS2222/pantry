@@ -1,5 +1,6 @@
 import { LeftoverService } from './leftoverService'
 import { NotificationService, NotificationItem } from './notificationService'
+import { pruneNotificationsForDeletedItems } from './notificationsService'
 import { PantryItem } from '../types'
 import AnalyticsService from './analyticsService'
 import { log } from './logService'
@@ -65,6 +66,36 @@ export class LeftoverNotificationService {
       });
 
       const leftovers = await LeftoverService.getLeftovers(householdId)
+
+      // Clean up stale leftover notifications for items no longer in inventory
+      const currentLeftoverIds = new Set(leftovers.map(l => l.id));
+      const staleLeftoverIds: string[] = [];
+      for (const n of cachedNotifications) {
+        const isLeftoverNotif = n.type === 'expiration' && (
+          n.actionData?.leftoverId ||
+          n.actionData?.leftovers ||
+          n.dedupeKey?.startsWith('leftover_')
+        );
+        if (!isLeftoverNotif) continue;
+
+        // Single leftover notification
+        if (n.actionData?.leftoverId && !currentLeftoverIds.has(n.actionData.leftoverId)) {
+          staleLeftoverIds.push(n.actionData.leftoverId);
+        }
+        // Aggregated leftover notification — collect IDs of leftovers that no longer exist
+        if (Array.isArray(n.actionData?.leftovers)) {
+          for (const l of n.actionData.leftovers) {
+            if (l.id && !currentLeftoverIds.has(l.id)) {
+              staleLeftoverIds.push(l.id);
+            }
+          }
+        }
+      }
+      if (staleLeftoverIds.length > 0) {
+        pruneNotificationsForDeletedItems(userId, staleLeftoverIds).catch((err) =>
+          log.info('Failed to prune stale leftover notifications', { error: err })
+        );
+      }
 
       if (leftovers.length === 0) return
 

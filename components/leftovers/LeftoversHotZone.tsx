@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { doc, onSnapshot } from 'firebase/firestore'
 import { db } from '../../firebaseConfig'
 import { LeftoverService } from '../../services/leftoverService'
+import { pruneNotificationsForDeletedItems } from '../../services/notificationsService'
 import FreezerService from '../../services/freezerService'
 import AnalyticsService from '../../services/analyticsService'
 import { getExpirationColor } from '../../utils/appUtils'
@@ -64,6 +65,9 @@ export default function LeftoversHotZone({ householdId, onNavigateToRecipes }: L
 
       const servingsLeft = result.deleted ? 0 : (leftover.leftoverMeta?.servings ?? 1) - 1
       AnalyticsService.trackLeftoverConsumed(householdId, leftover.id, servingsLeft)
+      if (result.deleted && user?.id) {
+        pruneNotificationsForDeletedItems(user.id, [leftover.id]).catch(() => {})
+      }
       addToast(
         servingsLeft > 0 ? `Consumed 1 serving (${servingsLeft} left)` : 'Consumed last serving',
         'success',
@@ -94,6 +98,9 @@ export default function LeftoversHotZone({ householdId, onNavigateToRecipes }: L
     try {
       await LeftoverService.discard(householdId, leftover.id)
       AnalyticsService.trackLeftoverDiscarded(householdId, leftover.id)
+      if (user?.id) {
+        pruneNotificationsForDeletedItems(user.id, [leftover.id]).catch(() => {})
+      }
       addToast('Discarded leftover', 'info', 5000, 'Undo', async () => {
         // Note: Restore functionality would need to be implemented
         addToast('Undo not implemented yet', 'info')

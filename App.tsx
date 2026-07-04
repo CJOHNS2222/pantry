@@ -23,7 +23,7 @@ import { useOfflineStatus } from './hooks/useOfflineStatus';
 import AnalyticsService from './services/analyticsService';
 import { SubscriptionProvider } from './hooks/useSubscription';
 
-import { isHouseholdMember, inferCategoryFromItemName, inferStorageLocationFromItemName, parseIngredientForShoppingList, getItemImage, fetchExternalItemImage } from './utils/appUtils';
+import { isHouseholdMember, inferCategoryFromItemName, inferStorageLocationFromItemName, parseIngredientForShoppingList, getItemImage, fetchExternalItemImage, parseQuantityAndUnit } from './utils/appUtils';
 import { getQuantityAmount } from './utils/quantityUtils';
 import { NotificationBanner } from './components/ui/NotificationBanner';
 import { NotificationService, NotificationItem, NotificationSettings } from './services/notificationService';
@@ -493,10 +493,12 @@ const App: React.FC = () => {
     
     const newItems: ShoppingItem[] = [];
     for (const { parsed, estimatedPrice, source: itemSource, notes: itemNotes } of priceResults) {
+      const { amount, unit } = parseQuantityAndUnit(parsed.quantity, parsed.itemName);
       newItems.push({
         id: Math.random().toString(36).substr(2, 9),
         item: parsed.itemName,
-        quantity: parsed.quantity,
+        quantity: amount === 1 && (unit === 'pcs' || unit === 'pieces') ? '1' : `${amount} ${unit}`,
+        unit,
         category: inferCategoryFromItemName(parsed.itemName),
         checked: false,
         source: itemSource,

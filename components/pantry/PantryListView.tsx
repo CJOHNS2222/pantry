@@ -1,6 +1,7 @@
 import React from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { List } from 'react-window';
+const ReactWindowList = List as any;
 import StorageLocationIndicator from './StorageLocationIndicator';
 import { PantryGridItem } from './PantryGridItem';
 import { PantryListItem } from './PantryListItem';
@@ -162,7 +163,7 @@ export const PantryListView: React.FC<PantryListViewProps> = ({
                 ))}
               </div>
             ) : items.length > CATEGORY_VIRTUALIZE_THRESHOLD ? (
-              <List
+              <ReactWindowList
                 height={Math.min(400, items.length * 64)}
                 itemCount={items.length}
                 itemSize={64}
@@ -174,8 +175,8 @@ export const PantryListView: React.FC<PantryListViewProps> = ({
                   renderRow: (index: number, style: React.CSSProperties) => renderCategoryItem({ index, style, category })
                 }}
               >
-                {VirtualizedRow}
-              </List>
+                {VirtualizedRow as any}
+              </ReactWindowList>
             ) : (
               items.map(item => (
                 <PantryListItem
@@ -240,7 +241,7 @@ export const PantryListView: React.FC<PantryListViewProps> = ({
               ))}
             </div>
           ) : items.length > CATEGORY_VIRTUALIZE_THRESHOLD ? (
-            <List
+            <ReactWindowList
               height={Math.min(400, items.length * 64)}
               itemCount={items.length}
               itemSize={64}
@@ -252,8 +253,8 @@ export const PantryListView: React.FC<PantryListViewProps> = ({
                 renderRow: (index: number, style: React.CSSProperties) => renderStorageItem({ index, style, location })
               }}
             >
-              {VirtualizedRow}
-            </List>
+              {VirtualizedRow as any}
+            </ReactWindowList>
           ) : (
             items.map(item => (
               <PantryListItem

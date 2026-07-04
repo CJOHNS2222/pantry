@@ -2267,3 +2267,89 @@ export function isCookedRiceItem(itemName: string): boolean {
   return (low.includes('rice') && low.includes('cooked')) ||
          (low.includes('rice') && low.includes('leftover'));
 }
+
+/**
+ * Resolves the common/default unit for certain types of items
+ */
+export function getCommonUnitForItem(itemName: string): string {
+  const name = (itemName || '').toLowerCase().trim();
+  if (name.includes('egg')) return 'dozen';
+  if (name.includes('apple') || name.includes('banana') || name.includes('potato') || name.includes('onion') || name.includes('tomato') || name.includes('orange')) {
+    if (name.includes('apple') || name.includes('potato')) return 'lbs';
+    if (name.includes('egg')) return 'dozen';
+    return 'pcs';
+  }
+  if (name.includes('chicken') || name.includes('beef') || name.includes('pork') || name.includes('fish') || name.includes('meat') || name.includes('cheese')) return 'lbs';
+  if (name.includes('milk') || name.includes('juice') || name.includes('soda') || name.includes('water') || name.includes('broth')) return 'cups';
+  if (name.includes('flour') || name.includes('sugar') || name.includes('rice')) return 'lbs';
+  return 'pcs';
+}
+
+/**
+ * Parses a combined quantity string or number into a separate numeric amount and unit
+ */
+export function parseQuantityAndUnit(quantityStrOrNum: string | number | undefined, itemName: string): { amount: number; unit: string } {
+  const defaultUnit = getCommonUnitForItem(itemName);
+  if (quantityStrOrNum === undefined || quantityStrOrNum === null) {
+    return { amount: 1, unit: defaultUnit };
+  }
+  if (typeof quantityStrOrNum === 'number') {
+    return { amount: quantityStrOrNum, unit: defaultUnit };
+  }
+  
+  const trimmed = quantityStrOrNum.trim();
+  if (!trimmed) {
+    return { amount: 1, unit: defaultUnit };
+  }
+
+  // Handle fractional unicode characters
+  let normalized = trimmed
+    .replace(/½/g, '0.5')
+    .replace(/¼/g, '0.25')
+    .replace(/¾/g, '0.75')
+    .replace(/⅓/g, '0.33')
+    .replace(/⅔/g, '0.67');
+
+  // Match leading number (decimals, fractions like 1/2, or mixed like 1 1/2)
+  const numMatch = normalized.match(/^(\d+(?:\s+\d+\/\d+|\/\d+|\.\d+)?)/);
+  if (numMatch) {
+    const numStr = numMatch[1].trim();
+    let amount = parseFloat(numStr);
+    if (numStr.includes('/')) {
+      const parts = numStr.split(/\s+/);
+      if (parts.length === 2) {
+        const [num, den] = parts[1].split('/').map(Number);
+        amount = parseFloat(parts[0]) + (num / den);
+      } else {
+        const [num, den] = numStr.split('/').map(Number);
+        amount = num / den;
+      }
+    }
+    let unitStr = normalized.replace(numMatch[0], '').trim().toLowerCase();
+    
+    // Normalize unit aliases
+    if (unitStr === 'pieces' || unitStr === 'piece' || unitStr === 'count' || unitStr === 'each' || unitStr === 'pcs') {
+      unitStr = 'pcs';
+    } else if (unitStr === 'dozens' || unitStr === 'dozen') {
+      unitStr = 'dozen';
+    } else if (unitStr === 'pound' || unitStr === 'pounds' || unitStr === 'lb' || unitStr === 'lbs') {
+      unitStr = 'lbs';
+    } else if (unitStr === 'ounce' || unitStr === 'ounces' || unitStr === 'oz') {
+      unitStr = 'oz';
+    } else if (unitStr === 'gram' || unitStr === 'grams' || unitStr === 'g') {
+      unitStr = 'g';
+    } else if (unitStr === 'kilogram' || unitStr === 'kilograms' || unitStr === 'kg') {
+      unitStr = 'kg';
+    } else if (unitStr === 'cup' || unitStr === 'cups' || unitStr === 'c') {
+      unitStr = 'cups';
+    } else if (unitStr === 'tablespoon' || unitStr === 'tablespoons' || unitStr === 'tbsp') {
+      unitStr = 'tbsp';
+    } else if (unitStr === 'teaspoon' || unitStr === 'teaspoons' || unitStr === 'tsp') {
+      unitStr = 'tsp';
+    }
+
+    return { amount: isNaN(amount) ? 1 : amount, unit: unitStr || defaultUnit };
+  }
+
+  return { amount: 1, unit: trimmed.toLowerCase() || defaultUnit };
+}

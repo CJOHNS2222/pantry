@@ -70,119 +70,128 @@ export const PantryListItem: React.FC<PantryListItemProps> = ({
         if (!bulkMode) setSelectedItemIndex(primaryIndex);
       }}
     >
-      {bulkMode && (
-        <input
-          type="checkbox"
-          checked={isSelected}
-          onChange={() => {
-            if (item.originalIndices) {
-              const allSelected = item.originalIndices.every((idx: number) => selectedItems.has(idx));
-              const newSelected = new Set(selectedItems);
-              if (allSelected) {
-                item.originalIndices.forEach((idx: number) => newSelected.delete(idx));
+      {/* Left section: Checkbox, Image, Item Name */}
+      <div className="flex items-center gap-3 min-w-0 flex-1">
+        {bulkMode && (
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={() => {
+              if (item.originalIndices) {
+                const allSelected = item.originalIndices.every((idx: number) => selectedItems.has(idx));
+                const newSelected = new Set(selectedItems);
+                if (allSelected) {
+                  item.originalIndices.forEach((idx: number) => newSelected.delete(idx));
+                } else {
+                  item.originalIndices.forEach((idx: number) => newSelected.add(idx));
+                }
+                setSelectedItems(newSelected);
               } else {
-                item.originalIndices.forEach((idx: number) => newSelected.add(idx));
+                toggleItemSelection(primaryIndex);
               }
-              setSelectedItems(newSelected);
-            } else {
-              toggleItemSelection(primaryIndex);
-            }
-          }}
-          className="mr-3 w-4 h-4 text-[var(--accent-color)] bg-theme-primary border-theme rounded focus:ring-[var(--accent-color)]"
-        />
-      )}
+            }}
+            className="w-4 h-4 text-[var(--accent-color)] bg-theme-primary border-theme rounded focus:ring-[var(--accent-color)] flex-shrink-0"
+          />
+        )}
 
-      <div className="flex items-center gap-1 flex-1">
         <ProgressiveImage
           src={getPreferredItemDisplayImage(item.item, item.category, item.image)}
           alt={item.item}
-          className="w-10 h-10 rounded-lg object-cover bg-theme-primary border border-theme"
+          className="w-10 h-10 rounded-lg object-cover bg-theme-primary border border-theme flex-shrink-0"
           placeholderSrc="/images/placeholder.svg"
           lazy={true}
         />
-        <div className="flex-1">
-          <div className="flex items-center gap-2">
-            <div className="font-medium text-theme-primary">{item.item}</div>
-            <div className="text-xs text-theme-secondary opacity-70 bg-theme-secondary px-1 py-0.5 rounded">Qty: {formatItemQuantity(item)}</div>
-            {item.expirationDate && (() => {
-              const color = getExpirationColor(daysRemaining as number, item.expirationType);
-              const expiryLabel = (daysRemaining as number) <= 0
-                ? `${item.item} has expired`
-                : `${item.item} expires in ${daysRemaining} day${daysRemaining === 1 ? '' : 's'} — ${color === 'red' ? 'critical' : color === 'yellow' ? 'warning' : 'ok'}`;
-              return (
-                <div
-                  className={`text-xs px-1 py-0.5 rounded font-medium ${
-                    color === 'red' ? 'bg-red-100 text-red-800' :
-                    color === 'yellow' ? 'bg-yellow-100 text-yellow-800' :
-                    'bg-green-100 text-green-800'
-                  }`}
-                  aria-label={expiryLabel}
-                >
-                  {daysRemaining}d
-                </div>
-              );
-            })()}
-            {item.expiryAlertShown && (
-              <Clock className="w-4 h-4 text-orange-500" aria-label="Expires within 7 days" />
-            )}
-            {item.is_immortal && (
-              <span className="text-xs px-1 py-0.5 rounded font-medium bg-blue-100 text-blue-800 flex items-center gap-1">
-                <span aria-hidden>∞</span>
-                <span className="opacity-90">Shelf Stable</span>
-              </span>
-            )}
-          </div>
-        </div>
+
+        <div className="font-medium text-theme-primary truncate">{item.item}</div>
       </div>
 
-      {!bulkMode && (
-        <div className="flex items-center gap-2 text-theme-secondary opacity-50">
-          {householdId && item.id && item.storageLocation !== 'freezer' && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setFreezeTargetIndex(primaryIndex);
-              }}
-              className="px-2 py-1 rounded bg-theme-secondary hover:bg-theme-primary text-xs"
-              title="Move to freezer"
-            >
-              ❄️ Freeze
-            </button>
+      {/* Right section: Expiration, Quantity, Actions, Chevron */}
+      <div className="flex items-center gap-3 flex-shrink-0 ml-4">
+        {/* Expiration date */}
+        <div className="flex items-center gap-1.5">
+          {item.expirationDate && (() => {
+            const color = getExpirationColor(daysRemaining as number, item.expirationType);
+            const expiryLabel = (daysRemaining as number) <= 0
+              ? `${item.item} has expired`
+              : `${item.item} expires in ${daysRemaining} day${daysRemaining === 1 ? '' : 's'} — ${color === 'red' ? 'critical' : color === 'yellow' ? 'warning' : 'ok'}`;
+            return (
+              <div
+                className={`text-xs px-1.5 py-0.5 rounded font-medium ${
+                  color === 'red' ? 'bg-red-100 text-red-800 dark:bg-red-950/40 dark:text-red-300' :
+                  color === 'yellow' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-950/40 dark:text-yellow-300' :
+                  'bg-green-100 text-green-800 dark:bg-green-950/40 dark:text-green-300'
+                }`}
+                aria-label={expiryLabel}
+              >
+                {daysRemaining}d
+              </div>
+            );
+          })()}
+          {item.expiryAlertShown && (
+            <Clock className="w-4 h-4 text-orange-500 flex-shrink-0" aria-label="Expires within 7 days" />
           )}
-          {householdId && item.id && (item.storageLocation === 'freezer' || item.is_frozen) && (
-            <button
-              onClick={async (e) => {
-                e.stopPropagation();
-                try {
-                  const previous = { storageLocation: item.storageLocation, is_frozen: item.is_frozen, expirationDate: item.expirationDate };
-                  // Note: For full defrost flow, logic has been kept in main or simplified here
-                  await onUpdateItem(primaryIndex, { storageLocation: 'fridge', is_frozen: false });
-                  appActions.addToast(
-                    'Defrosted to fridge',
-                    'success',
-                    5000,
-                    'Undo',
-                    async () => {
-                      try {
-                        await onUpdateItem(primaryIndex, previous);
-                      } catch {
-                        // ignore
-                      }
-                    }
-                  );
-                } catch {
-                  appActions.addToast('Failed to defrost item', 'error');
-                }
-              }}
-              className="px-2 py-1 rounded bg-theme-secondary hover:bg-theme-primary text-xs"
-              title="Move to fridge (defrost)"
-            >
-              🌡️ Defrost
-            </button>
+          {item.is_immortal && (
+            <span className="text-xs px-1.5 py-0.5 rounded font-medium bg-blue-100 text-blue-800 dark:bg-blue-950/40 dark:text-blue-300 flex items-center gap-1 flex-shrink-0">
+              <span aria-hidden>∞</span>
+              <span className="opacity-90">Shelf Stable</span>
+            </span>
           )}
-          <ChevronRight className="w-5 h-5" />
         </div>
-      )}
+
+        {/* Quantity */}
+        <div className="text-xs text-theme-secondary opacity-70 bg-theme-secondary px-2 py-0.5 rounded border border-theme flex-shrink-0">
+          Qty: {formatItemQuantity(item)}
+        </div>
+
+        {/* Action Buttons & Chevron */}
+        {!bulkMode && (
+          <div className="flex items-center gap-2 text-theme-secondary opacity-50 flex-shrink-0">
+            {householdId && item.id && item.storageLocation !== 'freezer' && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setFreezeTargetIndex(primaryIndex);
+                }}
+                className="px-2 py-1 rounded bg-theme-secondary hover:bg-theme-primary text-xs cursor-pointer"
+                title="Move to freezer"
+              >
+                ❄️ Freeze
+              </button>
+            )}
+            {householdId && item.id && (item.storageLocation === 'freezer' || item.is_frozen) && (
+              <button
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  try {
+                    const previous = { storageLocation: item.storageLocation, is_frozen: item.is_frozen, expirationDate: item.expirationDate };
+                    await onUpdateItem(primaryIndex, { storageLocation: 'fridge', is_frozen: false });
+                    appActions.addToast(
+                      'Defrosted to fridge',
+                      'success',
+                      5000,
+                      'Undo',
+                      async () => {
+                        try {
+                          await onUpdateItem(primaryIndex, previous);
+                        } catch {
+                          // ignore
+                        }
+                      }
+                    );
+                  } catch {
+                    appActions.addToast('Failed to defrost item', 'error');
+                  }
+                }}
+                className="px-2 py-1 rounded bg-theme-secondary hover:bg-theme-primary text-xs cursor-pointer"
+                title="Move to fridge (defrost)"
+              >
+                🌡️ Defrost
+              </button>
+            )}
+            <ChevronRight className="w-5 h-5 flex-shrink-0" />
+          </div>
+        )}
+      </div>
     </div>
   );
 };
