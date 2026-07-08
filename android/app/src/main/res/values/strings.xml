@@ -8,4 +8,6 @@
     <string name="admob_app_id">ca-app-pub-5084706792909644~8942926412</string>
     <!-- Google Sign-In: web client ID from google-services.json -->
     <string name="server_client_id">13848266518-0co4dav6sn9epov13vt0covii2nmg1ne.apps.googleusercontent.com</string>
+    <!-- Google Play Billing License Key -->
+    <string name="billing_key">MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAq2dJKtt7NQ67xjRiTaV6j6R345R22JdYOtOkJLhMbHC/EtX1lH0LOtD29J53LXXAJ2r/+mjCVLB8BoVqBIoeHxPnBMz2zdF3a96UVPSnGkwsp2/Q0polKt74m34toOfHuFyqM/onw/DREFDKGF2Gh79OHU1m5Eynp+g0kD8EPERLNXfUt8Z9io93oG/E85hdVc/kcU/wPN2zDgV/YuGAt9vVsHISpcyEK2+5Z7C7cOP4SE//93EOEnMP9QgcVWzvsTSuIoO5tn31PhiHdw0ha8LpUC4qX8InoA7zkamlgNNHQMryeVnLmCuMgrImnFKomP3V331vUxsvgnOi2kCHIQIDAQAB</string>
 </resources>
