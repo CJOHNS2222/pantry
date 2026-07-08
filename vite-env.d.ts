@@ -11,6 +11,8 @@ interface ImportMetaEnv {
   readonly VITE_GEMINI_API_KEY: string
   readonly VITE_SPOONACULAR_API_KEY: string
   readonly VITE_ADMOB_USE_TEST?: string
+  readonly VITE_IMPACT_ACCOUNT_SID?: string
+  readonly VITE_IMPACT_AUTH_TOKEN?: string
     // Stripe and PayPal variables removed for Google Play Billing migration
 }
 
