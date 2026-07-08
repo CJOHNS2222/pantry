@@ -20,6 +20,16 @@ export interface DetailedChangeEntry {
 
 export const RECENT_CHANGES: ChangeEntry[] = [
   {
+    "version": "3.0.1",
+    "date": "Jul 8, 2026",
+    "highlights": [
+      "Six-Retailer Online Checkout Integration — Added Target, Kroger, Safeway, and Thrive Market in addition to Walmart and…",
+      "Floating Shopping Cart FAB — Added a persistent floating shopping cart button to the top-right of the Shopping List…",
+      "Affiliate Link Redirect Guard — Configured a smart fallback mechanism that uses direct links if the merchant's specific…",
+      "Checkout Checklist Priority Sorting — Reorganized the ingredients checklist inside the Online Shopping modal to sort…"
+    ]
+  },
+  {
     "version": "3.0.0",
     "date": "Jul 8, 2026",
     "highlights": [
@@ -38,20 +48,32 @@ export const RECENT_CHANGES: ChangeEntry[] = [
       "Consolidation View Toggle — Integrated a \"Consolidate\" toggle into the Shopping List UI.",
       "Structured Decimal Quantities — Added an explicit amount decimal field to ShoppingItem interface and Firestore schema,…"
     ]
-  },
-  {
-    "version": "2.5.11",
-    "date": "Jul 4, 2026",
-    "highlights": [
-      "Direct Unit Editing in Pantry Details — Added unit dropdown next to quantity controls in ItemDetailModal for immediate…",
-      "Smart Unit Auto-Suggestions — Automated smart unit suggestions during manual additions or typing in both Shopping List…",
-      "Ingredient Parsing & Normalization — Created parseQuantityAndUnit to automatically split inputs (e.g.",
-      "Unified Card Selection — Removed circular checkboxes in EnhancedShoppingListItem; selection is indicated by card…"
-    ]
   }
 ];
 
 export const ALL_CHANGES: DetailedChangeEntry[] = [
+  {
+    "version": "3.0.1",
+    "date": "Jul 8, 2026",
+    "sections": [
+      {
+        "title": "Added",
+        "bullets": [
+          "**Six-Retailer Online Checkout Integration** — Added Target, Kroger, Safeway, and Thrive Market in addition to Walmart and Instacart inside the Online Shopping Modal, providing users with the ability to choose their preferred checkout merchant.",
+          "**Floating Shopping Cart FAB** — Added a persistent floating shopping cart button to the top-right of the Shopping List tab, displaying a real-time badge count of unchecked items."
+        ]
+      },
+      {
+        "title": "Changed",
+        "bullets": [
+          "**Affiliate Link Redirect Guard** — Configured a smart fallback mechanism that uses direct links if the merchant's specific Campaign ID or Ad ID are not configured in the environment, preventing 403, expired, or malformed URL errors.",
+          "**Checkout Checklist Priority Sorting** — Reorganized the ingredients checklist inside the Online Shopping modal to sort unmatched search items to the top (deselected by default) and matched auto-cart items to the bottom (selected by default) to speed up checkout.",
+          "**Theme-Integrated Modal UI** — Standardized modal CSS class styling to utilize theme-agnostic classes, allowing it to adapt dynamically to light/dark themes and active accent colors.",
+          "**Safe-Area Modal Lift** — Added bottom safe-area offset padding to the modal footer, raising the proceed button to prevent overlap with the app's bottom tab navigation bar."
+        ]
+      }
+    ]
+  },
   {
     "version": "3.0.0",
     "date": "Jul 8, 2026",

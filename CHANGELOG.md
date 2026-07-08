@@ -1,3 +1,17 @@
+## [3.0.1] - 2026-07-08
+
+### Added
+- **Six-Retailer Online Checkout Integration** — Added Target, Kroger, Safeway, and Thrive Market in addition to Walmart and Instacart inside the Online Shopping Modal, providing users with the ability to choose their preferred checkout merchant.
+- **Floating Shopping Cart FAB** — Added a persistent floating shopping cart button to the top-right of the Shopping List tab, displaying a real-time badge count of unchecked items.
+
+### Changed
+- **Affiliate Link Redirect Guard** — Configured a smart fallback mechanism that uses direct links if the merchant's specific Campaign ID or Ad ID are not configured in the environment, preventing 403, expired, or malformed URL errors.
+- **Checkout Checklist Priority Sorting** — Reorganized the ingredients checklist inside the Online Shopping modal to sort unmatched search items to the top (deselected by default) and matched auto-cart items to the bottom (selected by default) to speed up checkout.
+- **Theme-Integrated Modal UI** — Standardized modal CSS class styling to utilize theme-agnostic classes, allowing it to adapt dynamically to light/dark themes and active accent colors.
+- **Safe-Area Modal Lift** — Added bottom safe-area offset padding to the modal footer, raising the proceed button to prevent overlap with the app's bottom tab navigation bar.
+
+---
+
 ## [3.0.0] - 2026-07-08
 
 ### Added
