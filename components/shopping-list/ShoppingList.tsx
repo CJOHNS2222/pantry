@@ -23,6 +23,7 @@ import { ShoppingListItemsSection } from './ShoppingListItemsSection';
 import { ShoppingListFooterActions } from './ShoppingListFooterActions';
 import { ShoppingListActionBars } from './ShoppingListActionBars';
 import { ShoppingListAddFab } from './ShoppingListAddFab';
+import { RetailCheckoutModal } from './RetailCheckoutModal';
 import { ShoppingListUndoBanners } from './ShoppingListUndoBanners';
 import { getSmartUnits } from '../pantry/QuantityUnitPicker';
 
@@ -150,12 +151,14 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   const [purchaseTargetItem, setPurchaseTargetItem] = useState<ShoppingItem | null>(null);
   const [checkoutExpiryOpen, setCheckoutExpiryOpen] = useState(false);
   const [checkoutItems, setCheckoutItems] = useState<ShoppingItem[]>([]);
+  const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
 
   // Android back-button registration for ShoppingList modals
   useAndroidBack(isAddModalOpen, () => setIsAddModalOpen(false));
   useAndroidBack(showAnalytics, () => setShowAnalytics(false));
   useAndroidBack(purchaseModalOpen, () => setPurchaseModalOpen(false));
   useAndroidBack(checkoutExpiryOpen, () => setCheckoutExpiryOpen(false));
+  useAndroidBack(isCheckoutModalOpen, () => setIsCheckoutModalOpen(false));
   const [purchaseQty, setPurchaseQty] = useState<number>(1);
   const [purchaseUnit, setPurchaseUnit] = useState<string>('count');
   const [purchaseExpires, setPurchaseExpires] = useState<string | undefined>(undefined);
@@ -1046,6 +1049,13 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
         onShare={handleShare}
         onShareViaSMS={handleShareViaSMS}
         onExport={handleExport}
+        onCheckoutOnline={() => setIsCheckoutModalOpen(true)}
+      />
+
+      <RetailCheckoutModal
+        isOpen={isCheckoutModalOpen}
+        onClose={() => setIsCheckoutModalOpen(false)}
+        items={items}
       />
 
       {canShowAdBanner && <AdMobBanner />}
