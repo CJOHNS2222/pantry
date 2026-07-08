@@ -57,7 +57,7 @@ export default function RiskAssessmentQuestionnaire({ userId, onComplete }: Prop
   const canProceed = milkResponse !== null && meatResponse !== null
 
   return (
-    <div className="max-w-2xl mx-auto p-5">
+    <div className="max-w-2xl mx-auto p-5 pb-24">
       <div className="text-center mb-8">
         <h2 className="text-2xl font-bold mb-2 text-theme-primary">🍽️ Vibe Check</h2>
         <p className="text-theme-secondary text-base">

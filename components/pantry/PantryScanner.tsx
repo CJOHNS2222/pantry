@@ -66,7 +66,7 @@ import { canShowAds } from '../../utils/appUtils';
 import FreezeTransitionModal from './FreezeTransitionModal';
 
 import { InventoryCacheService } from '../../services/inventoryCacheService';
-import ImportModal from './ImportModal';
+import PantryImportModal from './PantryImportModal';
 import { PantryHealthScore } from './PantryHealthScore';
 import { hasMilestone } from '../../services/onboardingMilestoneService';
 
@@ -2592,10 +2592,9 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
       )}
 
       {showImportModal && (
-        <ImportModal
+        <PantryImportModal
           open={showImportModal}
           onClose={() => setShowImportModal(false)}
-          defaultTab="pantry"
           onImported={async (items) => {
             try {
               // Add to current session via provided prop

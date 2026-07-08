@@ -97,6 +97,7 @@ export interface ShoppingItem {
   category: string;
   checked: boolean;
   quantity?: number | string; // Can be a number or string like "2 cups", "1 tbsp"
+  amount?: number; // Numeric decimal amount (e.g., 1.5)
   unit?: string; // Unit of measurement
   source?: string; // How the item was added (e.g., "suggested", "recipe: Chicken Stir Fry")
   purchasedQuantity?: {
@@ -289,6 +290,9 @@ export interface User {
   customCategories?: CustomCategory[];
   householdId?: string;
   householdMembers?: HouseholdMember[];
+  discoveredFeatures?: string[];
+  dismissedTutorialTips?: string[];
+  fcmTokens?: string[];
 }
 
 export interface UserProfile {

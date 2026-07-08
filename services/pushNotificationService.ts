@@ -2,11 +2,14 @@ import { PushNotifications, PushNotificationSchema, ActionPerformed } from '@cap
 import { Capacitor } from '@capacitor/core';
 import { App as CapApp } from '@capacitor/app';
 import { log } from './logService';
+import DatabaseMonitoringService from './databaseMonitoringService';
+import { arrayUnion } from 'firebase/firestore';
 
 class PushNotificationService {
   private static instance: PushNotificationService;
   private fcmToken: string | null = null;
   private isInitialized = false;
+  private userId: string | null = null;
 
   private constructor() {}
 
@@ -64,9 +67,13 @@ class PushNotificationService {
     throw new Error('requestPermissions failed after retries');
   }
 
-  async initialize(): Promise<void> {
+  async initialize(userId?: string): Promise<void> {
     if (this.isInitialized || !Capacitor.isNativePlatform()) {
       return;
+    }
+
+    if (userId) {
+      this.userId = userId;
     }
 
     try {
@@ -125,9 +132,17 @@ class PushNotificationService {
 
   private async storeToken(token: string): Promise<void> {
     try {
-      // Store token in localStorage for now (in production, send to your server)
+      // Always persist to localStorage as a fast local cache
       localStorage.setItem('fcmToken', token);
-      // FCM token stored
+
+      // Also persist to Firestore so the server-side Cloud Function can send FCM messages
+      // to this device even when the app is closed.
+      if (this.userId) {
+        const userRef = DatabaseMonitoringService.doc('users', this.userId);
+        await DatabaseMonitoringService.updateDoc(userRef, {
+          fcmTokens: arrayUnion(token)
+        });
+      }
     } catch (err: unknown) {
       log.error('Failed to store FCM token', { err });
     }

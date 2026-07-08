@@ -8,6 +8,8 @@ interface ShoppingListViewModeToggleProps {
   storeProfileNames: string[];
   activeStoreProfile: string;
   setActiveStoreProfile: (name: string) => void;
+  consolidateList?: boolean;
+  setConsolidateList?: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 export const ShoppingListViewModeToggle: React.FC<ShoppingListViewModeToggleProps> = ({
@@ -17,6 +19,8 @@ export const ShoppingListViewModeToggle: React.FC<ShoppingListViewModeToggleProp
   storeProfileNames,
   activeStoreProfile,
   setActiveStoreProfile,
+  consolidateList = false,
+  setConsolidateList,
 }) => {
   if (!show) {
     return null;
@@ -44,6 +48,19 @@ export const ShoppingListViewModeToggle: React.FC<ShoppingListViewModeToggleProp
       >
         Store Order
       </button>
+      {setConsolidateList !== undefined && (
+        <button
+          onClick={() => setConsolidateList(prev => !prev)}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            consolidateList
+              ? 'bg-green-600 text-white'
+              : 'bg-theme-secondary text-theme-primary hover:bg-theme-primary border border-theme'
+          }`}
+          title="Consolidate duplicate ingredients (perfect for Walmart/Instacart ordering)"
+        >
+          {consolidateList ? 'Consolidated ✓' : 'Consolidate'}
+        </button>
+      )}
       {storeProfileNames.length > 0 && (
         <div className="relative">
           <select

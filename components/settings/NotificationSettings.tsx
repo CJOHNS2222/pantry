@@ -15,7 +15,7 @@ interface NotificationSettingsProps {
 }
 
 export const NotificationSettingsComponent: React.FC<NotificationSettingsProps> = ({
-  user: _user,
+  user,
   currentSettings,
   onSettingsChange
 }) => {
@@ -42,12 +42,12 @@ export const NotificationSettingsComponent: React.FC<NotificationSettingsProps> 
         const status = await PushNotifications.checkPermissions();
         if (status.receive === 'granted') {
           // Already granted: initialize service context and save
-          await pushNotificationService.initialize();
+          await pushNotificationService.initialize(user.id);
           setSettings(newSettings);
           onSettingsChange(newSettings);
         } else if (status.receive === 'prompt') {
           // First-time prompt from within the settings page
-          await pushNotificationService.initialize();
+          await pushNotificationService.initialize(user.id);
           const postStatus = await PushNotifications.checkPermissions();
           if (postStatus.receive === 'granted') {
             setSettings(newSettings);

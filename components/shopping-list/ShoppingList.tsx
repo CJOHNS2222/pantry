@@ -6,7 +6,7 @@ import { ShoppingItem, User, Household, Settings, PantryItem } from '../../types
 import HapticService from '../../services/hapticService';
 import { ShoppingListCacheService } from '../../services/shoppingListCacheService';
 import { log } from '../../services/logService';
-import { inferCategoryFromItemName, isHouseholdMember, cleanItemNameForShopping, parseQuantityAndUnit } from '../../utils/appUtils';
+import { inferCategoryFromItemName, isHouseholdMember, cleanItemNameForShopping, parseQuantityAndUnit, consolidateShoppingList } from '../../utils/appUtils';
 import { validateItemName, validateQuantity } from '../../src/utils/validation';
 
 // Import new enhancement components
@@ -137,6 +137,12 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
       : settings?.shopping?.storeLayout;
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [undoHistory, setUndoHistory] = useState<Array<{item: ShoppingItem, timestamp: Date}>>([])
+  const [consolidateList, setConsolidateList] = useState(false);
+
+  const displayedItems = useMemo(() => {
+    return consolidateList ? consolidateShoppingList(items) : items;
+  }, [items, consolidateList]);
+
   // Pending deletes for undo-on-swipe: map of id -> { item, timerId }
   const pendingDeletes = React.useRef<Map<string, { item: ShoppingItem; timerId: ReturnType<typeof setTimeout> }>>(new Map());
   const [pendingDeleteCount, setPendingDeleteCount] = useState(0);;
@@ -502,11 +508,11 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   };
 
   const handleItemToggle = (id: string) => {
-    const item = items.find(i => i.id === id);
-    if (!item) return;
+    const targetItem = displayedItems.find(i => i.id === id);
+    if (!targetItem) return;
 
     // Track item completion/uncompletion
-    if (!item.checked) {
+    if (!targetItem.checked) {
       // Item is being checked (completed)
       AnalyticsService.trackShoppingListComplete(1, items.length);
       HapticService.light();
@@ -514,11 +520,21 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
 
     // Simply toggle the checked state without opening purchase modal
     const now = new Date();
-    setItems(prev => prev.map(i => i.id === id ? {
-      ...i,
-      checked: !i.checked,
-      completedAt: !i.checked ? now : undefined
-    } : i));
+    if (consolidateList) {
+      const name = targetItem.item.toLowerCase();
+      const targetChecked = targetItem.checked;
+      setItems(prev => prev.map(i => i.item.toLowerCase() === name && i.checked === targetChecked ? {
+        ...i,
+        checked: !targetChecked,
+        completedAt: !targetChecked ? now : undefined
+      } : i));
+    } else {
+      setItems(prev => prev.map(i => i.id === id ? {
+        ...i,
+        checked: !i.checked,
+        completedAt: !i.checked ? now : undefined
+      } : i));
+    }
   };
 
   const confirmPurchaseForItem = (itemId: string) => {
@@ -563,29 +579,58 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   };
 
   const remove = (id: string) => {
-    const targetItem = items.find(i => i.id === id);
+    const targetItem = displayedItems.find(i => i.id === id);
     if (!targetItem) return;
 
-    // Optimistically remove from UI immediately
-    setItems(prev => prev.filter(i => i.id !== id));
+    if (consolidateList) {
+      const name = targetItem.item.toLowerCase();
+      const targetChecked = targetItem.checked;
+      const matchingItems = items.filter(i => i.item.toLowerCase() === name && i.checked === targetChecked);
 
-    // Delay the actual cache removal so the user can undo within 5 seconds
-    const timerId = setTimeout(async () => {
-      pendingDeletes.current.delete(id);
+      matchingItems.forEach(matchingItem => {
+        // Optimistically remove from UI immediately
+        setItems(prev => prev.filter(i => i.id !== matchingItem.id));
+
+        // Delay the actual cache removal so the user can undo within 5 seconds
+        const timerId = setTimeout(async () => {
+          pendingDeletes.current.delete(matchingItem.id);
+          setPendingDeleteCount(pendingDeletes.current.size);
+
+          const inHousehold = household?.id && user ? isHouseholdMember(household, user) : false;
+          const householdId = inHousehold ? household?.id : undefined;
+          const userId = inHousehold ? undefined : user?.id;
+          try {
+            await ShoppingListCacheService.removeItem(matchingItem.id, householdId, userId);
+          } catch (error) {
+            log.error('Failed to remove item from cache:', error);
+          }
+        }, 5000);
+
+        pendingDeletes.current.set(matchingItem.id, { item: matchingItem, timerId });
+      });
       setPendingDeleteCount(pendingDeletes.current.size);
+    } else {
+      // Optimistically remove from UI immediately
+      setItems(prev => prev.filter(i => i.id !== id));
 
-      const inHousehold = household?.id && user ? isHouseholdMember(household, user) : false;
-      const householdId = inHousehold ? household?.id : undefined;
-      const userId = inHousehold ? undefined : user?.id;
-      try {
-        await ShoppingListCacheService.removeItem(id, householdId, userId);
-      } catch (error) {
-        log.error('Failed to remove item from cache:', error);
-      }
-    }, 5000);
+      // Delay the actual cache removal so the user can undo within 5 seconds
+      const timerId = setTimeout(async () => {
+        pendingDeletes.current.delete(id);
+        setPendingDeleteCount(pendingDeletes.current.size);
 
-    pendingDeletes.current.set(id, { item: targetItem, timerId });
-    setPendingDeleteCount(pendingDeletes.current.size);
+        const inHousehold = household?.id && user ? isHouseholdMember(household, user) : false;
+        const householdId = inHousehold ? household?.id : undefined;
+        const userId = inHousehold ? undefined : user?.id;
+        try {
+          await ShoppingListCacheService.removeItem(id, householdId, userId);
+        } catch (error) {
+          log.error('Failed to remove item from cache:', error);
+        }
+      }, 5000);
+
+      pendingDeletes.current.set(id, { item: targetItem, timerId });
+      setPendingDeleteCount(pendingDeletes.current.size);
+    }
   };
 
   const undoDelete = () => {
@@ -603,20 +648,28 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   // Multi-selection functions
 
   const handleQuantityChange = (id: string, quantity: string) => {
+    const targetItem = displayedItems.find(i => i.id === id);
+    if (!targetItem) return;
+    const targetId = targetItem.id;
+
     setItems(prev => prev.map(item => 
-      item.id === id ? { ...item, quantity } : item
+      item.id === targetId ? { ...item, quantity } : item
     ));
   };
 
   const handleUpdateItem = async (id: string, updates: Partial<ShoppingItem>) => {
+    const targetItem = displayedItems.find(i => i.id === id);
+    if (!targetItem) return;
+    const targetId = targetItem.id;
+
     setItems(prev => prev.map(item =>
-      item.id === id ? { ...item, ...updates } : item
+      item.id === targetId ? { ...item, ...updates } : item
     ));
     const inHousehold = household?.id && user ? isHouseholdMember(household, user) : false;
     const householdId = inHousehold ? household?.id : undefined;
     const userId = inHousehold ? undefined : user?.id;
     try {
-      await ShoppingListCacheService.updateItem(id, updates, householdId, userId);
+      await ShoppingListCacheService.updateItem(targetId, updates, householdId, userId);
     } catch (_e) {
       // best-effort; local state already updated
     }
@@ -881,6 +934,8 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
         storeProfileNames={storeProfileNames}
         activeStoreProfile={activeStoreProfile}
         setActiveStoreProfile={setActiveStoreProfile}
+        consolidateList={consolidateList}
+        setConsolidateList={setConsolidateList}
       />
 
       <ShoppingListPurchaseModal
@@ -944,7 +999,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
       <ShoppingListItemsSection
         isLoadingShoppingList={isLoadingShoppingList}
         viewMode={viewMode}
-        items={items}
+        items={displayedItems}
         activeStoreLayout={activeStoreLayout}
         householdMembers={householdMembers.map(m => ({ id: m.id, name: m.name, avatar: m.avatar }))}
         isOffline={!isOnline}

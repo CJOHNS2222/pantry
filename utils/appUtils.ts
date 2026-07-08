@@ -1,6 +1,6 @@
 import { Timestamp, serverTimestamp } from 'firebase/firestore';
 import DatabaseMonitoringService from '../services/databaseMonitoringService';
-import { DayPlan, User, Household } from '../types';
+import { DayPlan, User, Household, ShoppingItem } from '../types';
 import { Capacitor } from '@capacitor/core';
 import { UsageService } from '../services/usageService';
 import remoteConfig from '../services/remoteConfigService';
@@ -1896,6 +1896,7 @@ const UNIT_CONVERSIONS: Record<string, number> = {
   'ounce': 28.35,
   'ounces': 28.35,
   'lb': 453.59,
+  'lbs': 453.59,
   'pound': 453.59,
   'pounds': 453.59,
 
@@ -2024,7 +2025,7 @@ export function normalizeQuantity(quantity: ParsedQuantity): QuantityResult {
 
   // For weight/volume units, convert to grams/ml
   const lowUnit = key;
-  if (['g', 'gram', 'grams', 'kg', 'kilogram', 'kilograms', 'oz', 'ounce', 'ounces', 'lb', 'pound', 'pounds'].includes(lowUnit)) {
+  if (['g', 'gram', 'grams', 'kg', 'kilogram', 'kilograms', 'oz', 'ounce', 'ounces', 'lb', 'lbs', 'pound', 'pounds'].includes(lowUnit)) {
     return {
       ...quantity,
       normalizedGrams: quantity.amount * conversionFactor
@@ -2113,6 +2114,93 @@ export function subtractQuantities(total: ParsedQuantity, used: ParsedQuantity):
     amount: remaining,
     unit: total.unit
   };
+}
+
+/**
+ * Consolidates duplicate shopping list items by name and checked status,
+ * combining quantities safely using unit conversion.
+ */
+export function consolidateShoppingList(items: ShoppingItem[]): ShoppingItem[] {
+  const consolidatedMap = new Map<string, ShoppingItem>();
+
+  items.forEach(item => {
+    if (!item.item) return;
+    
+    // Check if amount and unit are already structured
+    let amount = item.amount;
+    let unit = item.unit;
+
+    if (amount === undefined || unit === undefined) {
+      const parsed = parseQuantityAndUnit(item.quantity, item.item);
+      amount = parsed.amount;
+      unit = parsed.unit;
+    }
+    
+    const n = normalizeQuantity({ amount, unit });
+    const isNormalized = n !== null && n.normalizedGrams !== undefined;
+    const unitType = isNormalized ? 'measurable' : 'count';
+    
+    const key = `${item.item.trim().toLowerCase()}_${item.checked}_${unitType}`;
+    const existing = consolidatedMap.get(key);
+
+    if (!existing) {
+      consolidatedMap.set(key, {
+        ...item,
+        amount,
+        unit,
+        quantity: amount === 1 && (unit === 'pcs' || unit === 'pieces') ? '1' : `${amount} ${unit}`
+      });
+      return;
+    }
+
+    const q1 = { amount: existing.amount ?? 1, unit: existing.unit ?? 'pcs' };
+    const q2 = { amount, unit };
+
+    if (canCombineQuantities(q1, q2)) {
+      const combined = combineQuantities(q1, q2);
+      existing.amount = combined.amount;
+      existing.unit = combined.unit;
+      existing.quantity = combined.amount === 1 && (combined.unit === 'pcs' || combined.unit === 'pieces') ? '1' : `${combined.amount} ${combined.unit}`;
+      
+      // Merge sources cleanly without duplication
+      if (item.source && existing.source) {
+        const sources = new Set([
+          ...existing.source.split(',').map(s => s.trim()),
+          ...item.source.split(',').map(s => s.trim())
+        ]);
+        existing.source = Array.from(sources).join(', ');
+      } else if (item.source) {
+        existing.source = item.source;
+      }
+
+      // Merge prep notes / preparation modifiers
+      if (item.notes && existing.notes) {
+        const notesSet = new Set([
+          ...existing.notes.split(',').map(n => n.trim()),
+          ...item.notes.split(',').map(n => n.trim())
+        ]);
+        existing.notes = Array.from(notesSet).join(', ');
+      } else if (item.notes) {
+        existing.notes = item.notes;
+      }
+
+      // Add estimated prices
+      if (existing.estimatedPrice !== undefined || item.estimatedPrice !== undefined) {
+        existing.estimatedPrice = (existing.estimatedPrice || 0) + (item.estimatedPrice || 0);
+      }
+    } else {
+      // Fallback: If they can't be combined for some reason, append a suffix to the key
+      const fallbackKey = `${key}_${existing.id}_${item.id}`;
+      consolidatedMap.set(fallbackKey, {
+        ...item,
+        amount,
+        unit,
+        quantity: amount === 1 && (unit === 'pcs' || unit === 'pieces') ? '1' : `${amount} ${unit}`
+      });
+    }
+  });
+
+  return Array.from(consolidatedMap.values());
 }
 
 /**

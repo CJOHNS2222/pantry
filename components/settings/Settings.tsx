@@ -14,7 +14,7 @@ import type { Settings as AppSettings } from '../../types';
 type MemberPreferences = Pick<Member, 'dietaryRestrictions' | 'allergies' | 'dietGoal' | 'favoriteCuisines' | 'specialNeeds' | 'preferredProteins' | 'dislikedIngredients'>;
 import { NotificationService, NotificationSettings } from '../../services/notificationService';
 import { DayPlan } from '../../types';
-import { Loader2, Heart, AlertTriangle, X, Settings as SettingsIcon, User as UserIcon, ChevronLeft, ChevronRight, Sliders, Bell, TrendingDown, MessageSquare, HelpCircle, RefreshCw } from 'lucide-react';
+import { Loader2, Heart, AlertTriangle, X, Settings as SettingsIcon, User as UserIcon, ChevronLeft, ChevronRight, Sliders, Bell, TrendingDown, MessageSquare, HelpCircle, RefreshCw, Sparkles } from 'lucide-react';
 import { userOptedInToGemini, setUserGeminiOptIn, getGeminiUsage } from '../../services/featureFlags';
 
 import { Household } from '../../types';
@@ -108,6 +108,7 @@ interface SettingsProps {
   household?: Household | null;
   onShowHousehold?: () => void;
   addToast?: (message: string, type: 'success' | 'error' | 'info' | 'warning', duration?: number) => void;
+  onReplayOnboarding?: () => void;
 }
 
 export const Settings: React.FC<SettingsProps> = ({ 
@@ -122,7 +123,8 @@ export const Settings: React.FC<SettingsProps> = ({
   mealPlan,
   household,
   onShowHousehold,
-  addToast
+  addToast,
+  onReplayOnboarding
 }) => {
   const intl = useIntl();
   const [feedback, setFeedback] = useState('');
@@ -190,11 +192,11 @@ export const Settings: React.FC<SettingsProps> = ({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
-  // Android back-button registration for Settings modals
   useAndroidBack(showAvatarSelection, () => setShowAvatarSelection(false));
   useAndroidBack(showCategoryManager, () => setShowCategoryManager(false));
   useAndroidBack(showMemberPreferencesModal, () => setShowMemberPreferencesModal(false));
   useAndroidBack(showFAQModal, () => setShowFAQModal(false));
+  useAndroidBack(activeCategory !== null, () => setActiveCategory(null));
 
   const handleDeleteAccount = async () => {
     if (!user) return;
@@ -801,6 +803,26 @@ export const Settings: React.FC<SettingsProps> = ({
               </div>
               <ChevronRight className="w-4 h-4 text-theme-secondary" />
             </button>
+
+            {/* Replay Onboarding */}
+            {onReplayOnboarding && (
+              <button
+                onClick={onReplayOnboarding}
+                className="w-full flex items-center justify-between p-4 hover:bg-theme-primary/5 transition-colors text-left focus:outline-none"
+                data-category="replay-onboarding"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-[var(--accent-color)]/10 flex items-center justify-center text-[var(--accent-color)]">
+                    <Sparkles className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <span className="font-semibold text-theme-primary block text-sm">Replay Onboarding</span>
+                    <span className="text-[11px] text-theme-secondary opacity-70">Restart the onboarding tutorial flow</span>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-theme-secondary" />
+              </button>
+            )}
           </div>
         </div>
       ) : (

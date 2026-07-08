@@ -1,4 +1,5 @@
 import DatabaseMonitoringService from './databaseMonitoringService';
+import { RecipesCacheService } from './recipesCacheService';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { storage } from '../firebaseConfig';
 import { StructuredRecipe, SavedRecipe } from '../types';
@@ -570,38 +571,32 @@ export const submitRecipeForReview = async (recipe: StructuredRecipe, submitterI
  * Save a recipe into the user's single-cache document (users/{uid}/cache/savedRecipes)
  * Returns the generated recipe id stored in the cache.
  */
-export const saveRecipeToUserCache = async (uid: string, recipe: StructuredRecipe): Promise<string> => {
+export const saveRecipeToUserCache = async (uid: string, recipe: StructuredRecipe, householdId?: string): Promise<string> => {
   return withErrorHandling(async () => {
     const perfTrace = trace(performance, 'save_recipe_user_cache');
     perfTrace.start();
 
     try {
-      const cacheRef = DatabaseMonitoringService.doc(`users/${uid}/cache/savedRecipes`);
-      const snap = await DatabaseMonitoringService.getDoc(cacheRef);
+      const recipeId = `recipe-${Date.now()}`;
 
-      const recipeId = `r_${Date.now()}`;
-      const savedItem = {
-        ...recipe,
+      const savedItem: SavedRecipe = {
         id: recipeId,
-        dateSaved: new Date().toISOString(),
-        userId: uid,
-        visibility: 'private'
+        title: recipe.title,
+        description: recipe.description || '',
+        ingredients: recipe.ingredients || [],
+        instructions: recipe.instructions || [],
+        cookTime: String(recipe.cookTime || ''),
+        type: recipe.type || '',
+        image: recipe.image || '',
+        dateSaved: new Date().toISOString()
       };
 
-      if (snap && snap.exists()) {
-        const existing = snap.data();
-        if (existing && existing.recipes && Array.isArray(existing.recipes)) {
-          const arr = existing.recipes;
-          // prepend new recipe
-          arr.unshift(savedItem);
-          // Optionally trim to reasonable length (e.g., 500)
-          if (arr.length > 500) arr.length = 500;
-          await DatabaseMonitoringService.updateDoc(cacheRef, { recipes: arr, lastUpdated: serverTimestamp() });
-        } else {
-          await DatabaseMonitoringService.setDoc(cacheRef, { recipes: [savedItem], lastUpdated: serverTimestamp() });
-        }
-      } else {
-        await DatabaseMonitoringService.setDoc(cacheRef, { recipes: [savedItem], lastUpdated: serverTimestamp() });
+      // Always write to the user's personal cache so their own list is maintained
+      await RecipesCacheService.addRecipeToCache(savedItem, undefined, uid);
+
+      // If they are in a household, also write to the household cache
+      if (householdId) {
+        await RecipesCacheService.addRecipeToCache(savedItem, householdId, undefined);
       }
 
       return recipeId;

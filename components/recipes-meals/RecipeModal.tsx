@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { X } from 'lucide-react';
-import { StructuredRecipe, RecipeRating, SavedRecipe, PantryItem, Household } from '../../types';
+import { X, Star, Clock, UtensilsCrossed } from 'lucide-react';
+import { StructuredRecipe, RecipeRating, SavedRecipe, PantryItem, Household, RecipeCommunityStats } from '../../types';
 import { CookingMode } from './CookingMode';
 import { useKeyboardNavigation } from '../../hooks/useKeyboardNavigation';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
@@ -14,9 +14,27 @@ import { RecipeModalDetailsSection } from '../recipe-modal/RecipeModalDetailsSec
 import { RecipeModalImageSection } from '../recipe-modal/RecipeModalImageSection';
 import { RecipeModalLeftoverOverlay } from '../recipe-modal/RecipeModalLeftoverOverlay';
 import { RecipeModalRatingModal } from '../recipe-modal/RecipeModalRatingModal';
-import { RecipeModalTimerSubstitutionsSection } from '../recipe-modal/RecipeModalTimerSubstitutionsSection';
 import { RecipeModalDeductPantryModal } from '../recipe-modal/RecipeModalDeductPantryModal';
-import { parseIngredientForShoppingList } from '../../utils/appUtils';
+import { parseIngredientForShoppingList, generateBlurDataURL } from '../../utils/appUtils';
+import { RecipeRatingService } from '../../services/recipeRatingService';
+import { ProgressiveImage } from '../ui/ProgressiveImage';
+import { log } from '../../services/logService';
+
+const parseTimeToSeconds = (time: string | number | undefined): number => {
+  if (time === undefined || time === null || time === '') return 0;
+  if (typeof time === 'number') return Math.max(0, Math.floor(time)) * 60;
+  const match = (time || '').toString().match(/(\d+)\s*(min|minute|minutes|hour|hours|hr|h|sec|s)/i);
+  if (!match) {
+    const n = parseInt(time as string, 10);
+    return Number.isFinite(n) && !Number.isNaN(n) ? n * 60 : 0;
+  }
+  const value = parseInt(match[1], 10);
+  const unit = match[2].toLowerCase();
+  if (unit.startsWith('h')) return value * 3600;
+  if (unit.startsWith('m')) return value * 60;
+  if (unit.startsWith('s')) return value;
+  return value * 60;
+};
 
 interface RecipeModalProps {
   recipe: StructuredRecipe | SavedRecipe;
@@ -45,6 +63,7 @@ interface RecipeModalProps {
     avatar?: string;
   };
   editable?: boolean;
+  activeRecipes?: (StructuredRecipe | SavedRecipe)[];
 }
 
 export const RecipeModal: React.FC<RecipeModalProps> = ({
@@ -67,12 +86,15 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
   mealPlanLimitExceeded = false,
   recipeSavedCount,
   household = null,
-  user
-  , editable = false
+  user,
+  editable = false,
+  activeRecipes = [],
 }) => {
   const { addToast } = useAppActions();
   const [showLeftoverCapture, setShowLeftoverCapture] = useState(false);
   const [showCookingMode, setShowCookingMode] = useState(false);
+  const [activeTab, setActiveTab] = useState<'ingredients' | 'instructions'>('ingredients');
+  const [communityStats, setCommunityStats] = useState<RecipeCommunityStats | null>(null);
   const [servings, setServings] = useState(household?.members?.length || 4); // Default to household size
   const [isSaving, setIsSaving] = useState(false); // Prevent double-clicks
   const ratingRef = useRef<HTMLDivElement>(null);
@@ -94,15 +116,8 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
   const modalRef = useFocusTrap({ isActive: isOpen });
   useModalOpen();
   useAndroidBack(isOpen, onClose);
-  
-  // Cooking Timer State
-  const [timerActive, setTimerActive] = useState(false);
-  const [timeRemaining, setTimeRemaining] = useState(0);
-  const [totalTime, setTotalTime] = useState(0);
-  const [customTime, setCustomTime] = useState(0); // User-set custom time in minutes
-  const [showCustomTimer, setShowCustomTimer] = useState(false);
 
-  // Reset saving state when modal opens/closes
+  // Reset saving state when modal opens/closes & Fetch Community Stats
   useEffect(() => {
     if (isOpen) {
       setIsSaving(false);
@@ -112,8 +127,15 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
         recipe.title,
         isFromMealPlan ? 'meal_plan' : 'search'
       );
+
+      // Fetch Community Rating Stats
+      if (recipe.title) {
+        RecipeRatingService.getCommunityStats(recipe.title, household?.id || undefined)
+          .then(setCommunityStats)
+          .catch(err => log.error('Failed to load community stats in RecipeModal', { err }));
+      }
     }
-  }, [isOpen, recipe, isFromMealPlan]);
+  }, [isOpen, recipe, isFromMealPlan, household?.id]);
 
   // Populate editable fields when modal opens for editing
   useEffect(() => {
@@ -129,8 +151,6 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
       setSubmitForInclusion(false);
     }
   }, [isOpen, editable, recipe]);
-  const [timerLabel, setTimerLabel] = useState('Cooking Timer');
-  
   // Smart Substitutions State
   const [showSubstitutions, setShowSubstitutions] = useState(false);
   const [ingredientSubstitutions, setIngredientSubstitutions] = useState<{ingredient: string, substitutes: {name: string, ratio: string, notes: string}[]}[]>([]);
@@ -140,90 +160,13 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
   useAndroidBack(showLeftoverCapture, () => setShowLeftoverCapture(false));
   useAndroidBack(showReviewPrompt, () => setShowReviewPrompt(false));
   useAndroidBack(showRatingModal, () => setShowRatingModal(false));
-  useAndroidBack(showCustomTimer, () => setShowCustomTimer(false));
   useAndroidBack(showSubstitutions, () => setShowSubstitutions(false));
-
-  // Parse cook time (string like "15 min" or numeric minutes) to seconds
-  const parseTimeToSeconds = (time: string | number | undefined): number => {
-    if (time === undefined || time === null || time === '') return 0;
-    if (typeof time === 'number') return Math.max(0, Math.floor(time)) * 60;
-    const match = (time || '').toString().match(/(\d+)\s*(min|minute|minutes|hour|hours|hr|h|sec|s)/i);
-    if (!match) {
-      const n = parseInt(time as string, 10);
-      return Number.isFinite(n) && !Number.isNaN(n) ? n * 60 : 0;
-    }
-    const value = parseInt(match[1], 10);
-    const unit = match[2].toLowerCase();
-    if (unit.startsWith('h')) return value * 3600;
-    if (unit.startsWith('m')) return value * 60;
-    if (unit.startsWith('s')) return value;
-    return value * 60;
-  };
-
-  // Timer effect
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (timerActive && timeRemaining > 0) {
-      interval = setInterval(() => {
-        setTimeRemaining(prev => {
-          if (prev <= 1) {
-            setTimerActive(false);
-            // Play alert sound
-            const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAAB9AAACABAAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj==');
-            audio.play().catch(() => {});
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    }
-    return () => clearInterval(interval);
-  }, [timerActive, timeRemaining]);
 
   // Keyboard navigation support
   useKeyboardNavigation({
     onEscape: onClose,
     enabled: isOpen
   });
-
-  // Start timer with recipe time or custom time
-  const startTimer = (useCustomTime = false) => {
-    let seconds = 0;
-    if (useCustomTime && customTime > 0) {
-      seconds = customTime * 60; // Convert minutes to seconds
-    } else {
-      seconds = parseTimeToSeconds((recipe as StructuredRecipe).cookTime);
-    }
-    if (seconds > 0) {
-      // Track timer start
-      AnalyticsService.trackCookingReminderSet(
-        recipe.id || recipe.title,
-        recipe.title,
-        seconds / 60 // Convert to minutes
-      );
-      setTotalTime(seconds);
-      setTimeRemaining(seconds);
-      setTimerActive(true);
-      setTimerLabel(useCustomTime ? `Custom Timer (${customTime} min)` : 'Cooking Timer');
-    }
-  };
-
-  // Quick timer presets
-  const startQuickTimer = (minutes: number) => {
-    setCustomTime(minutes);
-    setTimerLabel(`${minutes} Minute Timer`);
-    setTotalTime(minutes * 60);
-    setTimeRemaining(minutes * 60);
-    setTimerActive(true);
-    setShowCustomTimer(false);
-  };
-
-  // Format seconds to MM:SS
-  const formatTime = (seconds: number): string => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
 
   // Common ingredient substitution lookup
   const SUBSTITUTIONS: Record<string, {name: string, ratio: string, notes: string}[]> = {
@@ -742,7 +685,15 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
 
   // Cooking mode fullscreen overlay — rendered above the modal
   if (showCookingMode) {
-    return <CookingMode recipe={recipe} onExit={() => setShowCookingMode(false)} />;
+    const list = activeRecipes && activeRecipes.length > 0 ? activeRecipes : [recipe];
+    const initialIdx = list.findIndex(r => r.title === recipe.title);
+    return (
+      <CookingMode
+        recipes={list as StructuredRecipe[]}
+        initialIndex={initialIdx >= 0 ? initialIdx : 0}
+        onExit={() => setShowCookingMode(false)}
+      />
+    );
   }
 
   const handleStartCookingMode = () => {
@@ -835,17 +786,117 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
         }}
       />
       <div ref={modalRef} role="dialog" aria-modal="true" aria-label={recipe.title} className="bg-theme-primary rounded-2xl shadow-2xl max-w-lg w-full relative flex flex-col h-full overflow-hidden" onClick={e => e.stopPropagation()}>
-        {/* Fixed Header */}
-        <div className="flex items-center justify-between p-4 pb-3 border-b border-theme flex-shrink-0 rounded-t-2xl">
-          <h2 className="text-lg font-semibold text-theme-primary truncate pr-2">{recipe.title}</h2>
-          <button className="p-1 hover:bg-theme-secondary rounded-full transition-colors" onClick={onClose} aria-label="Close recipe details">
-            <X className="w-5 h-5 text-theme-secondary" />
-          </button>
-        </div>
+        {/* Render either the non-editable fixed header (image, title, rating, cook time, start cooking button, tabs) or the editable header */}
+        {!editable ? (
+          <div className="flex-shrink-0 bg-theme-primary border-b border-theme relative">
+            {/* Relative Image container */}
+            {recipe.image ? (
+              <div className="relative h-48 w-full overflow-hidden">
+                <ProgressiveImage
+                  src={recipe.image}
+                  alt={recipe.title}
+                  className="w-full h-full object-cover"
+                  blurDataURL={generateBlurDataURL(400, 192)}
+                  placeholderSrc="/images/placeholder.svg"
+                />
+                {/* Close Button overlay */}
+                <button
+                  className="absolute top-3 right-3 bg-black/40 text-white hover:bg-black/60 rounded-full p-1.5 transition-colors shadow-md z-10"
+                  onClick={onClose}
+                  aria-label="Close recipe details"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            ) : (
+              /* If no image, render a standard header with Close button */
+              <div className="flex items-center justify-between p-4 pb-2">
+                <span className="text-xs font-bold text-theme-secondary uppercase tracking-widest">Recipe Details</span>
+                <button className="p-1 hover:bg-theme-secondary rounded-full transition-colors" onClick={onClose} aria-label="Close recipe details">
+                  <X className="w-5 h-5 text-theme-secondary" />
+                </button>
+              </div>
+            )}
+
+            {/* Title & Metadata Area */}
+            <div className="p-4 pb-3 space-y-2">
+              <div className="flex items-start justify-between gap-4">
+                <h2 className="text-xl font-bold font-serif text-theme-primary leading-tight truncate flex-1">{recipe.title || 'Untitled'}</h2>
+                {/* Star rating summary */}
+                {communityStats && communityStats.totalRatings > 0 && (
+                  <div className="flex items-center gap-1 text-sm bg-yellow-500/10 text-yellow-600 px-2 py-0.5 rounded-lg font-semibold flex-shrink-0">
+                    <Star className="w-3.5 h-3.5 fill-yellow-500 text-yellow-500" />
+                    <span>{communityStats.averageRating.toFixed(1)}</span>
+                    <span className="text-xs text-theme-secondary font-normal">({communityStats.totalRatings})</span>
+                  </div>
+                )}
+              </div>
+
+              {recipe.description && (
+                <p className="text-xs text-theme-secondary line-clamp-2 opacity-80 mb-1 leading-relaxed">{recipe.description}</p>
+              )}
+
+              {/* Cooking time & servings metadata */}
+              <div className="flex items-center gap-3 text-xs text-theme-secondary">
+                {recipe.cookTime && (
+                  <span className="flex items-center gap-1">
+                    <Clock className="w-3.5 h-3.5" />
+                    {typeof recipe.cookTime === 'number' ? `${recipe.cookTime} mins` : recipe.cookTime}
+                  </span>
+                )}
+                <span>•</span>
+                <span>{servings} servings</span>
+              </div>
+
+              {/* Start Cooking button positioned prominent right below the metadata */}
+              {Array.isArray(recipe.instructions) && recipe.instructions.some(s => s.trim()) && (
+                <button
+                  onClick={handleStartCookingMode}
+                  className="mt-2 w-full py-2.5 bg-[var(--accent-color)] hover:bg-[var(--accent-color)]/90 text-white font-bold text-sm rounded-xl active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-sm"
+                >
+                  <UtensilsCrossed className="w-4 h-4" />
+                  <span>Start Cooking Mode</span>
+                </button>
+              )}
+            </div>
+
+            {/* Panel Navigation Tabs */}
+            <div className="flex border-t border-theme bg-theme-secondary/10">
+              <button
+                onClick={() => setActiveTab('ingredients')}
+                className={`flex-1 py-2.5 text-center text-xs uppercase tracking-wider font-bold transition-all border-b-2 ${
+                  activeTab === 'ingredients'
+                    ? 'border-[var(--accent-color)] text-[var(--accent-color)] bg-[var(--accent-color)]/[0.02]'
+                    : 'border-transparent text-theme-secondary hover:text-theme-primary'
+                }`}
+              >
+                Ingredients
+              </button>
+              <button
+                onClick={() => setActiveTab('instructions')}
+                className={`flex-1 py-2.5 text-center text-xs uppercase tracking-wider font-bold transition-all border-b-2 ${
+                  activeTab === 'instructions'
+                    ? 'border-[var(--accent-color)] text-[var(--accent-color)] bg-[var(--accent-color)]/[0.02]'
+                    : 'border-transparent text-theme-secondary hover:text-theme-primary'
+                }`}
+              >
+                Steps
+              </button>
+            </div>
+          </div>
+        ) : (
+          /* Editable Header (with standard Close button) */
+          <div className="flex items-center justify-between p-4 pb-3 border-b border-theme flex-shrink-0 rounded-t-2xl bg-theme-primary">
+            <h2 className="text-lg font-semibold text-theme-primary truncate pr-2">Edit Recipe</h2>
+            <button className="p-1 hover:bg-theme-secondary rounded-full transition-colors" onClick={onClose} aria-label="Close recipe details">
+              <X className="w-5 h-5 text-theme-secondary" />
+            </button>
+          </div>
+        )}
 
         {/* Scrollable Content */}
         <div className="overflow-y-auto flex-1 p-4">
-          {editable ? (
+          {editable && (
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-theme-primary mb-2">Recipe Title</label>
@@ -912,44 +963,17 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
                   className="w-full px-3 py-2 border border-theme rounded-lg bg-theme-primary text-theme-primary focus:border-[var(--accent-color)] focus:outline-none" 
                 />
               </div>
+
+              <RecipeModalImageSection
+                editable={editable}
+                imagePreview={imagePreview}
+                recipeImage={recipe.image}
+                recipeTitle={recipe.title}
+                setImageFile={setImageFile}
+                setImagePreview={setImagePreview}
+              />
             </div>
-          ) : (
-            <>
-              <h2 className="text-2xl font-serif font-bold mb-2 text-[var(--accent-color)]">{recipe.title || 'Untitled'}</h2>
-              {recipe.description && <p className="mb-4 text-theme-secondary opacity-70">{recipe.description}</p>}
-            </>
           )}
-
-          <RecipeModalImageSection
-            editable={editable}
-            imagePreview={imagePreview}
-            recipeImage={recipe.image}
-            recipeTitle={recipe.title}
-            setImageFile={setImageFile}
-            setImagePreview={setImagePreview}
-          />
-
-          <RecipeModalTimerSubstitutionsSection
-            recipe={recipe}
-            timerLabel={timerLabel}
-            timerActive={timerActive}
-            timeRemaining={timeRemaining}
-            totalTime={totalTime}
-            customTime={customTime}
-            showCustomTimer={showCustomTimer}
-            setCustomTime={setCustomTime}
-            setShowCustomTimer={setShowCustomTimer}
-            setTimerActive={setTimerActive}
-            setTimeRemaining={setTimeRemaining}
-            setTotalTime={setTotalTime}
-            startTimer={startTimer}
-            startQuickTimer={startQuickTimer}
-            formatTime={formatTime}
-            findSubstitutions={findSubstitutions}
-            showSubstitutions={showSubstitutions}
-            setShowSubstitutions={setShowSubstitutions}
-            ingredientSubstitutions={ingredientSubstitutions}
-          />
 
           <RecipeModalDetailsSection
             editable={editable}
@@ -969,6 +993,11 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
             user={user}
             ratingRef={ratingRef}
             inventory={inventory}
+            activeTab={activeTab}
+            findSubstitutions={findSubstitutions}
+            showSubstitutions={showSubstitutions}
+            setShowSubstitutions={setShowSubstitutions}
+            ingredientSubstitutions={ingredientSubstitutions}
           />
         </div>
         <RecipeModalActionSection
@@ -987,7 +1016,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
           recipe={recipe}
           onClose={onClose}
           mealPlanLimitExceeded={mealPlanLimitExceeded}
-          canStartCooking={!editable && Array.isArray(recipe.instructions) && recipe.instructions.some(s => s.trim())}
+          canStartCooking={false}
           onStartCooking={handleStartCookingMode}
           isFromMealPlan={isFromMealPlan}
           onShowLeftovers={() => setShowLeftoverCapture(true)}

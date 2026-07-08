@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { X, ChevronLeft, ChevronRight, UtensilsCrossed, List, BookOpen, Clock } from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { X, ChevronLeft, ChevronRight, UtensilsCrossed, List, BookOpen, Clock, Check } from 'lucide-react';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { Capacitor } from '@capacitor/core';
 import { StructuredRecipe } from '../../types';
@@ -7,8 +7,9 @@ import { log } from '../../services/logService';
 import HapticService from '../../services/hapticService';
 
 interface CookingModeProps {
-  recipe: StructuredRecipe;
-  onExit: () => void;
+  recipes: StructuredRecipe[];
+  initialIndex?: number;
+  onExit: (completedRecipe?: StructuredRecipe) => void;
 }
 
 /** Parse instructions the same way RecipeModal does. */
@@ -88,17 +89,36 @@ function formatTimeLeft(seconds: number): string {
   return `${pad(minutes)}:${pad(secs)}`;
 }
 
-export const CookingMode: React.FC<CookingModeProps> = ({ recipe, onExit }) => {
-  const steps = processSteps(recipe.instructions || []);
-  const [currentStep, setCurrentStep] = useState(0);
-  const [showIngredients, setShowIngredients] = useState(false);
-   
+export const CookingMode: React.FC<CookingModeProps> = ({ recipes = [], initialIndex = 0, onExit }) => {
+  const [activeIndex, setActiveIndex] = useState(initialIndex);
+  
+  // Per-recipe cooking state maps
+  const [recipeStepsMap, setRecipeStepsMap] = useState<Record<number, number>>({});
+  const [checkedIngredientsMap, setCheckedIngredientsMap] = useState<Record<number, Record<number, boolean>>>({});
+
+  // Active recipe references
+  const recipe = recipes[activeIndex] || recipes[0];
+  const steps = useMemo(() => processSteps(recipe?.instructions || []), [recipe]);
+  const currentStep = recipeStepsMap[activeIndex] || 0;
+  const checkedIngredients = checkedIngredientsMap[activeIndex] || {};
+
+  const [showIngredientsMobile, setShowIngredientsMobile] = useState(false);
   const wakeLockRef = useRef<{ release: () => Promise<void> } | null>(null);
 
-  // Timer states (active globally within CookingMode so it persists across step navigation)
-  const [timerSeconds, setTimerSeconds] = useState<number | null>(null);
-  const [isTimerActive, setIsTimerActive] = useState<boolean>(false);
-  const [notificationId, setNotificationId] = useState<number | null>(null);
+  interface ActiveTimer {
+    seconds: number;
+    isActive: boolean;
+    notificationId: number | null;
+    label: string;
+  }
+
+  // Dictionary of timers index by recipe index
+  const [recipeTimers, setRecipeTimers] = useState<Record<number, ActiveTimer>>({});
+  const timersRef = useRef<Record<number, ActiveTimer>>({});
+
+  useEffect(() => {
+    timersRef.current = recipeTimers;
+  }, [recipeTimers]);
 
   // Acquire screen wake lock so the display stays on while cooking
   useEffect(() => {
@@ -124,7 +144,6 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipe, onExit }) => {
 
     requestWakeLock();
 
-    // Re-acquire after the page comes back into view (wake lock is auto-released on hide)
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') requestWakeLock();
     };
@@ -140,36 +159,58 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipe, onExit }) => {
   // Timer Countdown Effect
   useEffect(() => {
     let interval: ReturnType<typeof setInterval> | null = null;
-    if (isTimerActive && timerSeconds !== null && timerSeconds > 0) {
+    
+    // Check if there are any active timers running
+    const hasActiveTimers = Object.values(recipeTimers).some(t => t.isActive && t.seconds > 0);
+    
+    if (hasActiveTimers) {
       interval = setInterval(() => {
-        setTimerSeconds(prev => {
-          if (prev === null || prev <= 1) {
-            handleTimerFinished();
-            return null;
+        setRecipeTimers(prev => {
+          const updated = { ...prev };
+          let changed = false;
+          
+          for (const key in updated) {
+            const timer = updated[key];
+            if (timer && timer.isActive && timer.seconds > 0) {
+              if (timer.seconds === 1) {
+                // Timer finished!
+                HapticFeedback();
+                updated[key] = {
+                  ...timer,
+                  seconds: 0,
+                  isActive: false,
+                  notificationId: null
+                };
+              } else {
+                updated[key] = {
+                  ...timer,
+                  seconds: timer.seconds - 1
+                };
+              }
+              changed = true;
+            }
           }
-          return prev - 1;
+          
+          return changed ? updated : prev;
         });
       }, 1000);
     }
+    
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [isTimerActive, timerSeconds]);
+  }, [recipeTimers]);
 
-  // Clean up notifications on unmount
   useEffect(() => {
     return () => {
-      if (notificationId) {
-        LocalNotifications.cancel({ notifications: [{ id: notificationId }] }).catch((err: unknown) => log.info('Notification cancellation skipped or failed', { error: err }));
-      }
+      // Cancel all running notifications on unmount
+      Object.values(timersRef.current).forEach(timer => {
+        if (timer.notificationId) {
+          LocalNotifications.cancel({ notifications: [{ id: timer.notificationId }] }).catch(() => {});
+        }
+      });
     };
-  }, [notificationId]);
-
-  const handleTimerFinished = () => {
-    setIsTimerActive(false);
-    setNotificationId(null);
-    HapticFeedback();
-  };
+  }, []);
 
   const HapticFeedback = () => {
     if (navigator.vibrate) {
@@ -177,14 +218,13 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipe, onExit }) => {
     }
   };
 
-  const startTimer = async (seconds: number) => {
+  const startTimer = async (recipeIdx: number, seconds: number, stepLabel: string) => {
     try {
-      // Cancel any existing timer/notification first
-      if (notificationId) {
-        await LocalNotifications.cancel({ notifications: [{ id: notificationId }] });
+      const currentTimer = recipeTimers[recipeIdx];
+      if (currentTimer?.notificationId) {
+        await LocalNotifications.cancel({ notifications: [{ id: currentTimer.notificationId }] });
       }
 
-      // Request local notification permissions
       if (Capacitor.isNativePlatform()) {
         const perm = await LocalNotifications.requestPermissions();
         if (perm.display !== 'granted') {
@@ -193,70 +233,108 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipe, onExit }) => {
       }
 
       const notifId = Math.floor(Math.random() * 1000000);
-      
-      // Schedule local notification to fire in background
+      const recipeTitle = recipes[recipeIdx]?.title || 'Recipe';
+
       await LocalNotifications.schedule({
         notifications: [
           {
             id: notifId,
             title: `Cooking Timer Finished! 🍳`,
-            body: `Your timer for "${recipe.title}" is complete.`,
+            body: `Your timer for "${recipeTitle}" (${stepLabel}) is complete.`,
             schedule: { at: new Date(Date.now() + seconds * 1000) },
             sound: 'beep.wav'
           }
         ]
       });
 
-      setNotificationId(notifId);
-      setTimerSeconds(seconds);
-      setIsTimerActive(true);
+      setRecipeTimers(prev => ({
+        ...prev,
+        [recipeIdx]: {
+          seconds,
+          isActive: true,
+          notificationId: notifId,
+          label: stepLabel
+        }
+      }));
     } catch (error) {
       log.error('Failed to schedule cooking timer notification', { error }, 'CookingMode');
-      // Fallback: start local timer without notification
-      setTimerSeconds(seconds);
-      setIsTimerActive(true);
+      setRecipeTimers(prev => ({
+        ...prev,
+        [recipeIdx]: {
+          seconds,
+          isActive: true,
+          notificationId: null,
+          label: stepLabel
+        }
+      }));
     }
   };
 
-  const togglePauseResume = async () => {
-    if (timerSeconds === null) return;
+  const togglePauseResume = async (recipeIdx: number) => {
+    const timer = recipeTimers[recipeIdx];
+    if (!timer) return;
 
-    if (isTimerActive) {
-      // Pause: Cancel background notification
-      if (notificationId) {
-        await LocalNotifications.cancel({ notifications: [{ id: notificationId }] });
-        setNotificationId(null);
+    if (timer.isActive) {
+      if (timer.notificationId) {
+        await LocalNotifications.cancel({ notifications: [{ id: timer.notificationId }] });
       }
-      setIsTimerActive(false);
+      setRecipeTimers(prev => ({
+        ...prev,
+        [recipeIdx]: {
+          ...timer,
+          isActive: false,
+          notificationId: null
+        }
+      }));
     } else {
-      // Resume: Schedule new notification for remaining seconds
-      await startTimer(timerSeconds);
+      await startTimer(recipeIdx, timer.seconds, timer.label);
     }
   };
 
-  const cancelTimer = async () => {
-    if (notificationId) {
-      await LocalNotifications.cancel({ notifications: [{ id: notificationId }] });
-      setNotificationId(null);
+  const cancelTimer = async (recipeIdx: number) => {
+    const timer = recipeTimers[recipeIdx];
+    if (timer?.notificationId) {
+      await LocalNotifications.cancel({ notifications: [{ id: timer.notificationId }] });
     }
-    setTimerSeconds(null);
-    setIsTimerActive(false);
+    setRecipeTimers(prev => {
+      const updated = { ...prev };
+      delete updated[recipeIdx];
+      return updated;
+    });
   };
 
-  const goTo = (i: number) => setCurrentStep(Math.max(0, Math.min(steps.length - 1, i)));
+  const goTo = (i: number) => {
+    setRecipeStepsMap(prev => ({
+      ...prev,
+      [activeIndex]: Math.max(0, Math.min(steps.length - 1, i))
+    }));
+  };
+
+  const toggleIngredientCheck = (ingIdx: number) => {
+    setCheckedIngredientsMap(prev => {
+      const recipeChecked = { ...prev[activeIndex] };
+      recipeChecked[ingIdx] = !recipeChecked[ingIdx];
+      return {
+        ...prev,
+        [activeIndex]: recipeChecked
+      };
+    });
+    HapticService.light();
+  };
+
   const isFirst = currentStep === 0;
   const isLast = currentStep === steps.length - 1;
 
-  const currentStepText = steps[currentStep];
+  const currentStepText = steps[currentStep] || '';
   const parsedSeconds = parseTimerSeconds(currentStepText);
 
-  if (steps.length === 0) {
+  if (!recipe || steps.length === 0) {
     return (
       <div className="fixed inset-0 z-[60] bg-[#121212] flex flex-col items-center justify-center text-white p-8">
         <UtensilsCrossed className="w-12 h-12 text-gray-500 mb-4" />
         <p className="text-center text-lg text-gray-400 mb-8">No step-by-step instructions available for this recipe.</p>
         <button
-          onClick={onExit}
+          onClick={() => onExit()}
           className="px-8 py-4 bg-[var(--accent-color)] text-white rounded-2xl font-bold text-base"
         >
           Exit Cooking Mode
@@ -266,144 +344,226 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipe, onExit }) => {
   }
 
   return (
-    <div className="fixed inset-0 z-[60] bg-[#121212] flex flex-col text-white select-none">
-      {/* Header */}
-      <div className="flex items-center justify-between px-5 py-4 border-b border-white/10 flex-shrink-0">
-        <div className="flex-1 min-w-0">
-          <p className="text-xs text-gray-500 uppercase tracking-widest font-medium mb-0.5">Cooking Mode</p>
-          <h2 className="text-sm font-semibold truncate text-gray-200">{recipe.title}</h2>
+    <div className="fixed inset-0 z-[60] bg-[#121212] flex flex-col text-white select-none overflow-hidden animate-fade-in">
+      {/* Header with Recipe Switching */}
+      <div className="flex flex-col border-b border-white/10 flex-shrink-0 bg-black/35 shadow-md">
+        <div className="flex items-center justify-between px-5 py-3">
+          <div className="flex-1 min-w-0">
+            <p className="text-[9px] text-[var(--accent-color)] uppercase tracking-widest font-bold">Cooking Mode</p>
+            <h2 className="text-base font-bold truncate text-white mt-0.5 font-serif">{recipe.title}</h2>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowIngredientsMobile(v => !v)}
+              className={`p-2 rounded-full transition-colors md:hidden ${
+                showIngredientsMobile
+                  ? 'bg-[var(--accent-color)] text-white'
+                  : 'bg-white/10 text-gray-400 hover:bg-white/20'
+              }`}
+              aria-label={showIngredientsMobile ? 'Show steps' : 'Show ingredients'}
+            >
+              {showIngredientsMobile ? <BookOpen className="w-4 h-4" /> : <List className="w-4 h-4" />}
+            </button>
+            <button
+              onClick={() => onExit()}
+              className="p-2 bg-white/10 rounded-full text-gray-400 hover:bg-white/20 transition-colors"
+              aria-label="Exit cooking mode"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-2 ml-3">
-          <button
-            onClick={() => setShowIngredients(v => !v)}
-            className={`p-2.5 rounded-full transition-colors ${
-              showIngredients
-                ? 'bg-[var(--accent-color)] text-white'
-                : 'bg-white/10 text-gray-400 hover:bg-white/20'
-            }`}
-            aria-label={showIngredients ? 'Back to steps' : 'Show ingredients'}
-          >
-            {showIngredients ? <BookOpen className="w-4 h-4" /> : <List className="w-4 h-4" />}
-          </button>
-          <button
-            onClick={onExit}
-            className="p-2.5 bg-white/10 rounded-full text-gray-400 hover:bg-white/20 transition-colors"
-            aria-label="Exit cooking mode"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
 
-      {/* Progress bar */}
-      <div className="h-1 bg-white/10 flex-shrink-0">
-        <div
-          className="h-full bg-[var(--accent-color)] transition-all duration-300"
-          style={{ width: `${((currentStep + 1) / steps.length) * 100}%` }}
-        />
-      </div>
-
-      {showIngredients ? (
-        /* ── Ingredients panel ── */
-        <div className="flex-1 overflow-y-auto px-6 py-6">
-          <h3 className="text-base font-bold mb-5 text-[var(--accent-color)] uppercase tracking-wide">
-            Ingredients
-          </h3>
-          <ul className="space-y-4">
-            {(recipe.ingredients || []).map((ing, i) => (
-              <li key={`ing_${i}_${ing.slice(0, 10)}`} className="flex items-start gap-3 text-base text-gray-200 leading-snug">
-                <span className="mt-1.5 w-2 h-2 rounded-full bg-[var(--accent-color)] flex-shrink-0" />
-                {ing}
-              </li>
-            ))}
-          </ul>
-          <button
-            onClick={() => setShowIngredients(false)}
-            className="mt-8 w-full py-4 bg-[var(--accent-color)] text-white rounded-2xl font-bold text-base"
-          >
-            Back to Steps
-          </button>
-        </div>
-      ) : (
-        /* ── Step view ── */
-        <>
-          <div className="flex-1 flex flex-col items-center justify-center px-6 py-6 overflow-y-auto">
-            {/* Step counter */}
-            <p className="text-sm text-gray-500 mb-4 font-medium tracking-wide flex-shrink-0">
-              Step {currentStep + 1}{' '}
-              <span className="text-gray-700">/ {steps.length}</span>
-            </p>
-
-            {/* Step dot nav */}
-            <div className="flex gap-1.5 mb-6 flex-wrap justify-center max-w-xs flex-shrink-0">
-              {steps.map((_, i) => (
+        {/* Multi-recipe Segmented Control Switcher */}
+        {recipes.length > 1 && (
+          <div className="px-5 pb-3">
+            <div className="flex bg-white/5 p-1 rounded-xl border border-white/5 gap-1 overflow-x-auto scrollbar-none">
+              {recipes.map((r, idx) => (
                 <button
-                  key={`step_${i}`}
-                  onClick={() => goTo(i)}
-                  aria-label={`Go to step ${i + 1}`}
-                  className={`rounded-full transition-all duration-200 ${
-                    i === currentStep
-                      ? 'w-5 h-2 bg-[var(--accent-color)]'
-                      : i < currentStep
-                      ? 'w-2 h-2 bg-[var(--accent-color)]/40'
-                      : 'w-2 h-2 bg-white/20'
+                  key={idx}
+                  onClick={() => {
+                    setActiveIndex(idx);
+                    setShowIngredientsMobile(false);
+                    HapticService.light();
+                  }}
+                  className={`flex-1 min-w-[120px] py-1.5 px-3 rounded-lg text-xs font-bold transition-all truncate ${
+                    idx === activeIndex
+                      ? 'bg-[var(--accent-color)] text-white shadow-sm font-extrabold'
+                      : 'text-gray-400 hover:text-gray-200 hover:bg-white/5'
                   }`}
-                />
+                >
+                  {r.title}
+                </button>
               ))}
             </div>
-
-            {/* Step text — big and readable */}
-            <p className="text-xl sm:text-2xl text-center leading-relaxed font-medium text-white max-w-md mb-6">
-              {currentStepText}
-            </p>
-
-            {/* Inline parsed timer CTA */}
-            {parsedSeconds !== null && timerSeconds === null && (
-              <button
-                onClick={() => startTimer(parsedSeconds)}
-                className="flex items-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-white/20 active:scale-95 text-sm font-semibold rounded-xl text-[var(--accent-color)] border border-white/10 transition-all shadow-md flex-shrink-0"
-              >
-                <Clock className="w-4 h-4 text-[var(--accent-color)]" />
-                <span>Start {formatDuration(parsedSeconds)} Timer</span>
-              </button>
-            )}
           </div>
+        )}
+      </div>
 
-          {/* Docked Active/Paused Timer Bar */}
-          {timerSeconds !== null && (
-            <div className="mx-5 mb-4 p-4 bg-white/5 backdrop-blur-md rounded-2xl border border-white/10 flex items-center justify-between shadow-lg flex-shrink-0">
-              <div className="flex items-center gap-3">
-                <div className={`p-2.5 rounded-xl ${isTimerActive ? 'bg-[var(--accent-color)] text-white animate-pulse' : 'bg-white/10 text-gray-400'}`}>
-                  <Clock className="w-5 h-5" />
-                </div>
-                <div>
-                  <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">
-                    {isTimerActive ? 'Active Timer' : 'Timer Paused'}
-                  </p>
-                  <p className="text-lg font-mono font-bold leading-tight mt-0.5">
-                    {formatTimeLeft(timerSeconds)}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={togglePauseResume}
-                  className="px-3 py-2 bg-white/10 hover:bg-white/15 active:scale-95 text-xs font-semibold rounded-lg transition-all"
-                >
-                  {isTimerActive ? 'Pause' : 'Resume'}
-                </button>
-                <button
-                  onClick={cancelTimer}
-                  className="px-3 py-2 bg-red-500/20 hover:bg-red-500/30 active:scale-95 text-xs font-semibold text-red-300 rounded-lg transition-all"
-                >
-                  Cancel
-                </button>
-              </div>
+      {/* Main split screen layout */}
+      <div className="flex-1 flex overflow-hidden min-h-0">
+        {/* Left Side: Ingredients Checklist (visible on large screen, or on small screen if mobile toggle is checked) */}
+        <div className={`overflow-y-auto px-6 py-6 border-r border-white/10 bg-black/20 ${
+          showIngredientsMobile ? 'flex flex-col w-full' : 'hidden md:flex md:flex-col md:w-1/3'
+        }`}>
+          {/* Visual End-Result Image */}
+          {recipe.image && (
+            <div className="mb-4 rounded-xl overflow-hidden border border-white/10 flex-shrink-0 shadow-md">
+              <img
+                src={recipe.image}
+                alt={recipe.title}
+                className="w-full h-36 object-cover"
+              />
             </div>
           )}
 
-          {/* Navigation */}
-          <div className="flex-shrink-0 flex items-center gap-3 px-5 pb-8">
+          <div className="flex items-center justify-between mb-4 flex-shrink-0">
+            <h3 className="text-sm font-bold text-[var(--accent-color)] uppercase tracking-wider">
+              Ingredients
+            </h3>
+            <span className="text-xs text-gray-500">
+              {Object.values(checkedIngredients).filter(Boolean).length} / {(recipe.ingredients || []).length} checked
+            </span>
+          </div>
+          <ul className="space-y-3.5 overflow-y-auto flex-1 pr-1">
+            {(recipe.ingredients || []).map((ing, i) => {
+              const isChecked = checkedIngredients[i] || false;
+              return (
+                <li
+                  key={`ing_${i}`}
+                  onClick={() => toggleIngredientCheck(i)}
+                  className="flex items-start gap-3 py-1 cursor-pointer select-none group"
+                >
+                  <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors mt-0.5 flex-shrink-0 ${
+                    isChecked
+                      ? 'bg-[var(--accent-color)] border-[var(--accent-color)] text-white'
+                      : 'border-white/20 group-hover:border-white/40 text-transparent'
+                  }`}>
+                    <Check className="w-3.5 h-3.5 stroke-[3px]" />
+                  </div>
+                  <span className={`text-sm leading-snug transition-all ${
+                    isChecked ? 'text-gray-500 line-through' : 'text-gray-200'
+                  }`}>
+                    {ing}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+          {showIngredientsMobile && (
+            <button
+              onClick={() => setShowIngredientsMobile(false)}
+              className="mt-6 w-full py-4 bg-[var(--accent-color)] text-white rounded-xl font-bold text-sm flex-shrink-0"
+            >
+              Show Instructions Steps
+            </button>
+          )}
+        </div>
+
+        {/* Right Side: Highlightable Steps List */}
+        <div className={`flex-1 flex flex-col overflow-hidden min-w-0 ${showIngredientsMobile ? 'hidden' : 'flex'}`}>
+          {/* Scrolling Steps List */}
+          <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4">
+            <h3 className="text-sm font-bold text-[var(--accent-color)] uppercase tracking-wider mb-2 flex-shrink-0">
+              Instructions
+            </h3>
+            <div className="space-y-4">
+              {steps.map((step, idx) => {
+                const isActive = idx === currentStep;
+                const isPassed = idx < currentStep;
+                const stepSeconds = parseTimerSeconds(step);
+
+                return (
+                  <div
+                    key={idx}
+                    onClick={() => goTo(idx)}
+                    className={`p-4 rounded-xl border transition-all duration-300 cursor-pointer select-none relative ${
+                      isActive
+                        ? 'bg-white/5 border-[var(--accent-color)] shadow-[0_0_15px_rgba(var(--accent-color-rgb),0.1)] scale-[1.01]'
+                        : isPassed
+                        ? 'bg-black/10 border-white/5 opacity-40 hover:opacity-60'
+                        : 'bg-black/5 border-white/5 opacity-60 hover:opacity-85'
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <span className={`text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${
+                        isActive
+                          ? 'bg-[var(--accent-color)] text-white shadow-sm'
+                          : isPassed
+                          ? 'bg-white/20 text-gray-400'
+                          : 'bg-white/5 text-gray-500'
+                      }`}>
+                        {idx + 1}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm sm:text-base leading-relaxed ${
+                          isActive ? 'text-white font-medium' : 'text-gray-300'
+                        }`}>
+                          {step}
+                        </p>
+
+                        {/* Inline Timer Button for active step */}
+                        {isActive && stepSeconds !== null && !(recipeTimers[activeIndex] && recipeTimers[activeIndex].seconds > 0) && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              startTimer(activeIndex, stepSeconds, `Step ${idx + 1}`);
+                            }}
+                            className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/15 active:scale-95 text-xs font-bold rounded-lg text-[var(--accent-color)] transition-all shadow-sm"
+                          >
+                            <Clock className="w-3.5 h-3.5" />
+                            <span>Start {formatDuration(stepSeconds)} Timer</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Active Global Timers List */}
+          {Object.entries(recipeTimers).map(([idxStr, timer]) => {
+            const idx = parseInt(idxStr, 10);
+            const timerRecipe = recipes[idx];
+            if (!timerRecipe || timer.seconds <= 0) return null;
+
+            return (
+              <div key={idx} className="mx-6 mb-3 p-4 bg-white/5 backdrop-blur-md rounded-xl border border-white/10 flex items-center justify-between shadow-md flex-shrink-0 animate-fade-in">
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 rounded-lg ${timer.isActive ? 'bg-[var(--accent-color)] text-white animate-pulse' : 'bg-white/10 text-gray-400'}`}>
+                    <Clock className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wider truncate">
+                      {timer.isActive ? 'Active Timer' : 'Timer Paused'} • {timerRecipe.title}
+                    </p>
+                    <p className="text-base font-mono font-bold leading-tight mt-0.5">
+                      {formatTimeLeft(timer.seconds)} <span className="text-xs font-normal text-gray-400 font-sans ml-1">({timer.label})</span>
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0 ml-4">
+                  <button
+                    onClick={() => togglePauseResume(idx)}
+                    className="px-3 py-1.5 bg-white/10 hover:bg-white/15 active:scale-95 text-xs font-bold rounded-lg transition-all"
+                  >
+                    {timer.isActive ? 'Pause' : 'Resume'}
+                  </button>
+                  <button
+                    onClick={() => cancelTimer(idx)}
+                    className="px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 active:scale-95 text-xs font-bold text-red-300 rounded-lg transition-all"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Navigation Controls */}
+          <div className="flex-shrink-0 flex items-center gap-3 px-6 pb-6 pt-2 border-t border-white/5 bg-black/20">
             <button
               onClick={() => {
                 if (!isFirst) {
@@ -412,24 +572,24 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipe, onExit }) => {
                 }
               }}
               disabled={isFirst}
-              className={`flex-1 py-4 rounded-2xl font-bold text-base flex items-center justify-center gap-1.5 transition-all ${
+              className={`flex-1 py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-1 transition-all ${
                 isFirst
-                  ? 'bg-white/5 text-white/20 cursor-not-allowed'
-                  : 'bg-white/10 text-white active:bg-white/20'
+                  ? 'bg-white/5 text-white/20 cursor-not-allowed border border-white/5'
+                  : 'bg-white/10 text-white active:bg-white/20 border border-white/10'
               }`}
             >
-              <ChevronLeft className="w-5 h-5" /> Prev
+              <ChevronLeft className="w-4 h-4" /> Prev
             </button>
 
             {isLast ? (
               <button
                 onClick={() => {
                   HapticService.success();
-                  onExit();
+                  onExit(recipe);
                 }}
-                className="flex-1 py-4 rounded-2xl font-bold text-base bg-[var(--accent-color)] text-white flex items-center justify-center gap-1.5 active:opacity-80"
+                className="flex-1 py-3 rounded-xl font-bold text-sm bg-[var(--accent-color)] text-white flex items-center justify-center gap-1 active:opacity-85 shadow-sm"
               >
-                <UtensilsCrossed className="w-5 h-5" /> Done!
+                <UtensilsCrossed className="w-4 h-4" /> Complete Cooking
               </button>
             ) : (
               <button
@@ -439,14 +599,14 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipe, onExit }) => {
                     goTo(currentStep + 1);
                   }
                 }}
-                className="flex-1 py-4 rounded-2xl font-bold text-base bg-[var(--accent-color)] text-white flex items-center justify-center gap-1.5 active:opacity-80"
+                className="flex-1 py-3 rounded-xl font-bold text-sm bg-[var(--accent-color)] text-white flex items-center justify-center gap-1 active:opacity-85 shadow-sm"
               >
-                Next <ChevronRight className="w-5 h-5" />
+                Next <ChevronRight className="w-4 h-4" />
               </button>
             )}
           </div>
-        </>
-      )}
+        </div>
+      </div>
     </div>
   );
 };

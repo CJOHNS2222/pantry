@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Sparkles, X, ArrowRight } from 'lucide-react';
 import { type OnboardingMilestone, hasMilestone } from '../../services/onboardingMilestoneService';
+import { type User } from '../../types';
 
 interface FeatureDiscoveryProps {
   featureId: string;
@@ -230,21 +231,24 @@ export const FeatureDiscovery: React.FC<FeatureDiscoveryProps> = ({
 interface FeatureDiscoveryManagerProps {
   discoveries: Array<Omit<FeatureDiscoveryProps, 'onDismiss'>>;
   onDiscoveryDismiss?: (featureId: string) => void;
+  user?: User | null;
 }
 
 export const FeatureDiscoveryManager: React.FC<FeatureDiscoveryManagerProps> = ({
   discoveries,
-  onDiscoveryDismiss
+  onDiscoveryDismiss,
+  user
 }) => {
   const [currentDiscovery, setCurrentDiscovery] = useState<FeatureDiscoveryProps | null>(null);
   const [queue, setQueue] = useState<FeatureDiscoveryProps[]>([]);
 
   useEffect(() => {
     // Check which discoveries haven't been seen AND whose milestone has been reached
-    const discoveredFeatures = JSON.parse(localStorage.getItem('discovered-features') || '[]');
+    const localDiscovered = JSON.parse(localStorage.getItem('discovered-features') || '[]');
+    const dbDiscovered = user?.discoveredFeatures || [];
 
     const newDiscoveries = discoveries
-      .filter(discovery => !discoveredFeatures.includes(discovery.featureId))
+      .filter(discovery => !localDiscovered.includes(discovery.featureId) && !dbDiscovered.includes(discovery.featureId))
       .filter(discovery =>
         // If a required milestone is specified, gate on it; otherwise always eligible
         !discovery.requiredMilestone || hasMilestone(discovery.requiredMilestone)
@@ -260,7 +264,7 @@ export const FeatureDiscoveryManager: React.FC<FeatureDiscoveryManagerProps> = (
         setCurrentDiscovery(newDiscoveries[0]);
       }
     }
-  }, [discoveries]);
+  }, [discoveries, user?.discoveredFeatures]);
 
   const handleDiscoveryDismiss = (featureId: string) => {
     setCurrentDiscovery(null);

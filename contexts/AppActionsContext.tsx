@@ -50,6 +50,7 @@ interface AppActionsContextValue {
   checkRecipeSaveLimit: () => Promise<boolean>;
   checkMealPlanLimit: () => Promise<boolean>;
   refreshAllData: () => Promise<void>;
+  onReplayOnboarding?: () => void;
 }
 
 const AppActionsContext = createContext<AppActionsContextValue | undefined>(undefined);
@@ -93,6 +94,7 @@ const defaultAppActionsContextValue: AppActionsContextValue = {
   checkRecipeSaveLimit: async () => false,
   checkMealPlanLimit: async () => false,
   refreshAllData: async () => {},
+  onReplayOnboarding: () => {},
 };
 /* eslint-enable @typescript-eslint/no-explicit-any */
 

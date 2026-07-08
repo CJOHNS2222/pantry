@@ -6,3 +6,4 @@ export {getNutritionData} from './nutrition';
 export {resetWeeklyUsageLimits, resetUsageLimitsNow} from './resetUsageLimits';
 export {verifyPurchase} from './verifyPurchase';
 export {deleteAccount} from './deleteAccount';
+export {sendPushNotificationOnWrite} from './sendPushNotification';

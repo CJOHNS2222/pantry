@@ -127,6 +127,36 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
   const [localSavedRecipes, setLocalSavedRecipes] = useState<SavedRecipe[]>([]);
   const savedRecipes = propSavedRecipes.length > 0 ? propSavedRecipes : localSavedRecipes;
 
+  const activeMealPlanRecipes = useMemo(() => {
+    if (!mealPlan) return [];
+    
+    // Find the day index in the meal plan that contains this recipe (recipesDayIndex)
+    let targetDayIndex = -1;
+    if (modalRecipe) {
+      for (let i = 0; i < mealPlan.length; i++) {
+        const day = mealPlan[i];
+        const hasRecipe = [...(day.breakfast || []), ...(day.lunch || []), ...(day.dinner || [])]
+          .some(meal => meal.recipe && meal.recipe.title?.toLowerCase() === modalRecipe.title?.toLowerCase());
+        if (hasRecipe) {
+          targetDayIndex = i;
+          break;
+        }
+      }
+    }
+
+    const activeDayIndex = targetDayIndex !== -1 ? targetDayIndex : currentDayIndex;
+    const day = mealPlan[activeDayIndex];
+    if (!day) return [];
+
+    const recipesMap = new Map<string, StructuredRecipe>();
+    [...(day.breakfast || []), ...(day.lunch || []), ...(day.dinner || [])].forEach(meal => {
+      if (meal.recipe && meal.recipe.title) {
+        recipesMap.set(meal.recipe.title.toLowerCase(), meal.recipe);
+      }
+    });
+    return Array.from(recipesMap.values());
+  }, [mealPlan, modalRecipe, currentDayIndex]);
+
   const [isDragging, setIsDragging] = useState(false);
   const [dragOverTrash, setDragOverTrash] = useState(false);
   const [showRecipeSearch, setShowRecipeSearch] = useState(false);
@@ -1196,6 +1226,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
           mealPlanLimitExceeded={mealPlanLimitExceeded}
           user={user}
           inventory={inventory}
+          activeRecipes={activeMealPlanRecipes}
         />
       )}
 

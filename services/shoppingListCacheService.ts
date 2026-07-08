@@ -50,6 +50,8 @@ const shoppingItemToObject = (item: ShoppingItem): CachedShoppingListData[string
     category: item.category,
     source: item.source,
   };
+  if (item.amount !== undefined) obj.amount = item.amount;
+  if (item.unit !== undefined) obj.unit = item.unit;
   if (item.estimatedPrice !== undefined) obj.estimatedPrice = item.estimatedPrice;
   if (item.priceData) {
     obj.priceData = {
@@ -72,6 +74,8 @@ const objectToShoppingItem = (itemId: string, itemObject: CachedShoppingListData
     id: itemId,
     item: itemObject.item,
     quantity: itemObject.quantity,
+    amount: (itemObject as any).amount,
+    unit: (itemObject as any).unit || '',
     category: itemObject.category || '',
     checked: false,
     source: itemObject.source,

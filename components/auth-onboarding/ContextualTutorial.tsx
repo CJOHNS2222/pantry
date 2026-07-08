@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, ChevronRight, Lightbulb } from 'lucide-react';
+import DatabaseMonitoringService from '../../services/databaseMonitoringService';
+import { log } from '../../services/logService';
+import { type User } from '../../types';
 
 interface ContextualTipProps {
   id: string;
@@ -223,13 +226,24 @@ export const ContextualTutorial: React.FC<ContextualTutorialProps> = ({
 };
 
 // Hook for managing contextual tips
-export const useContextualTips = () => {
+export const useContextualTips = (user: User | null) => {
   const [dismissedTips, setDismissedTips] = useState<Set<string>>(() => {
     const stored = localStorage.getItem('dismissed-tutorial-tips');
     return stored ? new Set(JSON.parse(stored)) : new Set();
   });
 
   const [tips, setTips] = useState<ContextualTipProps[]>([]);
+
+  // Keep state in sync when user object is loaded/changed
+  useEffect(() => {
+    if (user?.dismissedTutorialTips) {
+      setDismissedTips(prev => {
+        const next = new Set(prev);
+        user.dismissedTutorialTips?.forEach(tipId => next.add(tipId));
+        return next;
+      });
+    }
+  }, [user]);
 
   const addTip = (tip: Omit<ContextualTipProps, 'onDismiss'>) => {
     if (dismissedTips.has(tip.id)) return;
@@ -242,9 +256,27 @@ export const useContextualTips = () => {
   };
 
   const dismissTip = (tipId: string) => {
-    setDismissedTips(prev => new Set([...prev, tipId]));
+    setDismissedTips(prev => {
+      const next = new Set(prev);
+      next.add(tipId);
+
+      // Save to localStorage
+      localStorage.setItem('dismissed-tutorial-tips', JSON.stringify([...next]));
+
+      // Save to Firestore if user is authenticated and not guest
+      if (user && !user.isGuest) {
+        const userRef = DatabaseMonitoringService.doc('users', user.id);
+        DatabaseMonitoringService.updateDoc(userRef, {
+          dismissedTutorialTips: [...next]
+        }).catch(err => {
+          log.error('Failed to sync dismissed tutorial tip to Firestore', { error: err?.message, tipId }, 'useContextualTips');
+        });
+      }
+
+      return next;
+    });
+
     setTips(prev => prev.filter(tip => tip.id !== tipId));
-    localStorage.setItem('dismissed-tutorial-tips', JSON.stringify([...dismissedTips, tipId]));
   };
 
   const clearAllTips = () => {

@@ -39,7 +39,9 @@ export function useAuth() {
             email: '',
             provider: 'guest',
             isGuest: true,
-            hasSeenTutorial: false
+            hasSeenTutorial: false,
+            discoveredFeatures: [],
+            dismissedTutorialTips: []
           });
         }
 
@@ -122,6 +124,8 @@ export function useAuth() {
           profile: userData?.profile,
           householdId: householdId,
           customCategories,
+          discoveredFeatures: userData?.discoveredFeatures || [],
+          dismissedTutorialTips: userData?.dismissedTutorialTips || [],
         });
 
         setUserContext(fbUser.uid, fbUser.email || undefined, householdId);

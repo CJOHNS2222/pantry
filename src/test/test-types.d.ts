@@ -36,7 +36,7 @@ export {};
 declare module '../../types' {
   export interface StructuredRecipe { [key: string]: any }
   export interface SavedRecipe { [key: string]: any }
-  export interface User { id: string; email?: string; name?: string; householdId?: string; provider?: string; hasSeenTutorial?: boolean }
+  export interface User { id: string; email?: string; name?: string; householdId?: string; provider?: string; hasSeenTutorial?: boolean; discoveredFeatures?: string[]; dismissedTutorialTips?: string[]; fcmTokens?: string[] }
   export interface GroceryPrice { [key: string]: any }
   export interface PriceTrend { currentPrice?: number | undefined; priceChange?: number | undefined; priceChangePercent: number; lastUpdated: Date; priceHistory: { date: Date; price: number }[] }
 }
@@ -44,13 +44,13 @@ declare module '../../types' {
 declare module '../types' {
   export interface StructuredRecipe { [key: string]: any }
   export interface SavedRecipe { [key: string]: any }
-  export interface User { id: string; email?: string; name?: string; householdId?: string; provider?: string; hasSeenTutorial?: boolean }
+  export interface User { id: string; email?: string; name?: string; householdId?: string; provider?: string; hasSeenTutorial?: boolean; discoveredFeatures?: string[]; dismissedTutorialTips?: string[]; fcmTokens?: string[] }
 }
 
 declare module '../../../types' {
   export interface StructuredRecipe { [key: string]: any }
   export interface SavedRecipe { [key: string]: any }
-  export interface User { id: string; email?: string; name?: string; householdId?: string; provider?: string; hasSeenTutorial?: boolean }
+  export interface User { id: string; email?: string; name?: string; householdId?: string; provider?: string; hasSeenTutorial?: boolean; discoveredFeatures?: string[]; dismissedTutorialTips?: string[]; fcmTokens?: string[] }
 }
 
 // Provide a global GroceryPrice for tests that reference it by name
