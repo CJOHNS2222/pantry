@@ -20,6 +20,13 @@ export interface DetailedChangeEntry {
 
 export const RECENT_CHANGES: ChangeEntry[] = [
   {
+    "version": "3.0.2",
+    "date": "Jul 8, 2026",
+    "highlights": [
+      "Release Verification & Housekeeping — Incremented platform release identifiers to v3.0.2 (versionCode 95) and rebuilt…"
+    ]
+  },
+  {
     "version": "3.0.1",
     "date": "Jul 8, 2026",
     "highlights": [
@@ -38,20 +45,22 @@ export const RECENT_CHANGES: ChangeEntry[] = [
       "Dedicated Import Modals — Split the combined import modal into separate tabless modals: PantryImportModal for CSV/TXT…",
       "Firestore Schema Sync for Scraped Recipes — Rewrote URL imports to save using the version-2 cache schema so Firestore…"
     ]
-  },
-  {
-    "version": "2.5.12",
-    "date": "Jul 7, 2026",
-    "highlights": [
-      "Firestore-Synced Push Notifications — Implemented an end-to-end native push notification system.",
-      "Unit-Aware Grocery Consolidation — Created a consolidateShoppingList utility that merges duplicate shopping list…",
-      "Consolidation View Toggle — Integrated a \"Consolidate\" toggle into the Shopping List UI.",
-      "Structured Decimal Quantities — Added an explicit amount decimal field to ShoppingItem interface and Firestore schema,…"
-    ]
   }
 ];
 
 export const ALL_CHANGES: DetailedChangeEntry[] = [
+  {
+    "version": "3.0.2",
+    "date": "Jul 8, 2026",
+    "sections": [
+      {
+        "title": "Changed",
+        "bullets": [
+          "**Release Verification & Housekeeping** — Incremented platform release identifiers to v3.0.2 (versionCode 95) and rebuilt client bundles for verification."
+        ]
+      }
+    ]
+  },
   {
     "version": "3.0.1",
     "date": "Jul 8, 2026",
