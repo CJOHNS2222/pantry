@@ -298,30 +298,60 @@ export function generateWalmartCartUrl(items: ShoppingItem[], storeId?: string):
 }
 
 /**
- * Generate a search URL on Walmart.com for an unmatched ingredient.
+ * Generate a search URL on the specified merchant's site for an ingredient.
  */
-export function generateWalmartSearchUrl(query: string): string {
-  return `https://www.walmart.com/search?q=${encodeURIComponent(query)}`;
+export function generateSearchUrl(query: string, merchant: 'walmart' | 'target' | 'kroger' | 'instacart' | 'albertsons' | 'thrive'): string {
+  const encodedQuery = encodeURIComponent(query);
+  switch (merchant) {
+    case 'walmart':
+      return `https://www.walmart.com/search?q=${encodedQuery}`;
+    case 'target':
+      return `https://www.target.com/s?searchTerm=${encodedQuery}`;
+    case 'kroger':
+      return `https://www.kroger.com/search?query=${encodedQuery}`;
+    case 'instacart':
+      return `https://www.instacart.com/store/partner/search/${encodedQuery}`;
+    case 'albertsons':
+      return `https://www.albertsons.com/shop/search-results.html?q=${encodedQuery}`;
+    case 'thrive':
+      return `https://thrivemarket.com/page/search?q=${encodedQuery}`;
+    default:
+      return `https://www.walmart.com/search?q=${encodedQuery}`;
+  }
 }
 
 /**
- * Wrap a destination Walmart.com URL with the Impact Radius affiliate redirect tracking parameters.
+ * Wrap a destination merchant URL with the Impact Radius affiliate redirect tracking parameters.
+ * Supports different redirect subdomains and campaign details based on the retailer.
  */
-export function wrapWithImpactTracker(destinationUrl: string): string {
+export function wrapWithImpactTracker(
+  destinationUrl: string,
+  merchant: 'walmart' | 'target' | 'kroger' | 'instacart' | 'albertsons' | 'thrive' = 'walmart'
+): string {
   // Read configured credentials from Vite environment
   const accountSid = import.meta.env.VITE_IMPACT_ACCOUNT_SID;
   const authToken = import.meta.env.VITE_IMPACT_AUTH_TOKEN;
 
-  // We also check for publisher campaigns, default to placeholders if not set
-  const publisherId = '3624855'; // Sample / fallback publisher ID
-  const adId = '1126749'; // Sample / fallback ad ID
-  const campaignId = '11463'; // Walmart campaign ID
-
-  // If there are no credentials configured, return the destination URL directly
+  // Fallback: If no credentials configured, return the destination URL directly
   if (!accountSid || !authToken) {
     return destinationUrl;
   }
 
+  // Publisher configurations (can be overridden by developer)
+  const publisherId = '3624855'; // General publisher account ID
+
+  // Mapping of merchant campaign details on Impact
+  const merchantConfig: Record<string, { trackingDomain: string; adId: string; campaignId: string }> = {
+    walmart: { trackingDomain: 'goto.walmart.com', adId: '1126749', campaignId: '11463' },
+    target: { trackingDomain: 'target.sjv.io', adId: '1126750', campaignId: '11466' },
+    kroger: { trackingDomain: 'kroger.sjv.io', adId: '1126751', campaignId: '11468' },
+    instacart: { trackingDomain: 'instacart.sjv.io', adId: '1126752', campaignId: '11470' },
+    albertsons: { trackingDomain: 'albertsons.sjv.io', adId: '1126753', campaignId: '11472' },
+    thrive: { trackingDomain: 'thrivemarket.pxf.io', adId: '1126754', campaignId: '11474' },
+  };
+
+  const config = merchantConfig[merchant] || merchantConfig.walmart;
   const encodedUrl = encodeURIComponent(destinationUrl);
-  return `https://goto.walmart.com/m/${publisherId}/${adId}/${campaignId}?veh=aff&sourceid=app&u=${encodedUrl}`;
+
+  return `https://${config.trackingDomain}/m/${publisherId}/${config.adId}/${config.campaignId}?veh=aff&sourceid=app&u=${encodedUrl}`;
 }

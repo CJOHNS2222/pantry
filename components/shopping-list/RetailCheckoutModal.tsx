@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { X, Check, Search, ShoppingBag, ArrowUpRight, ShieldCheck, Link2, Save } from 'lucide-react';
+import { X, Check, Search, ShoppingBag, ArrowUpRight, Link2, Save } from 'lucide-react';
 import { ShoppingItem } from '../../types';
 import { Browser } from '@capacitor/browser';
 import {
   generateWalmartCartUrl,
-  generateWalmartSearchUrl,
+  generateSearchUrl,
   hasWalmartMatch,
   wrapWithImpactTracker
 } from '../../services/groceryCheckoutService';
@@ -22,7 +22,7 @@ export const RetailCheckoutModal: React.FC<RetailCheckoutModalProps> = ({
   items,
   onUpdateItem,
 }) => {
-  const [selectedRetailer, setSelectedRetailer] = useState<'walmart' | 'instacart'>('walmart');
+  const [selectedRetailer, setSelectedRetailer] = useState<'walmart' | 'target' | 'kroger' | 'instacart' | 'albertsons' | 'thrive'>('walmart');
   
   // Track which item has the linker input open
   const [linkingItemId, setLinkingItemId] = useState<string | null>(null);
@@ -119,24 +119,24 @@ export const RetailCheckoutModal: React.FC<RetailCheckoutModalProps> = ({
       if (matchedItems.length > 0) {
         const cartUrl = generateWalmartCartUrl(matchedItems);
         if (cartUrl) {
-          const trackedUrl = wrapWithImpactTracker(cartUrl);
+          const trackedUrl = wrapWithImpactTracker(cartUrl, 'walmart');
           await Browser.open({ url: trackedUrl });
         }
       }
 
-      // 2. For unmatched items, open search URLs (limit to first 3 to avoid spamming tabs, or prompt the user)
+      // 2. For unmatched items, open search URLs
       if (unmatchedItems.length > 0) {
-        // Open the search link for the first unmatched item as a convenience
-        const searchUrl = generateWalmartSearchUrl(unmatchedItems[0].item);
-        const trackedSearchUrl = wrapWithImpactTracker(searchUrl);
+        const searchUrl = generateSearchUrl(unmatchedItems[0].item, 'walmart');
+        const trackedSearchUrl = wrapWithImpactTracker(searchUrl, 'walmart');
         await Browser.open({ url: trackedSearchUrl });
       }
     } else {
-      // Instacart Search Redirection Flow
-      // Link user to partner search for the first selected item, or standard instacart store locator
+      // General Merchant Search Redirection Flow
+      // Open the search query for the first selected item to drop the cookie!
       const firstItem = activeItems[0];
-      const searchUrl = `https://www.instacart.com/store/partner/search/${encodeURIComponent(firstItem.item)}`;
-      await Browser.open({ url: searchUrl });
+      const searchUrl = generateSearchUrl(firstItem.item, selectedRetailer);
+      const trackedSearchUrl = wrapWithImpactTracker(searchUrl, selectedRetailer);
+      await Browser.open({ url: trackedSearchUrl });
     }
 
     onClose();
@@ -163,32 +163,33 @@ export const RetailCheckoutModal: React.FC<RetailCheckoutModalProps> = ({
           </button>
         </div>
 
-        {/* Retailer Selector */}
-        <div className="p-5 border-b border-[#52151C] bg-[#3F1016]/40 flex gap-4">
-          <button
-            onClick={() => setSelectedRetailer('walmart')}
-            className={`flex-1 flex flex-col items-center justify-center p-3.5 rounded-xl border transition-all ${
-              selectedRetailer === 'walmart'
-                ? 'border-[#F59E0B] bg-[#52151C]/60 text-white shadow-lg'
-                : 'border-transparent bg-[#2A0A10]/50 text-gray-400 hover:bg-[#2A0A10]'
-            }`}
-          >
-            <span className="font-bold text-sm tracking-wider uppercase">Walmart</span>
-            <span className="text-xs text-[#F59E0B] mt-1 font-semibold flex items-center gap-1">
-              <ShieldCheck className="w-3.5 h-3.5" /> Direct Cart Sync
-            </span>
-          </button>
-          <button
-            onClick={() => setSelectedRetailer('instacart')}
-            className={`flex-1 flex flex-col items-center justify-center p-3.5 rounded-xl border transition-all ${
-              selectedRetailer === 'instacart'
-                ? 'border-[#F59E0B] bg-[#52151C]/60 text-white shadow-lg'
-                : 'border-transparent bg-[#2A0A10]/50 text-gray-400 hover:bg-[#2A0A10]'
-            }`}
-          >
-            <span className="font-bold text-sm tracking-wider uppercase">Instacart</span>
-            <span className="text-xs text-gray-400 mt-1">Search & Shop</span>
-          </button>
+        {/* Retailer Selector Grid */}
+        <div className="p-4 border-b border-[#52151C] bg-[#3F1016]/30 grid grid-cols-3 gap-2.5">
+          {(
+            [
+              { id: 'walmart', name: 'Walmart', subtitle: 'Direct Cart' },
+              { id: 'target', name: 'Target', subtitle: '7-Day Cookie' },
+              { id: 'kroger', name: 'Kroger', subtitle: '7-Day Cookie' },
+              { id: 'instacart', name: 'Instacart', subtitle: '7-Day Cookie' },
+              { id: 'albertsons', name: 'Safeway', subtitle: '7-Day Cookie' },
+              { id: 'thrive', name: 'Thrive Mkt', subtitle: '7-Day Cookie' },
+            ] as const
+          ).map(merchant => (
+            <button
+              key={merchant.id}
+              onClick={() => setSelectedRetailer(merchant.id)}
+              className={`flex flex-col items-center justify-center p-2.5 rounded-xl border transition-all ${
+                selectedRetailer === merchant.id
+                  ? 'border-[#F59E0B] bg-[#52151C]/60 text-white shadow-lg'
+                  : 'border-transparent bg-[#2A0A10]/50 text-gray-400 hover:bg-[#2A0A10]'
+              }`}
+            >
+              <span className="font-bold text-xs tracking-wider uppercase text-center">{merchant.name}</span>
+              <span className="text-[10px] text-[#F59E0B] mt-0.5 font-semibold text-center leading-none">
+                {merchant.subtitle}
+              </span>
+            </button>
+          ))}
         </div>
 
         {/* Selection Actions */}
@@ -320,7 +321,14 @@ export const RetailCheckoutModal: React.FC<RetailCheckoutModalProps> = ({
             disabled={activeItems.length === 0}
             className="w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl bg-[#F59E0B] hover:bg-[#F59E0B]/95 text-black font-bold uppercase tracking-wider text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
           >
-            <span>Proceed to {selectedRetailer === 'walmart' ? 'Walmart' : 'Instacart'}</span>
+            <span>Proceed to {{
+              walmart: 'Walmart',
+              target: 'Target',
+              kroger: 'Kroger',
+              instacart: 'Instacart',
+              albertsons: 'Safeway',
+              thrive: 'Thrive Market'
+            }[selectedRetailer]}</span>
             <ArrowUpRight className="w-4 h-4" />
           </button>
         </div>
