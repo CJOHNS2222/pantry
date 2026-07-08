@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { useIntl } from 'react-intl';
+import { ShoppingCart } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { Share } from '@capacitor/share';
 import { ShoppingItem, User, Household, Settings, PantryItem } from '../../types';
@@ -889,6 +890,22 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
 
   return (
     <div className="space-y-6 pb-24 max-w-2xl mx-auto animate-fade-in relative">
+      {/* Floating Shopping Cart Button (Top Right) */}
+      {items.length > 0 && (
+        <button
+          onClick={() => setIsCheckoutModalOpen(true)}
+          className="fixed top-6 right-6 z-[100] bg-[var(--accent-color)] text-white p-3 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 flex items-center justify-center theme-transition"
+          aria-label="Order ingredients online"
+        >
+          <ShoppingCart className="w-5 h-5" />
+          {items.filter(item => !item.checked).length > 0 && (
+            <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] font-bold min-w-5 h-5 px-1.5 rounded-full flex items-center justify-center border-2 border-theme-primary shadow-sm">
+              {items.filter(item => !item.checked).length}
+            </span>
+          )}
+        </button>
+      )}
+
       <div className="text-center mb-6">
         <h2 className="text-3xl font-serif font-bold text-theme-secondary">{intl.formatMessage({ id: 'shoppingList.title' })}</h2>
       </div>
