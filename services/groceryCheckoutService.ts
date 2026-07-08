@@ -323,6 +323,8 @@ export function generateSearchUrl(query: string, merchant: 'walmart' | 'target' 
 /**
  * Wrap a destination merchant URL with the Impact Radius affiliate redirect tracking parameters.
  * Supports different redirect subdomains and campaign details based on the retailer.
+ * Only wraps with affiliate tracking if the specific merchant's Campaign ID and Ad ID are configured
+ * in the environment variables, falling back to direct merchant links to avoid redirect errors.
  */
 export function wrapWithImpactTracker(
   destinationUrl: string,
@@ -337,21 +339,51 @@ export function wrapWithImpactTracker(
     return destinationUrl;
   }
 
-  // Publisher configurations (can be overridden by developer)
-  const publisherId = '3624855'; // General publisher account ID
+  let campaignId = '';
+  let adId = '';
+  let trackingDomain = '';
 
-  // Mapping of merchant campaign details on Impact
-  const merchantConfig: Record<string, { trackingDomain: string; adId: string; campaignId: string }> = {
-    walmart: { trackingDomain: 'goto.walmart.com', adId: '1126749', campaignId: '11463' },
-    target: { trackingDomain: 'target.sjv.io', adId: '1126750', campaignId: '11466' },
-    kroger: { trackingDomain: 'kroger.sjv.io', adId: '1126751', campaignId: '11468' },
-    instacart: { trackingDomain: 'instacart.sjv.io', adId: '1126752', campaignId: '11470' },
-    albertsons: { trackingDomain: 'albertsons.sjv.io', adId: '1126753', campaignId: '11472' },
-    thrive: { trackingDomain: 'thrivemarket.pxf.io', adId: '1126754', campaignId: '11474' },
-  };
+  const publisherId = import.meta.env.VITE_IMPACT_PUBLISHER_ID || '3624855';
 
-  const config = merchantConfig[merchant] || merchantConfig.walmart;
+  switch (merchant) {
+    case 'walmart':
+      campaignId = import.meta.env.VITE_WALMART_CAMPAIGN_ID;
+      adId = import.meta.env.VITE_WALMART_AD_ID;
+      trackingDomain = 'goto.walmart.com';
+      break;
+    case 'target':
+      campaignId = import.meta.env.VITE_TARGET_CAMPAIGN_ID;
+      adId = import.meta.env.VITE_TARGET_AD_ID;
+      trackingDomain = 'target.sjv.io';
+      break;
+    case 'kroger':
+      campaignId = import.meta.env.VITE_KROGER_CAMPAIGN_ID;
+      adId = import.meta.env.VITE_KROGER_AD_ID;
+      trackingDomain = 'kroger.sjv.io';
+      break;
+    case 'instacart':
+      campaignId = import.meta.env.VITE_INSTACART_CAMPAIGN_ID;
+      adId = import.meta.env.VITE_INSTACART_AD_ID;
+      trackingDomain = 'instacart.sjv.io';
+      break;
+    case 'albertsons':
+      campaignId = import.meta.env.VITE_ALBERTSONS_CAMPAIGN_ID;
+      adId = import.meta.env.VITE_ALBERTSONS_AD_ID;
+      trackingDomain = 'albertsons.sjv.io';
+      break;
+    case 'thrive':
+      campaignId = import.meta.env.VITE_THRIVE_CAMPAIGN_ID;
+      adId = import.meta.env.VITE_THRIVE_AD_ID;
+      trackingDomain = 'thrivemarket.pxf.io';
+      break;
+  }
+
+  // Fallback: If campaign and ad details are not configured for this specific merchant,
+  // return direct link to prevent 403, expired or malformed link errors on placeholder IDs.
+  if (!campaignId || !adId) {
+    return destinationUrl;
+  }
+
   const encodedUrl = encodeURIComponent(destinationUrl);
-
-  return `https://${config.trackingDomain}/m/${publisherId}/${config.adId}/${config.campaignId}?veh=aff&sourceid=app&u=${encodedUrl}`;
+  return `https://${trackingDomain}/m/${publisherId}/${adId}/${campaignId}?veh=aff&sourceid=app&u=${encodedUrl}`;
 }

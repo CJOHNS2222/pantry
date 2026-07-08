@@ -114,9 +114,11 @@ describe('groceryCheckoutService', () => {
       expect(wrapWithImpactTracker(target, 'walmart')).toBe(target);
     });
 
-    it('should build Walmart tracking redirect link when credentials exist', () => {
+    it('should build Walmart tracking redirect link when credentials and campaign IDs exist', () => {
       import.meta.env.VITE_IMPACT_ACCOUNT_SID = 'test-sid';
       import.meta.env.VITE_IMPACT_AUTH_TOKEN = 'test-token';
+      import.meta.env.VITE_WALMART_CAMPAIGN_ID = '11463';
+      import.meta.env.VITE_WALMART_AD_ID = '1126749';
 
       const target = 'https://www.walmart.com/some-path';
       const result = wrapWithImpactTracker(target, 'walmart');
@@ -125,24 +127,40 @@ describe('groceryCheckoutService', () => {
       expect(result).toContain('u=https%3A%2F%2Fwww.walmart.com%2Fsome-path');
     });
 
-    it('should build Target tracking redirect link when credentials exist', () => {
+    it('should build Target tracking redirect link when credentials and campaign IDs exist', () => {
       import.meta.env.VITE_IMPACT_ACCOUNT_SID = 'test-sid';
       import.meta.env.VITE_IMPACT_AUTH_TOKEN = 'test-token';
+      import.meta.env.VITE_TARGET_CAMPAIGN_ID = '11466';
+      import.meta.env.VITE_TARGET_AD_ID = '1126750';
 
       const target = 'https://www.target.com/s?searchTerm=eggs';
       const result = wrapWithImpactTracker(target, 'target');
 
-      expect(result).toContain('https://target.sjv.io/m/3624855');
+      expect(result).toContain('https://target.sjv.io/m/3624855/1126750/11466');
     });
 
-    it('should build Kroger tracking redirect link when credentials exist', () => {
+    it('should build Kroger tracking redirect link when credentials and campaign IDs exist', () => {
       import.meta.env.VITE_IMPACT_ACCOUNT_SID = 'test-sid';
       import.meta.env.VITE_IMPACT_AUTH_TOKEN = 'test-token';
+      import.meta.env.VITE_KROGER_CAMPAIGN_ID = '11468';
+      import.meta.env.VITE_KROGER_AD_ID = '1126751';
 
       const target = 'https://www.kroger.com/search?query=milk';
       const result = wrapWithImpactTracker(target, 'kroger');
 
-      expect(result).toContain('https://kroger.sjv.io/m/3624855');
+      expect(result).toContain('https://kroger.sjv.io/m/3624855/1126751/11468');
+    });
+
+    it('should fallback to direct link when specific campaign IDs are missing', () => {
+      import.meta.env.VITE_IMPACT_ACCOUNT_SID = 'test-sid';
+      import.meta.env.VITE_IMPACT_AUTH_TOKEN = 'test-token';
+      import.meta.env.VITE_WALMART_CAMPAIGN_ID = '';
+      import.meta.env.VITE_WALMART_AD_ID = '';
+
+      const target = 'https://www.walmart.com/some-path';
+      const result = wrapWithImpactTracker(target, 'walmart');
+
+      expect(result).toBe(target);
     });
   });
 });
