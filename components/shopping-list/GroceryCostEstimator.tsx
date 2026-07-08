@@ -1,9 +1,9 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { DollarSign, Calculator, TrendingUp, Users, RefreshCw, Lock } from 'lucide-react';
-import { DayPlan, PantryItem } from '../../types';
+import { DayPlan, PantryItem, ShoppingItem } from '../../types';
 import { Tab } from '../../types/app';
 import { groceryPriceService, PriceData } from '../../services/groceryPriceService';
-import { parseIngredientForShoppingList } from '../../utils/appUtils';
+import { parseIngredientForShoppingList, consolidateShoppingList } from '../../utils/appUtils';
 import { useAppActions } from '../../contexts/AppActionsContext';
 import { useApp } from '../../contexts/AppContext';
 import { log } from '../../services/logService';
@@ -324,28 +324,42 @@ export const GroceryCostEstimator: React.FC<GroceryCostEstimatorProps> = ({ meal
       [...(day.breakfast || []), ...(day.lunch || []), ...(day.dinner || [])].flatMap(meal => meal.recipe.ingredients || [])
     );
     
-    // Group by ingredient name
-    const groupedIngredients: Record<string, number> = {};
-    
-    allIngredients.forEach(ing => {
+    const tempShoppingItems: ShoppingItem[] = allIngredients.map((ing, idx) => {
       const parsed = parseIngredient(ing);
-      const key = parsed.name.toLowerCase();
-      groupedIngredients[key] = (groupedIngredients[key] || 0) + parsed.quantity;
+      return {
+        id: `temp-${idx}`,
+        item: parsed.name,
+        quantity: `${parsed.quantity} ${parsed.unit}`,
+        amount: parsed.quantity,
+        unit: parsed.unit,
+        category: '',
+        checked: false
+      };
     });
+
+    const consolidated = consolidateShoppingList(tempShoppingItems);
     
     // Check inventory and calculate costs for missing items (or all items if includeAllIngredients is true)
     const costItems: IngredientCost[] = [];
     
-    Object.entries(groupedIngredients).forEach(([name, totalQty]) => {
+    consolidated.forEach(item => {
+      const name = item.item;
+      const totalQty = item.amount || 0;
+      const unit = item.unit || 'each';
+      const key = name.toLowerCase();
+
       // Check if we have this in inventory
-      const inInventory = inventory.some(item => 
-        name.includes(item.item.toLowerCase()) || 
-        item.item.toLowerCase().includes(name)
+      const inInventory = inventory.some(pantryItem => 
+        key.includes(pantryItem.item.toLowerCase()) || 
+        pantryItem.item.toLowerCase().includes(key)
       );
       
       if (includeAllIngredients || !inInventory) {
-        const costItem = estimateCost(`${totalQty} ${name}`);
+        const isCountUnit = ['pcs', 'pieces', 'each', 'count', 'units', 'unit'].includes(unit.toLowerCase());
+        const formatStr = isCountUnit ? `${totalQty} ${name}` : `${totalQty} ${unit} ${name}`;
+        const costItem = estimateCost(formatStr);
         costItem.quantity = totalQty;
+        costItem.unit = unit;
         costItems.push(costItem);
       }
     });

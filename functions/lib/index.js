@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteAccount = exports.verifyPurchase = exports.resetUsageLimitsNow = exports.resetWeeklyUsageLimits = exports.getNutritionData = exports.migrateHouseholdClaimsHttp = exports.migrateHouseholdClaims = exports.checkInvitation = exports.leaveHouseholdHttp = exports.leaveHousehold = exports.inviteMemberHttp = exports.inviteMember = void 0;
+exports.sendPushNotificationOnWrite = exports.deleteAccount = exports.verifyPurchase = exports.resetUsageLimitsNow = exports.resetWeeklyUsageLimits = exports.getNutritionData = exports.migrateHouseholdClaimsHttp = exports.migrateHouseholdClaims = exports.checkInvitation = exports.leaveHouseholdHttp = exports.leaveHousehold = exports.inviteMemberHttp = exports.inviteMember = void 0;
 var inviteMember_1 = require("./inviteMember");
 Object.defineProperty(exports, "inviteMember", { enumerable: true, get: function () { return inviteMember_1.inviteMember; } });
 Object.defineProperty(exports, "inviteMemberHttp", { enumerable: true, get: function () { return inviteMember_1.inviteMemberHttp; } });
@@ -21,4 +21,6 @@ var verifyPurchase_1 = require("./verifyPurchase");
 Object.defineProperty(exports, "verifyPurchase", { enumerable: true, get: function () { return verifyPurchase_1.verifyPurchase; } });
 var deleteAccount_1 = require("./deleteAccount");
 Object.defineProperty(exports, "deleteAccount", { enumerable: true, get: function () { return deleteAccount_1.deleteAccount; } });
+var sendPushNotification_1 = require("./sendPushNotification");
+Object.defineProperty(exports, "sendPushNotificationOnWrite", { enumerable: true, get: function () { return sendPushNotification_1.sendPushNotificationOnWrite; } });
 //# sourceMappingURL=index.js.map

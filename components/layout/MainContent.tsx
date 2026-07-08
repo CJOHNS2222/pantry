@@ -260,6 +260,7 @@ export const MainContent: React.FC = () => {
               household={household ?? undefined}
               onShowHousehold={onShowHousehold}
               addToast={addToast}
+              onReplayOnboarding={appActions.onReplayOnboarding}
             />
           </Suspense>
         </ComponentErrorBoundary>

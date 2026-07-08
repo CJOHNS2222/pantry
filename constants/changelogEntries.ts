@@ -20,6 +20,26 @@ export interface DetailedChangeEntry {
 
 export const RECENT_CHANGES: ChangeEntry[] = [
   {
+    "version": "3.0.0",
+    "date": "Jul 8, 2026",
+    "highlights": [
+      "Action-Oriented Onboarding Overhaul — Redesigned the onboarding flow to be fully interactive.",
+      "Replay Onboarding Setting — Added an option in settings to clear onboarding progress and replay the new tutorial flow.",
+      "Dedicated Import Modals — Split the combined import modal into separate tabless modals: PantryImportModal for CSV/TXT…",
+      "Firestore Schema Sync for Scraped Recipes — Rewrote URL imports to save using the version-2 cache schema so Firestore…"
+    ]
+  },
+  {
+    "version": "2.5.12",
+    "date": "Jul 7, 2026",
+    "highlights": [
+      "Firestore-Synced Push Notifications — Implemented an end-to-end native push notification system.",
+      "Unit-Aware Grocery Consolidation — Created a consolidateShoppingList utility that merges duplicate shopping list…",
+      "Consolidation View Toggle — Integrated a \"Consolidate\" toggle into the Shopping List UI.",
+      "Structured Decimal Quantities — Added an explicit amount decimal field to ShoppingItem interface and Firestore schema,…"
+    ]
+  },
+  {
     "version": "2.5.11",
     "date": "Jul 4, 2026",
     "highlights": [
@@ -28,27 +48,58 @@ export const RECENT_CHANGES: ChangeEntry[] = [
       "Ingredient Parsing & Normalization — Created parseQuantityAndUnit to automatically split inputs (e.g.",
       "Unified Card Selection — Removed circular checkboxes in EnhancedShoppingListItem; selection is indicated by card…"
     ]
-  },
-  {
-    "version": "2.5.10",
-    "date": "Jul 4, 2026",
-    "highlights": [
-      "Refactored Settings Tab — Redesigned the Settings screen into a premium list-based category options screen.",
-      "Normalized Quantities & Measurements — Refactored quantity entry in both the Shopping List and Pantry Tab to handle…",
-      "Split Shopping List Inputs — Replaced the single quantity text input in the Shopping List rows with a Numeric Input and…",
-      "Smart Unit Auto-Suggestions — Automatically suggests and pre-selects smart units (like dozen for Eggs, lbs for Apples,…"
-    ]
-  },
-  {
-    "version": "2.5.9",
-    "date": "Jul 3, 2026",
-    "highlights": [
-      "Release Build Crash on Launch — Added ProGuard keep rules for Room Database, WorkManager, and Startup initialization…"
-    ]
   }
 ];
 
 export const ALL_CHANGES: DetailedChangeEntry[] = [
+  {
+    "version": "3.0.0",
+    "date": "Jul 8, 2026",
+    "sections": [
+      {
+        "title": "Added",
+        "bullets": [
+          "**Action-Oriented Onboarding Overhaul** — Redesigned the onboarding flow to be fully interactive. New users can pick from 24 starter recipes, which are saved, scheduled on the meal plan, and used to auto-populate the shopping list with missing ingredients.",
+          "**Replay Onboarding Setting** — Added an option in settings to clear onboarding progress and replay the new tutorial flow.",
+          "**Dedicated Import Modals** — Split the combined import modal into separate tabless modals: `PantryImportModal` for CSV/TXT lists, and `RecipeImportModal` for recipe URL scraping.",
+          "**Firestore Schema Sync for Scraped Recipes** — Rewrote URL imports to save using the version-2 cache schema so Firestore real-time snapshot listeners detect and update the saved recipe list instantly."
+        ]
+      },
+      {
+        "title": "Fixed",
+        "bullets": [
+          "**Settings Submenu Android Back Navigation** — Integrated hardware back button listeners on settings submenus to return to the main settings page instead of shifting active tabs.",
+          "**Freshness Vibe Check Button Visibility** — Added bottom safe area padding to the risk questionnaire scroll container so action buttons remain visible above virtual Android navigation bars."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "2.5.12",
+    "date": "Jul 7, 2026",
+    "sections": [
+      {
+        "title": "Added",
+        "bullets": [
+          "**Firestore-Synced Push Notifications** — Implemented an end-to-end native push notification system. FCM device tokens are now registered to Firestore (`users/{uid}.fcmTokens`) and sent real-time push banners via a new Firestore-triggered Cloud Function (`sendPushNotificationOnWrite`) utilizing the Firebase Admin SDK.",
+          "**Unit-Aware Grocery Consolidation** — Created a `consolidateShoppingList` utility that merges duplicate shopping list ingredients and sums compatible quantities using weight/volume conversion factors (e.g. merging `1 lb` and `8 oz` into `1.5 lbs` of butter).",
+          "**Consolidation View Toggle** — Integrated a \"Consolidate\" toggle into the Shopping List UI. When enabled, duplicate ingredients are consolidated in the list view, and checking/deleting consolidated items automatically updates all source items in Firestore.",
+          "**Structured Decimal Quantities** — Added an explicit `amount` decimal field to `ShoppingItem` interface and Firestore schema, and updated `shoppingListCacheService` to serialize/deserialize it to/from Firestore, preparing the app for Instacart and Walmart checkout APIs.",
+          "**Onboarding Persistence** — Added database synchronization for onboarding features (`discoveredFeatures`) and tutorial tips (`dismissedTutorialTips`) to prevent the same tooltips from appearing repeatedly across sessions.",
+          "**Redesigned Recipe Details Modal** — Replaced the long-scrolling details view with a clean, modern tabbed layout (Overview, Ingredients, Steps) for a more user-friendly presentation.",
+          "**Split-Screen Cooking Mode** — Introduced a responsive side-by-side split screen in cooking mode (visible in desktop/landscape tablet views) featuring a checkable ingredient sidebar alongside a highlightable instructions list.",
+          "**Multi-Recipe Prep Support** — Added tabbed switching at the top of Cooking Mode to quickly toggle between all recipes in a meal plan, with independently tracked step progress and checked ingredients.",
+          "**Active Step Highlights** — Rendered all instruction steps in Cooking Mode with click-to-activate focusing, highlighting the current step in a glowing card container while dimming other steps."
+        ]
+      },
+      {
+        "title": "Changed",
+        "bullets": [
+          "**Unit-Safe Cost Estimation** — Replaced the unit-blind simple addition in `GroceryCostEstimator` with the new `consolidateShoppingList` engine, ensuring ingredient costs are estimated on unit-converted quantities rather than adding incompatible units."
+        ]
+      }
+    ]
+  },
   {
     "version": "2.5.11",
     "date": "Jul 4, 2026",

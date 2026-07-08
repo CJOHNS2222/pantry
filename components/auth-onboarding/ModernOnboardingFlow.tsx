@@ -1,5 +1,6 @@
 import React from 'react';
 import { ModernOnboarding } from './ModernOnboarding';
+import { StructuredRecipe } from '../../types';
 
 interface ModernOnboardingFlowProps {
   user: unknown;
@@ -7,6 +8,10 @@ interface ModernOnboardingFlowProps {
   onSkip: () => void;
   onOpenHousehold?: () => void;
   onPersonaSelected?: (persona: 'relaxed' | 'normal' | 'strict') => void;
+  // Recipe bootstrapping callbacks (wired through from App.tsx)
+  onSaveRecipes?: (recipes: StructuredRecipe[]) => Promise<void>;
+  onAddIngredientsToList?: (items: string[]) => Promise<void>;
+  onScheduleRecipes?: (recipes: StructuredRecipe[], startFromTomorrow: boolean) => Promise<void>;
 }
 
 export const ModernOnboardingFlow: React.FC<ModernOnboardingFlowProps> = ({
@@ -15,6 +20,9 @@ export const ModernOnboardingFlow: React.FC<ModernOnboardingFlowProps> = ({
   onSkip,
   onOpenHousehold,
   onPersonaSelected,
+  onSaveRecipes,
+  onAddIngredientsToList,
+  onScheduleRecipes,
 }) => {
   return (
     <ModernOnboarding
@@ -23,6 +31,9 @@ export const ModernOnboardingFlow: React.FC<ModernOnboardingFlowProps> = ({
       onSkip={onSkip}
       onOpenHousehold={onOpenHousehold}
       onPersonaSelected={onPersonaSelected}
+      onSaveRecipes={onSaveRecipes}
+      onAddIngredientsToList={onAddIngredientsToList}
+      onScheduleRecipes={onScheduleRecipes}
     />
   );
 };

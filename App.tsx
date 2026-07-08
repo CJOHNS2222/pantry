@@ -83,7 +83,6 @@ const App: React.FC = () => {
   const prevActiveTabRef = useRef<Tab>(activeTab);
   // Stack of previously-visited tabs used by the hardware back button to navigate backwards.
   const tabHistoryRef = useRef<Tab[]>([]);
-  const { tips: contextualTips, addTip: addContextualTip, dismissTip: dismissContextualTip } = useContextualTips();
   // Track which tabs the user has already visited this session (for contextual tips)
   const visitedTabsRef = useRef<Set<Tab>>(new Set<Tab>());
   const [persistedRecipeResult, setPersistedRecipeResult] = useState<RecipeSearchResult | null>(null);
@@ -246,6 +245,7 @@ const App: React.FC = () => {
   const appUrlOpenListenerRef = useRef<PluginListenerHandle | null>(null);
 
   const { user, setUser, handleLogout, isAuthReady } = useAuth(); // Use isAuthReady
+  const { tips: contextualTips, addTip: addContextualTip, dismissTip: dismissContextualTip } = useContextualTips(user);
   const { settings, setSettings } = useSettings();
   const { addToast, toasts, setToasts } = useToasts();
   const { syncStatus, syncNow, updateSyncStatus } = useOfflineStatus();
@@ -499,6 +499,7 @@ const App: React.FC = () => {
         id: Math.random().toString(36).substr(2, 9),
         item: parsed.itemName,
         quantity: amount === 1 && (unit === 'pcs' || unit === 'pieces') ? '1' : `${amount} ${unit}`,
+        amount,
         unit,
         category: inferCategoryFromItemName(parsed.itemName),
         checked: false,
@@ -807,7 +808,7 @@ const App: React.FC = () => {
           try {
             const status = await PushNotifications.checkPermissions();
             if (status.receive === 'granted') {
-              await pushNotificationService.initialize();
+              await pushNotificationService.initialize(user.id);
             } else {
               log.debug('Skipping push notification initialization on startup: permission not granted', { status }, 'App');
             }
@@ -816,7 +817,7 @@ const App: React.FC = () => {
           }
         } else {
           // Web or other platform
-          await pushNotificationService.initialize();
+          await pushNotificationService.initialize(user.id);
         }
       };
       checkAndInitializePush();
@@ -1201,7 +1202,9 @@ const App: React.FC = () => {
           cancel_at_period_end: false
         },
         createdAt: serverTimestamp(),
-        hasSeenTutorial: false
+        hasSeenTutorial: false,
+        discoveredFeatures: [],
+        dismissedTutorialTips: []
       });
     } else {
       const userData = userDoc.data();
@@ -1214,7 +1217,9 @@ const App: React.FC = () => {
       // Merge Firestore data with the logged in user data
       finalUser = {
         ...loggedInUser,
-        hasSeenTutorial: userData?.hasSeenTutorial ?? false
+        hasSeenTutorial: userData?.hasSeenTutorial ?? false,
+        discoveredFeatures: userData?.discoveredFeatures || [],
+        dismissedTutorialTips: userData?.dismissedTutorialTips || []
       };
     }
 
@@ -1229,6 +1234,23 @@ const App: React.FC = () => {
     // Show onboarding if not completed (check both Firestore flag and localStorage for cross-device support)
     if (!finalUser.hasSeenTutorial && localStorage.getItem('onboarding-completed') !== 'true') {
       setShowOnboarding(true);
+    }
+  };
+
+  const handleDiscoveryDismiss = async (featureId: string) => {
+    if (user && !user.isGuest) {
+      try {
+        const userRef = DatabaseMonitoringService.doc('users', user.id);
+        const updatedDiscoveries = user.discoveredFeatures
+          ? [...user.discoveredFeatures, featureId]
+          : [featureId];
+        await DatabaseMonitoringService.updateDoc(userRef, {
+          discoveredFeatures: updatedDiscoveries
+        });
+        setUser(prev => prev ? { ...prev, discoveredFeatures: updatedDiscoveries } : prev);
+      } catch (error) {
+        log.error('Failed to sync discovered feature to Firestore', { error, featureId }, 'App');
+      }
     }
   };
 
@@ -1528,6 +1550,24 @@ const App: React.FC = () => {
             }}
             onOpenHousehold={() => { setShowOnboarding(false); setShowHousehold(true); }}
             onSkip={() => { recordMilestone('onboarding-completed'); setShowOnboarding(false); }}
+            onSaveRecipes={async (recipes) => {
+              for (const r of recipes) {
+                await handleSaveRecipe(r);
+              }
+            }}
+            onAddIngredientsToList={async (items) => {
+              await addToShoppingList(items.map(i => ({ item: i, source: 'onboarding' })));
+            }}
+            onScheduleRecipes={async (recipes, _startFromTomorrow) => {
+              const today = new Date();
+              for (let i = 0; i < recipes.length; i++) {
+                const day = new Date(today);
+                day.setDate(today.getDate() + 1 + i); // start from tomorrow
+                const dateStr = day.toISOString().slice(0, 10);
+                const dayIndex = mealPlan?.findIndex(d => d.date?.slice(0, 10) === dateStr) ?? -1;
+                await handleAddToPlan(recipes[i], dayIndex >= 0 ? dayIndex : undefined, 'dinner');
+              }
+            }}
           />
         )}
 
@@ -1890,7 +1930,12 @@ const App: React.FC = () => {
               checkRecipeSaveLimit,
               checkMealPlanLimit,
               addShoppingListItem,
-              refreshAllData
+              refreshAllData,
+              onReplayOnboarding: () => {
+                localStorage.removeItem('onboarding-completed');
+                localStorage.removeItem('onboarding-checklist-dismissed');
+                setShowOnboarding(true);
+              }
             }}
           >
             <MainContent />
@@ -1967,7 +2012,11 @@ const App: React.FC = () => {
 
       {/* Feature Discovery — one-time "New Feature!" cards for logged-in users */}
       {user && !showOnboarding && (
-        <FeatureDiscoveryManager discoveries={featureDiscoveries} />
+        <FeatureDiscoveryManager 
+          discoveries={featureDiscoveries} 
+          user={user}
+          onDiscoveryDismiss={handleDiscoveryDismiss}
+        />
       )}
 
       {/* Contextual Tutorial — per-tab hints shown once on first visit */}

@@ -13,8 +13,9 @@ import {
 } from 'lucide-react';
 import { SavedRecipe, StructuredRecipe } from '../../types';
 import { Tab } from '../../types/app';
-import ImportModal from '../pantry/ImportModal';
+import RecipeImportModal from './RecipeImportModal';
 import { RecipeCardSkeleton } from '../ui/SkeletonLoader';
+import { RecipeExportModal } from './RecipeExportModal';
 
 interface RecipeFinderSavedViewProps {
   showImportModal: boolean;
@@ -27,7 +28,7 @@ interface RecipeFinderSavedViewProps {
   setSavedSort: React.Dispatch<React.SetStateAction<'recent' | 'top-rated'>>;
   sortedSavedRecipes: SavedRecipe[];
   renderRecipeCard: (recipe: StructuredRecipe, isSavedView?: boolean, isCompact?: boolean) => React.ReactNode;
-  onExportRecipes: () => void;
+  onExportRecipes?: () => void;
   onAddManualRecipe: () => void;
 }
 
@@ -46,6 +47,7 @@ export const RecipeFinderSavedView: React.FC<RecipeFinderSavedViewProps> = ({
   onAddManualRecipe,
 }) => {
   const intl = useIntl();
+  const [showExportModal, setShowExportModal] = useState(false);
 
   // Collections State
   const [viewMode, setViewMode] = useState<'all' | 'collections'>('all');
@@ -135,7 +137,7 @@ export const RecipeFinderSavedView: React.FC<RecipeFinderSavedViewProps> = ({
 
   return (
     <div className="space-y-4">
-      {showImportModal && <ImportModal open={showImportModal} onClose={() => setShowImportModal(false)} defaultTab="recipes" />}
+      {showImportModal && <RecipeImportModal open={showImportModal} onClose={() => setShowImportModal(false)} />}
 
       {recipeSaveLimitExceeded && (
         <div className="mb-3 p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center justify-between gap-2">
@@ -357,7 +359,7 @@ export const RecipeFinderSavedView: React.FC<RecipeFinderSavedViewProps> = ({
               </button>
               <button
                 className="px-4 py-2 bg-[var(--accent-color)] text-white rounded-lg font-bold shadow hover:bg-[var(--accent-color)]/90 transition-colors text-xs"
-                onClick={onExportRecipes}
+                onClick={() => setShowExportModal(true)}
                 data-tutorial="export-recipes"
               >
                 Export Recipes
@@ -524,6 +526,14 @@ export const RecipeFinderSavedView: React.FC<RecipeFinderSavedViewProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {showExportModal && (
+        <RecipeExportModal
+          isOpen={showExportModal}
+          onClose={() => setShowExportModal(false)}
+          recipes={savedRecipes}
+        />
       )}
     </div>
   );

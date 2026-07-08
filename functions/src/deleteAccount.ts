@@ -73,7 +73,7 @@ export const deleteAccount = onCall(async (request) => {
   }
 
   // 3. Delete the user document itself
-  await userRef.delete().catch(() => {});
+  await userRef.delete().catch((_) => { /* Non-fatal: ignore deletion errors */ });
 
   // 4. Delete the Firebase Auth account (admin SDK — no reauthentication required)
   await auth.deleteUser(uid);

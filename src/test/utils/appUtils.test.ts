@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { inferStorageLocationFromItemName, parseIngredientForShoppingList } from '../../../utils/appUtils';
+import { inferStorageLocationFromItemName, parseIngredientForShoppingList, consolidateShoppingList } from '../../../utils/appUtils';
 
 // Test utility functions from App.tsx
 describe('next7DateKeys', () => {
@@ -286,6 +286,75 @@ describe('parseIngredientForShoppingList', () => {
     const r6 = parseIngredientForShoppingList('5 parts of jerk seasoning');
     expect(r6.quantity).toBe('5 parts');
     expect(r6.itemName).toBe('Jerk Seasoning');
+  });
+});
+
+describe('consolidateShoppingList', () => {
+  it('should consolidate duplicate items with compatible units and sum them', () => {
+    const items = [
+      { id: '1', item: 'Milk', quantity: '1 cup', unit: 'cups', amount: 1, category: 'Dairy', checked: false },
+      { id: '2', item: 'milk', quantity: '2 cups', unit: 'cups', amount: 2, category: 'Dairy', checked: false },
+      { id: '3', item: 'Onion', quantity: '1', unit: 'pcs', amount: 1, category: 'Produce', checked: false },
+      { id: '4', item: 'onion', quantity: '2', unit: 'pcs', amount: 2, category: 'Produce', checked: false },
+    ] as any[];
+
+    const result = consolidateShoppingList(items);
+    expect(result).toHaveLength(2);
+
+    const milkItem = result.find(i => i.item.toLowerCase() === 'milk');
+    expect(milkItem).toBeDefined();
+    expect(milkItem?.amount).toBe(3);
+    expect(milkItem?.unit).toBe('cups');
+    expect(milkItem?.quantity).toBe('3 cups');
+
+    const onionItem = result.find(i => i.item.toLowerCase() === 'onion');
+    expect(onionItem).toBeDefined();
+    expect(onionItem?.amount).toBe(3);
+    expect(onionItem?.unit).toBe('pcs');
+    expect(onionItem?.quantity).toBe('3 pcs');
+  });
+
+  it('should combine quantities with unit conversion', () => {
+    const items = [
+      { id: '1', item: 'Butter', quantity: '1 lb', unit: 'lbs', amount: 1, category: 'Dairy', checked: false },
+      { id: '2', item: 'butter', quantity: '8 oz', unit: 'oz', amount: 8, category: 'Dairy', checked: false },
+    ] as any[];
+
+    const result = consolidateShoppingList(items);
+    expect(result).toHaveLength(1);
+
+    const butterItem = result[0];
+    expect(butterItem.item.toLowerCase()).toBe('butter');
+    // 8 oz is 0.5 lbs, so total should be 1.5 lbs
+    expect(butterItem.amount).toBeCloseTo(1.5);
+    expect(butterItem.unit).toBe('lbs');
+  });
+
+  it('should keep different statuses and incompatible units separate', () => {
+    const items = [
+      { id: '1', item: 'Apple', quantity: '1', unit: 'pcs', amount: 1, category: 'Produce', checked: false },
+      { id: '2', item: 'Apple', quantity: '2', unit: 'pcs', amount: 2, category: 'Produce', checked: true },
+      { id: '3', item: 'Flour', quantity: '2 cups', unit: 'cups', amount: 2, category: 'Pantry', checked: false },
+      { id: '4', item: 'Flour', quantity: '1 bag', unit: 'bag', amount: 1, category: 'Pantry', checked: false },
+    ] as any[];
+
+    const result = consolidateShoppingList(items);
+    // Unchecked Apple, Checked Apple, Flour (cups), Flour (bag) should all remain separate
+    expect(result).toHaveLength(4);
+  });
+
+  it('should merge sources and notes cleanly', () => {
+    const items = [
+      { id: '1', item: 'Salt', quantity: '1 tsp', unit: 'tsp', amount: 1, category: 'Pantry', checked: false, source: 'recipe: Pasta', notes: 'kosher' },
+      { id: '2', item: 'Salt', quantity: '1 tsp', unit: 'tsp', amount: 1, category: 'Pantry', checked: false, source: 'recipe: Soup', notes: 'coarse' },
+    ] as any[];
+
+    const result = consolidateShoppingList(items);
+    expect(result).toHaveLength(1);
+    expect(result[0].source).toContain('recipe: Pasta');
+    expect(result[0].source).toContain('recipe: Soup');
+    expect(result[0].notes).toContain('kosher');
+    expect(result[0].notes).toContain('coarse');
   });
 });
 
