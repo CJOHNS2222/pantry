@@ -1,5 +1,5 @@
 import React from 'react';
-import { Copy, Share2, Download, MessageSquare } from 'lucide-react';
+import { Copy, Share2, Download, MessageSquare, ShoppingBag } from 'lucide-react';
 
 interface ShoppingListFooterActionsProps {
   hasItems: boolean;
@@ -9,6 +9,7 @@ interface ShoppingListFooterActionsProps {
   onShare: () => void;
   onShareViaSMS: () => void;
   onExport: () => void;
+  onCheckoutOnline: () => void;
 }
 
 export const ShoppingListFooterActions: React.FC<ShoppingListFooterActionsProps> = ({
@@ -19,6 +20,7 @@ export const ShoppingListFooterActions: React.FC<ShoppingListFooterActionsProps>
   onShare,
   onShareViaSMS,
   onExport,
+  onCheckoutOnline,
 }) => {
   if (!hasItems) return null;
 
@@ -34,6 +36,14 @@ export const ShoppingListFooterActions: React.FC<ShoppingListFooterActionsProps>
       </div>
 
       <div className="flex justify-center gap-2 mt-6 flex-wrap">
+        <button
+          onClick={onCheckoutOnline}
+          className="flex items-center gap-2 px-4 py-2 bg-[var(--accent-color)] text-black font-bold rounded-lg hover:opacity-95 transition-opacity text-sm shadow-md"
+          title="Order ingredients online"
+        >
+          <ShoppingBag className="w-4 h-4 stroke-[2.5]" />
+          Order Online
+        </button>
         <button
           onClick={onCopyToClipboard}
           className="flex items-center gap-2 px-3 py-2 bg-theme-secondary text-theme-primary rounded-lg border border-theme hover:bg-theme-primary transition-colors text-sm"
