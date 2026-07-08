@@ -4,7 +4,7 @@ import {
   getWalmartItemId,
   hasWalmartMatch,
   generateWalmartCartUrl,
-  generateWalmartSearchUrl,
+  generateSearchUrl,
   wrapWithImpactTracker
 } from '../../../services/groceryCheckoutService';
 
@@ -62,10 +62,35 @@ describe('groceryCheckoutService', () => {
     });
   });
 
-  describe('generateWalmartSearchUrl', () => {
-    it('should generate URL-encoded search links', () => {
-      const url = generateWalmartSearchUrl('organic chicken breast');
-      expect(url).toBe('https://www.walmart.com/search?q=organic%20chicken%20breast');
+  describe('generateSearchUrl', () => {
+    it('should generate Walmart search URL', () => {
+      expect(generateSearchUrl('organic chicken breast', 'walmart'))
+        .toBe('https://www.walmart.com/search?q=organic%20chicken%20breast');
+    });
+
+    it('should generate Target search URL', () => {
+      expect(generateSearchUrl('organic chicken breast', 'target'))
+        .toBe('https://www.target.com/s?searchTerm=organic%20chicken%20breast');
+    });
+
+    it('should generate Kroger search URL', () => {
+      expect(generateSearchUrl('milk', 'kroger'))
+        .toBe('https://www.kroger.com/search?query=milk');
+    });
+
+    it('should generate Instacart search URL', () => {
+      expect(generateSearchUrl('eggs', 'instacart'))
+        .toBe('https://www.instacart.com/store/partner/search/eggs');
+    });
+
+    it('should generate Albertsons/Safeway search URL', () => {
+      expect(generateSearchUrl('butter', 'albertsons'))
+        .toBe('https://www.albertsons.com/shop/search-results.html?q=butter');
+    });
+
+    it('should generate Thrive Market search URL', () => {
+      expect(generateSearchUrl('coconut oil', 'thrive'))
+        .toBe('https://thrivemarket.com/page/search?q=coconut%20oil');
     });
   });
 
@@ -86,18 +111,38 @@ describe('groceryCheckoutService', () => {
       import.meta.env.VITE_IMPACT_AUTH_TOKEN = '';
 
       const target = 'https://www.walmart.com/some-path';
-      expect(wrapWithImpactTracker(target)).toBe(target);
+      expect(wrapWithImpactTracker(target, 'walmart')).toBe(target);
     });
 
-    it('should build tracking redirect link when credentials exist', () => {
+    it('should build Walmart tracking redirect link when credentials exist', () => {
       import.meta.env.VITE_IMPACT_ACCOUNT_SID = 'test-sid';
       import.meta.env.VITE_IMPACT_AUTH_TOKEN = 'test-token';
 
       const target = 'https://www.walmart.com/some-path';
-      const result = wrapWithImpactTracker(target);
+      const result = wrapWithImpactTracker(target, 'walmart');
 
       expect(result).toContain('https://goto.walmart.com/m/3624855/1126749/11463');
       expect(result).toContain('u=https%3A%2F%2Fwww.walmart.com%2Fsome-path');
+    });
+
+    it('should build Target tracking redirect link when credentials exist', () => {
+      import.meta.env.VITE_IMPACT_ACCOUNT_SID = 'test-sid';
+      import.meta.env.VITE_IMPACT_AUTH_TOKEN = 'test-token';
+
+      const target = 'https://www.target.com/s?searchTerm=eggs';
+      const result = wrapWithImpactTracker(target, 'target');
+
+      expect(result).toContain('https://target.sjv.io/m/3624855');
+    });
+
+    it('should build Kroger tracking redirect link when credentials exist', () => {
+      import.meta.env.VITE_IMPACT_ACCOUNT_SID = 'test-sid';
+      import.meta.env.VITE_IMPACT_AUTH_TOKEN = 'test-token';
+
+      const target = 'https://www.kroger.com/search?query=milk';
+      const result = wrapWithImpactTracker(target, 'kroger');
+
+      expect(result).toContain('https://kroger.sjv.io/m/3624855');
     });
   });
 });
