@@ -24,6 +24,12 @@ describe('groceryCheckoutService', () => {
       expect(getWalmartItemId('dragon fruit')).toBeNull();
       expect(hasWalmartMatch({ item: 'dragon fruit' } as ShoppingItem)).toBe(false);
     });
+
+    it('should prioritize custom walmartItemId if present', () => {
+      const item = { item: 'dragon fruit', walmartItemId: '999888777' } as ShoppingItem;
+      expect(getWalmartItemId('dragon fruit', item)).toBe('999888777');
+      expect(hasWalmartMatch(item)).toBe(true);
+    });
   });
 
   describe('generateWalmartCartUrl', () => {

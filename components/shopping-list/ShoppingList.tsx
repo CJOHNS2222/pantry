@@ -1056,6 +1056,9 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
         isOpen={isCheckoutModalOpen}
         onClose={() => setIsCheckoutModalOpen(false)}
         items={items}
+        onUpdateItem={(updatedItem) => {
+          setItems(prev => prev.map(item => item.id === updatedItem.id ? updatedItem : item));
+        }}
       />
 
       {canShowAdBanner && <AdMobBanner />}

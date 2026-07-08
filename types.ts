@@ -130,6 +130,7 @@ export interface ShoppingItem {
   }[]; // Multiple price options for comparison
   assignedTo?: string; // Household member name the item is assigned to
   notes?: string; // Per-item note visible to all household members
+  walmartItemId?: string; // Mapped Walmart item identifier for affiliate checkout
 }
 
 export interface GroundingChunk {

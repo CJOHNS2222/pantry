@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Check, Search, ShoppingBag, ArrowUpRight, ShieldCheck } from 'lucide-react';
+import { X, Check, Search, ShoppingBag, ArrowUpRight, ShieldCheck, Link2, Save } from 'lucide-react';
 import { ShoppingItem } from '../../types';
 import { Browser } from '@capacitor/browser';
 import {
@@ -13,14 +13,20 @@ interface RetailCheckoutModalProps {
   isOpen: boolean;
   onClose: () => void;
   items: ShoppingItem[];
+  onUpdateItem?: (updatedItem: ShoppingItem) => void;
 }
 
 export const RetailCheckoutModal: React.FC<RetailCheckoutModalProps> = ({
   isOpen,
   onClose,
   items,
+  onUpdateItem,
 }) => {
   const [selectedRetailer, setSelectedRetailer] = useState<'walmart' | 'instacart'>('walmart');
+  
+  // Track which item has the linker input open
+  const [linkingItemId, setLinkingItemId] = useState<string | null>(null);
+  const [linkInputValue, setLinkInputValue] = useState<string>('');
   
   // Filter only unchecked items for checkout
   const checkoutableItems = items.filter(item => !item.checked);
@@ -37,10 +43,51 @@ export const RetailCheckoutModal: React.FC<RetailCheckoutModalProps> = ({
   if (!isOpen) return null;
 
   const toggleItem = (id: string) => {
+    // If clicking the row while editing the link, do not toggle selection
+    if (linkingItemId === id) return;
     setSelectedItemIds(prev => ({
       ...prev,
       [id]: !prev[id],
     }));
+  };
+
+  const handleStartLink = (e: React.MouseEvent, item: ShoppingItem) => {
+    e.stopPropagation(); // Prevent row click toggle
+    setLinkingItemId(item.id);
+    setLinkInputValue(item.walmartItemId || '');
+  };
+
+  const handleSaveLink = (e: React.MouseEvent, item: ShoppingItem) => {
+    e.stopPropagation(); // Prevent row click toggle
+    if (!onUpdateItem) return;
+
+    let parsedId = linkInputValue.trim();
+    
+    // Parse ID from URL if user pasted a full link
+    // e.g. https://www.walmart.com/ip/Great-Value-Organic-Bananas-1-Bunch/44390948
+    if (parsedId.includes('walmart.com') || parsedId.includes('http')) {
+      const ipMatch = parsedId.match(/\/ip\/(?:[^\/]+\/)?(\d+)/i);
+      const queryMatch = parsedId.match(/[?&]id=(\d+)/i);
+      if (ipMatch && ipMatch[1]) {
+        parsedId = ipMatch[1];
+      } else if (queryMatch && queryMatch[1]) {
+        parsedId = queryMatch[1];
+      } else {
+        // Fallback: extract any contiguous block of digits that looks like an ID
+        const digits = parsedId.match(/\b\d{7,11}\b/);
+        if (digits) {
+          parsedId = digits[0];
+        }
+      }
+    }
+
+    onUpdateItem({
+      ...item,
+      walmartItemId: parsedId || undefined
+    });
+
+    setLinkingItemId(null);
+    setLinkInputValue('');
   };
 
   const selectAll = () => {
@@ -166,44 +213,83 @@ export const RetailCheckoutModal: React.FC<RetailCheckoutModalProps> = ({
             checkoutableItems.map(item => {
               const isSelected = !!selectedItemIds[item.id];
               const isMatched = selectedRetailer === 'walmart' && hasWalmartMatch(item);
+              const isLinking = linkingItemId === item.id;
 
               return (
                 <div 
                   key={item.id}
                   onClick={() => toggleItem(item.id)}
-                  className={`flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer ${
+                  className={`flex flex-col p-3 rounded-xl border transition-all cursor-pointer ${
                     isSelected 
                       ? 'border-[#52151C] bg-[#3F1016]/30' 
                       : 'border-[#3F1016]/40 bg-transparent opacity-60'
                   }`}
                 >
-                  <div className="flex items-center gap-3">
-                    <div className={`w-5 h-5 rounded flex items-center justify-center border transition-all ${
-                      isSelected 
-                        ? 'bg-[#F59E0B] border-[#F59E0B] text-black' 
-                        : 'border-[#52151C]'
-                    }`}>
-                      {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-5 h-5 rounded flex items-center justify-center border transition-all ${
+                        isSelected 
+                          ? 'bg-[#F59E0B] border-[#F59E0B] text-black' 
+                          : 'border-[#52151C]'
+                      }`}>
+                        {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                      </div>
+                      <div>
+                        <p className="font-semibold text-sm">{item.item}</p>
+                        <p className="text-xs text-[#FECACA]/70">
+                          {item.quantity ? String(item.quantity) : '1 unit'}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-semibold text-sm">{item.item}</p>
-                      <p className="text-xs text-[#FECACA]/70">
-                        {item.quantity ? String(item.quantity) : '1 unit'}
-                      </p>
+
+                    <div className="flex items-center gap-2">
+                      {selectedRetailer === 'walmart' && (
+                        <>
+                          <button
+                            onClick={(e) => handleStartLink(e, item)}
+                            className="p-1 rounded bg-[#3F1016] text-[#FECACA] hover:bg-[#52151C] transition-colors border border-[#52151C]/60"
+                            title="Paste custom Walmart Item ID or URL"
+                          >
+                            <Link2 className="w-3.5 h-3.5 text-[#F59E0B]" />
+                          </button>
+                          
+                          {isMatched ? (
+                            <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-950/40 border border-emerald-900/50 text-emerald-400 font-semibold flex items-center gap-1">
+                              <Check className="w-3 h-3" /> Auto-Cart
+                            </span>
+                          ) : (
+                            <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-950/40 border border-amber-900/50 text-[#F59E0B] font-semibold flex items-center gap-1">
+                              <Search className="w-3 h-3" /> Search
+                            </span>
+                          )}
+                        </>
+                      )}
                     </div>
                   </div>
 
-                  {selectedRetailer === 'walmart' && (
-                    <div className="flex items-center gap-1.5">
-                      {isMatched ? (
-                        <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-950/40 border border-emerald-900/50 text-emerald-400 font-semibold flex items-center gap-1">
-                          <Check className="w-3 h-3" /> Auto-Cart
-                        </span>
-                      ) : (
-                        <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-950/40 border border-amber-900/50 text-[#F59E0B] font-semibold flex items-center gap-1">
-                          <Search className="w-3 h-3" /> Search
-                        </span>
-                      )}
+                  {/* Custom link input section */}
+                  {selectedRetailer === 'walmart' && isLinking && (
+                    <div className="mt-2.5 pt-2.5 border-t border-[#52151C]/40 flex gap-2" onClick={e => e.stopPropagation()}>
+                      <input
+                        type="text"
+                        value={linkInputValue}
+                        onChange={(e) => setLinkInputValue(e.target.value)}
+                        placeholder="Paste Walmart item URL or ID (e.g. 660768274)"
+                        className="flex-1 bg-[#2A0A10] border border-[#52151C] rounded-lg px-2.5 py-1 text-xs text-white focus:outline-none focus:border-[#F59E0B]"
+                        autoFocus
+                      />
+                      <button
+                        onClick={(e) => handleSaveLink(e, item)}
+                        className="px-3 py-1 bg-[#F59E0B] hover:bg-[#F59E0B]/90 text-black font-bold rounded-lg text-xs flex items-center gap-1 transition-colors"
+                      >
+                        <Save className="w-3.5 h-3.5" /> Save
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setLinkingItemId(null); }}
+                        className="px-2 py-1 bg-transparent hover:bg-[#3F1016] text-[#FECACA] rounded-lg text-xs transition-colors"
+                      >
+                        Cancel
+                      </button>
                     </div>
                   )}
                 </div>
