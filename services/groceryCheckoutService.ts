@@ -229,7 +229,12 @@ export const STAPLE_WALMART_MAP: Record<string, string> = {
 /**
  * Perform a fuzzy matching lookup to find the best Walmart Item ID for a given name.
  */
-export function getWalmartItemId(itemName: string): string | null {
+export function getWalmartItemId(itemName: string, itemObj?: ShoppingItem): string | null {
+  // If the item object is passed and has a custom mapped ID, use that first
+  if (itemObj?.walmartItemId) {
+    return itemObj.walmartItemId;
+  }
+
   const cleanName = itemName.toLowerCase().trim();
   
   // Try exact lookup first
@@ -251,7 +256,7 @@ export function getWalmartItemId(itemName: string): string | null {
  * Returns true if an item has a mapped Walmart ID.
  */
 export function hasWalmartMatch(item: ShoppingItem): boolean {
-  return getWalmartItemId(item.item) !== null;
+  return !!item.walmartItemId || getWalmartItemId(item.item) !== null;
 }
 
 /**
@@ -262,7 +267,7 @@ export function generateWalmartCartUrl(items: ShoppingItem[], storeId?: string):
   const cartItems: string[] = [];
 
   items.forEach(item => {
-    const itemId = getWalmartItemId(item.item);
+    const itemId = getWalmartItemId(item.item, item);
     if (itemId) {
       // Parse amount as integer or default to 1
       let amount = 1;
