@@ -1,3 +1,10 @@
+## [3.0.2] - 2026-07-08
+
+### Changed
+- **Release Verification & Housekeeping** — Incremented platform release identifiers to v3.0.2 (versionCode 95) and rebuilt client bundles for verification.
+
+---
+
 ## [3.0.1] - 2026-07-08
 
 ### Added
