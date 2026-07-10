@@ -1,3 +1,14 @@
+## [3.0.3] - 2026-07-09
+
+### Added
+- **Interactive Support Messaging** — Integrated a secure, interactive contact form on the website using EmailJS to allow direct user support inquiries and feedback.
+
+### Changed
+- **Repositioned Online Order FAB** — Moved the floating shopping cart button on the Shopping List tab to the bottom right (above the Add item FAB), making it more reachable and preventing layout overlap.
+- **Relative Path Optimization** — Converted website link references (logo, headers, footers) to relative paths, ensuring complete link portability across different web hosting environments.
+
+---
+
 ## [3.0.2] - 2026-07-08
 
 ### Changed

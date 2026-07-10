@@ -154,6 +154,10 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   const [checkoutItems, setCheckoutItems] = useState<ShoppingItem[]>([]);
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
 
+  const uncheckedItemsCount = useMemo(() => {
+    return items.filter(item => !item.checked).length;
+  }, [items]);
+
   // Android back-button registration for ShoppingList modals
   useAndroidBack(isAddModalOpen, () => setIsAddModalOpen(false));
   useAndroidBack(showAnalytics, () => setShowAnalytics(false));
@@ -890,19 +894,19 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
 
   return (
     <div className="space-y-6 pb-24 max-w-2xl mx-auto animate-fade-in relative">
-      {/* Floating Shopping Cart Button (Top Right) */}
-      {items.length > 0 && (
+      {/* Floating Shopping Cart Button (Repositioned to Bottom Right above Add FAB) */}
+      {uncheckedItemsCount > 0 && (
         <button
           onClick={() => setIsCheckoutModalOpen(true)}
-          className="fixed top-6 right-6 z-[100] bg-[var(--accent-color)] text-white p-3 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 flex items-center justify-center theme-transition"
+          className="fixed right-6 z-50 bg-[var(--accent-color)] text-white p-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 active:scale-95 flex items-center justify-center theme-transition"
+          style={{ bottom: 'calc(7rem + 15px + 70px)' }}
           aria-label="Order ingredients online"
+          title="Order online"
         >
-          <ShoppingCart className="w-5 h-5" />
-          {items.filter(item => !item.checked).length > 0 && (
-            <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] font-bold min-w-5 h-5 px-1.5 rounded-full flex items-center justify-center border-2 border-theme-primary shadow-sm">
-              {items.filter(item => !item.checked).length}
-            </span>
-          )}
+          <ShoppingCart className="w-6 h-6" />
+          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full min-w-[20px] h-[20px] px-1.5 flex items-center justify-center shadow-md animate-pulse border-2 border-theme-primary">
+            {uncheckedItemsCount}
+          </span>
         </button>
       )}
 
