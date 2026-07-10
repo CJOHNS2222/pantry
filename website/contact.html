@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,13 +8,14 @@
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z3KZ5XQ2C"></script>
     <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
+        window.dataLayer = window.dataLayer || [];
+        function gtag() { dataLayer.push(arguments); }
+        gtag('js', new Date());
 
-      gtag('config', 'G-9Z3KZ5XQ2C');
+        gtag('config', 'G-9Z3KZ5XQ2C');
     </script>
-    <meta name="description" content="Get in touch with the Stock & Spoon team. Contact us for support, feedback, or partnership inquiries.">
+    <meta name="description"
+        content="Get in touch with the Stock & Spoon team. Contact us for support, feedback, or partnership inquiries.">
     <meta name="keywords" content="contact, support, feedback, Stock & Spoon">
     <meta name="author" content="Stock & Spoon">
 
@@ -36,7 +38,9 @@
     <link rel="apple-touch-icon" href="icons/stockspoon-icon.png">
 
     <!-- Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;1,500&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;1,500&display=swap"
+        rel="stylesheet">
 
     <style>
         :root {
@@ -61,7 +65,7 @@
             line-height: 1.6;
             color: var(--text-main);
             background-color: var(--bg-deep);
-            background-image: 
+            background-image:
                 radial-gradient(at 0% 0%, rgba(245, 158, 11, 0.05) 0px, transparent 50%),
                 radial-gradient(at 100% 100%, rgba(245, 158, 11, 0.03) 0px, transparent 50%);
             min-height: 100vh;
@@ -280,6 +284,14 @@
             color: var(--accent);
         }
 
+        form input:focus,
+        form textarea:focus {
+            border-color: var(--accent) !important;
+            outline: none;
+            box-shadow: 0 0 10px rgba(245, 158, 11, 0.15);
+            background: rgba(255, 255, 255, 0.04) !important;
+        }
+
         /* Responsive */
         @media (max-width: 768px) {
             .nav-links {
@@ -297,16 +309,17 @@
         }
     </style>
 </head>
+
 <body>
     <header>
         <nav class="container">
-            <a href="/" class="logo-container">
+            <a href="index.html" class="logo-container">
                 <img src="icons/stockspoon-icon.png" alt="Stock & Spoon Logo" class="logo-img" />
                 <span class="logo-text">Stock & Spoon</span>
             </a>
             <div class="nav-links">
-                <a href="/#features">Features</a>
-                <a href="/#showcase">Inside the App</a>
+                <a href="index.html#features">Features</a>
+                <a href="index.html#showcase">Inside the App</a>
                 <a href="https://ornate-compass-478504-e1.web.app/" class="cta-button">Launch Web App</a>
             </div>
         </nav>
@@ -331,9 +344,105 @@
                     <div class="contact-icon">💡</div>
                     <h3>Feature Request</h3>
                     <p>Have a great idea that could make Stock & Spoon even better? Let us know!</p>
-                    <a href="mailto:smartpantry40@gmail.com?subject=Stock%20%26%20Spoon%20Feature%20Request" class="contact-link">Request Feature</a>
+                    <a href="mailto:smartpantry40@gmail.com?subject=Stock%20%26%20Spoon%20Feature%20Request"
+                        class="contact-link">Request Feature</a>
                 </div>
             </div>
+
+            <!-- Contact Form Section -->
+            <div class="contact-form-container"
+                style="max-width: 600px; margin: 4rem auto 0; background: var(--card-bg); border-radius: 20px; padding: 3rem 2.5rem; border: 1px solid var(--border); box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);">
+                <h2
+                    style="font-family: 'Playfair Display', serif; font-size: 2.2rem; margin-bottom: 1.5rem; text-align: center;">
+                    Send Us a Message</h2>
+                <form id="contact-form" onsubmit="sendContactEmail(event);"
+                    style="display: flex; flex-direction: column; gap: 1.5rem;">
+                    <div style="display: flex; flex-direction: column; gap: 0.5rem; text-align: left;">
+                        <label for="name" style="font-size: 0.95rem; font-weight: 500; color: var(--text-muted);">Your
+                            Name</label>
+                        <input type="text" id="name" required
+                            style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border); border-radius: 10px; padding: 0.8rem 1rem; color: var(--text-main); font-family: inherit; font-size: 0.95rem; transition: all 0.3s;"
+                            placeholder="John Doe">
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 0.5rem; text-align: left;">
+                        <label for="email" style="font-size: 0.95rem; font-weight: 500; color: var(--text-muted);">Your
+                            Email</label>
+                        <input type="email" id="email" required
+                            style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border); border-radius: 10px; padding: 0.8rem 1rem; color: var(--text-main); font-family: inherit; font-size: 0.95rem; transition: all 0.3s;"
+                            placeholder="john@example.com">
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 0.5rem; text-align: left;">
+                        <label for="message"
+                            style="font-size: 0.95rem; font-weight: 500; color: var(--text-muted);">Your Message</label>
+                        <textarea id="message" required rows="5"
+                            style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border); border-radius: 10px; padding: 0.8rem 1rem; color: var(--text-main); font-family: inherit; font-size: 0.95rem; transition: all 0.3s; resize: vertical;"
+                            placeholder="How can we help you?"></textarea>
+                    </div>
+                    <button type="submit" class="cta-button"
+                        style="width: 100%; padding: 0.95rem; font-size: 1rem; cursor: pointer; border: none; font-family: inherit;">Send
+                        Message</button>
+                </form>
+                <div id="form-success"
+                    style="display: none; text-align: center; color: #10b981; font-weight: 600; padding: 1rem; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 10px; margin-top: 1.5rem;">
+                    ✓ Thank you! Your message has been sent successfully. We will get back to you shortly.
+                </div>
+            </div>
+
+            <!-- EmailJS Integration -->
+            <script type="text/javascript"
+                src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+            <script type="text/javascript">
+                (function () {
+                    // Initialize EmailJS with your Public Key
+                    emailjs.init('u_wtW48BWFmZnstig');
+                })();
+
+                function sendContactEmail(e) {
+                    e.preventDefault();
+
+                    const btn = document.querySelector('#contact-form button[type="submit"]');
+                    btn.disabled = true;
+                    btn.textContent = 'Sending...';
+
+                    const name = document.getElementById('name').value;
+                    const email = document.getElementById('email').value;
+                    const message = document.getElementById('message').value;
+
+                    // Parameters configured in your EmailJS template
+                    const templateParams = {
+                        from_name: name,
+                        from_email: email,
+                        message: message,
+                        to_email: 'chrisj221986@gmail.com, cjohns22@duck.com'
+                    };
+
+                    // NOTE: Create a new template in your EmailJS dashboard under Service ID 'service_ekbmsjj'
+                    // with fields: {{from_name}}, {{from_email}}, and {{message}}
+                    // Then replace 'YOUR_TEMPLATE_ID_HERE' with your new Template ID.
+                    const templateId = 'template_ek5lu2r';
+
+                    if (templateId === 'YOUR_TEMPLATE_ID_HERE') {
+                        // Fallback demo behavior if they haven't configured a template ID yet
+                        console.warn('EmailJS Template ID not configured. Showing local success state.');
+                        setTimeout(() => {
+                            document.getElementById('contact-form').style.display = 'none';
+                            document.getElementById('form-success').style.display = 'block';
+                        }, 1000);
+                        return;
+                    }
+
+                    emailjs.send('service_ekbmsjj', templateId, templateParams)
+                        .then(function () {
+                            document.getElementById('contact-form').style.display = 'none';
+                            document.getElementById('form-success').style.display = 'block';
+                        }, function (error) {
+                            console.error('EmailJS Send Error:', error);
+                            alert('Failed to send message via EmailJS. Please contact us directly at smartpantry40@gmail.com');
+                            btn.disabled = false;
+                            btn.textContent = 'Send Message';
+                        });
+                }
+            </script>
         </div>
     </main>
 
@@ -342,12 +451,13 @@
             <div class="footer-content">
                 <p>&copy; 2026 Stock & Spoon. All rights reserved.</p>
                 <div class="footer-links">
-                    <a href="/privacy.html">Privacy Policy</a>
-                    <a href="/terms.html">Terms of Service</a>
-                    <a href="/contact.html">Contact Us</a>
+                    <a href="privacy.html">Privacy Policy</a>
+                    <a href="terms.html">Terms of Service</a>
+                    <a href="contact.html">Contact Us</a>
                 </div>
             </div>
         </div>
     </footer>
 </body>
+
 </html>

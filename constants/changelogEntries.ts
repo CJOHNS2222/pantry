@@ -20,6 +20,15 @@ export interface DetailedChangeEntry {
 
 export const RECENT_CHANGES: ChangeEntry[] = [
   {
+    "version": "3.0.3",
+    "date": "Jul 9, 2026",
+    "highlights": [
+      "Interactive Support Messaging — Integrated a secure, interactive contact form on the website using EmailJS to allow…",
+      "Repositioned Online Order FAB — Moved the floating shopping cart button on the Shopping List tab to the bottom right…",
+      "Relative Path Optimization — Converted website link references (logo, headers, footers) to relative paths, ensuring…"
+    ]
+  },
+  {
     "version": "3.0.2",
     "date": "Jul 8, 2026",
     "highlights": [
@@ -35,20 +44,29 @@ export const RECENT_CHANGES: ChangeEntry[] = [
       "Affiliate Link Redirect Guard — Configured a smart fallback mechanism that uses direct links if the merchant's specific…",
       "Checkout Checklist Priority Sorting — Reorganized the ingredients checklist inside the Online Shopping modal to sort…"
     ]
-  },
-  {
-    "version": "3.0.0",
-    "date": "Jul 8, 2026",
-    "highlights": [
-      "Action-Oriented Onboarding Overhaul — Redesigned the onboarding flow to be fully interactive.",
-      "Replay Onboarding Setting — Added an option in settings to clear onboarding progress and replay the new tutorial flow.",
-      "Dedicated Import Modals — Split the combined import modal into separate tabless modals: PantryImportModal for CSV/TXT…",
-      "Firestore Schema Sync for Scraped Recipes — Rewrote URL imports to save using the version-2 cache schema so Firestore…"
-    ]
   }
 ];
 
 export const ALL_CHANGES: DetailedChangeEntry[] = [
+  {
+    "version": "3.0.3",
+    "date": "Jul 9, 2026",
+    "sections": [
+      {
+        "title": "Added",
+        "bullets": [
+          "**Interactive Support Messaging** — Integrated a secure, interactive contact form on the website using EmailJS to allow direct user support inquiries and feedback."
+        ]
+      },
+      {
+        "title": "Changed",
+        "bullets": [
+          "**Repositioned Online Order FAB** — Moved the floating shopping cart button on the Shopping List tab to the bottom right (above the Add item FAB), making it more reachable and preventing layout overlap.",
+          "**Relative Path Optimization** — Converted website link references (logo, headers, footers) to relative paths, ensuring complete link portability across different web hosting environments."
+        ]
+      }
+    ]
+  },
   {
     "version": "3.0.2",
     "date": "Jul 8, 2026",
