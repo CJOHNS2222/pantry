@@ -20,6 +20,16 @@ export interface DetailedChangeEntry {
 
 export const RECENT_CHANGES: ChangeEntry[] = [
   {
+    "version": "3.0.4",
+    "date": "Jul 10, 2026",
+    "highlights": [
+      "Annual Subscription Billing Toggles — Integrated a billing cycle toggle switch under the Subscription manager,…",
+      "Target, Kroger, Albertsons, and Thrive Store Brand Search Affinity — Optimized search redirects to automatically…",
+      "Offer-Based Subscriptions & Price Fixes — Transitioned from raw Product-based ordering to Offer-based ordering…",
+      "Enriched Product ID Mapping — Integrated 375 common pantry staple product IDs (including Great Value brand variants)…"
+    ]
+  },
+  {
     "version": "3.0.3",
     "date": "Jul 9, 2026",
     "highlights": [
@@ -34,20 +44,30 @@ export const RECENT_CHANGES: ChangeEntry[] = [
     "highlights": [
       "Release Verification & Housekeeping — Incremented platform release identifiers to v3.0.2 (versionCode 95) and rebuilt…"
     ]
-  },
-  {
-    "version": "3.0.1",
-    "date": "Jul 8, 2026",
-    "highlights": [
-      "Six-Retailer Online Checkout Integration — Added Target, Kroger, Safeway, and Thrive Market in addition to Walmart and…",
-      "Floating Shopping Cart FAB — Added a persistent floating shopping cart button to the top-right of the Shopping List…",
-      "Affiliate Link Redirect Guard — Configured a smart fallback mechanism that uses direct links if the merchant's specific…",
-      "Checkout Checklist Priority Sorting — Reorganized the ingredients checklist inside the Online Shopping modal to sort…"
-    ]
   }
 ];
 
 export const ALL_CHANGES: DetailedChangeEntry[] = [
+  {
+    "version": "3.0.4",
+    "date": "Jul 10, 2026",
+    "sections": [
+      {
+        "title": "Added",
+        "bullets": [
+          "**Annual Subscription Billing Toggles** — Integrated a billing cycle toggle switch under the Subscription manager, supporting new yearly pricing options for Premium ($29.99/year) and Family ($59.99/year) plans, saving users ~50%.",
+          "**Target, Kroger, Albertsons, and Thrive Store Brand Search Affinity** — Optimized search redirects to automatically prepend store brands (e.g. `Good & Gather`, `Kroger`, `Signature Select`, `Thrive Market`) when users search for core kitchen staples."
+        ]
+      },
+      {
+        "title": "Changed",
+        "bullets": [
+          "**Offer-Based Subscriptions & Price Fixes** — Transitioned from raw Product-based ordering to Offer-based ordering (`product.getOffer()`), resolving Android `Product not registered: null` checkout errors and enabling live pricing display.",
+          "**Enriched Product ID Mapping** — Integrated 375 common pantry staple product IDs (including `Great Value` brand variants) into the static Walmart mapping in `groceryCheckoutService.ts`."
+        ]
+      }
+    ]
+  },
   {
     "version": "3.0.3",
     "date": "Jul 9, 2026",

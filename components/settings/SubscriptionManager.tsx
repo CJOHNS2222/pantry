@@ -20,9 +20,14 @@ interface SubscriptionManagerProps {
   user: User | null;
 }
 
-const PLAN_PRODUCT_MAP: Record<string, ProductId> = {
-  premium: PRODUCT_IDS.PREMIUM_MONTHLY,
-  family: PRODUCT_IDS.FAMILY_MONTHLY,
+const getPlanProductId = (planId: string, period: 'monthly' | 'yearly'): ProductId | null => {
+  if (planId === 'premium') {
+    return period === 'monthly' ? PRODUCT_IDS.PREMIUM_MONTHLY : PRODUCT_IDS.PREMIUM_YEARLY;
+  }
+  if (planId === 'family') {
+    return period === 'monthly' ? PRODUCT_IDS.FAMILY_MONTHLY : PRODUCT_IDS.FAMILY_YEARLY;
+  }
+  return null;
 };
 
 export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }) => {
@@ -33,6 +38,7 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }
   const [purchaseLoading, setPurchaseLoading] = useState<string | null>(null);
   const [purchaseError, setPurchaseError] = useState<string | null>(null);
   const [livePrices, setLivePrices] = useState<Record<string, string>>({});
+  const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'yearly'>('monthly');
 
   useEffect(() => {
     const fetchUsageLimits = async () => {
@@ -54,7 +60,9 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }
         .then(() => {
           setLivePrices({
             [PRODUCT_IDS.PREMIUM_MONTHLY]: getProductPrice(PRODUCT_IDS.PREMIUM_MONTHLY) ?? '',
+            [PRODUCT_IDS.PREMIUM_YEARLY]: getProductPrice(PRODUCT_IDS.PREMIUM_YEARLY) ?? '',
             [PRODUCT_IDS.FAMILY_MONTHLY]: getProductPrice(PRODUCT_IDS.FAMILY_MONTHLY) ?? '',
+            [PRODUCT_IDS.FAMILY_YEARLY]: getProductPrice(PRODUCT_IDS.FAMILY_YEARLY) ?? '',
           });
         })
         .catch((err: unknown) =>
@@ -81,7 +89,7 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }
       }, 1000);
       return;
     }
-    const productId = PLAN_PRODUCT_MAP[plan.id];
+    const productId = getPlanProductId(plan.id, billingPeriod);
     if (!productId) return;
 
     AnalyticsService.trackSubscriptionFunnel('upgrade_intent', {
@@ -138,8 +146,8 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }
     {
       id: 'premium',
       name: 'Premium',
-      price: '$4.99',
-      period: 'per month',
+      price: billingPeriod === 'monthly' ? '$4.99' : '$29.99',
+      period: billingPeriod === 'monthly' ? 'per month' : 'per year',
       description: 'Everything you need for meal planning',
       features: [
         'Up to 20 saved recipes',
@@ -158,8 +166,8 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }
     {
       id: 'family',
       name: 'Family',
-      price: '$9.99',
-      period: 'per month',
+      price: billingPeriod === 'monthly' ? '$9.99' : '$59.99',
+      period: billingPeriod === 'monthly' ? 'per month' : 'per year',
       description: 'Perfect for families and groups',
       features: [
         'Unlimited saved recipes',
@@ -195,15 +203,17 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }
           <div>
             <p className="text-sm text-gray-600 dark:text-gray-400">Current Plan</p>
             <p className="text-lg font-semibold text-gray-900 dark:text-white">
-              {currentPlan.name}
+              {currentPlan.name} {subscription?.product_id?.includes('yearly') ? '(Annual)' : subscription?.product_id?.includes('monthly') ? '(Monthly)' : ''}
             </p>
           </div>
           <div className="text-right">
             <p className="text-2xl font-bold text-gray-900 dark:text-white">
-              {currentPlan.price}
+              {subscription?.product_id
+                ? (livePrices[subscription.product_id] || (subscription.product_id.includes('yearly') ? (subscription.product_id.includes('premium') ? '$29.99' : '$59.99') : (subscription.product_id.includes('premium') ? '$4.99' : '$9.99')))
+                : '$0'}
             </p>
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              {currentPlan.period}
+              {subscription?.product_id?.includes('yearly') ? 'per year' : subscription?.product_id?.includes('monthly') ? 'per month' : 'forever'}
             </p>
           </div>
         </div>
@@ -267,99 +277,135 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }
 
       {showPlans && (
         <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
             Choose Your Plan
           </h3>
 
-          <div className="grid gap-4 md:grid-cols-3">
-            {plans.map((plan) => (
-              <div
-                key={plan.id}
-                className={`relative bg-white dark:bg-gray-800 rounded-xl border-2 p-6 transition-all ${
-                  plan.popular
-                    ? 'border-blue-500 shadow-lg scale-105'
-                    : 'border-gray-200 dark:border-gray-700'
-                } ${subscription?.tier === plan.id ? 'ring-2 ring-green-500' : ''}`}
+          {/* Billing Period Toggle */}
+          <div className="flex justify-center mb-6">
+            <div className="bg-gray-100 dark:bg-gray-800 p-1 rounded-lg inline-flex items-center gap-1 border border-gray-200 dark:border-gray-700">
+              <button
+                onClick={() => setBillingPeriod('monthly')}
+                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+                  billingPeriod === 'monthly'
+                    ? 'bg-white dark:bg-gray-700 text-blue-600 dark:text-white shadow-sm'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                }`}
               >
-                {plan.popular && (
-                  <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                    <span className="bg-blue-500 text-white px-3 py-1 rounded-full text-xs font-medium">
-                      Most Popular
-                    </span>
-                  </div>
-                )}
+                Monthly
+              </button>
+              <button
+                onClick={() => setBillingPeriod('yearly')}
+                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-1.5 ${
+                  billingPeriod === 'yearly'
+                    ? 'bg-white dark:bg-gray-700 text-blue-600 dark:text-white shadow-sm'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                }`}
+              >
+                Yearly
+                <span className="bg-green-100 dark:bg-green-950 text-green-700 dark:text-green-300 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                  Save ~50%
+                </span>
+              </button>
+            </div>
+          </div>
 
-                {subscription?.tier === plan.id && (
-                  <div className="absolute -top-3 right-4">
-                    <span className="bg-green-500 text-white px-3 py-1 rounded-full text-xs font-medium">
-                      Current
-                    </span>
-                  </div>
-                )}
+          <div className="grid gap-4 md:grid-cols-3">
+            {plans.map((plan) => {
+              const targetProductId = getPlanProductId(plan.id, billingPeriod);
+              const isCurrentProduct = targetProductId 
+                ? subscription?.product_id === targetProductId
+                : subscription?.tier === plan.id;
 
-                <div className="text-center mb-4">
-                  <h4 className="text-xl font-bold text-gray-900 dark:text-white mb-1">
-                    {plan.name}
-                  </h4>
-                  <p className="text-gray-600 dark:text-gray-400 text-sm mb-2">
-                    {plan.description}
-                  </p>
-                  <div className="flex items-center justify-center gap-1">
-                    <span className="text-3xl font-bold text-gray-900 dark:text-white">
-                      {plan.price}
-                    </span>
-                    <span className="text-gray-600 dark:text-gray-400">
-                      /{plan.period}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="space-y-2 mb-6">
-                  {plan.features.map((feature, index) => (
-                    <div key={index} className="flex items-center gap-2">
-                      <Check className="w-4 h-4 text-green-500 flex-shrink-0" />
-                      <span className="text-sm text-gray-700 dark:text-gray-300">
-                        {feature}
-                      </span>
-                    </div>
-                  ))}
-                  {plan.limitations.map((limitation, index) => (
-                    <div key={index} className="flex items-center gap-2">
-                      <X className="w-4 h-4 text-red-500 flex-shrink-0" />
-                      <span className="text-sm text-gray-500 dark:text-gray-500">
-                        {limitation}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-
-                <button
-                  onClick={() => handleUpgrade(plan)}
-                  className={`w-full py-2 px-4 rounded-lg font-medium transition-colors ${
-                    subscription?.tier === plan.id
-                      ? 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 cursor-not-allowed'
-                      : plan.id === 'free'
-                      ? 'border border-blue-500 text-blue-500 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30'
-                      : 'bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-60'
-                  }`}
-                  disabled={
-                    subscription?.tier === plan.id ||
-                    purchaseLoading !== null ||
-                    (plan.id !== 'free' && !Capacitor.isNativePlatform())
-                  }
+              return (
+                <div
+                  key={plan.id}
+                  className={`relative bg-white dark:bg-gray-800 rounded-xl border-2 p-6 transition-all ${
+                    plan.popular
+                      ? 'border-blue-500 shadow-lg scale-105'
+                      : 'border-gray-200 dark:border-gray-700'
+                  } ${isCurrentProduct ? 'ring-2 ring-green-500' : ''}`}
                 >
-                  {subscription?.tier === plan.id
-                    ? 'Current Plan'
-                    : plan.id === 'free'
-                    ? 'Downgrade'
-                    : purchaseLoading === PLAN_PRODUCT_MAP[plan.id]
-                    ? 'Processing…'
-                    : livePrices[PLAN_PRODUCT_MAP[plan.id]]
-                    ? `Subscribe — ${livePrices[PLAN_PRODUCT_MAP[plan.id]]}/mo`
-                    : 'Subscribe'}
-                </button>
-              </div>
-            ))}
+                  {plan.popular && (
+                    <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
+                      <span className="bg-blue-500 text-white px-3 py-1 rounded-full text-xs font-medium">
+                        Most Popular
+                      </span>
+                    </div>
+                  )}
+
+                  {isCurrentProduct && (
+                    <div className="absolute -top-3 right-4">
+                      <span className="bg-green-500 text-white px-3 py-1 rounded-full text-xs font-medium">
+                        Current
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="text-center mb-4">
+                    <h4 className="text-xl font-bold text-gray-900 dark:text-white mb-1">
+                      {plan.name}
+                    </h4>
+                    <p className="text-gray-600 dark:text-gray-400 text-sm mb-2">
+                      {plan.description}
+                    </p>
+                    <div className="flex items-center justify-center gap-1">
+                      <span className="text-3xl font-bold text-gray-900 dark:text-white">
+                        {plan.price}
+                      </span>
+                      <span className="text-gray-600 dark:text-gray-400">
+                        /{plan.period}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 mb-6">
+                    {plan.features.map((feature, index) => (
+                      <div key={index} className="flex items-center gap-2">
+                        <Check className="w-4 h-4 text-green-500 flex-shrink-0" />
+                        <span className="text-sm text-gray-700 dark:text-gray-300">
+                          {feature}
+                        </span>
+                      </div>
+                    ))}
+                    {plan.limitations.map((limitation, index) => (
+                      <div key={index} className="flex items-center gap-2">
+                        <X className="w-4 h-4 text-red-500 flex-shrink-0" />
+                        <span className="text-sm text-gray-500 dark:text-gray-500">
+                          {limitation}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <button
+                    onClick={() => handleUpgrade(plan)}
+                    className={`w-full py-2 px-4 rounded-lg font-medium transition-colors ${
+                      isCurrentProduct
+                        ? 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 cursor-not-allowed'
+                        : plan.id === 'free'
+                        ? 'border border-blue-500 text-blue-500 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30'
+                        : 'bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-60'
+                    }`}
+                    disabled={
+                      isCurrentProduct ||
+                      purchaseLoading !== null ||
+                      (plan.id !== 'free' && !Capacitor.isNativePlatform())
+                    }
+                  >
+                    {isCurrentProduct
+                      ? 'Current Plan'
+                      : plan.id === 'free'
+                      ? 'Downgrade'
+                      : purchaseLoading === targetProductId
+                      ? 'Processing…'
+                      : targetProductId && livePrices[targetProductId]
+                      ? `Subscribe — ${livePrices[targetProductId]}/${billingPeriod === 'monthly' ? 'mo' : 'yr'}`
+                      : 'Subscribe'}
+                  </button>
+                </div>
+              );
+            })}
           </div>
 
           <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">

@@ -336,6 +336,9 @@ export interface Subscription {
   current_period_end: Date;
   cancel_at_period_end: boolean;
   trial_end?: Date;
+  product_id?: string;
+  purchase_token?: string;
+  updated_at?: Date;
 }
 
 export interface ConsumptionSuggestion {

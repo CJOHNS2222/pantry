@@ -1,3 +1,15 @@
+## [3.0.4] - 2026-07-10
+
+### Added
+- **Annual Subscription Billing Toggles** — Integrated a billing cycle toggle switch under the Subscription manager, supporting new yearly pricing options for Premium ($29.99/year) and Family ($59.99/year) plans, saving users ~50%.
+- **Target, Kroger, Albertsons, and Thrive Store Brand Search Affinity** — Optimized search redirects to automatically prepend store brands (e.g. `Good & Gather`, `Kroger`, `Signature Select`, `Thrive Market`) when users search for core kitchen staples.
+
+### Changed
+- **Offer-Based Subscriptions & Price Fixes** — Transitioned from raw Product-based ordering to Offer-based ordering (`product.getOffer()`), resolving Android `Product not registered: null` checkout errors and enabling live pricing display.
+- **Enriched Product ID Mapping** — Integrated 375 common pantry staple product IDs (including `Great Value` brand variants) into the static Walmart mapping in `groceryCheckoutService.ts`.
+
+---
+
 ## [3.0.3] - 2026-07-09
 
 ### Added
