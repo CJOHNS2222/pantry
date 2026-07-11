@@ -24,7 +24,9 @@ import { log } from './logService';
 // Product IDs — must exactly match what is created in Google Play Console
 export const PRODUCT_IDS = {
   PREMIUM_MONTHLY: 'premium_monthly',
+  PREMIUM_YEARLY: 'premium_yearly',
   FAMILY_MONTHLY: 'family_monthly',
+  FAMILY_YEARLY: 'family_yearly',
 } as const;
 
 export type ProductId = typeof PRODUCT_IDS[keyof typeof PRODUCT_IDS];
@@ -32,7 +34,9 @@ export type ProductId = typeof PRODUCT_IDS[keyof typeof PRODUCT_IDS];
 // Maps store product ID → subscription tier written to Firestore
 export const PRODUCT_TIER_MAP: Record<ProductId, 'premium' | 'family'> = {
   [PRODUCT_IDS.PREMIUM_MONTHLY]: 'premium',
+  [PRODUCT_IDS.PREMIUM_YEARLY]: 'premium',
   [PRODUCT_IDS.FAMILY_MONTHLY]: 'family',
+  [PRODUCT_IDS.FAMILY_YEARLY]: 'family',
 };
 
 export interface PurchaseResult {
@@ -80,7 +84,17 @@ export async function initializePurchaseStore(userId: string): Promise<void> {
       platform: Platform.GOOGLE_PLAY,
     },
     {
+      id: PRODUCT_IDS.PREMIUM_YEARLY,
+      type: ProductType.PAID_SUBSCRIPTION,
+      platform: Platform.GOOGLE_PLAY,
+    },
+    {
       id: PRODUCT_IDS.FAMILY_MONTHLY,
+      type: ProductType.PAID_SUBSCRIPTION,
+      platform: Platform.GOOGLE_PLAY,
+    },
+    {
+      id: PRODUCT_IDS.FAMILY_YEARLY,
       type: ProductType.PAID_SUBSCRIPTION,
       platform: Platform.GOOGLE_PLAY,
     },
@@ -136,7 +150,17 @@ export async function initializePurchaseStore(userId: string): Promise<void> {
 export function getProductPrice(productId: ProductId): string | null {
   const IAP = getIAP();
   if (!IAP || !Capacitor.isNativePlatform()) return null;
-  return IAP.store.get(productId, IAP.Platform.GOOGLE_PLAY)?.pricing?.price ?? null;
+  
+  const product = IAP.store.get(productId, IAP.Platform.GOOGLE_PLAY);
+  if (!product) return null;
+
+  // For subscriptions, the price details are located on the active Offer (Base Plan) level
+  const offer = typeof product.getOffer === 'function' ? product.getOffer() : null;
+  if (offer && offer.pricing) {
+    return offer.pricing.price ?? null;
+  }
+
+  return product.pricing?.price ?? null;
 }
 
 /**
@@ -165,12 +189,17 @@ export function purchaseProduct(productId: ProductId): Promise<PurchaseResult> {
       return;
     }
 
+    // Determine target to purchase: order the default active Offer (Base Plan) for subscriptions,
+    // otherwise fall back to ordering the raw Product object.
+    const offer = typeof product.getOffer === 'function' ? product.getOffer() : null;
+    const orderTarget = offer || product;
+
     // Store the resolver so the verified/unverified handlers can settle it
     _pendingResolvers.set(productId, (ok, error) =>
       resolve(ok ? { success: true } : { success: false, error })
     );
 
-    IAP.store.order(product).then((err: any) => {
+    IAP.store.order(orderTarget).then((err: any) => {
       if (err) {
         _pendingResolvers.delete(productId);
         resolve({ success: false, error: err.message ?? 'Order failed' });

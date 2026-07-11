@@ -30,7 +30,9 @@ const PACKAGE_NAME = "com.smart.pantry";
 
 const PRODUCT_TIER_MAP: Record<string, "premium" | "family"> = {
   premium_monthly: "premium",
+  premium_yearly: "premium",
   family_monthly: "family",
+  family_yearly: "family",
 };
 
 async function getAndroidPublisher() {

@@ -11,13 +11,13 @@ import {
 describe('groceryCheckoutService', () => {
   describe('getWalmartItemId & hasWalmartMatch', () => {
     it('should match exact staple items', () => {
-      expect(getWalmartItemId('eggs')).toBe('172844358');
+      expect(getWalmartItemId('eggs')).toBe('145051970');
       expect(hasWalmartMatch({ item: 'eggs' } as ShoppingItem)).toBe(true);
     });
 
     it('should fuzzy match item names', () => {
-      expect(getWalmartItemId('organic whole milk')).toBe('660768274');
-      expect(getWalmartItemId('yellow onions')).toBe('44390977');
+      expect(getWalmartItemId('organic whole milk')).toBe('10450115');
+      expect(getWalmartItemId('yellow onions')).toBe('51259212');
     });
 
     it('should return null for unmatched items', () => {
@@ -41,7 +41,7 @@ describe('groceryCheckoutService', () => {
       ];
 
       const url = generateWalmartCartUrl(items);
-      expect(url).toBe('https://www.walmart.com/sc/cart/addToCart?items=172844358_1,660768274_1');
+      expect(url).toBe('https://www.walmart.com/sc/cart/addToCart?items=145051970_1,10450115_1');
     });
 
     it('should support numeric amount quantities', () => {
@@ -50,7 +50,7 @@ describe('groceryCheckoutService', () => {
       ];
 
       const url = generateWalmartCartUrl(items);
-      expect(url).toBe('https://www.walmart.com/sc/cart/addToCart?items=660768274_2');
+      expect(url).toBe('https://www.walmart.com/sc/cart/addToCart?items=10450115_2');
     });
 
     it('should return null if no items are matched', () => {
@@ -63,34 +63,39 @@ describe('groceryCheckoutService', () => {
   });
 
   describe('generateSearchUrl', () => {
-    it('should generate Walmart search URL', () => {
-      expect(generateSearchUrl('organic chicken breast', 'walmart'))
-        .toBe('https://www.walmart.com/search?q=organic%20chicken%20breast');
+    it('should generate Walmart search URL prepended with Great Value for staples', () => {
+      expect(generateSearchUrl('eggs', 'walmart'))
+        .toBe('https://www.walmart.com/search?q=Great%20Value%20eggs');
     });
 
-    it('should generate Target search URL', () => {
-      expect(generateSearchUrl('organic chicken breast', 'target'))
-        .toBe('https://www.target.com/s?searchTerm=organic%20chicken%20breast');
+    it('should generate Target search URL prepended with Good & Gather for staples', () => {
+      expect(generateSearchUrl('sugar', 'target'))
+        .toBe('https://www.target.com/s?searchTerm=Good%20%26%20Gather%20sugar');
     });
 
-    it('should generate Kroger search URL', () => {
+    it('should generate Kroger search URL prepended with Kroger for staples', () => {
       expect(generateSearchUrl('milk', 'kroger'))
-        .toBe('https://www.kroger.com/search?query=milk');
+        .toBe('https://www.kroger.com/search?query=Kroger%20milk');
     });
 
-    it('should generate Instacart search URL', () => {
+    it('should generate Instacart search URL without prepended brand (unsupported merchant)', () => {
       expect(generateSearchUrl('eggs', 'instacart'))
         .toBe('https://www.instacart.com/store/partner/search/eggs');
     });
 
-    it('should generate Albertsons/Safeway search URL', () => {
+    it('should generate Albertsons/Safeway search URL prepended with Signature Select for staples', () => {
       expect(generateSearchUrl('butter', 'albertsons'))
-        .toBe('https://www.albertsons.com/shop/search-results.html?q=butter');
+        .toBe('https://www.albertsons.com/shop/search-results.html?q=Signature%20Select%20butter');
     });
 
-    it('should generate Thrive Market search URL', () => {
-      expect(generateSearchUrl('coconut oil', 'thrive'))
-        .toBe('https://thrivemarket.com/page/search?q=coconut%20oil');
+    it('should generate Thrive Market search URL without prepending for non-staple ingredients', () => {
+      expect(generateSearchUrl('truffle oil', 'thrive'))
+        .toBe('https://thrivemarket.com/page/search?q=truffle%20oil');
+    });
+
+    it('should not prepend the brand if it is already present in the search query', () => {
+      expect(generateSearchUrl('Good & Gather organic milk', 'target'))
+        .toBe('https://www.target.com/s?searchTerm=Good%20%26%20Gather%20organic%20milk');
     });
   });
 

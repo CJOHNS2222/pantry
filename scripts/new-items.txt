@@ -1,0 +1,171 @@
+# Batch 2: List of 150 additional grocery and pantry items.
+# Save this file and run `node scripts/generate-walmart-ids.js --engine ddg`
+# 
+# Baking Staples & Specialty Flours
+almond flour
+coconut flour
+baking chocolate
+dark chocolate chips
+milk chocolate chips
+white chocolate chips
+sprinkles
+food coloring
+cream of tartar
+shortening
+lard
+molasses
+powdered gelatin
+pectin
+xanthan gum
+tapioca flour
+potato starch
+semolina flour
+bread flour
+self-rising flour
+whole wheat flour
+rye flour
+cornmeal
+polenta
+marshmallows
+graham cracker crumbs
+vanilla pudding
+
+# Oils & Specialty Vinegars
+avocado oil
+sesame oil
+canola oil
+grapeseed oil
+coconut oil
+peanut oil
+sushi vinegar
+white wine vinegar
+sherry vinegar
+tarragon vinegar
+
+# Condiments & International Sauces
+honey mustard
+dijon mustard
+spicy brown mustard
+yellow mustard
+tartar sauce
+horseradish
+wasabi
+hoisin sauce
+oyster sauce
+fish sauce
+gochujang
+chili garlic sauce
+sweet chili sauce
+harissa
+tahini paste
+salsa verde
+guacamole
+pico de gallo
+ranch dressing
+blue cheese dressing
+caesar dressing
+italian dressing
+balsamic vinaigrette
+thousand island dressing
+
+# Dried Herbs & Spices (Batch 2)
+ground cloves
+allspice
+cardamom
+coriander
+fennel seeds
+mustard seeds
+celery seeds
+caraway seeds
+star anise
+cloves whole
+nutmeg whole
+onion salt
+garlic salt
+celery salt
+lemon pepper
+poultry seasoning
+italian seasoning
+taco seasoning
+chili powder mild
+smoked paprika
+sweet paprika
+garam masala
+herbes de provence
+saffron threads
+dill weed
+marjoram
+
+# Canned & Packaged Goods (Batch 2)
+canned black beans
+canned kidney beans
+canned pinto beans
+canned cannellini beans
+canned refried beans
+baked beans
+canned corn
+canned green beans
+canned peas
+canned pumpkin
+tomato puree
+crushed tomatoes
+stewed tomatoes
+canned coconut milk
+canned coconut cream
+canned pineapple slices
+canned peach halves
+canned pears
+applesauce
+chicken noodle soup
+tomato soup
+clam chowder
+french onion soup
+vegetable soup
+
+# Pasta, Grains & Rice (Batch 2)
+penne pasta
+rotini pasta
+elbow macaroni
+fettuccine
+lasagna noodles
+ramen noodles
+soba noodles
+udon noodles
+rice noodles
+couscous
+barley
+farro
+bulgur wheat
+polenta grits
+
+# Beverages
+ground coffee
+coffee beans
+instant coffee
+black tea bags
+green tea bags
+chamomile tea
+peppermint tea
+apple juice
+orange juice pulp free
+cranberry juice
+lemonade
+club soda
+tonic water
+coconut water
+
+# Snacks, Nuts & Seeds (Batch 2)
+macadamia nuts
+hazelnuts
+pistachios
+pine nuts
+sunflower seed butter
+cacao nibs
+dried cherries
+dried blueberries
+dried figs
+dried apricots
+beef jerky
+tortilla chips
+potato chips
+pita chips
