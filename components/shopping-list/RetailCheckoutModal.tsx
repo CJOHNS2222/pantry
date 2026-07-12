@@ -23,6 +23,11 @@ export const RetailCheckoutModal: React.FC<RetailCheckoutModalProps> = ({
   onUpdateItem,
 }) => {
   const [selectedRetailer, setSelectedRetailer] = useState<'walmart' | 'target' | 'kroger' | 'instacart' | 'albertsons' | 'thrive'>('walmart');
+  const [checkoutInitiated, setCheckoutInitiated] = useState(false);
+
+  React.useEffect(() => {
+    setCheckoutInitiated(false);
+  }, [selectedRetailer, isOpen]);
   
   // Track which item has the linker input open
   const [linkingItemId, setLinkingItemId] = useState<string | null>(null);
@@ -151,7 +156,7 @@ export const RetailCheckoutModal: React.FC<RetailCheckoutModalProps> = ({
       await Browser.open({ url: trackedSearchUrl });
     }
 
-    onClose();
+    setCheckoutInitiated(true);
   };
 
   const activeItems = checkoutableItems.filter(item => selectedItemIds[item.id]);
@@ -269,9 +274,23 @@ export const RetailCheckoutModal: React.FC<RetailCheckoutModalProps> = ({
                           </button>
                           
                           {isMatched ? (
-                            <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 font-semibold flex items-center gap-1">
-                              <Check className="w-3 h-3" /> Auto-Cart
-                            </span>
+                            <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                              <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 font-semibold flex items-center gap-1">
+                                <Check className="w-3 h-3" /> Auto-Cart
+                              </span>
+                              <button
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  const searchUrl = generateSearchUrl(item.item, 'walmart');
+                                  const trackedSearchUrl = wrapWithImpactTracker(searchUrl, 'walmart');
+                                  await Browser.open({ url: trackedSearchUrl });
+                                }}
+                                className="p-1 rounded bg-theme-secondary text-theme-secondary hover:bg-theme-primary transition-colors border border-theme"
+                                title="Search for this item on Walmart instead"
+                              >
+                                <Search className="w-3.5 h-3.5 text-amber-500" />
+                              </button>
+                            </div>
                           ) : (
                             <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-500 font-semibold flex items-center gap-1">
                               <Search className="w-3 h-3" /> Search
@@ -315,36 +334,68 @@ export const RetailCheckoutModal: React.FC<RetailCheckoutModalProps> = ({
 
         {/* Footer Summary & Action */}
         <div className="p-5 pb-14 border-t border-theme bg-theme-secondary/20">
-          {selectedRetailer === 'walmart' && activeItems.length > 0 && (
-            <div className="mb-4 text-xs text-theme-secondary space-y-1 bg-theme-secondary/40 p-3 rounded-xl border border-theme/40">
-              {matchedCount > 0 && (
-                <p className="flex items-center gap-1.5 text-emerald-500">
-                  <Check className="w-4 h-4" /> <strong>{matchedCount} matched items</strong> will be added directly to your cart.
+          {checkoutInitiated ? (
+            <div className="space-y-4">
+              <div className="text-xs text-theme-secondary space-y-1.5 bg-blue-500/10 border border-blue-500/20 p-3 rounded-xl">
+                <p className="font-semibold text-blue-500 flex items-center gap-1.5">
+                  🛒 Cart Checkout Initiated!
                 </p>
-              )}
-              {unmatchedCount > 0 && (
-                <p className="flex items-center gap-1.5 text-amber-500">
-                  <Search className="w-4 h-4" /> <strong>{unmatchedCount} unmatched items</strong> will open in search.
+                <p className="text-theme-primary">
+                  Please review the opened browser tab to confirm your cart.
                 </p>
-              )}
+                <p>
+                  If any items failed to add (e.g. out of stock or zip code restricted), click the magnifying glass icon next to them in the list above to search and find local alternatives.
+                </p>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={handleCheckout}
+                  className="flex-1 py-3 px-4 rounded-xl border border-[var(--accent-color)] text-[var(--accent-color)] font-bold text-xs uppercase tracking-wider transition-colors hover:bg-theme-secondary"
+                >
+                  Resend Cart
+                </button>
+                <button
+                  onClick={onClose}
+                  className="flex-1 py-3 px-4 rounded-xl bg-[var(--accent-color)] hover:opacity-95 text-white font-bold text-xs uppercase tracking-wider transition-all shadow-lg"
+                >
+                  I'm Finished
+                </button>
+              </div>
             </div>
-          )}
+          ) : (
+            <>
+              {selectedRetailer === 'walmart' && activeItems.length > 0 && (
+                <div className="mb-4 text-xs text-theme-secondary space-y-1 bg-theme-secondary/40 p-3 rounded-xl border border-theme/40">
+                  {matchedCount > 0 && (
+                    <p className="flex items-center gap-1.5 text-emerald-500">
+                      <Check className="w-4 h-4" /> <strong>{matchedCount} matched items</strong> will be added directly to your cart.
+                    </p>
+                  )}
+                  {unmatchedCount > 0 && (
+                    <p className="flex items-center gap-1.5 text-amber-500">
+                      <Search className="w-4 h-4" /> <strong>{unmatchedCount} unmatched items</strong> will open in search.
+                    </p>
+                  )}
+                </div>
+              )}
 
-          <button
-            onClick={handleCheckout}
-            disabled={activeItems.length === 0}
-            className="w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl bg-[var(--accent-color)] hover:opacity-95 text-white font-bold uppercase tracking-wider text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
-          >
-            <span>Proceed to {{
-              walmart: 'Walmart',
-              target: 'Target',
-              kroger: 'Kroger',
-              instacart: 'Instacart',
-              albertsons: 'Safeway',
-              thrive: 'Thrive Market'
-            }[selectedRetailer]}</span>
-            <ArrowUpRight className="w-4 h-4" />
-          </button>
+              <button
+                onClick={handleCheckout}
+                disabled={activeItems.length === 0}
+                className="w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl bg-[var(--accent-color)] hover:opacity-95 text-white font-bold uppercase tracking-wider text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+              >
+                <span>Proceed to {{
+                  walmart: 'Walmart',
+                  target: 'Target',
+                  kroger: 'Kroger',
+                  instacart: 'Instacart',
+                  albertsons: 'Safeway',
+                  thrive: 'Thrive Market'
+                }[selectedRetailer]}</span>
+                <ArrowUpRight className="w-4 h-4" />
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>

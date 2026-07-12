@@ -42,6 +42,7 @@ export const MainContent: React.FC = () => {
     persistedRecipeResult,
     initialSearchQuery,
     customCategories,
+    activeSettingsCategory,
     recipeSaveLimitExceeded,
     mealPlanLimitExceeded,
     isLoadingInventory,
@@ -82,6 +83,7 @@ export const MainContent: React.FC = () => {
     onDeleteCustomCategory,
     onLogout,
     onShowHousehold,
+    setActiveSettingsCategory,
     updateMealPlan,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     refreshAllData
@@ -261,6 +263,8 @@ export const MainContent: React.FC = () => {
               onShowHousehold={onShowHousehold}
               addToast={addToast}
               onReplayOnboarding={appActions.onReplayOnboarding}
+              activeCategory={activeSettingsCategory}
+              setActiveCategory={setActiveSettingsCategory}
             />
           </Suspense>
         </ComponentErrorBoundary>

@@ -36,6 +36,7 @@ interface AppActionsContextValue {
   onAddCustomCategory?: (name: string, icon: string, color?: string) => void;
   onUpdateCustomCategory?: (categoryId: string, updates: Partial<Pick<CustomCategory, 'name' | 'icon' | 'color'>>) => void;
   onDeleteCustomCategory?: (categoryId: string) => void;
+  setActiveSettingsCategory: React.Dispatch<React.SetStateAction<string | null>>;
 
   // UI operations
   addToast: (message: string, type?: 'success' | 'error' | 'info' | 'warning', ttl?: number, actionLabel?: string, action?: () => void) => void;
@@ -86,6 +87,7 @@ const defaultAppActionsContextValue: AppActionsContextValue = {
   onAddCustomCategory: noop as any,
   onUpdateCustomCategory: noop as any,
   onDeleteCustomCategory: noop as any,
+  setActiveSettingsCategory: noop as any,
   addToast: noop as any,
   setInitialSearchQuery: noop as any,
   setPersistedRecipeResult: noop as any,

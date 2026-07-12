@@ -1,13 +1,13 @@
 /**
  * Onboarding Milestone Service
  *
- * Tracks user behaviour milestones in localStorage so that feature-discovery
+ * Tracks user behaviour milestones in localStorage and Firestore so that feature-discovery
  * tooltips and contextual tips are shown only after the user has reached a
  * meaningful stage in their journey — reducing cognitive overload right after
  * sign-up (audit item #18).
  *
- * Milestones are intentionally small and coarse-grained so they stay easy to
- * reason about without a complex state machine.
+ * Milestones are saved both in localStorage (for instant synchronous lookup)
+ * and in Firestore under users/{uid}.onboardingMilestones (for cross-device persistence).
  */
 
 const STORAGE_KEY = 'app-onboarding-milestones';
@@ -45,6 +45,24 @@ export function recordMilestone(milestone: OnboardingMilestone): void {
   if (!milestones.has(milestone)) {
     milestones.add(milestone);
     writeMilestones(milestones);
+
+    // Asynchronously sync the new milestone list to the user's Firestore document
+    Promise.resolve().then(async () => {
+      try {
+        const { getAuth } = await import('firebase/auth');
+        const auth = getAuth();
+        const uid = auth.currentUser?.uid;
+        if (uid) {
+          const { default: dbMonitor } = await import('./databaseMonitoringService');
+          const userDocRef = dbMonitor.doc('users', uid);
+          await dbMonitor.updateDoc(userDocRef, {
+            onboardingMilestones: Array.from(milestones)
+          });
+        }
+      } catch {
+        // Safe fallback: gracefully degrade in tests or web-only environments
+      }
+    });
   }
 }
 
@@ -56,4 +74,23 @@ export function hasMilestone(milestone: OnboardingMilestone): boolean {
 /** Returns the full set of milestones the user has reached. */
 export function getMilestones(): Set<OnboardingMilestone> {
   return readMilestones();
+}
+
+/** Synchronizes milestones from Firestore into the local storage set. */
+export function syncFromFirestore(firestoreMilestones: string[]): void {
+  if (!Array.isArray(firestoreMilestones)) return;
+  const milestones = readMilestones();
+  let changed = false;
+
+  firestoreMilestones.forEach(m => {
+    const milestone = m as OnboardingMilestone;
+    if (milestone && !milestones.has(milestone)) {
+      milestones.add(milestone);
+      changed = true;
+    }
+  });
+
+  if (changed) {
+    writeMilestones(milestones);
+  }
 }

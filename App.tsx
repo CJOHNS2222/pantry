@@ -81,6 +81,7 @@ const App: React.FC = () => {
   const intl = useIntl();
   const [activeTab, setActiveTab] = useState<Tab>(Tab.PANTRY); // Default to pantry
   const prevActiveTabRef = useRef<Tab>(activeTab);
+  const [activeSettingsCategory, setActiveSettingsCategory] = useState<string | null>(null);
   // Stack of previously-visited tabs used by the hardware back button to navigate backwards.
   const tabHistoryRef = useRef<Tab[]>([]);
   // Track which tabs the user has already visited this session (for contextual tips)
@@ -200,7 +201,10 @@ const App: React.FC = () => {
     tabHistoryRef.current = [...tabHistoryRef.current.slice(-19), activeTab];
     setActiveTab(tab);
     window.scrollTo(0, 0);
-    
+    if (tab === Tab.SETTINGS) {
+      setActiveSettingsCategory(null);
+    }
+
     PerformanceMonitoringService.mark(`tab_switch_end_${tab}`);
     PerformanceMonitoringService.measure(`tab_switch_${tab}`, `tab_switch_start_${tab}`, `tab_switch_end_${tab}`);
   };
@@ -1765,6 +1769,7 @@ const App: React.FC = () => {
             settings,
             setSettings,
             customCategories,
+            activeSettingsCategory,
             recipeSaveLimitExceeded,
             mealPlanLimitExceeded,
             isLoadingInventory,
@@ -1922,6 +1927,7 @@ const App: React.FC = () => {
               onAddCustomCategory: addCustomCategory,
               onUpdateCustomCategory: updateCustomCategory,
               onDeleteCustomCategory: deleteCustomCategory,
+              setActiveSettingsCategory,
               addToast,
               setInitialSearchQuery,
               setPersistedRecipeResult,

@@ -41,7 +41,7 @@ describe('groceryCheckoutService', () => {
       ];
 
       const url = generateWalmartCartUrl(items);
-      expect(url).toBe('https://www.walmart.com/sc/cart/addToCart?items=145051970_1,10450115_1');
+      expect(url).toBe('https://www.walmart.com/sc/cart/addToCart?items=10450115_1,145051970_1');
     });
 
     it('should support numeric amount quantities', () => {
@@ -59,6 +59,49 @@ describe('groceryCheckoutService', () => {
       ];
 
       expect(generateWalmartCartUrl(items)).toBeNull();
+    });
+
+    it('should consolidate items mapping to the same Product ID and sum their quantities', () => {
+      const items: ShoppingItem[] = [
+        { id: '1', item: 'milk', checked: false, amount: 2 } as ShoppingItem,
+        { id: '2', item: 'organic whole milk', checked: false, amount: 1 } as ShoppingItem
+      ];
+      // Milk ID is 10450115, total should be 2 + 1 = 3
+      expect(generateWalmartCartUrl(items)).toBe('https://www.walmart.com/sc/cart/addToCart?items=10450115_3');
+    });
+
+    it('should consolidate raw eggs to a dozen pack by default', () => {
+      const items: ShoppingItem[] = [
+        { id: '1', item: 'eggs', checked: false } as ShoppingItem
+      ];
+      // Default eggs ID is 145051970, quantity should default to 1 pack (1 dozen)
+      expect(generateWalmartCartUrl(items)).toBe('https://www.walmart.com/sc/cart/addToCart?items=145051970_1');
+    });
+
+    it('should sum individual egg counts from different recipes and round up to the nearest dozen', () => {
+      const items: ShoppingItem[] = [
+        { id: '1', item: 'eggs', checked: false, amount: 2 } as ShoppingItem, // Recipe 1: 2 eggs
+        { id: '2', item: 'large white eggs', checked: false, amount: 3 } as ShoppingItem // Recipe 2: 3 eggs
+      ];
+      // Total individual eggs = 5. Ceil to dozen pack = 1 pack
+      expect(generateWalmartCartUrl(items)).toBe('https://www.walmart.com/sc/cart/addToCart?items=145051970_1');
+    });
+
+    it('should scale egg dozen packs correctly when total count exceeds 12', () => {
+      const items: ShoppingItem[] = [
+        { id: '1', item: 'eggs', checked: false, amount: 8 } as ShoppingItem,
+        { id: '2', item: 'large white eggs', checked: false, amount: 6 } as ShoppingItem
+      ];
+      // Total individual eggs = 14. Ceil to dozen pack = 2 packs (24 eggs)
+      expect(generateWalmartCartUrl(items)).toBe('https://www.walmart.com/sc/cart/addToCart?items=145051970_2');
+    });
+
+    it('should support explicit dozens unit in egg count calculation', () => {
+      const items: ShoppingItem[] = [
+        { id: '1', item: 'eggs', checked: false, amount: 2, unit: 'dozen' } as ShoppingItem
+      ];
+      // 2 dozen = 24 eggs. Cart qty should be 2
+      expect(generateWalmartCartUrl(items)).toBe('https://www.walmart.com/sc/cart/addToCart?items=145051970_2');
     });
   });
 
