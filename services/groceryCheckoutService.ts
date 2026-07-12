@@ -415,28 +415,67 @@ export function hasWalmartMatch(item: ShoppingItem): boolean {
 /**
  * Generate a direct Walmart Add-to-Cart URL for a list of items.
  * Matched items will be added directly to the cart. Unmatched items are ignored.
+ * Consolidates multiple items mapping to the same Product ID.
+ * Defaults raw egg quantities to dozen packs (12-count) and rounds egg quantities to dozens.
  */
 export function generateWalmartCartUrl(items: ShoppingItem[], storeId?: string): string | null {
-  const cartItems: string[] = [];
+  const productQuantities: Record<string, number> = {};
+  let totalIndividualEggs = 0;
+  const EGGS_ID = '145051970'; // Default 12-count white eggs
 
   items.forEach(item => {
     const itemId = getWalmartItemId(item.item, item);
-    if (itemId) {
-      // Parse amount as integer or default to 1
-      let amount = 1;
-      if (item.amount) {
-        amount = Math.max(1, Math.round(item.amount));
-      } else if (typeof item.quantity === 'number') {
-        amount = Math.max(1, Math.round(item.quantity));
-      } else if (typeof item.quantity === 'string') {
-        const parsedAmount = parseFloat(item.quantity);
-        if (!isNaN(parsedAmount)) {
-          amount = Math.max(1, Math.round(parsedAmount));
+    if (!itemId) return;
+
+    // Parse amount as decimal or default to 1
+    let amount = 1;
+    let hasExplicitQuantity = false;
+    if (item.amount) {
+      amount = item.amount;
+      hasExplicitQuantity = true;
+    } else if (typeof item.quantity === 'number') {
+      amount = item.quantity;
+      hasExplicitQuantity = true;
+    } else if (typeof item.quantity === 'string') {
+      const parsedAmount = parseFloat(item.quantity);
+      if (!isNaN(parsedAmount)) {
+        amount = parsedAmount;
+        hasExplicitQuantity = true;
+      }
+    }
+
+    // Special consolidation for the default 12-count eggs
+    if (itemId === EGGS_ID) {
+      const cleanItem = item.item.toLowerCase().trim();
+      // If no explicit quantity was provided, or quantity is 1 and name is generic "eggs", default to 12 eggs (1 dozen)
+      if (!hasExplicitQuantity || (amount === 1 && (cleanItem === 'eggs' || cleanItem === 'large white eggs'))) {
+        totalIndividualEggs += 12;
+      } else {
+        const cleanUnit = (item.unit || '').toLowerCase().trim();
+        const isDozen = cleanUnit.includes('dozen') || cleanUnit.includes('doz') || cleanItem.includes('dozen') || cleanItem.includes('doz');
+        if (isDozen) {
+          totalIndividualEggs += amount * 12;
+        } else {
+          totalIndividualEggs += amount;
         }
       }
-      cartItems.push(`${itemId}_${amount}`);
+    } else {
+      // For all other items, sum their quantities directly (rounded)
+      const finalAmount = Math.max(1, Math.round(amount));
+      productQuantities[itemId] = (productQuantities[itemId] || 0) + finalAmount;
     }
   });
+
+  // Convert individual egg counts back to dozens (12-pack count)
+  if (totalIndividualEggs > 0) {
+    const eggPacksCount = Math.max(1, Math.ceil(totalIndividualEggs / 12));
+    productQuantities[EGGS_ID] = (productQuantities[EGGS_ID] || 0) + eggPacksCount;
+  }
+
+  const cartItems: string[] = [];
+  for (const [itemId, qty] of Object.entries(productQuantities)) {
+    cartItems.push(`${itemId}_${qty}`);
+  }
 
   if (cartItems.length === 0) {
     return null;

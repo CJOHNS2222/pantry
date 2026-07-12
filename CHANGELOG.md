@@ -1,3 +1,17 @@
+## [3.0.5] - 2026-07-12
+
+### Added
+- **Plan Comparison Matrix** — Added a detailed comparison modal displaying a side-by-side feature matrix of all plan limits (saved recipes, AI scans, household members, cost estimations, etc.) with dynamic monthly/yearly prices.
+- **Support Contact Modal** — Integrated an email support contact form inside the app that sends messages directly via the EmailJS endpoint using credentials matching the website.
+
+### Changed
+- **Optimistic Subscription Upgrades** — Implemented client-side optimistic UI updates to instantly unlock Premium/Family features upon purchase validation, removing backend round-trip latency.
+- **Legacy Subscription Fallbacks** — Refined pricing fields to handle legacy subscriptions (which lack product ID records) by defaulting to standard monthly rates rather than showing `$0 forever`.
+- **Navigation Reset to Top** — Modified the bottom settings button to reset the view to top-level settings categories when clicked, preventing users from getting stuck in submenus.
+- **Restore Purchases Visual State** — Added clear disabled/opacity styles to the Restore button when run on Web to clarify it is only active inside the native Android app wrapper.
+
+---
+
 ## [3.0.4] - 2026-07-10
 
 ### Added

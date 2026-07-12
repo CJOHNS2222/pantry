@@ -9,6 +9,7 @@ import { setUserContext, clearUserContext, trackAuthEvent } from '../services/se
 import { PriceDataCacheService } from '../services/priceDataCacheService';
 import { log } from '../services/logService';
 import { GUEST_USER_ID_KEY } from '../components/auth-onboarding/Login';
+import { syncFromFirestore } from '../services/onboardingMilestoneService';
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
@@ -93,6 +94,11 @@ export function useAuth() {
           } catch (err: unknown) {
             log.error('Failed to check for existing household:', { error: (err as Error)?.message }, 'useAuth');
           }
+        }
+
+        // Synchronize onboarding milestones from Firestore if they exist
+        if (Array.isArray(userData?.onboardingMilestones)) {
+          syncFromFirestore(userData.onboardingMilestones);
         }
 
         // One-time migration: move customCategories from old subcollection cache to user doc.

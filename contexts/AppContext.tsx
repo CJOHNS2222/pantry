@@ -1,7 +1,7 @@
 // contexts/AppContext.tsx
 import React, { createContext, useContext, ReactNode } from 'react';
 import { Tab } from '../types/app';
-import { User, PantryItem, DayPlan, ShoppingItem, SavedRecipe, RecipeRating, RecipeSearchResult, CustomCategory, StructuredRecipe, Household, Settings, ConsumptionSuggestion, ExpirationAlert, RecipeSuggestion, HouseholdActivity } from '../types';
+import { User, PantryItem, DayPlan, ShoppingItem, SavedRecipe, RecipeRating, RecipeSearchResult, CustomCategory, Household, Settings, ConsumptionSuggestion, ExpirationAlert, RecipeSuggestion, HouseholdActivity } from '../types';
 
 // Core app state that should be available globally
 interface AppContextValue {
@@ -33,6 +33,7 @@ interface AppContextValue {
   settings: Settings;
   setSettings: React.Dispatch<React.SetStateAction<Settings>>;
   customCategories?: CustomCategory[];
+  activeSettingsCategory: string | null;
 
   // Usage limits
   recipeSaveLimitExceeded: boolean;
@@ -105,6 +106,7 @@ const defaultAppContextValue: AppContextValue = {
   settings: defaultSettings,
   setSettings: () => {},
   customCategories: [],
+  activeSettingsCategory: null,
   recipeSaveLimitExceeded: false,
   mealPlanLimitExceeded: false,
   isLoadingInventory: false,

@@ -31,7 +31,6 @@ import { useIsAdmin } from '../../hooks/useIsAdmin';
 import { useAndroidBack } from '../../hooks/useAndroidBack';
 import { SettingsFeedbackSection } from './SettingsFeedbackSection';
 import { SettingsAppUpdatesSection } from './SettingsAppUpdatesSection';
-import { SettingsHelpSection } from './SettingsHelpSection';
 import { SettingsAppPreferencesSection } from './SettingsAppPreferencesSection';
 import { SettingsCategoriesSection } from './SettingsCategoriesSection';
 import { SettingsFoodSafetySection } from './SettingsFoodSafetySection';
@@ -109,6 +108,8 @@ interface SettingsProps {
   onShowHousehold?: () => void;
   addToast?: (message: string, type: 'success' | 'error' | 'info' | 'warning', duration?: number) => void;
   onReplayOnboarding?: () => void;
+  activeCategory?: string | null;
+  setActiveCategory?: React.Dispatch<React.SetStateAction<string | null>>;
 }
 
 export const Settings: React.FC<SettingsProps> = ({ 
@@ -124,7 +125,9 @@ export const Settings: React.FC<SettingsProps> = ({
   household,
   onShowHousehold,
   addToast,
-  onReplayOnboarding
+  onReplayOnboarding,
+  activeCategory: propActiveCategory,
+  setActiveCategory: propSetActiveCategory,
 }) => {
   const intl = useIntl();
   const [feedback, setFeedback] = useState('');
@@ -132,6 +135,11 @@ export const Settings: React.FC<SettingsProps> = ({
   const { isPremium, isFamily } = useSubscription(user || null);
   const [usageLimits, setUsageLimits] = useState<UsageLimits | null>(null);
   const { isAdmin } = useIsAdmin(user?.id);
+
+  // Backwards-compatible fallback to local state if parent did not pass category states
+  const [localActiveCategory, localSetActiveCategory] = useState<string | null>(null);
+  const activeCategory = propActiveCategory !== undefined ? propActiveCategory : localActiveCategory;
+  const setActiveCategory = propSetActiveCategory || localSetActiveCategory;
 
   useEffect(() => {
     if (!user) return;
@@ -162,7 +170,7 @@ export const Settings: React.FC<SettingsProps> = ({
   const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>(
     NotificationService.getDefaultSettings()
   );
-  const [activeCategory, setActiveCategory] = useState<string | null>(null);
+
 
   // Redirect to requested settings category if set in sessionStorage
   useEffect(() => {
@@ -613,6 +621,7 @@ export const Settings: React.FC<SettingsProps> = ({
     if (!feedback.trim()) return;
     setSending(true);
     try {
+      // 1. Submit to Firestore feedback collection for tracking
       await DatabaseMonitoringService.addDoc(DatabaseMonitoringService.collection('feedback'), {
         message: feedback,
         createdAt: Timestamp.now(),
@@ -623,9 +632,30 @@ export const Settings: React.FC<SettingsProps> = ({
           avatar: user.avatar || null
         } : null
       });
-      addToast?.('Thank you for your feedback!', 'success');
+
+      // 2. Submit email via EmailJS (same as the website!)
+      await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          service_id: 'service_ekbmsjj',
+          template_id: 'template_ek5lu2r',
+          user_id: 'u_wtW48BWFmZnstig',
+          template_params: {
+            from_name: user?.name || 'User',
+            from_email: user?.email || 'no-email@stockandspoon.com',
+            message: feedback,
+            to_email: 'chrisj221986@gmail.com, cjohns22@duck.com'
+          }
+        }),
+      });
+
+      addToast?.('Thank you! Your feedback has been sent successfully.', 'success');
       setFeedback('');
-    } catch {
+    } catch (err: unknown) {
+      log.error('Failed to send feedback email', { error: err instanceof Error ? err.message : String(err) }, 'Settings');
       addToast?.('Failed to send feedback. Please try again later.', 'error');
     }
     setSending(false);

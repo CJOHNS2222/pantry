@@ -6,6 +6,21 @@ import { StructuredRecipe } from '../../types';
 import { log } from '../../services/logService';
 import HapticService from '../../services/hapticService';
 
+interface DocumentWithPrefixes extends Document {
+  webkitExitFullscreen?: () => void;
+  mozCancelFullScreen?: () => void;
+  msExitFullscreen?: () => void;
+  webkitFullscreenElement?: Element;
+  mozFullScreenElement?: Element;
+  msFullscreenElement?: Element;
+}
+
+interface HTMLElementWithPrefixes extends HTMLElement {
+  webkitRequestFullscreen?: () => Promise<void>;
+  mozRequestFullScreen?: () => Promise<void>;
+  msRequestFullscreen?: () => Promise<void>;
+}
+
 interface CookingModeProps {
   recipes: StructuredRecipe[];
   initialIndex?: number;
@@ -153,6 +168,73 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipes = [], initialI
       released = true;
       wakeLockRef.current?.release().catch((err: unknown) => log.info('Wake lock release skipped or failed', { error: err }));
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
+
+  // Manage fullscreen immersive mode and orientation lock for Cooking Mode
+  useEffect(() => {
+    let active = true;
+
+    const requestImmersiveLandscape = async () => {
+      // 1. Request landscape orientation lock
+      if (screen.orientation && typeof screen.orientation.lock === 'function') {
+        try {
+          await screen.orientation.lock('landscape');
+        } catch (error) {
+          log.info('Orientation lock rejected or unsupported', { error });
+        }
+      }
+
+      // 2. Request immersive fullscreen mode (hides system nav and notification bars)
+      if (active) {
+        try {
+          const docEl = document.documentElement as HTMLElementWithPrefixes;
+          if (docEl.requestFullscreen) {
+            await docEl.requestFullscreen();
+          } else if (docEl.webkitRequestFullscreen) {
+            await docEl.webkitRequestFullscreen();
+          } else if (docEl.mozRequestFullScreen) {
+            await docEl.mozRequestFullScreen();
+          } else if (docEl.msRequestFullscreen) {
+            await docEl.msRequestFullscreen();
+          }
+        } catch (error) {
+          log.info('Fullscreen request rejected or unsupported', { error });
+        }
+      }
+    };
+
+    requestImmersiveLandscape();
+
+    return () => {
+      active = false;
+      
+      // 1. Restore/unlock screen orientation
+      if (screen.orientation && typeof screen.orientation.unlock === 'function') {
+        try {
+          screen.orientation.unlock();
+        } catch (error) {
+          log.info('Orientation unlock failed or unsupported', { error });
+        }
+      }
+
+      // 2. Exit immersive fullscreen mode
+      try {
+        const doc = document as DocumentWithPrefixes;
+        if (doc.fullscreenElement || doc.webkitFullscreenElement || doc.mozFullScreenElement || doc.msFullscreenElement) {
+          if (doc.exitFullscreen) {
+            doc.exitFullscreen().catch((err: unknown) => log.info('Exit fullscreen error', { error: err }));
+          } else if (doc.webkitExitFullscreen) {
+            doc.webkitExitFullscreen();
+          } else if (doc.mozCancelFullScreen) {
+            doc.mozCancelFullScreen();
+          } else if (doc.msExitFullscreen) {
+            doc.msExitFullscreen();
+          }
+        }
+      } catch (error) {
+        log.info('Exit fullscreen failed or unsupported', { error });
+      }
     };
   }, []);
 
@@ -325,8 +407,8 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipes = [], initialI
   const isFirst = currentStep === 0;
   const isLast = currentStep === steps.length - 1;
 
-  const currentStepText = steps[currentStep] || '';
-  const parsedSeconds = parseTimerSeconds(currentStepText);
+  // const currentStepText = steps[currentStep] || '';
+  // const parsedSeconds = parseTimerSeconds(currentStepText);
 
   if (!recipe || steps.length === 0) {
     return (

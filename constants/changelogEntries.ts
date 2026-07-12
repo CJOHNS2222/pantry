@@ -20,6 +20,16 @@ export interface DetailedChangeEntry {
 
 export const RECENT_CHANGES: ChangeEntry[] = [
   {
+    "version": "3.0.5",
+    "date": "Jul 12, 2026",
+    "highlights": [
+      "Plan Comparison Matrix — Added a detailed comparison modal displaying a side-by-side feature matrix of all plan limits…",
+      "Support Contact Modal — Integrated an email support contact form inside the app that sends messages directly via the…",
+      "Optimistic Subscription Upgrades — Implemented client-side optimistic UI updates to instantly unlock Premium/Family…",
+      "Legacy Subscription Fallbacks — Refined pricing fields to handle legacy subscriptions (which lack product ID records)…"
+    ]
+  },
+  {
     "version": "3.0.4",
     "date": "Jul 10, 2026",
     "highlights": [
@@ -37,17 +47,32 @@ export const RECENT_CHANGES: ChangeEntry[] = [
       "Repositioned Online Order FAB — Moved the floating shopping cart button on the Shopping List tab to the bottom right…",
       "Relative Path Optimization — Converted website link references (logo, headers, footers) to relative paths, ensuring…"
     ]
-  },
-  {
-    "version": "3.0.2",
-    "date": "Jul 8, 2026",
-    "highlights": [
-      "Release Verification & Housekeeping — Incremented platform release identifiers to v3.0.2 (versionCode 95) and rebuilt…"
-    ]
   }
 ];
 
 export const ALL_CHANGES: DetailedChangeEntry[] = [
+  {
+    "version": "3.0.5",
+    "date": "Jul 12, 2026",
+    "sections": [
+      {
+        "title": "Added",
+        "bullets": [
+          "**Plan Comparison Matrix** — Added a detailed comparison modal displaying a side-by-side feature matrix of all plan limits (saved recipes, AI scans, household members, cost estimations, etc.) with dynamic monthly/yearly prices.",
+          "**Support Contact Modal** — Integrated an email support contact form inside the app that sends messages directly via the EmailJS endpoint using credentials matching the website."
+        ]
+      },
+      {
+        "title": "Changed",
+        "bullets": [
+          "**Optimistic Subscription Upgrades** — Implemented client-side optimistic UI updates to instantly unlock Premium/Family features upon purchase validation, removing backend round-trip latency.",
+          "**Legacy Subscription Fallbacks** — Refined pricing fields to handle legacy subscriptions (which lack product ID records) by defaulting to standard monthly rates rather than showing `$0 forever`.",
+          "**Navigation Reset to Top** — Modified the bottom settings button to reset the view to top-level settings categories when clicked, preventing users from getting stuck in submenus.",
+          "**Restore Purchases Visual State** — Added clear disabled/opacity styles to the Restore button when run on Web to clarify it is only active inside the native Android app wrapper."
+        ]
+      }
+    ]
+  },
   {
     "version": "3.0.4",
     "date": "Jul 10, 2026",
