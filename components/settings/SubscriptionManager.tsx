@@ -516,21 +516,21 @@ const PlanComparisonModal: React.FC<PlanComparisonModalProps> = ({ isOpen, onClo
   if (!isOpen) return null;
 
   const rows = [
-    { feature: 'Price', free: '$0', premium: billingPeriod === 'monthly' ? '$4.99/mo' : '$29.99/yr', family: billingPeriod === 'monthly' ? '$9.99/mo' : '$59.99/yr' },
-    { feature: 'Saved Recipes', free: '10 recipes', premium: '20 recipes', family: 'Unlimited' },
-    { feature: 'Meal Planning', free: '3 entries / wk', premium: 'Unlimited (7-day)', family: 'Unlimited (2-week)' },
-    { feature: 'AI Pantry Scans', free: '5 scans / wk', premium: '15 scans / wk', family: 'Unlimited' },
-    { feature: 'Custom Categories', free: '1 category', premium: 'Unlimited', family: 'Unlimited' },
-    { feature: 'Cost Estimation', free: 'First 5 items', premium: 'Full details', family: 'Full details' },
-    { feature: 'Household Members', free: 'You + 1 member', premium: 'You + 3 members', family: 'You + 5 members' },
-    { feature: 'Shared Lists & Sync', free: '❌', premium: '✅', family: '✅' },
-    { feature: 'Support Level', free: 'Standard', premium: 'Priority', family: '24/7 Priority' },
+    { feature: 'Price', premium: billingPeriod === 'monthly' ? '$4.99/mo' : '$29.99/yr', family: billingPeriod === 'monthly' ? '$9.99/mo' : '$59.99/yr' },
+    { feature: 'Saved Recipes', premium: '20 recipes', family: 'Unlimited' },
+    { feature: 'Meal Planning', premium: 'Unlimited (7-day)', family: 'Unlimited (2-week)' },
+    { feature: 'AI Pantry Scans', premium: '15 scans / wk', family: 'Unlimited' },
+    { feature: 'Custom Categories', premium: 'Unlimited', family: 'Unlimited' },
+    { feature: 'Cost Estimation', premium: 'Full details', family: 'Full details' },
+    { feature: 'Household Members', premium: 'You + 3 members', family: 'You + 5 members' },
+    { feature: 'Shared Lists & Sync', premium: '✅', family: '✅' },
+    { feature: 'Support Level', premium: 'Priority', family: '24/7 Priority' },
   ];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in" onClick={onClose}>
       <div 
-        className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col"
+        className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl w-full max-w-xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -552,7 +552,6 @@ const PlanComparisonModal: React.FC<PlanComparisonModalProps> = ({ isOpen, onClo
                 <thead>
                   <tr className="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-800">
                     <th className="p-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Feature</th>
-                    <th className="p-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">Free</th>
                     <th className="p-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center text-blue-600 dark:text-blue-400">Premium</th>
                     <th className="p-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center text-purple-600 dark:text-purple-400">Family</th>
                   </tr>
@@ -561,7 +560,6 @@ const PlanComparisonModal: React.FC<PlanComparisonModalProps> = ({ isOpen, onClo
                   {rows.map((row, idx) => (
                     <tr key={idx} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/20 transition-colors">
                       <td className="p-3 text-sm font-medium text-gray-900 dark:text-gray-100">{row.feature}</td>
-                      <td className="p-3 text-sm text-gray-600 dark:text-gray-400 text-center">{row.free}</td>
                       <td className="p-3 text-sm text-gray-900 dark:text-white font-medium text-center">{row.premium}</td>
                       <td className="p-3 text-sm text-gray-900 dark:text-white font-medium text-center">{row.family}</td>
                     </tr>
