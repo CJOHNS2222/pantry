@@ -97,6 +97,7 @@
     "bestBy": "最佳使用日期",
     "useBy": "使用期限",
     "noExpirationSet": "未设置到期日期",
+    "cannedGoodsExpiryNote": "提示：如果保存得当，罐头食品通常可以无限期安全食用。设置过期日期是可选的，仅作为估算。",
     "isOpened": "已开封",
     "isStaple": "常备品",
     "consumptionHistory": "消耗历史",

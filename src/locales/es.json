@@ -97,6 +97,7 @@
     "bestBy": "Preferentemente antes de",
     "useBy": "Consumir antes de",
     "noExpirationSet": "Sin fecha de caducidad",
+    "cannedGoodsExpiryNote": "Nota: Los alimentos enlatados suelen ser seguros y comestibles de forma indefinida si se mantienen en buenas condiciones. Establecer una fecha de vencimiento es opcional y es solo una estimación.",
     "isOpened": "Abierto",
     "isStaple": "Artículo básico",
     "consumptionHistory": "Historial de consumo",

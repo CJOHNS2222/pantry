@@ -100,6 +100,7 @@
     "bestBy": "Best By",
     "useBy": "Use By",
     "noExpirationSet": "No expiration set",
+    "cannedGoodsExpiryNote": "Note: Canned goods typically remain safe and edible indefinitely if kept in good condition. Setting an expiration date is optional and is only an estimate.",
     "isOpened": "Opened",
     "isStaple": "Staple Item",
     "consumptionHistory": "Consumption History",

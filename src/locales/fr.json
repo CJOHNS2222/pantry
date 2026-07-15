@@ -97,6 +97,7 @@
     "bestBy": "À consommer de préférence avant",
     "useBy": "À consommer avant",
     "noExpirationSet": "Aucune date de péremption",
+    "cannedGoodsExpiryNote": "Remarque : Les produits en conserve restent généralement sûrs et consommables indéfiniment s'ils sont conservés dans de bonnes conditions. La date d'expiration est facultative et n'est qu'une estimation.",
     "isOpened": "Ouvert",
     "isStaple": "Article de base",
     "consumptionHistory": "Historique de consommation",

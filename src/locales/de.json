@@ -97,6 +97,7 @@
     "bestBy": "Mindesthaltbarkeitsdatum",
     "useBy": "Verbrauchsdatum",
     "noExpirationSet": "Kein Ablaufdatum gesetzt",
+    "cannedGoodsExpiryNote": "Hinweis: Konserven bleiben bei guter Lagerung in der Regel unbegrenzt sicher und genießbar. Das Ablaufdatum ist optional und nur ein Richtwert.",
     "isOpened": "Geöffnet",
     "isStaple": "Grundnahrungsmittel",
     "consumptionHistory": "Verbrauchsverlauf",

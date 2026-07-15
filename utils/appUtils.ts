@@ -1251,8 +1251,15 @@ export function getAutoExpirationDate(itemName: string, category: string, storag
     return d.toISOString().slice(0, 10);
   }
 
+  // Canned goods: default to 2 years (730 days) from today but optional
+  if (cat === 'canned goods') {
+    const expirationDate = new Date();
+    expirationDate.setDate(expirationDate.getDate() + 730);
+    return expirationDate.toISOString().slice(0, 10);
+  }
+
   // Long-term storage items should not have expiration dates
-  const longTermCategories = ['pasta & noodles', 'grains & bread', 'canned goods', 'baking supplies', 'condiments & sauces', 'spices & herbs', 'snacks', 'beverages'];
+  const longTermCategories = ['pasta & noodles', 'grains & bread', 'baking supplies', 'condiments & sauces', 'spices & herbs', 'snacks', 'beverages'];
   if (longTermCategories.includes(cat)) {
     return undefined;
   }
