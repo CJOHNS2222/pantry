@@ -10,6 +10,8 @@ Use this file as the authoritative instructions for any AI coding agent before e
 3. **Response Protocol (VibeCheck)**:
    - End **every response** with the exact line `*verified by vibecheck*` on its own line at the end of the message.
    - If changes were made, place a **What's left** section directly above the badge showing remaining tasks (or `✅ Task complete — nothing remaining.` if fully finished).
+4. **Git Push Constraint**:
+   - **Never push to Git (`git push`) automatically** after every minor change or layout fix. Only commit changes locally (`git commit`), and wait for the user to explicitly request a push or to initiate a `/releasebuild`.
 
 ---
 
