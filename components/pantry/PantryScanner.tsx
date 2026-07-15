@@ -5,6 +5,7 @@ import { Camera as CapacitorCamera, CameraResultType, CameraSource } from '@capa
 import { Camera, Upload, Loader2, Plus, Trash2, CheckCircle2, ShoppingBasket, X, Barcode, ChevronDown, ChevronRight, ChevronUp, Image, ChefHat, TrendingUp, Search, Filter, Clock, Tag, FilePlus, Receipt, LayoutGrid, LayoutList } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { List } from 'react-window';
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const ReactWindowList = List as any;
 import { extractReceiptItems } from '../../services/receiptOcrService';
 import { setUserGeminiOptIn } from '../../services/featureFlags';
@@ -68,7 +69,6 @@ import FreezeTransitionModal from './FreezeTransitionModal';
 import { InventoryCacheService } from '../../services/inventoryCacheService';
 import PantryImportModal from './PantryImportModal';
 import { PantryHealthScore } from './PantryHealthScore';
-import { hasMilestone } from '../../services/onboardingMilestoneService';
 
 // Constants for virtualization threshold
 
@@ -180,79 +180,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
     }
   };
 
-  // Onboarding checklist tracking
-  const [isChecklistCollapsed, setIsChecklistCollapsed] = useState(true);
-  const [isChecklistDismissed, setIsChecklistDismissed] = useState(() => {
-    try {
-      return localStorage.getItem('onboarding-checklist-dismissed') === 'true';
-    } catch {
-      return false;
-    }
-  });
 
-  const checklistSteps = useMemo(() => {
-    const pSaved = hasMilestone('first-recipe-saved');
-    const mPlanned = hasMilestone('first-meal-planned');
-    const hSetup = hasMilestone('household-setup');
-    const lLogged = hasMilestone('first-leftover-logged');
-    const pItemsCount = inventory.length;
-    
-    return [
-      {
-        id: 'add-items',
-        label: 'Add 5 Pantry Items',
-        description: `Add ingredients to unlock smart recommendations. (${pItemsCount}/5)`,
-        isCompleted: pItemsCount >= 5,
-        action: () => setIsAddModalOpen(true),
-        actionLabel: 'Add Items'
-      },
-      {
-        id: 'save-recipe',
-        label: 'Save a Recipe',
-        description: 'Explore recipes in the Chef tab and heart one to save it.',
-        isCompleted: pSaved,
-        action: () => { if (setActiveTab) setActiveTab(Tab.RECIPES); },
-        actionLabel: 'Browse Recipes'
-      },
-      {
-        id: 'plan-meal',
-        label: 'Plan a Meal',
-        description: 'Add a planned meal or saved recipe to your weekly calendar.',
-        isCompleted: mPlanned,
-        action: () => { if (setActiveTab) setActiveTab(Tab.MEALS); },
-        actionLabel: 'Open Planner'
-      },
-      {
-        id: 'household-share',
-        label: 'Set up Household Sharing',
-        description: 'Invite family members or roommates to sync in real-time.',
-        isCompleted: hSetup,
-        action: () => { if (setActiveTab) setActiveTab(Tab.SETTINGS); },
-        actionLabel: 'Set up Sharing'
-      },
-      {
-        id: 'log-leftover',
-        label: 'Record a Leftover',
-        description: 'Log leftovers with a tap to track food safety and waste.',
-        isCompleted: lLogged,
-        action: () => setIsAddModalOpen(true),
-        actionLabel: 'Log Leftover'
-      }
-    ];
-  }, [inventory.length, setActiveTab]);
-
-  const completedChecklistCount = useMemo(() => {
-    return checklistSteps.filter(s => s.isCompleted).length;
-  }, [checklistSteps]);
-
-  const dismissChecklist = () => {
-    setIsChecklistDismissed(true);
-    try {
-      localStorage.setItem('onboarding-checklist-dismissed', 'true');
-    } catch (e) {
-      log.error('Failed to save onboarding-checklist-dismissed to localStorage', { error: e });
-    }
-  };
 
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [rawBase64, setRawBase64] = useState<string | null>(null);
@@ -365,7 +293,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   const toggleDisplayLayout = () => {
     setDisplayLayout(prev => {
       const next = prev === 'list' ? 'grid' : 'list';
-      try { localStorage.setItem('pantry_display_layout', next); } catch { /* ignore */ }
+      try { localStorage.setItem('pantry_display_layout', next); } catch (e) { console.debug('Failed to write display layout preference:', e); }
       return next;
     });
   };
@@ -422,6 +350,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   const [autocompleteSuggestions, setAutocompleteSuggestions] = useState<AutocompleteSuggestion[]>([]);
   const [showAutocomplete, setShowAutocomplete] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
 
   // Meal prep suggestions state
   const [mealPrepSuggestions, setMealPrepSuggestions] = useState<RecipeIngredientMatch[]>([]);
@@ -434,6 +363,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   useAndroidBack(showRecipeModal, () => setShowRecipeModal(false));
   useAndroidBack(showFilters, () => setShowFilters(false));
   useAndroidBack(searchQuery.length > 0, () => setSearchQuery(''));
+  useAndroidBack(isSearchModalOpen, () => setIsSearchModalOpen(false));
 
   // Auto-set smart unit when item name changes in the quick-add form
   useEffect(() => {
@@ -443,6 +373,18 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
       setNewUnit('count');
     }
   }, [newItemText]);
+
+  // Automatically open the add items modal if redirected from achievements setup checklist
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem('open-pantry-add-modal') === 'true') {
+        setIsAddModalOpen(true);
+        sessionStorage.removeItem('open-pantry-add-modal');
+      }
+    } catch (e) {
+      log.error('Failed to check open-pantry-add-modal from sessionStorage', { error: e }, 'PantryScanner');
+    }
+  }, []);
 
   // Show a one-time non-blocking tip the first time bulk mode is activated
   useEffect(() => {
@@ -556,12 +498,16 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
         const dy = e.clientY - gestureStartRef.current.y;
         gestureStartRef.current = null;
         if (Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy)) return;
-        if (dx > 0) {
-          gestureActionTriggeredRef.current = true;
-          await applyQuickConsume(item);
-        } else {
-          gestureActionTriggeredRef.current = true;
-          applyQuickAddToShopping(item);
+        try {
+          if (dx > 0) {
+            gestureActionTriggeredRef.current = true;
+            await applyQuickConsume(item);
+          } else {
+            gestureActionTriggeredRef.current = true;
+            applyQuickAddToShopping(item);
+          }
+        } catch (err) {
+          console.error('Failed to execute swipe gesture action:', err);
         }
       },
       onPointerLeave: () => {
@@ -795,7 +741,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                 if (product && p.title) {
                   setNewItemText(p.title);
                   // Use the first breadcrumb as a category hint if available
-                  if (p.breadcrumbs?.length) {
+                  if (p.breadcrumbs && p.breadcrumbs.length) {
                     const hint = p.breadcrumbs[p.breadcrumbs.length - 1];
                     // capitalise first letter
                     setNewItemText(p.title);
@@ -1369,6 +1315,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                   renderRow: (index: number, style: React.CSSProperties) => renderCategoryItem({ index, style, category })
                 }}
               >
+                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                 {VirtualizedRow as any}
               </ReactWindowList>
             ) : (
@@ -1419,6 +1366,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                 renderRow: (index: number, style: React.CSSProperties) => renderStorageItem({ index, style, location })
               }}
             >
+              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
               {VirtualizedRow as any}
             </ReactWindowList>
           ) : (
@@ -1555,14 +1503,15 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                 <button
                   onClick={async (e) => {
                     e.stopPropagation();
-                    if (!household?.id) {
+                    const hhId = household?.id;
+                    if (!hhId) {
                       appActions.addToast('No household selected', 'error');
                       return;
                     }
                     try {
                       const cookingToday = false; // default defrost window; user can adjust expiry after
                       const prev = { storageLocation: item.storageLocation, is_frozen: item.is_frozen, expirationDate: item.expirationDate };
-                      const result = await FreezerService.moveToFridgeFromFreezer(household.id, item.id, { cookingToday });
+                      const result = await FreezerService.moveToFridgeFromFreezer(hhId, item.id, { cookingToday });
                       await onUpdateItem(primaryIndex, { storageLocation: 'fridge', is_frozen: false, expirationDate: result.newExpiry });
                       appActions.addToast(
                         cookingToday ? 'Defrosted for today' : 'Defrosted to fridge',
@@ -1572,8 +1521,8 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                         async () => {
                           try {
                             await onUpdateItem(primaryIndex, { storageLocation: prev.storageLocation, is_frozen: prev.is_frozen, expirationDate: prev.expirationDate });
-                          } catch {
-                            // ignore
+                          } catch (err) {
+                            console.error('Failed to undo defrost item update:', err);
                           }
                         }
                       );
@@ -1944,282 +1893,10 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
 
   return (
     <div className="space-y-6 pb-24 max-w-2xl mx-auto animate-fade-in relative">
-      {/* Search and Filter Bar at the very top */}
-      <div className="bg-theme-secondary p-4 rounded-2xl border border-theme shadow-lg mb-6 sticky top-0 z-20">
-        <div className="flex gap-3 items-center">
-          {/* Search Input */}
-          <div className="flex-1 relative">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-theme-secondary opacity-50" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onFocus={() => {
-                  if (searchQuery.length >= 1 && autocompleteSuggestions.length > 0) {
-                    setShowAutocomplete(true);
-                  } else if (searchQuery.length === 0 && recentSearches.length > 0) {
-                    setShowAutocomplete(true);
-                  }
-                }}
-                onBlur={() => setTimeout(() => setShowAutocomplete(false), 200)}
-                placeholder="Search pantry items..."
-                className="w-full pl-10 pr-4 py-2 bg-theme-primary border border-theme rounded-lg text-theme-primary placeholder-theme-primary/50 focus:border-[var(--accent-color)] focus:outline-none"
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-theme-secondary opacity-50 hover:opacity-100"
-                  aria-label="Clear search"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              )}
-            </div>
-            
-            {/* Autocomplete Suggestions */}
-            {showAutocomplete && (
-              <div className="absolute top-full left-0 right-0 bg-theme-primary border border-theme rounded-lg shadow-lg mt-1 z-10 max-h-60 overflow-y-auto">
-                {/* Recent Searches */}
-                {searchQuery.length === 0 && recentSearches.length > 0 && (
-                  <>
-                    <div className="px-4 py-2 text-xs font-semibold text-theme-secondary opacity-70 uppercase tracking-wider border-b border-theme">
-                      Recent Searches
-                    </div>
-                    {recentSearches.map((recentQuery, index) => (
-                      <button
-                        key={`recent-${index}`}
-                        onClick={() => {
-                          setSearchQuery(recentQuery);
-                          setShowAutocomplete(false);
-                        }}
-                        className="w-full text-left px-4 py-2 hover:bg-theme-secondary text-theme-primary flex items-center gap-2"
-                      >
-                        <Clock className="w-3 h-3 text-theme-secondary opacity-50" />
-                        <span>{recentQuery}</span>
-                      </button>
-                    ))}
-                    {autocompleteSuggestions.length > 0 && (
-                      <div className="px-4 py-2 text-xs font-semibold text-theme-secondary opacity-70 uppercase tracking-wider border-b border-theme">
-                        Suggestions
-                      </div>
-                    )}
-                  </>
-                )}
 
-                {/* Enhanced Suggestions */}
-                {autocompleteSuggestions.map((suggestion, index) => (
-                  <button
-                    key={`suggestion-${index}`}
-                    onClick={() => {
-                      setSearchQuery(suggestion.text);
-                      saveSearchToHistory(suggestion.text, 'pantry');
-                      setShowAutocomplete(false);
-                    }}
-                    className="w-full text-left px-4 py-2 hover:bg-theme-secondary text-theme-primary flex items-center gap-2"
-                  >
-                    <div className="flex items-center gap-1 min-w-0 flex-1">
-                      {suggestion.type === 'recent' && (
-                        <Clock className="w-3 h-3 text-blue-500 flex-shrink-0" />
-                      )}
-                      {suggestion.type === 'popular' && (
-                        <TrendingUp className="w-3 h-3 text-green-500 flex-shrink-0" />
-                      )}
-                      {suggestion.type === 'category' && (
-                        <Tag className="w-3 h-3 text-purple-500 flex-shrink-0" />
-                      )}
-                      {suggestion.type === 'match' && (
-                        <Search className="w-3 h-3 text-theme-secondary opacity-50 flex-shrink-0" />
-                      )}
-                      <span className="truncate">{suggestion.text}</span>
-                    </div>
-
-                    <div className="flex items-center gap-1 text-xs text-theme-secondary opacity-60">
-                      {suggestion.category && suggestion.type !== 'category' && (
-                        <span className="bg-theme-secondary px-1.5 py-0.5 rounded text-[10px]">
-                          {suggestion.category}
-                        </span>
-                      )}
-                      {suggestion.count && suggestion.count > 1 && (
-                        <span className="text-[10px]">
-                          ×{suggestion.count}
-                        </span>
-                      )}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Filter Button */}
-          {(() => {
-            const activeFilterCount =
-              (pantryFilter.categories.length > 0 ? 1 : 0) +
-              (pantryFilter.locations.length > 0 ? 1 : 0) +
-              (pantryFilter.expirationStatus !== 'all' ? 1 : 0) +
-              (pantryFilter.quantityStatus !== 'all' ? 1 : 0);
-            const isFilterActive = activeFilterCount > 0;
-            return (
-              <button
-                onClick={() => setShowFilters(!showFilters)}
-                aria-label={showFilters ? 'Hide filters' : `Show filters${isFilterActive ? `, ${activeFilterCount} active` : ''}`}
-                aria-expanded={showFilters}
-                className={`relative p-2 rounded-lg border transition-colors ${
-                  showFilters || isFilterActive
-                    ? 'bg-[var(--accent-color)] text-white border-[var(--accent-color)]'
-                    : 'bg-theme-primary border-theme text-theme-secondary hover:bg-theme-secondary'
-                }`}
-              >
-                <Filter className="w-4 h-4" />
-                {isFilterActive && (
-                  <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-0.5 rounded-full bg-white text-[var(--accent-color)] text-[10px] font-bold leading-4 flex items-center justify-center border border-[var(--accent-color)]">
-                    {activeFilterCount}
-                  </span>
-                )}
-              </button>
-            );
-          })()}
-        </div>
-
-        {/* Filter Options */}
-        {showFilters && (
-          <div className="mt-4 pt-4 border-t border-theme space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-theme-primary mb-2">Categories</label>
-              <div className="flex flex-wrap gap-2">
-                {Array.from(new Set(inventory.map(item => item.category).filter(Boolean))).map(category => (
-                  <button
-                    key={category}
-                    onClick={() => {
-                      const newFilter = { ...pantryFilter };
-                      if (newFilter.categories.includes(category!)) {
-                        newFilter.categories = newFilter.categories.filter(c => c !== category);
-                      } else {
-                        newFilter.categories.push(category!);
-                      }
-                      setPantryFilter(newFilter);
-                      savePantryFilter(newFilter);
-                    }}
-                    className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                      pantryFilter.categories.includes(category!)
-                        ? 'bg-[var(--accent-color)] text-white'
-                        : 'bg-theme-primary text-theme-secondary border border-theme hover:bg-theme-secondary'
-                    }`}
-                    aria-label={`${pantryFilter.categories.includes(category!) ? 'Remove' : 'Add'} ${category} filter`}
-                  >
-                    {category}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-theme-primary mb-2">Locations</label>
-              <div className="flex flex-wrap gap-2">
-                {['leftovers', 'pantry', 'fridge', 'freezer', 'spices', 'other'].map(location => (
-                  <button
-                    key={location}
-                    onClick={() => {
-                      const newFilter = { ...pantryFilter };
-                      if (newFilter.locations.includes(location)) {
-                        newFilter.locations = newFilter.locations.filter(l => l !== location);
-                      } else {
-                        newFilter.locations.push(location);
-                      }
-                      setPantryFilter(newFilter);
-                      savePantryFilter(newFilter);
-                    }}
-                    className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                      pantryFilter.locations.includes(location)
-                        ? 'bg-[var(--accent-color)] text-white'
-                        : 'bg-theme-primary text-theme-secondary border border-theme hover:bg-theme-secondary'
-                    }`}
-                    aria-label={`${pantryFilter.locations.includes(location) ? 'Remove' : 'Add'} ${location.charAt(0).toUpperCase() + location.slice(1)} location filter`}
-                  >
-                    {location.charAt(0).toUpperCase() + location.slice(1)}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-theme-primary mb-2">Expiration Status</label>
-              <select
-                value={pantryFilter.expirationStatus}
-                onChange={(e) => {
-                  const newFilter = { ...pantryFilter, expirationStatus: e.target.value as PantryFilter['expirationStatus'] };
-                  setPantryFilter(newFilter);
-                  savePantryFilter(newFilter);
-                }}
-                className="w-full px-3 py-2 bg-theme-primary border border-theme rounded-lg text-theme-primary focus:border-[var(--accent-color)] focus:outline-none"
-              >
-                <option value="all">All Items</option>
-                <option value="expiring-soon">Expiring Soon (7 days)</option>
-                <option value="expired">Expired</option>
-                <option value="fresh">Fresh</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-theme-primary mb-2">Stock Status</label>
-              <select
-                value={pantryFilter.quantityStatus}
-                onChange={(e) => {
-                  const newFilter = { ...pantryFilter, quantityStatus: e.target.value as PantryFilter['quantityStatus'] };
-                  setPantryFilter(newFilter);
-                  savePantryFilter(newFilter);
-                }}
-                className="w-full px-3 py-2 bg-theme-primary border border-theme rounded-lg text-theme-primary focus:border-[var(--accent-color)] focus:outline-none"
-              >
-                <option value="all">All Items</option>
-                <option value="low-stock">Low Stock (&lt;1)</option>
-                <option value="out-of-stock">Out of Stock</option>
-                <option value="in-stock">In Stock (≥1)</option>
-              </select>
-            </div>
-
-            <div className="flex justify-end">
-              <button
-                onClick={() => {
-                  setPantryFilter(defaultPantryFilter);
-                  savePantryFilter(defaultPantryFilter);
-                }}
-                className="px-4 py-2 bg-theme-primary border border-theme rounded-lg text-theme-secondary hover:bg-theme-secondary transition-colors"
-                aria-label="Clear all applied filters"
-              >
-                Clear Filters
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
 
       <div className="flex flex-col sm:flex-row items-center justify-end gap-4 mb-6">
         <div className="flex items-center gap-3">
-          {/* View Mode Toggle */}
-          <div className="flex bg-theme-secondary p-1 rounded-lg border border-theme">
-            <button
-              onClick={() => setViewMode('storage')}
-              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                viewMode === 'storage'
-                  ? 'bg-[var(--accent-color)] text-white shadow'
-                  : 'text-theme-secondary hover:text-theme-primary'
-              }`}
-            >
-              By Location
-            </button>
-            <button
-              onClick={() => setViewMode('category')}
-              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                viewMode === 'category'
-                  ? 'bg-[var(--accent-color)] text-white shadow'
-                  : 'text-theme-secondary hover:text-theme-primary'
-              }`}
-            >
-              By Category
-            </button>
-          </div>
 
           {/* Sort Dropdown */}
           <div className="relative">
@@ -2248,123 +1925,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
         </div>
       </div>
 
-      {/* Onboarding Checklist Card */}
-      {!isChecklistDismissed && completedChecklistCount < 5 && (
-        <div className="bg-theme-secondary rounded-2xl border border-theme shadow-lg overflow-hidden transition-all duration-300 mb-6">
-          {/* Header */}
-          <div 
-            onClick={() => setIsChecklistCollapsed(c => !c)}
-            className="px-5 py-4 flex items-center justify-between cursor-pointer hover:bg-theme-primary/5 transition-colors select-none"
-          >
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-8 h-8 bg-gradient-to-tr from-[var(--accent-color)]/20 to-[var(--accent-color)]/5 rounded-lg flex items-center justify-center text-[var(--accent-color)] flex-shrink-0">
-                🍳
-              </div>
-              <div className="min-w-0">
-                <h3 className="font-bold text-theme-primary text-sm sm:text-base truncate">Stock & Spoon Setup Checklist</h3>
-                <p className="text-xs text-theme-secondary opacity-75 truncate">
-                  {completedChecklistCount === 5 
-                    ? '🎉 Setup complete! You are ready to master your kitchen.' 
-                    : `${completedChecklistCount} of 5 steps completed`
-                  }
-                </p>
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-3 ml-3 flex-shrink-0">
-              {/* Progress Bar (mini, shown when collapsed) */}
-              {isChecklistCollapsed && completedChecklistCount < 5 && (
-                <div className="w-16 bg-theme rounded-full h-1.5 hidden sm:block">
-                  <div 
-                    className="bg-[var(--accent-color)] h-1.5 rounded-full transition-all duration-500"
-                    style={{ width: `${(completedChecklistCount / 5) * 100}%` }}
-                  />
-                </div>
-              )}
-              
-              <button 
-                onClick={(e) => { e.stopPropagation(); setIsChecklistCollapsed(c => !c); }}
-                className="p-1 hover:bg-theme rounded text-theme-secondary hover:text-theme-primary transition-colors"
-                aria-label={isChecklistCollapsed ? 'Expand checklist' : 'Collapse checklist'}
-              >
-                {isChecklistCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
-              </button>
-              
-              <button 
-                onClick={(e) => { e.stopPropagation(); dismissChecklist(); }}
-                className="p-1 hover:bg-theme rounded text-theme-secondary hover:text-theme-primary transition-colors"
-                aria-label="Dismiss checklist permanently"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
 
-          {/* Expanded Content */}
-          {!isChecklistCollapsed && (
-            <div className="px-5 pb-5 pt-2 border-t border-theme/40 bg-theme-primary/5">
-              {/* Progress Bar */}
-              <div className="mb-4">
-                <div className="flex justify-between text-xs text-theme-secondary font-medium mb-1">
-                  <span>Activation Progress</span>
-                  <span>{Math.round((completedChecklistCount / 5) * 100)}%</span>
-                </div>
-                <div className="w-full bg-theme rounded-full h-2 overflow-hidden">
-                  <div 
-                    className="bg-gradient-to-r from-[var(--accent-color)] to-[var(--accent-color)]/80 h-2 rounded-full transition-all duration-500"
-                    style={{ width: `${(completedChecklistCount / 5) * 100}%` }}
-                  />
-                </div>
-              </div>
-
-              {/* Steps List */}
-              <div className="space-y-3.5">
-                {checklistSteps.map(step => (
-                  <div 
-                    key={step.id} 
-                    className={`flex items-start gap-3 p-3 rounded-xl border transition-all ${
-                      step.isCompleted 
-                        ? 'bg-green-500/5 border-green-500/10 opacity-75' 
-                        : 'bg-theme-secondary/30 border-theme hover:border-theme-primary/20'
-                    }`}
-                  >
-                    <button 
-                      disabled={step.isCompleted}
-                      onClick={step.action}
-                      className={`w-5 h-5 rounded-full border flex items-center justify-center transition-all flex-shrink-0 mt-0.5 ${
-                        step.isCompleted 
-                          ? 'bg-green-500 border-green-500 text-white shadow-sm' 
-                          : 'border-theme-secondary hover:border-[var(--accent-color)]'
-                      }`}
-                      aria-label={step.isCompleted ? `${step.label} (Completed)` : `Start ${step.label}`}
-                    >
-                      {step.isCompleted && <CheckCircle2 className="w-3.5 h-3.5 text-white" />}
-                    </button>
-                    
-                    <div className="flex-1 min-w-0">
-                      <p className={`text-xs sm:text-sm font-bold leading-tight ${step.isCompleted ? 'text-theme-primary/80 line-through' : 'text-theme-primary'}`}>
-                        {step.label}
-                      </p>
-                      <p className="text-[10px] sm:text-xs text-theme-secondary opacity-80 mt-0.5 leading-relaxed">
-                        {step.description}
-                      </p>
-                    </div>
-
-                    {!step.isCompleted && (
-                      <button
-                        onClick={step.action}
-                        className="shrink-0 px-2.5 py-1 bg-theme-primary text-theme-secondary hover:bg-theme-secondary border border-theme text-[10px] sm:text-xs font-semibold rounded-lg transition-all shadow-sm active:scale-95 ml-2"
-                      >
-                        {step.actionLabel}
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Pantry Health Score ring */}
       {inventory.length >= 3 && (
@@ -2410,21 +1971,23 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
       )}
 
       {/* What Can I Cook Tonight Button */}
-      <div className="text-center">
-        <button
-          onClick={handleWhatCanICookTonight}
-          disabled={loadingState === LoadingState.LOADING}
-          className="inline-flex items-center gap-2 px-6 py-3 bg-[var(--accent-color)] text-white font-semibold rounded-lg shadow-lg hover:bg-[var(--accent-color)]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {loadingState === LoadingState.LOADING ? (
-            <Loader2 className="w-5 h-5 animate-spin" />
-          ) : (
-            <ChefHat className="w-5 h-5" />
-          )}
-          What Can I Cook Tonight?
-        </button>
-        <p className="text-xs text-theme-secondary opacity-60 mt-2">Get meal ideas from your pantry items</p>
-      </div>
+      {inventory.length > 0 && (
+        <div className="text-center">
+          <button
+            onClick={handleWhatCanICookTonight}
+            disabled={loadingState === LoadingState.LOADING}
+            className="inline-flex items-center gap-2 px-6 py-3 bg-[var(--accent-color)] text-white font-semibold rounded-lg shadow-lg hover:bg-[var(--accent-color)]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loadingState === LoadingState.LOADING ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <ChefHat className="w-5 h-5" />
+            )}
+            What Can I Cook Tonight?
+          </button>
+          <p className="text-xs text-theme-secondary opacity-60 mt-2">Get meal ideas from your pantry items</p>
+        </div>
+      )}
 
       {/* Consumption Suggestions */}
       {consumptionSuggestions.length > 0 && (
@@ -3247,11 +2810,70 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
               </div>
             </div>
           )}
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-bold text-theme-primary">
-              {viewMode === 'category' ? 'Pantry Items' : 'Storage Items'}
-            </h3>
-            <div className="flex gap-2 items-center">
+          <div className="flex flex-col mb-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <h3 className="text-lg font-bold text-theme-primary">
+                  {viewMode === 'category' ? 'Pantry Items' : 'Storage Items'}
+                </h3>
+                
+                {/* Search Button next to header */}
+                <button
+                  onClick={() => setIsSearchModalOpen(true)}
+                  className={`p-1.5 rounded-lg border transition-colors ${
+                    searchQuery
+                      ? 'bg-[var(--accent-color)] text-white border-[var(--accent-color)] shadow'
+                      : 'bg-theme-secondary border-theme text-theme-secondary hover:text-theme-primary'
+                  }`}
+                  aria-label="Search items"
+                >
+                  <Search className="w-4 h-4" />
+                </button>
+                
+                {/* Active Search Query Badge */}
+                {searchQuery && (
+                  <div className="flex items-center gap-1.5 bg-theme-secondary border border-theme rounded-lg px-2 py-0.5 text-xs text-theme-primary">
+                    <span className="truncate max-w-[80px] font-medium">"{searchQuery}"</span>
+                    <button
+                      onClick={() => setSearchQuery('')}
+                      className="p-0.5 hover:bg-theme-primary rounded-full text-theme-secondary hover:text-theme-primary transition-colors flex items-center justify-center"
+                      aria-label="Clear search"
+                    >
+                      <X className="w-2.5 h-2.5" />
+                    </button>
+                  </div>
+                )}
+
+                {/* Filter Button next to header */}
+                {(() => {
+                  const activeFilterCount =
+                    (pantryFilter.categories.length > 0 ? 1 : 0) +
+                    (pantryFilter.locations.length > 0 ? 1 : 0) +
+                    (pantryFilter.expirationStatus !== 'all' ? 1 : 0) +
+                    (pantryFilter.quantityStatus !== 'all' ? 1 : 0);
+                  const isFilterActive = activeFilterCount > 0;
+                  return (
+                    <button
+                      onClick={() => setShowFilters(!showFilters)}
+                      aria-label={showFilters ? 'Hide filters' : `Show filters${isFilterActive ? `, ${activeFilterCount} active` : ''}`}
+                      aria-expanded={showFilters}
+                      className={`relative p-1.5 rounded-lg border transition-colors ${
+                        showFilters || isFilterActive
+                          ? 'bg-[var(--accent-color)] text-white border-[var(--accent-color)] shadow'
+                          : 'bg-theme-secondary border-theme text-theme-secondary hover:bg-theme-secondary'
+                      }`}
+                    >
+                      <Filter className="w-4 h-4" />
+                      {isFilterActive && (
+                        <span className="absolute -top-1.5 -right-1.5 min-w-[14px] h-3.5 px-0.5 rounded-full bg-white text-[var(--accent-color)] text-[9px] font-bold leading-3.5 flex items-center justify-center border border-[var(--accent-color)]">
+                          {activeFilterCount}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })()}
+              </div>
+              <div className="flex gap-2 items-center">
               {viewMode === 'category' && (
                 <button
                   onClick={collapseAllCategories}
@@ -3314,13 +2936,126 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
               <button
                 onClick={toggleDisplayLayout}
                 className="w-8 h-8 flex items-center justify-center rounded-lg bg-theme-secondary text-theme-primary hover:bg-theme-primary transition-colors border border-theme"
-                aria-label={displayLayout === 'list' ? 'Switch to grid view' : 'Switch to list view'}
+                aria-label={displayLayout === 'list' ? 'Toggle grid view' : 'Toggle list view'}
                 title={displayLayout === 'list' ? 'Grid view' : 'List view'}
               >
                 {displayLayout === 'list' ? <LayoutGrid className="w-4 h-4" /> : <LayoutList className="w-4 h-4" />}
               </button>
             </div>
           </div>
+
+          {/* Inline Filter Options */}
+          {showFilters && (
+            <div className="bg-theme-secondary p-4 rounded-xl border border-theme shadow-md mt-2 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-theme-primary mb-2">Categories</label>
+                <div className="flex flex-wrap gap-2">
+                  {Array.from(new Set(inventory.map(item => item.category).filter(Boolean))).map(category => (
+                    <button
+                      key={category}
+                      onClick={() => {
+                        const newFilter = { ...pantryFilter };
+                        if (newFilter.categories.includes(category!)) {
+                          newFilter.categories = newFilter.categories.filter(c => c !== category);
+                        } else {
+                          newFilter.categories.push(category!);
+                        }
+                        setPantryFilter(newFilter);
+                        savePantryFilter(newFilter);
+                      }}
+                      className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                        pantryFilter.categories.includes(category!)
+                          ? 'bg-[var(--accent-color)] text-white'
+                          : 'bg-theme-primary text-theme-secondary border border-theme hover:bg-theme-secondary'
+                      }`}
+                      aria-label={`${pantryFilter.categories.includes(category!) ? 'Remove' : 'Add'} ${category} filter`}
+                    >
+                      {category}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-theme-primary mb-2">Locations</label>
+                <div className="flex flex-wrap gap-2">
+                  {['leftovers', 'pantry', 'fridge', 'freezer', 'spices', 'other'].map(location => (
+                    <button
+                      key={location}
+                      onClick={() => {
+                        const newFilter = { ...pantryFilter };
+                        if (newFilter.locations.includes(location)) {
+                          newFilter.locations = newFilter.locations.filter(l => l !== location);
+                        } else {
+                          newFilter.locations.push(location);
+                        }
+                        setPantryFilter(newFilter);
+                        savePantryFilter(newFilter);
+                      }}
+                      className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                        pantryFilter.locations.includes(location)
+                          ? 'bg-[var(--accent-color)] text-white'
+                          : 'bg-theme-primary text-theme-secondary border border-theme hover:bg-theme-secondary'
+                      }`}
+                      aria-label={`${pantryFilter.locations.includes(location) ? 'Remove' : 'Add'} ${location.charAt(0).toUpperCase() + location.slice(1)} location filter`}
+                    >
+                      {location.charAt(0).toUpperCase() + location.slice(1)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-theme-primary mb-2">Expiration Status</label>
+                <select
+                  value={pantryFilter.expirationStatus}
+                  onChange={(e) => {
+                    const newFilter = { ...pantryFilter, expirationStatus: e.target.value as PantryFilter['expirationStatus'] };
+                    setPantryFilter(newFilter);
+                    savePantryFilter(newFilter);
+                  }}
+                  className="w-full px-3 py-2 bg-theme-primary border border-theme rounded-lg text-theme-primary focus:border-[var(--accent-color)] focus:outline-none"
+                >
+                  <option value="all">All Items</option>
+                  <option value="expiring-soon">Expiring Soon (7 days)</option>
+                  <option value="expired">Expired</option>
+                  <option value="fresh">Fresh</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-theme-primary mb-2">Stock Status</label>
+                <select
+                  value={pantryFilter.quantityStatus}
+                  onChange={(e) => {
+                    const newFilter = { ...pantryFilter, quantityStatus: e.target.value as PantryFilter['quantityStatus'] };
+                    setPantryFilter(newFilter);
+                    savePantryFilter(newFilter);
+                  }}
+                  className="w-full px-3 py-2 bg-theme-primary border border-theme rounded-lg text-theme-primary focus:border-[var(--accent-color)] focus:outline-none"
+                >
+                  <option value="all">All Items</option>
+                  <option value="low-stock">Low Stock (&lt;1)</option>
+                  <option value="out-of-stock">Out of Stock</option>
+                  <option value="in-stock">In Stock (≥1)</option>
+                </select>
+              </div>
+
+              <div className="flex justify-end">
+                <button
+                  onClick={() => {
+                    setPantryFilter(defaultPantryFilter);
+                    savePantryFilter(defaultPantryFilter);
+                  }}
+                  className="px-4 py-2 bg-theme-primary border border-theme rounded-lg text-theme-secondary hover:bg-theme-secondary transition-colors"
+                  aria-label="Clear all applied filters"
+                >
+                  Clear Filters
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
 
 
 
@@ -3540,7 +3275,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
       )}
 
       {/* Freeze Transition Modal */}
-      {freezeTargetIndex !== null && household?.id && inventory[freezeTargetIndex]?.id && (
+      {freezeTargetIndex !== null && household && household.id && inventory[freezeTargetIndex]?.id && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] px-4 pt-[var(--safe-area-inset-top,0px)] pb-[var(--safe-area-inset-bottom,0px)]">
           <div className="bg-theme-primary rounded-lg shadow-xl w-full max-w-md mx-auto border border-theme">
             <FreezeTransitionModal
@@ -3579,8 +3314,8 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                 appActions.addToast('Moved to freezer', 'success', 5000, 'Undo', async () => {
                   try {
                     await onUpdateItem(freezeTargetIndex, previous);
-                  } catch {
-                    // ignore
+                  } catch (err) {
+                    console.error('Failed to undo freeze action:', err);
                   }
                 });
                 setFreezeTargetIndex(null);
@@ -3648,6 +3383,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                       }
                     } catch (err) {
                       log.error('Permission request failed', { err }, 'PantryScanner');
+                      appActions.addToast('Could not request camera permission', 'error');
                     }
                   }}
                   className="w-full bg-gradient-to-r from-blue-500 to-cyan-500 hover:opacity-90 text-white py-3 px-6 rounded-xl font-semibold transition-all duration-200"
@@ -3715,6 +3451,141 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
                   Close
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Search Modal Overlay */}
+      {isSearchModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-start justify-center z-[9999] px-4 pt-20" onClick={() => setIsSearchModalOpen(false)}>
+          <div 
+            className="bg-theme-secondary border border-theme rounded-2xl shadow-2xl w-full max-w-md p-5 space-y-4 relative animate-fade-in-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold text-theme-primary">Search Pantry Items</h3>
+              <button
+                onClick={() => setIsSearchModalOpen(false)}
+                className="p-1.5 hover:bg-theme-primary rounded-full text-theme-secondary hover:text-theme-primary transition-colors flex items-center justify-center"
+                aria-label="Close search"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-theme-secondary opacity-50" />
+              <input
+                type="text"
+                autoFocus
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onFocus={() => {
+                  if (searchQuery.length >= 1 && autocompleteSuggestions.length > 0) {
+                    setShowAutocomplete(true);
+                  } else if (searchQuery.length === 0 && recentSearches.length > 0) {
+                    setShowAutocomplete(true);
+                  }
+                }}
+                onBlur={() => setTimeout(() => setShowAutocomplete(false), 250)}
+                placeholder="Search pantry items..."
+                className="w-full pl-10 pr-10 py-2.5 bg-theme-primary border border-theme rounded-lg text-theme-primary placeholder-theme-primary/50 focus:border-[var(--accent-color)] focus:outline-none"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-theme-secondary opacity-50 hover:opacity-100"
+                  aria-label="Clear search"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+            
+            {/* Autocomplete Suggestions inside modal */}
+            {showAutocomplete && (
+              <div className="absolute left-5 right-5 bg-theme-primary border border-theme rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
+                {/* Recent Searches */}
+                {searchQuery.length === 0 && recentSearches.length > 0 && (
+                  <>
+                    <div className="px-4 py-2 text-xs font-semibold text-theme-secondary opacity-70 uppercase tracking-wider border-b border-theme">
+                      Recent Searches
+                    </div>
+                    {recentSearches.map((recentQuery, index) => (
+                      <button
+                        key={`recent-${index}`}
+                        onClick={() => {
+                          setSearchQuery(recentQuery);
+                          setShowAutocomplete(false);
+                          setIsSearchModalOpen(false);
+                        }}
+                        className="w-full text-left px-4 py-2 hover:bg-theme-secondary text-theme-primary flex items-center gap-2"
+                      >
+                        <Clock className="w-3 h-3 text-theme-secondary opacity-50" />
+                        <span>{recentQuery}</span>
+                      </button>
+                    ))}
+                    {autocompleteSuggestions.length > 0 && (
+                      <div className="px-4 py-2 text-xs font-semibold text-theme-secondary opacity-70 uppercase tracking-wider border-b border-theme">
+                        Suggestions
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* Enhanced Suggestions */}
+                {autocompleteSuggestions.map((suggestion, index) => (
+                  <button
+                    key={`suggestion-${index}`}
+                    onClick={() => {
+                      setSearchQuery(suggestion.text);
+                      saveSearchToHistory(suggestion.text, 'pantry');
+                      setShowAutocomplete(false);
+                      setIsSearchModalOpen(false);
+                    }}
+                    className="w-full text-left px-4 py-2 hover:bg-theme-secondary text-theme-primary flex items-center gap-2"
+                  >
+                    <div className="flex items-center gap-1 min-w-0 flex-1">
+                      {suggestion.type === 'recent' && (
+                        <Clock className="w-3 h-3 text-blue-500 flex-shrink-0" />
+                      )}
+                      {suggestion.type === 'popular' && (
+                        <TrendingUp className="w-3 h-3 text-green-500 flex-shrink-0" />
+                      )}
+                      {suggestion.type === 'category' && (
+                        <Tag className="w-3 h-3 text-purple-500 flex-shrink-0" />
+                      )}
+                      {suggestion.type === 'match' && (
+                        <Search className="w-3 h-3 text-theme-secondary opacity-50 flex-shrink-0" />
+                      )}
+                      <span className="truncate">{suggestion.text}</span>
+                    </div>
+
+                    <div className="flex items-center gap-1 text-xs text-theme-secondary opacity-60">
+                      {suggestion.category && suggestion.type !== 'category' && (
+                        <span className="bg-theme-secondary px-1.5 py-0.5 rounded text-[10px]">
+                          {suggestion.category}
+                        </span>
+                      )}
+                      {suggestion.count && suggestion.count > 1 && (
+                        <span className="text-[10px]">
+                          ×{suggestion.count}
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+            
+            <div className="flex justify-end pt-2">
+              <button
+                onClick={() => setIsSearchModalOpen(false)}
+                className="px-5 py-2.5 bg-[var(--accent-color)] text-white font-bold rounded-xl hover:opacity-90 transition-opacity text-sm shadow-md"
+              >
+                Done
+              </button>
             </div>
           </div>
         </div>

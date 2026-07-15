@@ -131,7 +131,10 @@
     "copiedToClipboard": "购物清单已复制到剪贴板！",
     "shareTitle": "购物清单",
     "smsFallback": "清单已复制（短信应用可能不可用）",
-    "smsUnavailable": "无法打开短信应用。清单已复制到剪贴板。"
+    "smsUnavailable": "无法打开短信应用。清单已复制到剪贴板。",
+    "addedBatches": "已添加批次:",
+    "unknownDate": "未知日期",
+    "via": "通过 {source}"
   },
   "recipes": {
     "title": "食谱",
@@ -172,7 +175,12 @@
     "hasMeals": "有餐食",
     "addToMealPlan": "添加到餐食计划",
     "day": "天",
-    "meal": "餐食"
+    "meal": "餐食",
+    "autoFillPlan": "自动填充计划",
+    "mealPrep": "备餐",
+    "clearWeek": "清空本周",
+    "copyToNextWeek": "复制到下周",
+    "exportIcs": "导出 .ics"
   },
   "settings": {
     "title": "设置",

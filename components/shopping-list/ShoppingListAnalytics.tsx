@@ -42,17 +42,16 @@ export const ShoppingListAnalytics: React.FC<ShoppingListAnalyticsProps> = ({
     const now = new Date();
     const completedItems = shoppingItems.filter(item => item.isCompleted);
     const totalSpent = shoppingItems.reduce((sum, item) => sum + (item.estimatedPrice || 0), 0);
-    const completedSpent = completedItems.reduce((sum, item) => sum + (item.estimatedPrice || 0), 0);
 
-    // Calculate time spent (simplified - based on first add to last completion)
-    const sortedItems = [...shoppingItems].sort((a, b) => a.addedAt.getTime() - b.addedAt.getTime());
-    const firstAdd = sortedItems[0]?.addedAt;
-    const lastCompletion = completedItems
-      .sort((a, b) => (b.completedAt?.getTime() || 0) - (a.completedAt?.getTime() || 0))[0]?.completedAt;
+    // Calculate time spent based on first completion to last completion of checked items
+    const completionTimes = completedItems
+      .map(item => item.completedAt ? new Date(item.completedAt).getTime() : 0)
+      .filter(t => t > 0)
+      .sort((a, b) => a - b);
 
-    const timeSpent = firstAdd && lastCompletion
-      ? Math.max(1, Math.round((lastCompletion.getTime() - firstAdd.getTime()) / (1000 * 60)))
-      : 0;
+    const timeSpent = completionTimes.length >= 2
+      ? Math.max(1, Math.round((completionTimes[completionTimes.length - 1] - completionTimes[0]) / (1000 * 60)))
+      : completionTimes.length === 1 ? 1 : 0;
 
     // Category spending
     const categorySpending = new Map<string, number>();

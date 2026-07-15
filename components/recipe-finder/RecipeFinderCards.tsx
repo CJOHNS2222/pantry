@@ -43,6 +43,7 @@ interface RecipeFinderTileProps {
   showPreferenceSignals: boolean;
   preferenceSignals: { positive: string[]; warning: string[] };
   onOpen: (recipe: StructuredRecipe) => void;
+  onAddToPlan: (recipe: StructuredRecipe) => void;
 }
 
 export const RecipeFinderCard: React.FC<RecipeFinderCardProps> = ({
@@ -220,7 +221,7 @@ export const RecipeFinderCard: React.FC<RecipeFinderCardProps> = ({
   );
 };
 
-export const RecipeFinderTile: React.FC<RecipeFinderTileProps> = ({ recipe, ratingInfo, showPreferenceSignals, preferenceSignals, onOpen }) => {
+export const RecipeFinderTile: React.FC<RecipeFinderTileProps> = ({ recipe, ratingInfo, showPreferenceSignals, preferenceSignals, onOpen, onAddToPlan }) => {
   const titleKey = recipe.title || 'Untitled Recipe';
 
   return (
@@ -239,6 +240,19 @@ export const RecipeFinderTile: React.FC<RecipeFinderTileProps> = ({ recipe, rati
       }}
     >
       <div className="aspect-video bg-theme-primary/20 relative overflow-hidden">
+        {/* Quick Add Button */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onAddToPlan(recipe);
+          }}
+          className="absolute top-2 right-2 p-1.5 rounded-full bg-theme-primary/80 backdrop-blur-sm border border-theme text-[var(--accent-color)] hover:bg-[var(--accent-color)] hover:text-white transition-all shadow-md z-10"
+          title="Add to Schedule"
+          aria-label={`Quick add ${recipe.title} to meal plan`}
+        >
+          <Plus className="w-3.5 h-3.5" />
+        </button>
+
         {recipe.image ? (
           <ProgressiveImage
             src={recipe.image}

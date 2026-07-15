@@ -134,7 +134,10 @@
     "copiedToClipboard": "Shopping list copied to clipboard!",
     "shareTitle": "Shopping List",
     "smsFallback": "Shopping list copied to clipboard (SMS app may not be available)",
-    "smsUnavailable": "Unable to open SMS app. Shopping list has been copied to clipboard."
+    "smsUnavailable": "Unable to open SMS app. Shopping list has been copied to clipboard.",
+    "addedBatches": "Added Batches:",
+    "unknownDate": "Unknown date",
+    "via": "via {source}"
   },
   "recipes": {
     "title": "Recipes",
@@ -175,7 +178,12 @@
     "hasMeals": "Has meals",
     "addToMealPlan": "Add to Meal Plan",
     "day": "Day",
-    "meal": "Meal"
+    "meal": "Meal",
+    "autoFillPlan": "Auto-Fill Plan",
+    "mealPrep": "Meal Prep",
+    "clearWeek": "Clear week",
+    "copyToNextWeek": "Copy to next week",
+    "exportIcs": "Export .ics"
   },
   "settings": {
     "title": "Settings",

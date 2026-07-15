@@ -1666,7 +1666,7 @@ export function generateRecipeSuggestions(inventory: PantryItem[]): RecipeSugges
     }
 
     if (suggestedRecipes.length > 0) {
-      let reason = '';
+      let reason: string;
       if (daysRemaining <= 1) {
         reason = `expires ${daysRemaining === 0 ? 'today' : 'tomorrow'} - use it now!`;
       } else if (daysRemaining <= 3) {
@@ -2148,7 +2148,15 @@ export function consolidateShoppingList(items: ShoppingItem[]): ShoppingItem[] {
         ...item,
         amount,
         unit,
-        quantity: amount === 1 && (unit === 'pcs' || unit === 'pieces') ? '1' : `${amount} ${unit}`
+        quantity: amount === 1 && (unit === 'pcs' || unit === 'pieces') ? '1' : `${amount} ${unit}`,
+        consolidatedItems: [{
+          id: item.id,
+          addedAt: item.addedAt,
+          quantity: item.quantity,
+          amount,
+          unit,
+          source: item.source
+        }]
       });
       return;
     }
@@ -2188,6 +2196,19 @@ export function consolidateShoppingList(items: ShoppingItem[]): ShoppingItem[] {
       if (existing.estimatedPrice !== undefined || item.estimatedPrice !== undefined) {
         existing.estimatedPrice = (existing.estimatedPrice || 0) + (item.estimatedPrice || 0);
       }
+
+      // Track individual item additions for consolidated list
+      if (!existing.consolidatedItems) {
+        existing.consolidatedItems = [];
+      }
+      existing.consolidatedItems.push({
+        id: item.id,
+        addedAt: item.addedAt,
+        quantity: item.quantity,
+        amount,
+        unit,
+        source: item.source
+      });
     } else {
       // Fallback: If they can't be combined for some reason, append a suffix to the key
       const fallbackKey = `${key}_${existing.id}_${item.id}`;
@@ -2195,7 +2216,15 @@ export function consolidateShoppingList(items: ShoppingItem[]): ShoppingItem[] {
         ...item,
         amount,
         unit,
-        quantity: amount === 1 && (unit === 'pcs' || unit === 'pieces') ? '1' : `${amount} ${unit}`
+        quantity: amount === 1 && (unit === 'pcs' || unit === 'pieces') ? '1' : `${amount} ${unit}`,
+        consolidatedItems: [{
+          id: item.id,
+          addedAt: item.addedAt,
+          quantity: item.quantity,
+          amount,
+          unit,
+          source: item.source
+        }]
       });
     }
   });
@@ -2391,7 +2420,7 @@ export function parseQuantityAndUnit(quantityStrOrNum: string | number | undefin
   }
 
   // Handle fractional unicode characters
-  let normalized = trimmed
+  const normalized = trimmed
     .replace(/½/g, '0.5')
     .replace(/¼/g, '0.25')
     .replace(/¾/g, '0.75')

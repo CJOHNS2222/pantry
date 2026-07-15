@@ -1,9 +1,8 @@
 import React, { useState, useRef } from 'react';
-import { Check, Trash2, Calculator, MessageSquare, UserCheck, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useIntl } from 'react-intl';
+import { Trash2, Calculator, MessageSquare, UserCheck, X, ChevronLeft } from 'lucide-react';
 import { ShoppingItem, StructuredRecipe, SavedRecipe, DayPlan } from '../../types';
-import { Tab } from '../../types/app';
 import { useApp } from '../../contexts/AppContext';
-import { useAppActions } from '../../contexts/AppActionsContext';
 import { comparePriceOptions, formatPricePerUnit, getPriceComparisonSummary } from '../../utils/priceCalculator';
 import { useAndroidBack } from '../../hooks/useAndroidBack';
 import HapticService from '../../services/hapticService';
@@ -87,6 +86,7 @@ export const EnhancedShoppingListItem: React.FC<ShoppingListItemProps> = ({
   lastSynced,
   showPriceData = false,
 }) => {
+  const intl = useIntl();
   const [isOpen, setIsOpen] = useState(false);
   const [showAssignPicker, setShowAssignPicker] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
@@ -94,7 +94,6 @@ export const EnhancedShoppingListItem: React.FC<ShoppingListItemProps> = ({
   const itemRef = useRef<HTMLDivElement>(null);
 
   const { savedRecipes, mealPlan } = useApp();
-  const { setActiveTab } = useAppActions();
 
   const handleRecipeClick = (e: React.MouseEvent, recipeTitle: string) => {
     e.stopPropagation();
@@ -286,6 +285,30 @@ export const EnhancedShoppingListItem: React.FC<ShoppingListItemProps> = ({
             {item.notes && !showNotes && (
               <div className="text-xs text-theme-secondary opacity-70 italic truncate max-w-[130px]" title={item.notes}>
                 📝 {item.notes.length > 30 ? `${item.notes.substring(0, 30)}...` : item.notes}
+              </div>
+            )}
+            {item.consolidatedItems && item.consolidatedItems.length > 1 && (
+              <div className="text-[10px] text-theme-secondary opacity-80 mt-1 space-y-1 bg-theme-secondary/40 border border-theme rounded-lg p-2 max-w-sm">
+                <span className="font-semibold text-theme-primary block mb-0.5">
+                  📅 {intl.formatMessage({ id: 'shoppingList.addedBatches' })}
+                </span>
+                {item.consolidatedItems.map((cItem, idx) => {
+                  const addedDate = cItem.addedAt ? new Date(cItem.addedAt) : null;
+                  const dateStr = addedDate ? addedDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : intl.formatMessage({ id: 'shoppingList.unknownDate' });
+                  return (
+                    <div key={idx} className="pl-2 border-l-2 border-[var(--accent-color)]/40 flex flex-wrap gap-1 items-center leading-relaxed">
+                      <span className="font-medium text-theme-primary">{dateStr}</span>
+                      {cItem.source && (
+                        <span className="opacity-75">
+                          {intl.formatMessage({ id: 'shoppingList.via' }, { source: cItem.source.replace(/^recipe:/, '🍳 ') })}
+                        </span>
+                      )}
+                      <span className="bg-theme px-1.5 py-0.2 rounded text-[9px] font-bold">
+                        {cItem.quantity || `${cItem.amount} ${cItem.unit}`}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             )}
             {isOffline && lastSynced && (

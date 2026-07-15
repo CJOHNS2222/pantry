@@ -1,4 +1,5 @@
 import React from 'react';
+import { useIntl } from 'react-intl';
 import { Copy, Download, Trash2 } from 'lucide-react';
 import { DayPlan } from '../../types';
 
@@ -53,6 +54,7 @@ export const MealPlannerCalendarSection: React.FC<MealPlannerCalendarSectionProp
   nextDayDisabled,
   nextDayTitle
 }) => {
+  const intl = useIntl();
   const currentDisplayDay = displayPlan[currentDayIndex];
 
   return (
@@ -258,7 +260,7 @@ export const MealPlannerCalendarSection: React.FC<MealPlannerCalendarSectionProp
               title="Clear all meals for this week"
             >
               <Trash2 className="w-3.5 h-3.5" />
-              Clear week
+              {intl.formatMessage({ id: 'mealPlanner.clearWeek' })}
             </button>
             <button
               onClick={onCopyWeek}
@@ -267,7 +269,7 @@ export const MealPlannerCalendarSection: React.FC<MealPlannerCalendarSectionProp
               title="Copy this week's meals to next week"
             >
               <Copy className="w-3.5 h-3.5" />
-              Copy to next week
+              {intl.formatMessage({ id: 'mealPlanner.copyToNextWeek' })}
             </button>
             <button
               onClick={onExportCalendar}
@@ -276,7 +278,7 @@ export const MealPlannerCalendarSection: React.FC<MealPlannerCalendarSectionProp
               title="Download this week as a calendar file (.ics)"
             >
               <Download className="w-3.5 h-3.5" />
-              Export .ics
+              {intl.formatMessage({ id: 'mealPlanner.exportIcs' })}
             </button>
           </div>
         </div>

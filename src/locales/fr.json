@@ -131,7 +131,10 @@
     "copiedToClipboard": "Liste de courses copiée dans le presse-papiers !",
     "shareTitle": "Liste de courses",
     "smsFallback": "Liste copiée (l'app SMS peut ne pas être disponible)",
-    "smsUnavailable": "Impossible d'ouvrir l'app SMS. La liste a été copiée dans le presse-papiers."
+    "smsUnavailable": "Impossible d'ouvrir l'app SMS. La liste a été copiée dans le presse-papiers.",
+    "addedBatches": "Lots Ajoutés:",
+    "unknownDate": "Date inconnue",
+    "via": "via {source}"
   },
   "recipes": {
     "title": "Recettes",
@@ -172,7 +175,12 @@
     "hasMeals": "A des repas",
     "addToMealPlan": "Ajouter au plan de repas",
     "day": "Jour",
-    "meal": "Repas"
+    "meal": "Repas",
+    "autoFillPlan": "Remplir Automatiquement",
+    "mealPrep": "Préparation des Repas",
+    "clearWeek": "Vider la semaine",
+    "copyToNextWeek": "Copier à la semaine suivante",
+    "exportIcs": "Exporter .ics"
   },
   "settings": {
     "title": "Paramètres",

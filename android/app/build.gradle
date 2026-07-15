@@ -17,14 +17,14 @@ if (file('google-services.json').exists()) {
 
 
 android {
-    namespace "com.smart.pantry"
+    namespace = "com.smart.pantry"
     compileSdk libs.versions.compileSdk.get().toInteger()
     defaultConfig {
         applicationId "com.smart.pantry"
         minSdk 24
         targetSdk 35
-        versionCode 98
-        versionName "3.0.5"
+        versionCode 99
+        versionName "3.0.6"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         
         buildFeatures {
@@ -52,10 +52,10 @@ android {
         release {
             minifyEnabled true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            signingConfig signingConfigs.release
+            signingConfig = signingConfigs.release
             
             ndk {
-                debugSymbolLevel 'SYMBOL_TABLE'
+                debugSymbolLevel = 'SYMBOL_TABLE'
             }
             
             pluginManager.withPlugin('com.google.firebase.appdistribution') {

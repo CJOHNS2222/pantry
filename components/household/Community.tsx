@@ -17,13 +17,17 @@ import {
   Users, 
   User, 
   Info, 
-  DollarSign 
+  DollarSign,
+  ChevronDown,
+  ChevronUp,
+  X
 } from 'lucide-react';
 import { RecipeRating, StructuredRecipe } from '../../types';
 import RecipeModal from '../recipes-meals/RecipeModal';
 import { getCachedCommunityRatedRecipes } from '../../services/recipeService';
 import { log } from '../../services/logService';
 import { useAndroidBack } from '../../hooks/useAndroidBack';
+import { hasMilestone } from '../../services/onboardingMilestoneService';
 
 // Staple items to ignore in ingredient display
 const _STAPLES = ['salt', 'pepper', 'oil', 'water', 'flour', 'sugar', 'butter', 'vinegar', 'baking powder', 'baking soda', 'spices', 'seasoning', 'soy sauce', 'cornstarch', 'yeast'];
@@ -85,6 +89,94 @@ export const Community: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecipe,
   const [localLoading, setLocalLoading] = useState(false);
   const [ratingsState, setRatingsState] = useState<RecipeRating[]>([]);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  // Onboarding checklist tracking relocated to Social tab
+  const [isChecklistCollapsed, setIsChecklistCollapsed] = useState(true);
+  const [isChecklistDismissed, setIsChecklistDismissed] = useState(() => {
+    try {
+      return localStorage.getItem('onboarding-checklist-dismissed') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const checklistSteps = useMemo(() => {
+    const pSaved = hasMilestone('first-recipe-saved');
+    const mPlanned = hasMilestone('first-meal-planned');
+    const hSetup = hasMilestone('household-setup');
+    const lLogged = hasMilestone('first-leftover-logged');
+    const pItemsCount = inventory.length;
+    
+    return [
+      {
+        id: 'add-items',
+        label: 'Add 5 Pantry Items',
+        description: `Add ingredients to unlock smart recommendations. (${pItemsCount}/5)`,
+        isCompleted: pItemsCount >= 5,
+        action: () => {
+          try {
+            sessionStorage.setItem('open-pantry-add-modal', 'true');
+          } catch (e) {
+            log.error('Failed to write open-pantry-add-modal to sessionStorage', { error: e }, 'Community');
+          }
+          if (setActiveTab) setActiveTab(Tab.PANTRY);
+        },
+        actionLabel: 'Add Items'
+      },
+      {
+        id: 'save-recipe',
+        label: 'Save a Recipe',
+        description: 'Explore recipes in the Chef tab and heart one to save it.',
+        isCompleted: pSaved,
+        action: () => { if (setActiveTab) setActiveTab(Tab.RECIPES); },
+        actionLabel: 'Browse Recipes'
+      },
+      {
+        id: 'plan-meal',
+        label: 'Plan a Meal',
+        description: 'Add a planned meal or saved recipe to your weekly calendar.',
+        isCompleted: mPlanned,
+        action: () => { if (setActiveTab) setActiveTab(Tab.MEALS); },
+        actionLabel: 'Open Planner'
+      },
+      {
+        id: 'household-share',
+        label: 'Set up Household Sharing',
+        description: 'Invite family members or roommates to sync in real-time.',
+        isCompleted: hSetup,
+        action: () => { if (setActiveTab) setActiveTab(Tab.SETTINGS); },
+        actionLabel: 'Set up Sharing'
+      },
+      {
+        id: 'log-leftover',
+        label: 'Record a Leftover',
+        description: 'Log leftovers with a tap to track food safety and waste.',
+        isCompleted: lLogged,
+        action: () => {
+          try {
+            sessionStorage.setItem('open-pantry-add-modal', 'true');
+          } catch (e) {
+            log.error('Failed to write open-pantry-add-modal to sessionStorage', { error: e }, 'Community');
+          }
+          if (setActiveTab) setActiveTab(Tab.PANTRY);
+        },
+        actionLabel: 'Log Leftover'
+      }
+    ];
+  }, [inventory.length, setActiveTab]);
+
+  const completedChecklistCount = useMemo(() => {
+    return checklistSteps.filter(s => s.isCompleted).length;
+  }, [checklistSteps]);
+
+  const dismissChecklist = () => {
+    setIsChecklistDismissed(true);
+    try {
+      localStorage.setItem('onboarding-checklist-dismissed', 'true');
+    } catch (e) {
+      log.error('Failed to save onboarding-checklist-dismissed to localStorage', { error: e }, 'Community');
+    }
+  };
 
   const triggerCelebration = () => {
     const canvas = canvasRef.current;
@@ -399,7 +491,7 @@ export const Community: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecipe,
     ];
 
     return list.map(badge => {
-      let isUnlocked = false;
+      let isUnlocked: boolean;
       if (badge.id === 'waste_warrior') {
         isUnlocked = inventory.length >= 5 && expiredCount === 0;
       } else if (badge.id === 'freshness_guru') {
@@ -482,12 +574,9 @@ export const Community: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecipe,
     const allEntries = [...basePeers, userEntry];
 
     // Filter by type (individual vs household)
-    let filtered = allEntries;
-    if (leaderboardType === 'household') {
-      filtered = allEntries.filter(e => e.isHousehold || e.isUser); // Always include user for context
-    } else {
-      filtered = allEntries.filter(e => !e.isHousehold || e.isUser);
-    }
+    let filtered = leaderboardType === 'household'
+      ? allEntries.filter(e => e.isHousehold || e.isUser) // Always include user for context
+      : allEntries.filter(e => !e.isHousehold || e.isUser);
 
     // Weekly vs Monthly slight score adjustments for dynamic feeling
     if (leaderboardTimeframe === 'monthly') {
@@ -1039,6 +1128,124 @@ export const Community: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecipe,
               Complete milestones and unlock gamified badges ({unlockedBadgesCount} / {achievementsList.length})
             </p>
           </div>
+
+          {/* Relocated Setup Checklist Card */}
+          {!isChecklistDismissed && completedChecklistCount < 5 && (
+            <div className="bg-theme-secondary rounded-2xl border border-theme shadow-lg overflow-hidden transition-all duration-300">
+              {/* Header */}
+              <div 
+                onClick={() => setIsChecklistCollapsed(c => !c)}
+                className="px-5 py-4 flex items-center justify-between cursor-pointer hover:bg-theme-primary/5 transition-colors select-none"
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-8 h-8 bg-gradient-to-tr from-[var(--accent-color)]/20 to-[var(--accent-color)]/5 rounded-lg flex items-center justify-center text-[var(--accent-color)] flex-shrink-0">
+                    🍳
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="font-bold text-theme-primary text-sm sm:text-base truncate">Stock & Spoon Setup Checklist</h3>
+                    <p className="text-xs text-theme-secondary opacity-75 truncate">
+                      {completedChecklistCount === 5 
+                        ? '🎉 Setup complete! You are ready to master your kitchen.' 
+                        : `${completedChecklistCount} of 5 steps completed`
+                      }
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-3 ml-3 flex-shrink-0">
+                  {/* Progress Bar (mini, shown when collapsed) */}
+                  {isChecklistCollapsed && completedChecklistCount < 5 && (
+                    <div className="w-16 bg-theme rounded-full h-1.5 hidden sm:block">
+                      <div 
+                        className="bg-[var(--accent-color)] h-1.5 rounded-full transition-all duration-500"
+                        style={{ width: `${(completedChecklistCount / 5) * 100}%` }}
+                      />
+                    </div>
+                  )}
+                  
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); setIsChecklistCollapsed(c => !c); }}
+                    className="p-1 hover:bg-theme rounded text-theme-secondary hover:text-theme-primary transition-colors"
+                    aria-label={isChecklistCollapsed ? 'Expand checklist' : 'Collapse checklist'}
+                  >
+                    {isChecklistCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+                  </button>
+                  
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); dismissChecklist(); }}
+                    className="p-1 hover:bg-theme rounded text-theme-secondary hover:text-theme-primary transition-colors"
+                    aria-label="Dismiss checklist permanently"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Expanded Content */}
+              {!isChecklistCollapsed && (
+                <div className="px-5 pb-5 pt-2 border-t border-theme/40 bg-theme-primary/5">
+                  {/* Progress Bar */}
+                  <div className="mb-4">
+                    <div className="flex justify-between text-xs text-theme-secondary font-medium mb-1">
+                      <span>Activation Progress</span>
+                      <span>{Math.round((completedChecklistCount / 5) * 100)}%</span>
+                    </div>
+                    <div className="w-full bg-theme rounded-full h-2 overflow-hidden">
+                      <div 
+                        className="bg-gradient-to-r from-[var(--accent-color)] to-[var(--accent-color)]/80 h-2 rounded-full transition-all duration-500"
+                        style={{ width: `${(completedChecklistCount / 5) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Steps List */}
+                  <div className="space-y-3.5">
+                    {checklistSteps.map(step => (
+                      <div 
+                        key={step.id} 
+                        className={`flex items-start gap-3 p-3 rounded-xl border transition-all ${
+                          step.isCompleted 
+                            ? 'bg-green-500/5 border-green-500/10 opacity-75' 
+                            : 'bg-theme-secondary/30 border-theme hover:border-theme-primary/20'
+                        }`}
+                      >
+                        <button 
+                          disabled={step.isCompleted}
+                          onClick={step.action}
+                          className={`w-5 h-5 rounded-full border flex items-center justify-center transition-all flex-shrink-0 mt-0.5 ${
+                            step.isCompleted 
+                              ? 'bg-green-500 border-green-500 text-white shadow-sm' 
+                              : 'border-theme-secondary hover:border-[var(--accent-color)]'
+                          }`}
+                          aria-label={step.isCompleted ? `${step.label} (Completed)` : `Start ${step.label}`}
+                        >
+                          {step.isCompleted && <CheckCircle className="w-3.5 h-3.5 text-white" />}
+                        </button>
+                        
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-xs sm:text-sm font-bold leading-tight ${step.isCompleted ? 'text-theme-primary/80 line-through' : 'text-theme-primary'}`}>
+                            {step.label}
+                          </p>
+                          <p className="text-[10px] sm:text-xs text-theme-secondary opacity-80 mt-0.5 leading-relaxed">
+                            {step.description}
+                          </p>
+                        </div>
+
+                        {!step.isCompleted && (
+                          <button
+                            onClick={step.action}
+                            className="shrink-0 px-2.5 py-1 bg-theme-primary text-theme-secondary hover:bg-theme-secondary border border-theme text-[10px] sm:text-xs font-semibold rounded-lg transition-all shadow-sm active:scale-95 ml-2"
+                          >
+                            {step.actionLabel}
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Badges Grid */}
           <div className="grid grid-cols-2 gap-4">

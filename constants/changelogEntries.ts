@@ -20,6 +20,16 @@ export interface DetailedChangeEntry {
 
 export const RECENT_CHANGES: ChangeEntry[] = [
   {
+    "version": "3.0.6",
+    "date": "Jul 13, 2026",
+    "highlights": [
+      "Quick-Add Card Button — Added a circular + button in the top-right corner of recipe image tiles to quickly schedule…",
+      "Direct Calendar Export (.ics) on Mobile — Integrated Capacitor Filesystem and Share API wrappers to let Android/iOS…",
+      "Native Shopping List Export — Rebuilt shopping list export/sharing to support Capacitor Share dialogs on mobile with…",
+      "Preserved Merge Batches — Modified automatic shopping list consolidation to track and display separate added dates,…"
+    ]
+  },
+  {
     "version": "3.0.5",
     "date": "Jul 12, 2026",
     "highlights": [
@@ -38,19 +48,36 @@ export const RECENT_CHANGES: ChangeEntry[] = [
       "Offer-Based Subscriptions & Price Fixes — Transitioned from raw Product-based ordering to Offer-based ordering…",
       "Enriched Product ID Mapping — Integrated 375 common pantry staple product IDs (including Great Value brand variants)…"
     ]
-  },
-  {
-    "version": "3.0.3",
-    "date": "Jul 9, 2026",
-    "highlights": [
-      "Interactive Support Messaging — Integrated a secure, interactive contact form on the website using EmailJS to allow…",
-      "Repositioned Online Order FAB — Moved the floating shopping cart button on the Shopping List tab to the bottom right…",
-      "Relative Path Optimization — Converted website link references (logo, headers, footers) to relative paths, ensuring…"
-    ]
   }
 ];
 
 export const ALL_CHANGES: DetailedChangeEntry[] = [
+  {
+    "version": "3.0.6",
+    "date": "Jul 13, 2026",
+    "sections": [
+      {
+        "title": "Added",
+        "bullets": [
+          "**Quick-Add Card Button** — Added a circular `+` button in the top-right corner of recipe image tiles to quickly schedule meals to the plan directly from search results.",
+          "**Direct Calendar Export (.ics) on Mobile** — Integrated Capacitor Filesystem and Share API wrappers to let Android/iOS users natively share or save meal plans.",
+          "**Native Shopping List Export** — Rebuilt shopping list export/sharing to support Capacitor Share dialogs on mobile with clean standard web file download fallback.",
+          "**Preserved Merge Batches** — Modified automatic shopping list consolidation to track and display separate added dates, quantities, and recipe sources for merged ingredients.",
+          "**Redirection Checklist Actions** — Integrated action deep-linking from the achievements checklist directly to the pantry modal scanner."
+        ]
+      },
+      {
+        "title": "Changed",
+        "bullets": [
+          "**Pantry Layout Restructuring** — Moved the large search bar to a clean modal overlay and relocated the onboarding setup checklist to the Community achievements sub-tab.",
+          "**Direct Meal Plan Scheduling** — Optimized recipe finder inside the meal planner to bypass redundant date pickers and duplicate modals, directly targeting the clicked schedule day.",
+          "**Auto-Consolidated Shopping Lists** — Made ingredient consolidation automatic and removed the duplicate manual toggle button.",
+          "**Shopping Analytics Accuracy** — Fixed duration calculations in shopping list analytics by computing active session times using completion timestamps.",
+          "**Fully Localized UI Strings** — Extracted new meal planning actions and consolidated batch details into all 7 supported locale translations."
+        ]
+      }
+    ]
+  },
   {
     "version": "3.0.5",
     "date": "Jul 12, 2026",

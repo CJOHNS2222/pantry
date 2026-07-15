@@ -131,7 +131,10 @@
     "copiedToClipboard": "買い物リストをクリップボードにコピーしました！",
     "shareTitle": "買い物リスト",
     "smsFallback": "リストをコピーしました（SMSアプリが利用できない場合があります）",
-    "smsUnavailable": "SMSアプリを開けませんでした。リストはクリップボードにコピーされました。"
+    "smsUnavailable": "SMSアプリを開けませんでした。リストはクリップボードにコピーされました。",
+    "addedBatches": "追加されたバッチ:",
+    "unknownDate": "不明な日付",
+    "via": "経由 {source}"
   },
   "recipes": {
     "title": "レシピ",
@@ -172,7 +175,12 @@
     "hasMeals": "食事あり",
     "addToMealPlan": "食事プランに追加",
     "day": "日",
-    "meal": "食事"
+    "meal": "食事",
+    "autoFillPlan": "プラン自動入力",
+    "mealPrep": "作り置き",
+    "clearWeek": "週をクリア",
+    "copyToNextWeek": "翌週にコピー",
+    "exportIcs": "エクスポート .ics"
   },
   "settings": {
     "title": "設定",
