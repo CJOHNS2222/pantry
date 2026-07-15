@@ -97,6 +97,7 @@
     "bestBy": "賞味期限",
     "useBy": "消費期限",
     "noExpirationSet": "有効期限未設定",
+    "cannedGoodsExpiryNote": "注意：缶詰は適切な状態で保管されていれば、通常は無期限に安全に食べることができます。賞味期限の設定は任意であり、目安にすぎません。",
     "isOpened": "開封済み",
     "isStaple": "定番品目",
     "consumptionHistory": "消費履歴",

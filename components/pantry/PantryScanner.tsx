@@ -1384,7 +1384,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
     const item = items[index];
     if (!item) return null;
     const expirationHeatClass = (d?: number) => {
-      if (d == null || item.is_immortal) return '';
+      if (d == null || item.is_immortal || item.category?.toLowerCase() === 'canned goods') return '';
       if (d <= 0) return 'bg-red-500/10 dark:bg-red-500/15 border-l-4 border-l-red-500';
       if (d <= 3) return 'bg-yellow-500/10 dark:bg-yellow-500/15 border-l-4 border-l-yellow-500';
       return '';
@@ -1449,7 +1449,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
         <div className="flex items-center gap-3 flex-shrink-0 ml-4">
           {/* Expiration date */}
           <div className="flex items-center gap-1.5">
-            {item.expirationDate && !item.is_immortal && (() => {
+            {item.expirationDate && !item.is_immortal && item.category?.toLowerCase() !== 'canned goods' && (() => {
               const daysRemaining = Math.ceil((new Date(item.expirationDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
               const color = getExpirationColor(daysRemaining, item.expirationType);
               const expiryLabel = daysRemaining <= 0
@@ -1551,12 +1551,12 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
     if (!item) return null;
     const daysRemaining = item.expirationDate ? Math.ceil((new Date(item.expirationDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : undefined;
     const expirationBorderClass = (d?: number) => {
-      if (d == null || item.is_immortal) return '';
+      if (d == null || item.is_immortal || item.category?.toLowerCase() === 'canned goods') return '';
       const c = getExpirationColor(d, item.expirationType);
       return c === 'red' ? 'ring-2 ring-red-300/40' : c === 'yellow' ? 'ring-2 ring-yellow-300/30' : '';
     };
     const expirationHeatClass = (d?: number) => {
-      if (d == null || item.is_immortal) return '';
+      if (d == null || item.is_immortal || item.category?.toLowerCase() === 'canned goods') return '';
       if (d <= 0) return 'bg-red-500/10 dark:bg-red-500/15 border-l-4 border-l-red-500';
       if (d <= 3) return 'bg-yellow-500/10 dark:bg-yellow-500/15 border-l-4 border-l-yellow-500';
       return '';
@@ -1618,7 +1618,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
         <div className="flex items-center gap-3 flex-shrink-0 ml-4">
           {/* Expiration date */}
           <div className="flex items-center gap-1.5">
-            {item.expirationDate && !item.is_immortal && (() => {
+            {item.expirationDate && !item.is_immortal && item.category?.toLowerCase() !== 'canned goods' && (() => {
               const daysRemaining = Math.ceil((new Date(item.expirationDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
               const color = getExpirationColor(daysRemaining, item.expirationType);
               const expiryLabel = daysRemaining <= 0
@@ -1668,12 +1668,12 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   function renderListItem(item: DisplayedPantryItem) {
     const daysRemaining = item.expirationDate ? Math.ceil((new Date(item.expirationDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : undefined;
     const expirationBorderClass = (d?: number) => {
-      if (d == null || item.is_immortal) return '';
+      if (d == null || item.is_immortal || item.category?.toLowerCase() === 'canned goods') return '';
       const c = getExpirationColor(d, item.expirationType);
       return c === 'red' ? 'ring-2 ring-red-300/40' : c === 'yellow' ? 'ring-2 ring-yellow-300/30' : '';
     };
     const expirationHeatClass = (d?: number) => {
-      if (d == null || item.is_immortal) return '';
+      if (d == null || item.is_immortal || item.category?.toLowerCase() === 'canned goods') return '';
       if (d <= 0) return 'bg-red-500/10 dark:bg-red-500/15 border-l-4 border-l-red-500';
       if (d <= 3) return 'bg-yellow-500/10 dark:bg-yellow-500/15 border-l-4 border-l-yellow-500';
       return '';
@@ -1735,7 +1735,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
         <div className="flex items-center gap-3 flex-shrink-0 ml-4">
           {/* Expiration date */}
           <div className="flex items-center gap-1.5">
-            {typeof daysRemaining === 'number' && !item.is_immortal && (() => {
+            {typeof daysRemaining === 'number' && !item.is_immortal && item.category?.toLowerCase() !== 'canned goods' && (() => {
               const color = getExpirationColor(daysRemaining, item.expirationType);
               const expiryLabel = daysRemaining <= 0
                 ? `${item.item} has expired`
@@ -1825,7 +1825,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
           />
 
           {/* Expiry badge — top left */}
-          {typeof daysRemaining === 'number' && (
+          {typeof daysRemaining === 'number' && item.category?.toLowerCase() !== 'canned goods' && (
             <div className={`absolute top-1.5 left-1.5 flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
               expiryColor === 'red' ? 'bg-red-600/90 text-white' :
               expiryColor === 'yellow' ? 'bg-yellow-500/90 text-white' :

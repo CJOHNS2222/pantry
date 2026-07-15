@@ -713,6 +713,11 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                       </div>
                     </div>
                   )}
+                  {localCategory?.toLowerCase() === 'canned goods' && (
+                    <div className="mt-2 text-xs text-theme-secondary opacity-80 leading-relaxed bg-theme-primary/40 border border-theme p-2 rounded-lg">
+                      💡 {intl.formatMessage({ id: 'pantry.cannedGoodsExpiryNote' })}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
