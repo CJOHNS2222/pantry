@@ -206,20 +206,7 @@ const SmartRecommendations: React.FC<SmartRecommendationsProps> = ({ inventory, 
   };
 
   if (recommendations.length === 0) {
-    return (
-      <div className="bg-white rounded-lg shadow-sm border p-6">
-        <div className="text-center py-8">
-          <Lightbulb className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No Recommendations Yet</h3>
-          <p className="text-sm text-gray-600">
-            Start using the app to get personalized recommendations based on your behavior and preferences.
-          </p>
-          <p className="text-sm text-gray-500 mt-2">
-            Add items, plan meals, or rate recipes to unlock smarter suggestions.
-          </p>
-        </div>
-      </div>
-    );
+    return null;
   }
 
   return (
