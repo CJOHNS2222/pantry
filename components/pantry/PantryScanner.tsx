@@ -1895,35 +1895,6 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
     <div className="space-y-6 pb-24 max-w-2xl mx-auto animate-fade-in relative">
 
 
-      <div className="flex flex-col sm:flex-row items-center justify-end gap-4 mb-6">
-        <div className="flex items-center gap-3">
-
-          {/* Sort Dropdown */}
-          <div className="relative">
-            <select
-              value={sortBy}
-              onChange={(e) => {
-                const value = e.target.value as typeof sortBy;
-                setSortBy(value);
-                // Also change view mode for category/location sorts
-                if (value === 'category') {
-                  setViewMode('category');
-                } else if (value === 'location') {
-                  setViewMode('storage');
-                }
-              }}
-              className="appearance-none bg-theme-secondary border-2 border-[var(--accent-color)] rounded-lg px-3 py-2 pr-8 text-sm font-medium text-theme-primary shadow-lg focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/50"
-            >
-              <option value="name">Sort by Name</option>
-              <option value="lastAdded">Sort by Last Added</option>
-              <option value="expiration">Sort by Expiration</option>
-              <option value="category">Sort by Category</option>
-              <option value="location">Sort by Location</option>
-            </select>
-            <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-theme-primary pointer-events-none" />
-          </div>
-        </div>
-      </div>
 
 
 
@@ -2692,12 +2663,39 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
       )}
 
       <div className="space-y-1">
-        <div className="text-center text-theme-secondary opacity-60 text-sm mb-4">
-          <span className="font-medium">{inventory.length}</span> items{' '}
-          {viewMode === 'category'
-            ? `in ${Object.keys(groupedItems).length} categories`
-            : 'across 5 storage locations'
-          }
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mb-4 mx-1">
+          <div className="text-theme-secondary opacity-70 text-sm font-medium text-center sm:text-left">
+            <span className="font-semibold text-theme-primary">{inventory.length}</span> items{' '}
+            {viewMode === 'category'
+              ? `in ${Object.keys(groupedItems).length} categories`
+              : 'across 5 storage locations'
+            }
+          </div>
+
+          {/* Sort Dropdown */}
+          <div className="relative w-full sm:w-auto">
+            <select
+              value={sortBy}
+              onChange={(e) => {
+                const value = e.target.value as typeof sortBy;
+                setSortBy(value);
+                // Also change view mode for category/location sorts
+                if (value === 'category') {
+                  setViewMode('category');
+                } else if (value === 'location') {
+                  setViewMode('storage');
+                }
+              }}
+              className="appearance-none w-full sm:w-auto bg-theme-secondary border border-theme rounded-xl px-3 py-1.5 pr-8 text-xs font-semibold text-theme-primary shadow-sm focus:outline-none focus:ring-1 focus:ring-[var(--accent-color)]/50 cursor-pointer"
+            >
+              <option value="name">Sort by Name</option>
+              <option value="lastAdded">Sort by Last Added</option>
+              <option value="expiration">Sort by Expiration</option>
+              <option value="category">Sort by Category</option>
+              <option value="location">Sort by Location</option>
+            </select>
+            <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 text-theme-primary pointer-events-none opacity-60" />
+          </div>
         </div>
         {user?.isGuest && (
           <div className="mb-3 mx-1 p-2 rounded-lg bg-theme-secondary border border-theme text-xs">
