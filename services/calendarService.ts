@@ -83,7 +83,7 @@ class CalendarService {
 
       const mealTitles = (dayPlan.meals || [])
         .filter(meal => meal.recipe)
-        .map(meal => `${(meal as any).mealType || (meal as any).type || 'Meal'}: ${meal.recipe!.title}`)
+        .map(meal => `${meal.mealType || 'Meal'}: ${meal.recipe!.title}`)
         .join('\n');
 
       if (!mealTitles) {
@@ -93,7 +93,7 @@ class CalendarService {
 
       await CapacitorCalendar.createEvent({
         title: `Meal Plan - ${date.toLocaleDateString()}`,
-        description: `Smart Pantry Meal Plan\n\n${mealTitles}\n\nTotal calories: ${(dayPlan as any).totalCalories || 'Not calculated'}`,
+        description: `Smart Pantry Meal Plan\n\n${mealTitles}\n\nTotal calories: ${(dayPlan as { totalCalories?: number }).totalCalories || 'Not calculated'}`,
         startDate: date.getTime(),
         endDate: new Date(date.getTime() + 24 * 60 * 60 * 1000).getTime(), // Next day
         isAllDay: true
@@ -166,23 +166,7 @@ class CalendarService {
   async exportWeekAsICS(days: DayPlan[]): Promise<void> {
     const platform = Capacitor.getPlatform();
 
-    if (platform !== 'web' && this.isAvailable()) {
-      // Mobile: create native calendar events
-      for (const day of days) {
-        const allMeals = [
-          ...(day.breakfast || []),
-          ...(day.lunch || []),
-          ...(day.dinner || []),
-          ...(day.meals || []),
-        ];
-        if (allMeals.length === 0) continue;
-        const date = new Date(day.date + 'T12:00:00');
-        await this.createMealPlanEvent(day, date);
-      }
-      return;
-    }
-
-    // Web: generate and download an ICS file
+    // Generate ICS content
     const escape = (str: string) =>
       str.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
 
@@ -199,7 +183,7 @@ class CalendarService {
         ...(day.breakfast || []).map(m => ({ type: 'Breakfast', ...m })),
         ...(day.lunch || []).map(m => ({ type: 'Lunch', ...m })),
         ...(day.dinner || []).map(m => ({ type: 'Dinner', ...m })),
-        ...(day.meals || []).map(m => ({ type: (m as any).mealType || 'Meal', ...m })),
+        ...(day.meals || []).map(m => ({ type: m.mealType || 'Meal', ...m })),
       ];
       if (allMeals.length === 0) continue;
 
@@ -227,8 +211,42 @@ class CalendarService {
     }
 
     lines.push('END:VCALENDAR');
-
     const icsContent = lines.join('\r\n');
+
+    if (platform !== 'web') {
+      try {
+        const { Filesystem, Directory, Encoding } = await import('@capacitor/filesystem');
+        const { Share } = await import('@capacitor/share');
+        const filename = 'meal-plan.ics';
+        
+        const writeResult = await Filesystem.writeFile({
+          path: filename,
+          data: icsContent,
+          directory: Directory.Cache,
+          encoding: Encoding.UTF8
+        });
+
+        await Share.share({
+          title: 'Export Meal Plan',
+          url: writeResult.uri,
+          dialogTitle: 'Export Meal Plan'
+        });
+      } catch (err) {
+        log.error('Failed to export calendar natively', { error: err }, 'CalendarService');
+        try {
+          const { Share } = await import('@capacitor/share');
+          await Share.share({
+            title: 'Export Meal Plan',
+            text: icsContent
+          });
+        } catch (shareErr) {
+          log.error('Fallback native share failed', { error: shareErr }, 'CalendarService');
+        }
+      }
+      return;
+    }
+
+    // Web: generate and download an ICS file
     const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');

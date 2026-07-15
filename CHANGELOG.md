@@ -1,3 +1,21 @@
+## [3.0.6] - 2026-07-13
+
+### Added
+- **Quick-Add Card Button** — Added a circular `+` button in the top-right corner of recipe image tiles to quickly schedule meals to the plan directly from search results.
+- **Direct Calendar Export (.ics) on Mobile** — Integrated Capacitor Filesystem and Share API wrappers to let Android/iOS users natively share or save meal plans.
+- **Native Shopping List Export** — Rebuilt shopping list export/sharing to support Capacitor Share dialogs on mobile with clean standard web file download fallback.
+- **Preserved Merge Batches** — Modified automatic shopping list consolidation to track and display separate added dates, quantities, and recipe sources for merged ingredients.
+- **Redirection Checklist Actions** — Integrated action deep-linking from the achievements checklist directly to the pantry modal scanner.
+
+### Changed
+- **Pantry Layout Restructuring** — Moved the large search bar to a clean modal overlay and relocated the onboarding setup checklist to the Community achievements sub-tab.
+- **Direct Meal Plan Scheduling** — Optimized recipe finder inside the meal planner to bypass redundant date pickers and duplicate modals, directly targeting the clicked schedule day.
+- **Auto-Consolidated Shopping Lists** — Made ingredient consolidation automatic and removed the duplicate manual toggle button.
+- **Shopping Analytics Accuracy** — Fixed duration calculations in shopping list analytics by computing active session times using completion timestamps.
+- **Fully Localized UI Strings** — Extracted new meal planning actions and consolidated batch details into all 7 supported locale translations.
+
+---
+
 ## [3.0.5] - 2026-07-12
 
 ### Added

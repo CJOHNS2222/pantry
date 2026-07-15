@@ -112,6 +112,14 @@ export interface ShoppingItem {
     is_immortal?: boolean;
   };
   addedAt?: Date; // When the item was added to the shopping list
+  consolidatedItems?: {
+    id: string;
+    addedAt?: Date | string;
+    quantity?: string | number;
+    amount?: number;
+    unit?: string;
+    source?: string;
+  }[];
   completedAt?: Date; // When the item was checked off
   estimatedPrice?: number; // Estimated price for analytics
   priceData?: {

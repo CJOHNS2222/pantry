@@ -1479,6 +1479,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                     showPreferenceSignals={showPreferenceSignals}
                     preferenceSignals={preferenceSignals}
                     onOpen={(selectedRecipe) => openRecipeModal(selectedRecipe, false)}
+                    onAddToPlan={onAddToPlan}
                 />
             );
         };

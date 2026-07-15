@@ -1,4 +1,5 @@
 import React from 'react';
+import { useIntl } from 'react-intl';
 import { CalendarClock, HelpCircle, Wand2 } from 'lucide-react';
 
 interface MealPlannerHeaderProps {
@@ -16,29 +17,29 @@ export const MealPlannerHeader: React.FC<MealPlannerHeaderProps> = ({
   onOpenAutoFill,
   onToggleHelpTooltip,
 }) => {
+  const intl = useIntl();
   return (
-    <div className="mb-1">
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex-1" />
-        <h2 className="text-3xl font-serif font-bold text-theme-secondary">{title}</h2>
-        <div className="flex-1 flex items-center justify-end gap-1">
+    <div className="mb-4">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+        <h2 className="text-2xl md:text-3xl font-serif font-bold text-theme-secondary text-center md:text-left">{title}</h2>
+        <div className="flex items-center justify-center md:justify-end gap-1.5 flex-wrap">
           <button
             onClick={onOpenAutoFill}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--accent-color)]/10 hover:bg-[var(--accent-color)]/20 text-[var(--accent-color)] text-sm font-medium transition-colors shadow-sm"
-            title="Auto-Fill Plan"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--accent-color)]/10 hover:bg-[var(--accent-color)]/20 text-[var(--accent-color)] text-sm font-medium transition-colors shadow-sm whitespace-nowrap"
+            title={intl.formatMessage({ id: 'mealPlanner.autoFillPlan' })}
             aria-label="Open auto fill modal"
           >
             <Wand2 className="w-4 h-4" />
-            <span>Auto-Fill Plan</span>
+            <span>{intl.formatMessage({ id: 'mealPlanner.autoFillPlan' })}</span>
           </button>
           <button
             onClick={onOpenMealPrepPlanner}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--accent-color)] hover:bg-[var(--accent-color)]/90 active:bg-[var(--accent-color)]/80 text-white text-sm font-medium transition-colors shadow-sm"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--accent-color)] hover:bg-[var(--accent-color)]/90 active:bg-[var(--accent-color)]/80 text-white text-sm font-medium transition-colors shadow-sm whitespace-nowrap"
             title="Smart Meal Prep Planner"
             aria-label="Open meal prep planner"
           >
             <CalendarClock className="w-4 h-4" />
-            <span>Meal Prep</span>
+            <span>{intl.formatMessage({ id: 'mealPlanner.mealPrep' })}</span>
           </button>
           <button
             onClick={onToggleHelpTooltip}

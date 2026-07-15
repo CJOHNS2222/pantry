@@ -253,7 +253,7 @@ export const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
                   onClick={() => {
                     // Open recipe modal for preview
                     const event = new CustomEvent('openRecipeModal', {
-                      detail: { recipe, isSavedView: false }
+                      detail: { recipe, isSavedView: false, isFromMealPlanner: true }
                     });
                     window.dispatchEvent(event);
                   }}
@@ -305,7 +305,7 @@ export const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
                   onClick={() => {
                     // Open recipe modal for preview
                     const event = new CustomEvent('openRecipeModal', {
-                      detail: { recipe, isSavedView: false }
+                      detail: { recipe, isSavedView: false, isFromMealPlanner: true }
                     });
                     window.dispatchEvent(event);
                   }}
@@ -357,7 +357,7 @@ export const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
                   onClick={() => {
                     // Open recipe modal for preview
                     const event = new CustomEvent('openRecipeModal', {
-                      detail: { recipe, isSavedView: false }
+                      detail: { recipe, isSavedView: false, isFromMealPlanner: true }
                     });
                     window.dispatchEvent(event);
                   }}
@@ -416,7 +416,7 @@ export const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
                   onClick={() => {
                     // Open recipe modal for preview
                     const event = new CustomEvent('openRecipeModal', {
-                      detail: { recipe, isSavedView: false }
+                      detail: { recipe, isSavedView: false, isFromMealPlanner: true }
                     });
                     window.dispatchEvent(event);
                   }}

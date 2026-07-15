@@ -131,7 +131,10 @@
     "copiedToClipboard": "¡Lista de compras copiada al portapapeles!",
     "shareTitle": "Lista de compras",
     "smsFallback": "Lista copiada (la app de SMS puede no estar disponible)",
-    "smsUnavailable": "No se pudo abrir la app de SMS. La lista se copió al portapapeles."
+    "smsUnavailable": "No se pudo abrir la app de SMS. La lista se copió al portapapeles.",
+    "addedBatches": "Lotes Agregados:",
+    "unknownDate": "Fecha desconocida",
+    "via": "vía {source}"
   },
   "recipes": {
     "title": "Recetas",
@@ -172,7 +175,12 @@
     "hasMeals": "Tiene comidas",
     "addToMealPlan": "Agregar al plan de comidas",
     "day": "Día",
-    "meal": "Comida"
+    "meal": "Comida",
+    "autoFillPlan": "Autocompletar Plan",
+    "mealPrep": "Preparación de Comidas",
+    "clearWeek": "Limpiar semana",
+    "copyToNextWeek": "Copiar a la siguiente semana",
+    "exportIcs": "Exportar .ics"
   },
   "settings": {
     "title": "Ajustes",

@@ -131,7 +131,10 @@
     "copiedToClipboard": "Einkaufsliste in die Zwischenablage kopiert!",
     "shareTitle": "Einkaufsliste",
     "smsFallback": "Liste kopiert (SMS-App möglicherweise nicht verfügbar)",
-    "smsUnavailable": "SMS-App konnte nicht geöffnet werden. Liste wurde in die Zwischenablage kopiert."
+    "smsUnavailable": "SMS-App konnte nicht geöffnet werden. Liste wurde in die Zwischenablage kopiert.",
+    "addedBatches": "Hinzugefügte Chargen:",
+    "unknownDate": "Unbekanntes Datum",
+    "via": "via {source}"
   },
   "recipes": {
     "title": "Rezepte",
@@ -172,7 +175,12 @@
     "hasMeals": "Hat Mahlzeiten",
     "addToMealPlan": "Zum Mahlzeitenplan hinzufügen",
     "day": "Tag",
-    "meal": "Mahlzeit"
+    "meal": "Mahlzeit",
+    "autoFillPlan": "Plan automatisch füllen",
+    "mealPrep": "Vorkochen",
+    "clearWeek": "Woche leeren",
+    "copyToNextWeek": "Kopieren in die nächste Woche",
+    "exportIcs": "Exportieren .ics"
   },
   "settings": {
     "title": "Einstellungen",

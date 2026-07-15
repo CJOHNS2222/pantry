@@ -714,7 +714,8 @@ const App: React.FC = () => {
   // Global handler to open recipe modal from anywhere without switching tabs
   useEffect(() => {
     const handleOpenRecipeModal = (event: CustomEvent) => {
-      const { recipe, isSavedView } = event.detail;
+      const { recipe, isSavedView, isFromMealPlanner } = event.detail;
+      if (isFromMealPlanner) return; // MealPlanner handles its own modal locally!
       setGlobalModalRecipe(recipe);
       setGlobalModalIsSavedView(Boolean(isSavedView));
       setShowGlobalRecipeModal(true);
