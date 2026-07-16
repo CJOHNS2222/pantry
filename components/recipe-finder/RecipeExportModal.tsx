@@ -226,7 +226,7 @@ export const RecipeExportModal: React.FC<RecipeExportModalProps> = ({
         <head>
           <title>Stock & Spoon Recipes</title>
           <style>
-            @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&family=Playfair+Display:ital,wght@0,700;0,900;1,700&display=swap');
+            @import url('https://fonts.googleapis.com/css?family=Outfit:400,600,800|Playfair+Display:700,900,700italic,900italic&display=swap');
             body { 
               font-family: 'Outfit', sans-serif; 
               padding: 40px; 
@@ -319,7 +319,7 @@ export const RecipeExportModal: React.FC<RecipeExportModalProps> = ({
             <div class="recipe-card">
               <h2>${r.title}</h2>
               ${r.description ? `<p class="description">${r.description}</p>` : ''}
-              <div class="meta">Cook Time: ${r.cookTime || 'N/A'} • Servings: ${r.servings || 'N/A'}</div>
+              <div class="meta">Cook Time: ${r.cookTime || '—'} • Servings: ${r.servings || '—'}</div>
               <h3>Ingredients</h3>
               <ul>
                 ${(r.ingredients || []).map(i => `<li>${i}</li>`).join('')}
@@ -330,17 +330,24 @@ export const RecipeExportModal: React.FC<RecipeExportModalProps> = ({
               </ol>
             </div>
           `).join('')}
-          <script>
-            window.onload = function() {
-              window.print();
-              setTimeout(function() { window.close(); }, 500);
-            };
-          </script>
         </body>
       </html>
     `;
-    printWindow.document.write(html);
+    printWindow.document.documentElement.innerHTML = html;
     printWindow.document.close();
+
+    const script = printWindow.document.createElement('script');
+    script.text = `
+      window.onload = function() {
+        window.print();
+        setTimeout(function() { window.close(); }, 500);
+      };
+      if (document.readyState === 'complete') {
+        window.print();
+        setTimeout(function() { window.close(); }, 500);
+      }
+    `;
+    printWindow.document.body.appendChild(script);
   };
 
   if (!isOpen) return null;
