@@ -10,7 +10,6 @@ const RecipeFinder = React.lazy(() => import('../recipes-meals/RecipeFinder').th
 const Community = React.lazy(() => import('../household/Community').then(module => ({ default: module.Community })));
 const Settings = React.lazy(() => import('../settings/Settings').then(module => ({ default: module.Settings })));
 
-import SmartRecommendations from '../pantry/SmartRecommendations';
 import { UsageIndicator } from '../admin-analytics/UsageIndicator';
 import ComponentErrorBoundary from '../ui/ComponentErrorBoundary';
 import { useApp } from '../../contexts/AppContext';
@@ -202,14 +201,7 @@ export const MainContent: React.FC = () => {
         </ComponentErrorBoundary>
       )}
       {activeTab === Tab.RECIPES && (
-        <>
-          <SmartRecommendations
-            inventory={inventory}
-            savedRecipes={savedRecipes}
-            user={user}
-            setActiveTab={setActiveTab}
-          />
-          <ComponentErrorBoundary componentName="RecipeFinder">
+        <ComponentErrorBoundary componentName="RecipeFinder">
           <Suspense fallback={<LoadingSpinner />}>
             <RecipeFinder
               onAddToPlan={onAddToPlan}
@@ -233,7 +225,6 @@ export const MainContent: React.FC = () => {
               />
             </Suspense>
           </ComponentErrorBoundary>
-        </>
       )}
       {activeTab === Tab.COMMUNITY && (
         <ComponentErrorBoundary componentName="Community">

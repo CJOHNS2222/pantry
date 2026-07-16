@@ -215,20 +215,59 @@ class CalendarService {
 
     if (platform !== 'web') {
       try {
+        // Try direct calendar integration first
+        const hasPermission = await this.checkPermissions();
+        let granted = hasPermission;
+        if (!hasPermission) {
+          granted = await this.requestPermissions();
+        }
+
+        if (granted) {
+          log.info('Writing meal plan directly to native calendar...', {}, 'CalendarService');
+          let successCount = 0;
+          for (const day of days) {
+            const dateObj = new Date(day.date + 'T12:00:00'); // Use noon to prevent timezone shifts
+            const success = await this.createMealPlanEvent(day, dateObj);
+            if (success) successCount++;
+          }
+          if (successCount > 0) {
+            log.info(`Successfully added ${successCount} meal events directly to native calendar`, {}, 'CalendarService');
+            return;
+          }
+        }
+      } catch (nativeErr) {
+        log.error('Failed to write directly to native calendar, falling back to file export', nativeErr, 'CalendarService');
+      }
+
+      // Fallback: Save/Share .ics file (prefer public Documents directory so it persists)
+      try {
         const { Filesystem, Directory, Encoding } = await import('@capacitor/filesystem');
         const { Share } = await import('@capacitor/share');
         const filename = 'meal-plan.ics';
         
-        const writeResult = await Filesystem.writeFile({
-          path: filename,
-          data: icsContent,
-          directory: Directory.Cache,
-          encoding: Encoding.UTF8
-        });
+        let fileUri = '';
+        try {
+          const writeResult = await Filesystem.writeFile({
+            path: filename,
+            data: icsContent,
+            directory: Directory.Documents,
+            encoding: Encoding.UTF8
+          });
+          fileUri = writeResult.uri;
+        } catch (docErr) {
+          log.warn('Failed to write to Documents directory, trying Cache', { error: docErr }, 'CalendarService');
+          const writeResult = await Filesystem.writeFile({
+            path: filename,
+            data: icsContent,
+            directory: Directory.Cache,
+            encoding: Encoding.UTF8
+          });
+          fileUri = writeResult.uri;
+        }
 
         await Share.share({
           title: 'Export Meal Plan',
-          url: writeResult.uri,
+          url: fileUri,
           dialogTitle: 'Export Meal Plan'
         });
       } catch (err) {

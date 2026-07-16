@@ -1,3 +1,26 @@
+## [3.0.7] - 2026-07-16
+
+### Added
+- **Capacitor Direct Calendar Sync** — Enhanced "Export to Calendar" to write meal plan events directly into native Android/iOS device calendars, with file fallback in the public Documents folder.
+- **Meat & Protein Filter** — Added a meat/protein type select filter (Chicken, Beef, Steak, Fish, Pork, Seafood, Turkey, Lamb, Tofu) to the Popular Searches list.
+- **Dessert Selection** — Added a dedicated Dessert option in meal type filters, matching sweet recipes automatically.
+- **Recipe Import Share Checkbox** — Added a "Share with community" checkbox to the import modal to allow users to opt-in to public submissions.
+- **Scraped Recipe URL Display** — Preserved original recipe URLs on import and added globe link icons in the recipe modal details view.
+- **Automatic Unit Conversions** — Implemented automatic quantity conversions on the shopping list when toggling units (e.g., converting 250g to 0.55 lbs, or 3 lbs to 48 oz).
+
+### Changed
+- **Pantry Canned Goods Adjustments** — Defaulted canned goods to 730 days auto-expiry, hid expiration highlights/colors from pantry grids, and added optional details warning notice.
+- **Always-Visible Cookbook Buttons** — Made saved recipe grid "+" add buttons and cookbook "Remove" buttons permanently visible, enabling full touch/mobile layout accessibility.
+- **Shopping List Image Quality** — Resolved cardboard box fallbacks for staples (eggs, milk, cheese) and prevented short key conflicts (ramen matching cheese).
+- **Manual Item Suggestions Layout** — Expanded item suggestions to 30 matching entries and increased scroll viewport height to 50vh.
+- **Sticky Recipe Tabs** — Made search/saved selectors sticky at the top of the Recipe Finder screen.
+- **Cooking Mode Layout** — Redesigned Cooking Mode left-side panel to scroll the image, header, and ingredients list together for better vertical space.
+- **Detailed SMS Export** — Upgraded SMS text sharing to export full recipe descriptions, ingredients, and instructions.
+- **Current Plan Status Indicator** — Refined Settings Subscription pricing layout to accurately display the "Current Plan" status on active memberships.
+- **Renamed Calendar Button** — Changed "Export .ics" to "Export to Calendar" across all 7 supported language locales.
+
+---
+
 ## [3.0.6] - 2026-07-13
 
 ### Added

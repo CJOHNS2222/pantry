@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { X, Star, Clock, UtensilsCrossed } from 'lucide-react';
+import { X, Star, Clock, UtensilsCrossed, Globe } from 'lucide-react';
+import { useIntl } from 'react-intl';
 import { StructuredRecipe, RecipeRating, SavedRecipe, PantryItem, Household, RecipeCommunityStats } from '../../types';
 import { CookingMode } from './CookingMode';
 import { useKeyboardNavigation } from '../../hooks/useKeyboardNavigation';
@@ -90,6 +91,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
   editable = false,
   activeRecipes = [],
 }) => {
+  const intl = useIntl();
   const { addToast } = useAppActions();
   const [showLeftoverCapture, setShowLeftoverCapture] = useState(false);
   const [showCookingMode, setShowCookingMode] = useState(false);
@@ -834,6 +836,21 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
 
               {recipe.description && (
                 <p className="text-xs text-theme-secondary line-clamp-2 opacity-80 mb-1 leading-relaxed">{recipe.description}</p>
+              )}
+
+              {recipe.url && (
+                <div className="flex items-center gap-1.5 mb-2 mt-0.5">
+                  <Globe className="w-3.5 h-3.5 text-theme-secondary opacity-70 flex-shrink-0" />
+                  <a
+                    href={recipe.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-[var(--accent-color)] hover:underline flex items-center gap-1 truncate max-w-full font-medium"
+                  >
+                    <span>{intl.formatMessage({ id: 'recipes.originalSource' })}</span>
+                    <span className="text-[10px] opacity-75">↗</span>
+                  </a>
+                </div>
               )}
 
               {/* Cooking time & servings metadata */}

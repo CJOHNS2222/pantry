@@ -51,7 +51,7 @@ export const ShoppingListAddItemModal: React.FC<ShoppingListAddItemModalProps> =
       return a.localeCompare(b);
     });
 
-    setSuggestions(matches.slice(0, 6));
+    setSuggestions(matches.slice(0, 30));
   }, [newItem]);
 
   const capitalizeWords = (str: string) => {
@@ -113,7 +113,7 @@ export const ShoppingListAddItemModal: React.FC<ShoppingListAddItemModalProps> =
                 )}
 
                 {suggestions.length > 0 && (
-                  <div className="mt-2 bg-theme-secondary border border-theme rounded-lg divide-y divide-theme max-h-60 overflow-y-auto shadow-sm">
+                  <div className="mt-2 bg-theme-secondary border border-theme rounded-lg divide-y divide-theme max-h-[50vh] overflow-y-auto shadow-sm">
                     {suggestions.map((suggestion) => {
                       const filename = itemImages[suggestion];
                       const imageUrl = filename ? `/images/items/${filename}` : null;

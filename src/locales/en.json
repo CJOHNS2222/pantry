@@ -141,6 +141,7 @@
     "via": "via {source}"
   },
   "recipes": {
+    "originalSource": "View original recipe",
     "title": "Recipes",
     "saved": "Saved Recipes",
     "popular": "Popular Recipes",
@@ -184,7 +185,7 @@
     "mealPrep": "Meal Prep",
     "clearWeek": "Clear week",
     "copyToNextWeek": "Copy to next week",
-    "exportIcs": "Export .ics"
+    "exportIcs": "Export to Calendar"
   },
   "settings": {
     "title": "Settings",

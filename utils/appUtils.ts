@@ -31,7 +31,7 @@ function resolveSeededItemImageFilename(itemName: string): string | undefined {
 
   let bestKey = '';
   for (const key of Object.keys(itemImages)) {
-    if ((cleanedName.includes(key) || name.includes(key)) && key.length > bestKey.length) {
+    if (key.length >= 3 && (cleanedName.includes(key) || name.includes(key)) && key.length > bestKey.length) {
       bestKey = key;
     }
   }
@@ -429,6 +429,9 @@ export async function canShowAds(user?: User | null): Promise<boolean> {
 
 const isFreshPepper = (name: string): boolean => {
   const low = name.toLowerCase();
+  if (low === 'pepper' || low === 'peppers' || low === 'ground pepper' || low === 'cracked pepper') {
+    return false;
+  }
   return (low.includes('pepper') || low.includes('peppers')) && 
          !low.includes('black') && 
          !low.includes('white') && 

@@ -20,6 +20,16 @@ export interface DetailedChangeEntry {
 
 export const RECENT_CHANGES: ChangeEntry[] = [
   {
+    "version": "3.0.7",
+    "date": "Jul 16, 2026",
+    "highlights": [
+      "Capacitor Direct Calendar Sync — Enhanced \"Export to Calendar\" to write meal plan events directly into native…",
+      "Meat & Protein Filter — Added a meat/protein type select filter (Chicken, Beef, Steak, Fish, Pork, Seafood, Turkey,…",
+      "Dessert Selection — Added a dedicated Dessert option in meal type filters, matching sweet recipes automatically.",
+      "Recipe Import Share Checkbox — Added a \"Share with community\" checkbox to the import modal to allow users to opt-in to…"
+    ]
+  },
+  {
     "version": "3.0.6",
     "date": "Jul 13, 2026",
     "highlights": [
@@ -38,20 +48,41 @@ export const RECENT_CHANGES: ChangeEntry[] = [
       "Optimistic Subscription Upgrades — Implemented client-side optimistic UI updates to instantly unlock Premium/Family…",
       "Legacy Subscription Fallbacks — Refined pricing fields to handle legacy subscriptions (which lack product ID records)…"
     ]
-  },
-  {
-    "version": "3.0.4",
-    "date": "Jul 10, 2026",
-    "highlights": [
-      "Annual Subscription Billing Toggles — Integrated a billing cycle toggle switch under the Subscription manager,…",
-      "Target, Kroger, Albertsons, and Thrive Store Brand Search Affinity — Optimized search redirects to automatically…",
-      "Offer-Based Subscriptions & Price Fixes — Transitioned from raw Product-based ordering to Offer-based ordering…",
-      "Enriched Product ID Mapping — Integrated 375 common pantry staple product IDs (including Great Value brand variants)…"
-    ]
   }
 ];
 
 export const ALL_CHANGES: DetailedChangeEntry[] = [
+  {
+    "version": "3.0.7",
+    "date": "Jul 16, 2026",
+    "sections": [
+      {
+        "title": "Added",
+        "bullets": [
+          "**Capacitor Direct Calendar Sync** — Enhanced \"Export to Calendar\" to write meal plan events directly into native Android/iOS device calendars, with file fallback in the public Documents folder.",
+          "**Meat & Protein Filter** — Added a meat/protein type select filter (Chicken, Beef, Steak, Fish, Pork, Seafood, Turkey, Lamb, Tofu) to the Popular Searches list.",
+          "**Dessert Selection** — Added a dedicated Dessert option in meal type filters, matching sweet recipes automatically.",
+          "**Recipe Import Share Checkbox** — Added a \"Share with community\" checkbox to the import modal to allow users to opt-in to public submissions.",
+          "**Scraped Recipe URL Display** — Preserved original recipe URLs on import and added globe link icons in the recipe modal details view.",
+          "**Automatic Unit Conversions** — Implemented automatic quantity conversions on the shopping list when toggling units (e.g., converting 250g to 0.55 lbs, or 3 lbs to 48 oz)."
+        ]
+      },
+      {
+        "title": "Changed",
+        "bullets": [
+          "**Pantry Canned Goods Adjustments** — Defaulted canned goods to 730 days auto-expiry, hid expiration highlights/colors from pantry grids, and added optional details warning notice.",
+          "**Always-Visible Cookbook Buttons** — Made saved recipe grid \"+\" add buttons and cookbook \"Remove\" buttons permanently visible, enabling full touch/mobile layout accessibility.",
+          "**Shopping List Image Quality** — Resolved cardboard box fallbacks for staples (eggs, milk, cheese) and prevented short key conflicts (ramen matching cheese).",
+          "**Manual Item Suggestions Layout** — Expanded item suggestions to 30 matching entries and increased scroll viewport height to 50vh.",
+          "**Sticky Recipe Tabs** — Made search/saved selectors sticky at the top of the Recipe Finder screen.",
+          "**Cooking Mode Layout** — Redesigned Cooking Mode left-side panel to scroll the image, header, and ingredients list together for better vertical space.",
+          "**Detailed SMS Export** — Upgraded SMS text sharing to export full recipe descriptions, ingredients, and instructions.",
+          "**Current Plan Status Indicator** — Refined Settings Subscription pricing layout to accurately display the \"Current Plan\" status on active memberships.",
+          "**Renamed Calendar Button** — Changed \"Export .ics\" to \"Export to Calendar\" across all 7 supported language locales."
+        ]
+      }
+    ]
+  },
   {
     "version": "3.0.6",
     "date": "Jul 13, 2026",

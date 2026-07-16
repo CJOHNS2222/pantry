@@ -25,6 +25,7 @@ import { RecipeFinderCard, RecipeFinderTile } from '../recipe-finder/RecipeFinde
 import { RecipeFinderTabs } from '../recipe-finder/RecipeFinderTabs';
 import { RecipeFinderModalSection } from '../recipe-finder/RecipeFinderModalSection';
 import { Tab } from '../../types/app';
+import SmartRecommendations from '../pantry/SmartRecommendations';
 
 /** Internal search params — partial RecipeSearchParams plus component-local filter fields */
 type RecipeFinderSearchParams = Partial<RecipeSearchParams> & {
@@ -144,6 +145,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
     );
     const [cacheMealTypeFilter, setCacheMealTypeFilter] = useState<CacheMealTypeFilter>('');
     const [cacheCuisineFilter, setCacheCuisineFilter] = useState<string>('');
+    const [cacheMeatFilter, setCacheMeatFilter] = useState<string>('');
     
     // Search parameters
     const [specificQuery, setSpecificQuery] = useState('');
@@ -175,7 +177,6 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
 
     // Firebase recipes state
     const [firebaseRecipes, setFirebaseRecipes] = useState<SavedRecipe[]>([]);
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const [firebaseRecipesLoading, setFirebaseRecipesLoading] = useState(false);
     // Visible count for incremental rendering from cached doc
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -191,14 +192,24 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
 
     // Memoized filtered recipes for popular cache section
     const filteredFirebaseRecipes = useMemo(() => {
-        const filtered = firebaseRecipes.filter(recipe =>
+        let filtered = firebaseRecipes.filter(recipe =>
             recipeMatchesCacheFilters(recipe, {
                 mealType: cacheMealTypeFilter,
                 cuisine: cacheCuisineFilter
             })
         );
+        if (cacheMeatFilter) {
+            const meat = cacheMeatFilter.toLowerCase();
+            filtered = filtered.filter(recipe => {
+                const titleMatch = recipe.title.toLowerCase().includes(meat);
+                const ingredientMatch = (recipe.ingredients || []).some(ing =>
+                    ing.toLowerCase().includes(meat)
+                );
+                return titleMatch || ingredientMatch;
+            });
+        }
         return rankCachedRecipesByPreferences(filtered, household?.members || [], user?.profile);
-    }, [firebaseRecipes, cacheMealTypeFilter, cacheCuisineFilter, household?.members, user?.profile]);
+    }, [firebaseRecipes, cacheMealTypeFilter, cacheCuisineFilter, cacheMeatFilter, household?.members, user?.profile]);
     
     // Recipe cache to avoid duplicate API calls
     const [recipeCache, setRecipeCache] = useState<Map<string, RecipeSearchResult>>(new Map());
@@ -924,6 +935,26 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
         }
     ];
 
+    const filteredFallbackRecipes = useMemo(() => {
+        let filtered = csvRecipes.filter(recipe =>
+            recipeMatchesCacheFilters(recipe, {
+                mealType: cacheMealTypeFilter,
+                cuisine: cacheCuisineFilter
+            })
+        );
+        if (cacheMeatFilter) {
+            const meat = cacheMeatFilter.toLowerCase();
+            filtered = filtered.filter(recipe => {
+                const titleMatch = recipe.title.toLowerCase().includes(meat);
+                const ingredientMatch = (recipe.ingredients || []).some(ing =>
+                    ing.toLowerCase().includes(meat)
+                );
+                return titleMatch || ingredientMatch;
+            });
+        }
+        return rankCachedRecipesByPreferences(filtered, household?.members || [], user?.profile);
+    }, [csvRecipes, cacheMealTypeFilter, cacheCuisineFilter, cacheMeatFilter, household?.members, user?.profile]);
+
   // Limit inventory items to reduce API token cost (top 25 most relevant items)
   const inventoryString = inventory
     .filter(item => !STAPLES.some(staple => item.item.toLowerCase().includes(staple)))
@@ -1486,7 +1517,9 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
 
   return (
     <div className="space-y-6 pb-24 max-w-2xl mx-auto animate-fade-in" role="main" aria-label="Recipe finder">
-            <RecipeFinderTabs activeView={activeView} setActiveView={setActiveView} savedCount={savedRecipes.length} />
+      <div className="sticky top-0 z-40 bg-theme-primary py-3 -mx-4 px-4 border-b border-theme/40 shadow-sm md:-mx-8 md:px-8">
+        <RecipeFinderTabs activeView={activeView} setActiveView={setActiveView} savedCount={savedRecipes.length} />
+      </div>
 
       {activeView === 'saved' ? (
           <PremiumFeature
@@ -1549,8 +1582,12 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
           </PremiumFeature>
       ) : (
         <>
-
-
+          <SmartRecommendations
+            inventory={inventory}
+            savedRecipes={savedRecipes}
+            user={user}
+            setActiveTab={setActiveTab}
+          />
 
             <RecipeFinderSearchControls
               specificQuery={specificQuery}
@@ -1613,15 +1650,17 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
               setCacheMealTypeFilter={setCacheMealTypeFilter}
               cacheCuisineFilter={cacheCuisineFilter}
               setCacheCuisineFilter={setCacheCuisineFilter}
+              cacheMeatFilter={cacheMeatFilter}
+              setCacheMeatFilter={setCacheMeatFilter}
               availableCuisineFilters={availableCuisineFilters}
               openRecipeModal={openRecipeModal}
               onAddToPlan={onAddToPlan}
               user={user}
               household={household}
               filteredFirebaseRecipes={
-                filteredFirebaseRecipes.length > 0
+                firebaseRecipes.length > 0 || !firebaseRecipesLoading
                   ? filteredFirebaseRecipes
-                  : rankCachedRecipesByPreferences(csvRecipes, household?.members || [], user?.profile)
+                  : filteredFallbackRecipes
               }
               onSearchEntireDatabase={handleSearchEntireDatabase}
             />

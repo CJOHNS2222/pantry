@@ -6,8 +6,9 @@ import { useApp } from '../../contexts/AppContext';
 import { comparePriceOptions, formatPricePerUnit, getPriceComparisonSummary } from '../../utils/priceCalculator';
 import { useAndroidBack } from '../../hooks/useAndroidBack';
 import HapticService from '../../services/hapticService';
-import { getItemImageLocalPath, parseQuantityAndUnit } from '../../utils/appUtils';
+import { getItemImage, parseQuantityAndUnit } from '../../utils/appUtils';
 import { getSmartUnits } from '../pantry/QuantityUnitPicker';
+import { convertUnit } from '../../utils/measurementUtils';
 
 const getRecipeTitleFromSource = (source: string | undefined): string => {
   if (!source || !source.startsWith('recipe:')) return '';
@@ -216,7 +217,7 @@ export const EnhancedShoppingListItem: React.FC<ShoppingListItemProps> = ({
       >
         <div className="flex items-start gap-3 flex-1 min-w-0">
           {(() => {
-            const imageUrl = getItemImageLocalPath(item.item);
+            const imageUrl = getItemImage(item.item, item.category);
             return imageUrl ? (
               <img
                 src={imageUrl}
@@ -403,9 +404,10 @@ export const EnhancedShoppingListItem: React.FC<ShoppingListItemProps> = ({
                     value={unit}
                     onChange={(e) => {
                       const newUnit = e.target.value;
+                      const convertedAmount = convertUnit(amount, unit, newUnit);
                       const newQuantityStr = newUnit === 'pcs' || newUnit === 'pieces' || newUnit === 'count' || newUnit === 'each'
-                        ? amount.toString()
-                        : `${amount} ${newUnit}`;
+                        ? convertedAmount.toString()
+                        : `${convertedAmount} ${newUnit}`;
                       onQuantityChange(item.id, newQuantityStr);
                       onUpdateItem?.(item.id, { quantity: newQuantityStr, unit: newUnit });
                     }}

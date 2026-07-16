@@ -138,6 +138,7 @@
     "via": "経由 {source}"
   },
   "recipes": {
+    "originalSource": "元のレシピを見る",
     "title": "レシピ",
     "saved": "保存済みレシピ",
     "popular": "人気レシピ",
@@ -181,7 +182,7 @@
     "mealPrep": "作り置き",
     "clearWeek": "週をクリア",
     "copyToNextWeek": "翌週にコピー",
-    "exportIcs": "エクスポート .ics"
+    "exportIcs": "カレンダーにエクスポート"
   },
   "settings": {
     "title": "設定",

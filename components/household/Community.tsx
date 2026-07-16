@@ -100,7 +100,16 @@ export const Community: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecipe,
     }
   });
 
-  const checklistSteps = useMemo(() => {
+  interface ChecklistStep {
+    id: string;
+    label: string;
+    description: string;
+    isCompleted: boolean;
+    action: () => void;
+    actionLabel: string;
+  }
+
+  const checklistSteps = useMemo((): ChecklistStep[] => {
     const pSaved = hasMilestone('first-recipe-saved');
     const mPlanned = hasMilestone('first-meal-planned');
     const hSetup = hasMilestone('household-setup');
@@ -118,6 +127,7 @@ export const Community: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecipe,
             sessionStorage.setItem('open-pantry-add-modal', 'true');
           } catch (e) {
             log.error('Failed to write open-pantry-add-modal to sessionStorage', { error: e }, 'Community');
+            return;
           }
           if (setActiveTab) setActiveTab(Tab.PANTRY);
         },
@@ -157,6 +167,7 @@ export const Community: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecipe,
             sessionStorage.setItem('open-pantry-add-modal', 'true');
           } catch (e) {
             log.error('Failed to write open-pantry-add-modal to sessionStorage', { error: e }, 'Community');
+            return;
           }
           if (setActiveTab) setActiveTab(Tab.PANTRY);
         },
@@ -175,6 +186,7 @@ export const Community: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecipe,
       localStorage.setItem('onboarding-checklist-dismissed', 'true');
     } catch (e) {
       log.error('Failed to save onboarding-checklist-dismissed to localStorage', { error: e }, 'Community');
+      return;
     }
   };
 
@@ -230,7 +242,7 @@ export const Community: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecipe,
     setTimeout(() => createExplosion(w * 0.75, h * 0.45), 400);
     setTimeout(() => createExplosion(w * 0.5, h * 0.35), 600);
 
-    const render = () => {
+    const drawFrame = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       for (let i = particles.length - 1; i >= 0; i--) {
@@ -255,13 +267,13 @@ export const Community: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecipe,
       }
 
       if (particles.length > 0) {
-        requestAnimationFrame(render);
+        requestAnimationFrame(drawFrame);
       } else {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
       }
     };
 
-    render();
+    drawFrame();
   };
 
   const handleBadgeClick = (badge: AchievementBadge) => {
@@ -290,27 +302,42 @@ export const Community: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecipe,
         if (!mounted) return;
 
         if (Array.isArray(cached) && cached.length > 0) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const first = cached[0] as any;
+          const first = cached[0] as unknown as Record<string, unknown>;
           if (first && (first.recipeTitle || first.comment || first.userName)) {
-            setRatingsState(cached as unknown as RecipeRating[]);
+            const ratings: RecipeRating[] = cached.map((r) => {
+              const item = r as unknown as Record<string, unknown>;
+              return {
+                id: String(item.id || ''),
+                recipeTitle: String(item.recipeTitle || ''),
+                rating: Number(item.rating || 0),
+                comment: String(item.comment || ''),
+                userName: String(item.userName || ''),
+                date: String(item.date || ''),
+                recipe: item.recipe as StructuredRecipe | undefined
+              };
+            });
+            setRatingsState(ratings);
           } else {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const synthetic: RecipeRating[] = (cached as any[]).map((r: any, i: number) => ({
-              id: r.id || `community_${i}`,
-              recipeTitle: r.title || 'Untitled',
-              rating: (typeof r.averageRating === 'number' ? Math.round(r.averageRating * 10) / 10 : 0),
-              comment: r.description || '',
-              userName: 'Community',
-              date: r.lastUpdated || r.dateSaved || new Date().toISOString(),
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              recipe: r as any
-            }));
+            const synthetic: RecipeRating[] = cached.map((r, i: number) => {
+              const item = r as unknown as Record<string, unknown>;
+              const averageRating = item.averageRating;
+              const lastUpdated = item.lastUpdated;
+              return {
+                id: r.id || `community_${i}`,
+                recipeTitle: r.title || 'Untitled',
+                rating: (typeof averageRating === 'number' ? Math.round(averageRating * 10) / 10 : 0),
+                comment: r.description || '',
+                userName: 'Community',
+                date: String(lastUpdated || r.dateSaved || new Date().toISOString()),
+                recipe: r
+              };
+            });
             setRatingsState(synthetic);
           }
         }
       } catch (e) {
         log.error('Failed to load cached community recipes', { error: e }, 'Community');
+        return;
       } finally {
         if (mounted) {
           setLocalLoading(false);
@@ -688,14 +715,14 @@ export const Community: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecipe,
               </div>
             ) : (
               <>
-                {(showAll ? sortedRecipes : sortedRecipes.slice(0, 5)).map((stat, idx) => {
+                {(showAll ? sortedRecipes : sortedRecipes.slice(0, 5)).map((stat) => {
                   const avg = (stat.totalRating / stat.count).toFixed(1);
                   const latestComment = stat.comments && stat.comments[0] ? stat.comments[0] : null;
                   const fullRecipe = findRecipeForStat(stat);
                   
                   return (
                     <div 
-                      key={idx} 
+                      key={stat.title} 
                       className="bg-theme-secondary rounded-xl border border-theme shadow-lg overflow-hidden group hover:shadow-xl transition-all cursor-pointer"
                       onClick={() => { setSelectedRecipe(stat); setShowModal(true); }}
                       role="button"
@@ -713,7 +740,7 @@ export const Community: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecipe,
                       <div className="h-32 bg-gray-200 relative overflow-hidden">
                         {fullRecipe?.image ? (
                           <img
-                            src={fullRecipe.image}
+                            src={fullRecipe?.image}
                             alt={stat.title}
                             className="w-full h-full object-cover"
                             onError={(e) => {
