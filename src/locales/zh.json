@@ -138,6 +138,7 @@
     "via": "通过 {source}"
   },
   "recipes": {
+    "originalSource": "查看原始食谱",
     "title": "食谱",
     "saved": "已保存的食谱",
     "popular": "热门食谱",
@@ -181,7 +182,7 @@
     "mealPrep": "备餐",
     "clearWeek": "清空本周",
     "copyToNextWeek": "复制到下周",
-    "exportIcs": "导出 .ics"
+    "exportIcs": "导出到日历"
   },
   "settings": {
     "title": "设置",

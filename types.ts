@@ -159,6 +159,7 @@ export interface StructuredRecipe {
   id?: string;
   type?: string;
   image?: string;
+  url?: string;
   nutrition?: {
     calories?: number;
     protein?: number;

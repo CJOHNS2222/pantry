@@ -43,7 +43,7 @@ export const RecipeFinderSavedView: React.FC<RecipeFinderSavedViewProps> = ({
   setSavedSort,
   sortedSavedRecipes,
   renderRecipeCard,
-  onExportRecipes,
+  onExportRecipes: _onExportRecipes,
   onAddManualRecipe,
 }) => {
   const intl = useIntl();
@@ -229,7 +229,7 @@ export const RecipeFinderSavedView: React.FC<RecipeFinderSavedViewProps> = ({
                     {renderRecipeCard(r, true, true)}
                     <button
                       onClick={() => setRecipeToOrganize(r)}
-                      className="absolute top-2 right-2 p-1.5 bg-white/95 dark:bg-black/90 rounded-full shadow border border-theme text-theme-secondary hover:text-[var(--accent-color)] transition-all opacity-0 group-hover:opacity-100 focus:opacity-100 z-10"
+                      className="absolute top-2 right-2 p-1.5 bg-white/95 dark:bg-black/90 rounded-full shadow border border-theme text-theme-secondary hover:text-[var(--accent-color)] transition-all opacity-100 z-10"
                       title="Organize into collections"
                     >
                       <PlusCircle className="w-4 h-4" />
@@ -332,7 +332,7 @@ export const RecipeFinderSavedView: React.FC<RecipeFinderSavedViewProps> = ({
                           {renderRecipeCard(r, true, true)}
                           <button
                             onClick={() => handleRemoveFromCollection(selectedCollection, r.title)}
-                            className="absolute top-2 right-2 p-1 px-2 bg-red-500 hover:bg-red-600 text-white text-[10px] font-bold rounded-lg shadow-md transition-all opacity-0 group-hover:opacity-100 focus:opacity-100 z-10"
+                            className="absolute top-2 right-2 p-1 px-2 bg-red-500 hover:bg-red-600 text-white text-[10px] font-bold rounded-lg shadow-md transition-all opacity-100 z-10"
                             title="Remove from cookbook"
                           >
                             Remove

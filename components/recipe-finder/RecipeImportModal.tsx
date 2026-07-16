@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { X, Link2, Globe, HelpCircle } from 'lucide-react';
+import { X, Link2, Globe } from 'lucide-react';
 import { fetchRecipeFromUrl } from '../../services/importService';
 import { useApp } from '../../contexts/AppContext';
 import { useAppActions } from '../../contexts/AppActionsContext';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
-import { saveRecipeToUserCache } from '../../services/recipeService';
+import { saveRecipeToUserCache, submitRecipeForReview } from '../../services/recipeService';
 import { log } from '../../services/logService';
 import AnalyticsService from '../../services/analyticsService';
 import { useAndroidBack } from '../../hooks/useAndroidBack';
@@ -23,6 +23,7 @@ const RecipeImportModal: React.FC<RecipeImportModalProps> = ({ open, onClose }) 
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [previewedRecipe, setPreviewedRecipe] = useState<import('../../types').StructuredRecipe | null>(null);
+  const [shareWithCommunity, setShareWithCommunity] = useState(true);
 
   if (!open) return null;
 
@@ -46,6 +47,15 @@ const RecipeImportModal: React.FC<RecipeImportModalProps> = ({ open, onClose }) 
         return;
       }
       await saveRecipeToUserCache(user.id, recipe, household?.id);
+      
+      if (shareWithCommunity) {
+        try {
+          await submitRecipeForReview(recipe, user.id);
+        } catch (subErr) {
+          log.warn('Failed to submit imported recipe to community', { error: subErr }, 'RecipeImportModal');
+        }
+      }
+
       addToast(`Recipe saved: "${recipe.title}"`, 'success');
       setPreviewedRecipe(null);
       onClose();
@@ -53,7 +63,8 @@ const RecipeImportModal: React.FC<RecipeImportModalProps> = ({ open, onClose }) 
       AnalyticsService.trackEvent('recipe_imported', {
         recipeTitle: recipe.title,
         sourceUrl: url,
-        userId: user.id
+        userId: user.id,
+        sharedWithCommunity: shareWithCommunity
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -117,6 +128,19 @@ const RecipeImportModal: React.FC<RecipeImportModalProps> = ({ open, onClose }) 
                 className="w-full pl-10 pr-4 py-2.5 rounded-2xl border border-theme bg-theme-primary text-theme-primary text-xs focus:border-[var(--accent-color)] focus:outline-none placeholder:text-theme-secondary" 
                 data-testid="import-recipe-url" 
               />
+            </div>
+            
+            <div className="flex items-center gap-2.5 pt-1 px-1">
+              <input
+                type="checkbox"
+                id="shareWithCommunity"
+                checked={shareWithCommunity}
+                onChange={(e) => setShareWithCommunity(e.target.checked)}
+                className="w-4 h-4 rounded border-theme bg-theme-primary text-[var(--accent-color)] focus:ring-[var(--accent-color)] focus:outline-none cursor-pointer"
+              />
+              <label htmlFor="shareWithCommunity" className="text-xs text-theme-secondary font-medium cursor-pointer select-none">
+                Share this recipe with the community
+              </label>
             </div>
           </div>
 

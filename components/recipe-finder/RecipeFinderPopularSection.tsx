@@ -10,6 +10,8 @@ interface RecipeFinderPopularSectionProps {
   setCacheMealTypeFilter: React.Dispatch<React.SetStateAction<CacheMealTypeFilter>>;
   cacheCuisineFilter: string;
   setCacheCuisineFilter: React.Dispatch<React.SetStateAction<string>>;
+  cacheMeatFilter: string;
+  setCacheMeatFilter: React.Dispatch<React.SetStateAction<string>>;
   availableCuisineFilters: string[];
   openRecipeModal: (recipe: StructuredRecipe, isSavedView?: boolean) => void;
   onAddToPlan: (recipe: StructuredRecipe) => void;
@@ -25,6 +27,8 @@ export const RecipeFinderPopularSection: React.FC<RecipeFinderPopularSectionProp
   setCacheMealTypeFilter,
   cacheCuisineFilter,
   setCacheCuisineFilter,
+  cacheMeatFilter,
+  setCacheMeatFilter,
   availableCuisineFilters,
   openRecipeModal,
   onAddToPlan,
@@ -48,7 +52,7 @@ export const RecipeFinderPopularSection: React.FC<RecipeFinderPopularSectionProp
         >
           All Meals
         </button>
-        {(['breakfast', 'lunch', 'dinner'] as CacheMealTypeFilter[]).map((meal) => (
+        {(['breakfast', 'lunch', 'dinner', 'dessert'] as CacheMealTypeFilter[]).map((meal) => (
           <button
             key={meal}
             onClick={() => setCacheMealTypeFilter(meal)}
@@ -69,6 +73,24 @@ export const RecipeFinderPopularSection: React.FC<RecipeFinderPopularSectionProp
               {cuisine.charAt(0).toUpperCase() + cuisine.slice(1)}
             </option>
           ))}
+        </select>
+
+        <select
+          value={cacheMeatFilter}
+          onChange={(e) => setCacheMeatFilter(e.target.value)}
+          className="ml-1 px-3 py-1 rounded-full border border-theme bg-theme-secondary/40 text-theme-secondary text-xs"
+          aria-label="Filter by meat/protein type"
+        >
+          <option value="">All Proteins</option>
+          <option value="chicken">Chicken</option>
+          <option value="beef">Beef</option>
+          <option value="steak">Steak</option>
+          <option value="pork">Pork</option>
+          <option value="fish">Fish</option>
+          <option value="seafood">Seafood</option>
+          <option value="turkey">Turkey</option>
+          <option value="lamb">Lamb</option>
+          <option value="tofu">Tofu</option>
         </select>
 
         {(cacheMealTypeFilter || cacheCuisineFilter) && (

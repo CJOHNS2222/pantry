@@ -164,34 +164,53 @@ export const RecipeExportModal: React.FC<RecipeExportModalProps> = ({
     window.location.href = `mailto:?subject=${subject}&body=${body}`;
   };
 
+  const generateSMSText = (list: SavedRecipe[]): string => {
+    let output = '';
+    list.forEach((r, idx) => {
+      output += `${r.title.toUpperCase()}\n`;
+      if (r.description) output += `${r.description}\n`;
+      if (r.cookTime) output += `Cook Time: ${r.cookTime}\n`;
+      output += `\nIngredients:\n`;
+      (r.ingredients || []).forEach(ing => {
+        output += `• ${ing}\n`;
+      });
+      output += `\nInstructions:\n`;
+      (r.instructions || []).forEach((step, sIdx) => {
+        output += `${sIdx + 1}. ${step}\n`;
+      });
+      if (idx < list.length - 1) {
+        output += `\n---\n\n`;
+      }
+    });
+    return output;
+  };
+
   const triggerSMSShare = (content: string) => {
-    const summary = `Shared Recipes:\n${selectedRecipes.map(r => r.title).join('\n')}`;
-    const body = encodeURIComponent(summary);
+    const smsBody = format === 'json' ? generateSMSText(selectedRecipes) : content;
+    const bodyText = smsBody.length > 1500 
+      ? smsBody.slice(0, 1500) + '\n\n[Truncated due to SMS size limits...]'
+      : smsBody;
+    const body = encodeURIComponent(bodyText);
     window.location.href = `sms:?&body=${body}`;
   };
 
   const triggerWebShare = async (filename: string, content: string, mimeType: string) => {
     if (!navigator.share) return;
     
-    try {
-      const file = new File([content], filename, { type: mimeType });
-      // Check if navigator supports sharing files
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({
-          files: [file],
-          title: 'Exported Recipes from Stock & Spoon',
-          text: 'Here are my saved recipes!'
-        });
-      } else {
-        // Fallback to text sharing
-        await navigator.share({
-          title: 'Exported Recipes from Stock & Spoon',
-          text: content.length > 2000 ? content.slice(0, 2000) + '...' : content
-        });
-      }
-    } catch (e) {
-      // User cancelled share sheet or error occurred, bubble up to main handler
-      throw e;
+    const file = new File([content], filename, { type: mimeType });
+    // Check if navigator supports sharing files
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({
+        files: [file],
+        title: 'Exported Recipes from Stock & Spoon',
+        text: 'Here are my saved recipes!'
+      });
+    } else {
+      // Fallback to text sharing
+      await navigator.share({
+        title: 'Exported Recipes from Stock & Spoon',
+        text: content.length > 2000 ? content.slice(0, 2000) + '...' : content
+      });
     }
   };
 

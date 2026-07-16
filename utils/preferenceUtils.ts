@@ -261,15 +261,18 @@ export function filterRecipesByHouseholdPreferences(
   return { safeRecipes, riskyRecipes };
 }
 
-export type CacheMealTypeFilter = '' | 'breakfast' | 'lunch' | 'dinner';
+export type CacheMealTypeFilter = '' | 'breakfast' | 'lunch' | 'dinner' | 'dessert';
 
 function getRecipeMealType(recipe: StructuredRecipe | SavedRecipe): string {
   const normalizedMealType = normalizeIngredient(((recipe as StructuredRecipe & { mealType?: string }).mealType || ''));
-  if (normalizedMealType === 'breakfast' || normalizedMealType === 'lunch' || normalizedMealType === 'dinner') {
+  if (normalizedMealType === 'breakfast' || normalizedMealType === 'lunch' || normalizedMealType === 'dinner' || normalizedMealType === 'dessert') {
     return normalizedMealType;
   }
 
   const normalizedType = normalizeIngredient(recipe.type || '');
+  if (normalizedType.includes('dessert') || normalizedType.includes('sweet') || normalizedType.includes('cake') || normalizedType.includes('cookie') || normalizedType.includes('pie')) {
+    return 'dessert';
+  }
   if (normalizedType.includes('breakfast') || normalizedType.includes('brunch') || normalizedType.includes('morning')) {
     return 'breakfast';
   }

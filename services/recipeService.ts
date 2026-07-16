@@ -588,7 +588,8 @@ export const saveRecipeToUserCache = async (uid: string, recipe: StructuredRecip
         cookTime: String(recipe.cookTime || ''),
         type: recipe.type || '',
         image: recipe.image || '',
-        dateSaved: new Date().toISOString()
+        dateSaved: new Date().toISOString(),
+        url: recipe.url || ''
       };
 
       // Always write to the user's personal cache so their own list is maintained

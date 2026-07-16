@@ -486,11 +486,11 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipes = [], initialI
       <div className="flex-1 flex overflow-hidden min-h-0">
         {/* Left Side: Ingredients Checklist (visible on large screen, or on small screen if mobile toggle is checked) */}
         <div className={`overflow-y-auto px-6 py-6 border-r border-white/10 bg-black/20 ${
-          showIngredientsMobile ? 'flex flex-col w-full' : 'hidden md:flex md:flex-col md:w-1/3'
+          showIngredientsMobile ? 'w-full' : 'hidden md:block md:w-1/3'
         }`}>
           {/* Visual End-Result Image */}
           {recipe.image && (
-            <div className="mb-4 rounded-xl overflow-hidden border border-white/10 flex-shrink-0 shadow-md">
+            <div className="mb-4 rounded-xl overflow-hidden border border-white/10 shadow-md">
               <img
                 src={recipe.image}
                 alt={recipe.title}
@@ -499,7 +499,7 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipes = [], initialI
             </div>
           )}
 
-          <div className="flex items-center justify-between mb-4 flex-shrink-0">
+          <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-bold text-[var(--accent-color)] uppercase tracking-wider">
               Ingredients
             </h3>
@@ -507,7 +507,7 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipes = [], initialI
               {Object.values(checkedIngredients).filter(Boolean).length} / {(recipe.ingredients || []).length} checked
             </span>
           </div>
-          <ul className="space-y-3.5 overflow-y-auto flex-1 pr-1">
+          <ul className="space-y-3.5 pr-1">
             {(recipe.ingredients || []).map((ing, i) => {
               const isChecked = checkedIngredients[i] || false;
               return (
@@ -535,7 +535,7 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipes = [], initialI
           {showIngredientsMobile && (
             <button
               onClick={() => setShowIngredientsMobile(false)}
-              className="mt-6 w-full py-4 bg-[var(--accent-color)] text-white rounded-xl font-bold text-sm flex-shrink-0"
+              className="mt-6 w-full py-4 bg-[var(--accent-color)] text-white rounded-xl font-bold text-sm"
             >
               Show Instructions Steps
             </button>

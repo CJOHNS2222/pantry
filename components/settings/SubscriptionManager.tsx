@@ -342,9 +342,7 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }
           <div className="grid gap-4 md:grid-cols-3">
             {plans.map((plan) => {
               const targetProductId = getPlanProductId(plan.id, billingPeriod);
-              const isCurrentProduct = targetProductId 
-                ? subscription?.product_id === targetProductId
-                : subscription?.tier === plan.id;
+              const isCurrentProduct = plan.id === (subscription?.tier || 'free');
 
               const planTierIndex = TIER_ORDER[plan.id] || 0;
               const currentTierIndex = TIER_ORDER[subscription?.tier || 'free'] || 0;

@@ -123,3 +123,69 @@ export function convertRecipeIngredients(
     };
   });
 }
+
+/**
+ * Convert an amount from one unit to another
+ */
+export function convertUnit(amount: number, fromUnit: string, toUnit: string): number {
+  const from = fromUnit.toLowerCase().trim();
+  const to = toUnit.toLowerCase().trim();
+
+  if (from === to) return amount;
+
+  // Weight conversion factors to Grams (g)
+  const weightFactors: Record<string, number> = {
+    'g': 1,
+    'grams': 1,
+    'kg': 1000,
+    'kilograms': 1000,
+    'oz': 28.3495,
+    'ounce': 28.3495,
+    'ounces': 28.3495,
+    'lb': 453.592,
+    'lbs': 453.592,
+    'pound': 453.592,
+    'pounds': 453.592
+  };
+
+  // Volume conversion factors to Milliliters (ml)
+  const volumeFactors: Record<string, number> = {
+    'ml': 1,
+    'milliliters': 1,
+    'l': 1000,
+    'liters': 1000,
+    'cup': 236.588,
+    'cups': 236.588,
+    'tbsp': 14.7868,
+    'tablespoon': 14.7868,
+    'tablespoons': 14.7868,
+    'tsp': 4.92892,
+    'teaspoon': 4.92892,
+    'teaspoons': 4.92892,
+    'fl oz': 29.5735,
+    'fluid ounce': 29.5735,
+    'fluid ounces': 29.5735,
+    'pint': 473.176,
+    'pints': 473.176,
+    'quart': 946.353,
+    'quarts': 946.353,
+    'gallon': 3785.41,
+    'gallons': 3785.41
+  };
+
+  // 1. Weight to Weight
+  if (weightFactors[from] !== undefined && weightFactors[to] !== undefined) {
+    const inGrams = amount * weightFactors[from];
+    const rawResult = inGrams / weightFactors[to];
+    return rawResult < 0.1 ? Math.round(rawResult * 1000) / 1000 : Math.round(rawResult * 100) / 100;
+  }
+
+  // 2. Volume to Volume
+  if (volumeFactors[from] !== undefined && volumeFactors[to] !== undefined) {
+    const inMl = amount * volumeFactors[from];
+    const rawResult = inMl / volumeFactors[to];
+    return rawResult < 0.1 ? Math.round(rawResult * 1000) / 1000 : Math.round(rawResult * 100) / 100;
+  }
+
+  return amount;
+}
