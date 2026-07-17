@@ -1,3 +1,15 @@
+## [3.0.8] - 2026-07-17
+
+### Added
+- **Standardized UI Components** — Added a suite of reusable UI primitives under `components/ui/` (including `Button`, `Toast`, `Modal`, `Tabs`, `BottomSheet`, `ConfirmDialog`, `EmptyState`, `Input`, `ProgressBar`, `Select`).
+- **UI Unification & Refactoring** — Refactored key screens (Pantry, Meal Planner, Household, Shopping List, App root) to use the new standardized UI components, improving aesthetic consistency.
+- **Portal-based Centralized Toasts** — Migrated to a centralized portal-based toast notification system (`ToastProvider`) for standardizing layout positioning and behaviors.
+
+### Fixed
+- **Code Quality & Type Safety** — Resolved type safety issues and lint warnings in `RecipeExportModal` and other codebase modules.
+
+---
+
 ## [3.0.7] - 2026-07-16
 
 ### Added

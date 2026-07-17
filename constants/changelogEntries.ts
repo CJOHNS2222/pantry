@@ -20,6 +20,16 @@ export interface DetailedChangeEntry {
 
 export const RECENT_CHANGES: ChangeEntry[] = [
   {
+    "version": "3.0.8",
+    "date": "Jul 17, 2026",
+    "highlights": [
+      "Standardized UI Components — Added a suite of reusable UI primitives under components/ui/ (including Button, Toast,…",
+      "UI Unification & Refactoring — Refactored key screens (Pantry, Meal Planner, Household, Shopping List, App root) to use…",
+      "Portal-based Centralized Toasts — Migrated to a centralized portal-based toast notification system (ToastProvider) for…",
+      "Code Quality & Type Safety — Resolved type safety issues and lint warnings in RecipeExportModal and other codebase…"
+    ]
+  },
+  {
     "version": "3.0.7",
     "date": "Jul 16, 2026",
     "highlights": [
@@ -38,20 +48,30 @@ export const RECENT_CHANGES: ChangeEntry[] = [
       "Native Shopping List Export — Rebuilt shopping list export/sharing to support Capacitor Share dialogs on mobile with…",
       "Preserved Merge Batches — Modified automatic shopping list consolidation to track and display separate added dates,…"
     ]
-  },
-  {
-    "version": "3.0.5",
-    "date": "Jul 12, 2026",
-    "highlights": [
-      "Plan Comparison Matrix — Added a detailed comparison modal displaying a side-by-side feature matrix of all plan limits…",
-      "Support Contact Modal — Integrated an email support contact form inside the app that sends messages directly via the…",
-      "Optimistic Subscription Upgrades — Implemented client-side optimistic UI updates to instantly unlock Premium/Family…",
-      "Legacy Subscription Fallbacks — Refined pricing fields to handle legacy subscriptions (which lack product ID records)…"
-    ]
   }
 ];
 
 export const ALL_CHANGES: DetailedChangeEntry[] = [
+  {
+    "version": "3.0.8",
+    "date": "Jul 17, 2026",
+    "sections": [
+      {
+        "title": "Added",
+        "bullets": [
+          "**Standardized UI Components** — Added a suite of reusable UI primitives under `components/ui/` (including `Button`, `Toast`, `Modal`, `Tabs`, `BottomSheet`, `ConfirmDialog`, `EmptyState`, `Input`, `ProgressBar`, `Select`).",
+          "**UI Unification & Refactoring** — Refactored key screens (Pantry, Meal Planner, Household, Shopping List, App root) to use the new standardized UI components, improving aesthetic consistency.",
+          "**Portal-based Centralized Toasts** — Migrated to a centralized portal-based toast notification system (`ToastProvider`) for standardizing layout positioning and behaviors."
+        ]
+      },
+      {
+        "title": "Fixed",
+        "bullets": [
+          "**Code Quality & Type Safety** — Resolved type safety issues and lint warnings in `RecipeExportModal` and other codebase modules."
+        ]
+      }
+    ]
+  },
   {
     "version": "3.0.7",
     "date": "Jul 16, 2026",

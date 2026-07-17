@@ -1,12 +1,14 @@
 import React from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { List } from 'react-window';
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const ReactWindowList = List as any;
 import StorageLocationIndicator from './StorageLocationIndicator';
 import { PantryGridItem } from './PantryGridItem';
 import { PantryListItem } from './PantryListItem';
 import { DisplayedPantryItem } from '../../hooks/usePantryFilters';
 import { PantryItem } from '../../types';
+import { EmptyState } from '../ui/EmptyState';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const VirtualizedRow = ({ index, style, data }: { index: number; style: React.CSSProperties; data: any }) => {
@@ -175,6 +177,7 @@ export const PantryListView: React.FC<PantryListViewProps> = ({
                   renderRow: (index: number, style: React.CSSProperties) => renderCategoryItem({ index, style, category })
                 }}
               >
+                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                 {VirtualizedRow as any}
               </ReactWindowList>
             ) : (
@@ -222,9 +225,12 @@ export const PantryListView: React.FC<PantryListViewProps> = ({
 
         <div className="border-t border-theme">
           {items.length === 0 ? (
-            <div className="p-4 text-center text-theme-secondary opacity-50 text-sm">
-              No items in {locationLabel.toLowerCase()}
-            </div>
+            <EmptyState
+              preset="pantry"
+              size="compact"
+              bare
+              description={`No items stored in ${locationLabel.toLowerCase()} yet.`}
+            />
           ) : displayLayout === 'grid' ? (
             <div className="grid grid-cols-3 gap-2 p-2">
               {items.map(item => (
@@ -253,6 +259,7 @@ export const PantryListView: React.FC<PantryListViewProps> = ({
                 renderRow: (index: number, style: React.CSSProperties) => renderStorageItem({ index, style, location })
               }}
             >
+              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
               {VirtualizedRow as any}
             </ReactWindowList>
           ) : (

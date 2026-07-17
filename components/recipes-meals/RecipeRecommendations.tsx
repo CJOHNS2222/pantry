@@ -4,7 +4,7 @@ import { Heart, Users, TrendingUp, Clock, ChefHat, Star, Loader2 } from 'lucide-
 import { StructuredRecipe } from '../../types';
 import { RecipeRecommendationService, RecipeRecommendation } from '../../services/recipeRecommendationService';
 import AppContext from '../../contexts/AppContext';
-import { useToasts } from '../../hooks/useToasts';
+import { useToast } from '../ui/Toast';
 import { log } from '../../services/logService';
 
 interface RecipeRecommendationsProps {
@@ -22,7 +22,7 @@ export const RecipeRecommendations: React.FC<RecipeRecommendationsProps> = ({
 }) => {
   const context = useContext(AppContext);
   const user = context?.user;
-  const { addToast } = useToasts();
+  const toast = useToast();
   const [recommendations, setRecommendations] = useState<RecipeRecommendation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -92,7 +92,7 @@ export const RecipeRecommendations: React.FC<RecipeRecommendationsProps> = ({
     } catch (err) {
       log.error('Failed to load recommendations:', err);
       setError('Failed to load recommendations');
-      addToast('Failed to load recipe recommendations', 'error');
+      toast.error('Failed to load recipe recommendations');
     } finally {
       setIsLoading(false);
     }

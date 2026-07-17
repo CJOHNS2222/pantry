@@ -39,22 +39,32 @@ const getCacheRef = (householdId?: string, userId?: string) => {
 const updateCache = async (mealPlan: DayPlan[], householdId?: string, userId?: string) => {
   try {
     const cacheRef = getCacheRef(householdId, userId);
-    const dataToCache = {
-      version: CACHE_VERSION,
-      lastUpdated: new Date(),
-      days: mealPlan.reduce((acc, day) => {
-        acc[day.date] = {
+    
+    // Only serialize days that contain meals to optimize storage size and support clearing days
+    const activeDays: { [key: string]: any } = {};
+    for (const day of mealPlan) {
+      const hasMeals = (day.breakfast?.length || 0) > 0 || (day.lunch?.length || 0) > 0 || (day.dinner?.length || 0) > 0;
+      if (hasMeals) {
+        activeDays[day.date] = {
           dayName: day.dayName,
           breakfast: day.breakfast || [],
           lunch: day.lunch || [],
           dinner: day.dinner || [],
         };
-        return acc;
-      }, {} as { [key: string]: any }),
+      }
+    }
+
+    const dataToCache = {
+      version: CACHE_VERSION,
+      lastUpdated: new Date(),
+      days: sanitizeObject(activeDays),
     };
-    await DatabaseMonitoringService.setDoc(cacheRef, dataToCache, { merge: true });
+
+    // Overwrite the entire cache document (do not merge) so that cleared days are actually deleted from Firestore
+    await DatabaseMonitoringService.setDoc(cacheRef, dataToCache);
   } catch (err: any) {
     console.error('Failed to update meal plan cache:', err);
+    throw err;
   }
 };
 

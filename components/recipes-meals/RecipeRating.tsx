@@ -4,7 +4,7 @@ import { RecipeRating, StructuredRecipe, RecipeFeedback, RecipePhoto, RecipeModi
 import { RecipeRatingService } from '../../services/recipeRatingService';
 import { RecipePhotoService } from '../../services/recipePhotoService';
 import AppContext from '../../contexts/AppContext';
-import { useToasts } from '../../hooks/useToasts';
+import { useToast } from '../ui/Toast';
 import { log } from '../../services/logService';
 
 interface RecipeRatingUIProps {
@@ -24,7 +24,7 @@ export const RecipeRatingUI: React.FC<RecipeRatingUIProps> = ({
 }) => {
   const context = useContext(AppContext);
   const contextUser = context?.user;
-  const { addToast } = useToasts();
+  const toast = useToast();
   const [existingRating, setExistingRating] = useState<RecipeRating | null>(null);
   // Support prop user override for testing
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -109,7 +109,7 @@ export const RecipeRatingUI: React.FC<RecipeRatingUIProps> = ({
     // Validate file
     const validation = RecipePhotoService.validatePhotoFile(file);
     if (!validation.valid) {
-      addToast(validation.error!, 'error');
+      toast.error(validation.error!);
       return;
     }
 
@@ -128,10 +128,10 @@ export const RecipeRatingUI: React.FC<RecipeRatingUIProps> = ({
       );
 
       setPhotos(prev => [...prev, photo]);
-      addToast('Photo uploaded successfully!', 'info');
+      toast.info('Photo uploaded successfully!');
     } catch (error) {
       log.error('Photo upload failed:', error);
-      addToast('Failed to upload photo. Please try again.', 'error');
+      toast.error('Failed to upload photo. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -175,10 +175,10 @@ export const RecipeRatingUI: React.FC<RecipeRatingUIProps> = ({
       setExistingRating(rating);
       setIsSubmitted(true);
       onRatingSubmitted?.(rating);
-      addToast('Rating submitted successfully!', 'info');
+      toast.info('Rating submitted successfully!');
     } catch (error) {
       log.error('Failed to submit rating', { error }, 'RecipeRatingUI');
-      addToast('Failed to submit rating. Please try again.', 'error');
+      toast.error('Failed to submit rating. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -200,10 +200,10 @@ export const RecipeRatingUI: React.FC<RecipeRatingUIProps> = ({
 
       setModificationText('');
       setShowModificationForm(false);
-      addToast('Modification suggestion added!', 'info');
+      toast.info('Modification suggestion added!');
     } catch (error) {
       log.error('Failed to add modification', { error }, 'RecipeRatingUI');
-      addToast('Failed to add modification. Please try again.', 'error');
+      toast.error('Failed to add modification. Please try again.');
     }
   };
 

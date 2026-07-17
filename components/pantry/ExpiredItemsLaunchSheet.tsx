@@ -1,12 +1,13 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { ChevronDown, AlertTriangle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { AlertTriangle } from 'lucide-react';
 import { PantryItem } from '../../types';
 import { getQuantityAmount } from '../../utils/quantityUtils';
 import { getItemImage } from '../../utils/appUtils';
 import HapticService from '../../services/hapticService';
+
 import AnalyticsService from '../../services/analyticsService';
 import { log } from '../../services/logService';
-import { useModalOpen } from '../../utils/useModalOpen';
+import { BottomSheet } from '../ui';
 
 const LAUNCH_PREF_KEY = 'pantry_expired_launch_enabled';
 
@@ -40,11 +41,9 @@ const ExpiredItemsLaunchSheet: React.FC<ExpiredItemsLaunchSheetProps> = ({
   expiredItems,
   onRemoveItems,
 }) => {
-  useModalOpen(isOpen);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [isProcessing, setIsProcessing] = useState(false);
   const [alwaysShow, setAlwaysShow] = useState(getExpiredLaunchEnabled);
-  const sheetRef = useRef<HTMLDivElement>(null);
 
   // Pre-select all expired items when sheet opens
   useEffect(() => {
@@ -103,77 +102,46 @@ const ExpiredItemsLaunchSheet: React.FC<ExpiredItemsLaunchSheetProps> = ({
     onClose();
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div
-      className="fixed inset-0 z-50 flex flex-col justify-end"
-      onClick={onClose}
+    <BottomSheet
+      isOpen={isOpen}
+      onClose={onClose}
+      title={
+        <div className="flex items-center gap-2">
+          <AlertTriangle className="w-5 h-5 text-red-500" />
+          <span className="text-lg font-bold text-theme-primary">Expired Items</span>
+        </div>
+      }
     >
-      {/* Semi-transparent backdrop */}
-      <div className="absolute inset-0 bg-black/40" />
-
-      {/* Sheet */}
-      <div
-        ref={sheetRef}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Expired Items"
-        className="relative bg-theme-primary rounded-t-2xl shadow-2xl flex flex-col max-h-[80vh] animate-slide-up"
-        onClick={e => e.stopPropagation()}
-      >
-        {/* Drag handle */}
-        <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
-          <div className="w-10 h-1 rounded-full bg-theme-secondary opacity-40" />
-        </div>
-
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-theme flex-shrink-0">
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="w-5 h-5 text-red-500" />
-            <span className="text-lg font-bold text-theme-primary">Expired Items</span>
-          </div>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-theme-secondary transition-colors"
-            aria-label="Close"
-          >
-            <ChevronDown className="w-5 h-5 text-theme-secondary" />
-          </button>
-        </div>
-
+      <BottomSheet.Body className="px-5 space-y-4">
         {/* Description */}
-        <div className="px-5 pt-3 pb-2 flex-shrink-0">
-          <p className="text-sm text-theme-secondary">
-            {expiredItems.length === 1
-              ? '1 item in your pantry has expired. Review and remove it to keep your inventory accurate.'
-              : `${expiredItems.length} items in your pantry have expired. Review and remove them to keep your inventory accurate.`}
-          </p>
-        </div>
+        <p className="text-sm text-theme-secondary">
+          {expiredItems.length === 1
+            ? '1 item in your pantry has expired. Review and remove it to keep your inventory accurate.'
+            : `${expiredItems.length} items in your pantry have expired. Review and remove them to keep your inventory accurate.`}
+        </p>
 
         {/* Always show toggle */}
-        <div className="px-5 pb-3 flex-shrink-0">
-          <label className="flex items-center justify-between gap-3 cursor-pointer select-none">
-            <span className="text-sm text-theme-secondary">Always display list of expired items on launch</span>
-            <button
-              role="switch"
-              aria-checked={alwaysShow}
-              onClick={() => handleAlwaysShowToggle(!alwaysShow)}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
-                alwaysShow ? 'bg-[var(--accent-color)]' : 'bg-gray-300 dark:bg-gray-600'
+        <label className="flex items-center justify-between gap-3 cursor-pointer select-none pb-2">
+          <span className="text-sm text-theme-secondary">Always display list of expired items on launch</span>
+          <button
+            role="switch"
+            aria-checked={alwaysShow}
+            onClick={() => handleAlwaysShowToggle(!alwaysShow)}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+              alwaysShow ? 'bg-[var(--accent-color)]' : 'bg-gray-300 dark:bg-gray-600'
+            }`}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                alwaysShow ? 'translate-x-6' : 'translate-x-1'
               }`}
-            >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
-                  alwaysShow ? 'translate-x-6' : 'translate-x-1'
-                }`}
-              />
-            </button>
-          </label>
-        </div>
+            />
+          </button>
+        </label>
 
         {/* Items list */}
-        <div className="flex-1 overflow-y-auto px-4 pb-2 space-y-2">
+        <div className="space-y-2">
           {expiredItems.map(item => {
             const daysExpired = getDaysExpired(item.expirationDate!);
             const isSelected = selectedItems.has(item.id);
@@ -231,37 +199,33 @@ const ExpiredItemsLaunchSheet: React.FC<ExpiredItemsLaunchSheetProps> = ({
             );
           })}
         </div>
+      </BottomSheet.Body>
 
-        {/* Footer */}
-        <div
-          className="flex items-center justify-between gap-3 px-5 py-4 border-t border-theme flex-shrink-0"
-          style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
+      <BottomSheet.Footer>
+        <button
+          onClick={handleCancel}
+          className="px-5 py-2.5 rounded-xl border border-theme text-theme-secondary hover:bg-theme-secondary/50 transition-colors text-sm font-medium"
         >
-          <button
-            onClick={handleCancel}
-            className="px-5 py-2.5 rounded-xl border border-theme text-theme-secondary hover:bg-theme-secondary/50 transition-colors text-sm font-medium"
-          >
-            CANCEL
-          </button>
-          <button
-            onClick={handleFinish}
-            disabled={isProcessing}
-            className="flex-1 py-2.5 rounded-xl bg-[var(--accent-color)] hover:opacity-90 text-white font-semibold text-sm transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isProcessing ? (
-              <span className="flex items-center justify-center gap-2">
-                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                Removing…
-              </span>
-            ) : selectedItems.size > 0 ? (
-              `FINISH (Remove ${selectedItems.size})`
-            ) : (
-              'FINISH'
-            )}
-          </button>
-        </div>
-      </div>
-    </div>
+          CANCEL
+        </button>
+        <button
+          onClick={handleFinish}
+          disabled={isProcessing}
+          className="flex-1 py-2.5 rounded-xl bg-[var(--accent-color)] hover:opacity-90 text-white font-semibold text-sm transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {isProcessing ? (
+            <span className="flex items-center justify-center gap-2">
+              <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              Removing…
+            </span>
+          ) : selectedItems.size > 0 ? (
+            `FINISH (Remove ${selectedItems.size})`
+          ) : (
+            'FINISH'
+          )}
+        </button>
+      </BottomSheet.Footer>
+    </BottomSheet>
   );
 };
 

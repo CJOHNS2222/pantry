@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useIntl } from 'react-intl';
+import { useConfirm } from '../ui/ConfirmDialog';
 import { 
   Bookmark, 
   Plus, 
@@ -47,6 +48,7 @@ export const RecipeFinderSavedView: React.FC<RecipeFinderSavedViewProps> = ({
   onAddManualRecipe,
 }) => {
   const intl = useIntl();
+  const confirm = useConfirm();
   const [showExportModal, setShowExportModal] = useState(false);
 
   // Collections State
@@ -88,9 +90,15 @@ export const RecipeFinderSavedView: React.FC<RecipeFinderSavedViewProps> = ({
   };
 
   // Delete a collection
-  const handleDeleteCollection = (e: React.MouseEvent, name: string) => {
+  const handleDeleteCollection = async (e: React.MouseEvent, name: string) => {
     e.stopPropagation();
-    if (window.confirm(`Are you sure you want to delete the collection "${name}"? The recipes themselves will not be deleted.`)) {
+    const ok = await confirm({
+      title: `Delete "${name}"?`,
+      description: 'The recipes themselves will not be deleted — only the collection grouping.',
+      variant: 'danger',
+      confirmLabel: 'Delete Collection',
+    });
+    if (ok) {
       setCollections(prev => {
         const next = { ...prev };
         delete next[name];
@@ -119,8 +127,14 @@ export const RecipeFinderSavedView: React.FC<RecipeFinderSavedViewProps> = ({
   };
 
   // Remove recipe directly from the active collection view
-  const handleRemoveFromCollection = (collectionName: string, recipeTitle: string) => {
-    if (window.confirm(`Remove "${recipeTitle}" from "${collectionName}"?`)) {
+  const handleRemoveFromCollection = async (collectionName: string, recipeTitle: string) => {
+    const ok = await confirm({
+      title: `Remove from "${collectionName}"?`,
+      description: `"${recipeTitle}" will be removed from this collection but not deleted from your saved recipes.`,
+      variant: 'danger',
+      confirmLabel: 'Remove',
+    });
+    if (ok) {
       setCollections(prev => ({
         ...prev,
         [collectionName]: (prev[collectionName] || []).filter(t => t !== recipeTitle)

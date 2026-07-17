@@ -3,6 +3,7 @@ import { useIntl } from 'react-intl';
 import { Calendar } from 'lucide-react';
 import { ShoppingItem } from '../../types';
 import VisualQuantitySelector from '../pantry/VisualQuantitySelector';
+import { Input, Select } from '../ui';
 
 interface ShoppingListPurchaseModalProps {
   purchaseModalOpen: boolean;
@@ -56,20 +57,24 @@ export const ShoppingListPurchaseModal: React.FC<ShoppingListPurchaseModalProps>
             </div>
           </div>
           <div>
-            <label className="text-sm text-theme-secondary">{intl.formatMessage({ id: 'shoppingList.unit' })}</label>
-            <select value={purchaseUnit} onChange={(e) => setPurchaseUnit(e.target.value)} className="w-full mt-1 p-2 rounded border text-black">
-              <option value="count">count</option>
-              <option value="lb">lb</option>
-              <option value="oz">oz</option>
-              <option value="kg">kg</option>
-              <option value="g">g</option>
-              <option value="pack">pack</option>
-              <option value="bag">bag</option>
-              <option value="bunch">bunch</option>
-              <option value="dozen">dozen</option>
-              <option value="can">can</option>
-              <option value="piece">piece</option>
-            </select>
+            <Select
+              value={purchaseUnit}
+              onChange={(val) => setPurchaseUnit(val || 'count')}
+              options={[
+                { value: 'count', label: 'count' },
+                { value: 'lb', label: 'lb' },
+                { value: 'oz', label: 'oz' },
+                { value: 'kg', label: 'kg' },
+                { value: 'g', label: 'g' },
+                { value: 'pack', label: 'pack' },
+                { value: 'bag', label: 'bag' },
+                { value: 'bunch', label: 'bunch' },
+                { value: 'dozen', label: 'dozen' },
+                { value: 'can', label: 'can' },
+                { value: 'piece', label: 'piece' },
+              ]}
+              label={intl.formatMessage({ id: 'shoppingList.unit' })}
+            />
           </div>
           <div>
             <label className="text-sm text-theme-secondary">Expiration date (optional)</label>
@@ -82,12 +87,12 @@ export const ShoppingListPurchaseModal: React.FC<ShoppingListPurchaseModalProps>
               >
                 <Calendar className="w-5 h-5 text-theme-primary" />
               </button>
-              <input
+              <Input
                 id="purchase-expires"
                 type="date"
                 value={purchaseExpires || ''}
                 onChange={(e) => setPurchaseExpires(e.target.value || undefined)}
-                className="p-2 rounded border text-black w-36"
+                className="w-36"
               />
             </div>
           </div>

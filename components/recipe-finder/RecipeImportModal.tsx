@@ -8,6 +8,7 @@ import { saveRecipeToUserCache, submitRecipeForReview } from '../../services/rec
 import { log } from '../../services/logService';
 import AnalyticsService from '../../services/analyticsService';
 import { useAndroidBack } from '../../hooks/useAndroidBack';
+import { Input } from '../ui';
 
 interface RecipeImportModalProps {
   open: boolean;
@@ -117,18 +118,15 @@ const RecipeImportModal: React.FC<RecipeImportModalProps> = ({ open, onClose }) 
           </div>
 
           <div className="space-y-1.5">
-            <span className="text-[10px] font-bold text-theme-secondary uppercase tracking-wider">Recipe Link</span>
-            <div className="relative">
-              <Link2 className="absolute left-3.5 top-3 w-4 h-4 text-theme-secondary opacity-60" />
-              <input 
-                type="text" 
-                value={url} 
-                onChange={(e) => { setUrl(e.target.value); setPreviewedRecipe(null); }} 
-                placeholder="https://example.com/some-delicious-recipe" 
-                className="w-full pl-10 pr-4 py-2.5 rounded-2xl border border-theme bg-theme-primary text-theme-primary text-xs focus:border-[var(--accent-color)] focus:outline-none placeholder:text-theme-secondary" 
-                data-testid="import-recipe-url" 
-              />
-            </div>
+            <Input
+              type="text"
+              value={url}
+              onChange={(e) => { setUrl(e.target.value); setPreviewedRecipe(null); }}
+              placeholder="https://example.com/some-delicious-recipe"
+              label="Recipe Link"
+              leadingIcon={<Link2 className="w-4 h-4" />}
+              data-testid="import-recipe-url"
+            />
             
             <div className="flex items-center gap-2.5 pt-1 px-1">
               <input
