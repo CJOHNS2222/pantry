@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, Suspense } from 'react';
+import React, { useState, useEffect, useRef, useMemo, Suspense, useCallback } from 'react';
 import { serverTimestamp } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import DatabaseMonitoringService from './services/databaseMonitoringService';
@@ -15,7 +15,8 @@ import { Tab } from './types/app';
 import { useAuth } from './hooks/useAuth';
 import { useTheme } from './hooks/useTheme';
 import { useSettings } from './hooks/useSettings';
-import { useToasts } from './hooks/useToasts';
+import { useToast } from './components/ui/Toast';
+import { Button } from './components/ui/Button';
 import { useDataManagement } from './hooks/useDataManagement';
 import RiskAssessmentQuestionnaire from './components/ui/RiskAssessmentQuestionnaire';
 import { useHouseholdActivity } from './hooks/useHouseholdActivity';
@@ -251,7 +252,28 @@ const App: React.FC = () => {
   const { user, setUser, handleLogout, isAuthReady } = useAuth(); // Use isAuthReady
   const { tips: contextualTips, addTip: addContextualTip, dismissTip: dismissContextualTip } = useContextualTips(user);
   const { settings, setSettings } = useSettings();
-  const { addToast, toasts, setToasts } = useToasts();
+  const toast = useToast();
+
+  // Bridge: preserve existing addToast(message, type?, ttl?, actionLabel?, action?) signature
+  // so all ~30 downstream call sites (hooks/services) work unchanged.
+  const addToast = useCallback((
+    message: string,
+    type: 'success' | 'error' | 'info' | 'warning' = 'info',
+    ttl?: number,
+    actionLabel?: string,
+    action?: () => void,
+  ) => {
+    const opts = {
+      duration: ttl,
+      action: actionLabel && action ? { label: actionLabel, onClick: action } : undefined,
+    };
+    switch (type) {
+      case 'success': toast.success(message, opts); break;
+      case 'error':   toast.error(message, opts);   break;
+      case 'warning': toast.warning(message, opts); break;
+      default:        toast.info(message, opts);    break;
+    }
+  }, [toast]);
   const { syncStatus, syncNow, updateSyncStatus } = useOfflineStatus();
   const { isAdmin } = useIsAdmin(user?.id);
 
@@ -1977,40 +1999,7 @@ const App: React.FC = () => {
           </div>
         )}
 
-        <div className="fixed bottom-20 right-4 mb-safe z-50 space-y-2">
-          {toasts.map((toast) => (
-            <div
-              key={toast.id}
-              className={`max-w-sm rounded-lg shadow-lg border transition-all duration-300 ${
-                toast.type === 'error'
-                  ? 'bg-red-50 border-red-200 text-red-800 p-4'
-                  : toast.type === 'info'
-                  ? 'bg-gray-800 border-gray-700 text-white p-2 text-xs opacity-80'
-                  : 'bg-blue-50 border-blue-200 text-blue-800 p-4'
-              }`}
-            >
-              <div className="flex items-start gap-3">
-                <div className="flex-1">
-                  <p className={`font-medium ${toast.type === 'info' ? 'text-xs' : 'text-sm'}`}>{toast.message}</p>
-                  {toast.actionLabel && toast.action && (
-                    <button
-                      onClick={toast.action}
-                      className="mt-2 text-xs underline hover:no-underline"
-                    >
-                      {toast.actionLabel}
-                    </button>
-                  )}
-                </div>
-                <button
-                  onClick={() => setToasts(prev => prev.filter(t => t.id !== toast.id))}
-                  className={`hover:text-gray-600 ${toast.type === 'info' ? 'text-gray-300 text-xs' : 'text-gray-400'}`}
-                >
-                  ×
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
+        {/* Toasts are now rendered by ToastProvider portal in index.tsx */}
       </div>
       </ErrorBoundary>
 
@@ -2126,15 +2115,17 @@ const App: React.FC = () => {
 
               {/* Action Buttons */}
               <div className="space-y-2">
-                <button
+                <Button
+                  variant="primary"
+                  size="lg"
+                  fullWidth
                   onClick={() => {
                     setNewlyUnlockedBadge(null);
                     HapticService.light();
                   }}
-                  className="w-full py-3 bg-[var(--accent-color)] hover:opacity-95 text-white font-semibold rounded-xl shadow-md transition-opacity"
                 >
                   Awesome! 🚀
-                </button>
+                </Button>
               </div>
             </div>
           </div>

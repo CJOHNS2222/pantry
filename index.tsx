@@ -8,6 +8,8 @@ import crashlytics from './services/crashlyticsService';
 import { I18nProvider } from './src/components/I18nProvider';
 import { AppProvider } from './contexts/AppContext';
 import { AppActionsProvider } from './contexts/AppActionsContext';
+import { ToastProvider } from './components/ui/Toast';
+import { ConfirmDialogProvider } from './components/ui/ConfirmDialog';
 import { cleanupCacheService } from './services/cacheService';
 import DatabaseMonitoringService from './services/databaseMonitoringService';
 import { offlineDataCache } from './services/offlineDataCache';
@@ -60,10 +62,14 @@ if (!rootElement) {
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <I18nProvider>
-    <AppProvider>
-      <AppActionsProvider>
-        <App />
-      </AppActionsProvider>
-    </AppProvider>
+    <ToastProvider position="bottom" maxToasts={4}>
+      <ConfirmDialogProvider>
+        <AppProvider>
+          <AppActionsProvider>
+            <App />
+          </AppActionsProvider>
+        </AppProvider>
+      </ConfirmDialogProvider>
+    </ToastProvider>
   </I18nProvider>
 );

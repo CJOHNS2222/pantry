@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Mic, MicOff, Camera, Search, Plus, X, Loader2 } from 'lucide-react';
+import { Mic, MicOff, Camera, Search, Plus, Loader2 } from 'lucide-react';
 import { useIntl } from 'react-intl';
-import { useModalOpen } from '../../utils/useModalOpen';
+import { BottomSheet } from '../ui';
 import { useAndroidBack } from '../../hooks/useAndroidBack';
 import { useAppActions } from '../../contexts/AppActionsContext';
 import { log } from '../../services/logService';
+import { Input } from '../ui/Input';
 
 interface QuickAddItem {
   name: string;
@@ -32,7 +33,6 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
   isOnline,
   recentItems = []
 }) => {
-  useModalOpen(isOpen);
   useAndroidBack(isOpen, onClose);
   const intl = useIntl();
   const { addToast } = useAppActions();
@@ -206,61 +206,34 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
     inputRef.current?.focus();
   };
 
-  const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
-      onClose();
-    }
-  };
-
-  if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] px-4 pt-[var(--safe-area-inset-top,0px)] pb-[var(--safe-area-inset-bottom,0px)]" onClick={handleBackdropClick} data-testid="quickadd-backdrop">
-      <div className="bg-theme-primary rounded-lg shadow-xl w-full max-w-md mx-auto h-full flex flex-col overflow-hidden border border-theme" role="dialog" aria-modal="true" aria-label="Add Item">
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-theme">
-          <h3 className="text-lg font-semibold text-theme-primary">Add Item</h3>
-          <button
-            onClick={onClose}
-            className="text-theme-secondary opacity-70 hover:opacity-100 hover:text-theme-primary p-1"
-            aria-label="Close modal"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Content */}
-        <div className="p-4 flex-1 overflow-y-auto">
-          <div className="relative mb-4">
+    <BottomSheet
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Add Item"
+    >
+      <BottomSheet.Body className="p-4 space-y-4">
+        <div className="relative">
           <div className="flex gap-2">
-            <div className="flex-1 relative">
-              <input
-                ref={inputRef}
-                type="text"
-                data-testid="quickadd-input"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKeyPress}
-                onFocus={() => setShowSuggestions(suggestions.length > 0)}
-                placeholder="Add item (e.g., '2 lbs chicken' or 'milk')"
-                className="w-full bg-theme-secondary border border-theme rounded-lg px-3 py-3 text-black placeholder-theme-secondary/50 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] pr-10"
-              />
-
-              {input && (
-                <button
-                  onClick={() => setInput('')}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-theme-secondary hover:text-theme-primary"
-                  data-testid="quickadd-clear"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              )}
-            </div>
+            <Input
+              ref={inputRef}
+              type="text"
+              data-testid="quickadd-input"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyPress}
+              onFocus={() => setShowSuggestions(suggestions.length > 0)}
+              placeholder="Add item (e.g., '2 lbs chicken' or 'milk')"
+              clearable
+              onClear={() => setInput('')}
+              className="flex-1"
+            />
 
             <button
               onClick={() => handleSubmit()}
               disabled={!input.trim()}
-              className="px-4 py-3 bg-[var(--accent-color)] text-white rounded-lg hover:bg-[var(--accent-color)]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-3 bg-[var(--accent-color)] text-white rounded-lg hover:bg-[var(--accent-color)]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
               data-testid="quickadd-submit"
             >
               <Plus className="w-5 h-5" />
@@ -288,10 +261,10 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
         </div>
 
         {/* Action Buttons */}
-        <div className="flex gap-2 mb-4">
+        <div className="flex gap-2">
           <button
             onClick={onClose}
-            className="px-3 py-2 bg-theme-secondary text-theme-primary hover:bg-theme-primary border border-theme rounded-lg transition-colors"
+            className="px-3 py-2 bg-theme-secondary text-theme-primary hover:bg-theme-primary border border-theme rounded-lg transition-colors text-sm font-medium"
             data-testid="quickadd-cancel"
           >
             Cancel
@@ -341,11 +314,10 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
         </div>
 
         {/* Helper Text */}
-        <div className="text-xs text-theme-secondary opacity-70">
+        <div className="text-xs text-theme-secondary opacity-70 text-center">
           Try: "2 lbs chicken", "milk", "bread" • Voice input works offline
         </div>
-        </div>
-      </div>
-    </div>
+      </BottomSheet.Body>
+    </BottomSheet>
   );
 };

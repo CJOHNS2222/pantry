@@ -9,6 +9,7 @@ export interface CachedShoppingListData {
     quantity?: string;
     category?: string;
     source?: string;
+    addedAt?: string; // ISO string
     estimatedPrice?: number;
     priceData?: {
       averagePrice: number;
@@ -61,6 +62,9 @@ const shoppingItemToObject = (item: ShoppingItem): CachedShoppingListData[string
   }
   if (item.assignedTo) obj.assignedTo = item.assignedTo;
   if (item.notes) obj.notes = item.notes;
+  if (item.addedAt) {
+    obj.addedAt = item.addedAt instanceof Date ? item.addedAt.toISOString() : new Date(item.addedAt).toISOString();
+  }
   return obj;
 };
 
@@ -79,7 +83,7 @@ const objectToShoppingItem = (itemId: string, itemObject: CachedShoppingListData
     category: itemObject.category || '',
     checked: false,
     source: itemObject.source,
-    addedAt: new Date(0), // Using a static date as it's no longer persisted
+    addedAt: itemObject.addedAt ? new Date(itemObject.addedAt) : new Date(),
     estimatedPrice: itemObject.estimatedPrice,
     completedAt: undefined,
     priceData,

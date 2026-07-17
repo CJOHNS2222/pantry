@@ -4,7 +4,7 @@ import { RecipeCommunityStats, RecipeModification, RecipeRating } from '../../ty
 import { RecipeRatingService } from '../../services/recipeRatingService';
 import DatabaseMonitoringService from '../../services/databaseMonitoringService';
 import AppContext from '../../contexts/AppContext';
-import { useToasts } from '../../hooks/useToasts';
+import { useToast } from '../ui/Toast';
 import { log } from '../../services/logService';
 
 interface RecipeCommunityInsightsProps {
@@ -18,7 +18,7 @@ export const RecipeCommunityInsights: React.FC<RecipeCommunityInsightsProps> = (
 }) => {
   const context = useContext(AppContext);
   const user = context?.user;
-  const { addToast } = useToasts();
+  const toast = useToast();
   const [stats, setStats] = useState<RecipeCommunityStats | null>(null);
   const [topModifications, setTopModifications] = useState<RecipeModification[]>([]);
   const [householdRatings, setHouseholdRatings] = useState<RecipeRating[]>([]);
@@ -72,7 +72,7 @@ export const RecipeCommunityInsights: React.FC<RecipeCommunityInsightsProps> = (
     } catch (err) {
       log.error('Failed to load community data', { error: err }, 'RecipeCommunityInsights');
       setError('Failed to load community insights');
-      addToast('Failed to load community insights', 'error');
+      toast.error('Failed to load community insights');
     } finally {
       setIsLoading(false);
     }
@@ -86,10 +86,10 @@ export const RecipeCommunityInsights: React.FC<RecipeCommunityInsightsProps> = (
       // Reload modifications to get updated helpful count
       const modifications = await RecipeRatingService.getTopModifications(recipeTitle, 5);
       setTopModifications(modifications);
-      addToast('Thanks for your feedback!', 'success');
+      toast.success('Thanks for your feedback!');
     } catch (err) {
       log.error('Failed to mark modification as helpful', { error: err }, 'RecipeCommunityInsights');
-      addToast('Failed to mark as helpful', 'error');
+      toast.error('Failed to mark as helpful');
     }
   };
 

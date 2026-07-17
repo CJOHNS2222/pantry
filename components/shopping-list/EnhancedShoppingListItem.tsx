@@ -291,7 +291,7 @@ export const EnhancedShoppingListItem: React.FC<ShoppingListItemProps> = ({
             {item.consolidatedItems && item.consolidatedItems.length > 1 && (
               <div className="text-[10px] text-theme-secondary opacity-80 mt-1 space-y-1 bg-theme-secondary/40 border border-theme rounded-lg p-2 max-w-sm">
                 <span className="font-semibold text-theme-primary block mb-0.5">
-                  📅 {intl.formatMessage({ id: 'shoppingList.addedBatches' })}
+                  📅 Added:
                 </span>
                 {item.consolidatedItems.map((cItem, idx) => {
                   const addedDate = cItem.addedAt ? new Date(cItem.addedAt) : null;

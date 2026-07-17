@@ -3,6 +3,7 @@
 import React, { useMemo } from 'react';
 import type { PantryItem } from '../../types';
 import { useAppActions } from '../../contexts/AppActionsContext';
+import { ProgressBar } from '../ui';
 
 interface PantryHealthScoreProps {
   inventory: PantryItem[];
@@ -176,18 +177,22 @@ export const PantryHealthScore: React.FC<PantryHealthScoreProps> = ({ inventory,
             </h3>
             <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full bg-theme-primary text-theme-secondary">{score}/100</span>
           </div>
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             {factors.map((f) => (
               <div key={f.label} className="group relative">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[11px]">{f.icon}</span>
-                  <div className="flex-1 h-1.5 bg-theme-primary rounded-full overflow-hidden">
-                    <div
-                      className="h-full rounded-full transition-all duration-700"
-                      style={{ width: `${(f.points / f.max) * 100}%`, backgroundColor: grade.color }}
-                    />
-                  </div>
-                  <span className="text-[10px] text-theme-secondary w-6 text-right shrink-0">{f.points}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] shrink-0" aria-hidden="true">{f.icon}</span>
+                  <ProgressBar
+                    value={f.points}
+                    max={f.max}
+                    colorMode="auto"
+                    size="sm"
+                    className="flex-1"
+                    aria-label={`${f.label} factor`}
+                  />
+                  <span className="text-[10px] text-theme-secondary w-8 text-right shrink-0 font-medium tabular-nums">
+                    {f.points}/{f.max}
+                  </span>
                 </div>
                 {/* Tooltip */}
                 <div className="absolute left-4 bottom-full mb-1 px-2 py-1 bg-theme-primary border border-theme rounded-lg text-[10px] text-theme-primary whitespace-nowrap shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">

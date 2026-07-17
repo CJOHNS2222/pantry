@@ -1,5 +1,6 @@
 import React from 'react';
 import { DayPlan, StructuredRecipe } from '../../types';
+import { Select } from '../ui';
 
 interface AddMealDialogProps {
   show: boolean;
@@ -33,22 +34,19 @@ export const AddMealDialog: React.FC<AddMealDialogProps> = ({
 
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-theme-text mb-2">Select Day:</label>
-            <select
-              className="w-full p-3 bg-theme-secondary border border-theme rounded-lg text-theme-text"
-              onChange={(e) => onSelectDay(parseInt(e.target.value))}
-              defaultValue=""
-            >
-              <option value="" disabled>Select a day...</option>
-              {displayPlan.map((day) => {
+            <Select
+              value={selectedDayForDialog !== null ? selectedDayForDialog.toString() : ''}
+              onChange={(val) => val && onSelectDay(parseInt(val))}
+              options={displayPlan.map((day) => {
                 const valueIndex = mealPlan.findIndex(d => d.date === day.date);
-                return (
-                  <option key={day.date} value={valueIndex}>
-                    {day.dayName} - {day.date}
-                  </option>
-                );
+                return {
+                  value: valueIndex.toString(),
+                  label: `${day.dayName} - ${day.date}`
+                };
               })}
-            </select>
+              placeholder="Select a day..."
+              label="Select Day:"
+            />
           </div>
 
           <div>

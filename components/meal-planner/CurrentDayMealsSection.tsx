@@ -2,6 +2,8 @@ import React, { useState, useCallback } from 'react';
 import { Plus, MoreVertical, RefreshCw, Trash2 } from 'lucide-react';
 import { useIntl } from 'react-intl';
 import { DayPlan, MealPlanItem, StructuredRecipe } from '../../types';
+import { EmptyState } from '../ui/EmptyState';
+import { Button } from '../ui/Button';
 
 // ─── Cooking streak helpers ──────────────────────────────────────────────────
 const STREAK_KEY = 'cookingStreakDates';
@@ -74,36 +76,37 @@ export const CurrentDayMealsSection: React.FC<CurrentDayMealsSectionProps> = ({
 
   if (totalMealsCount === 0) {
     return (
-      <div className="bg-theme-secondary rounded-xl p-3 border border-theme min-h-[300px] flex items-center justify-center">
-        <div className="w-full max-w-md border border-dashed border-theme/60 rounded-xl p-5 text-center flex flex-col items-center justify-center space-y-3">
-          <div className="p-2 bg-[var(--accent-color)]/10 rounded-full text-[var(--accent-color)]">
-            <Plus className="w-6 h-6" />
-          </div>
-          <div>
-            <h4 className="font-semibold text-theme-primary text-base">Plan Your Day's Meals</h4>
-            <p className="text-xs text-theme-secondary opacity-70 mt-0.5">No meals planned yet. Choose a meal type to get started:</p>
-          </div>
-          <div className="flex flex-wrap gap-1.5 justify-center pt-1">
-            <button
-              onClick={() => onOpenMealSearch('breakfast')}
-              className="px-3.5 py-1.5 bg-theme-secondary hover:bg-theme-primary border border-theme text-theme-primary text-xs font-semibold rounded-lg transition-all hover:border-[var(--accent-color)]"
-            >
-              🍳 Breakfast
-            </button>
-            <button
-              onClick={() => onOpenMealSearch('lunch')}
-              className="px-3.5 py-1.5 bg-theme-secondary hover:bg-theme-primary border border-theme text-theme-primary text-xs font-semibold rounded-lg transition-all hover:border-[var(--accent-color)]"
-            >
-              🥪 Lunch
-            </button>
-            <button
-              onClick={() => onOpenMealSearch('dinner')}
-              className="px-3.5 py-1.5 bg-theme-secondary hover:bg-theme-primary border border-theme text-theme-primary text-xs font-semibold rounded-lg transition-all hover:border-[var(--accent-color)]"
-            >
-              🥩 Dinner
-            </button>
-          </div>
-        </div>
+      <div className="bg-theme-secondary rounded-xl border border-theme min-h-[300px] flex items-center justify-center p-4">
+        <EmptyState
+          preset="mealplan"
+          size="default"
+          bare
+          action={
+            <div className="flex flex-wrap gap-2 justify-center mt-1">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => onOpenMealSearch('breakfast')}
+              >
+                🍳 Breakfast
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => onOpenMealSearch('lunch')}
+              >
+                🥪 Lunch
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => onOpenMealSearch('dinner')}
+              >
+                🥩 Dinner
+              </Button>
+            </div>
+          }
+        />
       </div>
     );
   }

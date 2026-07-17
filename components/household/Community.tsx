@@ -1,7 +1,9 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useApp } from '../../contexts/AppContext';
 import { useAppActions } from '../../contexts/AppActionsContext';
+import { useConfirm } from '../ui/ConfirmDialog';
 import { Tab } from '../../types/app';
+import { ProgressBar } from '../ui';
 import { 
   Star, 
   Plus, 
@@ -69,6 +71,7 @@ export const Community: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecipe,
   const app = useApp();
   const { isLoadingRatings, setLoadingRatingsComplete, inventory = [], savedRecipes = [], mealPlan = [], household = null } = app;
   const { setActiveTab, onRateRecipe, addToast } = useAppActions();
+  const confirm = useConfirm();
   
   // Navigation & Toggle State
   const [subTab, setSubTab] = useState<'recipes' | 'leaderboard' | 'achievements'>('recipes');
@@ -79,6 +82,20 @@ export const Community: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecipe,
   const [optedIn, setOptedIn] = useState(() => localStorage.getItem('pantryLeaderboardOptIn') === 'true');
   const [leaderboardName, setLeaderboardName] = useState(() => localStorage.getItem('pantryLeaderboardName') || user?.name || 'Pantry Champ');
   const [isAnonymous, setIsAnonymous] = useState(() => localStorage.getItem('pantryLeaderboardAnon') === 'true');
+
+  const handleLeaveLeaderboard = async () => {
+    const ok = await confirm({
+      title: 'Leave the leaderboard?',
+      description: 'Your profile and rankings will no longer be visible to other members.',
+      variant: 'danger',
+      confirmLabel: 'Leave Leaderboard',
+      cancelLabel: 'Stay',
+    });
+    if (ok) {
+      localStorage.removeItem('pantryLeaderboardOptIn');
+      setOptedIn(false);
+    }
+  };
   
   // Modals state
   const [showModal, setShowModal] = useState(false);
@@ -1128,12 +1145,7 @@ export const Community: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecipe,
               {/* Opt-out Option link */}
               <div className="text-center">
                 <button
-                  onClick={() => {
-                    if (window.confirm("Are you sure you want to leave the leaderboard? Your profile and rankings will no longer be visible.")) {
-                      localStorage.removeItem('pantryLeaderboardOptIn');
-                      setOptedIn(false);
-                    }
-                  }}
+                  onClick={handleLeaveLeaderboard}
                   className="text-xs text-theme-secondary opacity-50 hover:opacity-100 transition-opacity hover:underline"
                 >
                   Leave Leaderboard / Adjust Privacy settings
@@ -1328,14 +1340,12 @@ export const Community: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecipe,
                       {badge.currentValue}/{badge.targetValue} {badge.unit}
                     </span>
                   </div>
-                  <div className="w-full h-1.5 bg-theme-primary rounded-full overflow-hidden border border-theme">
-                    <div
-                      className={`h-full rounded-full transition-all duration-500 ${
-                        badge.isUnlocked ? 'bg-[var(--accent-color)]' : 'bg-theme-secondary'
-                      }`}
-                      style={{ width: `${Math.min(100, (badge.currentValue / badge.targetValue) * 100)}%` }}
-                    ></div>
-                  </div>
+                  <ProgressBar
+                    value={badge.currentValue}
+                    max={badge.targetValue}
+                    colorMode={badge.isUnlocked ? 'accent' : 'neutral'}
+                    size="xs"
+                  />
                 </div>
 
                 {/* Unlocked stamp */}
@@ -1400,14 +1410,12 @@ export const Community: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecipe,
                     {selectedBadge.currentValue} / {selectedBadge.targetValue} {selectedBadge.unit}
                   </span>
                 </div>
-                <div className="w-full h-3 bg-theme-primary rounded-full overflow-hidden border border-theme relative">
-                  <div
-                    className={`h-full rounded-full transition-all duration-700 ${
-                      selectedBadge.isUnlocked ? 'bg-gradient-to-r from-emerald-400 to-teal-500' : 'bg-[var(--accent-color)]'
-                    }`}
-                    style={{ width: `${Math.min(100, (selectedBadge.currentValue / selectedBadge.targetValue) * 100)}%` }}
-                  ></div>
-                </div>
+                <ProgressBar
+                  value={selectedBadge.currentValue}
+                  max={selectedBadge.targetValue}
+                  colorMode={selectedBadge.isUnlocked ? 'success' : 'accent'}
+                  size="sm"
+                />
                 <p className="text-xs text-theme-secondary italic opacity-75 pt-1">
                   <strong>Tip:</strong> {selectedBadge.tip}
                 </p>
@@ -1490,12 +1498,11 @@ export const Community: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecipe,
               </div>
 
               {/* Progress visual */}
-              <div className="w-full h-2.5 bg-theme-primary rounded-full overflow-hidden border border-theme">
-                <div 
-                  className="h-full bg-emerald-500 rounded-full transition-all duration-700"
-                  style={{ width: `${Math.max(40, 100 - expiredCount * 6)}%` }}
-                ></div>
-              </div>
+              <ProgressBar
+                value={Math.max(40, 100 - expiredCount * 6)}
+                colorMode="success"
+                size="sm"
+              />
 
               {/* Three detailed statistics columns */}
               <div className="grid grid-cols-3 gap-2 pt-2 border-t border-theme">

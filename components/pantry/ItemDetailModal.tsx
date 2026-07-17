@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { X, Trash2, Edit3, ChevronDown, ChevronRight, Minus, Plus, CalendarClock, TrendingUp } from 'lucide-react';
+import { Trash2, Edit3, ChevronDown, ChevronRight, Minus, Plus, CalendarClock, TrendingUp } from 'lucide-react';
 import { PantryItem, CustomCategory } from '../../types';
 import { Tab } from '../../types/app';
+import { Select, Input, BottomSheet } from '../ui';
 import PriceTrends from './PriceTrends';
 import { getAllCategories, cleanItemNameForShopping, getFreezerShelfLifeDays, getOpenedShelfLifeDays, getItemImageCdnUrl, getPreferredItemDisplayImage } from '../../utils/appUtils';
 import { getQuantityAmount, getQuantityUnit } from '../../utils/quantityUtils';
@@ -9,8 +10,6 @@ import { getNutritionFactsWithFallback, NutritionFacts } from '../../services/nu
 import { getItemTips } from '../../data/itemTips';
 import { useKeyboardNavigation } from '../../hooks/useKeyboardNavigation';
 import QuantityUnitPicker, { COMMON_UNITS, getSmartUnits } from './QuantityUnitPicker';
-import { useFocusTrap } from '../../hooks/useFocusTrap';
-import { useModalOpen } from '../../utils/useModalOpen';
 import { useAndroidBack } from '../../hooks/useAndroidBack';
 import { useApp } from '../../contexts/AppContext';
 import { useAppActions } from '../../contexts/AppActionsContext';
@@ -80,9 +79,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
 
-  // Focus trap for accessibility
-  const modalRef = useFocusTrap({ isActive: true });
-  useModalOpen();
+  // Focus trap and scroll locking are handled by BottomSheet
 
   useEffect(() => {
     // Reset local state when item prop changes
@@ -340,25 +337,29 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
   const toggleSection = (key: string) => setOpenSections(prev => ({ ...prev, [key]: !prev[key] }));
 
+  const smartUnits = getSmartUnits(item.item);
+  const otherUnits = COMMON_UNITS.filter(u => !smartUnits.includes(u));
+  const unitOptions = [
+    ...smartUnits.map(unitOption => ({
+      value: unitOption,
+      label: unitOption,
+      group: 'Recommended'
+    })),
+    ...otherUnits.map(unitOption => ({
+      value: unitOption,
+      label: unitOption,
+      group: 'Other Units'
+    }))
+  ];
+
   return (
-    <>
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start sm:items-center justify-center z-[9999] px-4 pt-[var(--safe-area-inset-top,0px)] pb-[var(--safe-area-inset-bottom,0px)]" onClick={handleCloseAndPersist}>
-      <div ref={modalRef} role="dialog" aria-modal="true" aria-label={item.item} className="bg-theme-primary rounded-lg shadow-xl w-full max-w-md mx-auto h-full flex flex-col border border-theme" onClick={e => e.stopPropagation()}>
-
-        {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto">
-
-          {/* ── Hero section ── */}
-          <div className="relative px-4 pt-4 pb-2">
-            {/* Close button */}
-            <button
-              onClick={handleCloseAndPersist}
-              className="absolute top-4 left-4 p-1.5 hover:bg-theme-secondary rounded-full transition-colors z-10"
-              aria-label={intl.formatMessage({ id: 'common.closeModal' })}
-              data-testid="item-close"
-            >
-              <X className="w-5 h-5 text-theme-secondary" />
-            </button>
+    <BottomSheet
+      isOpen={true}
+      onClose={handleCloseAndPersist}
+    >
+      <BottomSheet.Body>
+        {/* ── Hero section ── */}
+        <div className="relative px-4 pt-4 pb-2">
 
             {/* Item image */}
             <div className="flex justify-center pt-2 pb-4">
@@ -441,24 +442,13 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                 </button>
               </div>
 
-              {/* Unit Dropdown */}
-              <select
+              <Select
                 value={localUnit}
-                onChange={(e) => handleUnitChange(e.target.value)}
+                onChange={(val) => handleUnitChange(val || '')}
+                options={unitOptions}
                 aria-label="Unit of measurement"
-                className="px-3 py-1.5 bg-theme-secondary border border-theme rounded-lg text-theme-primary focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:border-transparent text-sm font-medium"
-              >
-                {getSmartUnits(item.item).map(unitOption => (
-                  <option key={unitOption} value={unitOption}>
-                    {unitOption}
-                  </option>
-                ))}
-                {COMMON_UNITS.filter(u => !getSmartUnits(item.item).includes(u)).map(unitOption => (
-                  <option key={unitOption} value={unitOption}>
-                    {unitOption}
-                  </option>
-                ))}
-              </select>
+                className="text-sm font-medium min-w-[100px]"
+              />
             </div>
 
             {/* Fill Level - Portion Selector */}
@@ -546,19 +536,13 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
               <div className="px-4 pb-4 space-y-3">
                 {/* Category */}
                 <div className="bg-theme-secondary rounded-lg p-3">
-                  <div className="text-xs text-theme-secondary mb-1">Category</div>
-                  <select
+                  <Select
                     value={localCategory}
-                    onChange={(e) => handleCategoryChange(e.target.value)}
-                    className="w-full px-2 py-1.5 text-sm border border-theme rounded-lg bg-theme-primary text-theme-primary focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]"
+                    onChange={(val) => handleCategoryChange(val || '')}
+                    options={getAllCategories(customCategories).map(cat => ({ value: cat, label: cat }))}
+                    label="Category"
                     data-testid="item-category-select"
-                  >
-                    {getAllCategories(customCategories).map(category => (
-                      <option key={category} value={category}>
-                        {category}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </div>
 
 
@@ -680,20 +664,21 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                   {isEditingExpiration && (
                     <div className="mt-2 space-y-2">
                       <div className="flex gap-2">
-                        <input
+                        <Input
                           type="date"
                           value={editExpirationDate}
                           onChange={(e) => setEditExpirationDate(e.target.value)}
-                          className="flex-1 px-2 py-1.5 text-sm border border-theme rounded-lg bg-theme-primary text-theme-primary focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]"
+                          className="flex-1"
                         />
-                        <select
+                        <Select
                           value={editExpirationType}
-                          onChange={(e) => setEditExpirationType(e.target.value as 'use-by' | 'best-by')}
-                          className="px-2 py-1.5 text-sm border border-theme rounded-lg bg-theme-primary text-theme-primary focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]"
-                        >
-                          <option value="best-by">{intl.formatMessage({ id: 'pantry.bestBy' })}</option>
-                          <option value="use-by">{intl.formatMessage({ id: 'pantry.useBy' })}</option>
-                        </select>
+                          onChange={(val) => setEditExpirationType((val || 'best-by') as 'use-by' | 'best-by')}
+                          options={[
+                            { value: 'best-by', label: intl.formatMessage({ id: 'pantry.bestBy' }) },
+                            { value: 'use-by', label: intl.formatMessage({ id: 'pantry.useBy' }) }
+                          ]}
+                          className="min-w-[110px]"
+                        />
                       </div>
                       <div className="flex gap-2 justify-end">
                         <button
@@ -936,18 +921,16 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
               View Price Trends
             </button>
           </div>
-        </div>
+      </BottomSheet.Body>
 
-        {/* Price Trends Modal */}
-        {showPriceTrends && (
-          <PriceTrends
-            ingredient={item.item}
-            onClose={() => setShowPriceTrends(false)}
-          />
-        )}
-      </div>
-    </div>
-    </>
+      {/* Price Trends Modal */}
+      {showPriceTrends && (
+        <PriceTrends
+          ingredient={item.item}
+          onClose={() => setShowPriceTrends(false)}
+        />
+      )}
+    </BottomSheet>
   );
 };
 

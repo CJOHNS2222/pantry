@@ -3,6 +3,7 @@ import { useIntl } from 'react-intl';
 import { Plus, X } from 'lucide-react';
 import QuantityUnitPicker, { getSmartUnits } from '../pantry/QuantityUnitPicker';
 import { itemImages } from '../../data/item-images';
+import { Input } from '../ui';
 
 interface ShoppingListAddItemModalProps {
   isOpen: boolean;
@@ -92,25 +93,18 @@ export const ShoppingListAddItemModal: React.FC<ShoppingListAddItemModalProps> =
           <div className="flex-1 overflow-y-auto p-6 space-y-6">
             <div className="space-y-4">
               <div className="relative">
-                <label htmlFor="newItem" className="block text-sm font-semibold text-theme-secondary mb-1.5">
-                  Item Name
-                </label>
-                <input
+                <Input
                   id="newItem"
                   name="newItem"
                   type="text"
                   value={newItem}
                   onChange={(e) => setNewItem(e.target.value)}
                   placeholder="Enter item name..."
-                  className={`w-full bg-theme-secondary border rounded-lg px-4 py-3 text-theme-primary shadow-sm outline-none focus:border-[var(--accent-color)] ${validationErrors.item ? 'border-red-500' : 'border-theme'}`}
+                  label="Item Name"
+                  error={validationErrors.item}
                   autoFocus
                   autoComplete="off"
                 />
-                {validationErrors.item && (
-                  <p className="text-red-500 text-xs mt-1" aria-live="polite">
-                    {validationErrors.item}
-                  </p>
-                )}
 
                 {suggestions.length > 0 && (
                   <div className="mt-2 bg-theme-secondary border border-theme rounded-lg divide-y divide-theme max-h-[50vh] overflow-y-auto shadow-sm">
