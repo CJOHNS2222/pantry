@@ -20,6 +20,16 @@ export interface DetailedChangeEntry {
 
 export const RECENT_CHANGES: ChangeEntry[] = [
   {
+    "version": "3.0.10",
+    "date": "Jul 19, 2026",
+    "highlights": [
+      "Fallback Recipe Memory Optimization — Extracted hardcoded CSV fallback recipes to external fallbackRecipes.ts module,…",
+      "Native Structured Deep Cloning — Replaced all legacy JSON.parse(JSON.stringify()) deep clones in snapshot callbacks…",
+      "Household Presence Optimization — Replaced full object serializations during presence heartbeats with fast scalar…",
+      "Server-Side Ratings Querying — Added server-side where('date', '>=', cutoff) query constraint to recipe ratings…"
+    ]
+  },
+  {
     "version": "3.0.9",
     "date": "Jul 18, 2026",
     "highlights": [
@@ -38,20 +48,28 @@ export const RECENT_CHANGES: ChangeEntry[] = [
       "Portal-based Centralized Toasts — Migrated to a centralized portal-based toast notification system (ToastProvider) for…",
       "Code Quality & Type Safety — Resolved type safety issues and lint warnings in RecipeExportModal and other codebase…"
     ]
-  },
-  {
-    "version": "3.0.7",
-    "date": "Jul 16, 2026",
-    "highlights": [
-      "Capacitor Direct Calendar Sync — Enhanced \"Export to Calendar\" to write meal plan events directly into native…",
-      "Meat & Protein Filter — Added a meat/protein type select filter (Chicken, Beef, Steak, Fish, Pork, Seafood, Turkey,…",
-      "Dessert Selection — Added a dedicated Dessert option in meal type filters, matching sweet recipes automatically.",
-      "Recipe Import Share Checkbox — Added a \"Share with community\" checkbox to the import modal to allow users to opt-in to…"
-    ]
   }
 ];
 
 export const ALL_CHANGES: DetailedChangeEntry[] = [
+  {
+    "version": "3.0.10",
+    "date": "Jul 19, 2026",
+    "sections": [
+      {
+        "title": "Performance & Optimization",
+        "bullets": [
+          "**Fallback Recipe Memory Optimization** — Extracted hardcoded CSV fallback recipes to external `fallbackRecipes.ts` module, eliminating per-render heap allocations.",
+          "**Native Structured Deep Cloning** — Replaced all legacy `JSON.parse(JSON.stringify())` deep clones in snapshot callbacks with native `structuredClone()`.",
+          "**Household Presence Optimization** — Replaced full object serializations during presence heartbeats with fast scalar property checks.",
+          "**Server-Side Ratings Querying** — Added server-side `where('date', '>=', cutoff)` query constraint to recipe ratings aggregation.",
+          "**Animation Resource Cleanup** — Added `cancelAnimationFrame` cleanup for achievement celebration fireworks to prevent background thread leaks on unmount.",
+          "**Render & State Efficiency** — Consolidated inventory `useMemo` hooks in `PantryScanner`, extracted scalar dependencies in `RecipeFinder`, and converted `recipeCache` to non-rendering persistent `useRef`.",
+          "**Search & Autocomplete Enhancements** — Streamlined text matching and added query length bounds to `getEnhancedAutocompleteSuggestions`."
+        ]
+      }
+    ]
+  },
   {
     "version": "3.0.9",
     "date": "Jul 18, 2026",

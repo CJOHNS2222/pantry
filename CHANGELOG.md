@@ -1,3 +1,16 @@
+## [3.0.10] - 2026-07-19
+
+### Performance & Optimization
+- **Fallback Recipe Memory Optimization** — Extracted hardcoded CSV fallback recipes to external `fallbackRecipes.ts` module, eliminating per-render heap allocations.
+- **Native Structured Deep Cloning** — Replaced all legacy `JSON.parse(JSON.stringify())` deep clones in snapshot callbacks with native `structuredClone()`.
+- **Household Presence Optimization** — Replaced full object serializations during presence heartbeats with fast scalar property checks.
+- **Server-Side Ratings Querying** — Added server-side `where('date', '>=', cutoff)` query constraint to recipe ratings aggregation.
+- **Animation Resource Cleanup** — Added `cancelAnimationFrame` cleanup for achievement celebration fireworks to prevent background thread leaks on unmount.
+- **Render & State Efficiency** — Consolidated inventory `useMemo` hooks in `PantryScanner`, extracted scalar dependencies in `RecipeFinder`, and converted `recipeCache` to non-rendering persistent `useRef`.
+- **Search & Autocomplete Enhancements** — Streamlined text matching and added query length bounds to `getEnhancedAutocompleteSuggestions`.
+
+---
+
 ## [3.0.9] - 2026-07-18
 
 ### Added

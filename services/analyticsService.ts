@@ -457,16 +457,39 @@ class AnalyticsService {
     });
   }
 
+  // Helper to validate and sanitize parameters for Firebase Analytics
+  private static sanitizeParameters(params?: Record<string, any>): Record<string, any> | undefined {
+    if (!params) return undefined;
+    const sanitized: Record<string, any> = {};
+    for (const [key, val] of Object.entries(params)) {
+      if (val === null || val === undefined) continue;
+      const cleanKey = key.replace(/[^a-zA-Z0-9_]/g, '_').slice(0, 40);
+      if (typeof val === 'string') {
+        sanitized[cleanKey] = val.slice(0, 100);
+      } else if (typeof val === 'number' || typeof val === 'boolean') {
+        sanitized[cleanKey] = val;
+      } else if (typeof val === 'object') {
+        try {
+          sanitized[cleanKey] = JSON.stringify(val).slice(0, 100);
+        } catch {
+          sanitized[cleanKey] = String(val).slice(0, 100);
+        }
+      }
+    }
+    return Object.keys(sanitized).length > 0 ? sanitized : undefined;
+  }
+
   // Generic event logging
   static logEvent(eventName: string, parameters?: Record<string, any>) {
     try {
+      const cleanParams = this.sanitizeParameters(parameters);
       if (Capacitor.isNativePlatform()) {
         FirebaseAnalytics.logEvent({
           name: eventName,
-          params: parameters
+          params: cleanParams
         });
       } else if (analytics) {
-        logEvent(analytics, eventName, parameters);
+        logEvent(analytics, eventName, cleanParams);
       }
     } catch (err: any) {
       log.warn('Analytics event failed', { err });

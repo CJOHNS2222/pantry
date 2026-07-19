@@ -1,0 +1,491 @@
+================================================================================
+  STOCK & SPOON — PRODUCTION PERFORMANCE AUDIT
+  Prepared by: Senior Performance Engineering Review
+  Scope: Exhaustive codebase analysis across all components, hooks, and services
+  Files Audited: 30+ files including all major components, hooks, services, utils
+================================================================================
+
+Reference standard: data/notes (normalized relational schema principles,
+two-step shopping-list generation, separation of data vs. presentation).
+
+--------------------------------------------------------------------------------
+SECTION 1 — RENDERING & COMPONENT ARCHITECTURE
+--------------------------------------------------------------------------------
+
+[PERF-001] [COMPLETED] CRITICAL — God Component: PantryScanner.tsx (3,596 lines)
+File: components/pantry/PantryScanner.tsx
+Problem:
+  A single component handles barcode scanning, receipt OCR, batch editing,
+  category management, search/filter, virtualization, and form state
+  simultaneously. Every state change in any sub-feature triggers a re-render
+  of the entire component tree rooted here.
+Impact: High CPU cost on every inventory mutation; slow initial render on
+  low-end Android devices (the app's primary market).
+Fix:
+  - Split into: <PantryHeader />, <PantryCameraCapture />, <PantryItemForm />,
+    <PantryList />, <PantryBatchEditor />, <PantryCategoryManager />.
+  - Apply React.memo() on each sub-component.
+  - Move scanning state into usePantryScan() hook.
+  - Move form state into usePantryForm() hook.
+
+[PERF-002] [COMPLETED] CRITICAL — God Hook: useDataManagement.ts (1,997 lines)
+File: hooks/useDataManagement.ts
+Problem:
+  A single hook owns 14+ independent domains (inventory, shopping list, meal
+  plan, saved recipes, household, ratings, undo, allergy checks, food-waste
+  analytics, usage limits, expiration notifications, online status) all in
+  one re-render cycle. Any state change in any domain re-evaluates the
+  entire hook body.
+Impact: Every Firestore snapshot re-triggers expensive useMemo computations
+  (consumptionSuggestions, expirationAlerts, recipeSuggestions) for ALL context
+  consumers simultaneously.
+Fix:
+  - Split into: useInventory(), useShoppingList(), useMealPlan(),
+    useSavedRecipes(), useHousehold(), useRatings(), useExpirationAlerts(),
+    useFoodWaste().
+  - Each hook manages only its own listener and state.
+
+[PERF-003] [COMPLETED] HIGH — O(n^2) Loop in calculateRecipeFeasibility Inside useMemo
+File: components/recipes-meals/RecipeFinder.tsx, lines 68-123
+Problem:
+  getRecipeSuggestions (useMemo) maps over ALL savedRecipes and for each calls
+  calculateRecipeFeasibility(), which is itself a nested loop:
+  recipeIngredients.forEach -> availableItems.some(). No early exit or
+  memoization. For 100 recipes x 15 ingredients x 200 inventory items = 300,000
+  comparisons per render.
+Impact: Visible jank when switching to Recipe Finder tab with a full pantry.
+Fix:
+  - Pre-compute a Set<string> of normalized inventory item names once.
+  - Run feasibility only for visible recipes (paginated), not all 100+.
+
+[PERF-004] [COMPLETED] HIGH — 20+ Hardcoded CSV Recipes Defined Inline in Render Scope
+File: components/recipes-meals/RecipeFinder.tsx, lines 407-600+
+Problem:
+  csvRecipes is an array literal of 20+ full recipe objects defined inside
+  the component function body. JavaScript re-allocates this on every render.
+Impact: Unnecessary heap allocations on every re-render.
+Fix:
+  - Move to a module-level constant outside the component, in a separate
+    data/fallbackRecipes.ts file.
+
+[PERF-005] [COMPLETED] HIGH — Fuse.js Index Rebuilt on Every Search Call
+File: utils/searchUtils.ts, lines 52-72
+Problem:
+  searchPantryItems() and searchRecipes() create new Fuse(items, options)
+  on every invocation. Fuse.js index construction is O(n) with significant
+  object allocation. Runs on every keystroke.
+Impact: Sluggish search on pantries with 200+ items; high GC pressure.
+Fix:
+  - Cache the Fuse instance; invalidate only when the items array ref changes.
+  - Use a useFuseIndex(items, options) hook with useRef + useMemo.
+
+[PERF-006] [COMPLETED] MEDIUM — JSON.stringify Deep-Clone in Firestore Snapshot Callbacks
+File: hooks/useDataManagement.ts, lines 77, 105, 149
+Problem:
+  prevShoppingListRef.current = JSON.parse(JSON.stringify(sortedItems)) runs
+  inside every Firestore snapshot callback. JSON round-trip is 10-50x slower
+  than structuredClone().
+Fix:
+  - Replace all instances with structuredClone(sortedItems).
+
+[PERF-007] [COMPLETED] MEDIUM — Full Array Sort on Every Firestore Snapshot
+File: hooks/useDataManagement.ts, lines 73, 101
+Problem:
+  items.sort((a, b) => a.item.localeCompare(b.item)) runs on every snapshot,
+  even when only a single item's purchased field changes.
+Fix:
+  - Sort at write time in ShoppingListCacheService.addItemToCache().
+  - Remove sort from the read (snapshot) path entirely.
+
+[PERF-008] [COMPLETED] MEDIUM — useMemo No-Op Wrapper for mealPlan
+File: hooks/useDataManagement.ts, line 454
+Problem:
+  const mealPlan = useMemo(() => mealPlanState, [mealPlanState]) adds a
+  useMemo with zero computation; functionally identical to a direct reference.
+Fix:
+  - Remove the useMemo wrapper; use mealPlanState directly.
+
+[PERF-009] [COMPLETED] LOW — validateMealPlan() Runs on Every setMealPlan Call
+File: hooks/useDataManagement.ts, lines 405-452
+Problem:
+  setMealPlan() re-filters and re-sorts the full array on every invocation,
+  including frequent Firestore-driven updates.
+Fix:
+  - Validate only at user-initiated write time, not on every state setter call.
+
+--------------------------------------------------------------------------------
+SECTION 2 — FIRESTORE READS, WRITES & REAL-TIME LISTENERS
+--------------------------------------------------------------------------------
+
+[PERF-010] [COMPLETED] CRITICAL — Analytics Event Fired on Every collection() Reference
+File: services/databaseMonitoringService.ts, lines 143-146
+Problem:
+  DatabaseMonitoringService.collection() calls
+  AnalyticsService.trackDatabaseOperation('read', path, 0) every time a
+  collection reference is constructed — even for query setup that has not
+  yet executed. Firebase Analytics has a 500-event-per-session cap.
+Impact: Infrastructure telemetry saturates the event cap, silently dropping
+  real business events (purchases, recipe saves, etc.).
+Fix:
+  - Remove the analytics call from collection().
+  - Only track reads inside getDoc()/getDocs() after the actual I/O completes.
+
+[PERF-011] [COMPLETED] CRITICAL — console.trace() Called Inside Production getDocs() Path
+File: services/databaseMonitoringService.ts, line 233
+Problem:
+  console.trace() captures a full synchronous stack trace after every Firestore
+  query. This is gated on DEV but runs in all non-production builds.
+Impact: Up to 50ms added latency per query in staging/testing; masks real
+  performance regressions.
+Fix:
+  - Remove console.trace() entirely from the production code path.
+
+[PERF-012] [COMPLETED] HIGH — FEFO Normalization Runs Client-Side on Every Snapshot
+File: hooks/useDataManagement.ts, lines 621-629
+Problem:
+  For every inventory snapshot the code iterates all items and for each item
+  with batches, filters/sorts/extracts the earliest expiry. This is O(n x batches)
+  computation on the main thread for every household member's change.
+Fix:
+  - Move FEFO normalization to InventoryCacheService at write time (addItemToCache,
+    updateItemInCache). Store the normalized expirationDate in Firestore directly.
+
+[PERF-013] [COMPLETED] HIGH — getRatingsForRecipe() Issues Uncached Firestore Query Per Modal
+File: hooks/useDataManagement.ts, lines 1748-1781
+Problem:
+  A new getDocs() query fires every time a user opens a recipe modal. No caching.
+  10 recipe views = 10 separate Firestore queries.
+Fix:
+  - Cache results in Map<recipeTitle, RecipeRating[]> with a TTL.
+  - Batch-fetch ratings for all visible recipes when the tab activates.
+
+[PERF-014] [COMPLETED] HIGH — 5th Concurrent Firestore Listener Added for Household Users
+File: hooks/useDataManagement.ts, lines 658-678
+Problem:
+  In-household users register a 5th onSnapshot listener (personal recipe cache)
+  on top of household/inventory, household/presence, shoppingList, savedRecipes,
+  and mealPlan listeners. Each listener holds a persistent WebSocket channel.
+Impact: Increased battery drain and memory usage on mobile devices.
+Fix:
+  - Embed personal recipe count in the user's Firestore document
+    (users/{uid}.personalRecipeCount), updated at write time. Data arrives
+    via the existing user document listener in useAuth — no 5th listener needed.
+
+[PERF-015] [COMPLETED] MEDIUM — rebuildCommunityRatedRecipes() Loads Full Collection Client-Side
+File: services/recipeService.ts, lines 257-298
+Problem:
+  getDocs(ratingsRef) has no query constraints. Fetches the entire recipeRatings
+  collection into memory, then filters by date in JavaScript.
+Fix:
+  - Use server-side where('date', '>=', cutoff) query.
+  - Guard with isAdmin check; this function is admin/Cloud Function territory.
+
+[PERF-016] [COMPLETED] MEDIUM — estimateRecipeCostFromIngredients() Uses Sequential Awaits
+File: services/recipeService.ts, lines 115-138
+Problem:
+  for (const ing of ingredients) { await getIngredientPrice(...) } — sequential.
+  15 ingredients = 15 chained async calls.
+Fix:
+  - Use Promise.all():
+    const prices = await Promise.all(ingredients.map(ing => getIngredientPrice(ing)));
+
+[PERF-017] [COMPLETED] MEDIUM — JSON.stringify for Household Equality Check on Every Presence Ping
+File: hooks/useDataManagement.ts, lines 539-559
+Problem:
+  JSON.stringify(merged) !== JSON.stringify(prevHouseholdRef.current) serializes
+  the entire Household object on every household AND presence snapshot.
+  Presence can update every few seconds.
+Fix:
+  - Compare only scalar fields: id, lastUpdated, member count.
+
+--------------------------------------------------------------------------------
+SECTION 3 — MEMORY LEAKS & RESOURCE MANAGEMENT
+--------------------------------------------------------------------------------
+
+[PERF-018] [COMPLETED] HIGH — DatabaseMonitoringService.metricsInterval Never Cleared
+File: services/databaseMonitoringService.ts, lines 60-64
+Problem:
+  metricsInterval is a static property; no evidence cleanup() is wired to
+  any component lifecycle. The interval runs for the full app session.
+Fix:
+  - Call DatabaseMonitoringService.cleanup() in App.tsx's useEffect cleanup.
+
+[PERF-019] [COMPLETED] HIGH — ReadThroughCache setInterval Runs Globally and Never Cleared
+File: services/cacheService.ts, lines 28-30
+Problem:
+  setInterval(() => this.cleanup(), 60000) in constructor. destroy() exists
+  but is never called in any production code path.
+Fix:
+  - Call firestoreCache.destroy() in App.tsx's useEffect cleanup.
+  - Or use lazy TTL eviction on get() instead of polling.
+
+[PERF-020] [COMPLETED] MEDIUM — leftoverNotificationCleanupRef Not Always Cleared on Re-Auth
+File: hooks/useDataManagement.ts, lines 552-558, 575-600
+Problem:
+  The householdIdChanged guard may miss cleanup when the same household ID
+  is re-assigned after a re-auth event, causing duplicate periodic checks.
+Fix:
+  - Always call cleanup before starting new checks, unconditionally.
+
+[PERF-021] [COMPLETED] MEDIUM — Fireworks rAF Loop Has No cancelAnimationFrame on Unmount
+File: App.tsx, lines 99-200
+Problem:
+  The requestAnimationFrame animation loop in triggerCelebration() has no
+  cancellation on component unmount. Continued callback firing post-unmount
+  prevents GC and wastes CPU.
+Fix:
+  - Store rAF handle in a useRef; call cancelAnimationFrame(ref.current) on cleanup.
+
+--------------------------------------------------------------------------------
+SECTION 4 — INEFFICIENT DATA STRUCTURES & ALGORITHMS
+--------------------------------------------------------------------------------
+
+[PERF-022] [COMPLETED] HIGH — GroceryPriceService Has 400+ Keys with Synonym Bloat
+File: services/groceryPriceService.ts, lines 66-400+
+Problem:
+  defaultPrices has 400+ entries with many synonym duplicates pointing to
+  identical values (e.g., chickpeas / canned chickpeas / garbanzo beans).
+  Bloats module parse time and memory footprint.
+Fix:
+  - Use a canonical Map<string, PriceData> + alias Map<string, string>.
+  - Reduces total entry count ~40% while improving maintainability.
+
+[PERF-023] HIGH — Shopping List Re-Sorted on Every Snapshot
+File: hooks/useDataManagement.ts, lines 73, 101
+(See also PERF-007 — restate as data-structure issue)
+Fix: Pre-sort at write time; remove sort from read path.
+
+[PERF-024] [COMPLETED] MEDIUM — Three Separate useMemo Calls Over the Same inventory Array
+File: hooks/useDataManagement.ts, lines 1903-1905
+Problem:
+  consumptionSuggestions, expirationAlerts, and recipeSuggestions are three
+  independent useMemos all depending on [inventory]. All three fire on the
+  same render cycle when inventory changes, tripling computation.
+Fix:
+  - Combine into a single useMemo returning all three results.
+  - Or colocate each in the specific component that needs it.
+
+[PERF-025] [COMPLETED] MEDIUM — filteredFirebaseRecipes useMemo Invalidates on Unstable
+  Nested Object References
+File: components/recipes-meals/RecipeFinder.tsx, lines 194-212
+Problem:
+  Dependencies include household?.members and user?.profile — nested references
+  from AppContext that change identity on every context update, even without
+  actual value changes. Causes Popular recipe re-filtering on every app-level
+  state update.
+Fix:
+  - Extract stable scalars (householdMemberIds, userDietaryRestrictions) into
+    the dependency array rather than full object references.
+
+--------------------------------------------------------------------------------
+SECTION 5 — ANALYTICS OVERHEAD
+--------------------------------------------------------------------------------
+
+[PERF-026] [COMPLETED] HIGH — Firebase Analytics Called on Every Firestore I/O Operation
+File: services/databaseMonitoringService.ts, services/analyticsService.ts
+Problem:
+  Every getDoc(), getDocs(), and collection() reference fires Firebase Analytics
+  events. A single pantry load fires 10-15 analytics events simultaneously.
+  Firebase's 500-event-per-session cap is saturated with infra telemetry.
+Impact: Real business events (purchases, saves) are silently dropped.
+Fix:
+  - Remove analytics from all Firestore wrapper methods.
+  - Use Firebase Performance Monitoring (perfTrace) for Firestore latency.
+  - Keep AnalyticsService calls only at business-logic call sites.
+
+[PERF-027] [COMPLETED] MEDIUM — Analytics Parameters Are Unvalidated (Silent Drop Risk)
+File: services/analyticsService.ts, lines 461-474
+Problem:
+  All analytics calls use Record<string, any>. Firebase limits: 25 params,
+  100-char keys, 100-char string values. Events exceeding limits are silently
+  dropped — no visibility into data loss.
+Fix:
+  - Add a sanitizeParams() validation wrapper enforcing Firebase limits.
+
+--------------------------------------------------------------------------------
+SECTION 6 — SCALABILITY & ARCHITECTURE
+--------------------------------------------------------------------------------
+
+[PERF-028] [COMPLETED] CRITICAL — Ingredient Storage Diverges from notes.txt Schema
+File: All cache services / Firestore schema
+Problem:
+  notes.txt specifies a normalized schema: ingredients as a master dictionary,
+  recipe_ingredients as a junction table with parsed quantity/unit/preparation.
+  Current implementation stores ingredients as raw string arrays
+  (recipe.ingredients: string[]). This means:
+  1. No server-side quantity aggregation (notes.txt Step 1 SQL pattern unavailable).
+  2. No grocery API readiness (raw strings can't be sent to Instacart).
+  3. Shopping list consolidation is fully client-side string matching
+     (consolidateShoppingList in appUtils.ts), which will not scale.
+Impact: Top long-term scalability risk.
+Recommended Direction:
+  - Parse ingredients at save time using parseIngredientForShoppingList()
+    (already exists in appUtils.ts).
+  - Persist {name, quantity, unit, preparation} objects in Firestore.
+  - Enable server-side aggregation via Cloud Functions.
+
+[PERF-029] [COMPLETED] HIGH — Monolithic AppContext Causes Global Re-Renders
+File: contexts/AppContext.tsx, contexts/AppActionsContext.tsx
+Problem:
+  Two monolithic context objects distribute all global state to all components.
+  A shopping list item being checked off triggers re-renders in Recipe Finder,
+  Meal Planner, Pantry, and Settings simultaneously.
+Fix:
+  - Split by domain: InventoryContext, ShoppingListContext, MealPlanContext,
+    RecipesContext, HouseholdContext.
+  - Apply React.memo() to all tab-level components.
+
+[PERF-030] [COMPLETED] HIGH — mealPlanSyncInProgress is a Module-Level Boolean (Race Condition)
+File: hooks/useDataManagement.ts, line 49
+Problem:
+  Module-level `let mealPlanSyncInProgress = false` is a race condition in
+  React Strict Mode (effects run twice; both checks see false before either sets
+  it to true).
+Fix:
+  - Replace with useRef<boolean>(false) inside the hook.
+
+[PERF-031] [COMPLETED] MEDIUM — recipeCache Stored in Component useState (Cleared on Tab Switch)
+File: components/recipes-meals/RecipeFinder.tsx, line 215
+Problem:
+  Cache lives in component state; destroyed every tab switch. Also triggers
+  re-render on cache population, even though cache state doesn't affect output.
+Fix:
+  - Move to useRef (no re-render) or a module-level variable (persists across
+    tab switches in the same session).
+
+[PERF-032] [COMPLETED] MEDIUM — getEnhancedAutocompleteSuggestions() O(n) Scan Per Keystroke
+File: utils/searchUtils.ts, lines 82-140
+Problem:
+  Full items array filter on every keystroke without debouncing at the utility
+  level. 200+ comparisons per character typed.
+Fix:
+  - Debounce call site (300ms minimum).
+  - Pre-build a lowercase name cache to avoid toLowerCase() per comparison.
+
+--------------------------------------------------------------------------------
+SECTION 7 — EXPIRATION & NOTIFICATION EFFICIENCY
+--------------------------------------------------------------------------------
+
+[PERF-033] [COMPLETED] MEDIUM — Dead expiredItems Computation in useEffect
+File: hooks/useDataManagement.ts, lines 696-704
+Problem:
+  const expiredItems = inventory.filter(...) is computed but the result block
+  is an empty comment ("This logic should probably be moved to a service").
+  The filter runs on every inventory change.
+Fix:
+  - Remove the unused computation. Use the expirationAlerts useMemo (line 1904).
+
+[PERF-034] [COMPLETED] LOW — createExpirationAlert Loop Uses Sequential Awaits
+File: hooks/useDataManagement.ts, lines 745-748
+Problem:
+  for (const item of itemsExpiringSoon.slice(0, 3)) {
+    await NotificationService.createExpirationAlert(...)
+  }
+  Independent Firestore writes chained sequentially.
+Fix:
+  - Use Promise.all() for the individual notification loop.
+
+--------------------------------------------------------------------------------
+SECTION 8 — QUICK WINS (Low Effort / High Value)
+--------------------------------------------------------------------------------
+
+[PERF-035] [COMPLETED] Cache Fuse.js Index (PERF-005 quick win)
+  Effort: 1 hour. Eliminates index rebuild on every search keystroke.
+
+[PERF-036] [COMPLETED] Remove useMemo No-Op for mealPlan
+  File: hooks/useDataManagement.ts, line 454
+  Effort: 5 minutes. Zero risk.
+
+[PERF-037] [COMPLETED] Move csvRecipes Outside RecipeFinder Component
+  File: components/recipes-meals/RecipeFinder.tsx, lines 407+
+  Effort: 10 minutes. Eliminates per-render heap allocation.
+
+[PERF-038] [COMPLETED] Replace JSON.stringify Clone with structuredClone()
+  File: hooks/useDataManagement.ts, lines 77, 105, 149
+  Effort: 30 minutes. 10-20x faster deep clone.
+
+[PERF-039] [COMPLETED] Remove Dead expiredItems Filter
+  File: hooks/useDataManagement.ts, lines 696-704
+  Effort: 5 minutes.
+
+--------------------------------------------------------------------------------
+PRIORITY MATRIX
+--------------------------------------------------------------------------------
+
+Priority 1 — Do First (Immediate, Current Sprint)
+  PERF-001: [COMPLETED] Split PantryScanner.tsx (3,596 lines)
+  PERF-010: [COMPLETED] Remove analytics from collection() references
+  PERF-011: [COMPLETED] Remove console.trace() from getDocs() path
+  PERF-026: [COMPLETED] Remove analytics from all Firestore wrapper methods
+  PERF-005: [COMPLETED] Cache Fuse.js index instances
+
+Priority 2 — Next Sprint
+  PERF-002: [COMPLETED] Split useDataManagement.ts into domain hooks
+  PERF-029: [COMPLETED] Split AppContext into domain contexts
+  PERF-003: [COMPLETED] Optimize calculateRecipeFeasibility with Sets
+  PERF-013: [COMPLETED] Cache getRatingsForRecipe(); batch-fetch on tab activate
+  PERF-012: [COMPLETED] Move FEFO normalization to write time
+
+Priority 3 — Backlog (Data Architecture)
+  PERF-028: [COMPLETED] Align ingredient storage with notes.txt normalized schema
+  PERF-014: [COMPLETED] Eliminate 5th Firestore listener via user doc embedding
+  PERF-022: [COMPLETED] Consolidate GroceryPriceService synonym map
+  PERF-016: [COMPLETED] Parallelize estimateRecipeCostFromIngredients
+
+Priority 4 — Ongoing / Maintenance
+  PERF-018: [COMPLETED] Wire DatabaseMonitoringService.cleanup() to App lifecycle
+  PERF-019: [COMPLETED] Wire cacheService.destroy() to App lifecycle
+  PERF-030: [COMPLETED] Replace mealPlanSyncInProgress with useRef
+  PERF-027: [COMPLETED] Add analytics parameter validation
+
+--------------------------------------------------------------------------------
+SUMMARY STATISTICS
+--------------------------------------------------------------------------------
+
+Total Issues Found:    39 (across 30+ files)
+Critical:               5  (PERF-001, PERF-002, PERF-010, PERF-011, PERF-028)
+High:                  13
+Medium:                14
+Low:                    7
+
+Estimated Gains (Priority 1, 2, 3, 4 implemented):
+  - ~40-60% reduction in re-renders for inventory-heavy users
+  - ~30-50% reduction in Firebase Analytics event volume
+  - ~70% reduction in unnecessary Firestore reads on ratings
+  - Measurable tab-switch latency improvement on mid-range Android
+
+notes.txt Compliance:
+  - Ingredient normalization (notes lines 41-97):   IMPLEMENTED [PERF-028]
+  - Quantity aggregation for shopping (lines 231-246): IMPLEMENTED [PERF-028]
+  - Household/user separation (lines 155-158):        IMPLEMENTED
+  - Date-based meal plan structure (lines 160-189):   IMPLEMENTED
+  - Custom item polymorphic design (lines 193-226):   IMPLEMENTED
+
+================================================================================
+END OF AUDIT
+================================================================================
+**incomplete**
+✅ All items completed!
+
+pass #1 [COMPLETED]
+[x] PERF-004: Extract 20+ hardcoded CSV fallback recipes in RecipeFinder.tsx to external data/fallbackRecipes.ts.
+[x] PERF-006: Replace legacy JSON.parse(JSON.stringify()) deep clones in snapshot callbacks with structuredClone().
+[x] PERF-007 / PERF-023: Move snapshot read-path array sorting to write-time sorting in cache services.
+[x] PERF-008 / PERF-036: Remove no-op useMemo wrapper around mealPlanState.
+[x] PERF-009: Validate meal plan data only at user write-time instead of inside setMealPlan.
+[x] PERF-015: Add where('date', '>=', cutoff) server query constraint to rebuildCommunityRatedRecipes.
+
+pass #2 [COMPLETED]
+[x] PERF-017: Replace full object JSON.stringify in household presence checks with scalar checks.
+[x] PERF-020: Unconditionally clear leftoverNotificationCleanupRef before starting new checks on re-auth.
+[x] PERF-021: Store celebration fireworks animation handle in a useRef and call cancelAnimationFrame on unmount.
+[x] PERF-024: Consolidate three separate useMemo calls over inventory into a single memoization block.
+[x] PERF-025: Extract scalar properties in filteredFirebaseRecipes useMemo dependencies to prevent context reference invalidations.
+
+pass #3 [COMPLETED]
+[x] PERF-031: Move recipeCache out of RecipeFinder component state to a persistent ref or module cache.
+[x] PERF-032: Debounce getEnhancedAutocompleteSuggestions and pre-build lowercase search cache.
+[x] PERF-033 / PERF-039: Remove dead expiredItems filter computation from useEffect.
+[x] PERF-034: Use Promise.all for the createExpirationAlert loop in useDataManagement.ts.
+[x] PERF-037: Move csvRecipes outside RecipeFinder component.
+[x] PERF-038: Replace JSON.stringify deep clone with structuredClone().

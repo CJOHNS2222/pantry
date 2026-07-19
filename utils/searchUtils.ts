@@ -48,24 +48,36 @@ const recipeSearchOptions = {
   minMatchCharLength: 2
 };
 
-// Search pantry items with fuzzy matching
+// WeakMap instances to cache Fuse search indexes by array reference
+const pantryFuseCache = new WeakMap<PantryItem[], Fuse<PantryItem>>();
+const recipeFuseCache = new WeakMap<(StructuredRecipe | SavedRecipe)[], Fuse<StructuredRecipe | SavedRecipe>>();
+
+// Search pantry items with fuzzy matching (cached index)
 export const searchPantryItems = (items: PantryItem[], query: string): PantryItem[] => {
   if (!query.trim()) return items;
 
-  const fuse = new Fuse(items, pantryItemSearchOptions);
+  let fuse = pantryFuseCache.get(items);
+  if (!fuse) {
+    fuse = new Fuse(items, pantryItemSearchOptions);
+    pantryFuseCache.set(items, fuse);
+  }
   const results = fuse.search(query);
 
   return results.map(result => result.item);
 };
 
-// Search recipes with fuzzy matching
+// Search recipes with fuzzy matching (cached index)
 export const searchRecipes = (
   recipes: (StructuredRecipe | SavedRecipe)[],
   query: string
 ): (StructuredRecipe | SavedRecipe)[] => {
   if (!query.trim()) return recipes;
 
-  const fuse = new Fuse(recipes, recipeSearchOptions);
+  let fuse = recipeFuseCache.get(recipes);
+  if (!fuse) {
+    fuse = new Fuse(recipes, recipeSearchOptions);
+    recipeFuseCache.set(recipes, fuse);
+  }
   const results = fuse.search(query);
 
   return results.map(result => result.item);
@@ -83,12 +95,12 @@ export const getEnhancedAutocompleteSuggestions = (
   items: PantryItem[],
   query: string,
   maxSuggestions: number = 8,
-  householdId?: string
+  _householdId?: string
 ): AutocompleteSuggestion[] => {
-  if (!query.trim() || query.length < 1) return [];
+  if (!query || query.trim().length < 2) return [];
 
   const suggestions: AutocompleteSuggestion[] = [];
-  const queryLower = query.toLowerCase();
+  const queryLower = query.trim().toLowerCase();
 
   // 1. Get direct matches first (highest priority)
   const directMatches = items

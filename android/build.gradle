@@ -8,7 +8,7 @@ buildscript {
     }
     dependencies {
         // Use AGP version from libs.versions.toml
-        classpath 'com.android.tools.build:gradle:9.2.1'
+        classpath 'com.android.tools.build:gradle:8.8.2'
 
     }
 }
