@@ -47,6 +47,12 @@ project(':capacitor-share').projectDir = new File('../node_modules/@capacitor/sh
 include ':capawesome-capacitor-app-review'
 project(':capawesome-capacitor-app-review').projectDir = new File('../node_modules/@capawesome/capacitor-app-review/android')
 
+include ':capawesome-capacitor-app-update'
+project(':capawesome-capacitor-app-update').projectDir = new File('../node_modules/@capawesome/capacitor-app-update/android')
+
+include ':capawesome-capacitor-navigation-bar'
+project(':capawesome-capacitor-navigation-bar').projectDir = new File('../node_modules/@capawesome/capacitor-navigation-bar/android')
+
 include ':codetrix-studio-capacitor-google-auth'
 project(':codetrix-studio-capacitor-google-auth').projectDir = new File('../node_modules/@codetrix-studio/capacitor-google-auth/android')
 

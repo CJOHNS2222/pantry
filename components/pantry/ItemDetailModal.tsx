@@ -921,6 +921,9 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
               View Price Trends
             </button>
           </div>
+
+          {/* Extra bottom padding to clear Android navigation buttons */}
+          <div className="h-[50px]" />
       </BottomSheet.Body>
 
       {/* Price Trends Modal */}

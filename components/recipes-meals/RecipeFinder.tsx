@@ -12,7 +12,7 @@ import { useKeyboardNavigation } from '../../hooks/useKeyboardNavigation';
 import { useAndroidBack } from '../../hooks/useAndroidBack';
 
 import { filterRecipesByHouseholdPreferences, checkRecipeAgainstPreferences, rankCachedRecipesByPreferences, recipeMatchesCacheFilters, CacheMealTypeFilter } from '../../utils/preferenceUtils';
-import { getUserMeasurementSystem } from '../../utils/measurementUtils';
+import { getUserMeasurementSystem, convertIngredientString } from '../../utils/measurementUtils';
 import { useIntl } from 'react-intl';
 import { Capacitor } from '@capacitor/core';
 import { SpeechRecognition } from '@capacitor-community/speech-recognition';
@@ -1474,11 +1474,14 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
             const dietaryBadges = getDietaryBadges(recipe);
             const cardWarning = recipeWarnings.get(recipe.title);
             
-            // Filter out staple items from ingredient list
-            const filteredIngredients = recipe.ingredients.filter(ing => {
-                const ingLower = ing.toLowerCase();
-                return !STAPLES.some(staple => ingLower.includes(staple));
-            });
+            // Filter out staple items from ingredient list and convert units
+            const measurementSystem = getUserMeasurementSystem(user?.profile);
+            const filteredIngredients = recipe.ingredients
+                .map(ing => convertIngredientString(ing, measurementSystem))
+                .filter(ing => {
+                    const ingLower = ing.toLowerCase();
+                    return !STAPLES.some(staple => ingLower.includes(staple));
+                });
             return (
                 <RecipeFinderCard
                     recipe={recipe}

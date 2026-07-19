@@ -25,6 +25,7 @@ import AnalyticsService from './services/analyticsService';
 import { SubscriptionProvider } from './hooks/useSubscription';
 
 import { isHouseholdMember, inferCategoryFromItemName, inferStorageLocationFromItemName, parseIngredientForShoppingList, getItemImage, fetchExternalItemImage, parseQuantityAndUnit } from './utils/appUtils';
+import { getUserMeasurementSystem, convertIngredientString } from './utils/measurementUtils';
 import { getQuantityAmount } from './utils/quantityUtils';
 import { NotificationBanner } from './components/ui/NotificationBanner';
 import { NotificationService, NotificationItem, NotificationSettings } from './services/notificationService';
@@ -491,13 +492,16 @@ const App: React.FC = () => {
     const householdId = inHousehold ? household?.id : undefined;
     const userId = inHousehold ? undefined : user?.id;
     
+    const measurementSystem = getUserMeasurementSystem(user?.profile);
+
     // Fetch prices in parallel
     const pricePromises = items.map(async (inputItem) => {
       const itemStr = typeof inputItem === 'string' ? inputItem : inputItem.item;
       const itemSource = typeof inputItem === 'string' ? defaultSource : inputItem.source;
       const itemNotes = typeof inputItem === 'string' ? undefined : inputItem.notes;
       
-      const parsed = parseIngredientForShoppingList(itemStr);
+      const convertedItemStr = convertIngredientString(itemStr, measurementSystem);
+      const parsed = parseIngredientForShoppingList(convertedItemStr);
       const priceData = await groceryPriceService.getIngredientPrice(parsed.itemName).catch((error) => {
         log.warn('Failed to fetch ingredient price', { itemName: parsed.itemName, error }, 'App');
         return null;

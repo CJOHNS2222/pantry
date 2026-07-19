@@ -305,6 +305,11 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     const addSuggestion = (name: string) => {
       const trimmed = name.trim();
       if (trimmed && !inShoppingList.has(trimmed.toLowerCase())) {
+        const lower = trimmed.toLowerCase();
+        // Ignore water, boiling water, etc.
+        if (lower === 'water' || lower === 'boiling water' || lower === 'tap water' || lower === 'hot water' || lower === 'cold water' || lower === 'ice water') {
+          return;
+        }
         let found = false;
         for (const existing of suggestionsSet) {
           if (existing.toLowerCase() === trimmed.toLowerCase()) {

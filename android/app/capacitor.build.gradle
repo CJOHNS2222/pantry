@@ -24,6 +24,8 @@ dependencies {
     implementation project(':capacitor-push-notifications')
     implementation project(':capacitor-share')
     implementation project(':capawesome-capacitor-app-review')
+    implementation project(':capawesome-capacitor-app-update')
+    implementation project(':capawesome-capacitor-navigation-bar')
     implementation project(':codetrix-studio-capacitor-google-auth')
     implementation project(':ebarooni-capacitor-calendar')
     implementation project(':capacitor-plugin-safe-area')

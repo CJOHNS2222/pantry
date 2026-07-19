@@ -356,6 +356,10 @@ export function parseIngredientForShoppingList(ingredientText: string): { quanti
  */
 export function cleanItemNameForShopping(itemName: string): string {
   let cleaned = itemName.toLowerCase()
+    // Remove parenthesized notes, sizes, or details (e.g. "(460g)", "(approx 2 cups)")
+    .replace(/\s*\([^)]*\)/g, '')
+    // Remove unicode fractions
+    .replace(/[½¼¾⅓⅔⅛⅜⅝⅞]/g, '')
     // Remove quantities at the beginning (e.g., "1 ", "2 ", "3 ", etc.)
     .replace(/^\d+\s+/, '')
     // Remove leading store-brand abbreviations (cv = Clover Valley, gv = Great Value)
@@ -366,7 +370,7 @@ export function cleanItemNameForShopping(itemName: string): string {
     // Remove common preparation connectors
     .replace(/\b(cut into|sliced into|torn into|chopped into|finely chopped into)\b/g, '')
     // Remove common preparation descriptors that don't affect core item identity
-    .replace(/\b(fresh|dried|canned|chopped|sliced|diced|minced|crushed|ground|cubed|grated|finely|halved|seeded|shredded|julienned|torn|plucked|to serve|for serving|strips|whole)\b/g, '')
+    .replace(/\b(fresh|dried|canned|chopped|sliced|diced|minced|crushed|ground|cubed|grated|finely|halved|seeded|shredded|julienned|torn|plucked|to serve|for serving|strips|whole|plain|boiling|hot|cold|warm|all-purpose|all purpose|store-bought|store bought)\b/g, '')
     // Remove units, measurements, and recipe-specific descriptors
     .replace(/\b(tbs|tblsp|tbsp|tbsps|tsp|tsps|tablespoons?|teaspoons?|pinch(es)?|zest and juice|zest|juice|cups?|ounces?|oz|pounds?|lbs?|grams?|g|milliliters?|ml|liters?|l|cloves?|pieces?|slices?|can(ned)?s?|jars?|bottles?|packets?|packs?|bags?|tins?|containers?|tubs?|heads?|bunches?|sprigs?|stalks?|loaves|loaf|tostaste|to taste)\b/g, '')
     // Remove standalone numbers (e.g., "1", "2", "1/2")
