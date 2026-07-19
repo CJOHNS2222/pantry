@@ -1,3 +1,20 @@
+## [3.0.9] - 2026-07-18
+
+### Added
+- **Immersive Landscape Cooking Mode** — Implemented native Android landscape orientation lock and sticky hidden status/navigation system bars for hands-free cooking mode.
+- **Dynamic Unit System Conversions** — Implemented automatic unit conversions (Grams to Oz/Lbs for Standard/US users) across Recipe Modal, Recipe Finder cards, Shopping List, and database item creation based on user preferences.
+- **Firestore Persistent Local Cache** — Configured native IndexedDB Firestore persistence for instant app startup load times and offline hydration.
+- **Native In-App Store Updates** — Integrated Capawesome App Update plugin (`@capawesome/capacitor-app-update`) for direct, seamless in-app Google Play Store and Apple App Store updates.
+- **Native Navigation Bar Theme Sync** — Integrated Capawesome Navigation Bar plugin (`@capawesome/capacitor-navigation-bar`) to dynamically sync Android bottom system navigation bar colors and icon contrast with Dark/Light theme modes.
+
+### Changed
+- **Quick Add Suggestions Cleanup** — Enhanced ingredient string cleaning to strip fractions, parenthesized quantities, and non-store descriptors, while filtering water from suggested items.
+- **Item Detail Bottom Sheet Safe Padding** — Added 50px bottom scroll clearance to clear Android system navigation buttons in the item detail bottom sheet.
+- **Raised Toast Notifications** — Adjusted bottom toast positioning by +30px (`bottom-[110px]`) to clear the bottom navigation footer bar.
+- **Package Dependencies** — Updated key library dependencies (`@capacitor/*`, `firebase`, `tailwindcss`, `vite`, `vitest`, `lucide-react`, `typescript-eslint`).
+
+---
+
 ## [3.0.8] - 2026-07-17
 
 ### Added

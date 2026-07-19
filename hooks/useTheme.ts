@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import NavigationBarService from '../services/navigationBarService';
 
 interface ThemeSettings {
   mode: 'light' | 'dark';
@@ -35,6 +36,9 @@ export function useTheme(themeSettings: ThemeSettings) {
       document.documentElement.style.removeProperty('--text-secondary');
       document.documentElement.style.removeProperty('color');
     }
+
+    // Sync Android native bottom navigation bar with current theme
+    NavigationBarService.setTheme(themeSettings.mode, themeSettings.backgroundColor);
   }, [themeSettings]);
 
   return { theme: themeSettings };

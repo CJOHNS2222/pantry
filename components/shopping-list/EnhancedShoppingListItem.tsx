@@ -8,7 +8,7 @@ import { useAndroidBack } from '../../hooks/useAndroidBack';
 import HapticService from '../../services/hapticService';
 import { getItemImage, parseQuantityAndUnit } from '../../utils/appUtils';
 import { getSmartUnits } from '../pantry/QuantityUnitPicker';
-import { convertUnit } from '../../utils/measurementUtils';
+import { convertUnit, getUserMeasurementSystem, convertToMetric, convertToStandard, formatScaledQuantity } from '../../utils/measurementUtils';
 
 const getRecipeTitleFromSource = (source: string | undefined): string => {
   if (!source || !source.startsWith('recipe:')) return '';
@@ -54,6 +54,24 @@ const findRecipeByTitle = (title: string, savedRecipes: SavedRecipe[], mealPlan:
   };
 };
 
+const formatItemQuantityForDisplay = (quantityStr: string | undefined, itemName: string, system: 'Standard' | 'Metric'): string => {
+  if (!quantityStr) return '';
+  const parsed = parseQuantityAndUnit(quantityStr, itemName);
+  const converted = system === 'Metric'
+    ? convertToMetric(parsed.amount, parsed.unit)
+    : convertToStandard(parsed.amount, parsed.unit);
+    
+  if (converted.amount === 1 && (converted.unit === 'pcs' || converted.unit === 'pieces' || converted.unit === 'count' || converted.unit === 'each' || !converted.unit)) {
+    return '1';
+  }
+  
+  const formattedAmount = system === 'Standard'
+    ? formatScaledQuantity(converted.amount)
+    : converted.amount.toString();
+    
+  return `${formattedAmount} ${converted.unit}`;
+};
+
 interface HouseholdMember {
   id: string;
   name: string;
@@ -94,7 +112,8 @@ export const EnhancedShoppingListItem: React.FC<ShoppingListItemProps> = ({
   const [noteText, setNoteText] = useState(item.notes ?? '');
   const itemRef = useRef<HTMLDivElement>(null);
 
-  const { savedRecipes, mealPlan } = useApp();
+  const { savedRecipes, mealPlan, user } = useApp();
+  const measurementSystem = getUserMeasurementSystem(user?.profile);
 
   const handleRecipeClick = (e: React.MouseEvent, recipeTitle: string) => {
     e.stopPropagation();
@@ -305,7 +324,7 @@ export const EnhancedShoppingListItem: React.FC<ShoppingListItemProps> = ({
                         </span>
                       )}
                       <span className="bg-theme px-1.5 py-0.2 rounded text-[9px] font-bold">
-                        {cItem.quantity || `${cItem.amount} ${cItem.unit}`}
+                        {formatItemQuantityForDisplay(cItem.quantity?.toString() || `${cItem.amount} ${cItem.unit}`, item.item, measurementSystem)}
                       </span>
                     </div>
                   );
@@ -376,10 +395,25 @@ export const EnhancedShoppingListItem: React.FC<ShoppingListItemProps> = ({
           )}
 
           {onQuantityChange && (() => {
-            const { amount, unit } = parseQuantityAndUnit(item.quantity, item.item);
+            const parsed = parseQuantityAndUnit(item.quantity, item.item);
+            const converted = measurementSystem === 'Metric'
+              ? convertToMetric(parsed.amount, parsed.unit)
+              : convertToStandard(parsed.amount, parsed.unit);
+            const { amount, unit } = converted;
             const smartUnits = getSmartUnits(item.item);
             const commonUnits = ['pcs', 'dozen', 'lbs', 'kg', 'oz', 'g', 'cups', 'tbsp', 'tsp', 'ml', 'l', 'cans', 'bottles', 'packages', 'boxes', 'bags'];
-            const allUnits = Array.from(new Set([...smartUnits, ...commonUnits]));
+            
+            const standardUnitsToFilter = ['lbs', 'oz', 'cups', 'tbsp', 'tsp', 'gallons', 'quarts', 'pints'];
+            const metricUnitsToFilter = ['kg', 'g', 'ml', 'l'];
+            
+            const filteredSmart = smartUnits.filter(u => 
+              measurementSystem === 'Standard' ? !metricUnitsToFilter.includes(u) : !standardUnitsToFilter.includes(u)
+            );
+            const filteredCommon = commonUnits.filter(u => 
+              measurementSystem === 'Standard' ? !metricUnitsToFilter.includes(u) : !standardUnitsToFilter.includes(u)
+            );
+            
+            const allUnits = Array.from(new Set([...filteredSmart, ...filteredCommon]));
             
             return (
               <div className="flex flex-col items-end gap-1" onClick={(e) => e.stopPropagation()}>
@@ -420,11 +454,15 @@ export const EnhancedShoppingListItem: React.FC<ShoppingListItemProps> = ({
                     ))}
                   </select>
                 </div>
-                {item.quantity && item.quantity !== '1' && (
-                  <div className="text-[10px] text-theme-secondary opacity-80 pr-1 text-right">
-                    Needed: {item.quantity}
-                  </div>
-                )}
+                {(() => {
+                  const displayQty = formatItemQuantityForDisplay(item.quantity?.toString(), item.item, measurementSystem);
+                  if (!displayQty || displayQty === '1' || displayQty === '1 pcs') return null;
+                  return (
+                    <div className="text-[10px] text-theme-secondary opacity-80 pr-1 text-right">
+                      Needed: {displayQty}
+                    </div>
+                  );
+                })()}
               </div>
             );
           })()}

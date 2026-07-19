@@ -1,4 +1,5 @@
 import { StructuredRecipe, SavedRecipe, Household } from '../types';
+import { MeasurementSystem, convertIngredientString } from './measurementUtils';
 
 // Portion scaling configuration
 export interface PortionConfig {
@@ -39,10 +40,12 @@ export const calculatePortionScaling = (
  */
 export const scaleRecipeIngredients = (
   recipe: StructuredRecipe | SavedRecipe,
-  portionConfig: PortionConfig
+  portionConfig: PortionConfig,
+  system: MeasurementSystem = 'Standard'
 ): string[] => {
   return recipe.ingredients.map(ingredient => {
-    const scaledIngredient = scaleIngredient(ingredient, portionConfig.scalingFactor);
+    const converted = convertIngredientString(ingredient, system);
+    const scaledIngredient = scaleIngredient(converted, portionConfig.scalingFactor);
     return scaledIngredient;
   });
 };
@@ -117,9 +120,10 @@ export const getRecommendedServings = (household: Household | null): number => {
 // Create scaled recipe with updated servings and ingredients
 export const createScaledRecipe = (
   originalRecipe: StructuredRecipe | SavedRecipe,
-  portionConfig: PortionConfig
+  portionConfig: PortionConfig,
+  system: MeasurementSystem = 'Standard'
 ): StructuredRecipe | SavedRecipe => {
-  const scaledIngredients = scaleRecipeIngredients(originalRecipe, portionConfig);
+  const scaledIngredients = scaleRecipeIngredients(originalRecipe, portionConfig, system);
   const origServings = typeof (originalRecipe as any).servings === 'number' ? (originalRecipe as any).servings : 4;
   const newServings = Math.round(origServings * portionConfig.scalingFactor);
 

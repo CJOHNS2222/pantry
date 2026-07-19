@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { X, ChevronLeft, ChevronRight, UtensilsCrossed, List, BookOpen, Clock, Check } from 'lucide-react';
 import { LocalNotifications } from '@capacitor/local-notifications';
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, registerPlugin } from '@capacitor/core';
 import { StructuredRecipe } from '../../types';
 import { log } from '../../services/logService';
 import HapticService from '../../services/hapticService';
@@ -20,6 +20,14 @@ interface HTMLElementWithPrefixes extends HTMLElement {
   mozRequestFullScreen?: () => Promise<void>;
   msRequestFullscreen?: () => Promise<void>;
 }
+
+interface CookingModePluginType {
+  enableCookingMode(): Promise<void>;
+  disableCookingMode(): Promise<void>;
+}
+
+const CookingModePlugin = registerPlugin<CookingModePluginType>('CookingModePlugin');
+
 
 interface CookingModeProps {
   recipes: StructuredRecipe[];
@@ -176,6 +184,15 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipes = [], initialI
     let active = true;
 
     const requestImmersiveLandscape = async () => {
+      if (Capacitor.getPlatform() === 'android') {
+        try {
+          await CookingModePlugin.enableCookingMode();
+        } catch (error) {
+          log.error('Failed to enable Android native cooking mode', { error }, 'CookingMode');
+        }
+        return;
+      }
+
       // 1. Request landscape orientation lock
       if (screen.orientation && typeof screen.orientation.lock === 'function') {
         try {
@@ -209,6 +226,13 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipes = [], initialI
     return () => {
       active = false;
       
+      if (Capacitor.getPlatform() === 'android') {
+        CookingModePlugin.disableCookingMode().catch((err: unknown) => {
+          log.error('Failed to disable Android native cooking mode', { error: err }, 'CookingMode');
+        });
+        return;
+      }
+
       // 1. Restore/unlock screen orientation
       if (screen.orientation && typeof screen.orientation.unlock === 'function') {
         try {

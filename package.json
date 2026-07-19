@@ -1,7 +1,7 @@
 {
   "name": "stockandspoon",
   "private": true,
-  "version": "3.0.8",
+  "version": "3.0.9",
   "type": "module",
   "scripts": {
     "generate:changelog": "node scripts/generate-changelog.cjs",
@@ -65,6 +65,8 @@
     "@capacitor/push-notifications": "^8.0.3",
     "@capacitor/share": "~8.0.1",
     "@capawesome/capacitor-app-review": "^8.0.1",
+    "@capawesome/capacitor-app-update": "^8.0.3",
+    "@capawesome/capacitor-navigation-bar": "^8.0.1",
     "@codetrix-studio/capacitor-google-auth": "^3.4.0-rc.4",
     "@ebarooni/capacitor-calendar": "^8.2.0",
     "@emailjs/browser": "^4.4.1",

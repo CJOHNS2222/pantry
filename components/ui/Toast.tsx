@@ -270,7 +270,7 @@ export const ToastProvider: React.FC<{
   const positionClass =
     position === 'top'
       ? 'top-safe top-4 items-start flex-col'
-      : 'bottom-safe bottom-20 items-end flex-col-reverse';
+      : 'bottom-safe bottom-[110px] items-end flex-col-reverse';
 
   const container = toasts.length > 0
     ? createPortal(

@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
+import { Capacitor } from '@capacitor/core';
 import { versionService, VersionCheckResult } from '../../services/versionService';
+import { AppUpdateService } from '../../services/appUpdateService';
 import { Download, AlertTriangle } from 'lucide-react';
 import { log } from '../../services/logService';
 
@@ -54,7 +56,12 @@ export const GlobalUpdatePrompt: React.FC<GlobalUpdatePromptProps> = ({ onDismis
     return () => { removeListener?.(); };
   }, [checkForUpdates]);
 
-  const handleUpdate = () => {
+  const handleUpdate = async () => {
+    if (Capacitor.isNativePlatform()) {
+      const success = await AppUpdateService.performUpdate(versionCheck?.forceUpdate);
+      if (success) return;
+    }
+
     const url = versionCheck?.downloadUrl || PLAY_STORE_URL;
     window.open(url, '_blank');
 

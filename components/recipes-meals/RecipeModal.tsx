@@ -1,13 +1,14 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { X, Star, Clock, UtensilsCrossed, Globe } from 'lucide-react';
 import { useIntl } from 'react-intl';
-import { StructuredRecipe, RecipeRating, SavedRecipe, PantryItem, Household, RecipeCommunityStats } from '../../types';
+import { StructuredRecipe, RecipeRating, SavedRecipe, PantryItem, Household, RecipeCommunityStats, User, UserProfile } from '../../types';
 import { CookingMode } from './CookingMode';
 import { useKeyboardNavigation } from '../../hooks/useKeyboardNavigation';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { useModalOpen } from '../../utils/useModalOpen';
 import { useAndroidBack } from '../../hooks/useAndroidBack';
 import { scaleRecipeIngredients, calculatePortionScaling } from '../../utils/portionUtils';
+import { getUserMeasurementSystem } from '../../utils/measurementUtils';
 import { useAppActions } from '../../contexts/AppActionsContext';
 import AnalyticsService from '../../services/analyticsService';
 import { RecipeModalActionSection } from '../recipe-modal/RecipeModalActionSection';
@@ -57,11 +58,12 @@ interface RecipeModalProps {
   mealPlanLimitExceeded?: boolean;
   recipeSavedCount?: number;
   household?: Household | null;
-  user?: {
+  user?: User | {
     id: string;
     name: string;
     email: string;
     avatar?: string;
+    profile?: UserProfile;
   };
   editable?: boolean;
   activeRecipes?: (StructuredRecipe | SavedRecipe)[];
@@ -680,8 +682,9 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
 
     // Use the proper portion scaling utility
     const portionConfig = calculatePortionScaling(household, servings);
-    return scaleRecipeIngredients(recipe, portionConfig);
-  }, [recipe.ingredients, servings, household]);
+    const system = getUserMeasurementSystem(user?.profile);
+    return scaleRecipeIngredients(recipe, portionConfig, system);
+  }, [recipe.ingredients, servings, household, user?.profile]);
 
   if (!isOpen || !recipe) return null;
 
