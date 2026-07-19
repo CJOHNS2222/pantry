@@ -12,7 +12,7 @@ import { sendHouseholdInvitationEmail } from '../../services/emailService';
 import { log } from '../../services/logService';
 import { UsageService } from '../../services/usageService';
 import { InventoryCacheService } from '../../services/inventoryCacheService';
-import { MealPlanCacheService } from '../../services/mealPlanCacheService';
+import { MealPlanCacheService } from '../../services/MealPlanCacheService';
 import { RecipesCacheService } from '../../services/recipesCacheService';
 import { ShoppingListCacheService } from '../../services/shoppingListCacheService';
 import { useIntl } from 'react-intl';

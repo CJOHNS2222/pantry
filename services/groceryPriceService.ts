@@ -818,10 +818,20 @@ class GroceryPriceService {
     }
   }
 
-  // Get default price for an ingredient
+  // Get default price for an ingredient with plural fallback
   private getDefaultPrice(ingredient: string): { price: number; unit: string } {
-    const normalizedIngredient = this.normalizeIngredientName(ingredient);
-    return this.defaultPrices[normalizedIngredient] || { price: 2.99, unit: 'unit' };
+    const key = this.normalizeIngredientName(ingredient);
+    if (this.defaultPrices[key]) return this.defaultPrices[key];
+
+    // Plural fallback: strip trailing 'es' or 's'
+    if (key.endsWith('es') && this.defaultPrices[key.slice(0, -2)]) {
+      return this.defaultPrices[key.slice(0, -2)];
+    }
+    if (key.endsWith('s') && this.defaultPrices[key.slice(0, -1)]) {
+      return this.defaultPrices[key.slice(0, -1)];
+    }
+
+    return { price: 2.99, unit: 'unit' };
   }
 
   // Fetch latest prices from external APIs (placeholder for future implementation)

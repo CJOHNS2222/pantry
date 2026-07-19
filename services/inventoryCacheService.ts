@@ -57,6 +57,17 @@ export class InventoryCacheService {
    * Convert a PantryItem to an array for caching
    */
   private static pantryItemToArray(item: PantryItem): string[] {
+    const computedExpirationDate = (() => {
+      if (item.batches && item.batches.length > 0) {
+        const batchExpiries = item.batches
+          .map(b => b.expires)
+          .filter((e): e is string => !!e)
+          .sort();
+        if (batchExpiries.length > 0) return batchExpiries[0];
+      }
+      return item.expirationDate || '';
+    })();
+
     return [
       item.category || '',
       item.image || '', // image, not imageUrl
@@ -67,7 +78,7 @@ export class InventoryCacheService {
       // reservations may contain recipe reservations; use first reservation if available
       (item.reservations && item.reservations.length > 0 ? item.reservations[0].recipeId : '') || '',
       (item.reservations && item.reservations.length > 0 ? item.reservations[0].recipeName : '') || '',
-      item.expirationDate || '',
+      computedExpirationDate,
       item.expirationType || '',
       item.dateAdded || '',
       item.lastRestocked || '',

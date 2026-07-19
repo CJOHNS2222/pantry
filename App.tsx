@@ -31,6 +31,7 @@ import { NotificationBanner } from './components/ui/NotificationBanner';
 import { NotificationService, NotificationItem, NotificationSettings } from './services/notificationService';
 import { markNotificationRead, deleteNotification, snoozeNotificationInCache, updateNotificationInCache } from './services/notificationsService';
 import { log } from './services/logService';
+import { destroyReceiptOcrWorker } from './services/receiptOcrService';
 import { pushNotificationService } from './services/pushNotificationService';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Capacitor, PluginListenerHandle } from '@capacitor/core';
@@ -50,7 +51,7 @@ import { useIsAdmin } from './hooks/useIsAdmin';
 import PerformanceMonitoringService from './services/performanceMonitoringService';
 import HapticService from './services/hapticService';
 import { ShoppingListCacheService } from './services/shoppingListCacheService';
-import { MealPlanCacheService } from './services/mealPlanCacheService';
+import { MealPlanCacheService } from './services/MealPlanCacheService';
 import { RecipesCacheService } from './services/recipesCacheService';
 import { groceryPriceService } from './services/groceryPriceService';
 import { PriceDataCacheService } from './services/priceDataCacheService'; // Import the service
@@ -254,6 +255,14 @@ const App: React.FC = () => {
   const { tips: contextualTips, addTip: addContextualTip, dismissTip: dismissContextualTip } = useContextualTips(user);
   const { settings, setSettings } = useSettings();
   const toast = useToast();
+
+  // Root lifecycle cleanup for monitoring and background workers (PERF-018, PERF-019)
+  useEffect(() => {
+    return () => {
+      DatabaseMonitoringService.cleanup();
+      destroyReceiptOcrWorker();
+    };
+  }, []);
 
   // Bridge: preserve existing addToast(message, type?, ttl?, actionLabel?, action?) signature
   // so all ~30 downstream call sites (hooks/services) work unchanged.

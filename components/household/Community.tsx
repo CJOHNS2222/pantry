@@ -106,6 +106,15 @@ export const Community: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecipe,
   const [localLoading, setLocalLoading] = useState(false);
   const [ratingsState, setRatingsState] = useState<RecipeRating[]>([]);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const celebrationFrameRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (celebrationFrameRef.current !== null) {
+        cancelAnimationFrame(celebrationFrameRef.current);
+      }
+    };
+  }, []);
 
   // Onboarding checklist tracking relocated to Social tab
   const [isChecklistCollapsed, setIsChecklistCollapsed] = useState(true);
@@ -284,13 +293,14 @@ export const Community: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecipe,
       }
 
       if (particles.length > 0) {
-        requestAnimationFrame(drawFrame);
+        celebrationFrameRef.current = requestAnimationFrame(drawFrame);
       } else {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+        celebrationFrameRef.current = null;
       }
     };
 
-    drawFrame();
+    celebrationFrameRef.current = requestAnimationFrame(drawFrame);
   };
 
   const handleBadgeClick = (badge: AchievementBadge) => {

@@ -148,10 +148,20 @@ export interface GroundingChunk {
   };
 }
 
+export interface StructuredIngredient {
+  name: string; // Normalized name: "chicken breast", "red onion", "olive oil"
+  quantity?: number; // Numeric quantity: 0.5, 1, 2
+  unit?: string; // Unit: "cup", "tbsp", "grams", "lbs", "count"
+  preparation?: string; // Modifier: "finely diced", "softened", "melted"
+  raw_string: string; // Raw ingredient string: "1/2 cup finely diced red onion"
+  category_id?: string;
+}
+
 export interface StructuredRecipe {
   title: string;
   description: string;
   ingredients: string[];
+  structuredIngredients?: StructuredIngredient[];
   instructions: string[];
   cookTime: string | number;
   prepTime?: string | number;

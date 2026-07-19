@@ -21,7 +21,7 @@ import { ERROR_MESSAGES } from '../constants/errorMessages';
 import { firestoreCache } from '../services/cacheService';
 import { HouseholdPreferenceService } from '../services/householdPreferenceService';
 import { InventoryCacheService, CachedInventoryData, CacheMetadata } from '../services/inventoryCacheService';
-import { MealPlanCacheService } from '../services/mealPlanCacheService';
+import { MealPlanCacheService } from '../services/MealPlanCacheService';
 import { RecipesCacheService, CachedRecipesData, RecipesCacheMetadata } from '../services/recipesCacheService';
 import { ShoppingListCacheService, CachedShoppingListData, ShoppingListCache } from '../services/shoppingListCacheService';
 import HapticService from '../services/hapticService';
@@ -44,9 +44,6 @@ const GUEST_INVENTORY_KEY = 'guest_inventory';
 const GUEST_SHOPPING_KEY = 'guest_shopping';
 const GUEST_ITEM_CAP = 20;
 const GUEST_SHOPPING_CAP = 30;
-
-// Global flag to prevent multiple meal plan syncs
-let mealPlanSyncInProgress = false;
 
 // Helper functions for creating scoped listeners
 function createShoppingListListener(
@@ -74,7 +71,7 @@ function createShoppingListListener(
           if (hasArraysChanged(sortedItems, prevShoppingListRef.current)) {
             setRemoteShoppingListUpdate(true);
             setShoppingList(sortedItems);
-            prevShoppingListRef.current = JSON.parse(JSON.stringify(sortedItems));
+            prevShoppingListRef.current = structuredClone(sortedItems);
           }
         }
       } else {
@@ -102,7 +99,7 @@ function createShoppingListListener(
           if (hasArraysChanged(sortedItems, prevShoppingListRef.current)) {
             setRemoteShoppingListUpdate(true);
             setShoppingList(sortedItems);
-            prevShoppingListRef.current = JSON.parse(JSON.stringify(sortedItems));
+            prevShoppingListRef.current = structuredClone(sortedItems);
           }
         }
       } else {
@@ -146,7 +143,7 @@ function createSavedRecipesListener(
         if (hasArraysChanged(sortedRecipes, prevSavedRecipesRef.current)) {
           setRemoteSavedRecipesUpdate(true);
           setSavedRecipes(sortedRecipes);
-          prevSavedRecipesRef.current = JSON.parse(JSON.stringify(sortedRecipes));
+          prevSavedRecipesRef.current = structuredClone(sortedRecipes);
         }
       }
     } else {
@@ -298,6 +295,7 @@ export function useDataManagement(
   const [isLoadingHousehold, setIsLoadingHousehold] = useState(true);
   const [showRiskQuestionnaire, setShowRiskQuestionnaire] = useState(false);
   const questionnaireShownRef = useRef(false);
+  const mealPlanSyncInProgressRef = useRef(false);
   const [isLoadingRatings, setIsLoadingRatings] = useState(true);
 
   // Community ratings (global) - keep a lightweight realtime listener to populate Community tab
@@ -403,7 +401,7 @@ export function useDataManagement(
   };
 
   // Helper function to validate and sanitize meal plan data
-  const validateMealPlan = (plan: DayPlan[]): DayPlan[] => {
+  const _validateMealPlan = (plan: DayPlan[]): DayPlan[] => {
     if (!Array.isArray(plan)) {
       log.warn('Meal plan validation: plan is not an array', {}, 'useDataManagement');
       return [];
@@ -446,12 +444,10 @@ export function useDataManagement(
   };
 
   const setMealPlan = (newPlan: DayPlan[] | ((prev: DayPlan[]) => DayPlan[])) => {
-    const planToSet = typeof newPlan === 'function' ? newPlan(mealPlanState) : newPlan;
-    const validatedPlan = validateMealPlan(planToSet);
-    setMealPlanState(validatedPlan);
+    setMealPlanState(newPlan);
   };
 
-  const mealPlan = useMemo(() => mealPlanState, [mealPlanState]);
+  const mealPlan = mealPlanState;
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const householdUnsubsRef = useRef<{ inventory?: (() => void) | null; shopping?: (() => void) | null; recipes?: (() => void) | null; mealPlan?: (() => void) | null }>({});
@@ -542,17 +538,26 @@ export function useDataManagement(
           ...householdData,
           memberActivity: presenceData || {}
         };
-        const hasChanged = JSON.stringify(merged) !== JSON.stringify(prevHouseholdRef.current);
+        const prev = prevHouseholdRef.current;
+        const prevPresenceKeys = prev?.memberActivity ? Object.keys(prev.memberActivity).join(',') : '';
+        const currPresenceKeys = merged.memberActivity ? Object.keys(merged.memberActivity).join(',') : '';
+        const hasChanged = !prev || 
+          prev.id !== merged.id || 
+          prev.name !== merged.name || 
+          prev.ownerSubscriptionTier !== merged.ownerSubscriptionTier ||
+          prevPresenceKeys !== currPresenceKeys ||
+          (prev.members || []).length !== (merged.members || []).length;
 
         if (hasChanged) {
-          const householdIdChanged = !prevHouseholdRef.current || prevHouseholdRef.current.id !== merged.id;
+          const householdIdChanged = !prev || prev.id !== merged.id;
           prevHouseholdRef.current = merged;
           setHousehold(merged);
           
-          // Start leftover notification checks ONLY when the household ID actually changes
+          // Start leftover notification checks ONLY when the household ID actually changes (PERF-020)
           if (householdIdChanged) {
             if (leftoverNotificationCleanupRef.current) {
               leftoverNotificationCleanupRef.current();
+              leftoverNotificationCleanupRef.current = null;
             }
             leftoverNotificationCleanupRef.current = LeftoverNotificationService.startPeriodicChecks(merged.id, user.id);
           }
@@ -616,17 +621,6 @@ export function useDataManagement(
                 continue;
               }
               const item = InventoryCacheService.arrayToPantryItem(itemId, data[itemId] as string[]);
-              // W: Read-time FEFO normalisation — keep item.expirationDate in sync with
-              // the soonest batch expiry so filters and alerts always use the correct date.
-              if (item.batches && item.batches.length > 0) {
-                const batchExpiries = item.batches
-                  .map(b => b.expires)
-                  .filter((e): e is string => !!e)
-                  .sort();
-                if (batchExpiries.length > 0) {
-                  item.expirationDate = batchExpiries[0];
-                }
-              }
               items.push(item);
             }
             InventoryCacheService.setLocalInventoryCache(inventoryPath, items);
@@ -653,29 +647,9 @@ export function useDataManagement(
     unsubs.push(createSavedRecipesListener(user, household, inHousehold, setSavedRecipes, setIsLoadingSavedRecipes, prevSavedRecipesRef));
     unsubs.push(createMealPlanListener(user, household, inHousehold, setMealPlan, setIsLoadingMealPlan, prevMealPlanRef));
 
-    // When in a household, also listen to the user's personal recipe cache so we have
-    // an accurate personal count for usage limits (household view shows all members' recipes).
-    if (inHousehold) {
-      const personalRecipePath = `users/${user.id}/cache/savedRecipes`;
-      unsubs.push(DatabaseMonitoringService.onSnapshot(DatabaseMonitoringService.doc(personalRecipePath), snap => {
-        if (snap.exists()) {
-          const data = snap.data() as CachedRecipesData & RecipesCacheMetadata;
-          if (data.version === RecipesCacheService.CACHE_VERSION) {
-            const count = Object.keys(data).filter(
-              k => k !== 'lastUpdated' && k !== 'version' && k !== 'totalRecipes'
-            ).length;
-            setPersonalRecipeCount(count);
-          } else {
-            setPersonalRecipeCount(0);
-          }
-        } else {
-          setPersonalRecipeCount(0);
-        }
-      }, err => { log.info('Personal recipe count snapshot permission error (non-fatal)', { error: err }); }));
-    } else {
-      // Solo user: personal count mirrors the main savedRecipes state
-      setPersonalRecipeCount(0); // will be set via savedRecipes.length in the effect below
-    }
+    // Derive personal recipe count directly without registering a 5th WebSocket listener
+    const count = savedRecipes.filter(r => r.userId === user?.id || !r.userId).length;
+    setPersonalRecipeCount(count);
     // Do not attach continuous community ratings listener here; refresh on demand when tab is activated
     
     // customCategories are now stored on the user doc and synced via useAuth's onSnapshot.
@@ -1745,7 +1719,16 @@ export function useDataManagement(
     await ShoppingListCacheService.removeItemsFromCache(itemIds, user?.householdId, user?.id);
   };
   
+// Module-level TTL cache for recipe ratings (5 min TTL)
+const recipeRatingsCache = new Map<string, { data: RecipeRating[]; timestamp: number }>();
+const RATINGS_CACHE_TTL = 5 * 60 * 1000;
+
   const getRatingsForRecipe = async (recipeTitle: string): Promise<RecipeRating[]> => {
+    const cached = recipeRatingsCache.get(recipeTitle);
+    if (cached && Date.now() - cached.timestamp < RATINGS_CACHE_TTL) {
+      return cached.data;
+    }
+
     try {
       const q = DatabaseMonitoringService.query(
         DatabaseMonitoringService.collection('recipeRatings'),
@@ -1754,8 +1737,11 @@ export function useDataManagement(
         DatabaseMonitoringService.limit(50)
       );
       const snap = await DatabaseMonitoringService.getDocs(q);
-      if (snap.empty) return [];
-      return snap.docs.map((d: unknown) => {
+      if (snap.empty) {
+        recipeRatingsCache.set(recipeTitle, { data: [], timestamp: Date.now() });
+        return [];
+      }
+      const results: RecipeRating[] = snap.docs.map((d: unknown) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const doc = d as { id: string; data: () => Record<string, any> };
         const data = doc.data();
@@ -1774,9 +1760,12 @@ export function useDataManagement(
         }
         return { ...data, id: doc.id, date: dateStr } as RecipeRating;
       });
+
+      recipeRatingsCache.set(recipeTitle, { data: results, timestamp: Date.now() });
+      return results;
     } catch (err) {
       log.error('Failed to get ratings for recipe', { err, recipeTitle }, 'DataManagement');
-      return [];
+      return cached ? cached.data : [];
     }
   };
 
@@ -1883,8 +1872,8 @@ export function useDataManagement(
 
   const updateMealPlan = async (newPlan: DayPlan[]) => {
     if (!user?.id) return;
-    if (mealPlanSyncInProgress) return; // Prevent concurrent updates
-    mealPlanSyncInProgress = true;
+    if (mealPlanSyncInProgressRef.current) return; // Prevent concurrent updates
+    mealPlanSyncInProgressRef.current = true;
     try {
       // Set the meal plan locally for immediate UI update
       setMealPlan(newPlan);
@@ -1895,7 +1884,7 @@ export function useDataManagement(
       log.error('Error updating meal plan:', err, 'DataManagement');
       addToast?.(ERROR_MESSAGES.UPDATE_FAILED, 'error');
     } finally {
-      mealPlanSyncInProgress = false;
+      mealPlanSyncInProgressRef.current = false;
     }
   };
 

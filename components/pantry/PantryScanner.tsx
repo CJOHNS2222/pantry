@@ -23,6 +23,7 @@ import { Tab } from '../../types/app';
 import AnalyticsService from '../../services/analyticsService';
 import { GeminiLoadingOverlay, IMAGE_ANALYSIS_STAGES } from '../ui/GeminiLoadingOverlay';
 import { log } from '../../services/logService';
+import { usePantryScan } from './usePantryScan';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const VirtualizedRow = ({ index, style, data }: { index: number; style: React.CSSProperties; data: any }) => {
@@ -182,11 +183,24 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
 
 
 
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [rawBase64, setRawBase64] = useState<string | null>(null);
-  const [mimeType, setMimeType] = useState<string>("");
-  const [loadingState, setLoadingState] = useState<LoadingState>(LoadingState.IDLE);
-  const [imageAnalyzeError, setImageAnalyzeError] = useState<string | null>(null);
+  const {
+    imagePreview,
+    setImagePreview,
+    rawBase64,
+    setRawBase64,
+    mimeType,
+    setMimeType,
+    loadingState,
+    imageAnalyzeError,
+    setImageAnalyzeError,
+    scanResults,
+    showScanReviewModal,
+    receiptDestination,
+    setReceiptDestination,
+    setShowScanReviewModal,
+    setScanResults,
+    setLoadingState
+  } = usePantryScan(appActions.addToast);
   const [newItemText, setNewItemText] = useState('');
   const [newQty, setNewQty] = useState(1);
   const [newUnit, setNewUnit] = useState('count');
@@ -239,33 +253,30 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   const [storageSectionOrder, setStorageSectionOrder] = useState<string[]>(['leftovers', 'pantry', 'fridge', 'freezer', 'spices', 'other']);
   const [showPriceTrends, setShowPriceTrends] = useState<string | null>(null);
   const [selectedItemIndex, setSelectedItemIndex] = useState<number | null>(null);
-  const [scanResults, setScanResults] = useState<ReceiptScanResult[] | null>(null);
-  const [showScanReviewModal, setShowScanReviewModal] = useState(false);
-  const [receiptDestination, setReceiptDestination] = useState<'pantry' | 'shopping'>('pantry');
   const [bulkQuantityEditItems, setBulkQuantityEditItems] = useState<PantryItem[]>([]);
   const [showBulkQuantityEdit, setShowBulkQuantityEdit] = useState(false);
   const [showUseSoon, setShowUseSoon] = useState(false);
 
-  const showDinnerCard = useMemo(() => {
+  const { showDinnerCard, showLeftoverChip } = useMemo(() => {
+    // 1. Calculate showDinnerCard
+    let dinnerCard = false;
     const currentHour = new Date().getHours();
     const isDinnerTime = currentHour >= 16 && currentHour < 20;
-    if (!isDinnerTime) return false;
+    if (isDinnerTime) {
+      const todayStr = (() => {
+        const d = new Date();
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const date = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${date}`;
+      })();
+      const todayPlan = mealPlan?.find(day => day.date === todayStr);
+      const hasDinner = todayPlan && Array.isArray(todayPlan.dinner) && todayPlan.dinner.length > 0;
+      dinnerCard = !hasDinner;
+    }
 
-    const todayStr = (() => {
-      const d = new Date();
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const date = String(d.getDate()).padStart(2, '0');
-      return `${year}-${month}-${date}`;
-    })();
-
-    const todayPlan = mealPlan?.find(day => day.date === todayStr);
-    const hasDinner = todayPlan && Array.isArray(todayPlan.dinner) && todayPlan.dinner.length > 0;
-    return !hasDinner;
-  }, [mealPlan]);
-
-  // Show "Log leftovers?" chip: yesterday had a meal AND pantry not updated in 24h
-  const showLeftoverChip = useMemo(() => {
+    // 2. Calculate showLeftoverChip
+    let leftoverChip = false;
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
     const yyyyMmDd = (d: Date) => d.toISOString().slice(0, 10);
@@ -275,16 +286,19 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
       (yesterdayPlan.dinner?.length ?? 0) > 0 ||
       (yesterdayPlan.lunch?.length ?? 0) > 0
     );
-    if (!hadMealYesterday) return false;
-    // Check if pantry was touched in last 24h
-    const mostRecentUpdate = inventory.reduce((latest, item) => {
-      const t = item.lastRestocked ? new Date(item.lastRestocked).getTime()
-              : item.dateAdded    ? new Date(item.dateAdded).getTime()
-              : 0;
-      return t > latest ? t : latest;
-    }, 0);
-    const twentyFourHoursAgo = Date.now() - 24 * 60 * 60 * 1000;
-    return mostRecentUpdate < twentyFourHoursAgo;
+
+    if (hadMealYesterday) {
+      const mostRecentUpdate = inventory.reduce((latest, item) => {
+        const t = item.lastRestocked ? new Date(item.lastRestocked).getTime()
+                : item.dateAdded    ? new Date(item.dateAdded).getTime()
+                : 0;
+        return t > latest ? t : latest;
+      }, 0);
+      const twentyFourHoursAgo = Date.now() - 24 * 60 * 60 * 1000;
+      leftoverChip = mostRecentUpdate < twentyFourHoursAgo;
+    }
+
+    return { showDinnerCard: dinnerCard, showLeftoverChip: leftoverChip };
   }, [mealPlan, inventory]);
   const [displayLayout, setDisplayLayout] = useState<'list' | 'grid'>(() => {
     try { return (localStorage.getItem('pantry_display_layout') as 'list' | 'grid') || 'list'; } catch { return 'list'; }

@@ -59,6 +59,13 @@ class DatabaseMonitoringService {
   private static isInitialized = false;
   private static metricsInterval: NodeJS.Timeout | null = null;
 
+  static cleanup(): void {
+    if (this.metricsInterval) {
+      clearInterval(this.metricsInterval);
+      this.metricsInterval = null;
+    }
+  }
+
   private static get shouldLog(): boolean {
     return !!(import.meta as any).env?.DEV;
   }
@@ -141,7 +148,6 @@ class DatabaseMonitoringService {
 
   // Enhanced collection wrapper with tracking
   static collection(path: string) {
-    AnalyticsService.trackDatabaseOperation('read', path, 0, { operation: 'collection_reference' });
     return firestoreCollection(db, path);
   }
 
@@ -185,27 +191,9 @@ class DatabaseMonitoringService {
 
   // Enhanced document operations with tracking
   static async getDoc(ref: any): Promise<any> {
-    const startTime = Date.now();
-    try {
-      const result = await getDoc(ref);
-      const duration = Date.now() - startTime;
-
-      this.metrics.reads++;
-      AnalyticsService.trackDatabaseOperation('read', (ref as any).parent?.id || 'unknown', 1, {
-        operation: 'getDoc',
-        duration_ms: duration,
-        success: true
-      });
-
-      return result;
-    } catch (err: any) {
-      AnalyticsService.trackDatabaseOperation('read', (ref as any).parent?.id || 'unknown', 1, {
-        operation: 'getDoc',
-        success: false,
-        error: err.message
-      });
-      throw err;
-    }
+    const result = await getDoc(ref);
+    this.metrics.reads++;
+    return result;
   }
 
   static async getDocs<T = DocumentData>(queryRef: Query<T>): Promise<any> {
@@ -213,9 +201,7 @@ class DatabaseMonitoringService {
     // Handle falsy or mocked queryRefs in tests gracefully
     if (!queryRef) {
       console.warn('DatabaseMonitoringService.getDocs called with falsy queryRef - returning empty snapshot');
-      const durationFallback = Date.now() - startTime;
       this.metrics.queries++;
-      AnalyticsService.trackQueryPerformance('unknown', 'getDocs', 0, durationFallback);
       return { size: 0, docs: [], forEach: (_fn: any) => {}, empty: true } as any;
     }
 
@@ -230,15 +216,7 @@ class DatabaseMonitoringService {
       const queryPath = this.getQueryPath(queryRef as any);
       if (this.shouldLog) {
         console.log(`🔍 QUERY: ${queryPath} | Results: ${result.size} | Duration: ${duration}ms | Total Queries: ${this.metrics.queries}`);
-        console.trace('Query call stack:');
       }
-
-      AnalyticsService.trackQueryPerformance(
-        (queryRef as any).parent?.id || 'unknown',
-        'getDocs',
-        result.size,
-        duration
-      );
 
       return result;
     } catch (err: any) {
@@ -246,12 +224,6 @@ class DatabaseMonitoringService {
       if (this.shouldLog) {
         console.error(`❌ QUERY FAILED: ${queryPath} | Error: ${err.message}`);
       }
-
-      AnalyticsService.trackDatabaseOperation('read', 'unknown', 0, {
-        operation: 'getDocs',
-        success: false,
-        error: err.message
-      });
 
       // If this query failed due to security rules (permission denied),
       // return an empty snapshot so callers can gracefully handle lack
@@ -313,21 +285,8 @@ class DatabaseMonitoringService {
           document_id: docId
         });
       }
-
-      AnalyticsService.trackDatabaseOperation('write', parentId, 1, {
-        operation: 'setDoc',
-        success: true,
-        duration_ms: duration
-      });
     } catch (err: any) {
       const duration = Date.now() - startTime;
-      AnalyticsService.trackDatabaseOperation('write', parentId, 1, {
-        operation: 'setDoc',
-        success: false,
-        error: err.message,
-        duration_ms: duration
-      });
-
       reportDatabaseError('setDoc', parentId, err as Error, {
         document_id: docId,
         duration_ms: duration
@@ -355,21 +314,8 @@ class DatabaseMonitoringService {
           document_id: docId
         });
       }
-
-      AnalyticsService.trackDatabaseOperation('write', parentId, 1, {
-        operation: 'updateDoc',
-        success: true,
-        duration_ms: duration
-      });
     } catch (err: any) {
       const duration = Date.now() - startTime;
-      AnalyticsService.trackDatabaseOperation('write', parentId, 1, {
-        operation: 'updateDoc',
-        success: false,
-        error: err.message,
-        duration_ms: duration
-      });
-
       reportDatabaseError('updateDoc', parentId, err as Error, {
         document_id: docId,
         duration_ms: duration
@@ -396,22 +342,9 @@ class DatabaseMonitoringService {
         });
       }
 
-      AnalyticsService.trackDatabaseOperation('write', parentId, 1, {
-        operation: 'addDoc',
-        success: true,
-        duration_ms: duration
-      });
-
       return result;
     } catch (err: any) {
       const duration = Date.now() - startTime;
-      AnalyticsService.trackDatabaseOperation('write', parentId, 1, {
-        operation: 'addDoc',
-        success: false,
-        error: err.message,
-        duration_ms: duration
-      });
-
       reportDatabaseError('addDoc', parentId, err as Error, {
         duration_ms: duration
       });
@@ -424,19 +357,9 @@ class DatabaseMonitoringService {
     try {
       await deleteDoc(ref);
       this.metrics.deletes++;
-
-      const parentId = (ref as any)?.parent?.id || 'unknown';
-      AnalyticsService.trackDatabaseOperation('delete', parentId, 1, {
-        operation: 'deleteDoc',
-        success: true
-      });
     } catch (err: any) {
       const parentId = (ref as any)?.parent?.id || 'unknown';
-      AnalyticsService.trackDatabaseOperation('delete', parentId, 1, {
-        operation: 'deleteDoc',
-        success: false,
-        error: err.message
-      });
+      reportDatabaseError('deleteDoc', parentId, err as Error, {});
       throw err;
     }
   }
@@ -464,13 +387,9 @@ class DatabaseMonitoringService {
           });
         }
 
-        AnalyticsService.trackBatchOperation('batch_write', 'multiple_collections', operationCount);
-
         return result;
       } catch (err: any) {
         const duration = Date.now() - startTime;
-        AnalyticsService.trackBatchOperation('batch_write', 'multiple_collections', 0);
-
         reportDatabaseError('batch_commit', 'multiple_collections', err as Error, {
           operation_count: operationCount,
           duration_ms: duration
@@ -513,11 +432,6 @@ class DatabaseMonitoringService {
       console.log(`📡 SUBSCRIPTION: ${path} | Total Subscriptions: ${this.metrics.realtimeSubscriptions}`);
     }
 
-    AnalyticsService.trackDatabaseOperation('read', ref.parent?.id || 'unknown', 0, {
-      operation: 'onSnapshot',
-      type: 'subscription_start'
-    });
-
     const unsubscribe = onSnapshot(ref, (snapshot: any) => {
       // Count reads exactly as Firebase bills them:
       // - Query/collection snapshot: 1 read per document on initial load, 1 per changed doc on updates (docChanges)
@@ -531,18 +445,12 @@ class DatabaseMonitoringService {
             console.log(`📡 SUBSCRIPTION UPDATE: ${path} | Reads: ${changedDocs} | Total Reads: ${this.metrics.reads}`);
           }
         }
-        AnalyticsService.trackDatabaseOperation('read', ref.parent?.id || 'unknown', changedDocs, {
-          operation: 'onSnapshot_update'
-        });
       } else {
         // Document snapshot: 1 read per delivery
         this.metrics.reads++;
         if (this.shouldLog) {
           console.log(`📡 SNAPSHOT READ: ${path} | Total Reads: ${this.metrics.reads}`);
         }
-        AnalyticsService.trackDatabaseOperation('read', ref.parent?.id || 'unknown', 1, {
-          operation: 'onSnapshot_read'
-        });
       }
       callback(snapshot);
     }, errorCallback);

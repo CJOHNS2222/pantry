@@ -113,10 +113,7 @@ export interface BulkUploadResult {
  * Falls back to default price data inside `groceryPriceService` when needed.
  */
 export const estimateRecipeCostFromIngredients = async (ingredients: string[]) : Promise<{ total: number; breakdown: Array<{ ingredient: string; estimatedCost: number; source: string }> }> => {
-  const breakdown: Array<{ ingredient: string; estimatedCost: number; source: string }> = [];
-  let total = 0;
-
-  for (const ing of ingredients) {
+  const breakdown = await Promise.all(ingredients.map(async (ing) => {
     try {
       const parsed = parseIngredientForShoppingList(ing);
       // parseIngredientForShoppingList returns an object with quantity string; try to extract numeric quantity
@@ -126,14 +123,14 @@ export const estimateRecipeCostFromIngredients = async (ingredients: string[]) :
       const priceData = await groceryPriceService.getIngredientPrice(parsed.itemName || ing);
       const unitPrice = priceData ? (priceData.minPrice ?? priceData.averagePrice ?? 0) : 0;
       const estimatedCost = unitPrice * qty;
-      breakdown.push({ ingredient: parsed.itemName || ing, estimatedCost, source: priceData ? 'known' : 'estimated' });
-      total += estimatedCost;
+      return { ingredient: parsed.itemName || ing, estimatedCost, source: priceData ? 'known' : 'estimated' };
     } catch (err) {
       log.warn('estimateRecipeCostFromIngredients failed for', ing, err instanceof Error ? err.message : String(err));
-      breakdown.push({ ingredient: ing, estimatedCost: 0, source: 'error' });
+      return { ingredient: ing, estimatedCost: 0, source: 'error' };
     }
-  }
+  }));
 
+  const total = breakdown.reduce((sum, item) => sum + item.estimatedCost, 0);
   return { total, breakdown };
 };
 export const fetchRecipesFromSpoonacular = async (
@@ -268,8 +265,12 @@ export const rebuildCommunityRatedRecipesFromRatings = async (days: number = 30,
     // are unavailable or mocked.
     let snap: { docs: FirestoreDocLike[] };
     try {
-      const rawSnap = await DatabaseMonitoringService.getDocs(ratingsRef);
-      // Filter by cutoff in-memory
+      const q = DatabaseMonitoringService.query(
+        ratingsRef,
+        DatabaseMonitoringService.where('date', '>=', cutoff.toISOString())
+      );
+      const rawSnap = await DatabaseMonitoringService.getDocs(q);
+      // Filter by cutoff in-memory fallback
       snap = { docs: (rawSnap.docs || []).filter((d: FirestoreDocLike) => {
         const data = d.data();
         const dateVal = data?.date ? new Date(data.date as string) : null;

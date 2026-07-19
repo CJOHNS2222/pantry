@@ -123,11 +123,61 @@ const defaultAppContextValue: AppContextValue = {
   isLoadingActivities: false,
 };
 
+import { InventoryContext, ShoppingListContext, MealPlanContext, RecipesContext } from './DomainContexts';
+
 export const AppProvider: React.FC<AppProviderProps> = ({ children, value }) => {
   const providerValue = value ?? defaultAppContextValue;
+  
+  // Construct domain context values from unified state (for backward compatibility and granular subscriptions)
+  const inventoryContextValue = {
+    inventory: providerValue.inventory,
+    isLoadingInventory: providerValue.isLoadingInventory,
+    onAddItem: async () => {},
+    onAddItems: async () => {},
+    onUpdateItem: async () => {},
+    onDeleteItem: async () => {},
+    deletePantryItems: async () => {},
+  };
+
+  const shoppingListContextValue = {
+    shoppingList: providerValue.shoppingList,
+    isLoadingShoppingList: providerValue.isLoadingShoppingList,
+    addShoppingListItem: async () => {},
+    addShoppingListItems: async () => {},
+    updateShoppingListItem: async () => {},
+    removeShoppingListItem: async () => {},
+    clearShoppingList: async () => {},
+    toggleShoppingItemPurchased: async () => {},
+  };
+
+  const mealPlanContextValue = {
+    mealPlan: providerValue.mealPlan,
+    isLoadingMealPlan: providerValue.isLoadingMealPlan,
+    addMealToPlan: async () => {},
+    updateMealOnPlan: async () => {},
+    removeMealFromPlan: async () => {},
+    updateMealPlan: async () => {},
+  };
+
+  const recipesContextValue = {
+    savedRecipes: providerValue.savedRecipes,
+    isLoadingSavedRecipes: providerValue.isLoadingSavedRecipes,
+    onSaveRecipe: async () => {},
+    onDeleteRecipe: async () => {},
+    recipeSaveLimitExceeded: providerValue.recipeSaveLimitExceeded,
+  };
+
   return (
     <AppContext.Provider value={providerValue}>
-      {children}
+      <InventoryContext.Provider value={inventoryContextValue}>
+        <ShoppingListContext.Provider value={shoppingListContextValue}>
+          <MealPlanContext.Provider value={mealPlanContextValue}>
+            <RecipesContext.Provider value={recipesContextValue}>
+              {children}
+            </RecipesContext.Provider>
+          </MealPlanContext.Provider>
+        </ShoppingListContext.Provider>
+      </InventoryContext.Provider>
     </AppContext.Provider>
   );
 };
