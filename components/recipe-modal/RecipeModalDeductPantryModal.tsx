@@ -27,9 +27,9 @@ export const RecipeModalDeductPantryModal: React.FC<RecipeModalDeductPantryModal
   useEffect(() => {
     if (isOpen && recipe.ingredients && inventory.length > 0) {
       const matches: typeof itemsToDeduct = [];
-      recipe.ingredients.forEach((ing) => {
-        const parsed = parseIngredientForShoppingList(ing);
-        const name = parsed.itemName.toLowerCase().trim();
+      recipe.ingredients.forEach((ing, idx) => {
+        const structuredName = recipe.structuredIngredients?.[idx]?.name;
+        const name = (structuredName ?? parseIngredientForShoppingList(ing).itemName).toLowerCase().trim();
 
         const match = inventory.find(pi => {
           const piName = pi.item.toLowerCase();

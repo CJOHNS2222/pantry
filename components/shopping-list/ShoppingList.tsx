@@ -32,7 +32,7 @@ import { getSmartUnits } from '../pantry/QuantityUnitPicker';
 import { useOfflineStatus } from '../../hooks/useOfflineStatus';
 import { offlineQueue } from '../../services/offlineQueueService';
 import { useAppActions } from '../../contexts/AppActionsContext';
-import { useApp } from '../../contexts/AppContext';
+import { useMealPlanContext } from '../../contexts/DomainContexts';
 import { useAndroidBack } from '../../hooks/useAndroidBack';
 import { groceryPriceService } from '../../services/groceryPriceService';
 import AnalyticsService from '../../services/analyticsService';
@@ -66,7 +66,7 @@ interface ShoppingListProps {
   settings?: Settings; // Settings object
 }
 
-export const ShoppingList: React.FC<ShoppingListProps> = ({
+const ShoppingListComponent: React.FC<ShoppingListProps> = ({
   items,
   setItems,
   onMoveToPantry,
@@ -84,7 +84,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   const [newItem, setNewItem] = React.useState('');
   const [canShowAdBanner, setCanShowAdBanner] = React.useState<boolean>(false);
   const { addToast } = useAppActions();
-  const { mealPlan } = useApp();
+  const { mealPlan } = useMealPlanContext();
 
   useEffect(() => {
     let mounted = true;
@@ -1125,3 +1125,5 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     </div>
   );
 };
+
+export const ShoppingList = React.memo(ShoppingListComponent);

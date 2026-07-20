@@ -1,5 +1,5 @@
 // contexts/AppContext.tsx
-import React, { createContext, useContext, ReactNode } from 'react';
+import React, { createContext, useContext, useMemo, ReactNode } from 'react';
 import { Tab } from '../types/app';
 import { User, PantryItem, DayPlan, ShoppingItem, SavedRecipe, RecipeRating, RecipeSearchResult, CustomCategory, Household, Settings, ConsumptionSuggestion, ExpirationAlert, RecipeSuggestion, HouseholdActivity } from '../types';
 
@@ -65,6 +65,17 @@ const AppContext = createContext<AppContextValue | undefined>(undefined);
 interface AppProviderProps {
   children: ReactNode;
   value?: AppContextValue;
+  /**
+   * Real, individually-memoized domain context values built in App.tsx from
+   * useDataManagement's mutators (PERF-029). When omitted (tests, storybook
+   * mounts), read-only stubs derived from `value` are provided instead.
+   */
+  domains?: {
+    inventory: InventoryContextType;
+    shoppingList: ShoppingListContextType;
+    mealPlan: MealPlanContextType;
+    recipes: RecipesContextType;
+  };
 }
 
 const defaultSettings: Settings = {
@@ -123,49 +134,56 @@ const defaultAppContextValue: AppContextValue = {
   isLoadingActivities: false,
 };
 
-import { InventoryContext, ShoppingListContext, MealPlanContext, RecipesContext } from './DomainContexts';
+import {
+  InventoryContext, ShoppingListContext, MealPlanContext, RecipesContext,
+  InventoryContextType, ShoppingListContextType, MealPlanContextType, RecipesContextType,
+} from './DomainContexts';
 
-export const AppProvider: React.FC<AppProviderProps> = ({ children, value }) => {
+// Shared no-op mutator for stub domain values — module-level so its identity
+// never invalidates the memoized fallbacks below.
+const noopAsync = async () => {};
+
+export const AppProvider: React.FC<AppProviderProps> = ({ children, value, domains }) => {
   const providerValue = value ?? defaultAppContextValue;
-  
-  // Construct domain context values from unified state (for backward compatibility and granular subscriptions)
-  const inventoryContextValue = {
+
+  // Real domain values come from App.tsx via `domains`; the stubs only serve
+  // mounts that don't supply them. Each is memoized on its own domain's data
+  // so one domain changing doesn't re-render the other domains' consumers.
+  const inventoryContextValue = useMemo<InventoryContextType>(() => domains?.inventory ?? {
     inventory: providerValue.inventory,
     isLoadingInventory: providerValue.isLoadingInventory,
-    onAddItem: async () => {},
-    onAddItems: async () => {},
-    onUpdateItem: async () => {},
-    onDeleteItem: async () => {},
-    deletePantryItems: async () => {},
-  };
+    onAddItem: noopAsync,
+    onAddItems: noopAsync,
+    onUpdateItem: noopAsync,
+    onDeleteItem: noopAsync,
+    deletePantryItems: noopAsync,
+  }, [domains?.inventory, providerValue.inventory, providerValue.isLoadingInventory]);
 
-  const shoppingListContextValue = {
+  const shoppingListContextValue = useMemo<ShoppingListContextType>(() => domains?.shoppingList ?? {
     shoppingList: providerValue.shoppingList,
     isLoadingShoppingList: providerValue.isLoadingShoppingList,
-    addShoppingListItem: async () => {},
-    addShoppingListItems: async () => {},
-    updateShoppingListItem: async () => {},
-    removeShoppingListItem: async () => {},
-    clearShoppingList: async () => {},
-    toggleShoppingItemPurchased: async () => {},
-  };
+    addShoppingListItem: noopAsync,
+    addShoppingListItems: noopAsync,
+    updateShoppingListItem: noopAsync,
+    removeShoppingListItem: noopAsync,
+  }, [domains?.shoppingList, providerValue.shoppingList, providerValue.isLoadingShoppingList]);
 
-  const mealPlanContextValue = {
+  const mealPlanContextValue = useMemo<MealPlanContextType>(() => domains?.mealPlan ?? {
     mealPlan: providerValue.mealPlan,
     isLoadingMealPlan: providerValue.isLoadingMealPlan,
-    addMealToPlan: async () => {},
-    updateMealOnPlan: async () => {},
-    removeMealFromPlan: async () => {},
-    updateMealPlan: async () => {},
-  };
+    addMealToPlan: noopAsync,
+    updateMealOnPlan: noopAsync,
+    removeMealFromPlan: noopAsync,
+    updateMealPlan: noopAsync,
+  }, [domains?.mealPlan, providerValue.mealPlan, providerValue.isLoadingMealPlan]);
 
-  const recipesContextValue = {
+  const recipesContextValue = useMemo<RecipesContextType>(() => domains?.recipes ?? {
     savedRecipes: providerValue.savedRecipes,
     isLoadingSavedRecipes: providerValue.isLoadingSavedRecipes,
-    onSaveRecipe: async () => {},
-    onDeleteRecipe: async () => {},
+    onSaveRecipe: noopAsync,
+    onDeleteRecipe: noopAsync,
     recipeSaveLimitExceeded: providerValue.recipeSaveLimitExceeded,
-  };
+  }, [domains?.recipes, providerValue.savedRecipes, providerValue.isLoadingSavedRecipes, providerValue.recipeSaveLimitExceeded]);
 
   return (
     <AppContext.Provider value={providerValue}>

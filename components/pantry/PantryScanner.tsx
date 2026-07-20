@@ -1,13 +1,12 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { useModalOpen } from '../../utils/useModalOpen';
 import { useAndroidBack } from '../../hooks/useAndroidBack';
-import { Camera as CapacitorCamera, CameraResultType, CameraSource } from '@capacitor/camera';
-import { Camera, Upload, Loader2, Plus, Trash2, CheckCircle2, ShoppingBasket, X, Barcode, ChevronDown, ChevronRight, ChevronUp, Image, ChefHat, TrendingUp, Search, Filter, Clock, Tag, FilePlus, Receipt, LayoutGrid, LayoutList } from 'lucide-react';
+import { Camera as CapacitorCamera } from '@capacitor/camera';
+import { Camera, Upload, Loader2, Plus, Trash2, CheckCircle2, ShoppingBasket, X, Barcode, ChevronDown, ChevronRight, Image, ChefHat, TrendingUp, Search, Filter, Clock, Tag, FilePlus, Receipt, LayoutGrid, LayoutList } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { List } from 'react-window';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const ReactWindowList = List as any;
-import { extractReceiptItems } from '../../services/receiptOcrService';
 import { setUserGeminiOptIn } from '../../services/featureFlags';
 import StorageLocationIndicator from './StorageLocationIndicator';
 import { PantryItem, LoadingState, ConsumptionSuggestion, ExpirationAlert, CustomCategory, RecipeSuggestion, PantryFilter, User, ShoppingItem, StructuredRecipe, SavedRecipe } from '../../types';
@@ -24,6 +23,7 @@ import AnalyticsService from '../../services/analyticsService';
 import { GeminiLoadingOverlay, IMAGE_ANALYSIS_STAGES } from '../ui/GeminiLoadingOverlay';
 import { log } from '../../services/logService';
 import { usePantryScan } from './usePantryScan';
+import { usePantryScannerScan } from './usePantryScannerScan';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const VirtualizedRow = ({ index, style, data }: { index: number; style: React.CSSProperties; data: any }) => {
@@ -45,8 +45,6 @@ interface ReceiptScanResult {
   image?: string;
 }
 import FreezerService from '../../services/freezerService';
-import { BrowserMultiFormatReader } from '@zxing/library';
-import SpoonacularFoodClient from '../../services/spoonacularFoodClient';
 import VisualQuantitySelector from './VisualQuantitySelector';
 import QuantityUnitPicker, { getSmartUnits } from './QuantityUnitPicker';
 import PriceTrends from './PriceTrends';
@@ -91,7 +89,7 @@ interface PantryScannerProps {
   user?: User | null;
 }
 
-export const PantryScanner: React.FC<PantryScannerProps> = ({ 
+const PantryScannerComponent: React.FC<PantryScannerProps> = ({
   inventory,
   isLoadingInventory = false,
   addToShoppingList,
@@ -255,7 +253,6 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   const [selectedItemIndex, setSelectedItemIndex] = useState<number | null>(null);
   const [bulkQuantityEditItems, setBulkQuantityEditItems] = useState<PantryItem[]>([]);
   const [showBulkQuantityEdit, setShowBulkQuantityEdit] = useState(false);
-  const [showUseSoon, setShowUseSoon] = useState(false);
 
   const { showDinnerCard, showLeftoverChip } = useMemo(() => {
     // 1. Calculate showDinnerCard
@@ -368,6 +365,49 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
 
   // Meal prep suggestions state
   const [mealPrepSuggestions, setMealPrepSuggestions] = useState<RecipeIngredientMatch[]>([]);
+
+  // Which slide of the consolidated "smart suggestion" carousel is active
+  const [suggestionSlide, setSuggestionSlide] = useState(0);
+  const carouselRef = useRef<HTMLDivElement>(null);
+
+  // Measured height of the fixed app header, so the sticky storage-location chip row
+  // can sit flush against it instead of guessing at an offset via CSS vars.
+  const [headerHeight, setHeaderHeight] = useState(0);
+  useEffect(() => {
+    const headerEl = document.querySelector('header');
+    if (!headerEl) return;
+    const update = () => setHeaderHeight(headerEl.getBoundingClientRect().height);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(headerEl);
+    return () => ro.disconnect();
+  }, []);
+
+  // Measured height of the sticky chip row itself, so jump-to-section scrolling
+  // (see toggleStorageLocation / toggleCategory) lands sections just below it
+  // instead of partially hidden underneath.
+  const chipRowRef = useRef<HTMLDivElement>(null);
+  const [chipRowHeight, setChipRowHeight] = useState(0);
+  useEffect(() => {
+    const el = chipRowRef.current;
+    if (!el) return;
+    const update = () => setChipRowHeight(el.getBoundingClientRect().height);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [viewMode]);
+
+  // Smoothly bring a just-reordered section into view, right below the sticky
+  // header + chip row, instead of leaving the user scrolled wherever they were
+  // (or worse, looking like the page jumped back to the top).
+  const scrollSectionIntoView = useCallback((elementId: string) => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        document.getElementById(elementId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    });
+  }, []);
 
   // Recipe modal state
   const [showRecipeModal, setShowRecipeModal] = useState(false);
@@ -559,10 +599,12 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
     }
   }, []);
 
-  // Update autocomplete suggestions when search query changes
+  // Update autocomplete suggestions when the debounced search query changes
+  // (uses debouncedSearchQuery, not the raw keystroke value, to avoid an O(n)
+  // scan over inventory on every keystroke — see PERF-032)
   React.useEffect(() => {
-    if (searchQuery.length >= 1) {
-      const suggestions = getEnhancedAutocompleteSuggestions(inventory, searchQuery, 8);
+    if (debouncedSearchQuery.length >= 1) {
+      const suggestions = getEnhancedAutocompleteSuggestions(inventory, debouncedSearchQuery, 8);
       setAutocompleteSuggestions(suggestions);
       setShowAutocomplete(suggestions.length > 0);
     } else {
@@ -572,7 +614,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
       setShowAutocomplete(false); // Don't show dropdown on initial load
       setAutocompleteSuggestions([]);
     }
-  }, [searchQuery, inventory]);
+  }, [debouncedSearchQuery, inventory]);
 
   // Save search to history when user performs a meaningful search
   React.useEffect(() => {
@@ -645,322 +687,18 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
     return filtered.map((item) => ({ ...item, originalIndex: inventory.indexOf(item) }));
   }, [inventory, debouncedSearchQuery, pantryFilter]);
 
-  // Use Capacitor Camera for mobile
-  const handleTakePhoto = useCallback(async () => {
-    try {
-      AnalyticsService.trackFeatureUsage('pantry_scanner', { success: true, itemsScanned: 0, itemsAdded: 0 });
-      
-      const photo = await CapacitorCamera.getPhoto({
-        resultType: CameraResultType.DataUrl,
-        source: CameraSource.Camera,
-        quality: 60,
-        width: 1280,
-        height: 1280,
-      });
-      setImagePreview(photo.dataUrl || null);
-      if (photo.dataUrl) {
-        const base64Data = photo.dataUrl.split(',')[1];
-        setRawBase64(base64Data);
-        setMimeType(photo.format ? `image/${photo.format}` : 'image/jpeg');
-      }
-      setLoadingState(LoadingState.IDLE);
-    } catch (err: unknown) {
-      setLoadingState(LoadingState.IDLE);
-      const errMsg = err instanceof Error ? err.message : '';
-      // Handle camera permission errors
-      if (errMsg.includes('permission') || errMsg.includes('denied') || errMsg.includes('Permission')) {
-        appActions.addToast(
-          'Camera permission is required. Please enable camera access in your device settings and try again.',
-          'error',
-          8000
-        );
-      } else if (!errMsg.includes('cancelled') && !errMsg.includes('dismissed')) {
-        // Only show error for non-user-cancellation errors
-        appActions.addToast('Failed to access camera. Please try again.', 'error');
-      }
-      // User cancelled - no toast needed
-    }
-  }, [appActions]);
-
-  // Select photo from gallery
-  const handleSelectFromGallery = useCallback(async () => {
-    try {
-      const photo = await CapacitorCamera.getPhoto({
-        resultType: CameraResultType.DataUrl,
-        source: CameraSource.Photos,
-        quality: 60,
-        width: 1280,
-        height: 1280,
-      });
-      setImagePreview(photo.dataUrl || null);
-      if (photo.dataUrl) {
-        const base64Data = photo.dataUrl.split(',')[1];
-        setRawBase64(base64Data);
-        setMimeType(photo.format ? `image/${photo.format}` : 'image/jpeg');
-      }
-    } catch (err: unknown) {
-      const errMsg = err instanceof Error ? err.message : '';
-      // Handle photo library permission errors
-      if (errMsg.includes('permission') || errMsg.includes('denied') || errMsg.includes('Permission')) {
-        appActions.addToast(
-          'Photo library permission is required. Please enable photo access in your device settings and try again.',
-          'error',
-          8000
-        );
-      } else if (!errMsg.includes('cancelled') && !errMsg.includes('dismissed')) {
-        // Only show error for non-user-cancellation errors
-        appActions.addToast('Failed to access photo library. Please try again.', 'error');
-      }
-      // User cancelled - no toast needed
-    }
-  }, [appActions]);
-
-  // Barcode scanning with camera
-  const handleScanBarcode = useCallback(async () => {
-    if (!Capacitor.isNativePlatform()) {
-      appActions.addToast('Barcode scanning requires the mobile app. Please use the camera or upload an image instead.', 'info', 6000);
-      return;
-    }
-    try {
-      // Track feature adoption
-      AnalyticsService.trackFeatureFirstUse('pantry_scanner_barcode', { method: 'barcode' });
-      
-      const photo = await CapacitorCamera.getPhoto({
-        resultType: CameraResultType.DataUrl,
-        source: CameraSource.Camera,
-        quality: 80,
-        width: 1920,
-        height: 1920,
-      });
-      
-      if (photo.dataUrl) {
-        setLoadingState(LoadingState.LOADING);
-        setImagePreview(photo.dataUrl);
-        
-        // Convert data URL to ImageData for barcode detection
-        const img = new window.Image();
-        img.onload = async () => {
-          try {
-            const codeReader = new BrowserMultiFormatReader();
-            const result = await codeReader.decodeFromImage(img);
-            
-            if (result) {
-              const barcode = result.getText();
-              AnalyticsService.trackPantryScan(1, 1);
-
-              // Look up the product name via Spoonacular UPC search
-              try {
-                const product = await SpoonacularFoodClient.searchGroceryProductByUPC(barcode);
-                const p = product as { title?: string; breadcrumbs?: string[] };
-                if (product && p.title) {
-                  setNewItemText(p.title);
-                  // Use the first breadcrumb as a category hint if available
-                  if (p.breadcrumbs && p.breadcrumbs.length) {
-                    const hint = p.breadcrumbs[p.breadcrumbs.length - 1];
-                    // capitalise first letter
-                    setNewItemText(p.title);
-                    // store breadcrumb in unit field temporarily isn't clean — just pre-fill name
-                    // Category inference will run in createManualItem from the product title
-                    void hint; // acknowledged, category inferred from title downstream
-                  }
-                  appActions.addToast(`Found: ${p.title}`, 'success', 3000);
-                } else {
-                  // Product not found in database — let user edit the raw barcode text
-                  setNewItemText(`Scanned Item (${barcode})`);
-                  appActions.addToast('Product not found in database. Please edit the name.', 'warning', 4000);
-                }
-              } catch {
-                setNewItemText(`Scanned Item (${barcode})`);
-              }
-
-              setIsAddModalOpen(true);
-            } else {
-              appActions.addToast('No barcode detected. Try taking a clearer photo or use manual entry.', 'error');
-            }
-          } catch (error) {
-            log.error('Barcode detection error', { error });
-            appActions.addToast('Barcode detection failed. Try taking a clearer photo or use manual entry.', 'error');
-          } finally {
-            setLoadingState(LoadingState.IDLE);
-          }
-        };
-        img.src = photo.dataUrl;
-      }
-    } catch (err: unknown) {
-      setLoadingState(LoadingState.IDLE);
-      const errMsg = err instanceof Error ? err.message : '';
-      // Handle camera permission errors for barcode scanning
-      if (errMsg.includes('permission') || errMsg.includes('denied') || errMsg.includes('Permission')) {
-        appActions.addToast(
-          'Camera permission is required for barcode scanning. Please enable camera access in your device settings and try again.',
-          'error',
-          8000
-        );
-      } else if (!errMsg.includes('cancelled') && !errMsg.includes('dismissed')) {
-        // Only show error for non-user-cancellation errors
-        appActions.addToast('Failed to access camera for barcode scanning. Please try again.', 'error');
-      }
-      // User cancelled - no toast needed
-    }
-  }, [appActions]);
-
-  // Receipt scanning with camera
-  const handleScanReceipt = useCallback(async () => {
-    try {
-      // Track feature adoption
-      AnalyticsService.trackFeatureFirstUse('pantry_scanner_receipt', { method: 'receipt' });
-      
-      const photo = await CapacitorCamera.getPhoto({
-        resultType: CameraResultType.DataUrl,
-        source: CameraSource.Camera,
-        quality: 80,
-        width: 1920,
-        height: 1920,
-      });
-      
-      if (photo.dataUrl) {
-        setLoadingState(LoadingState.LOADING);
-        setImagePreview(photo.dataUrl);
-        const base64Data = photo.dataUrl.split(',')[1];
-        setRawBase64(base64Data);
-        setMimeType(photo.format ? `image/${photo.format}` : 'image/jpeg');
-        
-        // Process receipt
-        await processReceiptImage(base64Data, photo.format ? `image/${photo.format}` : 'image/jpeg');
-      }
-    } catch (err: unknown) {
-      setLoadingState(LoadingState.IDLE);
-      const errMsg = err instanceof Error ? err.message : '';
-      // Handle camera permission errors for receipt scanning
-      if (errMsg.includes('permission') || errMsg.includes('denied') || errMsg.includes('Permission')) {
-        appActions.addToast(
-          'Camera permission is required for receipt scanning. Please enable camera access in your device settings and try again.',
-          'error',
-          8000
-        );
-      } else if (!errMsg.includes('cancelled') && !errMsg.includes('dismissed')) {
-        // Only show error for non-user-cancellation errors
-        appActions.addToast('Failed to access camera for receipt scanning. Please try again.', 'error');
-      }
-      // User cancelled - no toast needed
-    }
-  }, [appActions]);
-
-  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // Client-side validation: type and size before any processing
-    if (!file.type.startsWith('image/')) {
-      appActions.addToast('Only image files are supported. Please select a JPEG, PNG, or WebP file.', 'error');
-      e.target.value = '';
-      return;
-    }
-    const MAX_FILE_SIZE_MB = 10;
-    if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
-      appActions.addToast(`Image must be under ${MAX_FILE_SIZE_MB} MB. Please choose a smaller file.`, 'error');
-      e.target.value = '';
-      return;
-    }
-
-    setLoadingState(LoadingState.IDLE);
-    setMimeType(file.type);
-
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const result = reader.result as string;
-      setImagePreview(result);
-      const base64Data = result.split(',')[1];
-      setRawBase64(base64Data);
-    };
-    reader.readAsDataURL(file);
-  }, []);
-
-  const handleAnalyze = useCallback(async () => {
-    if (!rawBase64) return;
-
-    setLoadingState(LoadingState.LOADING);
-
-    log.debug('PantryScanner handleAnalyze starting', {
-      imageSizeKB: Math.round(rawBase64.length / 1024),
-      mimeType,
-      userId: user?.id ?? 'none',
-      isGuest: user?.isGuest ?? false,
-    }, 'PantryScanner');
-
-    try {
-      const processedItems = await PantryService.analyzePantryImage(rawBase64, mimeType, user ?? undefined);
-
-      // Instead of immediately saving, open a review modal so user can edit/confirm items
-      setScanResults(processedItems);
-      setShowScanReviewModal(true);
-      setLoadingState(LoadingState.SUCCESS);
-      setImageAnalyzeError(null);
-
-      // Auto-close the modal after showing success message
-      setTimeout(() => {
-        setImagePreview(null);
-        setRawBase64(null);
-        setLoadingState(LoadingState.IDLE);
-      }, 3000);
-    } catch (err) {
-      log.error('Image analysis failed', { err });
-      const msg = err instanceof Error ? err.message : 'Failed to analyze image. Please try again.';
-      setImageAnalyzeError(msg);
-      appActions.addToast(msg, 'error');
-      setLoadingState(LoadingState.ERROR);
-    }
-  }, [rawBase64, mimeType, user]);
-
-  // Receipt processing chain: Tesseract OCR runs first as a diagnostic pre-step.
-  // If OCR extracts text lines, they are logged but cannot currently be passed to the
-  // Gemini API (which only accepts base64 image + mimeType). Both branches therefore
-  // fall through to PantryService.analyzeReceiptImage (Gemini vision), which parses
-  // the image directly. The OCR step is retained for future use: once the API supports
-  // text hints, OCR output can significantly reduce Gemini token usage.
-  // Error path: if Tesseract fails (WASM load failure, network, etc.), we skip straight
-  // to image-only Gemini analysis without surfacing the OCR error to the user.
-  const processReceiptImage = useCallback(async (base64Data: string, mimeType: string) => {
-    try {
-      // Try Tesseract OCR first as a low-cost pre-processing step.
-      // If we can extract clean text, pass it through to save Gemini tokens.
-      let processedItems;
-      try {
-        const dataUrl = `data:${mimeType};base64,${base64Data}`;
-        const ocrLines = await extractReceiptItems(dataUrl);
-        if (ocrLines.length > 0) {
-          // We got OCR results — pass the extracted text alongside the image to Gemini
-          // so it can structure items with category/quantity info
-          log.debug('Tesseract OCR extracted lines', { count: ocrLines.length }, 'PantryScanner');
-          // Pass OCR hint in the mimeType slot isn't possible; fall back to standard analysis
-          // The OCR lines are logged for diagnostics but the API only accepts base64 + mimeType
-          processedItems = await PantryService.analyzeReceiptImage(base64Data, mimeType, user ?? undefined);
-        } else {
-          processedItems = await PantryService.analyzeReceiptImage(base64Data, mimeType, user ?? undefined);
-        }
-      } catch (ocrErr) {
-        // Tesseract failed (network, WASM, etc.) — fall back to image-only Gemini analysis
-        log.warn('Tesseract OCR failed, falling back to image-only analysis', { error: String(ocrErr) }, 'PantryScanner');
-        processedItems = await PantryService.analyzeReceiptImage(base64Data, mimeType, user ?? undefined);
-      }
-
-      // Instead of immediately saving, open a review modal so user can edit/confirm items
-      setScanResults(processedItems);
-      setShowScanReviewModal(true);
-      setLoadingState(LoadingState.SUCCESS);
-
-      // Auto-close the modal after showing success message
-      setTimeout(() => {
-        setImagePreview(null);
-        setRawBase64(null);
-        setLoadingState(LoadingState.IDLE);
-      }, 3000);
-    } catch (err) {
-      log.error('Receipt analysis failed', { err });
-      appActions.addToast(err instanceof Error ? err.message : 'Failed to analyze receipt. Please try again.', 'error');
-      setLoadingState(LoadingState.ERROR);
-    }
-  }, [user]);
+  const {
+    handleTakePhoto,
+    handleSelectFromGallery,
+    handleScanBarcode,
+    handleScanReceipt,
+    handleFileChange,
+    handleAnalyze,
+  } = usePantryScannerScan(
+    appActions, user, rawBase64, mimeType,
+    setImagePreview, setRawBase64, setMimeType, setLoadingState, setImageAnalyzeError,
+    setScanResults, setShowScanReviewModal, setNewItemText, setIsAddModalOpen,
+  );
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const removeItem = useCallback(async (index: number) => {
@@ -1069,7 +807,8 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
       const filtered = prev.filter(c => c !== category);
       return [category, ...filtered];
     });
-  }, [expandedCategories, setExpandedCategories, setCategoryOrder]);
+    scrollSectionIntoView(`category-section-${category}`);
+  }, [expandedCategories, setExpandedCategories, setCategoryOrder, scrollSectionIntoView]);
 
   // Bulk actions
   const bulkChangeLocation = useCallback(async (newLocation: 'pantry' | 'fridge' | 'freezer' | 'spices' | 'other') => {
@@ -1111,7 +850,8 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
       const filtered = prev.filter(l => l !== location);
       return [location, ...filtered];
     });
-  }, [setStorageSectionOrder]);
+    scrollSectionIntoView(`storage-section-${location}`);
+  }, [setStorageSectionOrder, scrollSectionIntoView]);
 
   const collapseAllCategories = useCallback(() => {
     setExpandedCategories(new Set());
@@ -1286,7 +1026,12 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
   const categoryViewContent = sortedCategories.map(category => {
     const items = categoryItemsArrays[category] || [];
     return (
-      <div key={category} className="bg-theme-secondary rounded-lg border border-theme overflow-hidden">
+      <div
+        key={category}
+        id={`category-section-${category}`}
+        style={{ scrollMarginTop: headerHeight + chipRowHeight }}
+        className="bg-theme-secondary rounded-lg border border-theme overflow-hidden"
+      >
         <div
           onClick={() => toggleCategory(category)}
           className="w-full flex items-center p-4 bg-[var(--accent-color)]/10 hover:bg-[var(--accent-color)]/20 transition-colors cursor-pointer"
@@ -1346,7 +1091,12 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
     const locationLabel = (storageLabels as Record<string, string>)[location] || location;
 
     return (
-      <div key={location} className="bg-theme-secondary rounded-lg border border-theme overflow-hidden">
+      <div
+        key={location}
+        id={`storage-section-${location}`}
+        style={{ scrollMarginTop: headerHeight + chipRowHeight }}
+        className="bg-theme-secondary rounded-lg border border-theme overflow-hidden"
+      >
         <div className="w-full flex items-center px-4 py-2 bg-theme-primary">
           <div className="flex items-center gap-3">
             <StorageLocationIndicator
@@ -1912,94 +1662,284 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
 
 
 
-      {/* Pantry Health Score ring */}
+      {/* Pantry status strip: health score + item count + expiring count, one row */}
       {inventory.length >= 3 && (
-        <PantryHealthScore inventory={inventory} className="mb-2" />
+        <PantryHealthScore inventory={inventory} variant="compact" className="mb-2" />
       )}
 
-      {/* "What's for dinner?" Contextual Card */}
-      {showDinnerCard && (
-        <div
-          onClick={handleWhatCanICookTonight}
-          className="bg-gradient-to-br from-indigo-500/10 via-purple-500/5 to-pink-500/10 border border-purple-500/20 hover:border-purple-500/40 p-5 rounded-xl cursor-pointer hover:shadow-lg transition-all duration-300 transform hover:-translate-y-0.5 group mb-6"
-        >
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-purple-500/20 text-purple-600 rounded-lg group-hover:scale-110 transition-transform">
-              <ChefHat className="w-6 h-6 animate-pulse" />
-            </div>
-            <div className="flex-1">
-              <h3 className="font-serif font-bold text-lg text-theme-primary">What's for dinner tonight?</h3>
-              <p className="text-sm text-theme-secondary opacity-80 mt-1">
-                You don't have dinner planned yet. Tap here to search recipes using what you have in your pantry!
-              </p>
-            </div>
-            <ChevronRight className="w-6 h-6 text-theme-secondary opacity-60 group-hover:translate-x-1 transition-transform" />
-          </div>
-        </div>
-      )}
+      {/* Smart suggestion carousel — combines the dinner prompt, leftover nudge, each
+          "recipe you can make now" suggestion, shopping suggestions, and the "what can
+          I cook" fallback into one swipeable, full-width carousel with a shared dot
+          pager, instead of stacking them as separate cards. */}
+      {inventory.length > 0 && (() => {
+        type CarouselSlide = {
+          key: string;
+          tone: 'accent' | 'amber' | 'purple' | 'blue' | 'green';
+          icon: React.ReactNode;
+          content: React.ReactNode;
+        };
 
-      {/* "Log leftovers?" chip — shown when yesterday had a meal but pantry wasn't updated */}
-      {showLeftoverChip && (
-        <div className="flex items-center gap-3 p-3 rounded-xl bg-amber-500/8 border border-amber-500/25 animate-fade-in">
-          <span className="text-xl">🥡</span>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-theme-primary">Did you have leftovers last night?</p>
-            <p className="text-xs text-theme-secondary opacity-70">Log them to track food waste and update your pantry.</p>
-          </div>
-          <button
-            onClick={() => setIsAddModalOpen(true)}
-            className="shrink-0 px-3 py-1.5 rounded-lg bg-amber-500 text-white text-xs font-bold hover:bg-amber-600 transition-colors shadow-sm"
-          >
-            Log now
-          </button>
-        </div>
-      )}
+        const slides: CarouselSlide[] = [];
 
-      {/* What Can I Cook Tonight Button */}
-      {inventory.length > 0 && (
-        <div className="text-center">
-          <button
-            onClick={handleWhatCanICookTonight}
-            disabled={loadingState === LoadingState.LOADING}
-            className="inline-flex items-center gap-2 px-6 py-3 bg-[var(--accent-color)] text-white font-semibold rounded-lg shadow-lg hover:bg-[var(--accent-color)]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loadingState === LoadingState.LOADING ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
-            ) : (
-              <ChefHat className="w-5 h-5" />
-            )}
-            What Can I Cook Tonight?
-          </button>
-          <p className="text-xs text-theme-secondary opacity-60 mt-2">Get meal ideas from your pantry items</p>
-        </div>
-      )}
-
-      {/* Consumption Suggestions */}
-      {consumptionSuggestions.length > 0 && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-          <h3 className="text-sm font-semibold text-blue-800 mb-2 flex items-center gap-2">
-            <ShoppingBasket className="w-4 h-4" />
-            Smart Shopping Suggestions
-          </h3>
-          <div className="space-y-2">
-            {consumptionSuggestions.slice(0, 3).map((suggestion, index) => (
-              <div key={index} className="flex items-center justify-between bg-white rounded p-3 border border-blue-100">
-                <div className="flex-1">
-                  <p className="text-sm text-blue-800 font-medium">{suggestion.item}</p>
-                  <p className="text-xs text-blue-600">{suggestion.reason}</p>
-                </div>
+        if (showLeftoverChip) {
+          slides.push({
+            key: 'leftover',
+            tone: 'amber',
+            icon: <span className="text-xl">🥡</span>,
+            content: (
+              <>
+                <h3 className="font-serif font-bold text-base text-theme-primary">Did you have leftovers last night?</h3>
+                <p className="text-sm text-theme-secondary opacity-80 mt-0.5 mb-3">Log them to track food waste and update your pantry.</p>
                 <button
-                  onClick={() => addToShoppingList([suggestion.item])}
-                  className="ml-3 px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors"
-                  aria-label={`Add ${suggestion.item} to shopping list`}
+                  onClick={() => setIsAddModalOpen(true)}
+                  className="px-3 py-1.5 rounded-lg bg-amber-500 text-white text-xs font-bold hover:bg-amber-600 transition-colors shadow-sm"
                 >
-                  Add to List
+                  Log now
+                </button>
+              </>
+            ),
+          });
+        }
+
+        if (showDinnerCard) {
+          slides.push({
+            key: 'dinner',
+            tone: 'purple',
+            icon: <ChefHat className="w-6 h-6 animate-pulse" />,
+            content: (
+              <>
+                <h3 className="font-serif font-bold text-base text-theme-primary">What's for dinner tonight?</h3>
+                <p className="text-sm text-theme-secondary opacity-80 mt-0.5 mb-3">You don't have dinner planned yet. Tap below to search recipes using what you have in your pantry!</p>
+                <button onClick={handleWhatCanICookTonight} className="text-xs font-bold text-theme-primary hover:underline">Find a recipe →</button>
+              </>
+            ),
+          });
+        }
+
+        recipeSuggestions.slice(0, 3).forEach((suggestion) => {
+          slides.push({
+            key: `useSoon-${suggestion.itemId}`,
+            tone: 'green',
+            icon: <Clock className="w-5 h-5" />,
+            content: (
+              <>
+                <div className="flex items-start justify-between gap-2">
+                  <h3 className="font-serif font-bold text-base text-theme-primary truncate">Use soon: {suggestion.itemName}</h3>
+                  <span className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+                    suggestion.daysRemaining <= 1 ? 'bg-red-100 text-red-800' :
+                    suggestion.daysRemaining <= 3 ? 'bg-yellow-100 text-yellow-800' :
+                    'bg-blue-100 text-blue-800'
+                  }`}>
+                    {suggestion.daysRemaining}d left
+                  </span>
+                </div>
+                <p className="text-sm text-theme-secondary opacity-80 mt-0.5 mb-3">{suggestion.reason}</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {suggestion.suggestedRecipes.slice(0, 3).map((recipe, i) => (
+                    <button
+                      key={i}
+                      onClick={() => {
+                        if (setActiveTab && setInitialSearchQuery) {
+                          setInitialSearchQuery(recipe);
+                          setActiveTab(Tab.RECIPES);
+                        }
+                      }}
+                      className="text-xs font-bold bg-theme-secondary border border-theme px-2.5 py-1.5 rounded-lg hover:bg-theme-primary transition-colors"
+                    >
+                      {recipe}
+                    </button>
+                  ))}
+                </div>
+              </>
+            ),
+          });
+        });
+
+        mealPrepSuggestions.slice(0, 4).forEach((suggestion, index) => {
+          slides.push({
+            key: `recipe-${index}`,
+            tone: 'green',
+            icon: <ChefHat className="w-5 h-5" />,
+            content: (
+              <>
+                <div className="flex items-start justify-between gap-2">
+                  <h3 className="font-serif font-bold text-base text-theme-primary truncate">{suggestion.recipe.title}</h3>
+                  {suggestion.canMake && (
+                    <span className="shrink-0 text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-bold">Ready!</span>
+                  )}
+                </div>
+                <p className="text-sm text-theme-secondary opacity-80 mt-0.5 mb-3">
+                  {suggestion.availableIngredients}/{suggestion.totalIngredients} ingredients available
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      setModalRecipe(suggestion.recipe);
+                      setModalContext('search');
+                      setShowRecipeModal(true);
+                      AnalyticsService.trackEvent('meal_prep_view_recipe', {
+                        recipe_title: suggestion.recipe.title,
+                        match_percentage: suggestion.matchPercentage,
+                        available_ingredients: suggestion.availableIngredients,
+                        total_ingredients: suggestion.totalIngredients,
+                        can_make: suggestion.canMake
+                      });
+                    }}
+                    className="text-xs font-bold bg-[var(--accent-color)] text-white px-2.5 py-1.5 rounded-lg hover:bg-[var(--accent-color)]/90 transition-colors"
+                  >
+                    View Recipe
+                  </button>
+                  <button
+                    onClick={() => { if (setActiveTab) setActiveTab(Tab.MEALS); }}
+                    className="text-xs font-bold bg-theme-secondary border border-theme px-2.5 py-1.5 rounded-lg hover:bg-theme-primary transition-colors"
+                  >
+                    Plan Meal
+                  </button>
+                  {suggestion.missingIngredients.length > 0 && (
+                    <button
+                      onClick={() => {
+                        const missingItems = suggestion.missingIngredients
+                          .filter(match => !match.available)
+                          .map(match => match.ingredient);
+                        if (missingItems.length > 0) {
+                          addToShoppingList(missingItems);
+                        }
+                      }}
+                      className="text-xs font-bold bg-theme-secondary border border-theme px-2.5 py-1.5 rounded-lg hover:bg-theme-primary transition-colors"
+                      title={`Add ${suggestion.missingIngredients.length} missing ingredients to shopping list`}
+                    >
+                      +{suggestion.missingIngredients.length}
+                    </button>
+                  )}
+                </div>
+              </>
+            ),
+          });
+        });
+
+        if (consumptionSuggestions.length > 0) {
+          const top = consumptionSuggestions[0];
+          slides.push({
+            key: 'shopping',
+            tone: 'blue',
+            icon: <ShoppingBasket className="w-5 h-5" />,
+            content: (
+              <>
+                <h3 className="font-serif font-bold text-base text-theme-primary">{top.item} — running low</h3>
+                <p className="text-sm text-theme-secondary opacity-80 mt-0.5 mb-3">{top.reason}</p>
+                <button
+                  onClick={() => addToShoppingList([top.item])}
+                  className="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 transition-colors"
+                >
+                  Add to shopping list
+                </button>
+              </>
+            ),
+          });
+        }
+
+        slides.push({
+          key: 'cookTonight',
+          tone: 'accent',
+          icon: loadingState === LoadingState.LOADING
+            ? <Loader2 className="w-5 h-5 animate-spin" />
+            : <ChefHat className="w-5 h-5" />,
+          content: (
+            <>
+              <h3 className="font-serif font-bold text-base text-theme-primary">Not sure what to make?</h3>
+              <p className="text-sm text-theme-secondary opacity-80 mt-0.5 mb-3">Get a meal idea from what you already have in your pantry.</p>
+              <button
+                onClick={handleWhatCanICookTonight}
+                disabled={loadingState === LoadingState.LOADING}
+                className="px-3 py-1.5 rounded-lg bg-[var(--accent-color)] text-white text-xs font-bold hover:bg-[var(--accent-color)]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                What can I cook tonight?
+              </button>
+            </>
+          ),
+        });
+
+        const toneCardClasses: Record<CarouselSlide['tone'], string> = {
+          purple: 'bg-gradient-to-br from-indigo-500/10 via-purple-500/5 to-pink-500/10 border-purple-500/20',
+          amber: 'bg-amber-500/8 border-amber-500/25',
+          blue: 'bg-blue-50 border-blue-200',
+          green: 'bg-gradient-to-r from-green-500/10 to-emerald-500/5 border-green-500/20',
+          accent: 'bg-[var(--accent-color)]/8 border-[var(--accent-color)]/25',
+        };
+        const toneIconClasses: Record<CarouselSlide['tone'], string> = {
+          purple: 'bg-purple-500/20 text-purple-600',
+          amber: 'bg-amber-500/20 text-amber-600',
+          blue: 'bg-blue-500/20 text-blue-600',
+          green: 'bg-green-500/20 text-green-600',
+          accent: 'bg-[var(--accent-color)]/20 text-[var(--accent-color)]',
+        };
+
+        const activeIndex = Math.min(suggestionSlide, slides.length - 1);
+
+        const scrollToSlide = (index: number) => {
+          const el = carouselRef.current;
+          if (el) el.scrollTo({ left: index * el.clientWidth, behavior: 'smooth' });
+          setSuggestionSlide(index);
+        };
+
+        const handleCarouselScroll = () => {
+          const el = carouselRef.current;
+          if (!el || el.clientWidth === 0) return;
+          const index = Math.round(el.scrollLeft / el.clientWidth);
+          setSuggestionSlide(prev => (prev === index ? prev : index));
+        };
+
+        return (
+          <div className="mb-6">
+            <div
+              ref={carouselRef}
+              onScroll={handleCarouselScroll}
+              className="flex overflow-x-auto snap-x snap-mandatory scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            >
+              {slides.map(slide => (
+                <div key={slide.key} className="w-full shrink-0 snap-center px-0.5">
+                  <div className={`rounded-xl border p-5 h-full ${toneCardClasses[slide.tone]}`}>
+                    <div className="flex items-start gap-4">
+                      <div className={`shrink-0 p-3 rounded-lg ${toneIconClasses[slide.tone]}`}>
+                        {slide.icon}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        {slide.content}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {slides.length > 1 && (
+              <div className="flex items-center justify-center gap-1.5 mt-2" role="tablist" aria-label="Suggestions">
+                {slides.map((s, i) => (
+                  <button
+                    key={s.key}
+                    onClick={() => scrollToSlide(i)}
+                    role="tab"
+                    aria-selected={i === activeIndex}
+                    aria-label={`Suggestion ${i + 1} of ${slides.length}`}
+                    className={`h-1.5 rounded-full transition-all ${i === activeIndex ? 'w-5 bg-[var(--text-primary)]' : 'w-1.5 bg-[var(--text-primary)]/30'}`}
+                  />
+                ))}
+              </div>
+            )}
+
+            {mealPrepSuggestions.length > 4 && (
+              <div className="text-center mt-2">
+                <button
+                  onClick={() => { if (setActiveTab) setActiveTab(Tab.MEALS); }}
+                  className="text-xs text-[var(--accent-color)] hover:underline"
+                >
+                  View all {mealPrepSuggestions.length} recipe suggestions →
                 </button>
               </div>
-            ))}
+            )}
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {lastImportedBatch && (
         <div className="w-full bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4 flex items-center justify-between">
@@ -2041,101 +1981,6 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
               Dismiss
             </button>
           </div>
-        </div>
-      )}
-
-      {/* Meal Prep Suggestions - Recipes You Can Make Immediately */}
-      {mealPrepSuggestions.length > 0 && (
-        <div className="bg-gradient-to-r from-green-500/10 to-emerald-500/5 border border-green-500/20 rounded-xl p-4 mb-6">
-          <div className="flex items-center gap-2 mb-3">
-            <ChefHat className="w-5 h-5 text-green-600" />
-            <h3 className="font-semibold text-theme-primary">Recipes You Can Make Now</h3>
-            <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">
-              {mealPrepSuggestions.filter(s => s.canMake).length} ready
-            </span>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {mealPrepSuggestions.slice(0, 4).map((suggestion, index) => (
-              <div
-                key={index}
-                className="bg-theme-secondary/80 backdrop-blur-sm border border-green-500/30 rounded-lg p-3 cursor-pointer hover:bg-theme-secondary transition-all hover:shadow-md"
-              >
-                <div className="flex items-start justify-between mb-2">
-                  <h4 className="text-sm font-semibold text-theme-primary truncate flex-1">
-                    {suggestion.recipe.title}
-                  </h4>
-                  {suggestion.canMake && (
-                    <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full ml-2 flex-shrink-0">
-                      Ready!
-                    </span>
-                  )}
-                </div>
-
-                <div className="text-xs text-theme-secondary mb-2">
-                  {suggestion.availableIngredients}/{suggestion.totalIngredients} ingredients available
-                </div>
-
-                <div className="flex gap-2">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setModalRecipe(suggestion.recipe);
-                      setModalContext('search');
-                      setShowRecipeModal(true);
-                      AnalyticsService.trackEvent('meal_prep_view_recipe', {
-                        recipe_title: suggestion.recipe.title,
-                        match_percentage: suggestion.matchPercentage,
-                        available_ingredients: suggestion.availableIngredients,
-                        total_ingredients: suggestion.totalIngredients,
-                        can_make: suggestion.canMake
-                      });
-                    }}
-                    className="flex-1 text-xs bg-[var(--accent-color)] text-white px-2 py-1 rounded hover:bg-[var(--accent-color)]/90 transition-colors"
-                  >
-                    View Recipe
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (setActiveTab) setActiveTab(Tab.MEALS);
-                      // Could add logic to open the specific recipe in meal planner
-                    }}
-                    className="flex-1 text-xs bg-theme-secondary border border-theme px-2 py-1 rounded hover:bg-theme-primary transition-colors"
-                  >
-                    Plan Meal
-                  </button>
-                  {suggestion.missingIngredients.length > 0 && (
-                    <button
-                      onClick={() => {
-                        const missingItems = suggestion.missingIngredients
-                          .filter(match => !match.available)
-                          .map(match => match.ingredient);
-                        if (missingItems.length > 0) {
-                          addToShoppingList(missingItems);
-                        }
-                      }}
-                      className="text-xs bg-theme-secondary border border-theme px-2 py-1 rounded hover:bg-theme-primary transition-colors"
-                      title={`Add ${suggestion.missingIngredients.length} missing ingredients to shopping list`}
-                    >
-                      +{suggestion.missingIngredients.length}
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-          {mealPrepSuggestions.length > 4 && (
-            <div className="text-center mt-3">
-              <button
-                onClick={() => {
-                  if (setActiveTab) setActiveTab(Tab.MEALS);
-                }}
-                className="text-sm text-[var(--accent-color)] hover:underline"
-              >
-                View all {mealPrepSuggestions.length} suggestions →
-              </button>
-            </div>
-          )}
         </div>
       )}
 
@@ -2608,74 +2453,6 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
         </div>
       )}
 
-      {/* Expiration Alerts removed per UX request; keep recipe/use-soon recommendations below */}
-
-      {/* Recipe Suggestions - Use Soon */}
-      {recipeSuggestions.length > 0 && (
-        <div className="bg-green-50 border border-green-200 rounded-lg mb-4 overflow-hidden">
-          <button
-            onClick={() => setShowUseSoon(s => !s)}
-            className="w-full p-4 flex items-center justify-between text-left hover:bg-green-100 transition-colors"
-            aria-expanded={showUseSoon}
-          >
-            <h3 className="text-sm font-semibold text-green-800 flex items-center gap-2">
-              <ChefHat className="w-4 h-4" />
-              Use Soon - Recipe Ideas
-              {!showUseSoon && <span className="text-xs font-normal text-green-600">({recipeSuggestions.slice(0, 3).length})</span>}
-            </h3>
-            {showUseSoon ? <ChevronUp className="w-4 h-4 text-green-600 flex-shrink-0" /> : <ChevronDown className="w-4 h-4 text-green-600 flex-shrink-0" />}
-          </button>
-          {showUseSoon && (
-            <div className="space-y-3 px-4 pb-4">
-              {recipeSuggestions.slice(0, 3).map((suggestion) => (
-                <div key={suggestion.itemId} className="bg-white rounded border border-green-100 p-3">
-                  <div className="flex items-start justify-between mb-2">
-                    <p className="text-sm font-medium text-gray-900">{suggestion.itemName}</p>
-                    <div className="flex items-center gap-1 flex-shrink-0 ml-2">
-                      <span className={`text-xs px-2 py-1 rounded ${
-                        suggestion.daysRemaining <= 1 ? 'bg-red-100 text-red-800' :
-                        suggestion.daysRemaining <= 3 ? 'bg-yellow-100 text-yellow-800' :
-                        'bg-blue-100 text-blue-800'
-                      }`}>
-                        {suggestion.daysRemaining}d left
-                      </span>
-                      <button
-                        onClick={async () => {
-                          const idx = inventory.findIndex(it => it.id === suggestion.itemId);
-                          if (idx !== -1) await onDeleteItem(idx);
-                        }}
-                        className="p-1 rounded hover:bg-red-100 text-red-400 hover:text-red-600 transition-colors"
-                        aria-label={`Delete ${suggestion.itemName}`}
-                        title="Delete from inventory"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                  <p className="text-xs text-gray-600 mb-2">{suggestion.reason}</p>
-                  <div className="flex flex-wrap gap-1">
-                    {suggestion.suggestedRecipes.map((recipe, index) => (
-                      <button
-                        key={index}
-                        onClick={() => {
-                          if (setActiveTab && setInitialSearchQuery) {
-                            setInitialSearchQuery(recipe);
-                            setActiveTab(Tab.RECIPES);
-                          }
-                        }}
-                        className="text-xs bg-green-100 hover:bg-green-200 text-green-800 px-2 py-1 rounded transition-colors"
-                      >
-                        {recipe}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
       <div className="space-y-1">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mb-4 mx-1">
           <div className="text-theme-secondary opacity-70 text-sm font-medium text-center sm:text-left">
@@ -2763,35 +2540,44 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
           </div>
         )}
 
-        {/* Storage Location Buttons - Only show in storage view */}
+        {/* Storage Location Chips - Only show in storage view. Sticky under the app
+            header so it stays reachable while the item list scrolls underneath.
+            Tapping a chip brings that section to the top of the list below (see
+            toggleStorageLocation) so it reads as a "jump to" shortcut rather than a
+            static legend. */}
         {viewMode === 'storage' && (
-          <div className="flex justify-center mb-4">
-            <div className="flex gap-3">
-              {storageOrder.map(location => {
-                const items = storageItemsArrays[location] || [];
-                const locationLabel = (storageLabels as Record<string, string>)[location] || location;
-                return (
-                  <div
-                    key={location}
-                    onClick={() => toggleStorageLocation(location)}
-                    className="bg-theme-secondary rounded-lg shadow-md border-2 border-[var(--accent-color)] overflow-hidden group hover:shadow-lg transition-all cursor-pointer w-20 h-20"
-                  >
-                    <div className="h-10 relative bg-gradient-to-br from-[var(--accent-color)]/20 to-[var(--accent-color)]/5 overflow-hidden flex items-center justify-center">
-                      <StorageLocationIndicator
-                        location={location as 'pantry' | 'freezer' | 'fridge' | 'spices' | 'other'}
-                        size="md"
-                      />
-                    </div>
-                    <div className="px-1 py-0.5 text-center">
-                      <h4 className="text-xs font-bold leading-tight text-theme-primary">{locationLabel}</h4>
-                      <div className="text-xs opacity-70 text-theme-secondary">
-                        {items.length}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+          <div
+            ref={chipRowRef}
+            className="sticky z-20 flex gap-2 overflow-x-auto py-2 mb-4 -mx-1 px-1 bg-theme-primary border-b border-theme"
+            style={{ top: 'calc(var(--app-header-h) - 100px)' }}
+          >
+            {storageOrder.map(location => {
+              const items = storageItemsArrays[location] || [];
+              const locationLabel = (storageLabels as Record<string, string>)[location] || location;
+              const isActive = storageSectionOrder[0] === location;
+              return (
+                <button
+                  key={location}
+                  onClick={() => toggleStorageLocation(location)}
+                  aria-label={`Jump to ${locationLabel}`}
+                  aria-pressed={isActive}
+                  className={`shrink-0 flex items-center gap-2 rounded-full border px-3 py-1.5 transition-colors ${
+                    isActive
+                      ? 'bg-[var(--accent-color)] border-[var(--accent-color)] text-white'
+                      : 'bg-theme-secondary border-theme text-theme-primary hover:border-[var(--accent-color)]/50'
+                  }`}
+                >
+                  <StorageLocationIndicator
+                    location={location as 'pantry' | 'freezer' | 'fridge' | 'spices' | 'other'}
+                    size="sm"
+                  />
+                  <span className="text-xs font-bold whitespace-nowrap">{locationLabel}</span>
+                  <span className={`text-[10px] font-semibold ${isActive ? 'text-white/80' : 'text-theme-secondary opacity-70'}`}>
+                    {items.length}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         )}
 
@@ -3607,3 +3393,5 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({
     </div>
   );
 };
+
+export const PantryScanner = React.memo(PantryScannerComponent);

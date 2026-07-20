@@ -112,7 +112,7 @@ interface SettingsProps {
   setActiveCategory?: React.Dispatch<React.SetStateAction<string | null>>;
 }
 
-export const Settings: React.FC<SettingsProps> = ({ 
+const SettingsComponent: React.FC<SettingsProps> = ({
   settings = defaultSettings, 
   setSettings, 
   user, 
@@ -1749,3 +1749,5 @@ export const Settings: React.FC<SettingsProps> = ({
     </>
   );
 };
+
+export const Settings = React.memo(SettingsComponent);

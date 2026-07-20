@@ -32,6 +32,7 @@ import { NotificationService, NotificationItem, NotificationSettings } from './s
 import { markNotificationRead, deleteNotification, snoozeNotificationInCache, updateNotificationInCache } from './services/notificationsService';
 import { log } from './services/logService';
 import { destroyReceiptOcrWorker } from './services/receiptOcrService';
+import { cleanupCacheService } from './services/cacheService';
 import { pushNotificationService } from './services/pushNotificationService';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Capacitor, PluginListenerHandle } from '@capacitor/core';
@@ -39,6 +40,8 @@ import { PushNotifications } from '@capacitor/push-notifications';
 import { AdMob } from '@capacitor-community/admob';
 import { AppProvider } from './contexts/AppContext';
 import { AppActionsProvider } from './contexts/AppActionsContext';
+import { InventoryContextType, ShoppingListContextType, MealPlanContextType, RecipesContextType } from './contexts/DomainContexts';
+import { useStableCallback } from './hooks/useStableCallback';
 import SafeAreaService from './services/safeAreaService';
 import { GlobalUpdatePrompt } from './components/ui/GlobalUpdatePrompt';
 import { WhatsNewModal } from './components/auth-onboarding/WhatsNewModal';
@@ -96,6 +99,7 @@ const App: React.FC = () => {
   // Global achievement state and celebration ref
   const [newlyUnlockedBadge, setNewlyUnlockedBadge] = useState<{ id: string; title: string; icon: string; description: string; color: string } | null>(null);
   const fireworksCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const fireworksRafRef = useRef<number | null>(null);
 
   const triggerCelebration = () => {
     const canvas = fireworksCanvasRef.current;
@@ -173,9 +177,10 @@ const App: React.FC = () => {
       }
 
       if (particles.length > 0) {
-        requestAnimationFrame(render);
+        fireworksRafRef.current = requestAnimationFrame(render);
       } else {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+        fireworksRafRef.current = null;
       }
     };
 
@@ -256,11 +261,16 @@ const App: React.FC = () => {
   const { settings, setSettings } = useSettings();
   const toast = useToast();
 
-  // Root lifecycle cleanup for monitoring and background workers (PERF-018, PERF-019)
+  // Root lifecycle cleanup for monitoring and background workers (PERF-018, PERF-019, PERF-021)
   useEffect(() => {
     return () => {
       DatabaseMonitoringService.cleanup();
       destroyReceiptOcrWorker();
+      cleanupCacheService();
+      if (fireworksRafRef.current !== null) {
+        cancelAnimationFrame(fireworksRafRef.current);
+        fireworksRafRef.current = null;
+      }
     };
   }, []);
 
@@ -599,11 +609,8 @@ const App: React.FC = () => {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     generateRecipeSuggestionsOnDemand,
     handleAddToPlan,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     addMealToPlan,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     updateMealOnPlan,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     removeMealFromPlan,
     handleSaveRecipe,
     handleDeleteRecipe,
@@ -627,13 +634,10 @@ const App: React.FC = () => {
     checkRecipeSaveLimit,
     checkMealPlanLimit,
     addShoppingListItem,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     addShoppingListItems,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     updateShoppingListItem,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     updateShoppingListItems,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     removeShoppingListItem,
     removeShoppingListItems,
     isLoadingInventory,
@@ -710,7 +714,9 @@ const App: React.FC = () => {
 
   // Effect to monitor and trigger new achievements instantly
   useEffect(() => {
-    if (!user || isLoadingInventory || isLoadingSavedRecipes || isLoadingMealPlan || isLoadingHousehold) return;
+    // Hold off while onboarding owns the screen — recheck once it closes so the
+    // celebration isn't lost, just deferred (avoids stacking with onboarding UI).
+    if (!user || isLoadingInventory || isLoadingSavedRecipes || isLoadingMealPlan || isLoadingHousehold || showOnboarding) return;
 
     const unlocked = getUnlockedBadges(inventory, savedRecipes, mealPlan, household);
     const unlockedIds = unlocked.map(b => b.id);
@@ -739,7 +745,7 @@ const App: React.FC = () => {
         triggerCelebration();
       }, 300);
     }
-  }, [inventory, savedRecipes, mealPlan, household, user, isLoadingInventory, isLoadingSavedRecipes, isLoadingMealPlan, isLoadingHousehold]);
+  }, [inventory, savedRecipes, mealPlan, household, user, isLoadingInventory, isLoadingSavedRecipes, isLoadingMealPlan, isLoadingHousehold, showOnboarding]);
 
   // Global Recipe Modal states
   const [globalModalRecipe, setGlobalModalRecipe] = useState<StructuredRecipe | null>(null);
@@ -1526,6 +1532,312 @@ const App: React.FC = () => {
     }
   }, [settings?.theme?.mode]);
 
+  // ─── PERF-029: stable handler identities + memoized context provider values ─
+  // Every function handed to a context provider gets a stable identity via
+  // useStableCallback, so the useMemo'd provider objects below only change
+  // when their underlying data changes. Previously both provider values were
+  // fresh object literals on every App render, re-rendering every consumer.
+  const stableSwitchTab = useStableCallback(switchTab);
+  const stableSetActiveTab = useStableCallback(setActiveTab);
+  const stableSetInventory = useStableCallback(setInventory);
+  const stableSetShoppingList = useStableCallback(setShoppingList);
+  const stableSetMealPlan = useStableCallback(setMealPlan);
+  const stableSetPersistedRecipeResult = useStableCallback(setPersistedRecipeResult);
+  const stableSetInitialSearchQuery = useStableCallback(setInitialSearchQuery);
+  const stableSetSettings = useStableCallback(setSettings);
+  const stableSetActiveSettingsCategory = useStableCallback(setActiveSettingsCategory);
+  const stableSetLoadingRatingsComplete = useStableCallback(setLoadingRatingsComplete);
+  const stableUpdateItem = useStableCallback(updateItem);
+  const stableDeleteItem = useStableCallback(deleteItem);
+  const stableDeleteItems = useStableCallback(deleteItems);
+  const stableAddItem = useStableCallback(addItem);
+  const stableAddItems = useStableCallback(addItems);
+  const stableUpdateMealPlan = useStableCallback(updateMealPlan);
+  const stableAddMealToPlan = useStableCallback(addMealToPlan);
+  const stableUpdateMealOnPlan = useStableCallback(updateMealOnPlan);
+  const stableRemoveMealFromPlan = useStableCallback(removeMealFromPlan);
+  const stableHandleAddToPlan = useStableCallback(handleAddToPlan);
+  const stableHandleSaveRecipe = useStableCallback(handleSaveRecipe);
+  const stableHandleDeleteRecipe = useStableCallback(handleDeleteRecipe);
+  const stableSubmitRating = useStableCallback(submitRating);
+  const stableHandleMarkAsMade = useStableCallback(handleMarkAsMade);
+  const stableAddToShoppingList = useStableCallback(addToShoppingList);
+  const stableAddShoppingListItem = useStableCallback(addShoppingListItem);
+  const stableAddShoppingListItems = useStableCallback(addShoppingListItems);
+  const stableUpdateShoppingListItem = useStableCallback(updateShoppingListItem);
+  const stableRemoveShoppingListItem = useStableCallback(removeShoppingListItem);
+  const stableAddCustomCategory = useStableCallback(addCustomCategory);
+  const stableUpdateCustomCategory = useStableCallback(updateCustomCategory);
+  const stableDeleteCustomCategory = useStableCallback(deleteCustomCategory);
+  const stableAddToast = useStableCallback(addToast);
+  const stableHandleLogout = useStableCallback(handleLogout);
+  const stableCheckRecipeSaveLimit = useStableCallback(checkRecipeSaveLimit);
+  const stableCheckMealPlanLimit = useStableCallback(checkMealPlanLimit);
+  const stableRefreshAllData = useStableCallback(refreshAllData);
+
+  const handleShowHousehold = useStableCallback(() => setShowHousehold(true));
+
+  const handleReplayOnboarding = useStableCallback(() => {
+    localStorage.removeItem('onboarding-completed');
+    localStorage.removeItem('onboarding-checklist-dismissed');
+    setShowOnboarding(true);
+  });
+
+  const handleMoveToPantry = useStableCallback(async (items: ShoppingItem[]) => {
+    // Bulk lookup cached images first to populate the cache and avoid N Firestore reads
+    try {
+      const { getCachedImageUrls } = await import('./services/imageCacheService');
+      await getCachedImageUrls(items.map(i => i.item));
+    } catch (error) {
+      log.error('Failed to pre-fetch cached image URLs', { error }, 'App');
+    }
+
+    const processedItems = await Promise.all(items.map(async (i) => {
+      const category = inferCategoryFromItemName(i.item);
+      let image = getItemImage(i.item, category);
+
+      if (image === '/images/placeholder.svg') {
+        try {
+          const externalImage = await fetchExternalItemImage(i.item);
+          if (externalImage) {
+            image = externalImage;
+          }
+        } catch (error) {
+          log.debug('Failed to fetch external image', { item: i.item, error }, 'App');
+        }
+      }
+
+      let addQty = getQuantityAmount(i.purchasedQuantity ?? i.quantity ?? i.purchasedBatch ?? 1);
+      if (addQty < 1) addQty = 1;
+
+      const reservations: { recipeId: string; recipeName: string; quantity: number; unit: string }[] = [];
+      if (i.source && i.source.startsWith('recipe: need ')) {
+        const match = i.source.match(/recipe: need (.+?) for "(.+?)"/);
+        if (match) {
+          const qtyStr = match[1];
+          const recipeName = match[2];
+          const qtyMatch = qtyStr.match(/(\d+(?:\.\d+)?)\s*(.+)/);
+          if (qtyMatch) {
+            const quantity = parseFloat(qtyMatch[1]);
+            const unit = qtyMatch[2];
+            reservations.push({
+              recipeId: `recipe_${recipeName.replace(/\s+/g, '_').toLowerCase()}`,
+              recipeName,
+              quantity,
+              unit
+            });
+          }
+        }
+      }
+
+      // Build pantry item and convert any purchased batch/quantity into batches[]
+      const batches: Batch[] = [];
+      const nowIso = new Date().toISOString();
+
+      if (i.purchasedBatch) {
+        batches.push({
+          batchId: Math.random().toString(36).substr(2,9),
+          quantity: Math.abs(i.purchasedBatch.amount) || Math.abs(addQty),
+          unit: i.purchasedBatch.unit || (i.purchasedQuantity?.unit ?? undefined),
+          expires: i.purchasedBatch.expires,
+          purchaseDate: nowIso,
+          note: i.purchasedBatch.note || i.notes || (i.source && i.source.startsWith('recipe:') ? i.source : undefined)
+        });
+      } else if (i.purchasedQuantity) {
+        batches.push({
+          batchId: Math.random().toString(36).substr(2,9),
+          quantity: Math.abs(i.purchasedQuantity.amount) || Math.abs(addQty),
+          unit: i.purchasedQuantity.unit || undefined,
+          purchaseDate: nowIso,
+          note: i.notes || (i.source && i.source.startsWith('recipe:') ? i.source : undefined)
+        });
+      } else {
+        // Fallback: create a batch from the generic quantity field.
+        // Preserve the unit if quantity is a string like "225 g" or "800 ml".
+        const qStr = typeof i.quantity === 'string' ? i.quantity.trim() : '';
+        const unitMatch = qStr.match(/^\d+(?:[./]\d+)?(?:\.\d+)?\s+(\S+)/);
+        const fallbackUnit = unitMatch?.[1] ?? undefined;
+        batches.push({
+          batchId: Math.random().toString(36).substr(2,9),
+          quantity: Math.abs(addQty),
+          unit: fallbackUnit,
+          purchaseDate: nowIso,
+          note: i.notes || (i.source && i.source.startsWith('recipe:') ? i.source : undefined)
+        });
+      }
+
+      return {
+        id: Math.random().toString(36).substr(2,9),
+        item: i.item,
+        category,
+        quantity_estimate: Math.abs(addQty).toString(),
+        storageLocation: inferStorageLocationFromItemName(i.item),
+        image,
+        originalQuantity: i.purchasedQuantity ? `${i.purchasedQuantity.amount} ${i.purchasedQuantity.unit}` : (typeof i.quantity === 'string' ? i.quantity : undefined),
+        reservations,
+        batches,
+        dateAdded: nowIso,
+        lastRestocked: nowIso,
+        notes: i.notes || (i.source && i.source.startsWith('recipe:') ? i.source : undefined)
+      };
+    }));
+
+    const addedItems = await addItems(processedItems);
+
+    setShoppingList(prev => prev.filter(item => !items.find(moved => moved.id === item.id)));
+    await removeShoppingListItems(items.map(i => i.id));
+
+    setTimeout(() => {
+      syncNow();
+    }, 100);
+
+    addToast(
+      `Added ${items.length} item${items.length > 1 ? 's' : ''} to pantry. Edit quantities?`,
+      'info',
+      8000,
+      'Edit Quantities',
+      () => {
+        localStorage.setItem('pendingQuantityEdits', JSON.stringify(addedItems));
+        setActiveTab(Tab.PANTRY);
+      }
+    );
+  });
+
+  // Stable callbacks above are intentionally omitted from the memo deps below —
+  // their identities never change by construction.
+  const appContextValue = useMemo(() => ({
+    activeTab,
+    setActiveTab: stableSwitchTab,
+    // The provider tree only renders after the `!user` early-return below,
+    // so `user` is always non-null when this value is actually consumed.
+    user: user as User,
+    household: household ?? undefined,
+    inventory,
+    setInventory: stableSetInventory,
+    shoppingList,
+    setShoppingList: stableSetShoppingList,
+    mealPlan,
+    setMealPlan: stableSetMealPlan,
+    savedRecipes,
+    ratings,
+    persistedRecipeResult,
+    setPersistedRecipeResult: stableSetPersistedRecipeResult,
+    initialSearchQuery,
+    setInitialSearchQuery: stableSetInitialSearchQuery,
+    settings,
+    setSettings: stableSetSettings,
+    customCategories,
+    activeSettingsCategory,
+    recipeSaveLimitExceeded,
+    mealPlanLimitExceeded,
+    isLoadingInventory,
+    isLoadingShoppingList,
+    isLoadingMealPlan,
+    isLoadingSavedRecipes,
+    isLoadingHousehold,
+    isLoadingRatings,
+    setLoadingRatingsComplete: stableSetLoadingRatingsComplete,
+    consumptionSuggestions,
+    expirationAlerts,
+    recipeSuggestions,
+    recentActivities,
+    isLoadingActivities
+  }), [activeTab, user, household, inventory, shoppingList, mealPlan, savedRecipes, ratings,
+    persistedRecipeResult, initialSearchQuery, settings, customCategories, activeSettingsCategory,
+    recipeSaveLimitExceeded, mealPlanLimitExceeded, isLoadingInventory, isLoadingShoppingList,
+    isLoadingMealPlan, isLoadingSavedRecipes, isLoadingHousehold, isLoadingRatings,
+    consumptionSuggestions, expirationAlerts, recipeSuggestions, recentActivities, isLoadingActivities]);
+
+  // Domain context values (PERF-029): each memoized on its own domain's data so
+  // a change in one domain doesn't re-render the other domains' consumers.
+  const inventoryDomainValue = useMemo<InventoryContextType>(() => ({
+    inventory,
+    isLoadingInventory,
+    onAddItem: stableAddItem,
+    onAddItems: stableAddItems,
+    onUpdateItem: stableUpdateItem,
+    onDeleteItem: stableDeleteItem,
+    deletePantryItems: stableDeleteItems,
+    handleMarkAsMade: stableHandleMarkAsMade,
+  }), [inventory, isLoadingInventory]);
+
+  const shoppingListDomainValue = useMemo<ShoppingListContextType>(() => ({
+    shoppingList,
+    isLoadingShoppingList,
+    addShoppingListItem: stableAddShoppingListItem,
+    addShoppingListItems: stableAddShoppingListItems,
+    updateShoppingListItem: stableUpdateShoppingListItem,
+    removeShoppingListItem: stableRemoveShoppingListItem,
+  }), [shoppingList, isLoadingShoppingList]);
+
+  const mealPlanDomainValue = useMemo<MealPlanContextType>(() => ({
+    mealPlan,
+    isLoadingMealPlan,
+    addMealToPlan: stableAddMealToPlan,
+    updateMealOnPlan: stableUpdateMealOnPlan,
+    removeMealFromPlan: stableRemoveMealFromPlan,
+    updateMealPlan: stableUpdateMealPlan,
+  }), [mealPlan, isLoadingMealPlan]);
+
+  const recipesDomainValue = useMemo<RecipesContextType>(() => ({
+    savedRecipes,
+    isLoadingSavedRecipes,
+    onSaveRecipe: stableHandleSaveRecipe,
+    onDeleteRecipe: stableHandleDeleteRecipe,
+    recipeSaveLimitExceeded,
+  }), [savedRecipes, isLoadingSavedRecipes, recipeSaveLimitExceeded]);
+
+  const domainContextValues = useMemo(() => ({
+    inventory: inventoryDomainValue,
+    shoppingList: shoppingListDomainValue,
+    mealPlan: mealPlanDomainValue,
+    recipes: recipesDomainValue,
+  }), [inventoryDomainValue, shoppingListDomainValue, mealPlanDomainValue, recipesDomainValue]);
+
+  // Every entry is identity-stable, so this value never changes and
+  // action-only consumers never re-render from context churn.
+  const appActionsValue = useMemo(() => ({
+    setActiveTab: stableSetActiveTab,
+    updateItem: stableUpdateItem,
+    deleteItem: stableDeleteItem,
+    deleteItems: stableDeleteItems,
+    addItem: stableAddItem,
+    addItems: stableAddItems,
+    setInventory: stableSetInventory,
+    setShoppingList: stableSetShoppingList,
+    setMealPlan: stableSetMealPlan,
+    updateMealPlan: stableUpdateMealPlan,
+    onAddToPlan: stableHandleAddToPlan,
+    onSaveRecipe: stableHandleSaveRecipe,
+    onDeleteRecipe: stableHandleDeleteRecipe,
+    onRateRecipe: stableSubmitRating,
+    handleMarkAsMade: stableHandleMarkAsMade,
+    onMoveToPantry: handleMoveToPantry,
+    onAddToShoppingList: stableAddToShoppingList,
+    addShoppingListItem: stableAddShoppingListItem,
+    setSettings: stableSetSettings,
+    onAddCustomCategory: stableAddCustomCategory,
+    onUpdateCustomCategory: stableUpdateCustomCategory,
+    onDeleteCustomCategory: stableDeleteCustomCategory,
+    setActiveSettingsCategory: stableSetActiveSettingsCategory,
+    addToast: stableAddToast,
+    setInitialSearchQuery: stableSetInitialSearchQuery,
+    setPersistedRecipeResult: stableSetPersistedRecipeResult,
+    onLogout: stableHandleLogout,
+    onShowHousehold: handleShowHousehold,
+    checkRecipeSaveLimit: stableCheckRecipeSaveLimit,
+    checkMealPlanLimit: stableCheckMealPlanLimit,
+    refreshAllData: stableRefreshAllData,
+    onReplayOnboarding: handleReplayOnboarding,
+  }), [stableSetActiveTab, stableUpdateItem, stableDeleteItem, stableDeleteItems, stableAddItem,
+    stableAddItems, stableSetInventory, stableSetShoppingList, stableSetMealPlan, stableUpdateMealPlan,
+    stableHandleAddToPlan, stableHandleSaveRecipe, stableHandleDeleteRecipe, stableSubmitRating,
+    stableHandleMarkAsMade, handleMoveToPantry, stableAddToShoppingList, stableAddShoppingListItem,
+    stableSetSettings, stableAddCustomCategory, stableUpdateCustomCategory, stableDeleteCustomCategory,
+    stableSetActiveSettingsCategory, stableAddToast, stableSetInitialSearchQuery,
+    stableSetPersistedRecipeResult, stableHandleLogout, handleShowHousehold, stableCheckRecipeSaveLimit,
+    stableCheckMealPlanLimit, stableRefreshAllData, handleReplayOnboarding]);
+
   // Show a loading spinner while waiting for auth to be ready
   if (!isAuthReady) {
     return (
@@ -1783,203 +2095,8 @@ const App: React.FC = () => {
         )}
         
         <SubscriptionProvider user={user}>
-        <AppProvider
-          value={{
-            activeTab,
-            setActiveTab: switchTab,
-            user,
-            household: household ?? undefined,
-            inventory,
-            setInventory,
-            shoppingList,
-            setShoppingList,
-            mealPlan,
-            setMealPlan,
-            
-            savedRecipes,
-            ratings,
-            persistedRecipeResult,
-            setPersistedRecipeResult,
-            initialSearchQuery,
-            setInitialSearchQuery,
-            settings,
-            setSettings,
-            customCategories,
-            activeSettingsCategory,
-            recipeSaveLimitExceeded,
-            mealPlanLimitExceeded,
-            isLoadingInventory,
-            isLoadingShoppingList,
-            isLoadingMealPlan,
-            isLoadingSavedRecipes,
-            isLoadingHousehold,
-            isLoadingRatings,
-            setLoadingRatingsComplete,
-            consumptionSuggestions,
-            expirationAlerts,
-            recipeSuggestions,
-            recentActivities,
-            isLoadingActivities
-          }}
-        >
-          <AppActionsProvider
-            value={{
-              setActiveTab,
-              updateItem,
-              deleteItem,
-              deleteItems,
-              addItem,
-              addItems,
-              setInventory,
-              setShoppingList,
-              setMealPlan,
-              updateMealPlan,
-              onAddToPlan: handleAddToPlan,
-              onSaveRecipe: handleSaveRecipe,
-              onDeleteRecipe: handleDeleteRecipe,
-              onRateRecipe: submitRating,
-              handleMarkAsMade,
-              onMoveToPantry: async (items) => {
-                // Bulk lookup cached images first to populate the cache and avoid N Firestore reads
-                try {
-                  const { getCachedImageUrls } = await import('./services/imageCacheService');
-                  await getCachedImageUrls(items.map(i => i.item));
-                } catch (error) {
-                  log.error('Failed to pre-fetch cached image URLs', { error }, 'App');
-                }
-
-                const processedItems = await Promise.all(items.map(async (i) => {
-                  const category = inferCategoryFromItemName(i.item);
-                  let image = getItemImage(i.item, category);
-                  
-                  if (image === '/images/placeholder.svg') {
-                    try {
-                      const externalImage = await fetchExternalItemImage(i.item);
-                      if (externalImage) {
-                        image = externalImage;
-                      }
-                    } catch (error) {
-                      log.debug('Failed to fetch external image', { item: i.item, error }, 'App');
-                    }
-                  }
-                  
-                  let addQty = getQuantityAmount(i.purchasedQuantity ?? i.quantity ?? i.purchasedBatch ?? 1);
-                  if (addQty < 1) addQty = 1;
-                  
-                  const reservations: { recipeId: string; recipeName: string; quantity: number; unit: string }[] = [];
-                  if (i.source && i.source.startsWith('recipe: need ')) {
-                    const match = i.source.match(/recipe: need (.+?) for "(.+?)"/);
-                    if (match) {
-                      const qtyStr = match[1];
-                      const recipeName = match[2];
-                      const qtyMatch = qtyStr.match(/(\d+(?:\.\d+)?)\s*(.+)/);
-                      if (qtyMatch) {
-                        const quantity = parseFloat(qtyMatch[1]);
-                        const unit = qtyMatch[2];
-                        reservations.push({
-                          recipeId: `recipe_${recipeName.replace(/\s+/g, '_').toLowerCase()}`,
-                          recipeName,
-                          quantity,
-                          unit
-                        });
-                      }
-                    }
-                  }
-                  
-                  // Build pantry item and convert any purchased batch/quantity into batches[]
-                  const batches: Batch[] = [];
-                  const nowIso = new Date().toISOString();
-
-                  if (i.purchasedBatch) {
-                    batches.push({
-                      batchId: Math.random().toString(36).substr(2,9),
-                      quantity: Math.abs(i.purchasedBatch.amount) || Math.abs(addQty),
-                      unit: i.purchasedBatch.unit || (i.purchasedQuantity?.unit ?? undefined),
-                      expires: i.purchasedBatch.expires,
-                      purchaseDate: nowIso,
-                      note: i.purchasedBatch.note || i.notes || (i.source && i.source.startsWith('recipe:') ? i.source : undefined)
-                    });
-                  } else if (i.purchasedQuantity) {
-                    batches.push({
-                      batchId: Math.random().toString(36).substr(2,9),
-                      quantity: Math.abs(i.purchasedQuantity.amount) || Math.abs(addQty),
-                      unit: i.purchasedQuantity.unit || undefined,
-                      purchaseDate: nowIso,
-                      note: i.notes || (i.source && i.source.startsWith('recipe:') ? i.source : undefined)
-                    });
-                  } else {
-                    // Fallback: create a batch from the generic quantity field.
-                    // Preserve the unit if quantity is a string like "225 g" or "800 ml".
-                    const qStr = typeof i.quantity === 'string' ? i.quantity.trim() : '';
-                    const unitMatch = qStr.match(/^\d+(?:[./]\d+)?(?:\.\d+)?\s+(\S+)/);
-                    const fallbackUnit = unitMatch?.[1] ?? undefined;
-                    batches.push({
-                      batchId: Math.random().toString(36).substr(2,9),
-                      quantity: Math.abs(addQty),
-                      unit: fallbackUnit,
-                      purchaseDate: nowIso,
-                      note: i.notes || (i.source && i.source.startsWith('recipe:') ? i.source : undefined)
-                    });
-                  }
-
-                  return {
-                    id: Math.random().toString(36).substr(2,9),
-                    item: i.item,
-                    category,
-                    quantity_estimate: Math.abs(addQty).toString(),
-                    storageLocation: inferStorageLocationFromItemName(i.item),
-                    image,
-                    originalQuantity: i.purchasedQuantity ? `${i.purchasedQuantity.amount} ${i.purchasedQuantity.unit}` : (typeof i.quantity === 'string' ? i.quantity : undefined),
-                    reservations,
-                    batches,
-                    dateAdded: nowIso,
-                    lastRestocked: nowIso,
-                    notes: i.notes || (i.source && i.source.startsWith('recipe:') ? i.source : undefined)
-                  };
-                }));
-                
-                const addedItems = await addItems(processedItems);
-
-                setShoppingList(prev => prev.filter(item => !items.find(moved => moved.id === item.id)));
-                await removeShoppingListItems(items.map(i => i.id));
-                
-                setTimeout(() => {
-                  syncNow();
-                }, 100);
-
-                addToast(
-                  `Added ${items.length} item${items.length > 1 ? 's' : ''} to pantry. Edit quantities?`,
-                  'info',
-                  8000,
-                  'Edit Quantities',
-                  () => {
-                    localStorage.setItem('pendingQuantityEdits', JSON.stringify(addedItems));
-                    setActiveTab(Tab.PANTRY);
-                  }
-                );
-              },
-              onAddToShoppingList: addToShoppingList,
-              setSettings,
-              onAddCustomCategory: addCustomCategory,
-              onUpdateCustomCategory: updateCustomCategory,
-              onDeleteCustomCategory: deleteCustomCategory,
-              setActiveSettingsCategory,
-              addToast,
-              setInitialSearchQuery,
-              setPersistedRecipeResult,
-              onLogout: handleLogout,
-              onShowHousehold: () => setShowHousehold(true),
-              checkRecipeSaveLimit,
-              checkMealPlanLimit,
-              addShoppingListItem,
-              refreshAllData,
-              onReplayOnboarding: () => {
-                localStorage.removeItem('onboarding-completed');
-                localStorage.removeItem('onboarding-checklist-dismissed');
-                setShowOnboarding(true);
-              }
-            }}
-          >
+        <AppProvider value={appContextValue} domains={domainContextValues}>
+          <AppActionsProvider value={appActionsValue}>
             <MainContent />
           </AppActionsProvider>
         </AppProvider>
@@ -2017,19 +2134,21 @@ const App: React.FC = () => {
       </ErrorBoundary>
 
       <GlobalUpdatePrompt />
-      <WhatsNewModal />
+      <WhatsNewModal suppress={showOnboarding || newlyUnlockedBadge !== null} />
 
-      {/* Feature Discovery — one-time "New Feature!" cards for logged-in users */}
-      {user && !showOnboarding && (
-        <FeatureDiscoveryManager 
-          discoveries={featureDiscoveries} 
+      {/* Feature Discovery — one-time "New Feature!" cards for logged-in users.
+          Suppressed while onboarding or the achievement modal owns the screen so
+          only one attention-grabbing overlay is ever visible at a time. */}
+      {user && !showOnboarding && !newlyUnlockedBadge && (
+        <FeatureDiscoveryManager
+          discoveries={featureDiscoveries}
           user={user}
           onDiscoveryDismiss={handleDiscoveryDismiss}
         />
       )}
 
       {/* Contextual Tutorial — per-tab hints shown once on first visit */}
-      {user && contextualTips.length > 0 && (
+      {user && !showOnboarding && !newlyUnlockedBadge && contextualTips.length > 0 && (
         <ContextualTutorial tips={contextualTips} onTipDismiss={dismissContextualTip} />
       )}
 

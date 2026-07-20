@@ -49,6 +49,8 @@ interface MealPlannerPremiumContentProps {
   onNextDay: () => void;
   nextDayDisabled: boolean;
   nextDayTitle?: string;
+  showHelpTooltip: boolean;
+  onToggleHelpTooltip: () => void;
   onOpenMealSearch: (mealType: 'breakfast' | 'lunch' | 'dinner') => void;
   onOpenRecipe: (recipe: MealPlanItem['recipe']) => void;
   onCooked: (meal: MealPlanItem) => void;
@@ -102,6 +104,8 @@ export const MealPlannerPremiumContent: React.FC<MealPlannerPremiumContentProps>
   onNextDay,
   nextDayDisabled,
   nextDayTitle,
+  showHelpTooltip,
+  onToggleHelpTooltip,
   onOpenMealSearch,
   onOpenRecipe,
   onCooked,
@@ -186,6 +190,8 @@ export const MealPlannerPremiumContent: React.FC<MealPlannerPremiumContentProps>
             onNextDay={onNextDay}
             nextDayDisabled={nextDayDisabled}
             nextDayTitle={nextDayTitle}
+            showHelpTooltip={showHelpTooltip}
+            onToggleHelpTooltip={onToggleHelpTooltip}
           />
 
           <CurrentDayMealsSection

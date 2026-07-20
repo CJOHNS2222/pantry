@@ -55,9 +55,8 @@ export const MealPlanAutoFillModal: React.FC<MealPlanAutoFillModalProps> = ({
   const isAnyMealTypeSelected = Object.values(preferences.mealTypes).some(Boolean);
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-[9999] flex items-center justify-center p-4">
-      <div className="bg-theme-primary rounded-xl w-full max-w-md shadow-xl border border-theme animate-in fade-in zoom-in-95 duration-200">
-        
+    <div className="bg-theme-primary rounded-xl w-full max-w-md mx-auto shadow-sm border border-theme animate-fade-in">
+
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-theme">
           <div className="flex items-center gap-2">
@@ -213,7 +212,6 @@ export const MealPlanAutoFillModal: React.FC<MealPlanAutoFillModalProps> = ({
             Generate Plan
           </button>
         </div>
-      </div>
     </div>
   );
 };

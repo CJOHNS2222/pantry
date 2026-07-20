@@ -3,6 +3,7 @@ import { useIntl } from 'react-intl';
 import { Trash2, Calculator, MessageSquare, UserCheck, X, ChevronLeft } from 'lucide-react';
 import { ShoppingItem, StructuredRecipe, SavedRecipe, DayPlan } from '../../types';
 import { useApp } from '../../contexts/AppContext';
+import { useRecipesContext, useMealPlanContext } from '../../contexts/DomainContexts';
 import { comparePriceOptions, formatPricePerUnit, getPriceComparisonSummary } from '../../utils/priceCalculator';
 import { useAndroidBack } from '../../hooks/useAndroidBack';
 import HapticService from '../../services/hapticService';
@@ -112,7 +113,9 @@ export const EnhancedShoppingListItem: React.FC<ShoppingListItemProps> = ({
   const [noteText, setNoteText] = useState(item.notes ?? '');
   const itemRef = useRef<HTMLDivElement>(null);
 
-  const { savedRecipes, mealPlan, user } = useApp();
+  const { savedRecipes } = useRecipesContext();
+  const { mealPlan } = useMealPlanContext();
+  const { user } = useApp();
   const measurementSystem = getUserMeasurementSystem(user?.profile);
 
   const handleRecipeClick = (e: React.MouseEvent, recipeTitle: string) => {

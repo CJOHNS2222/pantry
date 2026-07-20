@@ -1,3 +1,13 @@
+## [3.0.11] - 2026-07-20
+
+### Architecture & Refactoring
+- **Data Management Hook Modularization** — Modularized core data management hooks under dedicated `hooks/dataManagement/` structure for improved maintainability and bundle splitting.
+- **Pantry Scanner Component Streamlining** — Refactored Pantry Scanner UI logic and scan handlers into `usePantryScannerScan` for optimized re-renders and clean component composition.
+- **Stable Callback Utilities** — Introduced `useStableCallback` hook to prevent unnecessary callback recalculations across high-frequency components.
+- **Meal Planner & Community Architecture** — Modularized meal plan state management and community view layers.
+
+---
+
 ## [3.0.10] - 2026-07-19
 
 ### Performance & Optimization

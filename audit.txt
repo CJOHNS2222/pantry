@@ -1,3 +1,43 @@
+Here's my read on the UX, grounded in what's actually in the codebase (not generic advice). I had an agent survey the navigation shell, screen structure, modal count, and overlay mechanisms — six things stood out.
+
+1. You have five separate "grab the user's attention" systems running at once
+App.tsx wires up, independently and simultaneously:
+
+Onboarding flow (ModernOnboardingFlow.tsx)
+Feature-discovery tooltip cards (FeatureDiscovery.tsx, 4+ entries)
+Per-tab contextual tips (ContextualTutorial.tsx)
+A "What's New" modal (WhatsNewModal.tsx)
+Achievement-unlock fireworks + modal (App.tsx:2219-2229)
+...plus toasts and a stacked top-of-screen notification banner (NotificationBanner.tsx) on top of that. Nothing in the code stops two of these from firing on the same screen at the same moment (e.g., land on Pantry for the first time after unlocking a badge → contextual tip + feature discovery card + fireworks + achievement modal, all competing). This is the single biggest UX risk I'd flag. My suggestion: consolidate into one "engagement queue" service that shows at most one overlay at a time, priority-ordered (blocking > modal > tooltip > toast), rather than five components each deciding independently whether to render.
+
+2. Screens are doing too much in one file, and it shows in the UI
+PantryScanner.tsx is 3,300+ lines and is simultaneously the pantry list, a scanner, a search overlay, a "what's for dinner" recommendation card, a "recipes you can make" section, quick-add, bulk-edit, and expiry review. Settings.tsx (1,753 lines), Community.tsx (1,600 lines), and RecipeFinder.tsx (1,195 lines) follow the same pattern. When one component owns that much surface area, it tends to produce screens that feel like a stack of unrelated widgets rather than one coherent view — worth checking whether the Pantry tab in particular feels "busy" to real users, since it's carrying a recommendation carousel, a health-score element, a scanner, and inventory management all in one scroll.
+
+3. Modal-heavy overall — 30 modal components
+That's a lot of surfaces that pull the user out of context. A few are legitimately modal-shaped (item detail, recipe detail), but things like quick-add, bulk quantity edit, and checkout flows might read better as inline expansion or a bottom sheet that keeps the underlying list visible, rather than a full modal takeover. Worth an inventory pass: which of the 30 modals are "quick, low-commitment actions" (good candidates for bottom sheets) vs. "focused single tasks" (fine as modals).
+
+4. Inconsistent navigation metaphors across major screens
+Recipes: tab-within-tab (search vs saved views)
+Settings: category list → detail drawer with its own back stack
+Community: subTab (recipes / leaderboard / achievements)
+Meal Planner: calendar-centric, no sub-tabs
+Four different navigation patterns for four "major sections" means users have to relearn how to move around each time they switch tabs. I'd standardize on one pattern — probably the segmented-tab approach Recipes and Community already use — and make Settings match it instead of being the odd one out with a drawer.
+
+5. No shared Card primitive
+components/ui/ has Button, Input, Select, Modal, Tabs, ConfirmDialog, EmptyState, BottomSheet, ProgressBar, Toast, SkeletonLoader — but no Card.tsx. Given how many card-style sections exist (recommendation cards, achievement cards, leaderboard cards, setup-checklist cards), each one is likely hand-rolling its own padding/radius/shadow. That's a visual-consistency risk even if no one's noticed yet — worth grepping for repeated rounded-xl bg-[var(--bg-secondary)] shadow type patterns to see how much drift already exists.
+
+6. Bottom nav — check the overflow
+The Tab enum has 8 values but only 6 render in the bottom bar (AppNavigation.tsx), with Pantry and Settings pinned as always-visible and the rest hideable. Six bottom-tab items is already at the upper comfortable limit for thumb reach on a phone — if Analytics or other tabs are meant to grow, that's worth planning for now (e.g., "More" tab) rather than after seven items don't fit.
+
+If I had to prioritize: fix #1 first (overlay collisions are a concrete bug-shaped UX problem, not just taste), then #4 (navigation consistency is cheap to fix and pays off every session), then treat #2/#3/#5 as a longer-term design-system cleanup.
+
+Want me to open any of these — start with an overlay-priority queue, or pick one screen (Pantry seems like the most overloaded) and mock up a leaner layout?
+
+
+
+
+
+
 ================================================================================
   STOCK & SPOON — PRODUCTION PERFORMANCE AUDIT
   Prepared by: Senior Performance Engineering Review

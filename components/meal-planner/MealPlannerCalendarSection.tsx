@@ -1,6 +1,6 @@
 import React from 'react';
 import { useIntl } from 'react-intl';
-import { Copy, Download, Trash2 } from 'lucide-react';
+import { Copy, Download, Trash2, HelpCircle } from 'lucide-react';
 import { DayPlan } from '../../types';
 
 interface MealPlannerCalendarSectionProps {
@@ -27,6 +27,8 @@ interface MealPlannerCalendarSectionProps {
   onNextDay: () => void;
   nextDayDisabled: boolean;
   nextDayTitle?: string;
+  showHelpTooltip: boolean;
+  onToggleHelpTooltip: () => void;
 }
 
 export const MealPlannerCalendarSection: React.FC<MealPlannerCalendarSectionProps> = ({
@@ -52,7 +54,9 @@ export const MealPlannerCalendarSection: React.FC<MealPlannerCalendarSectionProp
   onPrevDay,
   onNextDay,
   nextDayDisabled,
-  nextDayTitle
+  nextDayTitle,
+  showHelpTooltip,
+  onToggleHelpTooltip
 }) => {
   const intl = useIntl();
   const currentDisplayDay = displayPlan[currentDayIndex];
@@ -282,7 +286,7 @@ export const MealPlannerCalendarSection: React.FC<MealPlannerCalendarSectionProp
             </button>
           </div>
         </div>
-        <div className="flex items-center justify-between bg-theme-secondary rounded-xl p-4 border border-theme">
+        <div className="relative flex items-center justify-between bg-theme-secondary rounded-xl p-4 border border-theme">
           <button
             onClick={onPrevDay}
             disabled={currentDayIndex === 0}
@@ -315,6 +319,27 @@ export const MealPlannerCalendarSection: React.FC<MealPlannerCalendarSectionProp
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
             </svg>
           </button>
+
+          <button
+            onClick={onToggleHelpTooltip}
+            className="help-tooltip-container absolute -top-2 -right-2 p-1 rounded-full bg-theme-primary border border-theme hover:bg-theme-primary/80 transition-colors"
+            title="Help"
+            aria-label="Show meal planning help"
+          >
+            <HelpCircle className="w-4 h-4 text-theme-secondary opacity-70 hover:opacity-100" />
+          </button>
+
+          {showHelpTooltip && (
+            <div className="help-tooltip-container absolute top-full right-0 mt-2 w-72 max-w-[calc(100vw-2rem)] p-4 bg-theme-primary border border-theme rounded-lg shadow-2xl z-50 text-left">
+              <h3 className="font-semibold text-theme-primary mb-2 text-sm">How to use Meal Planner:</h3>
+              <ul className="text-xs text-theme-secondary space-y-1">
+                <li>- <strong>Click any day</strong> to search for recipes to add</li>
+                <li>- <strong>Drag & drop</strong> meals between days to reschedule</li>
+                <li>- <strong>Drag to trash</strong> (bottom right) to remove meals</li>
+                <li>- <strong>Click meals</strong> to view recipe details</li>
+              </ul>
+            </div>
+          )}
         </div>
       </div>
     </>

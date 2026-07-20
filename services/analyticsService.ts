@@ -457,6 +457,9 @@ class AnalyticsService {
     });
   }
 
+  // Firebase Analytics hard limit: events are dropped if they exceed 25 params.
+  private static readonly MAX_ANALYTICS_PARAMS = 25;
+
   // Helper to validate and sanitize parameters for Firebase Analytics
   private static sanitizeParameters(params?: Record<string, any>): Record<string, any> | undefined {
     if (!params) return undefined;
@@ -476,7 +479,20 @@ class AnalyticsService {
         }
       }
     }
-    return Object.keys(sanitized).length > 0 ? sanitized : undefined;
+    const keys = Object.keys(sanitized);
+    if (keys.length > this.MAX_ANALYTICS_PARAMS) {
+      log.warn('Analytics event exceeded param limit, truncating', {
+        totalParams: keys.length,
+        limit: this.MAX_ANALYTICS_PARAMS,
+        droppedKeys: keys.slice(this.MAX_ANALYTICS_PARAMS),
+      });
+      const truncated: Record<string, any> = {};
+      for (const key of keys.slice(0, this.MAX_ANALYTICS_PARAMS)) {
+        truncated[key] = sanitized[key];
+      }
+      return truncated;
+    }
+    return keys.length > 0 ? sanitized : undefined;
   }
 
   // Generic event logging

@@ -8,7 +8,6 @@ import { Tab } from '../../types/app';
 import { parseIngredientForShoppingList } from '../../utils/appUtils';
 import AnalyticsService from '../../services/analyticsService';
 import HapticService from '../../services/hapticService';
-import { MealPlannerHeader } from '../meal-planner/MealPlannerHeader';
 import { MealPlannerPremiumContent } from '../meal-planner/MealPlannerPremiumContent';
 import { LeftoverModals } from '../meal-planner/LeftoverModals';
 import { AddMealDialog } from '../meal-planner/AddMealDialog';
@@ -92,7 +91,7 @@ interface MealPlannerProps {
   onOpenRecipeSearch?: () => void;
 }
 
-export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPlan, inventory, shoppingList, addToShoppingList, onAddToPlan, onSaveRecipe, onMarkAsMade, onRate, user, setActiveTab, recipeSaveLimitExceeded = false, mealPlanLimitExceeded = false, isLoadingMealPlan = false, savedRecipes: propSavedRecipes = [], settings }) => {
+const MealPlannerComponent: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPlan, inventory, shoppingList, addToShoppingList, onAddToPlan, onSaveRecipe, onMarkAsMade, onRate, user, setActiveTab, recipeSaveLimitExceeded = false, mealPlanLimitExceeded = false, isLoadingMealPlan = false, savedRecipes: propSavedRecipes = [], settings }) => {
   const { addToast } = useAppActions();
   const intl = useIntl();
   const { household } = useApp();
@@ -161,8 +160,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
   const [dragOverTrash, setDragOverTrash] = useState(false);
   const [showRecipeSearch, setShowRecipeSearch] = useState(false);
   const [searchMealType, setSearchMealType] = useState<'breakfast' | 'lunch' | 'dinner' | null>(null);
-  const [showMealPrepPlanner, setShowMealPrepPlanner] = useState(false);
-  const [showAutoFillModal, setShowAutoFillModal] = useState(false);
+  const [subTab, setSubTab] = useState<'schedule' | 'autofill' | 'mealprep'>('schedule');
   const [showAddMealDialog, setShowAddMealDialog] = useState(false);
   const [selectedDayForDialog, setSelectedDayForDialog] = useState<number | null>(null);
   const [pendingRecipe, setPendingRecipe] = useState<StructuredRecipe | null>(null);
@@ -190,10 +188,6 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
 
   const closeRecipeModal = useCallback(() => {
     setShowRecipeModal(false);
-  }, []);
-
-  const closeMealPrepPlanner = useCallback(() => {
-    setShowMealPrepPlanner(false);
   }, []);
 
   const closeRecipeSearch = useCallback(() => {
@@ -224,7 +218,6 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
     {
       showRecipeModal,
       showRecipeSearch,
-      showMealPrepPlanner,
       showAddMealDialog,
       showLeftoverPrompt,
       showLeftoverCapture,
@@ -233,7 +226,6 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
     {
       closeRecipeModal,
       closeRecipeSearch,
-      closeMealPrepPlanner,
       closeAddMealDialog,
       closeLeftoverPrompt,
       closeLeftoverCapture,
@@ -246,7 +238,6 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
   // Android back-button registration for all MealPlanner modals
   useAndroidBack(showRecipeModal, () => setShowRecipeModal(false));
   useAndroidBack(showRecipeSearch, () => setShowRecipeSearch(false));
-  useAndroidBack(showMealPrepPlanner, () => setShowMealPrepPlanner(false));
   useAndroidBack(showAddMealDialog, () => setShowAddMealDialog(false));
   useAndroidBack(showLeftoverPrompt, () => setShowLeftoverPrompt(false));
   useAndroidBack(showLeftoverCapture, () => setShowLeftoverCapture(false));
@@ -297,11 +288,6 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
   };
 
 
-
-  // Load saved recipes when meal prep planner opens
-  useEffect(() => {
-    // No longer need to load recipes since we use prop savedRecipes
-  }, [showMealPrepPlanner, propSavedRecipes.length]);
 
   // Calculate meal prep suggestions based on current pantry
   const mealPrepSuggestions = useMemo(() => {
@@ -875,7 +861,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
     
     updateMealPlan(newPlan);
     addToast('Meal plan auto-filled successfully!', 'success');
-    setShowAutoFillModal(false);
+    setSubTab('schedule');
   }, [mealPlan, displayPlan, savedRecipes, updateMealPlan, addToast, inventory, leftovers, household, user]);
 
   const handleClearWeek = useCallback(() => {
@@ -939,20 +925,23 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
 
     const missingWithRecipes = displayPlan
       .filter(day => day.date >= todayLocal)
-      .flatMap(day => 
-        [...(day.breakfast || []), ...(day.lunch || []), ...(day.dinner || [])].flatMap(meal => 
-          meal.recipe.ingredients.map(ingredient => ({
+      .flatMap(day =>
+        [...(day.breakfast || []), ...(day.lunch || []), ...(day.dinner || [])].flatMap(meal =>
+          meal.recipe.ingredients.map((ingredient, idx) => ({
             ingredient,
+            // Use the name already parsed at recipe-save time when available,
+            // instead of re-running parseIngredientForShoppingList on every
+            // ingredient of every planned meal on every render (PERF-028).
+            structuredName: meal.recipe.structuredIngredients?.[idx]?.name,
             recipeName: meal.recipe.title,
             recipeId: meal.recipe.id
           }))
         )
       );
-    
+
     // Filter out staple items and duplicates (unless user wants staples included)
     const missing = missingWithRecipes.filter(item => {
-      const parsed = parseIngredientForShoppingList(item.ingredient);
-      const itemNameLower = parsed.itemName.toLowerCase();
+      const itemNameLower = (item.structuredName ?? parseIngredientForShoppingList(item.ingredient).itemName).toLowerCase();
 
       if (!includeStaples && STAPLES.some(staple => itemNameLower.includes(staple))) return false;
       
@@ -1019,14 +1008,59 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
 
   return (
     <div className="space-y-6 pb-24 animate-fade-in">
-      <MealPlannerHeader
-        title={intl.formatMessage({ id: 'mealPlanner.mealSchedule' })}
-        showHelpTooltip={showHelpTooltip}
-        onOpenMealPrepPlanner={() => setShowMealPrepPlanner(true)}
-        onOpenAutoFill={() => setShowAutoFillModal(true)}
-        onToggleHelpTooltip={() => setShowHelpTooltip(prev => !prev)}
-      />
+      <div className="sticky top-0 z-40 bg-theme-primary py-3 -mx-4 px-4 border-b border-theme/40 shadow-sm md:-mx-8 md:px-8">
+        <div className="flex bg-theme-secondary rounded-xl p-1 border border-theme shadow-sm">
+          <button
+            onClick={() => setSubTab('schedule')}
+            className={`flex-1 py-2.5 text-center text-xs font-bold uppercase tracking-wider rounded-lg transition-all ${
+              subTab === 'schedule'
+                ? 'bg-theme-primary text-[var(--accent-color)] shadow-sm border border-theme'
+                : 'text-theme-secondary opacity-60 hover:opacity-100'
+            }`}
+          >
+            Schedule
+          </button>
+          <button
+            onClick={() => setSubTab('autofill')}
+            className={`flex-1 py-2.5 text-center text-xs font-bold uppercase tracking-wider rounded-lg transition-all ${
+              subTab === 'autofill'
+                ? 'bg-theme-primary text-[var(--accent-color)] shadow-sm border border-theme'
+                : 'text-theme-secondary opacity-60 hover:opacity-100'
+            }`}
+          >
+            Auto Fill Plan
+          </button>
+          <button
+            onClick={() => setSubTab('mealprep')}
+            className={`flex-1 py-2.5 text-center text-xs font-bold uppercase tracking-wider rounded-lg transition-all ${
+              subTab === 'mealprep'
+                ? 'bg-theme-primary text-[var(--accent-color)] shadow-sm border border-theme'
+                : 'text-theme-secondary opacity-60 hover:opacity-100'
+            }`}
+          >
+            Meal Prep
+          </button>
+        </div>
+      </div>
 
+      {subTab === 'autofill' && (
+        <MealPlanAutoFillModal
+          onClose={() => setSubTab('schedule')}
+          onAutoFill={handleAutoFillPlan}
+          canUseTwoWeekPlanning={canUseTwoWeekPlanning}
+        />
+      )}
+
+      {subTab === 'mealprep' && (
+        <MealPrepPlanner
+          savedRecipes={savedRecipes}
+          inventory={inventory}
+          onAddToPlan={handleAddToPlan}
+          onClose={() => setSubTab('schedule')}
+        />
+      )}
+
+      {subTab === 'schedule' && (
       <PremiumFeature
         feature="mealPlanning"
         user={user}
@@ -1089,7 +1123,7 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
               });
             }
           }}
-          onViewAllSuggestions={() => setShowMealPrepPlanner(true)}
+          onViewAllSuggestions={() => setSubTab('mealprep')}
           isLoadingMealPlan={isLoadingMealPlan}
           displayPlan={displayPlan}
           currentDayIndex={currentDayIndex}
@@ -1147,6 +1181,8 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
           }}
           nextDayDisabled={currentDayIndex === displayPlan.length - 1 || (!canUseTwoWeekPlanning && currentDayIndex >= 6)}
           nextDayTitle={!canUseTwoWeekPlanning && currentDayIndex >= 6 ? 'Upgrade to Premium to plan beyond 7 days' : undefined}
+          showHelpTooltip={showHelpTooltip}
+          onToggleHelpTooltip={() => setShowHelpTooltip(prev => !prev)}
           onOpenMealSearch={(mealType) => {
             setSearchMealType(mealType);
             setShowRecipeSearch(true);
@@ -1178,7 +1214,8 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
           }}
         />
       </PremiumFeature>
-      
+      )}
+
       <RecipeSearchOverlay
         show={showRecipeSearch}
         searchMealType={searchMealType}
@@ -1230,16 +1267,6 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
         />
       )}
 
-      {/* Meal Prep Planner Modal */}
-      {showMealPrepPlanner && (
-        <MealPrepPlanner
-          savedRecipes={savedRecipes}
-          inventory={inventory}
-          onAddToPlan={handleAddToPlan}
-          onClose={closeMealPrepPlanner}
-        />
-      )}
-
       <LeftoverModals
         showLeftoverPrompt={showLeftoverPrompt}
         showLeftoverCapture={showLeftoverCapture}
@@ -1270,14 +1297,8 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPl
         onConfirm={confirmAddToPlan}
         onClose={closeAddMealDialog}
       />
-
-      {showAutoFillModal && (
-        <MealPlanAutoFillModal
-          onClose={() => setShowAutoFillModal(false)}
-          onAutoFill={handleAutoFillPlan}
-          canUseTwoWeekPlanning={canUseTwoWeekPlanning}
-        />
-      )}
     </div>
   );
 };
+
+export const MealPlanner = React.memo(MealPlannerComponent);

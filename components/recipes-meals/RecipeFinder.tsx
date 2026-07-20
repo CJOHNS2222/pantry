@@ -63,7 +63,7 @@ interface RecipeFinderProps {
 // List of staple items to ignore in recipe calculations
 const STAPLES = ['salt', 'pepper', 'oil', 'water', 'flour', 'sugar', 'butter', 'vinegar', 'baking powder', 'baking soda', 'spices', 'seasoning', 'soy sauce', 'cornstarch', 'yeast'];
 
-export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveRecipe, onDeleteRecipe, onMarkAsMade, inventory, ratings = [], onRate, savedRecipes, user, setActiveTab, persistedResult, setPersistedResult, initialSearchQuery, addToast, recipeSaveLimitExceeded = false, mealPlanLimitExceeded = false, isLoadingSavedRecipes = false, household }) => {
+const RecipeFinderComponent: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveRecipe, onDeleteRecipe, onMarkAsMade, inventory, ratings = [], onRate, savedRecipes, user, setActiveTab, persistedResult, setPersistedResult, initialSearchQuery, addToast, recipeSaveLimitExceeded = false, mealPlanLimitExceeded = false, isLoadingSavedRecipes = false, household }) => {
     const intl = useIntl();
     // Pre-computed inventory lookup data for fast feasibility calculations
     const inventoryLookup = useMemo(() => {
@@ -1192,3 +1192,5 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
     </div>
   );
 };
+
+export const RecipeFinder = React.memo(RecipeFinderComponent);

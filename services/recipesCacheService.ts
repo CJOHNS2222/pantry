@@ -2,9 +2,14 @@ import DatabaseMonitoringService from './databaseMonitoringService';
 import { SavedRecipe } from '../types';
 import { log } from './logService';
 
+// The 10th element (structuredIngredients JSON) is optional so arrays cached
+// before PERF-028 (length 9) keep reading correctly — recipeArray[9] is
+// `undefined` for them at runtime, matching the type.
+type CachedRecipeArray = [string, string, string, string, string, string, string, string, string, string?];
+
 export interface CachedRecipesData {
-  // Recipe ID -> [title, description, ingredients(JSON), instructions(JSON), cookTime, type, image, dateSaved, imagePlaceholder]
-  [recipeId: string]: [string, string, string, string, string, string, string, string, string];
+  // Recipe ID -> [title, description, ingredients(JSON), instructions(JSON), cookTime, type, image, dateSaved, imagePlaceholder, structuredIngredients(JSON)?]
+  [recipeId: string]: CachedRecipeArray;
 }
 
 // Metadata stored separately in the cache document
@@ -24,7 +29,7 @@ export class RecipesCacheService {
   /**
    * Convert a SavedRecipe to a cached array format
    */
-  private static savedRecipeToArray(recipe: SavedRecipe): [string, string, string, string, string, string, string, string, string] {
+  private static savedRecipeToArray(recipe: SavedRecipe): CachedRecipeArray {
     return [
       recipe.title,
       recipe.description,
@@ -34,14 +39,15 @@ export class RecipesCacheService {
       recipe.type || '',
       recipe.image || '',
       recipe.dateSaved,
-      recipe.imagePlaceholder || ''
+      recipe.imagePlaceholder || '',
+      recipe.structuredIngredients?.length ? JSON.stringify(recipe.structuredIngredients) : undefined
     ];
   }
 
   /**
    * Convert cached array back to SavedRecipe
    */
-  static arrayToSavedRecipe(recipeId: string, recipeArray: [string, string, string, string, string, string, string, string, string]): SavedRecipe {
+  static arrayToSavedRecipe(recipeId: string, recipeArray: CachedRecipeArray): SavedRecipe {
     return {
       id: recipeId,
       title: recipeArray[0],
@@ -52,7 +58,10 @@ export class RecipesCacheService {
       type: recipeArray[5] || undefined,
       image: recipeArray[6] || undefined,
       dateSaved: recipeArray[7],
-      imagePlaceholder: recipeArray[8] || undefined
+      imagePlaceholder: recipeArray[8] || undefined,
+      // Absent on recipes cached before PERF-028 — consumers fall back to
+      // parsing `ingredients` on demand when this is undefined.
+      structuredIngredients: recipeArray[9] ? JSON.parse(recipeArray[9]) : undefined
     };
   }
 

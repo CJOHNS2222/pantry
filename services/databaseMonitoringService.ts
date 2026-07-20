@@ -458,10 +458,6 @@ class DatabaseMonitoringService {
     // Return enhanced unsubscribe function
     return () => {
       this.metrics.realtimeSubscriptions--;
-      AnalyticsService.trackDatabaseOperation('read', ref.parent?.id || 'unknown', 0, {
-        operation: 'onSnapshot',
-        type: 'subscription_end'
-      });
       unsubscribe();
     };
   }
