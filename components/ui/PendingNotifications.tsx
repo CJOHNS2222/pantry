@@ -1,12 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import { Bell, Clock, Check, X, AlertCircle } from 'lucide-react';
-import { NotificationService, NotificationItem } from '../../services/notificationService';
+import { NotificationItem } from '../../services/notificationService';
 import { markNotificationRead, snoozeNotificationInCache, updateNotificationInCache } from '../../services/notificationsService';
 import { User } from '../../types';
 import { serverTimestamp } from 'firebase/firestore';
 import DatabaseMonitoringService from '../../services/databaseMonitoringService';
-import { useApp } from '../../contexts/AppContext';
 import { useAppActions } from '../../contexts/AppActionsContext';
+import { useInventoryContext } from '../../contexts/DomainContexts';
 import { Tab } from '../../types/app';
 import { log } from '../../services/logService';
 import { useUserNotifications } from '../../hooks/useUserNotifications';
@@ -21,7 +21,7 @@ export const PendingNotifications: React.FC<PendingNotificationsProps> = ({
   onNavigateToSettings: _onNavigateToSettings
 }) => {
   const [processing, setProcessing] = useState<string | null>(null);
-  const { inventory } = useApp();
+  const { inventory } = useInventoryContext();
   const { setActiveTab, onAddToShoppingList, addToast } = useAppActions();
 
   // Stream notifications in realtime
@@ -34,11 +34,11 @@ export const PendingNotifications: React.FC<PendingNotificationsProps> = ({
       .map(n => ({
         id: n.id,
         userId: user.id,
-        type: (n as any).type || 'system',
+        type: (n as { type?: NotificationItem['type'] }).type as NotificationItem['type'] || 'system',
         title: n.title,
         message: n.message || n.body || n.title,
         actionLabel: n.actionLabel,
-        actionType: n.actionType as any,
+        actionType: n.actionType as NotificationItem['actionType'],
         actionData: n.actionData,
         priority: n.priority || 'low',
         read: n.read || false,
@@ -46,7 +46,7 @@ export const PendingNotifications: React.FC<PendingNotificationsProps> = ({
         expiresAt: n.expiresAt,
         snoozedUntil: n.snoozedUntil
       }))
-      .sort((a: any, b: any) => {
+      .sort((a, b) => {
         const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
         const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
         return bTime - aTime;

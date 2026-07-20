@@ -226,10 +226,7 @@ export const MealPrepPlanner: React.FC<MealPrepPlannerProps> = ({
   };
 
   return (
-    // Fixed overlay — z-[9999] ensures it renders above AppHeader (z-20)
-    // items-start + pt prevents the modal card from being obscured by the fixed header
-    <div className="fixed inset-0 bg-black/60 z-[9999] flex items-start justify-center overflow-y-auto p-3 pt-[calc(var(--safe-area-top,0px)+72px)]">
-      <div className="bg-theme-primary rounded-xl border border-theme p-5 w-full max-w-2xl mb-6">
+    <div className="bg-theme-primary rounded-xl border border-theme p-5 w-full max-w-2xl mx-auto animate-fade-in">
 
         {/* Header */}
         <div className="flex items-start justify-between mb-4">
@@ -621,7 +618,6 @@ export const MealPrepPlanner: React.FC<MealPrepPlannerProps> = ({
             </p>
           )}
         </div>
-      </div>
     </div>
   );
 };

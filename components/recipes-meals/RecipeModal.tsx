@@ -605,9 +605,9 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
   const handleMarkAsMadeClick = async () => {
     if (!editable && recipe.ingredients && recipe.ingredients.length > 0 && inventory && inventory.length > 0) {
       const matches: { ingredient: string; pantryItem: PantryItem; checked: boolean }[] = [];
-      recipe.ingredients.forEach(ing => {
-        const parsed = parseIngredientForShoppingList(ing);
-        const name = parsed.itemName.toLowerCase().trim();
+      recipe.ingredients.forEach((ing, idx) => {
+        const structuredName = recipe.structuredIngredients?.[idx]?.name;
+        const name = (structuredName ?? parseIngredientForShoppingList(ing).itemName).toLowerCase().trim();
         const match = inventory.find(pi => {
           const piName = pi.item.toLowerCase();
           return piName.includes(name) || name.includes(piName);

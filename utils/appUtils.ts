@@ -4,7 +4,7 @@ import { DayPlan, User, Household, ShoppingItem } from '../types';
 import { Capacitor } from '@capacitor/core';
 import { UsageService } from '../services/usageService';
 import remoteConfig from '../services/remoteConfigService';
-import { ConsumptionSuggestion, ExpirationAlert, RecipeSuggestion, PantryItem, CustomCategory, Member } from '../types';
+import { ConsumptionSuggestion, ExpirationAlert, RecipeSuggestion, PantryItem, CustomCategory, Member, StructuredIngredient } from '../types';
 import { getQuantityAmount, getQuantityUnit } from './quantityUtils';
 import { convertToMetric, convertToStandard } from './measurementUtils';
 import { getPerformance, trace } from "firebase/performance";
@@ -347,6 +347,25 @@ export function parseIngredientForShoppingList(ingredientText: string): { quanti
   } finally {
     perfTrace.stop();
   }
+}
+
+/**
+ * Parses a raw ingredient string into a normalized structured record
+ * ({name, quantity, unit, preparation, raw_string}) for persistence and
+ * server-side-friendly consolidation, instead of re-parsing the raw string
+ * on every read (PERF-028).
+ */
+export function parseStructuredIngredient(raw: string): StructuredIngredient {
+  const { quantity: quantityStr, itemName, prepNotes } = parseIngredientForShoppingList(raw);
+  const { amount, unit } = parseQuantityAndUnit(quantityStr, itemName);
+
+  return {
+    name: itemName,
+    quantity: Number.isFinite(amount) ? amount : undefined,
+    unit: unit || undefined,
+    preparation: prepNotes,
+    raw_string: raw,
+  };
 }
 
 /**

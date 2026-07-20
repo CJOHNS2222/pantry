@@ -67,7 +67,7 @@ interface LeaderboardEntry {
 
 import { calculatePantryScore, getCookingStreak, AchievementBadge } from '../../utils/achievementUtils';
 
-export const Community: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecipe, user }) => {
+const CommunityComponent: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecipe, user }) => {
   const app = useApp();
   const { isLoadingRatings, setLoadingRatingsComplete, inventory = [], savedRecipes = [], mealPlan = [], household = null } = app;
   const { setActiveTab, onRateRecipe, addToast } = useAppActions();
@@ -674,37 +674,39 @@ export const Community: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecipe,
   return (
     <div className="space-y-6 pb-24 animate-fade-in">
       {/* Dynamic Tab Switcher */}
-      <div className="flex bg-theme-secondary rounded-xl p-1 border border-theme shadow-sm">
-        <button
-          onClick={() => setSubTab('recipes')}
-          className={`flex-1 py-2.5 text-center text-xs font-bold uppercase tracking-wider rounded-lg transition-all ${
-            subTab === 'recipes'
-              ? 'bg-theme-primary text-[var(--accent-color)] shadow-sm border border-theme'
-              : 'text-theme-secondary opacity-60 hover:opacity-100'
-          }`}
-        >
-          Favorites
-        </button>
-        <button
-          onClick={() => setSubTab('leaderboard')}
-          className={`flex-1 py-2.5 text-center text-xs font-bold uppercase tracking-wider rounded-lg transition-all ${
-            subTab === 'leaderboard'
-              ? 'bg-theme-primary text-[var(--accent-color)] shadow-sm border border-theme'
-              : 'text-theme-secondary opacity-60 hover:opacity-100'
-          }`}
-        >
-          Leaderboard
-        </button>
-        <button
-          onClick={() => setSubTab('achievements')}
-          className={`flex-1 py-2.5 text-center text-xs font-bold uppercase tracking-wider rounded-lg transition-all ${
-            subTab === 'achievements'
-              ? 'bg-theme-primary text-[var(--accent-color)] shadow-sm border border-theme'
-              : 'text-theme-secondary opacity-60 hover:opacity-100'
-          }`}
-        >
-          Achievements
-        </button>
+      <div className="sticky top-0 z-40 bg-theme-primary py-3 -mx-4 px-4 border-b border-theme/40 shadow-sm md:-mx-8 md:px-8">
+        <div className="flex bg-theme-secondary rounded-xl p-1 border border-theme shadow-sm">
+          <button
+            onClick={() => setSubTab('recipes')}
+            className={`flex-1 py-2.5 text-center text-xs font-bold uppercase tracking-wider rounded-lg transition-all ${
+              subTab === 'recipes'
+                ? 'bg-theme-primary text-[var(--accent-color)] shadow-sm border border-theme'
+                : 'text-theme-secondary opacity-60 hover:opacity-100'
+            }`}
+          >
+            Favorites
+          </button>
+          <button
+            onClick={() => setSubTab('leaderboard')}
+            className={`flex-1 py-2.5 text-center text-xs font-bold uppercase tracking-wider rounded-lg transition-all ${
+              subTab === 'leaderboard'
+                ? 'bg-theme-primary text-[var(--accent-color)] shadow-sm border border-theme'
+                : 'text-theme-secondary opacity-60 hover:opacity-100'
+            }`}
+          >
+            Leaderboard
+          </button>
+          <button
+            onClick={() => setSubTab('achievements')}
+            className={`flex-1 py-2.5 text-center text-xs font-bold uppercase tracking-wider rounded-lg transition-all ${
+              subTab === 'achievements'
+                ? 'bg-theme-primary text-[var(--accent-color)] shadow-sm border border-theme'
+                : 'text-theme-secondary opacity-60 hover:opacity-100'
+            }`}
+          >
+            Achievements
+          </button>
+        </div>
       </div>
 
       {/* ────────────────── SUBTAB 1: COMMUNITY RECIPES ────────────────── */}
@@ -1597,3 +1599,5 @@ export const Community: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecipe,
     </div>
   );
 };
+
+export const Community = React.memo(CommunityComponent);

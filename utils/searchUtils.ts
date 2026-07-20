@@ -52,6 +52,18 @@ const recipeSearchOptions = {
 const pantryFuseCache = new WeakMap<PantryItem[], Fuse<PantryItem>>();
 const recipeFuseCache = new WeakMap<(StructuredRecipe | SavedRecipe)[], Fuse<StructuredRecipe | SavedRecipe>>();
 
+// Cache lowercased item names by object reference so autocomplete doesn't
+// re-run toLowerCase() on every item for every keystroke.
+const lowerNameCache = new WeakMap<PantryItem, string>();
+const getLowerName = (item: PantryItem): string => {
+  let lower = lowerNameCache.get(item);
+  if (lower === undefined) {
+    lower = item.item.toLowerCase();
+    lowerNameCache.set(item, lower);
+  }
+  return lower;
+};
+
 // Search pantry items with fuzzy matching (cached index)
 export const searchPantryItems = (items: PantryItem[], query: string): PantryItem[] => {
   if (!query.trim()) return items;
@@ -104,7 +116,7 @@ export const getEnhancedAutocompleteSuggestions = (
 
   // 1. Get direct matches first (highest priority)
   const directMatches = items
-    .filter(item => item.item.toLowerCase().includes(queryLower))
+    .filter(item => getLowerName(item).includes(queryLower))
     .slice(0, 3)
     .map(item => ({
       text: item.item,
@@ -119,7 +131,7 @@ export const getEnhancedAutocompleteSuggestions = (
   const recentItems = items
     .filter(item => {
       const addedDate = item.dateAdded ? new Date(item.dateAdded) : null;
-      return addedDate && addedDate > thirtyDaysAgo && item.item.toLowerCase().includes(queryLower);
+      return addedDate && addedDate > thirtyDaysAgo && getLowerName(item).includes(queryLower);
     })
     .sort((a, b) => {
       const aDate = new Date(a.dateAdded || 0).getTime();

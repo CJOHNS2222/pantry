@@ -234,50 +234,45 @@ interface FeatureDiscoveryManagerProps {
   user?: User | null;
 }
 
+// One card per app session (cleared each cold start via sessionStorage) so a
+// user who unlocks several milestones in one sitting isn't shown a stack of
+// "New Feature!" cards back to back — the rest wait for their next app open.
+const SESSION_SHOWN_KEY = 'feature-discovery-shown-session';
+
 export const FeatureDiscoveryManager: React.FC<FeatureDiscoveryManagerProps> = ({
   discoveries,
   onDiscoveryDismiss,
   user
 }) => {
   const [currentDiscovery, setCurrentDiscovery] = useState<FeatureDiscoveryProps | null>(null);
-  const [queue, setQueue] = useState<FeatureDiscoveryProps[]>([]);
 
   useEffect(() => {
+    if (currentDiscovery) return;
+    if (sessionStorage.getItem(SESSION_SHOWN_KEY) === 'true') return;
+
     // Check which discoveries haven't been seen AND whose milestone has been reached
     const localDiscovered = JSON.parse(localStorage.getItem('discovered-features') || '[]');
     const dbDiscovered = user?.discoveredFeatures || [];
 
-    const newDiscoveries = discoveries
+    const nextDiscovery = discoveries
       .filter(discovery => !localDiscovered.includes(discovery.featureId) && !dbDiscovered.includes(discovery.featureId))
-      .filter(discovery =>
+      .find(discovery =>
         // If a required milestone is specified, gate on it; otherwise always eligible
         !discovery.requiredMilestone || hasMilestone(discovery.requiredMilestone)
-      )
-      .map(discovery => ({
-        ...discovery,
-        onDismiss: () => handleDiscoveryDismiss(discovery.featureId)
-      }));
+      );
 
-    if (newDiscoveries.length > 0) {
-      setQueue(newDiscoveries);
-      if (!currentDiscovery) {
-        setCurrentDiscovery(newDiscoveries[0]);
-      }
+    if (nextDiscovery) {
+      sessionStorage.setItem(SESSION_SHOWN_KEY, 'true');
+      setCurrentDiscovery({
+        ...nextDiscovery,
+        onDismiss: () => handleDiscoveryDismiss(nextDiscovery.featureId)
+      });
     }
-  }, [discoveries, user?.discoveredFeatures]);
+  }, [discoveries, user?.discoveredFeatures, currentDiscovery]);
 
   const handleDiscoveryDismiss = (featureId: string) => {
     setCurrentDiscovery(null);
     onDiscoveryDismiss?.(featureId);
-
-    // Show next discovery after a delay
-    setTimeout(() => {
-      const remaining = queue.filter(d => d.featureId !== featureId);
-      setQueue(remaining);
-      if (remaining.length > 0) {
-        setCurrentDiscovery(remaining[0]);
-      }
-    }, 1000);
   };
 
   return currentDiscovery ? <FeatureDiscovery {...currentDiscovery} /> : null;

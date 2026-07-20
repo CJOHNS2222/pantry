@@ -1,6 +1,7 @@
 // components/PantryHealthScore.tsx
 // Gamified pantry health ring + badge. No external deps.
 import React, { useMemo } from 'react';
+import { ChevronRight } from 'lucide-react';
 import type { PantryItem } from '../../types';
 import { useAppActions } from '../../contexts/AppActionsContext';
 import { ProgressBar } from '../ui';
@@ -8,6 +9,8 @@ import { ProgressBar } from '../ui';
 interface PantryHealthScoreProps {
   inventory: PantryItem[];
   className?: string;
+  /** 'full' shows the factor breakdown card; 'compact' shows a single-row ring + stats strip. */
+  variant?: 'full' | 'compact';
 }
 
 interface ScoreFactor {
@@ -32,11 +35,11 @@ function getGrade(score: number): { letter: string; color: string; glow: string;
   return               { letter: 'F',  color: '#ef4444', glow: 'shadow-red-500/30',    ring: 'stroke-red-500',   label: 'Critical' };
 }
 
-export const PantryHealthScore: React.FC<PantryHealthScoreProps> = ({ inventory, className = '' }) => {
+export const PantryHealthScore: React.FC<PantryHealthScoreProps> = ({ inventory, className = '', variant = 'full' }) => {
   const { addToast } = useAppActions();
 
-  const { score, factors } = useMemo(() => {
-    if (!inventory.length) return { score: 0, factors: [] };
+  const { score, factors, expiringSoonCount } = useMemo(() => {
+    if (!inventory.length) return { score: 0, factors: [], expiringSoonCount: 0 };
 
     const now = Date.now();
     const total = inventory.length;
@@ -120,7 +123,7 @@ export const PantryHealthScore: React.FC<PantryHealthScoreProps> = ({ inventory,
       },
     ];
 
-    return { score: clampedScore, factors };
+    return { score: clampedScore, factors, expiringSoonCount };
   }, [inventory]);
 
   const grade = getGrade(score);
@@ -140,8 +143,57 @@ export const PantryHealthScore: React.FC<PantryHealthScoreProps> = ({ inventory,
 
   if (inventory.length === 0) return null;
 
+  if (variant === 'compact') {
+    return (
+      <div
+        onClick={handleScoreClick}
+        className={`flex items-center gap-3 bg-theme-secondary border border-theme rounded-2xl px-4 py-2.5 cursor-pointer hover:bg-theme-secondary/80 transition-all duration-200 ${className}`}
+        title="Tap to view scoring categories explanation"
+      >
+        <div className="relative shrink-0 w-10 h-10">
+          <svg width="40" height="40" viewBox="0 0 88 88" className="-rotate-90">
+            <circle cx="44" cy="44" r={radius} strokeWidth="10" fill="none" className="stroke-theme-primary" />
+            <circle
+              cx="44" cy="44" r={radius}
+              strokeWidth="10" fill="none"
+              strokeDasharray={`${dash} ${circ - dash}`}
+              strokeLinecap="round"
+              style={{ stroke: grade.color, transition: 'stroke-dasharray 0.8s ease-out' }}
+            />
+          </svg>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="text-[11px] font-black" style={{ color: grade.color }}>{grade.letter}</span>
+          </div>
+        </div>
+
+        <div className="flex-1 min-w-0 flex items-center gap-3 overflow-x-auto">
+          <div className="leading-tight shrink-0">
+            <div className="text-xs font-bold text-theme-primary tabular-nums">{score}/100</div>
+            <div className="text-[10px] text-theme-secondary opacity-70">{grade.label}</div>
+          </div>
+          <div className="w-px h-7 bg-theme-primary/20 shrink-0" />
+          <div className="leading-tight shrink-0">
+            <div className="text-xs font-bold text-theme-primary tabular-nums">{inventory.length}</div>
+            <div className="text-[10px] text-theme-secondary opacity-70">items</div>
+          </div>
+          {expiringSoonCount > 0 && (
+            <>
+              <div className="w-px h-7 bg-theme-primary/20 shrink-0" />
+              <div className="leading-tight shrink-0">
+                <div className="text-xs font-bold text-red-500 tabular-nums">{expiringSoonCount}</div>
+                <div className="text-[10px] text-theme-secondary opacity-70">expiring</div>
+              </div>
+            </>
+          )}
+        </div>
+
+        <ChevronRight className="w-4 h-4 text-theme-secondary opacity-50 shrink-0" />
+      </div>
+    );
+  }
+
   return (
-    <div 
+    <div
       onClick={handleScoreClick}
       className={`bg-theme-secondary border border-theme rounded-2xl p-4 cursor-pointer hover:bg-theme-secondary/80 transition-all duration-200 ${className}`}
       title="Click to view scoring categories explanation"

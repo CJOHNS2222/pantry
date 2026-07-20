@@ -20,6 +20,16 @@ export interface DetailedChangeEntry {
 
 export const RECENT_CHANGES: ChangeEntry[] = [
   {
+    "version": "3.0.11",
+    "date": "Jul 20, 2026",
+    "highlights": [
+      "Data Management Hook Modularization — Modularized core data management hooks under dedicated hooks/dataManagement/…",
+      "Pantry Scanner Component Streamlining — Refactored Pantry Scanner UI logic and scan handlers into usePantryScannerScan…",
+      "Stable Callback Utilities — Introduced useStableCallback hook to prevent unnecessary callback recalculations across…",
+      "Meal Planner & Community Architecture — Modularized meal plan state management and community view layers."
+    ]
+  },
+  {
     "version": "3.0.10",
     "date": "Jul 19, 2026",
     "highlights": [
@@ -38,20 +48,25 @@ export const RECENT_CHANGES: ChangeEntry[] = [
       "Firestore Persistent Local Cache — Configured native IndexedDB Firestore persistence for instant app startup load times…",
       "Native In-App Store Updates — Integrated Capawesome App Update plugin (@capawesome/capacitor-app-update) for direct,…"
     ]
-  },
-  {
-    "version": "3.0.8",
-    "date": "Jul 17, 2026",
-    "highlights": [
-      "Standardized UI Components — Added a suite of reusable UI primitives under components/ui/ (including Button, Toast,…",
-      "UI Unification & Refactoring — Refactored key screens (Pantry, Meal Planner, Household, Shopping List, App root) to use…",
-      "Portal-based Centralized Toasts — Migrated to a centralized portal-based toast notification system (ToastProvider) for…",
-      "Code Quality & Type Safety — Resolved type safety issues and lint warnings in RecipeExportModal and other codebase…"
-    ]
   }
 ];
 
 export const ALL_CHANGES: DetailedChangeEntry[] = [
+  {
+    "version": "3.0.11",
+    "date": "Jul 20, 2026",
+    "sections": [
+      {
+        "title": "Architecture & Refactoring",
+        "bullets": [
+          "**Data Management Hook Modularization** — Modularized core data management hooks under dedicated `hooks/dataManagement/` structure for improved maintainability and bundle splitting.",
+          "**Pantry Scanner Component Streamlining** — Refactored Pantry Scanner UI logic and scan handlers into `usePantryScannerScan` for optimized re-renders and clean component composition.",
+          "**Stable Callback Utilities** — Introduced `useStableCallback` hook to prevent unnecessary callback recalculations across high-frequency components.",
+          "**Meal Planner & Community Architecture** — Modularized meal plan state management and community view layers."
+        ]
+      }
+    ]
+  },
   {
     "version": "3.0.10",
     "date": "Jul 19, 2026",

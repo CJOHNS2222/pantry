@@ -11,10 +11,14 @@ const CURRENT_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__
 export interface WhatsNewModalProps {
   isOpen?: boolean;
   onClose?: () => void;
+  /** While true, delay showing even if an update is pending — used to avoid
+   *  stacking with onboarding or the achievement-unlocked modal. */
+  suppress?: boolean;
 }
 
-export const WhatsNewModal: React.FC<WhatsNewModalProps> = ({ isOpen, onClose }) => {
+export const WhatsNewModal: React.FC<WhatsNewModalProps> = ({ isOpen, onClose, suppress }) => {
   const [open, setOpen] = useState(false);
+  const [pendingUpdate, setPendingUpdate] = useState(false);
 
   useEffect(() => {
     if (isOpen !== undefined) {
@@ -22,20 +26,32 @@ export const WhatsNewModal: React.FC<WhatsNewModalProps> = ({ isOpen, onClose })
     }
   }, [isOpen]);
 
+  // Determine once whether this is a genuine update vs. a brand-new install.
   useEffect(() => {
     if (isOpen !== undefined) return;
-    let cleanup: (() => void) | undefined;
     try {
       const seen = localStorage.getItem(STORAGE_KEY);
+      if (seen === null) {
+        // First-ever launch — nothing "new" to announce. Baseline the version
+        // so this device only sees What's New after a real future update,
+        // and let onboarding own the first-run experience instead.
+        localStorage.setItem(STORAGE_KEY, CURRENT_VERSION);
+        return;
+      }
       if (seen !== CURRENT_VERSION) {
-        const t = setTimeout(() => setOpen(true), 1500);
-        cleanup = () => clearTimeout(t);
+        setPendingUpdate(true);
       }
     } catch {
       // localStorage unavailable — skip silently
     }
-    return cleanup;
   }, [isOpen]);
+
+  // Only pop the modal once nothing else (onboarding, achievement modal) is suppressing it.
+  useEffect(() => {
+    if (isOpen !== undefined || !pendingUpdate || suppress) return;
+    const t = setTimeout(() => setOpen(true), 1500);
+    return () => clearTimeout(t);
+  }, [isOpen, pendingUpdate, suppress]);
 
   const handleClose = () => {
     if (isOpen === undefined) {

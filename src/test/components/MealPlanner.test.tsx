@@ -212,8 +212,8 @@ describe('MealPlanner - AutoFill Plan', () => {
       />
     );
 
-    // Open Auto-Fill Modal
-    const autoFillBtn = screen.getByLabelText('Open auto fill modal');
+    // Switch to Auto Fill Plan sub-tab
+    const autoFillBtn = screen.getByRole('button', { name: /auto fill plan/i });
     fireEvent.click(autoFillBtn);
 
     // Verify modal is open

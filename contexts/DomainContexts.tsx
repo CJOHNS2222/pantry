@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react';
-import { PantryItem, ShoppingItem, StructuredRecipe, SavedRecipe, DayPlan } from '../types';
+import { PantryItem, ShoppingItem, StructuredRecipe, SavedRecipe, DayPlan, MealPlanItem } from '../types';
 
 // ─── Inventory Domain Context ──────────────────────────────────────────────
 
@@ -9,8 +9,8 @@ export interface InventoryContextType {
   onAddItem: (item: PantryItem) => Promise<void>;
   onAddItems: (items: PantryItem[]) => Promise<void>;
   onUpdateItem: (index: number, updates: Partial<PantryItem>) => Promise<void>;
-  onDeleteItem: (index: number) => Promise<void>;
-  deletePantryItems: (indices: number[]) => Promise<void>;
+  onDeleteItem: (index: number, disposalReason?: 'thrown_away' | 'cooked' | 'remove') => Promise<void>;
+  deletePantryItems: (indices: number[], disposalReason?: 'thrown_away' | 'cooked' | 'remove') => Promise<void>;
   handleMarkAsMade?: (recipe: StructuredRecipe) => Promise<void>;
 }
 
@@ -30,11 +30,9 @@ export interface ShoppingListContextType {
   shoppingList: ShoppingItem[];
   isLoadingShoppingList: boolean;
   addShoppingListItem: (item: Omit<ShoppingItem, 'id'>) => Promise<void>;
-  addShoppingListItems: (items: Omit<ShoppingItem, 'id'>[]) => Promise<void>;
+  addShoppingListItems: (items: Omit<ShoppingItem, 'id' | 'addedAt'>[]) => Promise<void>;
   updateShoppingListItem: (id: string, updates: Partial<ShoppingItem>) => Promise<void>;
   removeShoppingListItem: (id: string) => Promise<void>;
-  clearShoppingList: () => Promise<void>;
-  toggleShoppingItemPurchased: (id: string) => Promise<void>;
 }
 
 export const ShoppingListContext = createContext<ShoppingListContextType | null>(null);
@@ -52,9 +50,9 @@ export const useShoppingListContext = () => {
 export interface MealPlanContextType {
   mealPlan: DayPlan[];
   isLoadingMealPlan: boolean;
-  addMealToPlan: (recipe: StructuredRecipe, dayIndex: number, mealType: 'breakfast' | 'lunch' | 'dinner' | 'snack') => Promise<void>;
-  updateMealOnPlan: (recipe: StructuredRecipe, dayIndex: number, mealType: 'breakfast' | 'lunch' | 'dinner' | 'snack') => Promise<void>;
-  removeMealFromPlan: (recipeId: string, dayIndex: number, mealType: 'breakfast' | 'lunch' | 'dinner' | 'snack') => Promise<void>;
+  addMealToPlan: (date: string, mealType: 'breakfast' | 'lunch' | 'dinner', meal: MealPlanItem) => Promise<void>;
+  updateMealOnPlan: (date: string, mealType: 'breakfast' | 'lunch' | 'dinner', meal: MealPlanItem) => Promise<void>;
+  removeMealFromPlan: (date: string, mealType: 'breakfast' | 'lunch' | 'dinner', mealId: string) => Promise<void>;
   updateMealPlan: (newPlan: DayPlan[]) => Promise<void>;
 }
 

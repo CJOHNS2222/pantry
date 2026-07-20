@@ -3,7 +3,6 @@ import { useCallback, useEffect } from 'react';
 interface ModalStackState {
   showRecipeModal: boolean;
   showRecipeSearch: boolean;
-  showMealPrepPlanner: boolean;
   showAddMealDialog: boolean;
   showLeftoverPrompt: boolean;
   showLeftoverCapture: boolean;
@@ -13,7 +12,6 @@ interface ModalStackState {
 interface ModalStackClosers {
   closeRecipeModal: () => void;
   closeRecipeSearch: () => void;
-  closeMealPrepPlanner: () => void;
   closeAddMealDialog: () => void;
   closeLeftoverPrompt: () => void;
   closeLeftoverCapture: () => void;
@@ -38,10 +36,6 @@ export const useMealPlannerModalStack = (state: ModalStackState, closers: ModalS
       closers.closeAddMealDialog();
       return;
     }
-    if (state.showMealPrepPlanner) {
-      closers.closeMealPrepPlanner();
-      return;
-    }
     if (state.showRecipeSearch) {
       closers.closeRecipeSearch();
       return;
@@ -54,14 +48,12 @@ export const useMealPlannerModalStack = (state: ModalStackState, closers: ModalS
     state.showLeftoverCapture,
     state.showLeftoverPrompt,
     state.showAddMealDialog,
-    state.showMealPrepPlanner,
     state.showRecipeSearch,
     state.showRecipeModal,
     closers.closeLeftoverSwapModal,
     closers.closeLeftoverCapture,
     closers.closeLeftoverPrompt,
     closers.closeAddMealDialog,
-    closers.closeMealPrepPlanner,
     closers.closeRecipeSearch,
     closers.closeRecipeModal,
   ]);
@@ -69,7 +61,6 @@ export const useMealPlannerModalStack = (state: ModalStackState, closers: ModalS
   const isAnyModalOpen =
     state.showRecipeModal ||
     state.showRecipeSearch ||
-    state.showMealPrepPlanner ||
     state.showAddMealDialog ||
     state.showLeftoverPrompt ||
     state.showLeftoverCapture ||
