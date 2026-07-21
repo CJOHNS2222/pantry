@@ -5,128 +5,26 @@ import { ChevronRight } from 'lucide-react';
 import type { PantryItem } from '../../types';
 import { useAppActions } from '../../contexts/AppActionsContext';
 import { ProgressBar } from '../ui';
+import { calculatePantryHealth, getHealthGrade } from '../../utils/pantryHealthUtils';
 
 interface PantryHealthScoreProps {
   inventory: PantryItem[];
   className?: string;
   /** 'full' shows the factor breakdown card; 'compact' shows a single-row ring + stats strip. */
   variant?: 'full' | 'compact';
+  /**
+   * Called when the compact card is tapped, instead of the default
+   * "explain scoring" toast — used to open a detail view. Ignored for variant="full".
+   */
+  onExpand?: () => void;
 }
 
-interface ScoreFactor {
-  label: string;
-  points: number;
-  max: number;
-  icon: string;
-  tip: string;
-}
-
-function daysUntil(dateStr?: string): number | null {
-  if (!dateStr) return null;
-  return Math.ceil((new Date(dateStr).getTime() - Date.now()) / 86400000);
-}
-
-function getGrade(score: number): { letter: string; color: string; glow: string; ring: string; label: string } {
-  if (score >= 90) return { letter: 'A+', color: '#22c55e', glow: 'shadow-green-500/30', ring: 'stroke-green-500', label: 'Excellent' };
-  if (score >= 80) return { letter: 'A',  color: '#4ade80', glow: 'shadow-green-400/25', ring: 'stroke-green-400', label: 'Great' };
-  if (score >= 70) return { letter: 'B',  color: '#a3e635', glow: 'shadow-lime-400/25',  ring: 'stroke-lime-400',  label: 'Good' };
-  if (score >= 60) return { letter: 'C',  color: '#facc15', glow: 'shadow-yellow-500/25', ring: 'stroke-yellow-400', label: 'Fair' };
-  if (score >= 40) return { letter: 'D',  color: '#fb923c', glow: 'shadow-orange-500/25', ring: 'stroke-orange-400', label: 'Needs Work' };
-  return               { letter: 'F',  color: '#ef4444', glow: 'shadow-red-500/30',    ring: 'stroke-red-500',   label: 'Critical' };
-}
-
-export const PantryHealthScore: React.FC<PantryHealthScoreProps> = ({ inventory, className = '', variant = 'full' }) => {
+export const PantryHealthScore: React.FC<PantryHealthScoreProps> = ({ inventory, className = '', variant = 'full', onExpand }) => {
   const { addToast } = useAppActions();
 
-  const { score, factors, expiringSoonCount } = useMemo(() => {
-    if (!inventory.length) return { score: 0, factors: [], expiringSoonCount: 0 };
+  const { score, factors, expiringSoonCount } = useMemo(() => calculatePantryHealth(inventory), [inventory]);
 
-    const now = Date.now();
-    const total = inventory.length;
-
-    // Factor 1: Freshness (no expired items)
-    const expiredCount = inventory.filter(i => {
-      const d = daysUntil(i.expirationDate);
-      return d !== null && d < 0;
-    }).length;
-    const expiringSoonCount = inventory.filter(i => {
-      const d = daysUntil(i.expirationDate);
-      return d !== null && d >= 0 && d <= 3;
-    }).length;
-    const freshnessPoints = Math.max(0, 30 - expiredCount * 10 - expiringSoonCount * 3);
-
-    // Factor 2: Variety (different categories)
-    const categories = new Set(inventory.map(i => i.category || 'other'));
-    const varietyPoints = Math.min(25, categories.size * 3);
-
-    // Factor 3: Stock level (items with qty > 0)
-    const inStockCount = inventory.filter(i => {
-      const q = i.quantity;
-      if (q == null) return true; // treat unset as in-stock
-      if (typeof q === 'number') return q > 0;
-      return q.amount > 0;
-    }).length;
-    const stockPoints = Math.round((inStockCount / total) * 20);
-
-    // Factor 4: Expiry tracking (items with dates set)
-    const trackedCount = inventory.filter(i => !!i.expirationDate).length;
-    const trackingPoints = Math.round((trackedCount / total) * 15);
-
-    // Factor 5: Recency (items updated within 30 days)
-    const thirtyDaysAgo = now - 30 * 86400000;
-    const recentCount = inventory.filter(i => {
-      const t = i.lastRestocked ? new Date(i.lastRestocked).getTime()
-              : i.dateAdded   ? new Date(i.dateAdded).getTime()
-              : 0;
-      return t > thirtyDaysAgo;
-    }).length;
-    const recencyPoints = Math.round((recentCount / total) * 10);
-
-    const rawScore = freshnessPoints + varietyPoints + stockPoints + trackingPoints + recencyPoints;
-    const clampedScore = Math.min(100, Math.max(0, rawScore));
-
-    const factors: ScoreFactor[] = [
-      {
-        label: 'Freshness',
-        points: freshnessPoints,
-        max: 30,
-        icon: '🥬',
-        tip: expiredCount > 0 ? `${expiredCount} expired item${expiredCount !== 1 ? 's' : ''} — remove them to boost score` : 'All items are fresh!',
-      },
-      {
-        label: 'Variety',
-        points: varietyPoints,
-        max: 25,
-        icon: '🌈',
-        tip: `${categories.size} categories stocked`,
-      },
-      {
-        label: 'In Stock',
-        points: stockPoints,
-        max: 20,
-        icon: '📦',
-        tip: `${inStockCount}/${total} items available`,
-      },
-      {
-        label: 'Expiry Tracking',
-        points: trackingPoints,
-        max: 15,
-        icon: '📅',
-        tip: `${trackedCount}/${total} items have expiry dates`,
-      },
-      {
-        label: 'Up to Date',
-        points: recencyPoints,
-        max: 10,
-        icon: '🔄',
-        tip: `${recentCount}/${total} items updated in 30 days`,
-      },
-    ];
-
-    return { score: clampedScore, factors, expiringSoonCount };
-  }, [inventory]);
-
-  const grade = getGrade(score);
+  const grade = getHealthGrade(score);
 
   // SVG ring params
   const radius = 36;
@@ -146,9 +44,9 @@ export const PantryHealthScore: React.FC<PantryHealthScoreProps> = ({ inventory,
   if (variant === 'compact') {
     return (
       <div
-        onClick={handleScoreClick}
+        onClick={onExpand ?? handleScoreClick}
         className={`flex items-center gap-3 bg-theme-secondary border border-theme rounded-2xl px-4 py-2.5 cursor-pointer hover:bg-theme-secondary/80 transition-all duration-200 ${className}`}
-        title="Tap to view scoring categories explanation"
+        title={onExpand ? 'Tap to view full pantry health breakdown' : 'Tap to view scoring categories explanation'}
       >
         <div className="relative shrink-0 w-10 h-10">
           <svg width="40" height="40" viewBox="0 0 88 88" className="-rotate-90">
@@ -194,9 +92,7 @@ export const PantryHealthScore: React.FC<PantryHealthScoreProps> = ({ inventory,
 
   return (
     <div
-      onClick={handleScoreClick}
-      className={`bg-theme-secondary border border-theme rounded-2xl p-4 cursor-pointer hover:bg-theme-secondary/80 transition-all duration-200 ${className}`}
-      title="Click to view scoring categories explanation"
+      className={`bg-theme-secondary border border-theme rounded-2xl p-4 ${className}`}
     >
       <div className="flex items-center gap-4">
         {/* Animated SVG ring */}
@@ -223,10 +119,7 @@ export const PantryHealthScore: React.FC<PantryHealthScoreProps> = ({ inventory,
         {/* Details */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <h3 className="text-sm font-bold text-theme-primary flex items-center gap-1">
-              Pantry Health
-              <span className="text-[10px] opacity-60 font-normal">(Tap for details)</span>
-            </h3>
+            <h3 className="text-sm font-bold text-theme-primary">Pantry Health</h3>
             <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full bg-theme-primary text-theme-secondary">{score}/100</span>
           </div>
           <div className="space-y-1.5">

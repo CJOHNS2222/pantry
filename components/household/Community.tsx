@@ -3,7 +3,8 @@ import { useApp } from '../../contexts/AppContext';
 import { useAppActions } from '../../contexts/AppActionsContext';
 import { useConfirm } from '../ui/ConfirmDialog';
 import { Tab } from '../../types/app';
-import { ProgressBar } from '../ui';
+import { ProgressBar, BottomSheet } from '../ui';
+import { PantryHealthScore } from '../pantry/PantryHealthScore';
 import { 
   Star, 
   Plus, 
@@ -60,9 +61,13 @@ interface LeaderboardEntry {
   name: string;
   isUser: boolean;
   score: number;
-  streak: number;
-  badges: number;
+  /** null when this is a real household member whose individual streak isn't tracked (streaks are device-local). */
+  streak: number | null;
+  /** null when this is a real household member whose individual badge count isn't tracked. */
+  badges: number | null;
   isHousehold: boolean;
+  /** True for real household members (not the current user, not simulated peers) — same shared pantry score, unknown streak/badges. */
+  isRealMember?: boolean;
 }
 
 import { calculatePantryScore, getCookingStreak, AchievementBadge } from '../../utils/achievementUtils';
@@ -102,6 +107,7 @@ const CommunityComponent: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecip
   const [selectedRecipe, setSelectedRecipe] = useState<{ title: string, comments: RecipeRating[] } | null>(null);
   const [selectedBadge, setSelectedBadge] = useState<AchievementBadge | null>(null);
   const [showWasteReport, setShowWasteReport] = useState(false);
+  const [showHealthDetail, setShowHealthDetail] = useState(false);
 
   const [localLoading, setLocalLoading] = useState(false);
   const [ratingsState, setRatingsState] = useState<RecipeRating[]>([]);
@@ -318,6 +324,7 @@ const CommunityComponent: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecip
     setSelectedBadge(null);
     setShowWasteReport(false);
   });
+  useAndroidBack(showHealthDetail, () => setShowHealthDetail(false));
 
   // Load community-rated cache once
   useEffect(() => {
@@ -625,37 +632,53 @@ const CommunityComponent: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecip
       isHousehold: household !== null
     };
 
-    const allEntries = [...basePeers, userEntry];
+    // Real household members share the same pantry (and therefore the same score) as the
+    // current user — streak/badges are device-local and not tracked per-member, so those
+    // are left unknown (null) rather than fabricated.
+    const realMemberEntries: Omit<LeaderboardEntry, 'rank'>[] = (household?.members || [])
+      .filter(m => m.id !== user?.id && m.status === 'active')
+      .map(m => ({
+        name: m.name,
+        isUser: false,
+        score: userScore,
+        streak: null,
+        badges: null,
+        isHousehold: false,
+        isRealMember: true,
+      }));
+
+    const allEntries = [...basePeers, ...realMemberEntries, userEntry];
 
     // Filter by type (individual vs household)
     let filtered = leaderboardType === 'household'
       ? allEntries.filter(e => e.isHousehold || e.isUser) // Always include user for context
       : allEntries.filter(e => !e.isHousehold || e.isUser);
 
-    // Weekly vs Monthly slight score adjustments for dynamic feeling
+    // Weekly vs Monthly slight score adjustments for dynamic feeling — only applied to
+    // simulated peers; real entries (the user and real household members) keep their actual data.
     if (leaderboardTimeframe === 'monthly') {
       filtered = filtered.map(e => {
-        if (e.isUser) return e;
+        if (e.isUser || e.isRealMember) return e;
         return {
           ...e,
           score: Math.max(40, Math.min(100, e.score + (e.score % 3 === 0 ? 2 : -2))),
-          streak: e.streak * 4
+          streak: (e.streak ?? 0) * 4
         };
       });
     }
 
-    // Sort: Score desc, then streak desc, then badges desc
+    // Sort: Score desc, then streak desc (unknown streaks sort last), then badges desc
     return filtered
       .sort((a, b) => {
         if (b.score !== a.score) return b.score - a.score;
-        if (b.streak !== a.streak) return b.streak - a.streak;
-        return b.badges - a.badges;
+        if ((b.streak ?? -1) !== (a.streak ?? -1)) return (b.streak ?? -1) - (a.streak ?? -1);
+        return (b.badges ?? -1) - (a.badges ?? -1);
       })
       .map((e, index) => ({
         ...e,
         rank: index + 1
       }));
-  }, [userScore, userStreak, unlockedBadgesCount, household, leaderboardType, leaderboardTimeframe, isAnonymous, leaderboardName]);
+  }, [userScore, userStreak, unlockedBadgesCount, household, leaderboardType, leaderboardTimeframe, isAnonymous, leaderboardName, user?.id]);
 
   const userRank = useMemo(() => {
     const entry = leaderboardData.find(e => e.isUser);
@@ -1024,6 +1047,15 @@ const CommunityComponent: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecip
                 </button>
               </div>
 
+              {/* Your Pantry Health — real card for the signed-in user's own entry (peer rows are simulated data) */}
+              {leaderboardType === 'individual' && inventory.length >= 3 && (
+                <PantryHealthScore
+                  inventory={inventory}
+                  variant="compact"
+                  onExpand={() => setShowHealthDetail(true)}
+                />
+              )}
+
               {/* Toggles bar */}
               <div className="flex items-center justify-between gap-4">
                 {/* Individual vs Household segment */}
@@ -1127,16 +1159,21 @@ const CommunityComponent: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecip
                                 Group
                               </span>
                             )}
+                            {entry.isRealMember && (
+                              <span className="text-[9px] font-extrabold uppercase px-1 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400 tracking-wider">
+                                Household
+                              </span>
+                            )}
                           </div>
                           {/* Subtitles: streak info */}
                           <div className="flex items-center gap-2 mt-0.5 text-xs text-theme-secondary opacity-60">
-                            {entry.streak > 0 && (
+                            {entry.streak !== null && entry.streak > 0 && (
                               <span className="flex items-center gap-0.5">
                                 <Flame className="w-3.5 h-3.5 text-orange-500 fill-current" /> {entry.streak}d streak
                               </span>
                             )}
                             <span className="flex items-center gap-0.5">
-                              🎖️ {entry.badges} Badges
+                              🎖️ {entry.badges === null ? '—' : entry.badges} Badges
                             </span>
                           </div>
                         </div>
@@ -1472,6 +1509,19 @@ const CommunityComponent: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecip
       )}
 
       {/* ────────────────── POPUP MODAL: WEEKLY WASTE REPORT SUMMARY ────────────────── */}
+      {/* Pantry Health Detail Sheet */}
+      <BottomSheet
+        isOpen={showHealthDetail}
+        onClose={() => setShowHealthDetail(false)}
+        title="Pantry Health"
+        subtitle="Full breakdown of your score"
+        snap="auto"
+      >
+        <BottomSheet.Body className="p-4">
+          <PantryHealthScore inventory={inventory} variant="full" />
+        </BottomSheet.Body>
+      </BottomSheet>
+
       {showWasteReport && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in" role="dialog" aria-modal="true">
           <div className="bg-theme-secondary border border-theme rounded-3xl w-full max-w-sm p-6 shadow-2xl relative overflow-hidden animate-slide-up">

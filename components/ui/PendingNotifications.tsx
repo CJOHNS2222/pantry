@@ -6,7 +6,7 @@ import { User } from '../../types';
 import { serverTimestamp } from 'firebase/firestore';
 import DatabaseMonitoringService from '../../services/databaseMonitoringService';
 import { useAppActions } from '../../contexts/AppActionsContext';
-import { useInventoryContext } from '../../contexts/DomainContexts';
+import { useApp } from '../../contexts/AppContext';
 import { Tab } from '../../types/app';
 import { log } from '../../services/logService';
 import { useUserNotifications } from '../../hooks/useUserNotifications';
@@ -21,7 +21,7 @@ export const PendingNotifications: React.FC<PendingNotificationsProps> = ({
   onNavigateToSettings: _onNavigateToSettings
 }) => {
   const [processing, setProcessing] = useState<string | null>(null);
-  const { inventory } = useInventoryContext();
+  const { inventory } = useApp();
   const { setActiveTab, onAddToShoppingList, addToast } = useAppActions();
 
   // Stream notifications in realtime

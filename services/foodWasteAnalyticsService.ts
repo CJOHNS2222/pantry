@@ -1,6 +1,7 @@
 import { increment } from 'firebase/firestore';
 import DatabaseMonitoringService from './databaseMonitoringService';
 import { log } from './logService';
+import { getHouseholdOrUserCachePath } from './cachePathUtils';
 
 /**
  * Simplified food waste analytics — summary counters only, no per-item history.
@@ -43,14 +44,10 @@ export interface DisposalRecord {
 }
 
 class FoodWasteAnalyticsService {
-  private static readonly HOUSEHOLD_COLLECTION = 'households';
-  private static readonly USER_COLLECTION = 'users';
   static readonly FOOD_WASTE_FIELD = '_foodWaste';
 
   static getCachePath(householdId?: string, userId?: string): string {
-    if (householdId) return `${this.HOUSEHOLD_COLLECTION}/${householdId}/cache/inventory`;
-    if (userId) return `${this.USER_COLLECTION}/${userId}/cache/inventory`;
-    throw new Error('Either householdId or userId must be provided');
+    return getHouseholdOrUserCachePath('inventory', householdId, userId);
   }
 
   /**

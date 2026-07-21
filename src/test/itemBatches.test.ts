@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { Batch } from '../types';
+import { Batch } from '../../types';
 
 describe('batch totals', () => {
   it('sums batch quantities correctly', () => {

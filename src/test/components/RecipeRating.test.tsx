@@ -2,7 +2,11 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { RecipeRatingUI } from '../../../components/recipes-meals/RecipeRating';
+import { ToastProvider } from '../../../components/ui/Toast';
 import { StructuredRecipe } from '../types';
+
+// RecipeRatingUI calls useToast() internally, so every render needs a ToastProvider ancestor.
+const renderRating = (ui: React.ReactElement) => render(<ToastProvider>{ui}</ToastProvider>);
 
 // Mock RecipeRatingService to avoid real Firestore writes in unit tests
 vi.mock('../../../services/recipeRatingService', () => ({
@@ -57,7 +61,7 @@ describe('RecipeRatingUI', () => {
   };
 
   it('renders rating form initially', () => {
-    render(<RecipeRatingUI {...defaultProps} />);
+    renderRating(<RecipeRatingUI {...defaultProps} />);
 
     expect(screen.getByText('Rate this recipe')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('Share your thoughts or tips...')).toBeInTheDocument();
@@ -65,7 +69,7 @@ describe('RecipeRatingUI', () => {
   });
 
   it('allows selecting star rating', () => {
-    render(<RecipeRatingUI {...defaultProps} />);
+    renderRating(<RecipeRatingUI {...defaultProps} />);
 
     // Select the 'I'd make again' verdict
     const makeAgainBtn = screen.getByRole('button', { name: /i'd make again/i });
@@ -76,7 +80,7 @@ describe('RecipeRatingUI', () => {
   });
 
   it('allows entering comment', () => {
-    render(<RecipeRatingUI {...defaultProps} />);
+    renderRating(<RecipeRatingUI {...defaultProps} />);
 
     const commentTextarea = screen.getByPlaceholderText('Share your thoughts or tips...');
     fireEvent.change(commentTextarea, { target: { value: 'Great recipe!' } });
@@ -88,7 +92,7 @@ describe('RecipeRatingUI', () => {
     const mockOnRate = vi.fn();
     // Ensure TEST_USER is set so component picks up a logged-in user in tests
     (window as any).TEST_USER = mockUser;
-    render(<RecipeRatingUI {...defaultProps} onRatingSubmitted={mockOnRate} />);
+    renderRating(<RecipeRatingUI {...defaultProps} onRatingSubmitted={mockOnRate} />);
 
     // Select verdict 'make-again' which maps to 5-star rating
     const makeAgainBtn = screen.getByRole('button', { name: /i'd make again/i });
@@ -124,7 +128,7 @@ describe('RecipeRatingUI', () => {
   it('shows thank you message after submission', async () => {
     const mockOnRate = vi.fn();
     (window as any).TEST_USER = mockUser;
-    render(<RecipeRatingUI {...defaultProps} onRatingSubmitted={mockOnRate} />);
+    renderRating(<RecipeRatingUI {...defaultProps} onRatingSubmitted={mockOnRate} />);
 
     // Select rating and submit (use 5 stars for 'make-again' verdict)
     const makeAgainBtn = screen.getByRole('button', { name: /i'd make again/i });
@@ -144,7 +148,7 @@ describe('RecipeRatingUI', () => {
     const mockOnRate = vi.fn();
     // Set TEST_USER to undefined to simulate anonymous
     (window as any).TEST_USER = undefined;
-    render(<RecipeRatingUI {...defaultProps} onRatingSubmitted={mockOnRate} user={undefined} />);
+    renderRating(<RecipeRatingUI {...defaultProps} onRatingSubmitted={mockOnRate} user={undefined} />);
 
     // Select verdict 'skip' which maps to 1-star rating
     const skipBtn = screen.getByRole('button', { name: /skip/i });
@@ -174,7 +178,7 @@ describe('RecipeRatingUI', () => {
 
   it('prevents form submission without rating', () => {
     const mockOnRate = vi.fn();
-    render(<RecipeRatingUI {...defaultProps} onRatingSubmitted={mockOnRate} />);
+    renderRating(<RecipeRatingUI {...defaultProps} onRatingSubmitted={mockOnRate} />);
 
     const submitButton = screen.getByRole('button', { name: /submit rating/i });
     expect(submitButton).toBeDisabled();

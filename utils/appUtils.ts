@@ -1914,6 +1914,10 @@ export interface QuantityResult {
   amount: number;
   unit: string;
   normalizedGrams?: number; // For comparison
+  /** Weight and volume are never combined with each other, even though both are stored
+   *  in normalizedGrams (a 1ml≈1g simplification) — this keeps them from cross-matching.
+   *  Containers (can, bag, ...) count as 'weight' since they're standardized to grams. */
+  normalizedKind?: 'weight' | 'volume';
 }
 
 // Unit conversion factors (to grams or milliliters)
@@ -1940,6 +1944,9 @@ const UNIT_CONVERSIONS: Record<string, number> = {
   'l': 1000,
   'liter': 1000,
   'liters': 1000,
+  'fl oz': 29.57,
+  'fluid ounce': 29.57,
+  'fluid ounces': 29.57,
   'cup': 236.59,
   'cups': 236.59,
   'tbsp': 14.79,
@@ -1958,7 +1965,32 @@ const UNIT_CONVERSIONS: Record<string, number> = {
   'gallon': 3785.41,
   'gallons': 3785.41,
 
-  // Count units (no conversion)
+  // Standardized container weights (approximate grams per container) — used so e.g.
+  // "1 can" combines with "400g" of the same item under one common unit. These are
+  // reasonable category averages (a "can" of beans and a "can" of tomatoes are both
+  // ~400g), not exact per-product sizes — there's no per-product size data in the
+  // app to be more precise than this. Needed so consolidated shopping-list
+  // quantities can eventually be sent to a grocery cart/checkout integration.
+  'can': 400,
+  'cans': 400,
+  'jar': 450,
+  'jars': 450,
+  'bottle': 500,
+  'bottles': 500,
+  'package': 400,
+  'packages': 400,
+  'pkg': 400,
+  'box': 350,
+  'boxes': 350,
+  'bag': 450,
+  'bags': 450,
+  'container': 450,
+  'containers': 450,
+  'pack': 400,
+  'packs': 400,
+
+  // Count units (no conversion — these vary too much in size to standardize, e.g.
+  // a "piece" or "clove" has no consistent weight)
   'count': 1,
   'piece': 1,
   'pieces': 1,
@@ -1966,17 +1998,6 @@ const UNIT_CONVERSIONS: Record<string, number> = {
   'slices': 1,
   'clove': 1,
   'cloves': 1,
-  'can': 1,
-  'cans': 1,
-  'bottle': 1,
-  'bottles': 1,
-  'package': 1,
-  'packages': 1,
-  'pkg': 1,
-  'box': 1,
-  'boxes': 1,
-  'bag': 1,
-  'bags': 1,
   'bunch': 1,
   'bunches': 1,
   'head': 1,
@@ -1987,6 +2008,7 @@ const UNIT_CONVERSIONS: Record<string, number> = {
   'sprigs': 1,
   'dash': 1,
   'pinch': 1,
+  'dozen': 1,
 };
 
 /**
@@ -2056,23 +2078,33 @@ export function normalizeQuantity(quantity: ParsedQuantity): QuantityResult {
     return { ...quantity };
   }
 
-  // For weight/volume units, convert to grams/ml
+  // For weight units (and standardized containers, which are weight-equivalent),
+  // convert to grams.
   const lowUnit = key;
-  if (['g', 'gram', 'grams', 'kg', 'kilogram', 'kilograms', 'oz', 'ounce', 'ounces', 'lb', 'lbs', 'pound', 'pounds'].includes(lowUnit)) {
+  const weightUnits = ['g', 'gram', 'grams', 'kg', 'kilogram', 'kilograms', 'oz', 'ounce', 'ounces', 'lb', 'lbs', 'pound', 'pounds'];
+  // Standardized containers (can, jar, bottle, box, bag, package, pack) — normalized to
+  // their approximate gram equivalent so they combine with true weight quantities of
+  // the same item under one common unit.
+  const containerUnits = ['can', 'cans', 'jar', 'jars', 'bottle', 'bottles', 'package', 'packages', 'pkg', 'box', 'boxes', 'bag', 'bags', 'container', 'containers', 'pack', 'packs'];
+  if (weightUnits.includes(lowUnit) || containerUnits.includes(lowUnit)) {
     return {
       ...quantity,
-      normalizedGrams: quantity.amount * conversionFactor
+      normalizedGrams: quantity.amount * conversionFactor,
+      normalizedKind: 'weight',
     };
   }
 
-  if (['ml', 'milliliter', 'milliliters', 'l', 'liter', 'liters', 'cup', 'cups', 'tbsp', 'tablespoon', 'tablespoons', 'tsp', 'teaspoon', 'teaspoons', 'qt', 'quart', 'quarts', 'pt', 'pint', 'pints', 'gal', 'gallon', 'gallons'].includes(lowUnit)) {
+  const volumeUnits = ['ml', 'milliliter', 'milliliters', 'l', 'liter', 'liters', 'fl oz', 'fluid ounce', 'fluid ounces', 'cup', 'cups', 'tbsp', 'tablespoon', 'tablespoons', 'tsp', 'teaspoon', 'teaspoons', 'qt', 'quart', 'quarts', 'pt', 'pint', 'pints', 'gal', 'gallon', 'gallons'];
+  if (volumeUnits.includes(lowUnit)) {
     return {
       ...quantity,
-      normalizedGrams: quantity.amount * conversionFactor // Using grams field for volume too
+      normalizedGrams: quantity.amount * conversionFactor, // Using grams field for volume too
+      normalizedKind: 'volume',
     };
   }
 
-  // For count units, no normalization needed
+  // For remaining count units (piece, clove, bunch, dozen, ...), no normalization —
+  // these have no consistent standardized size.
   return { ...quantity };
 }
 
@@ -2083,8 +2115,13 @@ export function canCombineQuantities(q1: ParsedQuantity, q2: ParsedQuantity): bo
   const n1 = normalizeQuantity(q1);
   const n2 = normalizeQuantity(q2);
 
-  // Both have normalization (weight/volume) or both don't (count)
-  return (n1.normalizedGrams !== undefined) === (n2.normalizedGrams !== undefined);
+  // Both normalized to the same kind (weight or volume), or both are plain counts.
+  // Weight and volume are never cross-combined, even though both use the
+  // normalizedGrams field, since a ml isn't a gram.
+  if (n1.normalizedGrams === undefined || n2.normalizedGrams === undefined) {
+    return n1.normalizedGrams === undefined && n2.normalizedGrams === undefined;
+  }
+  return n1.normalizedKind === n2.normalizedKind;
 }
 
 /**
@@ -2150,6 +2187,25 @@ export function subtractQuantities(total: ParsedQuantity, used: ParsedQuantity):
 }
 
 /**
+ * Reduces a grocery item name to a simple singular form for matching purposes only
+ * (e.g. "onions" -> "onion", "tomatoes" -> "tomato"). Never used for display — recipes
+ * often supply the same ingredient as singular in one place and plural in another
+ * ("1 onion" vs "2 onions"), and without this the exact-string match in
+ * consolidateShoppingList treats them as different items.
+ */
+function singularizeForMatching(word: string): string {
+  const w = word.toLowerCase();
+  if (w.length <= 3) return w;
+  // Words where a trailing "s" is part of the word itself, not a plural marker
+  // (hummus, asparagus, couscous, citrus, octopus, ...)
+  if (/(ss|us|is)$/.test(w)) return w;
+  if (/ies$/.test(w) && w.length > 4) return w.slice(0, -3) + 'y'; // berries -> berry
+  if (/(oes|ches|shes|xes|zes|sses)$/.test(w)) return w.slice(0, -2); // tomatoes -> tomato, boxes -> box
+  if (/s$/.test(w)) return w.slice(0, -1); // onions -> onion, prawns -> prawn
+  return w;
+}
+
+/**
  * Consolidates duplicate shopping list items by name and checked status,
  * combining quantities safely using unit conversion.
  */
@@ -2158,7 +2214,7 @@ export function consolidateShoppingList(items: ShoppingItem[]): ShoppingItem[] {
 
   items.forEach(item => {
     if (!item.item) return;
-    
+
     // Check if amount and unit are already structured
     let amount = item.amount;
     let unit = item.unit;
@@ -2168,12 +2224,13 @@ export function consolidateShoppingList(items: ShoppingItem[]): ShoppingItem[] {
       amount = parsed.amount;
       unit = parsed.unit;
     }
-    
+
     const n = normalizeQuantity({ amount, unit });
     const isNormalized = n !== null && n.normalizedGrams !== undefined;
     const unitType = isNormalized ? 'measurable' : 'count';
-    
-    const key = `${item.item.trim().toLowerCase()}_${item.checked}_${unitType}`;
+
+    const normalizedName = singularizeForMatching(item.item.trim().toLowerCase());
+    const key = `${normalizedName}_${item.checked}_${unitType}`;
     const existing = consolidatedMap.get(key);
 
     if (!existing) {

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { PantryService } from '../services/pantryService';
-import { PantryItem } from '../types';
+import { PantryService } from '../../../services/pantryService';
+import { PantryItem } from '../../../types';
 
 function makeItemWithBatches(): PantryItem {
   return {

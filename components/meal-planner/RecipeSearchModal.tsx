@@ -198,11 +198,16 @@ export const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
   const defaultPopularRecipes = useMemo(() => {
     if (!cachedRecipesLoaded) return [];
     return rankCachedRecipesByPreferences(
-      cachedRecipes.filter(recipe => isRecipeSafeFromAllergies(recipe, household?.members || [], user?.profile)),
+      cachedRecipes
+        .filter((recipe, index, self) =>
+          index === self.findIndex(r => r.title === recipe.title)
+        )
+        .filter(recipe => !savedRecipes.some(saved => saved.title === recipe.title))
+        .filter(recipe => isRecipeSafeFromAllergies(recipe, household?.members || [], user?.profile)),
       household?.members || [],
       user?.profile
     ).slice(0, 12);
-  }, [cachedRecipes, cachedRecipesLoaded, household?.members, user?.profile]);
+  }, [cachedRecipes, cachedRecipesLoaded, savedRecipes, household?.members, user?.profile]);
 
   return (
     <div className="space-y-4">
@@ -346,7 +351,7 @@ export const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
           </div>
         )}
 
-        {filteredCachedRecipes.length > 0 && cachedRecipesLoaded && (
+        {!!searchQuery && filteredCachedRecipes.length > 0 && cachedRecipesLoaded && (
           <div>
             <h4 className="text-sm font-semibold text-theme-secondary mb-2">{intl.formatMessage({ id: 'mealPlanner.popularRecipes' })}</h4>
             <div className="grid grid-cols-3 gap-2">
@@ -468,15 +473,9 @@ export const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
           </div>
         )}
 
-        {!searchQuery && cachedRecipesLoaded && cachedRecipes.length === 0 && (
+        {!searchQuery && cachedRecipesLoaded && filteredSavedRecipes.length === 0 && defaultPopularRecipes.length === 0 && (
           <div className="text-center py-8 text-theme-primary opacity-50">
-            No popular recipes available
-          </div>
-        )}
-
-        {!searchQuery && (
-          <div className="text-center py-8 text-theme-primary opacity-50">
-            Enter a search term to find recipes
+            No recipes available — try searching
           </div>
         )}
       </div>

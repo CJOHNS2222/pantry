@@ -4,9 +4,7 @@ import { useAndroidBack } from '../../hooks/useAndroidBack';
 import { Camera as CapacitorCamera } from '@capacitor/camera';
 import { Camera, Upload, Loader2, Plus, Trash2, CheckCircle2, ShoppingBasket, X, Barcode, ChevronDown, ChevronRight, Image, ChefHat, TrendingUp, Search, Filter, Clock, Tag, FilePlus, Receipt, LayoutGrid, LayoutList } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
-import { List } from 'react-window';
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const ReactWindowList = List as any;
+import { FixedSizeList as ReactWindowList } from 'react-window';
 import { setUserGeminiOptIn } from '../../services/featureFlags';
 import StorageLocationIndicator from './StorageLocationIndicator';
 import { PantryItem, LoadingState, ConsumptionSuggestion, ExpirationAlert, CustomCategory, RecipeSuggestion, PantryFilter, User, ShoppingItem, StructuredRecipe, SavedRecipe } from '../../types';
@@ -68,6 +66,7 @@ import FreezeTransitionModal from './FreezeTransitionModal';
 import { InventoryCacheService } from '../../services/inventoryCacheService';
 import PantryImportModal from './PantryImportModal';
 import { PantryHealthScore } from './PantryHealthScore';
+import { BottomSheet } from '../ui';
 
 // Constants for virtualization threshold
 
@@ -362,6 +361,7 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
   const [showAutocomplete, setShowAutocomplete] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
+  const [showHealthDetail, setShowHealthDetail] = useState(false);
 
   // Meal prep suggestions state
   const [mealPrepSuggestions, setMealPrepSuggestions] = useState<RecipeIngredientMatch[]>([]);
@@ -418,6 +418,7 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
   useAndroidBack(showFilters, () => setShowFilters(false));
   useAndroidBack(searchQuery.length > 0, () => setSearchQuery(''));
   useAndroidBack(isSearchModalOpen, () => setIsSearchModalOpen(false));
+  useAndroidBack(showHealthDetail, () => setShowHealthDetail(false));
 
   // Auto-set smart unit when item name changes in the quick-add form
   useEffect(() => {
@@ -1664,7 +1665,12 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
 
       {/* Pantry status strip: health score + item count + expiring count, one row */}
       {inventory.length >= 3 && (
-        <PantryHealthScore inventory={inventory} variant="compact" className="mb-2" />
+        <PantryHealthScore
+          inventory={inventory}
+          variant="compact"
+          className="mb-2"
+          onExpand={() => setShowHealthDetail(true)}
+        />
       )}
 
       {/* Smart suggestion carousel — combines the dinner prompt, leftover nudge, each
@@ -3071,6 +3077,19 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
           originalIndex={selectedItemIndex}
         />
       )}
+
+      {/* Pantry Health Detail Sheet */}
+      <BottomSheet
+        isOpen={showHealthDetail}
+        onClose={() => setShowHealthDetail(false)}
+        title="Pantry Health"
+        subtitle="Full breakdown of your score"
+        snap="auto"
+      >
+        <BottomSheet.Body className="p-4">
+          <PantryHealthScore inventory={inventory} variant="full" />
+        </BottomSheet.Body>
+      </BottomSheet>
 
       {/* Freeze Transition Modal */}
       {freezeTargetIndex !== null && household && household.id && inventory[freezeTargetIndex]?.id && (

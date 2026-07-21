@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, Suspense, useCallback } from 'react';
 import { serverTimestamp } from 'firebase/firestore';
-import { getAuth } from 'firebase/auth';
 import DatabaseMonitoringService from './services/databaseMonitoringService';
 import { Login } from './components/auth-onboarding/Login';
 import { HouseholdManager } from './components/household/Household';
@@ -40,7 +39,6 @@ import { PushNotifications } from '@capacitor/push-notifications';
 import { AdMob } from '@capacitor-community/admob';
 import { AppProvider } from './contexts/AppContext';
 import { AppActionsProvider } from './contexts/AppActionsContext';
-import { InventoryContextType, ShoppingListContextType, MealPlanContextType, RecipesContextType } from './contexts/DomainContexts';
 import { useStableCallback } from './hooks/useStableCallback';
 import SafeAreaService from './services/safeAreaService';
 import { GlobalUpdatePrompt } from './components/ui/GlobalUpdatePrompt';
@@ -54,15 +52,12 @@ import { useIsAdmin } from './hooks/useIsAdmin';
 import PerformanceMonitoringService from './services/performanceMonitoringService';
 import HapticService from './services/hapticService';
 import { ShoppingListCacheService } from './services/shoppingListCacheService';
-import { MealPlanCacheService } from './services/MealPlanCacheService';
-import { RecipesCacheService } from './services/recipesCacheService';
 import { groceryPriceService } from './services/groceryPriceService';
 import { PriceDataCacheService } from './services/priceDataCacheService'; // Import the service
 import ExpiredItemsModal from './components/pantry/ExpiredItemsModal';
 import ExpiredItemsLaunchSheet, { getExpiredLaunchEnabled } from './components/pantry/ExpiredItemsLaunchSheet';
 import ItemDetailModal from './components/pantry/ItemDetailModal';
 import { RecipeFinderModalSection } from './components/recipe-finder/RecipeFinderModalSection';
-import { InventoryCacheService } from './services/inventoryCacheService';
 import { recordMilestone } from './services/onboardingMilestoneService';
 import { useIntl } from 'react-intl';
 import { useAndroidBack, closeTopAndroidModal } from './hooks/useAndroidBack';
@@ -70,6 +65,10 @@ import { useKeyboard } from './hooks/useKeyboard';
 import { GeminiTokenDebugger } from './components/ui/GeminiTokenDebugger';
 import { cameraRestoredStore } from './utils/cameraRestoredStore';
 import { getUnlockedBadges } from './utils/achievementUtils';
+import { useCelebrationFireworks } from './hooks/useCelebrationFireworks';
+import { useNotificationPolling } from './hooks/useNotificationPolling';
+import { useHouseholdMigrationRetry } from './hooks/useHouseholdMigrationRetry';
+import { migrateUserDataToHousehold } from './services/householdMigrationService';
 
 // Lazy load monitoring components
 const DatabaseAnalytics = React.lazy(() => import('./components/admin-analytics/DatabaseAnalytics').then(module => ({ default: module.default })));
@@ -98,94 +97,7 @@ const App: React.FC = () => {
 
   // Global achievement state and celebration ref
   const [newlyUnlockedBadge, setNewlyUnlockedBadge] = useState<{ id: string; title: string; icon: string; description: string; color: string } | null>(null);
-  const fireworksCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const fireworksRafRef = useRef<number | null>(null);
-
-  const triggerCelebration = () => {
-    const canvas = fireworksCanvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-
-    interface Particle {
-      x: number;
-      y: number;
-      vx: number;
-      vy: number;
-      color: string;
-      size: number;
-      alpha: number;
-      decay: number;
-      gravity: number;
-    }
-
-    const particles: Particle[] = [];
-    const colors = ['#ff0055', '#00ffcc', '#ffcc00', '#ff6600', '#9900ff', '#33ccff', '#ff33aa', '#00ff66'];
-
-    const createExplosion = (x: number, y: number) => {
-      const count = 50 + Math.random() * 30;
-      for (let i = 0; i < count; i++) {
-        const angle = Math.random() * Math.PI * 2;
-        const speed = 1.5 + Math.random() * 6;
-        particles.push({
-          x,
-          y,
-          vx: Math.cos(angle) * speed,
-          vy: Math.sin(angle) * speed - (0.5 + Math.random() * 1.5),
-          color: colors[Math.floor(Math.random() * colors.length)],
-          size: 2 + Math.random() * 3,
-          alpha: 1,
-          decay: 0.012 + Math.random() * 0.015,
-          gravity: 0.12,
-        });
-      }
-    };
-
-    const w = canvas.width;
-    const h = canvas.height;
-    
-    createExplosion(w / 2, h / 2);
-    setTimeout(() => createExplosion(w * 0.25, h * 0.45), 200);
-    setTimeout(() => createExplosion(w * 0.75, h * 0.45), 400);
-    setTimeout(() => createExplosion(w * 0.5, h * 0.35), 600);
-
-    const render = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      for (let i = particles.length - 1; i >= 0; i--) {
-        const p = particles[i];
-        p.x += p.vx;
-        p.y += p.vy;
-        p.vy += p.gravity;
-        p.alpha -= p.decay;
-
-        if (p.alpha <= 0) {
-          particles.splice(i, 1);
-          continue;
-        }
-
-        ctx.save();
-        ctx.globalAlpha = p.alpha;
-        ctx.fillStyle = p.color;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-      }
-
-      if (particles.length > 0) {
-        fireworksRafRef.current = requestAnimationFrame(render);
-      } else {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        fireworksRafRef.current = null;
-      }
-    };
-
-    render();
-  };
+  const { canvasRef: fireworksCanvasRef, triggerCelebration } = useCelebrationFireworks();
 
   // Custom tab switching function that resets scroll position
   const switchTab = (tab: Tab) => {
@@ -233,7 +145,6 @@ const App: React.FC = () => {
   const [selectedDayForPlan, setSelectedDayForPlan] = useState<number | null>(null);
   const [selectedMealForPlan, setSelectedMealForPlan] = useState<'breakfast' | 'lunch' | 'dinner' | null>(null);
   const [householdInvites, setHouseholdInvites] = useState<NotificationItem[]>([]);
-  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>({
     enabled: true,
     quietHours: {
@@ -260,6 +171,7 @@ const App: React.FC = () => {
   const { tips: contextualTips, addTip: addContextualTip, dismissTip: dismissContextualTip } = useContextualTips(user);
   const { settings, setSettings } = useSettings();
   const toast = useToast();
+  const { notifications, setNotifications } = useNotificationPolling(user, notificationSettings);
 
   // Root lifecycle cleanup for monitoring and background workers (PERF-018, PERF-019, PERF-021)
   useEffect(() => {
@@ -267,10 +179,6 @@ const App: React.FC = () => {
       DatabaseMonitoringService.cleanup();
       destroyReceiptOcrWorker();
       cleanupCacheService();
-      if (fireworksRafRef.current !== null) {
-        cancelAnimationFrame(fireworksRafRef.current);
-        fireworksRafRef.current = null;
-      }
     };
   }, []);
 
@@ -609,9 +517,6 @@ const App: React.FC = () => {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     generateRecipeSuggestionsOnDemand,
     handleAddToPlan,
-    addMealToPlan,
-    updateMealOnPlan,
-    removeMealFromPlan,
     handleSaveRecipe,
     handleDeleteRecipe,
     submitRating,
@@ -634,11 +539,8 @@ const App: React.FC = () => {
     checkRecipeSaveLimit,
     checkMealPlanLimit,
     addShoppingListItem,
-    addShoppingListItems,
-    updateShoppingListItem,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     updateShoppingListItems,
-    removeShoppingListItem,
     removeShoppingListItems,
     isLoadingInventory,
     isLoadingShoppingList,
@@ -876,63 +778,6 @@ const App: React.FC = () => {
     }
   }, [user?.id]);
 
-  useEffect(() => {
-    if (!user?.id) return;
-
-    const auth = getAuth();
-    if (!auth.currentUser) return;
-
-    const checkAndShowNotifications = async () => {
-      try {
-        const unreadNotifications = await NotificationService.getUnreadNotifications(user.id, user.email);
-        const filteredNotifications = unreadNotifications.filter(notification =>
-          NotificationService.shouldShowNotification(notification, notificationSettings)
-        );
-
-        if (filteredNotifications.length > 0) {
-          // Sort by priority first (urgent > high > medium > low), then by newest
-          const sorted = [...filteredNotifications].sort((a, b) => {
-            const weightDiff = getPriorityWeight(b.priority) - getPriorityWeight(a.priority);
-            if (weightDiff !== 0) return weightDiff;
-            
-            const getTime = (val: unknown) => {
-              if (!val) return 0;
-              if (typeof val === 'object' && val !== null && 'toDate' in val && typeof (val as { toDate: () => Date }).toDate === 'function') return (val as { toDate: () => Date }).toDate().getTime();
-              return new Date(val as string | number | Date).getTime();
-            };
-            
-            const timeA = getTime(a.createdAt);
-            const timeB = getTime(b.createdAt);
-            return timeB - timeA;
-          });
-
-          // Show top 3 notifications
-          setNotifications(sorted.slice(0, 3));
-          localStorage.removeItem('lastNotificationShown'); // Clear legacy throttle
-        } else {
-          setNotifications([]);
-        }
-      } catch (error) {
-        log.error('Error checking notifications', { error }, 'App');
-      }
-    };
-
-    checkAndShowNotifications();
-    const interval = setInterval(checkAndShowNotifications, 5 * 60 * 1000);
-
-    return () => clearInterval(interval);
-  }, [user?.id, notificationSettings]);
-
-  const getPriorityWeight = (priority: string): number => {
-    switch (priority) {
-      case 'urgent': return 4;
-      case 'high': return 3;
-      case 'medium': return 2;
-      case 'low': return 1;
-      default: return 0;
-    }
-  };
-
   const handleNotificationDismiss = async (notificationId: string) => {
     try {
       if (user?.id) await markNotificationRead(user.id, notificationId);
@@ -1045,94 +890,6 @@ const App: React.FC = () => {
     } catch (err) {
       log.error('Failed to snooze notification', { err }, 'App');
     }
-  };
-
-  /**
-   * Merges a user's personal data (inventory, shopping list, meal plan, saved recipes)
-   * into the household they just joined, then clears the personal copies.
-   *
-   * A localStorage checkpoint is written before migration begins and cleared only on
-   * full success. If the app is closed mid-migration or a step fails, the checkpoint
-   * persists so the user can retry on next load (see the effect below).
-   */
-  const migrateUserDataToHousehold = async (householdId: string, userId: string): Promise<boolean> => {
-    const CHECKPOINT_KEY = `pending_migration_${userId}`;
-
-    // Write checkpoint so we can retry if the app crashes mid-migration
-    localStorage.setItem(CHECKPOINT_KEY, JSON.stringify({ householdId, timestamp: Date.now() }));
-
-    let allSucceeded = true;
-
-    try {
-      const [userInventory, userShoppingList, userMealPlan, userRecipes] = await Promise.all([
-        InventoryCacheService.getCachedInventory(undefined, userId),
-        ShoppingListCacheService.getCachedShoppingList(undefined, userId),
-        MealPlanCacheService.getCachedMealPlan(undefined, userId),
-        RecipesCacheService.getCachedRecipes(undefined, userId),
-      ]);
-
-      // Run each step sequentially so a failure in one doesn't cancel the others
-      // and the user cache is only cleared when that step is confirmed written
-
-      if (userInventory.length > 0) {
-        try {
-          await InventoryCacheService.addItemsToCache(userInventory, householdId, undefined);
-          await InventoryCacheService.updateCache([], undefined, userId);
-        } catch (e) {
-          allSucceeded = false;
-          log.error('Migration: inventory step failed', { userId, householdId, error: e }, 'App');
-        }
-      }
-
-      if (userShoppingList.length > 0) {
-        try {
-          await ShoppingListCacheService.addItemsToCache(userShoppingList, householdId, undefined);
-          await ShoppingListCacheService.setCache([], undefined, userId);
-        } catch (e) {
-          allSucceeded = false;
-          log.error('Migration: shopping list step failed', { userId, householdId, error: e }, 'App');
-        }
-      }
-
-      if (userMealPlan.length > 0) {
-        try {
-          const householdMealPlan = await MealPlanCacheService.getCachedMealPlan(householdId, undefined);
-          const householdDates = new Set(householdMealPlan.map(d => d.date));
-          const newDays = userMealPlan.filter(d => !householdDates.has(d.date));
-          await MealPlanCacheService.updateCache([...householdMealPlan, ...newDays], householdId, undefined);
-          await MealPlanCacheService.updateCache([], undefined, userId);
-        } catch (e) {
-          allSucceeded = false;
-          log.error('Migration: meal plan step failed', { userId, householdId, error: e }, 'App');
-        }
-      }
-
-      if (userRecipes.length > 0) {
-        try {
-          const householdRecipes = await RecipesCacheService.getCachedRecipes(householdId, undefined);
-          const existingIds = new Set(householdRecipes.map(r => r.id));
-          const newRecipes = userRecipes.filter(r => !existingIds.has(r.id));
-          const merged = newRecipes.length > 0 ? [...householdRecipes, ...newRecipes] : householdRecipes;
-          if (newRecipes.length > 0) await RecipesCacheService.updateCache(merged, householdId, undefined);
-          await RecipesCacheService.updateCache([], undefined, userId);
-        } catch (e) {
-          allSucceeded = false;
-          log.error('Migration: recipes step failed', { userId, householdId, error: e }, 'App');
-        }
-      }
-
-      if (allSucceeded) {
-        localStorage.removeItem(CHECKPOINT_KEY);
-        log.info('Personal data migrated to household on join', { householdId, userId }, 'App');
-      } else {
-        log.warn('Migration completed with some failures — checkpoint kept for retry', { householdId, userId }, 'App');
-      }
-    } catch (error) {
-      allSucceeded = false;
-      log.error('Failed to migrate personal data to household', { userId, householdId, error }, 'App');
-    }
-
-    return allSucceeded;
   };
 
   const handleHouseholdInviteAccept = async (invite: NotificationItem) => {
@@ -1445,37 +1202,7 @@ const App: React.FC = () => {
   }, [user]);
 
   // Retry any pending data migration that was interrupted (app crash / network failure)
-  useEffect(() => {
-    if (!user?.id || !user?.householdId) return;
-    const CHECKPOINT_KEY = `pending_migration_${user.id}`;
-    const raw = localStorage.getItem(CHECKPOINT_KEY);
-    if (!raw) return;
-
-    try {
-      const { householdId } = JSON.parse(raw) as { householdId: string; timestamp: number };
-      // Only retry if the checkpoint is for the household the user is currently in
-      if (householdId !== user.householdId) {
-        localStorage.removeItem(CHECKPOINT_KEY);
-        return;
-      }
-
-      addToast(
-        'A previous data migration was incomplete.',
-        'warning',
-        0, // persistent
-        'Retry now',
-        async () => {
-          const ok = await migrateUserDataToHousehold(householdId, user.id);
-          addToast(
-            ok ? 'Data migration completed successfully!' : 'Migration still has errors. Please check your connection and try again.',
-            ok ? 'success' : 'error'
-          );
-        }
-      );
-    } catch {
-      localStorage.removeItem(CHECKPOINT_KEY);
-    }
-  }, [user?.id, user?.householdId]);
+  useHouseholdMigrationRetry(user, addToast);
 
   // Show expired items launch sheet once per session when the user has opted in
   useEffect(() => {
@@ -1553,9 +1280,6 @@ const App: React.FC = () => {
   const stableAddItem = useStableCallback(addItem);
   const stableAddItems = useStableCallback(addItems);
   const stableUpdateMealPlan = useStableCallback(updateMealPlan);
-  const stableAddMealToPlan = useStableCallback(addMealToPlan);
-  const stableUpdateMealOnPlan = useStableCallback(updateMealOnPlan);
-  const stableRemoveMealFromPlan = useStableCallback(removeMealFromPlan);
   const stableHandleAddToPlan = useStableCallback(handleAddToPlan);
   const stableHandleSaveRecipe = useStableCallback(handleSaveRecipe);
   const stableHandleDeleteRecipe = useStableCallback(handleDeleteRecipe);
@@ -1563,9 +1287,6 @@ const App: React.FC = () => {
   const stableHandleMarkAsMade = useStableCallback(handleMarkAsMade);
   const stableAddToShoppingList = useStableCallback(addToShoppingList);
   const stableAddShoppingListItem = useStableCallback(addShoppingListItem);
-  const stableAddShoppingListItems = useStableCallback(addShoppingListItems);
-  const stableUpdateShoppingListItem = useStableCallback(updateShoppingListItem);
-  const stableRemoveShoppingListItem = useStableCallback(removeShoppingListItem);
   const stableAddCustomCategory = useStableCallback(addCustomCategory);
   const stableUpdateCustomCategory = useStableCallback(updateCustomCategory);
   const stableDeleteCustomCategory = useStableCallback(deleteCustomCategory);
@@ -1747,52 +1468,6 @@ const App: React.FC = () => {
     recipeSaveLimitExceeded, mealPlanLimitExceeded, isLoadingInventory, isLoadingShoppingList,
     isLoadingMealPlan, isLoadingSavedRecipes, isLoadingHousehold, isLoadingRatings,
     consumptionSuggestions, expirationAlerts, recipeSuggestions, recentActivities, isLoadingActivities]);
-
-  // Domain context values (PERF-029): each memoized on its own domain's data so
-  // a change in one domain doesn't re-render the other domains' consumers.
-  const inventoryDomainValue = useMemo<InventoryContextType>(() => ({
-    inventory,
-    isLoadingInventory,
-    onAddItem: stableAddItem,
-    onAddItems: stableAddItems,
-    onUpdateItem: stableUpdateItem,
-    onDeleteItem: stableDeleteItem,
-    deletePantryItems: stableDeleteItems,
-    handleMarkAsMade: stableHandleMarkAsMade,
-  }), [inventory, isLoadingInventory]);
-
-  const shoppingListDomainValue = useMemo<ShoppingListContextType>(() => ({
-    shoppingList,
-    isLoadingShoppingList,
-    addShoppingListItem: stableAddShoppingListItem,
-    addShoppingListItems: stableAddShoppingListItems,
-    updateShoppingListItem: stableUpdateShoppingListItem,
-    removeShoppingListItem: stableRemoveShoppingListItem,
-  }), [shoppingList, isLoadingShoppingList]);
-
-  const mealPlanDomainValue = useMemo<MealPlanContextType>(() => ({
-    mealPlan,
-    isLoadingMealPlan,
-    addMealToPlan: stableAddMealToPlan,
-    updateMealOnPlan: stableUpdateMealOnPlan,
-    removeMealFromPlan: stableRemoveMealFromPlan,
-    updateMealPlan: stableUpdateMealPlan,
-  }), [mealPlan, isLoadingMealPlan]);
-
-  const recipesDomainValue = useMemo<RecipesContextType>(() => ({
-    savedRecipes,
-    isLoadingSavedRecipes,
-    onSaveRecipe: stableHandleSaveRecipe,
-    onDeleteRecipe: stableHandleDeleteRecipe,
-    recipeSaveLimitExceeded,
-  }), [savedRecipes, isLoadingSavedRecipes, recipeSaveLimitExceeded]);
-
-  const domainContextValues = useMemo(() => ({
-    inventory: inventoryDomainValue,
-    shoppingList: shoppingListDomainValue,
-    mealPlan: mealPlanDomainValue,
-    recipes: recipesDomainValue,
-  }), [inventoryDomainValue, shoppingListDomainValue, mealPlanDomainValue, recipesDomainValue]);
 
   // Every entry is identity-stable, so this value never changes and
   // action-only consumers never re-render from context churn.
@@ -2095,7 +1770,7 @@ const App: React.FC = () => {
         )}
         
         <SubscriptionProvider user={user}>
-        <AppProvider value={appContextValue} domains={domainContextValues}>
+        <AppProvider value={appContextValue}>
           <AppActionsProvider value={appActionsValue}>
             <MainContent />
           </AppActionsProvider>

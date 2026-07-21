@@ -1,9 +1,9 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import { vi, describe, test, expect, beforeEach, afterEach } from 'vitest';
-import { RecipeFinder } from '../recipes-meals/RecipeFinder';
-import { RecipeSearchResult, StructuredRecipe, SavedRecipe, PantryItem, RecipeRating, User, Household } from '../../types';
-import { Tab } from '../../types/app';
+import { RecipeFinder } from '../../../components/recipes-meals/RecipeFinder';
+import { RecipeSearchResult, StructuredRecipe, SavedRecipe, PantryItem, RecipeRating, User, Household } from '../../../types';
+import { Tab } from '../../../types/app';
 
 // Mock services and utilities
 vi.mock('react-intl', () => ({
@@ -12,17 +12,17 @@ vi.mock('react-intl', () => ({
   }),
 }));
 
-vi.mock('../../services/geminiService', () => ({
+vi.mock('../../../services/geminiService', () => ({
   searchRecipes: vi.fn(),
 }));
 
-vi.mock('../../services/recipeService', () => ({
+vi.mock('../../../services/recipeService', () => ({
   getSavedRecipes: vi.fn(() => Promise.resolve([])),
   getCachedPopularRecipes: vi.fn(() => Promise.resolve([])),
   getCachedRecipesCache: vi.fn(() => Promise.resolve([])),
 }));
 
-vi.mock('../../services/analyticsService', () => ({
+vi.mock('../../../services/analyticsService', () => ({
   default: {
     trackRecipeSearch: vi.fn(),
     trackRecipeSave: vi.fn(),
@@ -30,7 +30,7 @@ vi.mock('../../services/analyticsService', () => ({
   },
 }));
 
-vi.mock('../../services/logService', () => ({
+vi.mock('../../../services/logService', () => ({
   log: {
     error: vi.fn(),
     debug: vi.fn(),
@@ -38,7 +38,7 @@ vi.mock('../../services/logService', () => ({
   },
 }));
 
-vi.mock('../../utils/searchUtils', () => ({
+vi.mock('../../../utils/searchUtils', () => ({
   searchPantryItems: vi.fn(),
   getEnhancedAutocompleteSuggestions: vi.fn(),
   filterPantryItems: vi.fn(),
@@ -49,18 +49,18 @@ vi.mock('../../utils/searchUtils', () => ({
   getRecentSearchSuggestions: vi.fn(),
 }));
 
-vi.mock('../../utils/debounceUtils', () => ({
+vi.mock('../../../utils/debounceUtils', () => ({
   debounce: vi.fn((fn) => fn),
 }));
 
-vi.mock('../../utils/preferenceUtils', () => ({
+vi.mock('../../../utils/preferenceUtils', () => ({
   filterRecipesByHouseholdPreferences: vi.fn((recipes) => ({ safeRecipes: recipes, riskyRecipes: [] })),
   rankCachedRecipesByPreferences: vi.fn((recipes) => recipes),
   checkRecipeAgainstPreferences: vi.fn(() => ({ isSafe: true, violations: { allergies: [], restrictions: [], dislikes: [] }, warnings: [] })),
   recipeMatchesCacheFilters: vi.fn(() => true),
 }));
 
-vi.mock('../hooks/useKeyboardNavigation', () => ({
+vi.mock('../../../hooks/useKeyboardNavigation', () => ({
   useKeyboardNavigation: vi.fn(() => ({
     handleKeyDown: vi.fn(),
     focusedIndex: -1,
@@ -68,23 +68,23 @@ vi.mock('../hooks/useKeyboardNavigation', () => ({
 }));
 
 // Mock child components
-vi.mock('../ui/SkeletonLoader', () => ({
+vi.mock('../../../components/ui/SkeletonLoader', () => ({
   RecipeCardSkeleton: () => <div data-testid="recipe-card-skeleton">Loading...</div>,
 }));
 
-vi.mock('../settings/PremiumFeature', () => ({
+vi.mock('../../../components/settings/PremiumFeature', () => ({
   PremiumFeature: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
-vi.mock('../recipes-meals/RecipeRating', () => ({
+vi.mock('../../../components/recipes-meals/RecipeRating', () => ({
   RecipeRatingUI: () => <div data-testid="recipe-rating">Rating</div>,
 }));
 
-vi.mock('../ui/ProgressiveImage', () => ({
+vi.mock('../../../components/ui/ProgressiveImage', () => ({
   ProgressiveImage: ({ alt }: { alt: string }) => <img alt={alt} data-testid="progressive-image" />,
 }));
 
-vi.mock('../recipes-meals/RecipeModal', () => ({
+vi.mock('../../../components/recipes-meals/RecipeModal', () => ({
   default: () => <div data-testid="recipe-modal">Recipe Modal</div>,
 }));
 
@@ -168,7 +168,7 @@ describe('RecipeFinder', () => {
 
   test('shows loading state when searching', async () => {
     // Mock the search function to return a promise that doesn't resolve immediately
-    const { searchRecipes } = await import('../../services/geminiService');
+    const { searchRecipes } = await import('../../../services/geminiService');
     vi.mocked(searchRecipes).mockImplementation(() => new Promise(() => {}));
 
     render(<RecipeFinder {...defaultProps} />);
@@ -216,7 +216,7 @@ describe('RecipeFinder', () => {
       totalResults: 1,
     };
 
-    const { searchRecipes } = await import('../../services/geminiService');
+    const { searchRecipes } = await import('../../../services/geminiService');
     vi.mocked(searchRecipes).mockResolvedValue(mockSearchResult);
 
     // Render component with persistedResult to directly verify rendering of results
@@ -293,8 +293,8 @@ describe('RecipeFinder', () => {
       type: 'Dinner',
     };
 
-    const { getCachedRecipesCache } = await import('../../services/recipeService');
-    const { searchRecipes } = await import('../../services/geminiService');
+    const { getCachedRecipesCache } = await import('../../../services/recipeService');
+    const { searchRecipes } = await import('../../../services/geminiService');
     vi.mocked(getCachedRecipesCache).mockResolvedValue([mockRecipe]);
 
     render(<RecipeFinder {...defaultProps} />);

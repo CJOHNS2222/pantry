@@ -1,4 +1,6 @@
 import { ShoppingItem } from '../types';
+import { normalizeQuantity } from '../utils/appUtils';
+import { WALMART_PACKAGE_SIZE_DATA, PackageOption } from '../data/walmartPackageSizes';
 
 // Top ~140 most common shopping list staples mapped to standard Walmart Item IDs (UPCs / Catalog IDs)
 export const STAPLE_WALMART_MAP: Record<string, string> = {
@@ -379,6 +381,20 @@ export const STAPLE_WALMART_MAP: Record<string, string> = {
   'zucchini': '44390947',
 };
 
+// Units where the amount is a literal count of purchasable items — e.g. "3 onions"
+// means buy 3 onions, so the amount can go straight into the cart as a quantity.
+// Everything else — weight ("400g"), volume ("2 cups"), containers ("1 can"), or
+// descriptive recipe measurements ("2 cloves", "1 bunch") — is NOT a 1:1 purchase
+// multiplier. For items with known package-size data (see WALMART_PACKAGE_SIZES
+// below) we compute an accurate pack count instead; everything else defaults to a
+// single pack rather than risking a wildly wrong cart quantity (e.g. adding 200
+// units of shrimp for "200g shrimp").
+const PURCHASABLE_COUNT_UNITS = new Set(['pcs', 'piece', 'pieces', 'count', 'each', '']);
+
+function isPurchasableCountUnit(unit: string | undefined): boolean {
+  return PURCHASABLE_COUNT_UNITS.has((unit || '').toLowerCase().trim());
+}
+
 /**
  * Perform a fuzzy matching lookup to find the best Walmart Item ID for a given name.
  */
@@ -406,6 +422,39 @@ export function getWalmartItemId(itemName: string, itemObj?: ShoppingItem): stri
 }
 
 /**
+ * Smallest package-size tier per Walmart Item ID, built by fuzzy-matching
+ * WALMART_PACKAGE_SIZE_DATA's item names to STAPLE_WALMART_MAP via the same lookup
+ * used for cart IDs (getWalmartItemId) — so a package size is only ever attached to
+ * a real, confirmed Walmart ID, never to the placeholder IDs in the package-size data
+ * itself. The smallest tier is assumed to be the mapped SKU's size (see
+ * data/walmartPackageSizes.ts for why that's the conservative choice).
+ */
+interface NormalizedPackageSize extends PackageOption {
+  normalizedGrams: number;
+  normalizedKind: 'weight' | 'volume';
+}
+
+const WALMART_PACKAGE_SIZES: Record<string, NormalizedPackageSize> = (() => {
+  const sizes: Record<string, NormalizedPackageSize> = {};
+  for (const product of WALMART_PACKAGE_SIZE_DATA) {
+    const walmartId = getWalmartItemId(product.name);
+    if (!walmartId || product.options.length === 0) continue;
+
+    // Pick the smallest option by normalized weight/volume, not array order.
+    let smallest: NormalizedPackageSize | null = null;
+    for (const option of product.options) {
+      const n = normalizeQuantity({ amount: option.packageAmount, unit: option.packageUnit });
+      if (n.normalizedGrams === undefined || !n.normalizedKind) continue; // unit we can't normalize (e.g. "count")
+      if (!smallest || n.normalizedGrams < smallest.normalizedGrams) {
+        smallest = { ...option, normalizedGrams: n.normalizedGrams, normalizedKind: n.normalizedKind };
+      }
+    }
+    if (smallest) sizes[walmartId] = smallest;
+  }
+  return sizes;
+})();
+
+/**
  * Returns true if an item has a mapped Walmart ID.
  */
 export function hasWalmartMatch(item: ShoppingItem): boolean {
@@ -420,6 +469,15 @@ export function hasWalmartMatch(item: ShoppingItem): boolean {
  */
 export function generateWalmartCartUrl(items: ShoppingItem[], storeId?: string): string | null {
   const productQuantities: Record<string, number> = {};
+  // Products referenced only via a weight/volume/container/descriptive quantity with
+  // no known package size — guaranteed at least 1 pack each, but never multiplied by
+  // the raw amount.
+  const productsNeedingDefaultPack = new Set<string>();
+  // Total weight/volume needed per product, in grams, for products with a known
+  // package size — summed across all its non-count line items before computing a
+  // single pack count, so e.g. "1 cup flour" + "1 cup flour" from two recipes
+  // doesn't round up to 2 packs when it's really still well under one bag.
+  const neededGramsByProduct: Record<string, number> = {};
   let totalIndividualEggs = 0;
   const EGGS_ID = '145051970'; // Default 12-count white eggs
 
@@ -459,10 +517,24 @@ export function generateWalmartCartUrl(items: ShoppingItem[], storeId?: string):
           totalIndividualEggs += amount;
         }
       }
-    } else {
-      // For all other items, sum their quantities directly (rounded)
+    } else if (isPurchasableCountUnit(item.unit)) {
+      // Genuine per-item count (e.g. "3 onions") — the amount maps 1:1 to cart quantity.
       const finalAmount = Math.max(1, Math.round(amount));
       productQuantities[itemId] = (productQuantities[itemId] || 0) + finalAmount;
+    } else {
+      // Weight/volume/container/descriptive quantity (e.g. "2 cups flour", "400g
+      // shrimp", "1 can tomatoes"). If we know this product's package size, accumulate
+      // the needed amount (in grams) so we can compute an accurate pack count once,
+      // after summing every line item that references this product. Otherwise fall
+      // back to a single default pack.
+      const pkg = WALMART_PACKAGE_SIZES[itemId];
+      const needed = pkg ? normalizeQuantity({ amount, unit: item.unit || '' }) : undefined;
+
+      if (pkg && needed?.normalizedGrams !== undefined && needed.normalizedKind === pkg.normalizedKind) {
+        neededGramsByProduct[itemId] = (neededGramsByProduct[itemId] || 0) + needed.normalizedGrams;
+      } else {
+        productsNeedingDefaultPack.add(itemId);
+      }
     }
   });
 
@@ -471,6 +543,26 @@ export function generateWalmartCartUrl(items: ShoppingItem[], storeId?: string):
     const eggPacksCount = Math.max(1, Math.ceil(totalIndividualEggs / 12));
     productQuantities[EGGS_ID] = (productQuantities[EGGS_ID] || 0) + eggPacksCount;
   }
+
+  // Compute an accurate pack count for products with known package sizes, from the
+  // total amount needed across every line item that referenced them.
+  Object.entries(neededGramsByProduct).forEach(([itemId, totalGrams]) => {
+    const pkg = WALMART_PACKAGE_SIZES[itemId];
+    if (!pkg || pkg.normalizedGrams <= 0) return;
+    const packsNeeded = Math.max(1, Math.ceil(totalGrams / pkg.normalizedGrams));
+    if (!productQuantities[itemId]) {
+      productQuantities[itemId] = packsNeeded;
+    }
+  });
+
+  // Ensure every remaining product referenced only by a non-count quantity with no
+  // known package size gets at least one pack, without double-counting products that
+  // already have a literal-count or computed-pack quantity.
+  productsNeedingDefaultPack.forEach(itemId => {
+    if (!productQuantities[itemId]) {
+      productQuantities[itemId] = 1;
+    }
+  });
 
   const cartItems: string[] = [];
   for (const [itemId, qty] of Object.entries(productQuantities)) {

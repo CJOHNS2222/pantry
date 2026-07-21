@@ -343,6 +343,67 @@ describe('consolidateShoppingList', () => {
     expect(result).toHaveLength(4);
   });
 
+  it('should consolidate singular and plural forms of the same item', () => {
+    const items = [
+      { id: '1', item: 'onion', quantity: '1', unit: 'pcs', amount: 1, category: 'Produce', checked: false },
+      { id: '2', item: 'onion', quantity: '1', unit: 'pcs', amount: 1, category: 'Produce', checked: false },
+      { id: '3', item: 'onions', quantity: '2', unit: 'pcs', amount: 2, category: 'Produce', checked: false },
+      { id: '4', item: 'tinned tomatoes', quantity: '1 can', unit: 'can', amount: 1, category: 'Canned', checked: false },
+      { id: '5', item: 'tinned tomatoes', quantity: '1 can', unit: 'can', amount: 1, category: 'Canned', checked: false },
+      { id: '6', item: 'prawns', quantity: '200 g', unit: 'g', amount: 200, category: 'Seafood', checked: false },
+      { id: '7', item: 'prawns', quantity: '100 g', unit: 'g', amount: 100, category: 'Seafood', checked: false },
+    ] as any[];
+
+    const result = consolidateShoppingList(items);
+    expect(result).toHaveLength(3);
+
+    const onionItem = result.find(i => i.item.toLowerCase().startsWith('onion'));
+    expect(onionItem?.amount).toBe(4);
+    expect(onionItem?.unit).toBe('pcs');
+
+    const tomatoItem = result.find(i => i.item.toLowerCase().includes('tomatoes'));
+    expect(tomatoItem?.amount).toBe(2);
+    expect(tomatoItem?.unit).toBe('can');
+
+    const prawnItem = result.find(i => i.item.toLowerCase().includes('prawn'));
+    expect(prawnItem?.amount).toBe(300);
+    expect(prawnItem?.unit).toBe('g');
+  });
+
+  it('should combine standardized container units with true weight units of the same item', () => {
+    const items = [
+      { id: '1', item: 'Tinned Tomatoes', quantity: '1 can', unit: 'can', amount: 1, category: 'Canned', checked: false },
+      { id: '2', item: 'tinned tomatoes', quantity: '400 g', unit: 'g', amount: 400, category: 'Canned', checked: false },
+    ] as any[];
+
+    const result = consolidateShoppingList(items);
+    expect(result).toHaveLength(1);
+    // 1 can (400g) + 400g = 800g total, converted back to the first item's unit (can)
+    expect(result[0].unit).toBe('can');
+    expect(result[0].amount).toBe(2);
+  });
+
+  it('should still keep weight and volume units separate (a ml is not a gram)', () => {
+    const items = [
+      { id: '1', item: 'Flour', quantity: '2 cups', unit: 'cups', amount: 2, category: 'Pantry', checked: false },
+      { id: '2', item: 'Flour', quantity: '1 bag', unit: 'bag', amount: 1, category: 'Pantry', checked: false },
+    ] as any[];
+
+    const result = consolidateShoppingList(items);
+    expect(result).toHaveLength(2);
+  });
+
+  it('should not falsely singularize words ending in "us"/"ss"/"is"', () => {
+    const items = [
+      { id: '1', item: 'hummus', quantity: '1', unit: 'pcs', amount: 1, category: 'Dips', checked: false },
+      { id: '2', item: 'asparagus', quantity: '1', unit: 'bunch', amount: 1, category: 'Produce', checked: false },
+    ] as any[];
+
+    const result = consolidateShoppingList(items);
+    expect(result).toHaveLength(2);
+    expect(result.map(i => i.item)).toEqual(expect.arrayContaining(['hummus', 'asparagus']));
+  });
+
   it('should merge sources and notes cleanly', () => {
     const items = [
       { id: '1', item: 'Salt', quantity: '1 tsp', unit: 'tsp', amount: 1, category: 'Pantry', checked: false, source: 'recipe: Pasta', notes: 'kosher' },

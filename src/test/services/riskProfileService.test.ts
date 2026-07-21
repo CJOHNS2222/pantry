@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import RiskProfileService from '../services/riskProfileService'
+import RiskProfileService from '../../../services/riskProfileService'
 
 describe('RiskProfileService.computeRiskLevelFromAnswers', () => {
   it('computes highest risk for immunocompromised', () => {
