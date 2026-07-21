@@ -32,4 +32,16 @@ describe('LeftoverService.computeBestBeforeISO', () => {
     expected.setDate(expected.getDate() + 4);
     expect(res).toBe(expected.toISOString());
   });
+
+  it('applies cooked-rice 4-day cap even when risk_level would allow longer', () => {
+    const res = computeBestBeforeISO(createdAt, { cooked_rice: true, risk_level: 4 });
+    const expected = new Date(createdAt);
+    expected.setDate(expected.getDate() + 4);
+    expect(res).toBe(expected.toISOString());
+  });
+
+  it('accepts ISO string input and returns a string', () => {
+    const res = computeBestBeforeISO(createdAt, { cooked_rice: true });
+    expect(typeof res).toBe('string');
+  });
 });

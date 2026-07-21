@@ -103,6 +103,70 @@ describe('groceryCheckoutService', () => {
       // 2 dozen = 24 eggs. Cart qty should be 2
       expect(generateWalmartCartUrl(items)).toBe('https://www.walmart.com/sc/cart/addToCart?items=145051970_2');
     });
+
+    it('should default weight/volume/container quantities to a single pack when there is no known package size', () => {
+      // "200g shrimp" should not add 200 units of shrimp to the cart — shrimp has no
+      // package-size data, so this falls back to a single default pack.
+      const shrimpItems: ShoppingItem[] = [
+        { id: '1', item: 'shrimp', checked: false, amount: 200, unit: 'g' } as ShoppingItem
+      ];
+      expect(generateWalmartCartUrl(shrimpItems)).toBe('https://www.walmart.com/sc/cart/addToCart?items=791288879_1');
+    });
+
+    it('should fall back to a single pack when the needed unit and package unit are different kinds (volume vs weight)', () => {
+      // Flour's known package size is in lbs (weight). "2 cups" is a volume — we don't
+      // convert between the two (no density data), so this safely defaults to 1 pack
+      // rather than guessing.
+      const flourItems: ShoppingItem[] = [
+        { id: '1', item: 'flour', checked: false, amount: 2, unit: 'cups' } as ShoppingItem
+      ];
+      expect(generateWalmartCartUrl(flourItems)).toBe('https://www.walmart.com/sc/cart/addToCart?items=178921158_1');
+    });
+
+    it('should compute an accurate pack count for items with known package sizes', () => {
+      // Flour's smallest known package is a 1 lb bag. "3 lb flour" needs 3 packs.
+      const items: ShoppingItem[] = [
+        { id: '1', item: 'flour', checked: false, amount: 3, unit: 'lbs' } as ShoppingItem
+      ];
+      expect(generateWalmartCartUrl(items)).toBe('https://www.walmart.com/sc/cart/addToCart?items=178921158_3');
+    });
+
+    it('should sum weight/volume quantities across line items before rounding up to packs', () => {
+      // Flour's smallest known package is 1 lb. Three separate 0.3 lb needs (0.9 lb
+      // total) should round up to just 1 pack — not 3, which is what naive per-line
+      // rounding (ceil(0.3/1) = 1, repeated 3 times) would incorrectly produce.
+      const items: ShoppingItem[] = [
+        { id: '1', item: 'flour', checked: false, amount: 0.3, unit: 'lbs' } as ShoppingItem,
+        { id: '2', item: 'flour', checked: false, amount: 0.3, unit: 'lbs' } as ShoppingItem,
+        { id: '3', item: 'flour', checked: false, amount: 0.3, unit: 'lbs' } as ShoppingItem
+      ];
+      expect(generateWalmartCartUrl(items)).toBe('https://www.walmart.com/sc/cart/addToCart?items=178921158_1');
+    });
+
+    it('should not multiply pack count when a matching-kind and mismatched-kind quantity both reference the same product', () => {
+      const items: ShoppingItem[] = [
+        { id: '1', item: 'flour', checked: false, amount: 2, unit: 'cups' } as ShoppingItem, // volume — mismatched kind, ignored
+        { id: '2', item: 'flour', checked: false, amount: 400, unit: 'g' } as ShoppingItem // weight — matches package kind, used
+      ];
+      // 400g needs ceil(400 / 453.59) = 1 pack; the cups quantity can't be combined in.
+      expect(generateWalmartCartUrl(items)).toBe('https://www.walmart.com/sc/cart/addToCart?items=178921158_1');
+    });
+
+    it('should still use the literal count when a genuine per-item count unit is given', () => {
+      const items: ShoppingItem[] = [
+        { id: '1', item: 'onion', checked: false, amount: 3, unit: 'pcs' } as ShoppingItem
+      ];
+      expect(generateWalmartCartUrl(items)).toBe('https://www.walmart.com/sc/cart/addToCart?items=51259212_3');
+    });
+
+    it('should prefer a literal count over a non-count reference to the same product', () => {
+      const items: ShoppingItem[] = [
+        { id: '1', item: 'onion', checked: false, amount: 3, unit: 'pcs' } as ShoppingItem,
+        { id: '2', item: 'onion', checked: false, amount: 1, unit: 'bag' } as ShoppingItem
+      ];
+      // The literal count (3 onions) wins; the bag reference doesn't add a spurious extra pack.
+      expect(generateWalmartCartUrl(items)).toBe('https://www.walmart.com/sc/cart/addToCart?items=51259212_3');
+    });
   });
 
   describe('generateSearchUrl', () => {

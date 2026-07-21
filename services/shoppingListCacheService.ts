@@ -2,6 +2,7 @@ import DatabaseMonitoringService from './databaseMonitoringService';
 import { increment, deleteField } from 'firebase/firestore';
 import { ShoppingItem } from '../types';
 import { log } from './logService';
+import { getHouseholdOrUserCachePath } from './cachePathUtils';
 
 export interface CachedShoppingListData {
   [itemId: string]: {
@@ -35,14 +36,8 @@ export interface ShoppingListCache {
 
 const CACHE_VERSION = 2.1; // Version bump due to schema change (removed addedAt)
 
-const getCachePath = (householdId?: string, userId?: string): string => {
-  if (householdId) {
-    return `households/${householdId}/cache/shoppingList`;
-  } else if (userId) {
-    return `users/${userId}/cache/shoppingList`;
-  }
-  throw new Error('Either householdId or userId must be provided');
-};
+const getCachePath = (householdId?: string, userId?: string): string =>
+  getHouseholdOrUserCachePath('shoppingList', householdId, userId);
 
 const shoppingItemToObject = (item: ShoppingItem): CachedShoppingListData[string] => {
   const obj: any = {

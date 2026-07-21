@@ -32,7 +32,7 @@ import { getSmartUnits } from '../pantry/QuantityUnitPicker';
 import { useOfflineStatus } from '../../hooks/useOfflineStatus';
 import { offlineQueue } from '../../services/offlineQueueService';
 import { useAppActions } from '../../contexts/AppActionsContext';
-import { useMealPlanContext } from '../../contexts/DomainContexts';
+import { useApp } from '../../contexts/AppContext';
 import { useAndroidBack } from '../../hooks/useAndroidBack';
 import { groceryPriceService } from '../../services/groceryPriceService';
 import AnalyticsService from '../../services/analyticsService';
@@ -84,7 +84,7 @@ const ShoppingListComponent: React.FC<ShoppingListProps> = ({
   const [newItem, setNewItem] = React.useState('');
   const [canShowAdBanner, setCanShowAdBanner] = React.useState<boolean>(false);
   const { addToast } = useAppActions();
-  const { mealPlan } = useMealPlanContext();
+  const { mealPlan } = useApp();
 
   useEffect(() => {
     let mounted = true;

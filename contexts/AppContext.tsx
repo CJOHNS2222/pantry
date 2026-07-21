@@ -1,5 +1,5 @@
 // contexts/AppContext.tsx
-import React, { createContext, useContext, useMemo, ReactNode } from 'react';
+import React, { createContext, useContext, ReactNode } from 'react';
 import { Tab } from '../types/app';
 import { User, PantryItem, DayPlan, ShoppingItem, SavedRecipe, RecipeRating, RecipeSearchResult, CustomCategory, Household, Settings, ConsumptionSuggestion, ExpirationAlert, RecipeSuggestion, HouseholdActivity } from '../types';
 
@@ -65,17 +65,6 @@ const AppContext = createContext<AppContextValue | undefined>(undefined);
 interface AppProviderProps {
   children: ReactNode;
   value?: AppContextValue;
-  /**
-   * Real, individually-memoized domain context values built in App.tsx from
-   * useDataManagement's mutators (PERF-029). When omitted (tests, storybook
-   * mounts), read-only stubs derived from `value` are provided instead.
-   */
-  domains?: {
-    inventory: InventoryContextType;
-    shoppingList: ShoppingListContextType;
-    mealPlan: MealPlanContextType;
-    recipes: RecipesContextType;
-  };
 }
 
 const defaultSettings: Settings = {
@@ -134,68 +123,12 @@ const defaultAppContextValue: AppContextValue = {
   isLoadingActivities: false,
 };
 
-import {
-  InventoryContext, ShoppingListContext, MealPlanContext, RecipesContext,
-  InventoryContextType, ShoppingListContextType, MealPlanContextType, RecipesContextType,
-} from './DomainContexts';
-
-// Shared no-op mutator for stub domain values — module-level so its identity
-// never invalidates the memoized fallbacks below.
-const noopAsync = async () => {};
-
-export const AppProvider: React.FC<AppProviderProps> = ({ children, value, domains }) => {
+export const AppProvider: React.FC<AppProviderProps> = ({ children, value }) => {
   const providerValue = value ?? defaultAppContextValue;
-
-  // Real domain values come from App.tsx via `domains`; the stubs only serve
-  // mounts that don't supply them. Each is memoized on its own domain's data
-  // so one domain changing doesn't re-render the other domains' consumers.
-  const inventoryContextValue = useMemo<InventoryContextType>(() => domains?.inventory ?? {
-    inventory: providerValue.inventory,
-    isLoadingInventory: providerValue.isLoadingInventory,
-    onAddItem: noopAsync,
-    onAddItems: noopAsync,
-    onUpdateItem: noopAsync,
-    onDeleteItem: noopAsync,
-    deletePantryItems: noopAsync,
-  }, [domains?.inventory, providerValue.inventory, providerValue.isLoadingInventory]);
-
-  const shoppingListContextValue = useMemo<ShoppingListContextType>(() => domains?.shoppingList ?? {
-    shoppingList: providerValue.shoppingList,
-    isLoadingShoppingList: providerValue.isLoadingShoppingList,
-    addShoppingListItem: noopAsync,
-    addShoppingListItems: noopAsync,
-    updateShoppingListItem: noopAsync,
-    removeShoppingListItem: noopAsync,
-  }, [domains?.shoppingList, providerValue.shoppingList, providerValue.isLoadingShoppingList]);
-
-  const mealPlanContextValue = useMemo<MealPlanContextType>(() => domains?.mealPlan ?? {
-    mealPlan: providerValue.mealPlan,
-    isLoadingMealPlan: providerValue.isLoadingMealPlan,
-    addMealToPlan: noopAsync,
-    updateMealOnPlan: noopAsync,
-    removeMealFromPlan: noopAsync,
-    updateMealPlan: noopAsync,
-  }, [domains?.mealPlan, providerValue.mealPlan, providerValue.isLoadingMealPlan]);
-
-  const recipesContextValue = useMemo<RecipesContextType>(() => domains?.recipes ?? {
-    savedRecipes: providerValue.savedRecipes,
-    isLoadingSavedRecipes: providerValue.isLoadingSavedRecipes,
-    onSaveRecipe: noopAsync,
-    onDeleteRecipe: noopAsync,
-    recipeSaveLimitExceeded: providerValue.recipeSaveLimitExceeded,
-  }, [domains?.recipes, providerValue.savedRecipes, providerValue.isLoadingSavedRecipes, providerValue.recipeSaveLimitExceeded]);
 
   return (
     <AppContext.Provider value={providerValue}>
-      <InventoryContext.Provider value={inventoryContextValue}>
-        <ShoppingListContext.Provider value={shoppingListContextValue}>
-          <MealPlanContext.Provider value={mealPlanContextValue}>
-            <RecipesContext.Provider value={recipesContextValue}>
-              {children}
-            </RecipesContext.Provider>
-          </MealPlanContext.Provider>
-        </ShoppingListContext.Provider>
-      </InventoryContext.Provider>
+      {children}
     </AppContext.Provider>
   );
 };

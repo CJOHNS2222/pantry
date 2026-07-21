@@ -1,6 +1,7 @@
 import DatabaseMonitoringService from './databaseMonitoringService';
 import { PantryItem } from '../types';
 import { log } from './logService';
+import { getHouseholdOrUserCachePath } from './cachePathUtils';
 
 export interface CachedInventoryData {
   // Item ID -> [category, imageUrl, name, quantity, location, recipeId?, recipeName?, ...other fields]
@@ -155,12 +156,7 @@ export class InventoryCacheService {
    * Get the cache document path for a household or user
    */
   private static getCachePath(householdId?: string, userId?: string): string {
-    if (householdId) {
-      return `households/${householdId}/cache/inventory`;
-    } else if (userId) {
-      return `users/${userId}/cache/inventory`;
-    }
-    throw new Error('Either householdId or userId must be provided');
+    return getHouseholdOrUserCachePath('inventory', householdId, userId);
   }
 
   private static localInventoryCache: { path: string; items: PantryItem[] } | null = null;

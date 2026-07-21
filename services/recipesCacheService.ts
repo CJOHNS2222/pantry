@@ -1,6 +1,7 @@
 import DatabaseMonitoringService from './databaseMonitoringService';
 import { SavedRecipe } from '../types';
 import { log } from './logService';
+import { getHouseholdOrUserCachePath } from './cachePathUtils';
 
 // The 10th element (structuredIngredients JSON) is optional so arrays cached
 // before PERF-028 (length 9) keep reading correctly — recipeArray[9] is
@@ -69,12 +70,7 @@ export class RecipesCacheService {
    * Get the cache document path for a household or user
    */
   private static getCachePath(householdId?: string, userId?: string): string {
-    if (householdId) {
-      return `households/${householdId}/cache/savedRecipes`;
-    } else if (userId) {
-      return `users/${userId}/cache/savedRecipes`;
-    }
-    throw new Error('Either householdId or userId must be provided');
+    return getHouseholdOrUserCachePath('savedRecipes', householdId, userId);
   }
 
   /**

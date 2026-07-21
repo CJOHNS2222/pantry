@@ -292,9 +292,18 @@ export const RetailCheckoutModal: React.FC<RetailCheckoutModalProps> = ({
                               </button>
                             </div>
                           ) : (
-                            <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-500 font-semibold flex items-center gap-1">
+                            <button
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                const searchUrl = generateSearchUrl(item.item, 'walmart');
+                                const trackedSearchUrl = wrapWithImpactTracker(searchUrl, 'walmart');
+                                await Browser.open({ url: trackedSearchUrl });
+                              }}
+                              className="text-xs px-2.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-500 font-semibold flex items-center gap-1 hover:bg-amber-500/20 transition-colors"
+                              title="Search for this item on Walmart"
+                            >
                               <Search className="w-3 h-3" /> Search
-                            </span>
+                            </button>
                           )}
                         </>
                       )}

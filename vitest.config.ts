@@ -4,9 +4,7 @@ export default defineConfig({
   test: {
     include: [
       'src/**/__tests__/**',
-      'src/**/?(*.)+(spec|test).[tj]s?(x)',
-      'components/**/__tests__/**',
-      'tests/**/?(*.)+(spec|test).[tj]s?(x)'
+      'src/**/?(*.)+(spec|test).[tj]s?(x)'
     ],
     exclude: ['e2e/**', 'node_modules/**', 'functions/**', 'functions/**/node_modules/**'],
     environment: 'jsdom',

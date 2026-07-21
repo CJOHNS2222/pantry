@@ -229,5 +229,15 @@ const sessionStorageMock = {
 };
 Object.defineProperty(window, 'sessionStorage', { value: sessionStorageMock });
 
+// jsdom doesn't implement ResizeObserver — polyfill globally so any component
+// that measures its own layout (e.g. via a ref callback) doesn't crash in tests.
+class MockResizeObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+(global as any).ResizeObserver = MockResizeObserver;
+(window as any).ResizeObserver = MockResizeObserver;
+
 // for Vitest: extend expect with testing-library matchers
 expect.extend(matchers);

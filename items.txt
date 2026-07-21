@@ -1,0 +1,622 @@
+[
+  {
+    "baseProductId": "WMT-BAK-001",
+    "name": "All-Purpose Flour",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "FLR-16OZ", "packageAmount": 1, "packageUnit": "lb" },
+      { "productId": "FLR-80OZ", "packageAmount": 5, "packageUnit": "lb" },
+      { "productId": "FLR-160OZ", "packageAmount": 10, "packageUnit": "lb" }
+    ]
+  },
+  {
+    "baseProductId": "WMT-BAK-002",
+    "name": "Granulated Sugar",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "SGR-16OZ", "packageAmount": 1, "packageUnit": "lb" },
+      { "productId": "SGR-64OZ", "packageAmount": 4, "packageUnit": "lb" },
+      { "productId": "SGR-160OZ", "packageAmount": 10, "packageUnit": "lb" }
+    ]
+  },
+  {
+    "baseProductId": "WMT-PAN-001",
+    "name": "Long Grain White Rice",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "RCE-16OZ", "packageAmount": 1, "packageUnit": "lb" },
+      { "productId": "RCE-48OZ", "packageAmount": 3, "packageUnit": "lb" },
+      { "productId": "RCE-320OZ", "packageAmount": 20, "packageUnit": "lb" }
+    ]
+  },
+  {
+    "baseProductId": "WMT-DAI-001",
+    "name": "Whole Milk",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "MLK-32OZ", "packageAmount": 1, "packageUnit": "qt" },
+      { "productId": "MLK-64OZ", "packageAmount": 0.5, "packageUnit": "gal" },
+      { "productId": "MLK-128OZ", "packageAmount": 1, "packageUnit": "gal" }
+    ]
+  },
+  {
+    "baseProductId": "WMT-DAI-002",
+    "name": "Large White Eggs",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "EGG-06CT", "packageAmount": 6, "packageUnit": "count" },
+      { "productId": "EGG-12CT", "packageAmount": 12, "packageUnit": "count" },
+      { "productId": "EGG-18CT", "packageAmount": 18, "packageUnit": "count" },
+      { "productId": "EGG-60CT", "packageAmount": 60, "packageUnit": "count" }
+    ]
+  },
+  {
+    "baseProductId": "WMT-DAI-003",
+    "name": "Salted Butter",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "BTR-08OZ", "packageAmount": 8, "packageUnit": "oz" },
+      { "productId": "BTR-16OZ", "packageAmount": 16, "packageUnit": "oz" }
+    ]
+  },
+  {
+    "baseProductId": "WMT-OIL-001",
+    "name": "Extra Virgin Olive Oil",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "EVOO-16OZ", "packageAmount": 16.9, "packageUnit": "fl oz" },
+      { "productId": "EVOO-25OZ", "packageAmount": 25.4, "packageUnit": "fl oz" },
+      { "productId": "EVOO-50OZ", "packageAmount": 50.7, "packageUnit": "fl oz" },
+      { "productId": "EVOO-101OZ", "packageAmount": 101.4, "packageUnit": "fl oz" }
+    ]
+  },
+  {
+    "baseProductId": "WMT-PRD-001",
+    "name": "Russet Potatoes",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "POT-01LB", "packageAmount": 1, "packageUnit": "lb" },
+      { "productId": "POT-05LB", "packageAmount": 5, "packageUnit": "lb" },
+      { "productId": "POT-10LB", "packageAmount": 10, "packageUnit": "lb" }
+    ]
+  },
+  {
+    "baseProductId": "WMT-PRD-002",
+    "name": "Yellow Onions",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "ONI-01LB", "packageAmount": 1, "packageUnit": "lb" },
+      { "productId": "ONI-03LB", "packageAmount": 3, "packageUnit": "lb" },
+      { "productId": "ONI-05LB", "packageAmount": 5, "packageUnit": "lb" }
+    ]
+  },
+  {
+    "baseProductId": "WMT-MEA-001",
+    "name": "Boneless Skinless Chicken Breast",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "CHK-01LB", "packageAmount": 1, "packageUnit": "lb" },
+      { "productId": "CHK-02LB", "packageAmount": 2.5, "packageUnit": "lb" },
+      { "productId": "CHK-05LB", "packageAmount": 5, "packageUnit": "lb" }
+    ]
+  },
+  {
+    "baseProductId": "WMT-MEA-002",
+    "name": "Ground Beef 80/20",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "BEEF-01LB", "packageAmount": 1, "packageUnit": "lb" },
+      { "productId": "BEEF-03LB", "packageAmount": 3, "packageUnit": "lb" },
+      { "productId": "BEEF-05LB", "packageAmount": 5, "packageUnit": "lb" }
+    ]
+  },
+  {
+    "baseProductId": "WMT-PAN-002",
+    "name": "Spaghetti Pasta",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "PST-16OZ", "packageAmount": 16, "packageUnit": "oz" },
+      { "productId": "PST-32OZ", "packageAmount": 32, "packageUnit": "oz" }
+    ]
+  },
+  {
+    "baseProductId": "WMT-PAN-003",
+    "name": "Creamy Peanut Butter",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "PB-16OZ", "packageAmount": 16, "packageUnit": "oz" },
+      { "productId": "PB-40OZ", "packageAmount": 40, "packageUnit": "oz" },
+      { "productId": "PB-64OZ", "packageAmount": 64, "packageUnit": "oz" }
+    ]
+  },
+  {
+    "baseProductId": "WMT-BEV-001",
+    "name": "Ground Coffee",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "COF-12OZ", "packageAmount": 12, "packageUnit": "oz" },
+      { "productId": "COF-25OZ", "packageAmount": 25.9, "packageUnit": "oz" },
+      { "productId": "COF-48OZ", "packageAmount": 48, "packageUnit": "oz" }
+    ]
+  },
+  {
+    "baseProductId": "WMT-CAN-001",
+    "name": "Black Beans",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "BBN-15OZ", "packageAmount": 15.25, "packageUnit": "oz" },
+      { "productId": "BBN-29OZ", "packageAmount": 29, "packageUnit": "oz" }
+    ]
+  }
+]
+
+
+[
+  {
+    "baseProductId": "WMT-PRD-003",
+    "name": "Yellow Bananas",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "BAN-01LB", "packageAmount": 1, "packageUnit": "lb" },
+      { "productId": "BAN-03LB", "packageAmount": 3, "packageUnit": "lb" }
+    ]
+  },
+  {
+    "baseProductId": "WMT-PRD-004",
+    "name": "Whole Carrots",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "CRT-01LB", "packageAmount": 1, "packageUnit": "lb" },
+      { "productId": "CRT-02LB", "packageAmount": 2, "packageUnit": "lb" },
+      { "productId": "CRT-05LB", "packageAmount": 5, "packageUnit": "lb" }
+    ]
+  },
+  {
+    "baseProductId": "WMT-PRD-005",
+    "name": "Gala Apples",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "APP-03LB", "packageAmount": 3, "packageUnit": "lb" },
+      { "productId": "APP-05LB", "packageAmount": 5, "packageUnit": "lb" }
+    ]
+  },
+  {
+    "baseProductId": "WMT-PRD-006",
+    "name": "Fresh Spinach",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "SPN-10OZ", "packageAmount": 10, "packageUnit": "oz" },
+      { "productId": "SPN-16OZ", "packageAmount": 16, "packageUnit": "oz" }
+    ]
+  },
+  {
+    "baseProductId": "WMT-PRD-007",
+    "name": "Roma Tomatoes",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "TOM-01LB", "packageAmount": 1, "packageUnit": "lb" },
+      { "productId": "TOM-03LB", "packageAmount": 3, "packageUnit": "lb" }
+    ]
+  },
+  {
+    "baseProductId": "WMT-PRD-008",
+    "name": "Fresh Strawberries",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "STR-16OZ", "packageAmount": 16, "packageUnit": "oz" },
+      { "productId": "STR-32OZ", "packageAmount": 32, "packageUnit": "oz" }
+    ]
+  },
+  {
+    "baseProductId": "WMT-PRD-009",
+    "name": "Broccoli Crowns",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "BRC-01LB", "packageAmount": 1, "packageUnit": "lb" },
+      { "productId": "BRC-02LB", "packageAmount": 2, "packageUnit": "lb" }
+    ]
+  },
+  {
+    "baseProductId": "WMT-PRD-010",
+    "name": "Hass Avocados",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "AVO-01CT", "packageAmount": 1, "packageUnit": "count" },
+      { "productId": "AVO-04CT", "packageAmount": 4, "packageUnit": "count" },
+      { "productId": "AVO-06CT", "packageAmount": 6, "packageUnit": "count" }
+    ]
+  },
+  {
+    "baseProductId": "WMT-MEA-003",
+    "name": "Ground Turkey 93/7",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "TRK-01LB", "packageAmount": 1, "packageUnit": "lb" },
+      { "productId": "TRK-03LB", "packageAmount": 3, "packageUnit": "lb" }
+    ]
+  },
+  {
+    "baseProductId": "WMT-MEA-004",
+    "name": "Assorted Pork Chops",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "PRK-01LB", "packageAmount": 1, "packageUnit": "lb" },
+      { "productId": "PRK-25LB", "packageAmount": 2.5, "packageUnit": "lb" }
+    ]
+  },
+  {
+    "baseProductId": "WMT-MEA-005",
+    "name": "Thick Cut Bacon",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "BCN-12OZ", "packageAmount": 12, "packageUnit": "oz" },
+      { "productId": "BCN-24OZ", "packageAmount": 24, "packageUnit": "oz" },
+      { "productId": "BCN-48OZ", "packageAmount": 48, "packageUnit": "oz" }
+    ]
+  },
+  {
+    "baseProductId": "WMT-DAI-004",
+    "name": "Shredded Mild Cheddar Cheese",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "CHD-08OZ", "packageAmount": 8, "packageUnit": "oz" },
+      { "productId": "CHD-16OZ", "packageAmount": 16, "packageUnit": "oz" },
+      { "productId": "CHD-32OZ", "packageAmount": 32, "packageUnit": "oz" }
+    ]
+  },
+  {
+    "baseProductId": "WMT-DAI-005",
+    "name": "Plain Greek Yogurt",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "YOG-05OZ", "packageAmount": 5.3, "packageUnit": "oz" },
+      { "productId": "YOG-32OZ", "packageAmount": 32, "packageUnit": "oz" }
+    ]
+  },
+  {
+    "baseProductId": "WMT-DAI-006",
+    "name": "Original Cream Cheese",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "CRM-08OZ", "packageAmount": 8, "packageUnit": "oz" },
+      { "productId": "CRM-16OZ", "packageAmount": 16, "packageUnit": "oz" }
+    ]
+  },
+  {
+    "baseProductId": "WMT-DAI-007",
+    "name": "Original Sour Cream",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "SCR-08OZ", "packageAmount": 8, "packageUnit": "oz" },
+      { "productId": "SCR-16OZ", "packageAmount": 16, "packageUnit": "oz" },
+      { "productId": "SCR-24OZ", "packageAmount": 24, "packageUnit": "oz" }
+    ]
+  },
+  {
+    "baseProductId": "WMT-CAN-002",
+    "name": "Petite Diced Tomatoes",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "DCT-14OZ", "packageAmount": 14.5, "packageUnit": "oz" },
+      { "productId": "DCT-28OZ", "packageAmount": 28, "packageUnit": "oz" }
+    ]
+  },
+  {
+    "baseProductId": "WMT-CAN-003",
+    "name": "Chicken Broth",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "BRT-14OZ", "packageAmount": 14.5, "packageUnit": "oz" },
+      { "productId": "BRT-32OZ", "packageAmount": 32, "packageUnit": "oz" },
+      { "productId": "BRT-48OZ", "packageAmount": 48, "packageUnit": "oz" }
+    ]
+  },
+  {
+    "baseProductId": "WMT-CAN-004",
+    "name": "Whole Kernel Sweet Corn",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "CRN-15OZ", "packageAmount": 15.25, "packageUnit": "oz" },
+      { "productId": "CRN-29OZ", "packageAmount": 29, "packageUnit": "oz" }
+    ]
+  },
+  {
+    "baseProductId": "WMT-CAN-005",
+    "name": "Chunk Light Tuna in Water",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "TNA-05OZ", "packageAmount": 5, "packageUnit": "oz" },
+      { "productId": "TNA-12OZ", "packageAmount": 12, "packageUnit": "oz" }
+    ]
+  },
+  {
+    "baseProductId": "WMT-PAN-004",
+    "name": "Old Fashioned Rolled Oats",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "OAT-18OZ", "packageAmount": 18, "packageUnit": "oz" },
+      { "productId": "OAT-42OZ", "packageAmount": 42, "packageUnit": "oz" }
+    ]
+  },
+  {
+    "baseProductId": "WMT-PAN-005",
+    "name": "Tomato Ketchup",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "KTC-20OZ", "packageAmount": 20, "packageUnit": "oz" },
+      { "productId": "KTC-38OZ", "packageAmount": 38, "packageUnit": "oz" },
+      { "productId": "KTC-64OZ", "packageAmount": 64, "packageUnit": "oz" }
+    ]
+  },
+  {
+    "baseProductId": "WMT-PAN-006",
+    "name": "Real Mayonnaise",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "MAYO-15OZ", "packageAmount": 15, "packageUnit": "fl oz" },
+      { "productId": "MAYO-30OZ", "packageAmount": 30, "packageUnit": "fl oz" },
+      { "productId": "MAYO-48OZ", "packageAmount": 48, "packageUnit": "fl oz" }
+    ]
+  },
+  {
+    "baseProductId": "WMT-PAN-007",
+    "name": "Less Sodium Soy Sauce",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "SOY-10OZ", "packageAmount": 10, "packageUnit": "fl oz" },
+      { "productId": "SOY-15OZ", "packageAmount": 15, "packageUnit": "fl oz" },
+      { "productId": "SOY-64OZ", "packageAmount": 64, "packageUnit": "fl oz" }
+    ]
+  },
+  {
+    "baseProductId": "WMT-PAN-008",
+    "name": "Original Macaroni & Cheese",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "MAC-07OZ", "packageAmount": 7.25, "packageUnit": "oz" },
+      { "productId": "MAC-14OZ", "packageAmount": 14, "packageUnit": "oz" }
+    ]
+  },
+  {
+    "baseProductId": "WMT-FRZ-001",
+    "name": "Frozen Mixed Vegetables",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "MXV-12OZ", "packageAmount": 12, "packageUnit": "oz" },
+      { "productId": "MXV-32OZ", "packageAmount": 32, "packageUnit": "oz" }
+    ]
+  }
+]
+
+
+[
+  {
+    "baseProductId": "WMT-PRD-011",
+    "name": "Fresh Sweet Onions",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "SNO-01LB", "packageAmount": 1, "packageUnit": "lb" },
+      { "productId": "SNO-03LB", "packageAmount": 3, "packageUnit": "lb" }
+    ]
+  },
+  {
+    "baseProductId": "WMT-PRD-012",
+    "name": "Whole Green Asparagus",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "ASP-01LB", "packageAmount": 1, "packageUnit": "lb" },
+      { "productId": "ASP-02LB", "packageAmount": 2, "packageUnit": "lb" }
+    ]
+  },
+  {
+    "baseProductId": "WMT-PRD-013",
+    "name": "Red Seedless Grapes",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "GRP-1.5LB", "packageAmount": 1.5, "packageUnit": "lb" },
+      { "productId": "GRP-03LB", "packageAmount": 3, "packageUnit": "lb" }
+    ]
+  },
+  {
+    "baseProductId": "WMT-MEA-006",
+    "name": "Smoked Turkey Sausage",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "TSG-13OZ", "packageAmount": 13, "packageUnit": "oz" },
+      { "productId": "TSG-26OZ", "packageAmount": 26, "packageUnit": "oz" }
+    ]
+  },
+  {
+    "baseProductId": "WMT-MEA-007",
+    "name": "Beef Hot Dogs",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "HD-15OZ", "packageAmount": 15, "packageUnit": "oz" },
+      { "productId": "HD-30OZ", "packageAmount": 30, "packageUnit": "oz" }
+    ]
+  },
+  {
+    "baseProductId": "WMT-MEA-008",
+    "name": "Thin Sliced Deli Ham",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "HAM-09OZ", "packageAmount": 9, "packageUnit": "oz" },
+      { "productId": "HAM-16OZ", "packageAmount": 16, "packageUnit": "oz" }
+    ]
+  },
+  {
+    "baseProductId": "WMT-DAI-008",
+    "name": "Heavy Whipping Cream",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "HWC-08OZ", "packageAmount": 8, "packageUnit": "fl oz" },
+      { "productId": "HWC-16OZ", "packageAmount": 16, "packageUnit": "fl oz" },
+      { "productId": "HWC-32OZ", "packageAmount": 32, "packageUnit": "fl oz" }
+    ]
+  },
+  {
+    "baseProductId": "WMT-DAI-009",
+    "name": "Grated Parmesan Cheese",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "PARM-08OZ", "packageAmount": 8, "packageUnit": "oz" },
+      { "productId": "PARM-16OZ", "packageAmount": 16, "packageUnit": "oz" }
+    ]
+  },
+  {
+    "baseProductId": "WMT-DAI-010",
+    "name": "Sliced Provolone Cheese",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "PROV-08OZ", "packageAmount": 8, "packageUnit": "oz" },
+      { "productId": "PROV-16OZ", "packageAmount": 16, "packageUnit": "oz" }
+    ]
+  },
+  {
+    "baseProductId": "WMT-PAN-009",
+    "name": "Garlic Powder",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "GAR-3.4OZ", "packageAmount": 3.4, "packageUnit": "oz" },
+      { "productId": "GAR-10OZ", "packageAmount": 10.5, "packageUnit": "oz" }
+    ]
+  },
+  {
+    "baseProductId": "WMT-PAN-010",
+    "name": "Onion Powder",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "ONP-3.2OZ", "packageAmount": 3.25, "packageUnit": "oz" },
+      { "productId": "ONP-09OZ", "packageAmount": 9.25, "packageUnit": "oz" }
+    ]
+  },
+  {
+    "baseProductId": "WMT-PAN-011",
+    "name": "Vegetable Oil",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "VOIL-48OZ", "packageAmount": 48, "packageUnit": "fl oz" },
+      { "productId": "VOIL-128OZ", "packageAmount": 128, "packageUnit": "fl oz" }
+    ]
+  },
+  {
+    "baseProductId": "WMT-PAN-012",
+    "name": "Baking Soda",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "BSODA-16OZ", "packageAmount": 16, "packageUnit": "oz" },
+      { "productId": "BSODA-64OZ", "packageAmount": 64, "packageUnit": "oz" }
+    ]
+  },
+  {
+    "baseProductId": "WMT-PAN-013",
+    "name": "Light Brown Sugar",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "BRSGR-32OZ", "packageAmount": 32, "packageUnit": "oz" },
+      { "productId": "BRSGR-64OZ", "packageAmount": 64, "packageUnit": "oz" }
+    ]
+  },
+  {
+    "baseProductId": "WMT-PAN-014",
+    "name": "White Sandwich Bread",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "BRD-20OZ", "packageAmount": 20, "packageUnit": "oz" },
+      { "productId": "BRD-40OZ", "packageAmount": 40, "packageUnit": "oz" }
+    ]
+  },
+  {
+    "baseProductId": "WMT-CAN-006",
+    "name": "Cut Green Beans",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "CGB-14OZ", "packageAmount": 14.5, "packageUnit": "oz" },
+      { "productId": "CGB-28OZ", "packageAmount": 28, "packageUnit": "oz" }
+    ]
+  },
+  {
+    "baseProductId": "WMT-CAN-007",
+    "name": "Tomato Sauce",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "TSAU-08OZ", "packageAmount": 8, "packageUnit": "oz" },
+      { "productId": "TSAU-15OZ", "packageAmount": 15, "packageUnit": "oz" },
+      { "productId": "TSAU-29OZ", "packageAmount": 29, "packageUnit": "oz" }
+    ]
+  },
+  {
+    "baseProductId": "WMT-CAN-008",
+    "name": "Cream of Chicken Condensed Soup",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "CCS-10OZ", "packageAmount": 10.5, "packageUnit": "oz" },
+      { "productId": "CCS-22OZ", "packageAmount": 22.6, "packageUnit": "oz" }
+    ]
+  },
+  {
+    "baseProductId": "WMT-CAN-009",
+    "name": "Sriracha Hot Chili Sauce",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "SRI-09OZ", "packageAmount": 9, "packageUnit": "oz" },
+      { "productId": "SRI-17OZ", "packageAmount": 17, "packageUnit": "oz" },
+      { "productId": "SRI-28OZ", "packageAmount": 28, "packageUnit": "oz" }
+    ]
+  },
+  {
+    "baseProductId": "WMT-FRZ-002",
+    "name": "Fully Cooked Chicken Nuggets",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "NUG-32OZ", "packageAmount": 32, "packageUnit": "oz" },
+      { "productId": "NUG-64OZ", "packageAmount": 64, "packageUnit": "oz" }
+    ]
+  },
+  {
+    "baseProductId": "WMT-FRZ-003",
+    "name": "Frozen Broccoli Florets",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "FBRC-12OZ", "packageAmount": 12, "packageUnit": "oz" },
+      { "productId": "FBRC-32OZ", "packageAmount": 32, "packageUnit": "oz" }
+    ]
+  },
+  {
+    "baseProductId": "WMT-FRZ-004",
+    "name": "Cheese Tortellini Pasta",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "FTOR-19OZ", "packageAmount": 19, "packageUnit": "oz" },
+      { "productId": "FTOR-36OZ", "packageAmount": 36, "packageUnit": "oz" }
+    ]
+  },
+  {
+    "baseProductId": "WMT-FRZ-005",
+    "name": "Frozen Wild Blueberries",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "FBLU-15OZ", "packageAmount": 15, "packageUnit": "oz" },
+      { "productId": "FBLU-32OZ", "packageAmount": 32, "packageUnit": "oz" }
+    ]
+  },
+  {
+    "baseProductId": "WMT-BEV-002",
+    "name": "Distilled Water",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "DWAT-128OZ", "packageAmount": 1, "packageUnit": "gal" },
+      { "productId": "DWAT-06PK", "packageAmount": 6, "packageUnit": "gal" }
+    ]
+  },
+  {
+    "baseProductId": "WMT-BEV-003",
+    "name": "Orange Juice No Pulp",
+    "retailer": "Walmart",
+    "options": [
+      { "productId": "OJ-52OZ", "packageAmount": 52, "packageUnit": "fl oz" },
+      { "productId": "OJ-89OZ", "packageAmount": 89, "packageUnit": "fl oz" }
+    ]
+  }
+]
+

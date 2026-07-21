@@ -1,6 +1,7 @@
 import { arrayUnion, arrayRemove } from 'firebase/firestore';
 import { DayPlan, MealPlanItem } from '../types';
 import DatabaseMonitoringService from './databaseMonitoringService';
+import { getHouseholdOrUserCachePath } from './cachePathUtils';
 
 export const CACHE_VERSION = '1.0';
 
@@ -27,13 +28,7 @@ const sanitizeObject = (obj: any): any => {
 };
 
 const getCacheRef = (householdId?: string, userId?: string) => {
-  if (householdId) {
-    return DatabaseMonitoringService.doc(`households/${householdId}/cache/mealPlan`);
-  } else if (userId) {
-    return DatabaseMonitoringService.doc(`users/${userId}/cache/mealPlan`);
-  } else {
-    throw new Error('A householdId or userId must be provided');
-  }
+  return DatabaseMonitoringService.doc(getHouseholdOrUserCachePath('mealPlan', householdId, userId));
 };
 
 const updateCache = async (mealPlan: DayPlan[], householdId?: string, userId?: string) => {

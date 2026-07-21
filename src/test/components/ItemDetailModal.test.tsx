@@ -120,8 +120,8 @@ describe('ItemDetailModal Component', () => {
     const emptyButton = screen.getByTestId('item-visual-empty');
     fireEvent.click(emptyButton);
     
-    // Trigger save/close
-    const closeButton = screen.getByTestId('item-close');
+    // Trigger save/close via the shared BottomSheet close button (aria-label="Close")
+    const closeButton = screen.getByLabelText('Close');
     fireEvent.click(closeButton);
 
     expect(mockOnDeleteItem).toHaveBeenCalledWith(0, 'cooked');
@@ -137,8 +137,8 @@ describe('ItemDetailModal Component', () => {
     const emptyButton = screen.getByTestId('item-visual-empty');
     fireEvent.click(emptyButton);
     
-    // Trigger save/close
-    const closeButton = screen.getByTestId('item-close');
+    // Trigger save/close via the shared BottomSheet close button (aria-label="Close")
+    const closeButton = screen.getByLabelText('Close');
     fireEvent.click(closeButton);
 
     expect(mockOnDeleteItem).toHaveBeenCalledWith(0, 'thrown_away');
