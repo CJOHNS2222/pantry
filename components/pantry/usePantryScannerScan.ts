@@ -1,7 +1,6 @@
 import { useCallback } from 'react';
 import { Camera as CapacitorCamera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { Capacitor } from '@capacitor/core';
-import { BrowserMultiFormatReader } from '@zxing/library';
 import { LoadingState, User } from '../../types';
 import { log } from '../../services/logService';
 import AnalyticsService from '../../services/analyticsService';
@@ -131,6 +130,7 @@ export function usePantryScannerScan(
         const img = new window.Image();
         img.onload = async () => {
           try {
+            const { BrowserMultiFormatReader } = await import('@zxing/library');
             const codeReader = new BrowserMultiFormatReader();
             const result = await codeReader.decodeFromImage(img);
 

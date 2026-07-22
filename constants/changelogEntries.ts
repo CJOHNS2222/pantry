@@ -20,6 +20,16 @@ export interface DetailedChangeEntry {
 
 export const RECENT_CHANGES: ChangeEntry[] = [
   {
+    "version": "3.0.12",
+    "date": "Jul 20, 2026",
+    "highlights": [
+      "Architecture & Service Layer Modularization — Extracted cache path utilities and modularized inventoryCacheService,…",
+      "Household Migration & Retry Safeguards — Added dedicated householdMigrationService and useHouseholdMigrationRetry hook…",
+      "Pantry Health & Scanner Utilities — Extracted standalone pantryHealthUtils and modularized PantryScanner scan execution…",
+      "Retail & Package Size Data — Added curated Walmart package size lookup options and enhanced RetailCheckoutModal item…"
+    ]
+  },
+  {
     "version": "3.0.11",
     "date": "Jul 20, 2026",
     "highlights": [
@@ -38,20 +48,27 @@ export const RECENT_CHANGES: ChangeEntry[] = [
       "Household Presence Optimization — Replaced full object serializations during presence heartbeats with fast scalar…",
       "Server-Side Ratings Querying — Added server-side where('date', '>=', cutoff) query constraint to recipe ratings…"
     ]
-  },
-  {
-    "version": "3.0.9",
-    "date": "Jul 18, 2026",
-    "highlights": [
-      "Immersive Landscape Cooking Mode — Implemented native Android landscape orientation lock and sticky hidden…",
-      "Dynamic Unit System Conversions — Implemented automatic unit conversions (Grams to Oz/Lbs for Standard/US users) across…",
-      "Firestore Persistent Local Cache — Configured native IndexedDB Firestore persistence for instant app startup load times…",
-      "Native In-App Store Updates — Integrated Capawesome App Update plugin (@capawesome/capacitor-app-update) for direct,…"
-    ]
   }
 ];
 
 export const ALL_CHANGES: DetailedChangeEntry[] = [
+  {
+    "version": "3.0.12",
+    "date": "Jul 20, 2026",
+    "sections": [
+      {
+        "title": "Added / Changed / Refactored",
+        "bullets": [
+          "**Architecture & Service Layer Modularization** — Extracted cache path utilities and modularized `inventoryCacheService`, `shoppingListCacheService`, `mealPlanCacheService`, and `recipesCacheService`.",
+          "**Household Migration & Retry Safeguards** — Added dedicated `householdMigrationService` and `useHouseholdMigrationRetry` hook for resilient multi-user data migration.",
+          "**Pantry Health & Scanner Utilities** — Extracted standalone `pantryHealthUtils` and modularized `PantryScanner` scan execution hook (`usePantryScannerScan`).",
+          "**Retail & Package Size Data** — Added curated Walmart package size lookup options and enhanced `RetailCheckoutModal` item matching.",
+          "**Notification & Animation Hooks** — Integrated background notification polling hook (`useNotificationPolling`) and celebration fireworks hook (`useCelebrationFireworks`).",
+          "**Test Infrastructure Streamlining** — Consolidated and standardized test files into `src/test/` structure with enhanced coverage across grocery checkout and health scoring."
+        ]
+      }
+    ]
+  },
   {
     "version": "3.0.11",
     "date": "Jul 20, 2026",

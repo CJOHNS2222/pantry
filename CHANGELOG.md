@@ -1,3 +1,15 @@
+## [3.0.12] - 2026-07-20
+
+### Added / Changed / Refactored
+- **Architecture & Service Layer Modularization** — Extracted cache path utilities and modularized `inventoryCacheService`, `shoppingListCacheService`, `mealPlanCacheService`, and `recipesCacheService`.
+- **Household Migration & Retry Safeguards** — Added dedicated `householdMigrationService` and `useHouseholdMigrationRetry` hook for resilient multi-user data migration.
+- **Pantry Health & Scanner Utilities** — Extracted standalone `pantryHealthUtils` and modularized `PantryScanner` scan execution hook (`usePantryScannerScan`).
+- **Retail & Package Size Data** — Added curated Walmart package size lookup options and enhanced `RetailCheckoutModal` item matching.
+- **Notification & Animation Hooks** — Integrated background notification polling hook (`useNotificationPolling`) and celebration fireworks hook (`useCelebrationFireworks`).
+- **Test Infrastructure Streamlining** — Consolidated and standardized test files into `src/test/` structure with enhanced coverage across grocery checkout and health scoring.
+
+---
+
 ## [3.0.11] - 2026-07-20
 
 ### Architecture & Refactoring
