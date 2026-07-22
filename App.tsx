@@ -2,10 +2,8 @@ import React, { useState, useEffect, useRef, useMemo, Suspense, useCallback } fr
 import { serverTimestamp } from 'firebase/firestore';
 import DatabaseMonitoringService from './services/databaseMonitoringService';
 import { Login } from './components/auth-onboarding/Login';
-import { HouseholdManager } from './components/household/Household';
-import { HouseholdInviteModal } from './components/household/HouseholdInviteModal';
-import { ModernOnboardingFlow } from './components/auth-onboarding/ModernOnboardingFlow';
 import ErrorBoundary from './components/ui/ErrorBoundary';
+import { AppLoadingScreen } from './components/ui/AppLoadingScreen';
 import { AppHeader } from './components/layout/AppHeader';
 import { AppNavigation } from './components/layout/AppNavigation';
 import { MainContent } from './components/layout/MainContent';
@@ -17,7 +15,6 @@ import { useSettings } from './hooks/useSettings';
 import { useToast } from './components/ui/Toast';
 import { Button } from './components/ui/Button';
 import { useDataManagement } from './hooks/useDataManagement';
-import RiskAssessmentQuestionnaire from './components/ui/RiskAssessmentQuestionnaire';
 import { useHouseholdActivity } from './hooks/useHouseholdActivity';
 import { useOfflineStatus } from './hooks/useOfflineStatus';
 import AnalyticsService from './services/analyticsService';
@@ -42,8 +39,6 @@ import { AppActionsProvider } from './contexts/AppActionsContext';
 import { useStableCallback } from './hooks/useStableCallback';
 import SafeAreaService from './services/safeAreaService';
 import { GlobalUpdatePrompt } from './components/ui/GlobalUpdatePrompt';
-import { WhatsNewModal } from './components/auth-onboarding/WhatsNewModal';
-import { FeatureDiscoveryManager } from './components/auth-onboarding/FeatureDiscovery';
 import { ContextualTutorial, useContextualTips } from './components/auth-onboarding/ContextualTutorial';
 import { joinHousehold } from './services/householdService';
 import { setAppContext, trackNavigation, trackShoppingListAction } from './services/sentryService';
@@ -54,15 +49,11 @@ import HapticService from './services/hapticService';
 import { ShoppingListCacheService } from './services/shoppingListCacheService';
 import { groceryPriceService } from './services/groceryPriceService';
 import { PriceDataCacheService } from './services/priceDataCacheService'; // Import the service
-import ExpiredItemsModal from './components/pantry/ExpiredItemsModal';
 import ExpiredItemsLaunchSheet, { getExpiredLaunchEnabled } from './components/pantry/ExpiredItemsLaunchSheet';
-import ItemDetailModal from './components/pantry/ItemDetailModal';
-import { RecipeFinderModalSection } from './components/recipe-finder/RecipeFinderModalSection';
 import { recordMilestone } from './services/onboardingMilestoneService';
 import { useIntl } from 'react-intl';
 import { useAndroidBack, closeTopAndroidModal } from './hooks/useAndroidBack';
 import { useKeyboard } from './hooks/useKeyboard';
-import { GeminiTokenDebugger } from './components/ui/GeminiTokenDebugger';
 import { cameraRestoredStore } from './utils/cameraRestoredStore';
 import { getUnlockedBadges } from './utils/achievementUtils';
 import { useCelebrationFireworks } from './hooks/useCelebrationFireworks';
@@ -72,6 +63,20 @@ import { migrateUserDataToHousehold } from './services/householdMigrationService
 
 // Lazy load monitoring components
 const DatabaseAnalytics = React.lazy(() => import('./components/admin-analytics/DatabaseAnalytics').then(module => ({ default: module.default })));
+
+// Lazy load modal-only components — these are only needed after a specific user
+// action (household setup, onboarding, recipe search, etc.) so keeping them out
+// of the initial bundle shrinks first-load JS for every user.
+const HouseholdManager = React.lazy(() => import('./components/household/Household').then(m => ({ default: m.HouseholdManager })));
+const HouseholdInviteModal = React.lazy(() => import('./components/household/HouseholdInviteModal').then(m => ({ default: m.HouseholdInviteModal })));
+const ModernOnboardingFlow = React.lazy(() => import('./components/auth-onboarding/ModernOnboardingFlow').then(m => ({ default: m.ModernOnboardingFlow })));
+const RiskAssessmentQuestionnaire = React.lazy(() => import('./components/ui/RiskAssessmentQuestionnaire'));
+const ItemDetailModal = React.lazy(() => import('./components/pantry/ItemDetailModal'));
+const ExpiredItemsModal = React.lazy(() => import('./components/pantry/ExpiredItemsModal'));
+const RecipeFinderModalSection = React.lazy(() => import('./components/recipe-finder/RecipeFinderModalSection').then(m => ({ default: m.RecipeFinderModalSection })));
+const GeminiTokenDebugger = React.lazy(() => import('./components/ui/GeminiTokenDebugger').then(m => ({ default: m.GeminiTokenDebugger })));
+const WhatsNewModal = React.lazy(() => import('./components/auth-onboarding/WhatsNewModal').then(m => ({ default: m.WhatsNewModal })));
+const FeatureDiscoveryManager = React.lazy(() => import('./components/auth-onboarding/FeatureDiscovery').then(m => ({ default: m.FeatureDiscoveryManager })));
 
 // Loading component for lazy-loaded components
 const LoadingSpinner: React.FC = () => (
@@ -1513,13 +1518,9 @@ const App: React.FC = () => {
     stableSetPersistedRecipeResult, stableHandleLogout, handleShowHousehold, stableCheckRecipeSaveLimit,
     stableCheckMealPlanLimit, stableRefreshAllData, handleReplayOnboarding]);
 
-  // Show a loading spinner while waiting for auth to be ready
+  // Show a branded loading screen while waiting for auth to be ready
   if (!isAuthReady) {
-    return (
-      <div className="h-screen flex items-center justify-center bg-theme-primary">
-        <LoadingSpinner />
-      </div>
-    );
+    return <AppLoadingScreen />;
   }
 
   if (!user) return <Login onLogin={handleLogin} />;
@@ -1552,17 +1553,20 @@ const App: React.FC = () => {
       <ErrorBoundary>
         <div className="h-screen flex flex-col max-w-md mx-auto shadow-2xl relative border-x border-theme transition-colors duration-300 overflow-x-hidden">
         {showHousehold && (
-          <HouseholdManager 
-              user={user} 
-              household={household} 
-              setHousehold={setHousehold} 
-              onClose={() => setShowHousehold(false)}
-              setActiveTab={setActiveTab}
-              addToast={addToast}
-          />
+          <Suspense fallback={null}>
+            <HouseholdManager
+                user={user}
+                household={household}
+                setHousehold={setHousehold}
+                onClose={() => setShowHousehold(false)}
+                setActiveTab={setActiveTab}
+                addToast={addToast}
+            />
+          </Suspense>
         )}
 
         {showOnboarding && user && (
+          <Suspense fallback={null}>
           <ModernOnboardingFlow
             user={user}
             onComplete={() => {
@@ -1596,11 +1600,13 @@ const App: React.FC = () => {
               }
             }}
           />
+          </Suspense>
         )}
 
         {showRiskQuestionnaire && (
           <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-md flex flex-col justify-end sm:justify-center overflow-hidden">
             <div className="bg-theme-secondary w-full sm:max-w-2xl sm:mx-auto sm:rounded-3xl shadow-2xl relative flex flex-col max-h-[90vh] rounded-t-3xl mt-10 sm:mt-0 overflow-y-auto">
+              <Suspense fallback={null}>
               <RiskAssessmentQuestionnaire
                 userId={user.id}
                 onComplete={(level: number, sensitive?: boolean) => {
@@ -1613,11 +1619,13 @@ const App: React.FC = () => {
                     });
                 }}
               />
+              </Suspense>
             </div>
           </div>
         )}
 
         {showHouseholdInviteModal && user && (
+          <Suspense fallback={null}>
           <HouseholdInviteModal
             invites={householdInvites}
             user={user}
@@ -1625,9 +1633,11 @@ const App: React.FC = () => {
             onAccept={handleHouseholdInviteAccept}
             onDecline={handleHouseholdInviteDecline}
           />
+          </Suspense>
         )}
 
         {notificationViewItem && (
+          <Suspense fallback={null}>
           <ItemDetailModal
             item={notificationViewItem.item}
             originalIndex={notificationViewItem.index}
@@ -1637,9 +1647,11 @@ const App: React.FC = () => {
             onAddToShoppingList={addToShoppingList}
             customCategories={customCategories}
           />
+          </Suspense>
         )}
 
         {showExpiredItemsModal && (
+          <Suspense fallback={null}>
           <ExpiredItemsModal
             isOpen={showExpiredItemsModal}
             onClose={() => setShowExpiredItemsModal(false)}
@@ -1649,6 +1661,7 @@ const App: React.FC = () => {
             userId={user?.id}
             userName={user?.name}
           />
+          </Suspense>
         )}
 
         {showAddToPlanDialog && pendingRecipeForPlan && (
@@ -1779,6 +1792,7 @@ const App: React.FC = () => {
         <AppNavigation activeTab={activeTab} setActiveTab={switchTab} hiddenTabs={settings.navigation?.hiddenTabs} isKeyboardVisible={isKeyboardVisible} />
         
         {showHousehold && (
+          <Suspense fallback={null}>
           <HouseholdManager
             user={user}
             household={household}
@@ -1787,6 +1801,7 @@ const App: React.FC = () => {
             setActiveTab={switchTab}
             addToast={addToast}
           />
+          </Suspense>
         )}
 
         {notifications.length > 0 && (
@@ -1809,17 +1824,21 @@ const App: React.FC = () => {
       </ErrorBoundary>
 
       <GlobalUpdatePrompt />
-      <WhatsNewModal suppress={showOnboarding || newlyUnlockedBadge !== null} />
+      <Suspense fallback={null}>
+        <WhatsNewModal suppress={showOnboarding || newlyUnlockedBadge !== null} />
+      </Suspense>
 
       {/* Feature Discovery — one-time "New Feature!" cards for logged-in users.
           Suppressed while onboarding or the achievement modal owns the screen so
           only one attention-grabbing overlay is ever visible at a time. */}
       {user && !showOnboarding && !newlyUnlockedBadge && (
-        <FeatureDiscoveryManager
-          discoveries={featureDiscoveries}
-          user={user}
-          onDiscoveryDismiss={handleDiscoveryDismiss}
-        />
+        <Suspense fallback={null}>
+          <FeatureDiscoveryManager
+            discoveries={featureDiscoveries}
+            user={user}
+            onDiscoveryDismiss={handleDiscoveryDismiss}
+          />
+        </Suspense>
       )}
 
       {/* Contextual Tutorial — per-tab hints shown once on first visit */}
@@ -1828,19 +1847,21 @@ const App: React.FC = () => {
       )}
 
       {showExpiredItemsModal && (
-        <ExpiredItemsModal
-          isOpen={showExpiredItemsModal}
-          onClose={() => {
-            setShowExpiredItemsModal(false);
-            setExpiredItemsModalSpecificItems(undefined);
-          }}
-          inventory={inventory}
-          onRemoveItems={handleRemoveExpiredItems}
-          householdId={household?.id}
-          userId={user?.id}
-          userName={user?.name}
-          specificItems={expiredItemsModalSpecificItems}
-        />
+        <Suspense fallback={null}>
+          <ExpiredItemsModal
+            isOpen={showExpiredItemsModal}
+            onClose={() => {
+              setShowExpiredItemsModal(false);
+              setExpiredItemsModalSpecificItems(undefined);
+            }}
+            inventory={inventory}
+            onRemoveItems={handleRemoveExpiredItems}
+            householdId={household?.id}
+            userId={user?.id}
+            userName={user?.name}
+            specificItems={expiredItemsModalSpecificItems}
+          />
+        </Suspense>
       )}
 
       {/* Launch-time expired items bottom sheet */}
@@ -1860,40 +1881,46 @@ const App: React.FC = () => {
       )}
 
       {notificationViewItem && (
-        <ItemDetailModal
-          item={notificationViewItem.item}
-          onClose={() => setNotificationViewItem(null)}
-          onUpdateItem={updateItem}
-          onDeleteItem={deleteItem}
-          onAddToShoppingList={addToShoppingList}
-          customCategories={customCategories}
-          originalIndex={notificationViewItem.index}
-        />
+        <Suspense fallback={null}>
+          <ItemDetailModal
+            item={notificationViewItem.item}
+            onClose={() => setNotificationViewItem(null)}
+            onUpdateItem={updateItem}
+            onDeleteItem={deleteItem}
+            onAddToShoppingList={addToShoppingList}
+            customCategories={customCategories}
+            originalIndex={notificationViewItem.index}
+          />
+        </Suspense>
       )}
 
-      <RecipeFinderModalSection
-        showRecipeModal={showGlobalRecipeModal}
-        modalRecipe={globalModalRecipe}
-        setShowRecipeModal={setShowGlobalRecipeModal}
-        onAddToPlan={handleAddToPlan}
-        handleModalSaveRecipe={handleSaveRecipe}
-        onDeleteRecipe={handleDeleteRecipe}
-        onRate={submitRating}
-        onMarkAsMade={handleMarkAsMade}
-        modalIsSavedView={globalModalIsSavedView}
-        recipeSaveLimitExceeded={recipeSaveLimitExceeded}
-        mealPlanLimitExceeded={mealPlanLimitExceeded}
-        savedRecipesCount={savedRecipes.length}
-        user={user}
-        inventory={inventory}
-      />
+      <Suspense fallback={null}>
+        <RecipeFinderModalSection
+          showRecipeModal={showGlobalRecipeModal}
+          modalRecipe={globalModalRecipe}
+          setShowRecipeModal={setShowGlobalRecipeModal}
+          onAddToPlan={handleAddToPlan}
+          handleModalSaveRecipe={handleSaveRecipe}
+          onDeleteRecipe={handleDeleteRecipe}
+          onRate={submitRating}
+          onMarkAsMade={handleMarkAsMade}
+          modalIsSavedView={globalModalIsSavedView}
+          recipeSaveLimitExceeded={recipeSaveLimitExceeded}
+          mealPlanLimitExceeded={mealPlanLimitExceeded}
+          savedRecipesCount={savedRecipes.length}
+          user={user}
+          inventory={inventory}
+        />
+      </Suspense>
 
       {isAdmin && (
         <Suspense fallback={<LoadingSpinner />}>
           <DatabaseAnalytics />
         </Suspense>
       )}
-      <GeminiTokenDebugger isAdmin={isAdmin} />
+      <Suspense fallback={null}>
+        <GeminiTokenDebugger isAdmin={isAdmin} />
+      </Suspense>
 
       {/* Canvas for global achievement fireworks */}
       <canvas

@@ -86,6 +86,14 @@ export default defineConfig(({ mode }) => {
               if (id.includes('lucide-react')) {
                 return 'ui-vendor';
               }
+              // Barcode scanning - loaded on demand, large decoder lib
+              if (id.includes('@zxing/library')) {
+                return 'barcode-vendor';
+              }
+              // OCR - loaded on demand, large WASM-backed lib
+              if (id.includes('tesseract.js')) {
+                return 'ocr-vendor';
+              }
               // Default chunk for everything else
               return undefined;
             }
