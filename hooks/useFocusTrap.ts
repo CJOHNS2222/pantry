@@ -4,10 +4,12 @@ import { useEffect, useRef } from 'react';
 interface UseFocusTrapOptions {
   isActive: boolean;
   restoreFocus?: boolean;
+  /** Called when Escape is pressed while the trap is active — typically closes the modal. */
+  onEscape?: () => void;
 }
 
 export function useFocusTrap(options: UseFocusTrapOptions) {
-  const { isActive, restoreFocus = true } = options;
+  const { isActive, restoreFocus = true, onEscape } = options;
   const containerRef = useRef<HTMLDivElement>(null);
   const previouslyFocusedElementRef = useRef<Element | null>(null);
 
@@ -40,6 +42,10 @@ export function useFocusTrap(options: UseFocusTrapOptions) {
     };
 
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onEscape?.();
+        return;
+      }
       if (event.key !== 'Tab') return;
 
       const focusableElements = getFocusableElements();
@@ -79,7 +85,7 @@ export function useFocusTrap(options: UseFocusTrapOptions) {
         setTimeout(() => (previouslyFocusedElementRef.current as HTMLElement)?.focus(), 0);
       }
     };
-  }, [isActive, restoreFocus]);
+  }, [isActive, restoreFocus, onEscape]);
 
   return containerRef;
 }

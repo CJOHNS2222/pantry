@@ -20,7 +20,7 @@ interface PantryImportModalProps {
 const PantryImportModal: React.FC<PantryImportModalProps> = ({ open, onClose, onImported }) => {
   const { user, household } = useApp();
   const { addToast } = useAppActions();
-  const modalRef = useFocusTrap({ isActive: open });
+  const modalRef = useFocusTrap({ isActive: open, onEscape: onClose });
   useAndroidBack(open, onClose);
   
   const [csvText, setCsvText] = useState('');

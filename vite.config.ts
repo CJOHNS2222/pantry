@@ -71,17 +71,14 @@ export default defineConfig(({ mode }) => {
               if (id.includes('firebase/')) {
                 return 'firebase-vendor';
               }
-              // AI and ML services - split Gemini separately as it's largest
-              if (id.includes('services/geminiService')) {
-                return 'gemini-service';
-              }
-              if (id.includes('services/analyticsService')) {
-                return 'analytics-service';
-              }
-              // Utility functions
-              if (id.includes('utils/appUtils')) {
-                return 'utils';
-              }
+              // Note: first-party app files (geminiService, analyticsService, appUtils) are
+              // intentionally NOT force-split here. Forcing a single first-party module into
+              // its own named chunk fights Rollup's dependency-graph-based splitting — it ends
+              // up sweeping in whatever shared code is reachable only alongside that module,
+              // producing a chunk whose size has nothing to do with the named file itself.
+              // Letting Rollup's automatic splitting handle first-party code means it naturally
+              // separates anything only reachable via a lazy (React.lazy/dynamic import())
+              // boundary, which is what actually keeps it out of the eager bundle.
               // UI components and icons
               if (id.includes('lucide-react')) {
                 return 'ui-vendor';

@@ -233,8 +233,9 @@ export const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
         </button>
       </div>
 
-      {/* Results */}
-      <div className="max-h-96 overflow-y-auto">
+      {/* Results — scrolling handled by the overlay's flex-1 container so this area
+          fills all remaining vertical space instead of stopping at a fixed height. */}
+      <div>
         {isSearching && (
           <div>
             <h4 className="text-sm font-semibold text-theme-secondary mb-2">{intl.formatMessage({ id: 'mealPlanner.searchResults' })}</h4>

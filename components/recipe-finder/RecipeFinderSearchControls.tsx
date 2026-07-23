@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
-import { Search, Mic, Clock, Sparkles, Loader2, ChefHat, ChevronDown, ChevronUp } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Search, Mic, Clock, Sparkles, Loader2, ChefHat, ChevronDown, ChevronUp, X } from 'lucide-react';
 import { LoadingState } from '../../types';
+
+const VOICE_HINT_SEEN_KEY = 'recipeFinder_voiceSearchHintSeen';
 
 interface RecipeFinderSearchControlsProps {
   specificQuery: string;
@@ -63,6 +65,25 @@ export const RecipeFinderSearchControls: React.FC<RecipeFinderSearchControlsProp
 }) => {
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
+  // One-time callout pointing at voice search so the feature actually gets discovered
+  // instead of relying on users noticing the idle ping animation on the mic button.
+  const [showVoiceHint, setShowVoiceHint] = useState(false);
+  useEffect(() => {
+    if (!voiceSearchSupported) return;
+    try {
+      if (!localStorage.getItem(VOICE_HINT_SEEN_KEY)) {
+        setShowVoiceHint(true);
+      }
+    } catch {
+      // localStorage unavailable — skip the hint rather than risk showing it every time
+    }
+  }, [voiceSearchSupported]);
+
+  const dismissVoiceHint = () => {
+    setShowVoiceHint(false);
+    try { localStorage.setItem(VOICE_HINT_SEEN_KEY, 'true'); } catch { /* ignore */ }
+  };
+
   return (
     <>
       <div className="bg-theme-secondary p-5 rounded-2xl border border-theme shadow-lg">
@@ -81,26 +102,48 @@ export const RecipeFinderSearchControls: React.FC<RecipeFinderSearchControlsProp
               className={`w-full bg-theme-primary border border-theme rounded-xl px-4 py-3 text-theme-primary focus:border-[var(--accent-color)] outline-none ${voiceSearchSupported ? 'pr-10' : ''}`}
             />
             {voiceSearchSupported && (
-              <button
-                type="button"
-                onClick={onStartVoiceSearch}
-                data-testid="recipefinder-voice-button"
-                disabled={loadingState === LoadingState.LOADING}
-                className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg transition-all ${
-                  isListening
-                    ? 'bg-red-500 text-white animate-pulse shadow-lg shadow-red-500/40'
-                    : 'bg-[var(--accent-color)]/10 text-[var(--accent-color)] hover:bg-[var(--accent-color)]/20 hover:scale-110'
-                }`}
-                aria-label={isListening ? 'Stop voice search' : 'Start voice search'}
-                data-tutorial="voice-search"
-                title={isListening ? 'Tap to stop' : 'Voice search — say a recipe name'}
-              >
-                {/* Subtle ping ring when idle to draw attention */}
-                {!isListening && (
-                  <span className="absolute inset-0 rounded-lg bg-[var(--accent-color)]/20 animate-ping opacity-60 pointer-events-none" />
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    dismissVoiceHint();
+                    onStartVoiceSearch();
+                  }}
+                  data-testid="recipefinder-voice-button"
+                  disabled={loadingState === LoadingState.LOADING}
+                  className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg transition-all ${
+                    isListening
+                      ? 'bg-red-500 text-white animate-pulse shadow-lg shadow-red-500/40'
+                      : 'bg-[var(--accent-color)]/10 text-[var(--accent-color)] hover:bg-[var(--accent-color)]/20 hover:scale-110'
+                  }`}
+                  aria-label={isListening ? 'Stop voice search' : 'Start voice search'}
+                  data-tutorial="voice-search"
+                  title={isListening ? 'Tap to stop' : 'Voice search — say a recipe name'}
+                >
+                  {/* Subtle ping ring when idle to draw attention */}
+                  {!isListening && (
+                    <span className="absolute inset-0 rounded-lg bg-[var(--accent-color)]/20 animate-ping opacity-60 pointer-events-none" />
+                  )}
+                  <Mic className="w-4 h-4 relative z-10" />
+                </button>
+
+                {showVoiceHint && !isListening && (
+                  <div className="absolute right-0 top-full mt-2 z-20 w-56 bg-theme-primary border border-theme rounded-xl shadow-xl p-3 animate-fade-in">
+                    <div className="absolute -top-1.5 right-4 w-3 h-3 bg-theme-primary border-t border-l border-theme rotate-45" />
+                    <button
+                      type="button"
+                      onClick={dismissVoiceHint}
+                      aria-label="Dismiss tip"
+                      className="absolute top-1.5 right-1.5 p-0.5 rounded-full hover:bg-theme-secondary text-theme-secondary"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                    <p className="text-xs font-medium text-theme-primary pr-4">
+                      🎤 New: tap the mic and just say a recipe — try "chicken and rice dinner".
+                    </p>
+                  </div>
                 )}
-                <Mic className="w-4 h-4 relative z-10" />
-              </button>
+              </>
             )}
 
             {showRecipeAutocomplete && (

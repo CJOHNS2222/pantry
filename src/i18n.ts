@@ -29,6 +29,7 @@ import zhMessages from './locales/zh.json';
 import jaMessages from './locales/ja.json';
 
 // Function to flatten nested messages
+/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
 const flattenMessages = (nestedMessages: any, prefix = ''): Record<string, string> => {
   return Object.keys(nestedMessages).reduce((messages: Record<string, string>, key) => {
     const value = nestedMessages[key];
@@ -44,6 +45,7 @@ const flattenMessages = (nestedMessages: any, prefix = ''): Record<string, strin
   }, {});
 };
 
+/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
 const messages: Record<Locale, any> = {
   en: flattenMessages(enMessages),
   es: flattenMessages(esMessages),
@@ -90,6 +92,7 @@ export const getMessages = (locale: Locale = DEFAULT_LOCALE) => {
 };
 
 // Utility function to get translated message
+/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
 export const t = (id: string, values?: Record<string, any>): string => {
   return getIntl().formatMessage({ id }, values);
 };

@@ -48,9 +48,9 @@ export default function RiskAssessmentQuestionnaire({ userId, onComplete }: Prop
       await RiskProfileService.setUserRiskLevel(userId, level)
       setLoading(false)
       onComplete?.(level, false) // No longer using preferStrict
-    } catch (err: any) {
+    } catch (err) {
       setLoading(false)
-      setError(err?.message || 'Failed to save')
+      setError(err instanceof Error ? err.message : 'Failed to save')
     }
   }
 

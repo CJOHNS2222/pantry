@@ -1,6 +1,6 @@
 // components/VisualQuantitySelector.tsx
-import React, { useState, useEffect } from 'react';
-import { Droplet, Minus, Plus } from 'lucide-react';
+import React, { useState } from 'react';
+import { Minus, Plus } from 'lucide-react';
 
 interface VisualQuantitySelectorProps {
   value: number;
@@ -34,7 +34,7 @@ const VisualQuantitySelector: React.FC<VisualQuantitySelectorProps> = ({
   minValue = 0.25,
   className = ''
 }) => {
-  const [isDragging, setIsDragging] = useState(false);
+  const [_isDragging, setIsDragging] = useState(false);
 
   // Get appropriate unit based on item name
   const getSmartUnit = (itemName: string) => {

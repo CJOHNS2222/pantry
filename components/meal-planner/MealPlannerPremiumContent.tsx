@@ -9,6 +9,7 @@ import { MealPlanSkeleton } from '../ui/SkeletonLoader';
 import { MealPlannerDragTrash } from './MealPlannerDragTrash';
 
 interface MealPlannerPremiumContentProps {
+  userId?: string;
   missingItemsCount: number;
   isAddingToShopping: boolean;
   onAddMissingToShopping: () => void;
@@ -64,6 +65,7 @@ interface MealPlannerPremiumContentProps {
 }
 
 export const MealPlannerPremiumContent: React.FC<MealPlannerPremiumContentProps> = ({
+  userId,
   missingItemsCount,
   isAddingToShopping,
   onAddMissingToShopping,
@@ -122,7 +124,7 @@ export const MealPlannerPremiumContent: React.FC<MealPlannerPremiumContentProps>
       <button
         onClick={onAddMissingToShopping}
         disabled={missingItemsCount === 0 || isAddingToShopping}
-        className={`w-full border font-medium py-3 rounded-xl transition-all flex items-center justify-center gap-2 mb-6 ${
+        className={`w-full border font-medium py-3 rounded-xl transition-all flex items-center justify-center gap-2 mb-3 ${
           missingItemsCount > 0 && !isAddingToShopping
             ? 'bg-theme-secondary border-[var(--accent-color)] text-[var(--accent-color)] shadow-lg'
             : 'opacity-50 cursor-not-allowed border-theme'
@@ -132,8 +134,8 @@ export const MealPlannerPremiumContent: React.FC<MealPlannerPremiumContentProps>
         {isAddingToShopping ? 'Added!' : missingItemsCount > 0 ? `Add ${missingItemsCount} Missing Items to List` : 'Pantry is Stocked'}
       </button>
 
-      <div className={`flex gap-4 ${isEstimatorOpen ? 'flex-col' : ''}`}>
-        {showPriceData && (
+      {showPriceData && (
+        <div className={`flex gap-4 mb-3 ${isEstimatorOpen ? 'flex-col' : ''}`}>
           <div className={isEstimatorOpen ? 'w-full' : 'flex-1'}>
             <GroceryCostEstimator
               mealPlan={mealPlan}
@@ -142,8 +144,8 @@ export const MealPlannerPremiumContent: React.FC<MealPlannerPremiumContentProps>
               freeItemLimit={freeItemLimit}
             />
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       <MealPlannerHighlightsSection
         todaysMeals={todaysMeals}
@@ -165,7 +167,7 @@ export const MealPlannerPremiumContent: React.FC<MealPlannerPremiumContentProps>
           </div>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-3">
           <MealPlannerCalendarSection
             displayPlan={displayPlan}
             mealPlan={mealPlan}
@@ -198,6 +200,7 @@ export const MealPlannerPremiumContent: React.FC<MealPlannerPremiumContentProps>
             mealPlan={mealPlan}
             displayPlan={displayPlan}
             currentDayIndex={currentDayIndex}
+            userId={userId}
             onOpenMealSearch={onOpenMealSearch}
             onOpenRecipe={onOpenRecipe}
             onCooked={onCooked}

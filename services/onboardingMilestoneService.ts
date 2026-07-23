@@ -15,6 +15,7 @@ const STORAGE_KEY = 'app-onboarding-milestones';
 export type OnboardingMilestone =
   | 'onboarding-completed'  // user finished (or skipped) the first-run flow
   | 'first-pantry-item'     // at least one pantry item exists
+  | 'pantry-health-visible' // 3+ pantry items exist (PantryHealthScore's render threshold)
   | 'first-shopping-item'   // at least one shopping list item exists
   | 'first-meal-planned'    // at least one meal has been added to the plan
   | 'first-leftover-logged' // at least one leftover has been added

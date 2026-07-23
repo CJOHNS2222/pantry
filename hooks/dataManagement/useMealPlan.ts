@@ -8,6 +8,7 @@ import { setRemoteMealPlanUpdate } from '../../services/syncStateService';
 import { log } from '../../services/logService';
 import { ERROR_MESSAGES } from '../../constants/errorMessages';
 import { MealPlanCacheService } from '../../services/MealPlanCacheService';
+import { GUEST_MEAL_PLAN_KEY } from './shared';
 
 type AddToast = (message: string, type: 'success' | 'error' | 'info' | 'warning', duration?: number, actionLabel?: string, action?: () => void) => void;
 
@@ -139,8 +140,15 @@ export function useMealPlan(
       return;
     }
 
-    // Guest users: no Firestore-backed meal plan
+    // Guest users: hydrate from localStorage instead of Firestore
     if (user.isGuest) {
+      try {
+        const stored = JSON.parse(localStorage.getItem(GUEST_MEAL_PLAN_KEY) || '[]') as DayPlan[];
+        setMealPlan(stored);
+        prevMealPlanRef.current = stored;
+      } catch {
+        setMealPlan([]);
+      }
       setIsLoadingMealPlan(false);
       return;
     }
@@ -156,7 +164,7 @@ export function useMealPlan(
   // Keep mealPlanning.weeklyUsed Firestore counter in sync with actual current/future entries.
   // Past entries are excluded so they never count against the user's quota.
   useEffect(() => {
-    if (!user || isLoadingMealPlan) return;
+    if (!user || isLoadingMealPlan || user.isGuest) return;
     const now = new Date();
     const weekStart = new Date(now);
     weekStart.setDate(now.getDate() - now.getDay());
@@ -190,8 +198,35 @@ export function useMealPlan(
     }
   };
 
+  // Guests persist the whole rolling plan to localStorage instead of Firestore.
+  const saveGuestMealPlan = (plan: DayPlan[]) => {
+    try { localStorage.setItem(GUEST_MEAL_PLAN_KEY, JSON.stringify(plan)); } catch { /* storage full */ }
+  };
+
+  const getOrCreateGuestDay = (plan: DayPlan[], date: string): DayPlan => {
+    const existing = plan.find(d => d.date === date);
+    if (existing) return existing;
+    const dayName = new Date(`${date}T00:00:00`).toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
+    return { date, dayName, breakfast: [], lunch: [], dinner: [] };
+  };
+
   const addMealToPlan = async (date: string, mealType: 'breakfast' | 'lunch' | 'dinner', meal: MealPlanItem) => {
     if (!user?.id) return;
+
+    if (user.isGuest) {
+      setMealPlan(prev => {
+        const day = getOrCreateGuestDay(prev, date);
+        const updatedDay = { ...day, [mealType]: [...(day[mealType] || []), meal] };
+        const updatedPlan = prev.some(d => d.date === date)
+          ? prev.map(d => (d.date === date ? updatedDay : d))
+          : [...prev, updatedDay];
+        saveGuestMealPlan(updatedPlan);
+        return updatedPlan;
+      });
+      addToast?.(`Added ${meal.recipe.title} to your meal plan!`, 'success');
+      return;
+    }
+
     try {
       await MealPlanCacheService.addMeal(date, mealType, meal, user?.householdId, user?.id);
       if (loggingOptions?.updateActivityStatus) {
@@ -206,6 +241,20 @@ export function useMealPlan(
 
   const updateMealOnPlan = async (date: string, mealType: 'breakfast' | 'lunch' | 'dinner', meal: MealPlanItem) => {
     if (!user?.id) return;
+
+    if (user.isGuest) {
+      setMealPlan(prev => {
+        const updatedPlan = prev.map(d => {
+          if (d.date !== date) return d;
+          return { ...d, [mealType]: (d[mealType] || []).map(m => (m.id === meal.id ? meal : m)) };
+        });
+        saveGuestMealPlan(updatedPlan);
+        return updatedPlan;
+      });
+      addToast?.(`Updated ${meal.recipe.title} on your meal plan!`, 'success');
+      return;
+    }
+
     try {
       await MealPlanCacheService.updateMeal(date, mealType, meal, user?.householdId, user?.id);
       if (loggingOptions?.updateActivityStatus) {
@@ -220,6 +269,20 @@ export function useMealPlan(
 
   const removeMealFromPlan = async (date: string, mealType: 'breakfast' | 'lunch' | 'dinner', mealId: string) => {
     if (!user?.id) return;
+
+    if (user.isGuest) {
+      setMealPlan(prev => {
+        const updatedPlan = prev.map(d => {
+          if (d.date !== date) return d;
+          return { ...d, [mealType]: (d[mealType] || []).filter(m => m.id !== mealId) };
+        });
+        saveGuestMealPlan(updatedPlan);
+        return updatedPlan;
+      });
+      addToast?.('Removed meal from your plan!', 'success');
+      return;
+    }
+
     try {
       await MealPlanCacheService.removeMeal(date, mealType, mealId, user?.householdId, user?.id);
       if (loggingOptions?.updateActivityStatus) {
@@ -239,6 +302,12 @@ export function useMealPlan(
     try {
       // Set the meal plan locally for immediate UI update
       setMealPlan(newPlan);
+
+      if (user.isGuest) {
+        saveGuestMealPlan(newPlan);
+        return;
+      }
+
       // Save the entire new meal plan to the cache
       await MealPlanCacheService.setCache(newPlan, user?.householdId, user?.id);
       addToast?.('Meal plan updated successfully!', 'success');
@@ -269,7 +338,7 @@ export function useMealPlan(
     // The mealPlan sync effect will also re-sync once state settles, but we
     // call syncMealPlanCount here immediately so the counter is never stale.
     const _syncNow = (addedDateStr: string) => {
-      if (!user) return;
+      if (!user || user.isGuest) return;
       const now = new Date();
       const weekStart = new Date(now);
       weekStart.setDate(now.getDate() - now.getDay());

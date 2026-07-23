@@ -3,6 +3,7 @@ import { User, PantryItem, Household } from '../../types';
 // Guest user local-storage keys and limits (no Firestore for guests)
 export const GUEST_INVENTORY_KEY = 'guest_inventory';
 export const GUEST_SHOPPING_KEY = 'guest_shopping';
+export const GUEST_MEAL_PLAN_KEY = 'guest_meal_plan';
 export const GUEST_ITEM_CAP = 20;
 export const GUEST_SHOPPING_CAP = 30;
 

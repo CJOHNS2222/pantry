@@ -28,7 +28,7 @@ class PerformanceMonitoringService {
         });
         lcpObserver.observe({ entryTypes: ['largest-contentful-paint'] });
         this.observers.push(lcpObserver);
-      } catch (e) {
+      } catch (_e) {
         console.warn('LCP observation not supported');
       }
 
@@ -45,7 +45,7 @@ class PerformanceMonitoringService {
         });
         fidObserver.observe({ entryTypes: ['first-input'] });
         this.observers.push(fidObserver);
-      } catch (e) {
+      } catch (_e) {
         console.warn('FID observation not supported');
       }
 
@@ -68,7 +68,7 @@ class PerformanceMonitoringService {
           trackPerformanceMetric('cls', clsValue, 'score');
         };
         window.addEventListener('beforeunload', this.beforeUnloadListener);
-      } catch (e) {
+      } catch (_e) {
         console.warn('CLS observation not supported');
       }
     }
@@ -111,7 +111,7 @@ class PerformanceMonitoringService {
         });
         resourceObserver.observe({ entryTypes: ['resource'] });
         this.observers.push(resourceObserver);
-      } catch (e) {
+      } catch (_e) {
         console.warn('Resource observation not supported');
       }
     }

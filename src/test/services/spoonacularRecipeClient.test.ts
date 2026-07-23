@@ -5,7 +5,6 @@ describe('SpoonacularRecipeClient', () => {
   const originalFetch = global.fetch;
 
   beforeEach(() => {
-    // @ts-ignore
     global.fetch = vi.fn();
   });
 

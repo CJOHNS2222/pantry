@@ -1,7 +1,7 @@
 export function safeStringify(obj: any): string {
   try {
     return JSON.stringify(obj);
-  } catch (e) {
+  } catch {
     return String(obj);
   }
 }

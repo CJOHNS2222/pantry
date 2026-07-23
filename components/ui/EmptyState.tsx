@@ -129,7 +129,7 @@ const SIZE_CONFIG: Record<
   { container: string; iconWrap: string; iconSize: string; title: string; desc: string }
 > = {
   compact: {
-    container: 'py-8 gap-2',
+    container: 'py-2 gap-2',
     iconWrap: 'w-10 h-10 rounded-2xl',
     iconSize: 'w-5 h-5',
     title: 'text-sm font-semibold',

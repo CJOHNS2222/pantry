@@ -1080,6 +1080,7 @@ const MealPlannerComponent: React.FC<MealPlannerProps> = ({ mealPlan, updateMeal
         onUpgrade={() => setActiveTab(Tab.SETTINGS)}
       >
         <MealPlannerPremiumContent
+          userId={user?.id}
           missingItemsCount={missingItemsCount}
           isAddingToShopping={isAddingToShopping}
           onAddMissingToShopping={handleAddMissingToShopping}

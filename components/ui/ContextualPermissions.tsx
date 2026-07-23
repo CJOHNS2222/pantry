@@ -75,7 +75,7 @@ export const PermissionRequest: React.FC<PermissionRequestProps> = ({
             const stream = await navigator.mediaDevices.getUserMedia({ video: true });
             stream.getTracks().forEach(track => track.stop()); // Stop immediately
             granted = true;
-          } catch (error) {
+          } catch (_error) {
             log.warn('Camera permission denied or not available');
             granted = false;
           }
@@ -101,7 +101,7 @@ export const PermissionRequest: React.FC<PermissionRequestProps> = ({
               );
             });
             granted = true;
-          } catch (error) {
+          } catch (_error) {
             log.warn('Location permission denied or not available');
             granted = false;
           }

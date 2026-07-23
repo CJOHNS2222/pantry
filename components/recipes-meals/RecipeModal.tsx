@@ -117,7 +117,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
   const [submitForInclusion, setSubmitForInclusion] = useState(false);
   
   // Focus trap for accessibility
-  const modalRef = useFocusTrap({ isActive: isOpen });
+  const modalRef = useFocusTrap({ isActive: isOpen, onEscape: onClose });
   useModalOpen();
   useAndroidBack(isOpen, onClose);
 
@@ -157,7 +157,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
   }, [isOpen, editable, recipe]);
   // Smart Substitutions State
   const [showSubstitutions, setShowSubstitutions] = useState(false);
-  const [ingredientSubstitutions, setIngredientSubstitutions] = useState<{ingredient: string, substitutes: {name: string, ratio: string, notes: string}[]}[]>([]);
+  const [ingredientSubstitutions, setIngredientSubstitutions] = useState<{ingredient: string, inPantry: boolean, substitutes: {name: string, ratio: string, notes: string, inPantry: boolean}[]}[]>([]);
 
   // Sub-modal back-button registration (LIFO — closed inner-first)
   useAndroidBack(showCookingMode, () => setShowCookingMode(false));
@@ -573,11 +573,25 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
     ],
   };
 
+  // Same "does the pantry already have this" matcher RecipeModalDetailsSection uses for
+  // its availability badges, so "in pantry" means the same thing in both places.
+  const isIngredientInPantry = (name: string): boolean => {
+    if (!inventory || inventory.length === 0) return false;
+    const cleaned = name
+      .replace(/^[\d\/\s\.\-]+(cups?|tbsps?|tsps?|g|oz|lbs?|ml|pack(et)?s?|cans?|pieces?|cloves?|slices?|jars?|bottles?)?\s+/i, '')
+      .toLowerCase()
+      .trim();
+    return inventory.some(pi => {
+      const piName = pi.item.toLowerCase();
+      return piName.includes(cleaned) || cleaned.includes(piName);
+    });
+  };
+
   const findSubstitutions = () => {
     const recipeIngredients = (recipe as StructuredRecipe).ingredients || [];
     if (recipeIngredients.length === 0) return;
 
-    const results: {ingredient: string, substitutes: {name: string, ratio: string, notes: string}[]}[] = [];
+    const results: {ingredient: string, inPantry: boolean, substitutes: {name: string, ratio: string, notes: string, inPantry: boolean}[]}[] = [];
 
     // Sort longest keys first so "evaporated milk" matches before "milk",
     // "buttermilk" before "butter", "heavy cream" before "cream", etc.
@@ -587,7 +601,12 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
       const ingLower = ing.toLowerCase();
       for (const [key, subs] of sortedEntries) {
         if (ingLower.includes(key)) {
-          results.push({ ingredient: ing, substitutes: subs });
+          const substitutesWithPantry = subs
+            .map(s => ({ ...s, inPantry: isIngredientInPantry(s.name) }))
+            // Substitutes you already have go first — that's the actionable answer to
+            // "I'm out of X, what can I use instead?"
+            .sort((a, b) => Number(b.inPantry) - Number(a.inPantry));
+          results.push({ ingredient: ing, inPantry: isIngredientInPantry(ing), substitutes: substitutesWithPantry });
           break;
         }
       }
@@ -597,6 +616,9 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
       addToast('No common substitutions found for these ingredients.', 'info');
       return;
     }
+
+    // Ingredients you're missing (the ones you actually need a substitute for) lead the list.
+    results.sort((a, b) => Number(a.inPantry) - Number(b.inPantry));
 
     setIngredientSubstitutions(results);
     setShowSubstitutions(true);

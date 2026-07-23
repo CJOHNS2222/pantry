@@ -1,7 +1,7 @@
 export function deepEqual(a: any, b: any): boolean {
   try {
     return JSON.stringify(a) === JSON.stringify(b);
-  } catch (e) {
+  } catch {
     return false;
   }
 }

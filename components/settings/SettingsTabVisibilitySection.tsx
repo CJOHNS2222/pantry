@@ -12,7 +12,6 @@ const NAV_TABS: { tab: Tab; label: string; description: string }[] = [
   { tab: Tab.MEALS, label: 'Meal Planner', description: 'Plan your meals for the week' },
   { tab: Tab.RECIPES, label: 'Recipes', description: 'Browse and search recipes' },
   { tab: Tab.COMMUNITY, label: 'Community', description: 'Connect with other users' },
-  { tab: Tab.ANALYTICS, label: 'Analytics', description: 'Pantry usage and waste stats' },
 ];
 
 export const SettingsTabVisibilitySection: React.FC<SettingsTabVisibilitySectionProps> = ({

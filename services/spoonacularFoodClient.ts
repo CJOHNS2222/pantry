@@ -9,9 +9,10 @@ async function loadGeneratedClient() {
   _triedLoad = true;
   try {
     // dynamic import: only attempt when actually needed
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore - optional generated client may be absent from repo
     _generated = await import(/* @vite-ignore */ '../typescript/dist');
-  } catch (err) {
+  } catch (_err) {
     _generated = null;
   }
   return _generated;
@@ -32,7 +33,7 @@ async function getApis() {
       productsApi: cfg && mod.ProductsApi ? new mod.ProductsApi(cfg) : (mod.ProductsApi ? new mod.ProductsApi() : undefined),
       miscApi: cfg && mod.MiscApi ? new mod.MiscApi(cfg) : (mod.MiscApi ? new mod.MiscApi() : undefined),
     };
-  } catch (err) {
+  } catch (_err) {
     _cachedApis = {};
   }
   return _cachedApis;

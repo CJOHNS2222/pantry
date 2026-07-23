@@ -1,6 +1,6 @@
 import DatabaseMonitoringService from './databaseMonitoringService';
 import { InventoryCacheService } from './inventoryCacheService';
-import { PantryItem, User } from '../types';
+import { User } from '../types';
 import { fetchExternalItemImage } from '../utils/appUtils';
 import { getCachedImageUrls, cacheImagesFromUrls, initializeImageCache } from './imageCacheService';
 import { log } from './logService';

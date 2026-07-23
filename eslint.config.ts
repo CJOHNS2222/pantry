@@ -17,6 +17,7 @@ export default defineConfig([
       "capacitor-cordova-android-plugins/**",
       "testlab/**",
       "scripts/**",
+      "typescript/**",
       "*.cjs",
       "*.mjs",
     ],
@@ -62,6 +63,9 @@ export default defineConfig([
       "hooks/**/*.ts",
       "utils/**/*.ts",
       "utils/shared/**/*.ts",
+      "src/utils/**/*.ts",
+      "types/**/*.d.ts",
+      "src/types/**/*.d.ts",
     ],
     rules: {
       "@typescript-eslint/no-explicit-any": "warn",

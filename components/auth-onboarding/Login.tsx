@@ -281,7 +281,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
       <div className="w-full max-w-md mx-auto bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl relative z-10 my-8 flex-shrink-0">
         <div className="flex flex-col items-center mb-8">
           <div className="w-20 h-20 bg-gradient-to-br from-amber-400 to-amber-600 rounded-full flex items-center justify-center shadow-lg mb-4 overflow-hidden">
-            <img src="/icons/icon.PNG" alt="App Icon" className="w-16 h-16 object-contain" />
+            <img src="/icons/icon.png" alt="App Icon" className="w-16 h-16 object-contain" />
           </div>
           <h1 className="text-3xl font-bold font-serif tracking-wide text-amber-50">
             <FormattedMessage id="app.name" />

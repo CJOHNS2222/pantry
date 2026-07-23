@@ -31,6 +31,7 @@ import { getCachedCommunityRatedRecipes } from '../../services/recipeService';
 import { log } from '../../services/logService';
 import { useAndroidBack } from '../../hooks/useAndroidBack';
 import { hasMilestone } from '../../services/onboardingMilestoneService';
+import { LeaderboardCacheService, GlobalLeaderboardEntries, GlobalHouseholdLeaderboardEntries } from '../../services/LeaderboardCacheService';
 
 // Staple items to ignore in ingredient display
 const _STAPLES = ['salt', 'pepper', 'oil', 'water', 'flour', 'sugar', 'butter', 'vinegar', 'baking powder', 'baking soda', 'spices', 'seasoning', 'soy sauce', 'cornstarch', 'yeast'];
@@ -88,6 +89,23 @@ const CommunityComponent: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecip
   const [leaderboardName, setLeaderboardName] = useState(() => localStorage.getItem('pantryLeaderboardName') || user?.name || 'Pantry Champ');
   const [isAnonymous, setIsAnonymous] = useState(() => localStorage.getItem('pantryLeaderboardAnon') === 'true');
 
+  // Global leaderboard cache: everyone opted-in shares one document (individual entries
+  // keyed by uid, household entries keyed by householdId), so loading it is 1 read and
+  // logging a score is 1 write each (see LeaderboardCacheService).
+  const [globalEntries, setGlobalEntries] = useState<GlobalLeaderboardEntries>({});
+  const [globalHouseholdEntries, setGlobalHouseholdEntries] = useState<GlobalHouseholdLeaderboardEntries>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    LeaderboardCacheService.getGlobalLeaderboard().then(({ entries, householdEntries }) => {
+      if (!cancelled) {
+        setGlobalEntries(entries);
+        setGlobalHouseholdEntries(householdEntries);
+      }
+    });
+    return () => { cancelled = true; };
+  }, []);
+
   const handleLeaveLeaderboard = async () => {
     const ok = await confirm({
       title: 'Leave the leaderboard?',
@@ -99,6 +117,22 @@ const CommunityComponent: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecip
     if (ok) {
       localStorage.removeItem('pantryLeaderboardOptIn');
       setOptedIn(false);
+      if (user?.id) {
+        LeaderboardCacheService.removeMyEntry(user.id).catch(() => {});
+        setGlobalEntries(prev => {
+          const next = { ...prev };
+          delete next[user.id];
+          return next;
+        });
+      }
+      if (household?.id) {
+        LeaderboardCacheService.removeMyHouseholdEntry(household.id).catch(() => {});
+        setGlobalHouseholdEntries(prev => {
+          const next = { ...prev };
+          delete next[household.id];
+          return next;
+        });
+      }
     }
   };
   
@@ -568,6 +602,39 @@ const CommunityComponent: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecip
     return achievementsList.filter(a => a.isUnlocked).length;
   }, [achievementsList]);
 
+  // Log this user's own score, and (if in a household) the household's shared score,
+  // to the shared global leaderboard doc — 1 write each — whenever they change,
+  // debounced so scrolling/rerenders don't spam Firestore.
+  useEffect(() => {
+    if (!optedIn || !user?.id) return;
+    const entry = {
+      name: isAnonymous ? 'Pantry Champ' : leaderboardName,
+      score: userScore,
+      streak: userStreak,
+      badges: unlockedBadgesCount,
+      isHousehold: household !== null,
+      isAnonymous,
+      updatedAt: new Date().toISOString(),
+    };
+    const householdEntry = household ? {
+      name: household.name,
+      score: userScore,
+      streak: userStreak,
+      badges: unlockedBadgesCount,
+      memberCount: (household.members || []).filter(m => m.status === 'active').length,
+      updatedAt: new Date().toISOString(),
+    } : null;
+    const timeout = setTimeout(() => {
+      LeaderboardCacheService.upsertMyEntry(user.id, entry).catch(() => {});
+      setGlobalEntries(prev => ({ ...prev, [user.id]: entry }));
+      if (household?.id && householdEntry) {
+        LeaderboardCacheService.upsertMyHouseholdEntry(household.id, householdEntry).catch(() => {});
+        setGlobalHouseholdEntries(prev => ({ ...prev, [household.id]: householdEntry }));
+      }
+    }, 2000);
+    return () => clearTimeout(timeout);
+  }, [optedIn, user?.id, isAnonymous, leaderboardName, userScore, userStreak, unlockedBadgesCount, household]);
+
   // Dynamic Leaderboard Rankings
   const leaderboardData = useMemo((): LeaderboardEntry[] => {
     // Generate realistic peers with scores centered around the user's performance
@@ -622,15 +689,39 @@ const CommunityComponent: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecip
       }
     ];
 
-    // Add user entry
+    // Add user entry (individual view)
     const userEntry: Omit<LeaderboardEntry, 'rank'> = {
       name: isAnonymous ? 'Pantry Champ (You)' : `${leaderboardName} (You)`,
       isUser: true,
       score: userScore,
       streak: userStreak,
       badges: unlockedBadgesCount,
-      isHousehold: household !== null
+      isHousehold: false
     };
+
+    // The current user's household, as its own leaderboard row (household view). Only
+    // present when the user actually belongs to a household.
+    const householdSelfEntry: Omit<LeaderboardEntry, 'rank'> | null = household ? {
+      name: `${household.name} (You)`,
+      isUser: true,
+      score: userScore,
+      streak: userStreak,
+      badges: unlockedBadgesCount,
+      isHousehold: true
+    } : null;
+
+    // Other opted-in households' real scores, read from the shared global leaderboard cache.
+    const globalHouseholdPeerEntries: Omit<LeaderboardEntry, 'rank'>[] = Object.entries(globalHouseholdEntries)
+      .filter(([id]) => id !== household?.id)
+      .map(([, e]) => ({
+        name: e.name,
+        isUser: false,
+        score: e.score,
+        streak: e.streak,
+        badges: e.badges,
+        isHousehold: true,
+        isRealMember: true,
+      }));
 
     // Real household members share the same pantry (and therefore the same score) as the
     // current user — streak/badges are device-local and not tracked per-member, so those
@@ -647,12 +738,35 @@ const CommunityComponent: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecip
         isRealMember: true,
       }));
 
-    const allEntries = [...basePeers, ...realMemberEntries, userEntry];
+    // Other opted-in users' real scores, read from the shared global leaderboard cache.
+    // Individual view membership doesn't depend on whether that user also belongs to a
+    // household — every opted-in user gets one row here.
+    const globalPeerEntries: Omit<LeaderboardEntry, 'rank'>[] = Object.entries(globalEntries)
+      .filter(([id]) => id !== user?.id)
+      .map(([, e]) => ({
+        name: e.name,
+        isUser: false,
+        score: e.score,
+        streak: e.streak,
+        badges: e.badges,
+        isHousehold: false,
+        isRealMember: true,
+      }));
 
-    // Filter by type (individual vs household)
-    let filtered = leaderboardType === 'household'
-      ? allEntries.filter(e => e.isHousehold || e.isUser) // Always include user for context
-      : allEntries.filter(e => !e.isHousehold || e.isUser);
+    // Simulated filler entries only pad each view while few real opted-in
+    // users/households exist yet, so the leaderboard doesn't look empty early on.
+    const fillerIndividualPeers = basePeers.filter(p => !p.isHousehold);
+    const fillerHouseholdPeers = basePeers.filter(p => p.isHousehold);
+    const fillerPeers = leaderboardType === 'household'
+      ? (globalHouseholdPeerEntries.length >= 3 ? [] : fillerHouseholdPeers.slice(0, 3 - globalHouseholdPeerEntries.length))
+      : (globalPeerEntries.length >= 3 ? [] : fillerIndividualPeers.slice(0, 3 - globalPeerEntries.length));
+
+    const allEntries = leaderboardType === 'household'
+      ? [...fillerPeers, ...globalHouseholdPeerEntries, ...(householdSelfEntry ? [householdSelfEntry] : [])]
+      : [...fillerPeers, ...globalPeerEntries, ...realMemberEntries, userEntry];
+
+    // allEntries is already scoped to the active view (individual vs household) above.
+    let filtered = allEntries;
 
     // Weekly vs Monthly slight score adjustments for dynamic feeling — only applied to
     // simulated peers; real entries (the user and real household members) keep their actual data.
@@ -678,7 +792,7 @@ const CommunityComponent: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecip
         ...e,
         rank: index + 1
       }));
-  }, [userScore, userStreak, unlockedBadgesCount, household, leaderboardType, leaderboardTimeframe, isAnonymous, leaderboardName, user?.id]);
+  }, [userScore, userStreak, unlockedBadgesCount, household, leaderboardType, leaderboardTimeframe, isAnonymous, leaderboardName, user?.id, globalEntries, globalHouseholdEntries]);
 
   const userRank = useMemo(() => {
     const entry = leaderboardData.find(e => e.isUser);
@@ -1517,7 +1631,7 @@ const CommunityComponent: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecip
         subtitle="Full breakdown of your score"
         snap="auto"
       >
-        <BottomSheet.Body className="p-4">
+        <BottomSheet.Body className="p-4 pb-safe">
           <PantryHealthScore inventory={inventory} variant="full" />
         </BottomSheet.Body>
       </BottomSheet>

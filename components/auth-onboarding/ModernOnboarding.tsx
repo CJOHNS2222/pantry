@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
-  SkipForward,
   Sparkles,
   ChefHat,
   Users,
@@ -127,6 +126,12 @@ export const ModernOnboarding: React.FC<ModernOnboardingProps> = ({
   const finishOnboarding = () => {
     if (!onCompleteCalledRef.current) {
       onCompleteCalledRef.current = true;
+      // If the user skipped recipe-picking (no meal plan/shopping list momentum was
+      // built for them), hand them straight into adding their first pantry item
+      // instead of dropping them on an empty Pantry tab with nothing to do next.
+      if (savedCount === 0 && ingredientCount === 0) {
+        try { sessionStorage.setItem('open-pantry-add-modal', 'true'); } catch { /* ignore */ }
+      }
       onComplete({ completed: true, selectedSetup: null, permissions: [], leftoverPersona: 'normal' });
     }
   };
@@ -403,8 +408,8 @@ export const ModernOnboarding: React.FC<ModernOnboardingProps> = ({
               <Sparkles className="w-5 h-5 text-theme-primary" />
             </div>
             <div>
-              <div className="text-sm font-bold text-theme-primary">Ready to Explore</div>
-              <div className="text-xs text-theme-secondary">Search recipes, build your meal plan, and scan your pantry</div>
+              <div className="text-sm font-bold text-theme-primary">Let's Stock Your Pantry</div>
+              <div className="text-xs text-theme-secondary">Tap "Let's Cook!" below to add your first few items</div>
             </div>
           </div>
         )}

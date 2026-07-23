@@ -2,7 +2,7 @@ import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { useModalOpen } from '../../utils/useModalOpen';
 import { useAndroidBack } from '../../hooks/useAndroidBack';
 import { Camera as CapacitorCamera } from '@capacitor/camera';
-import { Camera, Upload, Loader2, Plus, Trash2, CheckCircle2, ShoppingBasket, X, Barcode, ChevronDown, ChevronRight, Image, ChefHat, TrendingUp, Search, Filter, Clock, Tag, FilePlus, Receipt, LayoutGrid, LayoutList } from 'lucide-react';
+import { Camera, Upload, Loader2, Plus, Trash2, CheckCircle2, ShoppingBasket, X, Barcode, ChevronDown, ChevronRight, Image, ChefHat, TrendingUp, Search, Filter, Clock, Tag, FilePlus, Receipt, LayoutGrid, LayoutList, AlertTriangle } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { FixedSizeList as ReactWindowList } from 'react-window';
 import { setUserGeminiOptIn } from '../../services/featureFlags';
@@ -98,7 +98,6 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
   onAddItems,
   onUpdateItem,
   consumptionSuggestions = [],
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   expirationAlerts = [],
   recipeSuggestions = [],
   customCategories = [],
@@ -142,6 +141,13 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
 
   // Constants for virtualization threshold
   const CATEGORY_VIRTUALIZE_THRESHOLD = 20;
+  // Grid layout can't use react-window's fixed-height list (tiles are responsive/aspect-square,
+  // so row height isn't a stable pixel value) — cap initial render per section instead and let
+  // the user expand, keyed per section so a large pantry doesn't render hundreds of tile DOM nodes at once.
+  const [gridExpandedSections, setGridExpandedSections] = useState<Set<string>>(new Set());
+  const expandGridSection = useCallback((key: string) => {
+    setGridExpandedSections(prev => new Set(prev).add(key));
+  }, []);
 
   // Inventory management functions using cache service
   const updateItem = async (index: number, updates: Partial<PantryItem>) => {
@@ -362,6 +368,28 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
   const [showHealthDetail, setShowHealthDetail] = useState(false);
+
+  // Inline "N items expiring" banner — dismissible for the day so it doesn't nag
+  // every time the tab is reopened (the launch-sheet/modal already handles the
+  // urgent interrupt case; this is the persistent, on-your-own-terms version).
+  const [expiringBannerDismissedDate, setExpiringBannerDismissedDate] = useState<string | null>(() => {
+    try { return localStorage.getItem('pantry_expiring_banner_dismissed_date'); } catch { return null; }
+  });
+
+  const expiringSoonSummary = useMemo(() => {
+    const needsAttention = expirationAlerts.filter(a => a.alertLevel === 'expired' || a.alertLevel === 'critical' || a.alertLevel === 'warning');
+    if (needsAttention.length === 0) return null;
+    const expiredCount = needsAttention.filter(a => a.alertLevel === 'expired').length;
+    return { count: needsAttention.length, expiredCount };
+  }, [expirationAlerts]);
+
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const showExpiringBanner = !!expiringSoonSummary && expiringBannerDismissedDate !== todayStr;
+
+  const dismissExpiringBanner = () => {
+    setExpiringBannerDismissedDate(todayStr);
+    try { localStorage.setItem('pantry_expiring_banner_dismissed_date', todayStr); } catch { /* ignore */ }
+  };
 
   // Meal prep suggestions state
   const [mealPrepSuggestions, setMealPrepSuggestions] = useState<RecipeIngredientMatch[]>([]);
@@ -859,7 +887,7 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
   }, [setExpandedCategories]);
 
   // Sort inventory based on selected criteria
-  const sortedInventory = processedInventory.sort((a, b) => {
+  const sortedInventory = useMemo(() => [...processedInventory].sort((a, b) => {
     switch (sortBy) {
       case 'name':
         return a.item.localeCompare(b.item);
@@ -884,10 +912,10 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
       default:
         return 0;
     }
-  });
+  }), [processedInventory, sortBy]);
 
   // Group inventory by category (combine like items within categories)
-  const groupedItems = sortedInventory.reduce((acc, item) => {
+  const groupedItems = useMemo(() => sortedInventory.reduce((acc, item) => {
     // Show a dedicated "Leftovers" category for leftover items so it's
     // visible in the category view only when leftovers exist.
     const category = item.is_leftover ? 'Leftovers' : (item.category || 'Uncategorized');
@@ -932,16 +960,16 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
       }
     }
     return acc;
-  }, {} as Record<string, Record<string, PantryItem & { combinedItems: PantryItem[]; totalQuantity: number; originalIndices: number[]; originalIndex: number }>>);
+  }, {} as Record<string, Record<string, PantryItem & { combinedItems: PantryItem[]; totalQuantity: number; originalIndices: number[]; originalIndex: number }>>), [sortedInventory]);
 
   // Convert grouped items to arrays for display
-  const categoryItemsArrays = Object.keys(groupedItems).reduce((acc, category) => {
+  const categoryItemsArrays = useMemo(() => Object.keys(groupedItems).reduce((acc, category) => {
     acc[category] = Object.values(groupedItems[category]);
     return acc;
-  }, {} as Record<string, (PantryItem & { combinedItems: PantryItem[]; totalQuantity: number; originalIndices: number[]; originalIndex: number })[]>);
+  }, {} as Record<string, (PantryItem & { combinedItems: PantryItem[]; totalQuantity: number; originalIndices: number[]; originalIndex: number })[]>), [groupedItems]);
 
   // Group inventory by storage location (combine like items within locations)
-  const groupedByStorage = sortedInventory.reduce((acc, item) => {
+  const groupedByStorage = useMemo(() => sortedInventory.reduce((acc, item) => {
     const location = item.is_leftover ? 'leftovers' : (item.storageLocation || 'pantry'); // Default to pantry if not set
     if (!acc[location]) {
       acc[location] = {};
@@ -984,7 +1012,7 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
       }
     }
     return acc;
-  }, {} as Record<string, Record<string, PantryItem & { combinedItems: PantryItem[]; totalQuantity: number; originalIndices: number[]; originalIndex: number }>>);
+  }, {} as Record<string, Record<string, PantryItem & { combinedItems: PantryItem[]; totalQuantity: number; originalIndices: number[]; originalIndex: number }>>), [sortedInventory]);
 
   // Convert grouped storage items to arrays for display
   const storageItemsArrays = Object.keys(groupedByStorage).reduce((acc, location) => {
@@ -1061,7 +1089,19 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
         {expandedCategories.has(category) && (
           <div className="border-t border-theme">
             {displayLayout === 'grid' ? (
-              <div className="grid grid-cols-3 gap-2 p-2">{items.map(renderTileItem)}</div>
+              <>
+                <div className="grid grid-cols-3 gap-2 p-2">
+                  {(gridExpandedSections.has(`category-${category}`) ? items : items.slice(0, CATEGORY_VIRTUALIZE_THRESHOLD)).map(renderTileItem)}
+                </div>
+                {!gridExpandedSections.has(`category-${category}`) && items.length > CATEGORY_VIRTUALIZE_THRESHOLD && (
+                  <button
+                    onClick={() => expandGridSection(`category-${category}`)}
+                    className="w-full py-2 text-sm font-medium text-[var(--accent-color)] hover:underline"
+                  >
+                    Show all {items.length} items
+                  </button>
+                )}
+              </>
             ) : items.length > CATEGORY_VIRTUALIZE_THRESHOLD ? (
               <ReactWindowList
                 height={Math.min(400, items.length * 64)}
@@ -1117,7 +1157,19 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
               No items in {locationLabel.toLowerCase()}
             </div>
           ) : displayLayout === 'grid' ? (
-            <div className="grid grid-cols-3 gap-2 p-2">{items.map(renderTileItem)}</div>
+            <>
+              <div className="grid grid-cols-3 gap-2 p-2">
+                {(gridExpandedSections.has(`storage-${location}`) ? items : items.slice(0, CATEGORY_VIRTUALIZE_THRESHOLD)).map(renderTileItem)}
+              </div>
+              {!gridExpandedSections.has(`storage-${location}`) && items.length > CATEGORY_VIRTUALIZE_THRESHOLD && (
+                <button
+                  onClick={() => expandGridSection(`storage-${location}`)}
+                  className="w-full py-2 text-sm font-medium text-[var(--accent-color)] hover:underline"
+                >
+                  Show all {items.length} items
+                </button>
+              )}
+            </>
           ) : items.length > CATEGORY_VIRTUALIZE_THRESHOLD ? (
             <ReactWindowList
               height={Math.min(400, items.length * 64)}
@@ -1671,6 +1723,40 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
           className="mb-2"
           onExpand={() => setShowHealthDetail(true)}
         />
+      )}
+
+      {/* Persistent, dismissible expiring-items summary — lets users address expirations
+          on their own terms instead of only via the app-open interrupt modal/launch sheet. */}
+      {showExpiringBanner && expiringSoonSummary && (
+        <div className={`flex items-center gap-3 rounded-xl border p-3 ${
+          expiringSoonSummary.expiredCount > 0
+            ? 'bg-red-500/10 border-red-500/30'
+            : 'bg-amber-500/10 border-amber-500/30'
+        }`}>
+          <AlertTriangle className={`w-5 h-5 shrink-0 ${expiringSoonSummary.expiredCount > 0 ? 'text-red-500' : 'text-amber-500'}`} />
+          <button
+            onClick={() => {
+              setPantryFilter(prev => {
+                const next = { ...prev, expirationStatus: 'expiring-soon' as PantryFilter['expirationStatus'] };
+                savePantryFilter(next);
+                return next;
+              });
+            }}
+            className="flex-1 text-left text-sm font-medium text-theme-primary"
+          >
+            {expiringSoonSummary.expiredCount > 0
+              ? `${expiringSoonSummary.expiredCount} item${expiringSoonSummary.expiredCount > 1 ? 's' : ''} expired, ${expiringSoonSummary.count} need${expiringSoonSummary.count === 1 ? 's' : ''} attention`
+              : `${expiringSoonSummary.count} item${expiringSoonSummary.count > 1 ? 's' : ''} expiring soon`}
+            <span className="ml-1 opacity-60 font-normal">— tap to view</span>
+          </button>
+          <button
+            onClick={dismissExpiringBanner}
+            aria-label="Dismiss for today"
+            className="shrink-0 p-1 rounded-full hover:bg-theme-primary/40 text-theme-secondary"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
       )}
 
       {/* Smart suggestion carousel — combines the dinner prompt, leftover nudge, each

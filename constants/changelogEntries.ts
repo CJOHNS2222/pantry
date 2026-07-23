@@ -20,6 +20,16 @@ export interface DetailedChangeEntry {
 
 export const RECENT_CHANGES: ChangeEntry[] = [
   {
+    "version": "3.0.13",
+    "date": "Jul 23, 2026",
+    "highlights": [
+      "Daily Reminders & Push Functions — Implemented dedicated background daily reminder cloud function dailyReminders.ts.",
+      "Leaderboards & Cooking Streaks — Added LeaderboardCacheService and cookingStreakService for tracking user engagement…",
+      "Service & Monitoring Enhancements — Upgraded performance monitoring, haptic feedback integration, image caching, and…",
+      "UI & Component Refactoring — Enhanced focus trapping, onboarding flows, meal planning components, settings tabs, and…"
+    ]
+  },
+  {
     "version": "3.0.12",
     "date": "Jul 20, 2026",
     "highlights": [
@@ -38,20 +48,25 @@ export const RECENT_CHANGES: ChangeEntry[] = [
       "Stable Callback Utilities — Introduced useStableCallback hook to prevent unnecessary callback recalculations across…",
       "Meal Planner & Community Architecture — Modularized meal plan state management and community view layers."
     ]
-  },
-  {
-    "version": "3.0.10",
-    "date": "Jul 19, 2026",
-    "highlights": [
-      "Fallback Recipe Memory Optimization — Extracted hardcoded CSV fallback recipes to external fallbackRecipes.ts module,…",
-      "Native Structured Deep Cloning — Replaced all legacy JSON.parse(JSON.stringify()) deep clones in snapshot callbacks…",
-      "Household Presence Optimization — Replaced full object serializations during presence heartbeats with fast scalar…",
-      "Server-Side Ratings Querying — Added server-side where('date', '>=', cutoff) query constraint to recipe ratings…"
-    ]
   }
 ];
 
 export const ALL_CHANGES: DetailedChangeEntry[] = [
+  {
+    "version": "3.0.13",
+    "date": "Jul 23, 2026",
+    "sections": [
+      {
+        "title": "Added / Changed / Refactored",
+        "bullets": [
+          "**Daily Reminders & Push Functions** — Implemented dedicated background daily reminder cloud function `dailyReminders.ts`.",
+          "**Leaderboards & Cooking Streaks** — Added `LeaderboardCacheService` and `cookingStreakService` for tracking user engagement and cooking milestones.",
+          "**Service & Monitoring Enhancements** — Upgraded performance monitoring, haptic feedback integration, image caching, and bulk image updates.",
+          "**UI & Component Refactoring** — Enhanced focus trapping, onboarding flows, meal planning components, settings tabs, and permissions UI."
+        ]
+      }
+    ]
+  },
   {
     "version": "3.0.12",
     "date": "Jul 20, 2026",

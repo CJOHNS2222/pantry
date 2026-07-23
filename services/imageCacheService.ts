@@ -2,6 +2,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '../firebaseConfig';
 import DatabaseMonitoringService from './databaseMonitoringService';
 import { log } from './logService';
+import { debounce } from '../utils/debounceUtils';
 
 // Simple cached-image shape used locally by this service
 interface CachedImage {
@@ -115,6 +116,11 @@ function saveLocalCache(): void {
   }
 }
 
+// Callers invoke this after every single memoryCache.set(), which during a pantry scan with
+// many images resolving in quick succession would otherwise re-stringify up to 300 cache
+// entries on every resolve. Debounce collapses a burst into one trailing write.
+const debouncedSaveLocalCache = debounce(saveLocalCache, 500);
+
 /**
  * Sync cache with Firestore (only when needed)
  */
@@ -136,7 +142,7 @@ async function syncCacheWithFirestore(): Promise<void> {
       // Firebase not initialized yet, skipping image cache sync
       return;
     }
-  } catch (err: any) {
+  } catch (_err) {
     // Firebase config not available, skipping image cache sync
     return;
   }
@@ -156,7 +162,7 @@ async function syncCacheWithFirestore(): Promise<void> {
       }
     }
 
-    saveLocalCache();
+    debouncedSaveLocalCache();
     localStorage.setItem(LAST_SYNC_KEY, now.toString());
     // Synced cached images
   } catch (err: any) {
@@ -228,7 +234,7 @@ export async function getCachedImageUrl(itemName: string): Promise<string | null
       if (cachedImage) {
         // Store in memory and local cache
         memoryCache.set(cacheKey, cachedImage);
-        saveLocalCache();
+        debouncedSaveLocalCache();
         return cachedImage.cachedUrl;
       }
     }
@@ -281,7 +287,7 @@ export async function getCachedImageUrls(itemNames: string[]): Promise<Map<strin
   }
 
   if (uncachedKeys.length === 0) {
-    saveLocalCache();
+    debouncedSaveLocalCache();
     return results; // All found in local cache
   }
 
@@ -301,7 +307,7 @@ export async function getCachedImageUrls(itemNames: string[]): Promise<Map<strin
       });
     }
 
-    saveLocalCache();
+    debouncedSaveLocalCache();
   } catch (err: any) {
     log.error('Error batch getting cached images from Firestore', { err });
   }
@@ -352,7 +358,7 @@ export async function cacheImageFromUrl(originalUrl: string, itemName: string): 
     // Update local caches
     evictLruIfNeeded();
     memoryCache.set(cacheKey, cachedImage);
-    saveLocalCache();
+    debouncedSaveLocalCache();
 
     return cachedUrl;
   } catch (err: any) {
@@ -456,7 +462,7 @@ export async function cacheImagesFromUrls(imageMap: Map<string, string>): Promis
     }
   }
 
-  saveLocalCache();
+  debouncedSaveLocalCache();
   return results;
 }
 
@@ -491,6 +497,6 @@ export function cleanupExpiredImageCache(): void {
 
   if (cleaned > 0) {
     // Cleaned up expired image cache entries
-    saveLocalCache(); // Update localStorage
+    debouncedSaveLocalCache(); // Update localStorage
   }
 }

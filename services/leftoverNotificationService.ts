@@ -1,7 +1,6 @@
 import { LeftoverService } from './leftoverService'
 import { NotificationService, NotificationItem } from './notificationService'
 import { pruneNotificationsForDeletedItems } from './notificationsService'
-import { PantryItem } from '../types'
 import AnalyticsService from './analyticsService'
 import { log } from './logService'
 import DatabaseMonitoringService from './databaseMonitoringService'

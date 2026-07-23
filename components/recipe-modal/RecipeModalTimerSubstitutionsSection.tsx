@@ -1,10 +1,12 @@
 import React from 'react';
-import { AlertCircle, Pause, Play, RotateCcw } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Pause, Play, RotateCcw } from 'lucide-react';
 import { SavedRecipe, StructuredRecipe } from '../../types';
 
 interface IngredientSubstitution {
   ingredient: string;
-  substitutes: { name: string; ratio: string; notes: string }[];
+  /** True when this ingredient is already in the user's pantry — no substitute needed. */
+  inPantry: boolean;
+  substitutes: { name: string; ratio: string; notes: string; inPantry: boolean }[];
 }
 
 interface RecipeModalTimerSubstitutionsSectionProps {
@@ -166,12 +168,33 @@ export const RecipeModalTimerSubstitutionsSection: React.FC<RecipeModalTimerSubs
             ) : (
               <div className="space-y-4">
                 {ingredientSubstitutions.map((item, index) => (
-                  <div key={index} className="border-l-4 border-[var(--accent-color)]/50 pl-3">
-                    <p className="text-sm font-semibold text-theme-primary mb-2">{item.ingredient}</p>
+                  <div key={index} className={`border-l-4 pl-3 ${item.inPantry ? 'border-theme/40' : 'border-[var(--accent-color)]/50'}`}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <p className="text-sm font-semibold text-theme-primary">{item.ingredient}</p>
+                      {item.inPantry ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded-full">
+                          <CheckCircle2 className="w-3 h-3" /> In your pantry
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-bold uppercase text-[var(--accent-color)] bg-[var(--accent-color)]/10 px-1.5 py-0.5 rounded-full">
+                          Missing
+                        </span>
+                      )}
+                    </div>
                     <div className="space-y-2">
                       {item.substitutes.map((substitute, subIndex) => (
-                        <div key={subIndex} className="bg-theme-secondary/10 rounded-lg px-3 py-2">
-                          <p className="text-sm font-medium text-[var(--accent-color)]">{substitute.name}</p>
+                        <div
+                          key={subIndex}
+                          className={`rounded-lg px-3 py-2 ${substitute.inPantry ? 'bg-emerald-500/10 border border-emerald-500/30' : 'bg-theme-secondary/10'}`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-medium text-[var(--accent-color)]">{substitute.name}</p>
+                            {substitute.inPantry && (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase text-emerald-500">
+                                <CheckCircle2 className="w-3 h-3" /> You have this
+                              </span>
+                            )}
+                          </div>
                           <p className="text-xs text-theme-secondary opacity-80">{substitute.ratio}</p>
                           {substitute.notes && <p className="text-xs text-theme-secondary opacity-60 mt-0.5 italic">{substitute.notes}</p>}
                         </div>
