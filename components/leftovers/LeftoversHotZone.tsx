@@ -3,7 +3,6 @@ import { doc, onSnapshot } from 'firebase/firestore'
 import { db } from '../../firebaseConfig'
 import { LeftoverService } from '../../services/leftoverService'
 import { pruneNotificationsForDeletedItems } from '../../services/notificationsService'
-import FreezerService from '../../services/freezerService'
 import AnalyticsService from '../../services/analyticsService'
 import { getExpirationColor } from '../../utils/appUtils'
 import { useAppActions } from '../../contexts/AppActionsContext'
@@ -34,6 +33,7 @@ export default function LeftoversHotZone({ householdId, onNavigateToRecipes }: L
         setLeftovers([])
         return
       }
+      /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
       const data = snap.data() as Record<string, any>
       const items: PantryItem[] = []
       for (const [itemId, itemArray] of Object.entries(data)) {
@@ -44,25 +44,17 @@ export default function LeftoversHotZone({ householdId, onNavigateToRecipes }: L
           } catch { /* skip malformed entries */ }
         }
       }
-      items.sort((a, b) => {
-        const aDate = a.leftoverMeta?.createdAt ?? ''
-        const bDate = b.leftoverMeta?.createdAt ?? ''
-        return bDate.localeCompare(aDate)
-      })
       setLeftovers(items)
     })
 
-    return () => {
-      unsub()
-    }
+    return () => unsub()
   }, [householdId, user?.id])
 
-  if (!leftovers.length) return null
+  if (leftovers.length === 0) return null
 
   const handleConsume = async (leftover: PantryItem) => {
     try {
       const result = await LeftoverService.consumeServing(householdId, leftover.id)
-
       const servingsLeft = result.deleted ? 0 : (leftover.leftoverMeta?.servings ?? 1) - 1
       AnalyticsService.trackLeftoverConsumed(householdId, leftover.id, servingsLeft)
       if (result.deleted && user?.id) {
@@ -70,16 +62,9 @@ export default function LeftoversHotZone({ householdId, onNavigateToRecipes }: L
       }
       addToast(
         servingsLeft > 0 ? `Consumed 1 serving (${servingsLeft} left)` : 'Consumed last serving',
-        'success',
-        5000,
-        servingsLeft === 0 ? undefined : 'Undo',
-        servingsLeft === 0 ? undefined : async () => {
-          // Note: Undo functionality would need to be implemented
-          // For now, just show a message
-          addToast('Undo not implemented yet', 'info')
-        }
+        'success'
       )
-    } catch (err) {
+    } catch (_err) {
       addToast('Could not consume leftover', 'error')
     }
   }
@@ -89,7 +74,7 @@ export default function LeftoversHotZone({ householdId, onNavigateToRecipes }: L
       await LeftoverService.moveToFreezer(householdId, leftover.id)
       AnalyticsService.trackMoveToFreezer(householdId, leftover.id)
       addToast('Moved to freezer', 'success')
-    } catch (err) {
+    } catch (_err) {
       addToast('Failed to move to freezer', 'error')
     }
   }
@@ -101,25 +86,11 @@ export default function LeftoversHotZone({ householdId, onNavigateToRecipes }: L
       if (user?.id) {
         pruneNotificationsForDeletedItems(user.id, [leftover.id]).catch(() => {})
       }
-      addToast('Discarded leftover', 'info', 5000, 'Undo', async () => {
-        // Note: Restore functionality would need to be implemented
-        addToast('Undo not implemented yet', 'info')
-      })
-    } catch (err) {
+      addToast('Discarded leftover', 'info')
+    } catch (_err) {
       addToast('Could not discard leftover', 'error')
     }
   }
-
-  const handleTransformLeftover = async (leftover: PantryItem) => {
-    try {
-      // Navigate to recipes with a prompt about this leftover
-      // This would need to be passed up to the parent component
-      // For now, just show a placeholder
-      addToast('Leftover transformation coming soon!', 'info');
-    } catch (error) {
-      addToast('Failed to get transformation ideas', 'error');
-    }
-  };
 
   return (
     <section className="px-3 py-2" aria-label="Leftovers Hot Zone">
@@ -143,9 +114,9 @@ export default function LeftoversHotZone({ householdId, onNavigateToRecipes }: L
             <div
               key={leftover.id}
               className={`min-w-[200px] bg-theme-secondary rounded-lg p-3 border ${
-                attentionLevel === 'urgent' ? 'border-red-300 bg-red-50' :
-                attentionLevel === 'warning' ? 'border-yellow-300 bg-yellow-50' :
-                attentionLevel === 'freeze' ? 'border-blue-300 bg-blue-50' :
+                attentionLevel === 'urgent' ? 'border-red-500/30 bg-red-500/10' :
+                attentionLevel === 'warning' ? 'border-yellow-500/30 bg-yellow-500/10' :
+                attentionLevel === 'freeze' ? 'border-blue-500/30 bg-blue-500/10' :
                 'border-theme'
               }`}
             >

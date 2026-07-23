@@ -6,12 +6,9 @@ Use this file as the authoritative instructions for any AI coding agent before e
 1. **ESLint Cleanliness** — Clean up all lint warnings and errors in modified files, but do NOT run full lint check commands automatically after each task.    - **Never** use `any` unless absolutely necessary. If required, use `/* eslint-disable-next-line @typescript-eslint/no-explicit-any */`.
    - **Never** leave unused imports or unused variables (even inside `catch` blocks—use `catch` without an unused parameter or prefix with `_`).
 2. **Type Checking** — Always run `npx tsc --noEmit` to verify type safety after each task. Do NOT run other commands like lint checks, build, or capacitor sync (`npx cap sync`) unless explicitly requested or during a release build.
-3. **Response Protocol (VibeCheck)**:
-   - End **every response** with the exact line `*verified by vibecheck*` on its own line at the end of the message.
-   - If changes were made, place a **What's left** section directly above the badge showing remaining tasks (or `✅ Task complete — nothing remaining.` if fully finished).
-4. **Git Commit & Push Constraint**:
+3. **Git Commit & Push Constraint**:
    - **Never commit changes (`git commit`) or push changes (`git push`) to Git automatically** unless explicitly requested by the user or when running a `/releasebuild`. Keep all modified files unstaged/committed in the workspace so the user can review them first.
-5. **Localization Constraint**:
+4. **Localization Constraint**:
    - **Do NOT update locale translation JSON files** (e.g., in `src/locales/`) automatically for minor edits or general tasks. Use plain English text directly in the components or utilize existing translation keys unless explicitly asked by the user to translate.
 
 ---

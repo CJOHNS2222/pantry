@@ -166,7 +166,7 @@ async function deleteOp(id: number) {
 
 export async function processQueue() {
   if (!navigator.onLine) return;
-  let ops: BaseOp[] = [];
+  let ops: BaseOp[];
   try {
     ops = await getAllOps();
   } catch (err) {

@@ -16,6 +16,7 @@ import { useToast } from './components/ui/Toast';
 import { Button } from './components/ui/Button';
 import { useDataManagement } from './hooks/useDataManagement';
 import { useHouseholdActivity } from './hooks/useHouseholdActivity';
+import { HouseholdActivityService } from './services/householdActivityService';
 import { useOfflineStatus } from './hooks/useOfflineStatus';
 import AnalyticsService from './services/analyticsService';
 import { SubscriptionProvider } from './hooks/useSubscription';
@@ -115,8 +116,7 @@ const App: React.FC = () => {
       [Tab.MEALS]: 'meals',
       [Tab.RECIPES]: 'recipes',
       [Tab.SETTINGS]: 'settings',
-      [Tab.COMMUNITY]: 'community',
-      [Tab.ANALYTICS]: 'analytics'
+      [Tab.COMMUNITY]: 'community'
     } as Record<Tab, string>;
     
     trackNavigation(tabNames[activeTab] || 'unknown', tabNames[tab] || 'unknown');
@@ -316,7 +316,7 @@ const App: React.FC = () => {
       actionLabel: 'View Pantry',
       onAction: () => setActiveTab(Tab.PANTRY),
       autoHideDelay: 10000,
-      requiredMilestone: 'first-pantry-item' as const,
+      requiredMilestone: 'pantry-health-visible' as const,
     },
   ], [setActiveTab, setShowHousehold]);
 
@@ -589,7 +589,39 @@ const App: React.FC = () => {
   // (audit item #18 — trigger by milestone rather than showing all tips at once).
   useEffect(() => {
     if (inventory.length > 0) recordMilestone('first-pantry-item');
+    // Matches PantryHealthScore's own >=3 render gate — no point tipping toward a card that isn't shown yet.
+    if (inventory.length >= 3) recordMilestone('pantry-health-visible');
   }, [inventory.length]);
+
+  // Toast household members' activity as it streams in, so it's noticed without opening
+  // the header dropdown. Skips the initial batch on mount/household-switch (that's history,
+  // not something that "just happened") and never toasts the current user's own actions.
+  // recentActivities is server-sorted newest-first and capped at 20 (subscribeToActivities),
+  // so a single "last seen id" boundary is enough — no need to accumulate a growing id set.
+  const lastSeenActivityIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!recentActivities.length) return;
+    const lastSeenId = lastSeenActivityIdRef.current;
+    if (lastSeenId === null) {
+      lastSeenActivityIdRef.current = recentActivities[0].id;
+      return;
+    }
+    const lastSeenIndex = recentActivities.findIndex(a => a.id === lastSeenId);
+    // If the boundary scrolled out of the 20-item window (activity burst), don't
+    // flood-toast everything currently in view — just re-anchor silently.
+    const newActivities = lastSeenIndex === -1 ? [] : recentActivities.slice(0, lastSeenIndex);
+    for (let i = newActivities.length - 1; i >= 0; i--) {
+      const activity = newActivities[i];
+      if (activity.userId !== user?.id) {
+        addToast(HouseholdActivityService.getActivityMessage(activity), 'info', 4000);
+      }
+    }
+    lastSeenActivityIdRef.current = recentActivities[0].id;
+  }, [recentActivities, user?.id, addToast]);
+
+  useEffect(() => {
+    lastSeenActivityIdRef.current = null;
+  }, [activityHousehold?.id]);
 
   useEffect(() => {
     if (shoppingList.length > 0) recordMilestone('first-shopping-item');
@@ -703,8 +735,7 @@ const App: React.FC = () => {
         [Tab.MEALS]: 'viewing meal plan',
         [Tab.RECIPES]: 'viewing recipes',
         [Tab.SETTINGS]: 'viewing settings',
-        [Tab.COMMUNITY]: 'viewing community',
-        [Tab.ANALYTICS]: 'viewing analytics'
+        [Tab.COMMUNITY]: 'viewing community'
       };
 
       const currentActivity = activityMap[activeTab] || 'using app';
@@ -1526,26 +1557,10 @@ const App: React.FC = () => {
   if (!user) return <Login onLogin={handleLogin} />;
 
   const navigateToNotifications = () => {
+    // Settings.tsx reads this on mount and switches to the notifications
+    // category, then scrolls the Pending Notifications card into view.
+    sessionStorage.setItem('settings_redirect_tab', 'notifications');
     setActiveTab(Tab.SETTINGS);
-    setTimeout(() => {
-      // Switch to the Account tab (Pending Notifications is its own box there)
-      const accountTab = document.querySelector('[data-settings-tab="account"]') as HTMLElement;
-      if (accountTab) accountTab.click();
-
-      setTimeout(() => {
-        // Expand the Pending Notifications accordion if collapsed
-        const pendingSection = document.querySelector('[data-section="pending-notifications"]') as HTMLElement;
-        if (pendingSection) {
-          const header = pendingSection.querySelector('.cursor-pointer') as HTMLElement;
-          const isExpanded = pendingSection.querySelector('.border-t.border-theme.p-4') !== null;
-          if (!isExpanded && header) header.click();
-
-          setTimeout(() => {
-            pendingSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          }, 150);
-        }
-      }, 100);
-    }, 100);
   };
 
   return (

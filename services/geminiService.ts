@@ -128,7 +128,7 @@ export const analyzePantryImage = async (base64Image: string, mimeType: string, 
     
     const errMsg = err instanceof Error ? err.message : String(err);
     if (errMsg.includes('403') || errMsg.includes('Forbidden')) {
-      throw new Error('Photo rejected by AI safety filters. Please ensure no people, faces, hands, or reflections are visible in the image and try again.');
+      throw new Error('Photo rejected by AI safety filters. Please ensure no people, faces, hands, or reflections are visible in the image and try again.', { cause: err });
     }
     
     throw err;
@@ -233,7 +233,7 @@ export const analyzeReceiptImage = async (base64Image: string, mimeType: string,
     
     const errMsg = err instanceof Error ? err.message : String(err);
     if (errMsg.includes('403') || errMsg.includes('Forbidden')) {
-      throw new Error('Photo rejected by AI safety filters. Please ensure no people, faces, hands, or reflections are visible in the image and try again.');
+      throw new Error('Photo rejected by AI safety filters. Please ensure no people, faces, hands, or reflections are visible in the image and try again.', { cause: err });
     }
     
     throw err;
@@ -445,15 +445,15 @@ const performSearch = async (params: RecipeSearchParams, user: User | undefined,
 
     // Provide more specific error messages
     if (errMsg.includes('API_KEY')) {
-      throw new Error('API configuration error. Please check your Gemini API key.');
+      throw new Error('API configuration error. Please check your Gemini API key.', { cause: err });
     } else if (errMsg.includes('429') || errMsg.includes('Too Many Requests') || errMsg.includes('Resource exhausted')) {
-      throw new Error('API rate limit exceeded. Please wait a moment and try again.');
+      throw new Error('API rate limit exceeded. Please wait a moment and try again.', { cause: err });
     } else if (errMsg.includes('quota') || errMsg.includes('limit')) {
-      throw new Error('API quota exceeded. Please try again later.');
+      throw new Error('API quota exceeded. Please try again later.', { cause: err });
     } else if (errMsg.includes('network') || errMsg.includes('fetch')) {
-      throw new Error('Network error. Please check your internet connection.');
+      throw new Error('Network error. Please check your internet connection.', { cause: err });
     } else {
-      throw new Error(`Recipe search failed: ${errMsg}`);
+      throw new Error(`Recipe search failed: ${errMsg}`, { cause: err });
     }
   } finally {
     perfTrace?.stop();

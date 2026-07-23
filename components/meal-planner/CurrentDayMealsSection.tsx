@@ -1,39 +1,16 @@
 import React, { useState, useCallback } from 'react';
-import { Plus, MoreVertical, RefreshCw, Trash2 } from 'lucide-react';
+import { Plus, MoreVertical, RefreshCw, Shuffle, Trash2 } from 'lucide-react';
 import { useIntl } from 'react-intl';
 import { DayPlan, MealPlanItem, StructuredRecipe } from '../../types';
 import { EmptyState } from '../ui/EmptyState';
 import { Button } from '../ui/Button';
-
-// ─── Cooking streak helpers ──────────────────────────────────────────────────
-const STREAK_KEY = 'cookingStreakDates';
-
-function updateCookingStreak(): number {
-  const today = new Date().toISOString().slice(0, 10);
-  const raw = localStorage.getItem(STREAK_KEY);
-  const dates: string[] = raw ? JSON.parse(raw) : [];
-  if (!dates.includes(today)) {
-    dates.push(today);
-    // Keep only last 30 days
-    const pruned = dates.slice(-30);
-    localStorage.setItem(STREAK_KEY, JSON.stringify(pruned));
-  }
-  // Count consecutive trailing days
-  const sorted = [...new Set(dates)].sort();
-  let streak = 1;
-  for (let i = sorted.length - 1; i > 0; i--) {
-    const diff = (new Date(sorted[i]).getTime() - new Date(sorted[i - 1]).getTime()) / 86400000;
-    if (diff === 1) streak++;
-    else break;
-  }
-  return streak;
-}
-// ─────────────────────────────────────────────────────────────────────────────
+import { recordCookedToday } from '../../services/cookingStreakService';
 
 interface CurrentDayMealsSectionProps {
   mealPlan: DayPlan[];
   displayPlan: DayPlan[];
   currentDayIndex: number;
+  userId?: string;
   onOpenMealSearch: (mealType: 'breakfast' | 'lunch' | 'dinner') => void;
   onOpenRecipe: (recipe: StructuredRecipe) => void;
   onCooked: (meal: MealPlanItem) => void;
@@ -45,6 +22,7 @@ export const CurrentDayMealsSection: React.FC<CurrentDayMealsSectionProps> = ({
   mealPlan,
   displayPlan,
   currentDayIndex,
+  userId,
   onOpenMealSearch,
   onOpenRecipe,
   onCooked,
@@ -57,16 +35,17 @@ export const CurrentDayMealsSection: React.FC<CurrentDayMealsSectionProps> = ({
   const [streak, setStreak] = useState<number | null>(null);
 
   const handleCooked = useCallback((meal: MealPlanItem) => {
-    const newStreak = updateCookingStreak();
     setCelebratingId(meal.id);
-    setStreak(newStreak);
     onCooked(meal);
+    // Sync (localStorage + Firestore) happens off the critical path; the celebration
+    // UI doesn't need to wait on it.
+    void recordCookedToday(userId).then(setStreak);
     // Reset celebration state after animation completes
     setTimeout(() => {
       setCelebratingId(null);
       setStreak(null);
     }, 1800);
-  }, [onCooked]);
+  }, [onCooked, userId]);
 
   const effectiveIndex = mealPlan.findIndex(d => d.date === displayPlan[currentDayIndex].date);
   const dayPlanItem = effectiveIndex >= 0 ? mealPlan[effectiveIndex] : null;
@@ -76,10 +55,10 @@ export const CurrentDayMealsSection: React.FC<CurrentDayMealsSectionProps> = ({
 
   if (totalMealsCount === 0) {
     return (
-      <div className="bg-theme-secondary rounded-xl border border-theme min-h-[300px] flex items-center justify-center p-4">
+      <div className="bg-theme-secondary rounded-xl border border-theme p-3">
         <EmptyState
           preset="mealplan"
-          size="default"
+          size="compact"
           bare
           action={
             <div className="flex flex-wrap gap-2 justify-center mt-1">
@@ -271,6 +250,18 @@ export const CurrentDayMealsSection: React.FC<CurrentDayMealsSectionProps> = ({
                                     >
                                       <RefreshCw className="w-4 h-4 text-blue-500" />
                                       <span>Swap with leftover</span>
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setActiveMealMenuId(null);
+                                        if (effectiveIndex >= 0) onRemove(effectiveIndex, mealTypeKey, mealIndex);
+                                        onOpenMealSearch(mealTypeKey);
+                                      }}
+                                      className="w-full text-left px-4 py-2.5 hover:bg-theme-secondary text-theme-primary text-sm flex items-center gap-2 transition-colors"
+                                    >
+                                      <Shuffle className="w-4 h-4 text-purple-500" />
+                                      <span>Swap for another recipe</span>
                                     </button>
                                     <button
                                       onClick={(e) => {

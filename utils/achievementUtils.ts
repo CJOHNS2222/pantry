@@ -1,4 +1,5 @@
 import { PantryItem, SavedRecipe, Household, DayPlan } from '../types';
+import { getCookingStreak as getCookingStreakSynced } from '../services/cookingStreakService';
 
 export interface AchievementBadge {
   id: string;
@@ -61,39 +62,10 @@ export const calculatePantryScore = (items: PantryItem[]) => {
   return Math.min(100, Math.max(0, rawScore));
 };
 
-// Cooking Streak Calculation Helper
-export const getCookingStreak = (): number => {
-  const STREAK_KEY = 'cookingStreakDates';
-  const raw = localStorage.getItem(STREAK_KEY);
-  if (!raw) return 0;
-  try {
-    const dates: string[] = JSON.parse(raw);
-    if (!Array.isArray(dates) || dates.length === 0) return 0;
-    
-    const sorted = [...dates].sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
-    const todayStr = new Date().toISOString().split('T')[0];
-    const yesterdayStr = new Date(Date.now() - 86400000).toISOString().split('T')[0];
-    
-    const latest = sorted[0];
-    if (latest !== todayStr && latest !== yesterdayStr) return 0;
-    
-    let streak = 1;
-    for (let i = 0; i < sorted.length - 1; i++) {
-      const d1 = new Date(sorted[i]);
-      const d2 = new Date(sorted[i + 1]);
-      const diffTime = Math.abs(d1.getTime() - d2.getTime());
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      if (diffDays === 1) {
-        streak++;
-      } else if (diffDays > 1) {
-        break;
-      }
-    }
-    return streak;
-  } catch {
-    return 0;
-  }
-};
+// Cooking Streak — re-exported from cookingStreakService, which backs it with a
+// Firestore-synced cache (see services/cookingStreakService.ts) instead of raw
+// per-device localStorage.
+export const getCookingStreak = getCookingStreakSynced;
 
 export const getUnlockedBadges = (
   inventory: PantryItem[],

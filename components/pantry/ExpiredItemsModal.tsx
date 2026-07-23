@@ -34,7 +34,7 @@ const ExpiredItemsModal: React.FC<ExpiredItemsModalProps> = ({
   specificItems
 }) => {
   useModalOpen(isOpen);
-  const modalRef = useFocusTrap({ isActive: isOpen });
+  const modalRef = useFocusTrap({ isActive: isOpen, onEscape: onClose });
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [disposalReason, setDisposalReason] = useState<DisposalReason>('thrown_away');
   const [isProcessing, setIsProcessing] = useState(false);

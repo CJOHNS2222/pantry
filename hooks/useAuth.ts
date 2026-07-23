@@ -10,6 +10,7 @@ import { PriceDataCacheService } from '../services/priceDataCacheService';
 import { log } from '../services/logService';
 import { GUEST_USER_ID_KEY } from '../components/auth-onboarding/Login';
 import { syncFromFirestore } from '../services/onboardingMilestoneService';
+import { seedCookingStreakFromServer } from '../services/cookingStreakService';
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
@@ -132,7 +133,12 @@ export function useAuth() {
           customCategories,
           discoveredFeatures: userData?.discoveredFeatures || [],
           dismissedTutorialTips: userData?.dismissedTutorialTips || [],
+          cookingStreakDates: userData?.cookingStreakDates || [],
         });
+
+        // Merge the server's cooking-streak history into the local cache so a streak
+        // built on another device (or before reinstall) still shows up here.
+        seedCookingStreakFromServer(userData?.cookingStreakDates);
 
         setUserContext(fbUser.uid, fbUser.email || undefined, householdId);
         setIsAuthReady(true); // Auth is ready

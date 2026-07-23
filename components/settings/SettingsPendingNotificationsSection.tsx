@@ -25,7 +25,7 @@ export const SettingsPendingNotificationsSection: React.FC<SettingsPendingNotifi
         </div>
       </div>
       <div className="p-4">
-          <PendingNotifications user={user} />
+          <PendingNotifications user={user} mode="history" />
         </div>
     </div>
   );

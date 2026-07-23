@@ -28,7 +28,7 @@ export default class FreezerService {
     try {
       itemSnap = await getDoc(itemRef)
     } catch (err) {
-      throw new Error(`Failed to fetch item for freezer move: ${err instanceof Error ? err.message : String(err)}`)
+      throw new Error(`Failed to fetch item for freezer move: ${err instanceof Error ? err.message : String(err)}`, { cause: err })
     }
     if (!itemSnap.exists()) throw new Error('Item not found')
     const item = itemSnap.data() as Record<string, unknown>
@@ -97,7 +97,7 @@ export default class FreezerService {
     try {
       itemSnap = await getDoc(itemRef)
     } catch (err) {
-      throw new Error(`Failed to fetch item for defrost: ${err instanceof Error ? err.message : String(err)}`)
+      throw new Error(`Failed to fetch item for defrost: ${err instanceof Error ? err.message : String(err)}`, { cause: err })
     }
     if (!itemSnap.exists()) throw new Error('Item not found')
 

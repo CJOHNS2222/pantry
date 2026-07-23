@@ -12,6 +12,7 @@ export interface ValidationOptions {
   minLength?: number;
   maxLength?: number;
   pattern?: RegExp;
+  /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
   customValidators?: ((value: any) => string | null)[];
 }
 
@@ -28,6 +29,7 @@ export const PATTERNS = {
 
 // Generic validation function
 export function validateField(
+  /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
   value: any,
   fieldName: string,
   options: ValidationOptions = {}
@@ -202,6 +204,7 @@ export function validateURL(url: string): ValidationResult {
 }
 
 // Batch validation for forms
+/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
 export function validateForm(fields: Record<string, { value: any; rules: ValidationOptions }>): ValidationResult {
   const allErrors: string[] = [];
   const allWarnings: string[] = [];

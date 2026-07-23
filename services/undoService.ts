@@ -1,4 +1,3 @@
-import { PantryItem } from '../types';
 import remoteConfig from './remoteConfigService';
 
 type ActionType = 'delete_item' | 'bulk_edit' | 'update_item';

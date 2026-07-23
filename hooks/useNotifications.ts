@@ -74,7 +74,7 @@ export function useNotifications(settings: NotificationSettings, userEmail?: str
     }
   };
 
-  const scheduleNotifications = async (settings: NotificationSettings, mealPlan?: DayPlan[]) => {
+  const scheduleNotifications = async (settings: NotificationSettings, _mealPlan?: DayPlan[]) => {
     const [hours, minutes] = settings.time.split(':').map(Number);
     const now = new Date();
     const notificationTime = new Date(now);

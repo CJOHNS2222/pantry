@@ -34,7 +34,7 @@ function buildPrompt(params: RecipeSearchParams): string {
   // Same compact JSON format used by Gemini to keep prompts comparable
   const jsonFormat = `{"r":[{"t":"title","d":"short desc","i":["qty ingredient"],"s":["step"],"c":"15 min"}]}`;
 
-  let prompt = '';
+  let prompt: string;
 
   if (params.query) {
     prompt = `2 recipes for "${params.query}". Reply JSON: ${jsonFormat}`;

@@ -40,10 +40,18 @@ export const PremiumFeature: React.FC<PremiumFeatureProps> = ({
     return <>{children}</>;
   }
 
-  // Check if user has reached the limit for free tier
-  const hasReachedLimit = limit && currentCount && currentCount >= limit;
+  // Check if user has reached the limit for free tier. Compare against the actual
+  // usage count (defaulting to 0) rather than the truthiness of currentCount — a
+  // falsy-but-valid 0 must not be treated the same as "no limit info available".
+  const hasReachedLimit = limit !== undefined && (currentCount ?? 0) >= limit;
 
   if (isPremium && isActive) {
+    return <>{children}</>;
+  }
+
+  // A limit was specified and the free-tier user hasn't reached it yet — let them
+  // use the feature normally instead of showing a premium block on their first use.
+  if (limit !== undefined && !hasReachedLimit) {
     return <>{children}</>;
   }
 

@@ -14,11 +14,19 @@ import { useUserNotifications } from '../../hooks/useUserNotifications';
 interface PendingNotificationsProps {
   user: User;
   onNavigateToSettings?: () => void;
+  /**
+   * 'pending' (default) — action-required inbox, unread only, matches the header bell.
+   * 'history' — full record including already-read notifications, for the Settings
+   * page where users expect to be able to look back at everything, not just what's
+   * still outstanding.
+   */
+  mode?: 'pending' | 'history';
 }
 
 export const PendingNotifications: React.FC<PendingNotificationsProps> = ({
   user,
-  onNavigateToSettings: _onNavigateToSettings
+  onNavigateToSettings: _onNavigateToSettings,
+  mode = 'pending'
 }) => {
   const [processing, setProcessing] = useState<string | null>(null);
   const { inventory } = useApp();
@@ -27,10 +35,12 @@ export const PendingNotifications: React.FC<PendingNotificationsProps> = ({
   // Stream notifications in realtime
   const { items: rawNotifications } = useUserNotifications(user.id, 500);
 
-  // Filter for unread and format/sort them
+  // Pending mode only surfaces what still needs action; history mode shows everything
+  // that hasn't expired yet (the underlying cache doc already holds both), so users
+  // have somewhere to look back at what already happened.
   const notifications = useMemo(() => {
     return (rawNotifications || [])
-      .filter(n => !n.read)
+      .filter(n => mode === 'history' || !n.read)
       .map(n => ({
         id: n.id,
         userId: user.id,
@@ -51,8 +61,8 @@ export const PendingNotifications: React.FC<PendingNotificationsProps> = ({
         const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
         return bTime - aTime;
       })
-      .slice(0, 20);
-  }, [rawNotifications, user.id]);
+      .slice(0, mode === 'history' ? 50 : 20);
+  }, [rawNotifications, user.id, mode]);
 
   const handleAcceptNotification = async (notification: NotificationItem) => {
     setProcessing(notification.id);
@@ -213,15 +223,17 @@ export const PendingNotifications: React.FC<PendingNotificationsProps> = ({
       {notifications.length === 0 ? (
         <div className="text-center py-8">
           <Bell className="w-12 h-12 text-theme-secondary mx-auto mb-3 opacity-50" />
-          <p className="text-theme-secondary">No pending notifications</p>
-          <p className="text-sm text-theme-secondary mt-1">You're all caught up!</p>
+          <p className="text-theme-secondary">{mode === 'history' ? 'No notifications yet' : 'No pending notifications'}</p>
+          <p className="text-sm text-theme-secondary mt-1">
+            {mode === 'history' ? "You'll see everything sent to you here." : "You're all caught up!"}
+          </p>
         </div>
       ) : (
         <div className="space-y-3">
           {notifications.map((notification) => (
             <div
               key={notification.id}
-              className={`border rounded-lg p-3 ${getPriorityColor(notification.priority)} bg-theme-primary/50`}
+              className={`border rounded-lg p-3 bg-theme-primary/50 ${notification.read ? 'opacity-60 border-theme' : getPriorityColor(notification.priority)}`}
             >
               <div className="flex items-start justify-between mb-2">
                 <div className="flex items-center gap-2">
@@ -229,6 +241,11 @@ export const PendingNotifications: React.FC<PendingNotificationsProps> = ({
                   <span className="text-sm font-medium text-theme-primary capitalize">
                     {notification.type.replace('_', ' ')}
                   </span>
+                  {mode === 'history' && (
+                    <span className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded ${notification.read ? 'bg-theme-secondary text-theme-secondary' : 'bg-[var(--accent-color)]/20 text-[var(--accent-color)]'}`}>
+                      {notification.read ? 'Read' : 'Unread'}
+                    </span>
+                  )}
                 </div>
                 <span className="text-xs text-theme-secondary">
                   {(() => {
@@ -248,36 +265,38 @@ export const PendingNotifications: React.FC<PendingNotificationsProps> = ({
               <h4 className="font-medium text-theme-primary mb-1">{notification.title}</h4>
               <p className="text-sm text-theme-secondary mb-3">{notification.message}</p>
 
-              <div className="flex gap-2">
-                {notification.actionType && notification.actionLabel && (
+              {!notification.read && (
+                <div className="flex gap-2">
+                  {notification.actionType && notification.actionLabel && (
+                    <button
+                      onClick={() => handleAcceptNotification(notification)}
+                      disabled={processing === notification.id}
+                      className="flex items-center gap-1 bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm font-medium transition-colors disabled:opacity-50"
+                    >
+                      <Check className="w-3 h-3" />
+                      {notification.actionLabel}
+                    </button>
+                  )}
+
                   <button
-                    onClick={() => handleAcceptNotification(notification)}
+                    onClick={() => handleSnoozeNotification(notification, 60)}
                     disabled={processing === notification.id}
-                    className="flex items-center gap-1 bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm font-medium transition-colors disabled:opacity-50"
+                    className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm font-medium transition-colors disabled:opacity-50"
                   >
-                    <Check className="w-3 h-3" />
-                    {notification.actionLabel}
+                    <Clock className="w-3 h-3" />
+                    Snooze 1h
                   </button>
-                )}
 
-                <button
-                  onClick={() => handleSnoozeNotification(notification, 60)}
-                  disabled={processing === notification.id}
-                  className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm font-medium transition-colors disabled:opacity-50"
-                >
-                  <Clock className="w-3 h-3" />
-                  Snooze 1h
-                </button>
-
-                <button
-                  onClick={() => handleDismissNotification(notification)}
-                  disabled={processing === notification.id}
-                  className="flex items-center gap-1 bg-gray-600 hover:bg-gray-700 text-white px-3 py-1 rounded text-sm font-medium transition-colors disabled:opacity-50"
-                >
-                  <X className="w-3 h-3" />
-                  Dismiss
-                </button>
-              </div>
+                  <button
+                    onClick={() => handleDismissNotification(notification)}
+                    disabled={processing === notification.id}
+                    className="flex items-center gap-1 bg-gray-600 hover:bg-gray-700 text-white px-3 py-1 rounded text-sm font-medium transition-colors disabled:opacity-50"
+                  >
+                    <X className="w-3 h-3" />
+                    Dismiss
+                  </button>
+                </div>
+              )}
             </div>
           ))}
         </div>

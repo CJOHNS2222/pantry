@@ -1,7 +1,6 @@
 import React, { useMemo } from 'react';
 import { Minus, Plus, Check, AlertTriangle, AlertCircle } from 'lucide-react';
 import { Household, RecipeRating, SavedRecipe, StructuredRecipe, PantryItem } from '../../types';
-import { RecipeRatingUI } from '../recipes-meals/RecipeRating';
 
 interface RecipeModalDetailsSectionProps {
   editable: boolean;
@@ -32,7 +31,8 @@ interface RecipeModalDetailsSectionProps {
   setShowSubstitutions: React.Dispatch<React.SetStateAction<boolean>>;
   ingredientSubstitutions: {
     ingredient: string;
-    substitutes: { name: string; ratio: string; notes: string }[];
+    inPantry: boolean;
+    substitutes: { name: string; ratio: string; notes: string; inPantry: boolean }[];
   }[];
 }
 
@@ -46,13 +46,13 @@ export const RecipeModalDetailsSection: React.FC<RecipeModalDetailsSectionProps>
   setEditInstructionsText,
   scaledIngredients,
   recipe,
-  onRate,
-  showReviewPrompt,
-  setShowReviewPrompt,
-  onRatingSubmitted,
-  household,
-  user,
-  ratingRef,
+  onRate: _onRate,
+  showReviewPrompt: _showReviewPrompt,
+  setShowReviewPrompt: _setShowReviewPrompt,
+  onRatingSubmitted: _onRatingSubmitted,
+  household: _household,
+  user: _user,
+  ratingRef: _ratingRef,
   inventory = [],
   activeTab = 'ingredients',
   findSubstitutions,

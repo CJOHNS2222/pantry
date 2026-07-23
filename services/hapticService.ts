@@ -16,7 +16,7 @@ class HapticService {
   static async light() {
     try {
       await Haptics.impact({ style: ImpactStyle.Light });
-    } catch (err: any) {
+    } catch {
       // Silently fail if haptics not available
     }
   }
@@ -25,7 +25,7 @@ class HapticService {
   static async medium() {
     try {
       await Haptics.impact({ style: ImpactStyle.Medium });
-    } catch (err: any) {
+    } catch {
       // Silently fail if haptics not available
     }
   }
@@ -34,7 +34,7 @@ class HapticService {
   static async heavy() {
     try {
       await Haptics.impact({ style: ImpactStyle.Heavy });
-    } catch (err: any) {
+    } catch {
       // Silently fail if haptics not available
     }
   }
@@ -43,7 +43,7 @@ class HapticService {
   static async success() {
     try {
       await Haptics.notification({ type: NotificationType.Success });
-    } catch (err: any) {
+    } catch {
       // Silently fail if haptics not available
     }
   }
@@ -52,7 +52,7 @@ class HapticService {
   static async warning() {
     try {
       await Haptics.notification({ type: NotificationType.Warning });
-    } catch (err: any) {
+    } catch {
       // Silently fail if haptics not available
     }
   }
@@ -61,7 +61,7 @@ class HapticService {
   static async error() {
     try {
       await Haptics.notification({ type: NotificationType.Error });
-    } catch (err: any) {
+    } catch {
       // Silently fail if haptics not available
     }
   }
@@ -69,7 +69,7 @@ class HapticService {
   static async itemAdded() {
     try {
       await Haptics.impact({ style: ImpactStyle.Light });
-    } catch (err: any) {
+    } catch {
       // Silently fail if haptics not available
     }
   }

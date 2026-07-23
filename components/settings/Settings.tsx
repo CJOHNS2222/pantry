@@ -172,6 +172,8 @@ const SettingsComponent: React.FC<SettingsProps> = ({
   );
 
 
+  const [scrollToPendingNotifications, setScrollToPendingNotifications] = useState(false);
+
   // Redirect to requested settings category if set in sessionStorage
   useEffect(() => {
     const redirectTab = sessionStorage.getItem('settings_redirect_tab');
@@ -184,8 +186,21 @@ const SettingsComponent: React.FC<SettingsProps> = ({
     } else if (redirectTab === 'organization') {
       setActiveCategory('food_waste');
       sessionStorage.removeItem('settings_redirect_tab');
+    } else if (redirectTab === 'notifications') {
+      setActiveCategory('notifications');
+      setScrollToPendingNotifications(true);
+      sessionStorage.removeItem('settings_redirect_tab');
     }
   }, []);
+
+  // Once the notifications category has rendered, scroll the pending-notifications card into view
+  useEffect(() => {
+    if (scrollToPendingNotifications && activeCategory === 'notifications') {
+      document.querySelector('[data-section="pending-notifications"]')
+        ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      setScrollToPendingNotifications(false);
+    }
+  }, [scrollToPendingNotifications, activeCategory]);
 
   // Member preferences state
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);

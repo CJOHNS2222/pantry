@@ -17,6 +17,15 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/admins/$(request.auth.uid)).exists();
     }
 
+    // Helpers for the leaderboard_cache/global doc (see match block below).
+    function priorLeaderboardMap(field) {
+      return resource == null ? {} : resource.data.get(field, {});
+    }
+
+    function changedHouseholdLeaderboardKeys() {
+      return request.resource.data.householdEntries.diff(priorLeaderboardMap('householdEntries')).affectedKeys();
+    }
+
     match /admins/{userId} {
       allow read: if request.auth != null && request.auth.uid == userId;
       allow write: if false;
@@ -241,6 +250,29 @@ service cloud.firestore {
     // Price data cache: allow authenticated users to read/write the single global cache document.
     match /price_cache/priceData {
       allow read, write: if request.auth != null;
+    }
+
+    // Global leaderboard cache: single shared document holding every opted-in user's
+    // entry (keyed by uid) and every opted-in household's entry (keyed by householdId),
+    // so reading the leaderboard is 1 read instead of N. Any authenticated user may
+    // read it; a write may only touch the caller's own key in `entries`, and/or one
+    // household key in `householdEntries` that the caller is actually a member of.
+    match /leaderboard_cache/global {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+        && request.resource.data.entries is map
+        && request.resource.data.householdEntries is map
+        // Own user entry: only the caller's own uid key may change.
+        && request.resource.data.entries.diff(priorLeaderboardMap('entries')).affectedKeys().hasOnly([request.auth.uid])
+        // Household entry: at most one household key may change, and only if the caller
+        // is a member of that household.
+        && changedHouseholdLeaderboardKeys().size() <= 1
+        && (
+          changedHouseholdLeaderboardKeys().size() == 0
+          || (
+            request.auth.uid in get(/databases/$(database)/documents/households/$(changedHouseholdLeaderboardKeys().toList()[0])).data.memberIds
+          )
+        );
     }
 
     // System collection: allow read access for authenticated users (for cached data like popular recipes)

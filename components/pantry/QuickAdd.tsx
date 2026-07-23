@@ -7,6 +7,10 @@ interface QuickAddProps {
   suggestedItems: string[];
   /** Called when the user taps a chip. ShoppingList owns the actual add logic. */
   onAddItem: (itemName: string) => void;
+  /** Section label. Defaults to "Quick Add". */
+  title?: string;
+  /** When provided, shows a header "Add All" button that bulk-adds every chip at once. */
+  onAddAll?: () => void;
 }
 
 /**
@@ -14,7 +18,7 @@ interface QuickAddProps {
  * Each chip shows an image + label; tapping it calls onAddItem and briefly
  * flashes a checkmark so the user knows the tap registered.
  */
-export const QuickAdd: React.FC<QuickAddProps> = ({ suggestedItems, onAddItem }) => {
+export const QuickAdd: React.FC<QuickAddProps> = ({ suggestedItems, onAddItem, title = 'Quick Add', onAddAll }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [showLeft, setShowLeft] = useState(false);
   const [showRight, setShowRight] = useState(false);
@@ -55,9 +59,19 @@ export const QuickAdd: React.FC<QuickAddProps> = ({ suggestedItems, onAddItem })
 
   return (
     <div className="bg-theme-secondary rounded-xl border border-theme px-3 pt-3 pb-2 mb-3">
-      <p className="text-xs font-semibold text-theme-secondary/70 uppercase tracking-wide mb-2 px-0.5">
-        Quick Add
-      </p>
+      <div className="flex items-center justify-between mb-2 px-0.5">
+        <p className="text-xs font-semibold text-theme-secondary/70 uppercase tracking-wide">
+          {title}
+        </p>
+        {onAddAll && (
+          <button
+            onClick={onAddAll}
+            className="text-xs font-bold text-[var(--accent-color)] hover:underline"
+          >
+            Add All
+          </button>
+        )}
+      </div>
 
       <div className="relative">
         {/* Left scroll arrow */}

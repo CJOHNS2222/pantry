@@ -1,20 +1,17 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Users,
   TrendingUp,
   Clock,
   Target,
   BarChart3,
-  PieChart,
   Activity,
   Zap,
   ChefHat,
   ShoppingCart,
   Camera,
-  Heart,
   Star,
-  Calendar,
-  Settings
+  Calendar
 } from 'lucide-react';
 import AnalyticsService from '../../services/analyticsService';
 

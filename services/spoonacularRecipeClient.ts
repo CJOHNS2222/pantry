@@ -8,6 +8,7 @@ let _cachedRecipesApi: any | null | undefined = undefined;
 async function getRecipesApi(): Promise<any | null> {
   if (_cachedRecipesApi !== undefined) return _cachedRecipesApi;
   try {
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore - optional generated client may be absent from repo
     const mod = await import(/* @vite-ignore */ '../typescript/dist');
     const { createConfiguration, RecipesApi } = mod as any;

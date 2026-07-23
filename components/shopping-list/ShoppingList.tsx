@@ -7,7 +7,7 @@ import { ShoppingItem, User, Household, Settings, PantryItem } from '../../types
 import HapticService from '../../services/hapticService';
 import { ShoppingListCacheService } from '../../services/shoppingListCacheService';
 import { log } from '../../services/logService';
-import { inferCategoryFromItemName, isHouseholdMember, cleanItemNameForShopping, parseQuantityAndUnit, consolidateShoppingList } from '../../utils/appUtils';
+import { inferCategoryFromItemName, isHouseholdMember, cleanItemNameForShopping, parseQuantityAndUnit, consolidateShoppingList, generateConsumptionSuggestions } from '../../utils/appUtils';
 import { validateItemName, validateQuantity } from '../../src/utils/validation';
 
 // Import new enhancement components
@@ -297,14 +297,28 @@ const ShoppingListComponent: React.FC<ShoppingListProps> = ({
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const processQueue = () => offlineQueue.processQueue();
 
+  // "Your usuals" — staples/recurring items you're actually overdue to restock, based
+  // on how often you've historically re-added them to the pantry (item.consumptionHistory).
+  // Distinct from the generic "recently consumed" QuickAdd row below: this one is
+  // frequency-aware ("you buy this every ~7 days, it's been 9") rather than just
+  // "you used this sometime in the last 30 days".
+  const restockDueItems = useMemo(() => {
+    const inShoppingList = new Set(items.map(i => i.item.toLowerCase()));
+    return generateConsumptionSuggestions(_pantryItems)
+      .filter(s => s.suggestedAction === 'restock' && !inShoppingList.has(s.item.toLowerCase()))
+      .slice(0, 8)
+      .map(s => s.item);
+  }, [_pantryItems, items]);
+
   // Suggested items for quick adding — filter out what's already in the list
   const suggestedItems = useMemo(() => {
     const inShoppingList = new Set(items.map(i => i.item.toLowerCase()));
+    const inRestockDue = new Set(restockDueItems.map(i => i.toLowerCase()));
     const suggestionsSet = new Set<string>();
 
     const addSuggestion = (name: string) => {
       const trimmed = name.trim();
-      if (trimmed && !inShoppingList.has(trimmed.toLowerCase())) {
+      if (trimmed && !inShoppingList.has(trimmed.toLowerCase()) && !inRestockDue.has(trimmed.toLowerCase())) {
         const lower = trimmed.toLowerCase();
         // Ignore water, boiling water, etc.
         if (lower === 'water' || lower === 'boiling water' || lower === 'tap water' || lower === 'hot water' || lower === 'cold water' || lower === 'ice water') {
@@ -407,7 +421,7 @@ const ShoppingListComponent: React.FC<ShoppingListProps> = ({
     }
 
     return Array.from(suggestionsSet);
-  }, [items, _pantryItems, mealPlan, previousSessions]);
+  }, [items, _pantryItems, mealPlan, previousSessions, restockDueItems]);
 
   // Memoized expensive computations for sharing/exporting
   const uncheckedItemsText = useMemo(() => {
@@ -488,6 +502,13 @@ const ShoppingListComponent: React.FC<ShoppingListProps> = ({
       log.error('Failed to add suggested item', { itemName, error }, 'ShoppingList');
       addToast(`Failed to add ${itemName}. Please try again.`, 'error');
     }
+  };
+
+  const addAllRestockDue = async () => {
+    const toAdd = restockDueItems;
+    if (toAdd.length === 0) return;
+    await Promise.all(toAdd.map(itemName => addSuggestedItem(itemName)));
+    addToast(`Added ${toAdd.length} usual${toAdd.length > 1 ? 's' : ''} to your list`, 'success');
   };
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -982,6 +1003,15 @@ const ShoppingListComponent: React.FC<ShoppingListProps> = ({
           </div>
         );
       })()}
+
+      {/* Staples you're actually overdue to restock, based on purchase frequency —
+          distinct from the generic "recently used" row below. */}
+      <QuickAdd
+        title="Time to Restock"
+        suggestedItems={restockDueItems}
+        onAddItem={addSuggestedItem}
+        onAddAll={restockDueItems.length > 1 ? addAllRestockDue : undefined}
+      />
 
       {/* Quick Add Component */}
       <QuickAdd

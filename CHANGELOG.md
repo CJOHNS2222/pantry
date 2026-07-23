@@ -1,3 +1,13 @@
+## [3.0.13] - 2026-07-23
+
+### Added / Changed / Refactored
+- **Daily Reminders & Push Functions** — Implemented dedicated background daily reminder cloud function `dailyReminders.ts`.
+- **Leaderboards & Cooking Streaks** — Added `LeaderboardCacheService` and `cookingStreakService` for tracking user engagement and cooking milestones.
+- **Service & Monitoring Enhancements** — Upgraded performance monitoring, haptic feedback integration, image caching, and bulk image updates.
+- **UI & Component Refactoring** — Enhanced focus trapping, onboarding flows, meal planning components, settings tabs, and permissions UI.
+
+---
+
 ## [3.0.12] - 2026-07-20
 
 ### Added / Changed / Refactored

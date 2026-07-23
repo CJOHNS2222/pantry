@@ -34,6 +34,7 @@ export enum ErrorCode {
   UNKNOWN_ERROR = 'UNKNOWN_ERROR'
 }
 // Add common error codes used in mappings
+/* eslint-disable-next-line @typescript-eslint/no-namespace */
 export namespace ErrorCode {
   export const NOT_FOUND = 'NOT_FOUND' as unknown as ErrorCode;
   export const CONFLICT = 'CONFLICT' as unknown as ErrorCode;

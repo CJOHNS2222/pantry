@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { FormattedMessage } from 'react-intl';
 import { Globe } from 'lucide-react';
 import { LOCALES, Locale } from '../i18n';
 import { useI18n } from './I18nProvider';

@@ -1,4 +1,3 @@
-import { serverTimestamp } from 'firebase/firestore'
 import { InventoryCacheService } from './inventoryCacheService'
 import { PantryItem, LeftoverMeta } from '../types'
 import { computeBestBeforeISO } from '../utils/leftoverUtils'

@@ -33,6 +33,19 @@ function useSubscriptionInternal(user: User | null, enabled: boolean) {
       return;
     }
 
+    // Guests have no real Firebase Auth session, so a Firestore listener on their doc
+    // would only ever resolve permission-denied — they're always free tier anyway.
+    if (user.isGuest) {
+      setSubscription({
+        tier: 'free',
+        status: 'active',
+        current_period_end: new Date(),
+        cancel_at_period_end: false
+      });
+      setLoading(false);
+      return;
+    }
+
     const unsubscribe = DatabaseMonitoringService.onSnapshot(DatabaseMonitoringService.doc('users', user.id), (doc) => {
       const data = doc.data();
       if (data?.subscription) {
@@ -46,6 +59,12 @@ function useSubscriptionInternal(user: User | null, enabled: boolean) {
           cancel_at_period_end: false
         });
       }
+      setLoading(false);
+    }, (err: any) => {
+      // Without this, a permission error (revoked access, rules change, etc.) would leave
+      // `loading` stuck true forever, and every PremiumFeature-gated screen would render
+      // its loading skeleton indefinitely instead of falling back to a usable state.
+      log.debug('Subscription listener error', { error: err?.message }, 'useSubscription');
       setLoading(false);
     });
 

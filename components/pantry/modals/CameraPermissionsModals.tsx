@@ -1,6 +1,5 @@
 import React from 'react';
 import { Camera } from 'lucide-react';
-import { Capacitor } from '@capacitor/core';
 import { Camera as CapacitorCamera } from '@capacitor/camera';
 import { log } from '../../../services/logService';
 

@@ -60,7 +60,7 @@ export const RecipeSearchOverlay: React.FC<RecipeSearchOverlayProps> = ({
           </div>
         </div>
 
-        <div className="p-6">
+        <div className="p-6 flex-1 min-h-0 overflow-y-auto">
           <RecipeSearchModal
             mealType={searchMealType}
             dayIndex={currentDayIndex}

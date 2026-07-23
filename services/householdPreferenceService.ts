@@ -1,7 +1,6 @@
 import DatabaseMonitoringService from './databaseMonitoringService';
 import { InventoryCacheService } from './inventoryCacheService';
-import { db } from '../firebaseConfig';
-import { Member, PantryItem, Household } from '../types';
+import { Member, Household } from '../types';
 import { checkInventoryAgainstHouseholdAllergies } from '../utils/preferenceUtils';
 import { NotificationService } from './notificationService';
 import { log } from './logService';
@@ -93,7 +92,7 @@ export class HouseholdPreferenceService {
    * Check if a user should be notified about allergy alerts
    * (Can be extended with user preferences for notification suppression)
    */
-  static shouldNotifyAboutAllergies(userId: string): boolean {
+  static shouldNotifyAboutAllergies(_userId: string): boolean {
     // For now, always notify about allergies as they're safety-critical
     // In the future, this could check user settings for allergy notification preferences
     return true;

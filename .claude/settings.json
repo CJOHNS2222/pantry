@@ -3,7 +3,12 @@
     "allow": [
       "Bash(npx vitest run *)",
       "Bash(npx tsc --noEmit *)",
-      "Bash(npx eslint *)"
+      "Bash(npx eslint *)",
+      "Bash(npm install)",
+      "Bash(npm start)",
+      "Bash(npx start)",
+      "Bash(npx browser-use)",
+      "Bash(npm run test:e2e)"
     ]
   }
 }

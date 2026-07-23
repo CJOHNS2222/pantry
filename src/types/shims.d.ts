@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 declare module '@ionic/react' {
   export const IonContent: any;
   export const IonPage: any;
