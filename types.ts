@@ -420,6 +420,11 @@ export interface Household {
    * this equals 'family' and they remain active members of the household.
    */
   ownerSubscriptionTier?: 'free' | 'premium' | 'family';
+  /**
+   * Admin-set usage cap per member, keyed by userId. Caps DOWN from the member's
+   * effective tier limits — never grants more than the plan allows. Omitted = full plan.
+   */
+  memberLimits?: Record<string, 'half' | 'minimal'>;
 }
 
 export interface Member {

@@ -453,7 +453,7 @@ describe('UsageService', () => {
       expect(limits.premium.searches.weekly).toBe(15);
       expect(limits.premium.recipes.max).toBe(20);
       expect(limits.premium.mealPlanning.weeklyRecipes).toBe(-1); // unlimited
-      expect(limits.premium.mealPlanning.twoWeekPlanning).toBe(true);
+      expect(limits.premium.mealPlanning.twoWeekPlanning).toBe(false); // Family-exclusive perk
     });
 
     it('has correct family plan limits', () => {

@@ -7,7 +7,6 @@ import { Tab } from '../../types/app';
 import { serverTimestamp } from 'firebase/firestore';
 import { auth } from '../../firebaseConfig';
 import DatabaseMonitoringService from '../../services/databaseMonitoringService';
-import { removeMemberFromHousehold } from '../../services/householdService';
 import { sendHouseholdInvitationEmail } from '../../services/emailService';
 import { log } from '../../services/logService';
 import { UsageService } from '../../services/usageService';
@@ -17,6 +16,8 @@ import { RecipesCacheService } from '../../services/recipesCacheService';
 import { ShoppingListCacheService } from '../../services/shoppingListCacheService';
 import { useIntl } from 'react-intl';
 import AnalyticsService from '../../services/analyticsService';
+import { useConfirm } from '../ui/ConfirmDialog';
+import { HOUSEHOLD_LEFT_AT_KEY } from '../../hooks/useAuth';
 
 interface HouseholdManagerProps {
   user: User;
@@ -30,6 +31,7 @@ interface HouseholdManagerProps {
 export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, household, setHousehold, onClose, setActiveTab, addToast }) => {
   
   const intl = useIntl();
+  const confirm = useConfirm();
   const [inviteEmail, setInviteEmail] = useState('');
   const [isInviting, setIsInviting] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
@@ -132,22 +134,55 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
     }
   };
 
-  const removeMember = async (id: string) => {
+  const removeMember = async (id: string, memberName: string) => {
+    const ok = await confirm({
+      title: `Remove ${memberName}?`,
+      description: 'They will lose access to this household\'s shared inventory, meal plan, and shopping list immediately. This cannot be undone.',
+      confirmLabel: 'Remove',
+      variant: 'danger'
+    });
+    if (!ok) return;
+
     try {
       if (!household) return;
-      await removeMemberFromHousehold(household.id, id, user.id);
+      // Removing the last other member disbands the household and clears the
+      // ADMIN's own householdId too — set the same guard as leaveHousehold so
+      // useAuth's auto-heal fallback doesn't immediately resurrect it.
+      sessionStorage.setItem(HOUSEHOLD_LEFT_AT_KEY, String(Date.now()));
+      const removeHouseholdMemberFunction = httpsCallable(getFunctions(), 'removeHouseholdMember');
+      await removeHouseholdMemberFunction({ householdId: household.id, memberId: id });
     } catch (error: unknown) {
       const err = error as { message?: string; code?: string };
       log.error('Error removing member', { error: err.message, code: err.code }, 'Household');
-      
+
       let message = 'Failed to remove member';
       if (err.code === 'functions/permission-denied') {
         message = 'You do not have permission to remove this member';
       } else if (err.code === 'functions/not-found') {
         message = 'Member or household not found';
       }
-      
+
       addToast(message, 'error');
+    }
+  };
+
+  const setMemberLimit = async (memberId: string, preset: 'full' | 'half' | 'minimal') => {
+    if (!household) return;
+    const nextMemberLimits = { ...(household.memberLimits || {}) };
+    if (preset === 'full') {
+      delete nextMemberLimits[memberId];
+    } else {
+      nextMemberLimits[memberId] = preset;
+    }
+    try {
+      await DatabaseMonitoringService.updateDoc(
+        DatabaseMonitoringService.doc('households/' + household.id),
+        { memberLimits: nextMemberLimits }
+      );
+      setHousehold({ ...household, memberLimits: nextMemberLimits });
+    } catch (error) {
+      log.error('Error setting member usage limit', error, 'Household');
+      addToast('Failed to update usage limit', 'error');
     }
   };
 
@@ -173,9 +208,11 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
       const savedRecipes = await RecipesCacheService.getCachedRecipes(householdId);
       await RecipesCacheService.updateCache(savedRecipes, undefined, userId);
 
+      sessionStorage.setItem(HOUSEHOLD_LEFT_AT_KEY, String(Date.now()));
+
       const leaveHouseholdFunction = httpsCallable(getFunctions(), 'leaveHousehold');
       await leaveHouseholdFunction({ householdId });
-      
+
       await AnalyticsService.trackEvent('household_leave', { householdId });
 
       const userRef = DatabaseMonitoringService.doc('users', userId);
@@ -460,15 +497,30 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
                   <div className="flex items-center gap-2">
                     {(() => {
                       const currentUser = household?.members && Array.isArray(household.members) ? household.members.find(m => m.email === user.email) : null;
-                      return member.email !== user.email && currentUser?.role === 'admin' && (
-                        <button 
-                          onClick={() => removeMember(member.id)}
-                          className="text-theme-secondary hover:text-red-400 p-2"
-                          title="Remove member"
-                          data-testid={`household-remove-${member.id}`}
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
+                      if (member.email === user.email || currentUser?.role !== 'admin') return null;
+                      const currentPreset = household?.memberLimits?.[member.id] ?? 'full';
+                      return (
+                        <>
+                          <select
+                            value={currentPreset}
+                            onChange={(e) => setMemberLimit(member.id, e.target.value as 'full' | 'half' | 'minimal')}
+                            className="bg-theme-primary border border-theme rounded-lg text-xs text-theme-secondary px-2 py-1.5 outline-none focus:border-[var(--accent-color)]"
+                            title="Weekly usage cap for this member"
+                            data-testid={`household-member-limit-${member.id}`}
+                          >
+                            <option value="full">Full plan</option>
+                            <option value="half">Half usage</option>
+                            <option value="minimal">Minimal usage</option>
+                          </select>
+                          <button
+                            onClick={() => removeMember(member.id, member.name || member.email)}
+                            className="text-theme-secondary hover:text-red-400 p-2"
+                            title="Remove member"
+                            data-testid={`household-remove-${member.id}`}
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </>
                       );
                     })()}
                   </div>

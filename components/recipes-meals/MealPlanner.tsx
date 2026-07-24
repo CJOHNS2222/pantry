@@ -101,7 +101,7 @@ const MealPlannerComponent: React.FC<MealPlannerProps> = ({ mealPlan, updateMeal
     if (!user) return;
     UsageService.getUsageLimits(user).then(setUsageLimits).catch(() => {});
   }, [user?.id]);
-  const canUseTwoWeekPlanning = usageLimits?.mealPlanning.twoWeekPlanning ?? (isPremium || isFamily);
+  const canUseTwoWeekPlanning = usageLimits?.mealPlanning.twoWeekPlanning ?? isFamily;
     // List of staple items to ignore (unless user wants them included)
     const STAPLES = ['salt', 'pepper', 'oil', 'water', 'flour', 'sugar', 'butter', 'vinegar', 'baking powder', 'baking soda', 'spices', 'seasoning', 'soy sauce', 'cornstarch', 'yeast'];
     const includeStaples = settings?.shopping?.includeStaples || false;
@@ -1136,7 +1136,7 @@ const MealPlannerComponent: React.FC<MealPlannerProps> = ({ mealPlan, updateMeal
           hasMealsLabel={intl.formatMessage({ id: 'mealPlanner.hasMeals' })}
           onSetCalendarExpanded={setIsCalendarExpanded}
           onUpgradeMonthView={() => {
-            addToast('Monthly planning is a premium feature.', 'info', 5000, 'Upgrade', () => setActiveTab(Tab.SETTINGS));
+            addToast('Monthly planning is a Family plan feature.', 'info', 5000, 'Upgrade', () => setActiveTab(Tab.SETTINGS));
           }}
           onPrevMonth={() => {
             const newMonth = new Date(currentCalendarMonth);
@@ -1181,7 +1181,7 @@ const MealPlannerComponent: React.FC<MealPlannerProps> = ({ mealPlan, updateMeal
             setCurrentDayIndex(Math.min(displayPlan.length - 1, currentDayIndex + 1));
           }}
           nextDayDisabled={currentDayIndex === displayPlan.length - 1 || (!canUseTwoWeekPlanning && currentDayIndex >= 6)}
-          nextDayTitle={!canUseTwoWeekPlanning && currentDayIndex >= 6 ? 'Upgrade to Premium to plan beyond 7 days' : undefined}
+          nextDayTitle={!canUseTwoWeekPlanning && currentDayIndex >= 6 ? 'Upgrade to Family to plan beyond 7 days' : undefined}
           showHelpTooltip={showHelpTooltip}
           onToggleHelpTooltip={() => setShowHelpTooltip(prev => !prev)}
           onOpenMealSearch={(mealType) => {

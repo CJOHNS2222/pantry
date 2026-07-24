@@ -520,7 +520,7 @@ const PlanComparisonModal: React.FC<PlanComparisonModalProps> = ({ isOpen, onClo
     { feature: 'AI Pantry Scans', premium: '15 scans / wk', family: 'Unlimited' },
     { feature: 'Custom Categories', premium: 'Unlimited', family: 'Unlimited' },
     { feature: 'Cost Estimation', premium: 'Full details', family: 'Full details' },
-    { feature: 'Household Members', premium: 'You + 3 members', family: 'You + 5 members' },
+    { feature: 'Household Members (share your plan)', premium: '3 total', family: '5 total' },
     { feature: 'Shared Lists & Sync', premium: '✅', family: '✅' },
     { feature: 'Support Level', premium: 'Priority', family: '24/7 Priority' },
   ];

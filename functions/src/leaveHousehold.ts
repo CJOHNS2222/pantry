@@ -118,9 +118,11 @@ export const leaveHousehold = onCall(async (request) => {
         logger.error('Error copying household cache to remaining admin', err);
       }
 
-      // Delete the household document
-      await householdRef.delete();
-      
+      // .delete() only removes the household doc itself — its subcollections
+      // (cache/*, presence/*, activity/*) are NOT cascade-deleted by Firestore and
+      // would otherwise be orphaned forever. recursiveDelete removes the whole subtree.
+      await db.recursiveDelete(householdRef);
+
       // Update user document
       const lastUserRef = db.collection("users").doc(lastMemberId);
       const lastUserDoc = await lastUserRef.get();
@@ -129,7 +131,7 @@ export const leaveHousehold = onCall(async (request) => {
           householdId: FieldValue.delete()
         });
       }
-      
+
       // Remove custom claims
       try {
         await admin.auth().setCustomUserClaims(lastMemberId, { householdId: null });
@@ -138,7 +140,7 @@ export const leaveHousehold = onCall(async (request) => {
         logger.error('Error removing custom claims for last remaining admin', err);
       }
     } else if (remainingCount === 0) {
-      await householdRef.delete();
+      await db.recursiveDelete(householdRef);
     }
 
     return { success: true, message: 'Successfully left household' };
@@ -272,9 +274,11 @@ export const leaveHouseholdHttp = onRequest(async (req, res) => {
         logger.error('Error copying household cache to remaining admin', err);
       }
 
-      // Delete the household document
-      await householdRef.delete();
-      
+      // .delete() only removes the household doc itself — its subcollections
+      // (cache/*, presence/*, activity/*) are NOT cascade-deleted by Firestore and
+      // would otherwise be orphaned forever. recursiveDelete removes the whole subtree.
+      await db.recursiveDelete(householdRef);
+
       // Update user document
       const lastUserRef = db.collection("users").doc(lastMemberId);
       const lastUserDoc = await lastUserRef.get();
@@ -283,7 +287,7 @@ export const leaveHouseholdHttp = onRequest(async (req, res) => {
           householdId: FieldValue.delete()
         });
       }
-      
+
       // Remove custom claims
       try {
         await admin.auth().setCustomUserClaims(lastMemberId, { householdId: null });
@@ -292,7 +296,7 @@ export const leaveHouseholdHttp = onRequest(async (req, res) => {
         logger.error('Error removing custom claims for last remaining admin', err);
       }
     } else if (remainingCount === 0) {
-      await householdRef.delete();
+      await db.recursiveDelete(householdRef);
     }
 
     res.json({ success: true, message: 'Successfully left household' });

@@ -6,7 +6,6 @@
 import DatabaseMonitoringService from './databaseMonitoringService';
 import {
   arrayUnion,
-  arrayRemove,
   serverTimestamp,
 } from 'firebase/firestore';
 import { Household, Member, User } from '../types';
@@ -14,7 +13,6 @@ import { getPerformance, trace } from "firebase/performance";
 import { log } from './logService';
 import {
   migrateUserCacheToHousehold,
-  copyHouseholdCacheToUser,
 } from './householdDataMigrationService';
 
 const performance = getPerformance();
@@ -186,88 +184,11 @@ export const updateMemberStatus = async (
   }
 };
 
-/**
- * Remove a member from household (admin action)
- */
-export const removeMemberFromHousehold = async (
-  householdId: string,
-  memberId: string,
-  currentUserId: string
-): Promise<void> => {
-  try {
-    const householdRef = DatabaseMonitoringService.doc('households/' + householdId);
-    const householdSnap = await DatabaseMonitoringService.getDoc(householdRef);
-
-    if (!householdSnap.exists()) {
-      throw new Error('Household not found');
-    }
-
-    const householdData = householdSnap.data();
-    const members = householdData.members || [];
-
-    // Check if current user is admin or is removing themselves
-    const currentUserMember = members.find((m: Member) => m.id === currentUserId);
-    const isSelfRemoval = memberId === currentUserId;
-    
-    if (!currentUserMember) {
-      throw new Error('User not found in household');
-    }
-    
-    if (!isSelfRemoval && currentUserMember.role !== 'admin') {
-      throw new Error('Only admins can remove other members');
-    }
-
-    // Find member to remove
-    const memberToRemove = members.find((m: Member) => m.id === memberId);
-    if (!memberToRemove) {
-      throw new Error('Member not found');
-    }
-
-    // Remove member from members and memberIds
-    const updatedMembers = members.filter((m: Member) => m.id !== memberId);
-    const updatePayload: any = {
-      members: updatedMembers,
-      updatedAt: serverTimestamp(),
-    };
-
-    if (householdData.memberIds?.includes(memberId)) {
-      updatePayload.memberIds = arrayRemove(memberId);
-    }
-
-    await DatabaseMonitoringService.updateDoc(householdRef, updatePayload);
-
-    // Copy the household caches to the departing member's personal cache
-    // so they don't lose their pantry/shopping/meal-plan/recipe data.
-    // Use the member's User shape from what we have available.
-    const departingUser: User = { id: memberId } as User;
-    copyHouseholdCacheToUser(departingUser, householdId).catch(err =>
-      log.error('Cache copy failed after removing member', { err }, 'HouseholdService')
-    );
-
-    // If this was the last member besides the admin, delete the household
-    if (updatedMembers.length === 1) {
-      const remainingAdminId = updatedMembers[0].id;
-      
-      // Copy household caches to the remaining admin's personal cache so they don't lose data
-      const remainingUser: User = { id: remainingAdminId } as User;
-      await copyHouseholdCacheToUser(remainingUser, householdId).catch(err =>
-        log.error('Cache copy failed for remaining admin', { err }, 'HouseholdService')
-      );
-
-      await DatabaseMonitoringService.deleteDoc(householdRef);
-      
-      // Clear householdId from the remaining admin's user document
-      const adminUserRef = DatabaseMonitoringService.doc('users/' + remainingAdminId);
-      await DatabaseMonitoringService.updateDoc(adminUserRef, {
-        householdId: null,
-        updatedAt: serverTimestamp(),
-      });
-    }
-  } catch (err: any) {
-    log.error('Error removing member from household:', { err }, 'HouseholdService');
-    throw err;
-  }
-};
+// Member removal moved server-side — see functions/src/removeHouseholdMember.ts.
+// A client write can only ever legitimately clear its OWN users/{uid}.householdId
+// (Firestore rules block writing another user's doc), so a client-side removal path
+// could update the household doc but never actually clear the removed member's
+// household reference. The Cloud Function runs with Admin SDK privileges instead.
 
 /**
  * Find a household by invitation (user email and household ID from invite link)

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth';
+import { getDocsFromServer } from 'firebase/firestore';
 import DatabaseMonitoringService from '../services/databaseMonitoringService';
 import { logEvent } from 'firebase/analytics';
 import { User } from '../types';
@@ -11,6 +12,12 @@ import { log } from '../services/logService';
 import { GUEST_USER_ID_KEY } from '../components/auth-onboarding/Login';
 import { syncFromFirestore } from '../services/onboardingMilestoneService';
 import { seedCookingStreakFromServer } from '../services/cookingStreakService';
+
+// Set by Household.tsx right after an explicit leave/removal so the auto-heal query
+// below doesn't immediately resurrect the membership it was just cleared from — see
+// the fallback block for why.
+export const HOUSEHOLD_LEFT_AT_KEY = 'household_left_at';
+const HOUSEHOLD_LEFT_GUARD_MS = 30_000;
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
@@ -77,13 +84,23 @@ export function useAuth() {
         const userData = userDocSnap.data();
         const householdId = userData?.householdId;
 
-        if (!householdId) {
+        // Guard against re-deriving a householdId we (or an admin) just intentionally
+        // cleared — the query below trusts `memberIds array-contains`, which can still
+        // briefly match a household doc whose removal write hasn't fully settled.
+        const leftAt = Number(sessionStorage.getItem(HOUSEHOLD_LEFT_AT_KEY) || 0);
+        const recentlyLeft = leftAt > 0 && Date.now() - leftAt < HOUSEHOLD_LEFT_GUARD_MS;
+
+        if (!householdId && !recentlyLeft) {
           try {
             const householdQuery = DatabaseMonitoringService.query(
               DatabaseMonitoringService.collection('households'),
               DatabaseMonitoringService.where('memberIds', 'array-contains', fbUser.uid)
             );
-            const querySnapshot = await DatabaseMonitoringService.getDocs(householdQuery);
+            // Force a server read — this fallback exists specifically to recover from
+            // a stale/missing `users/{uid}.householdId`, so trusting the local
+            // persistent cache here would defeat the purpose (and is exactly what
+            // caused a just-cleared householdId to reappear).
+            const querySnapshot = await getDocsFromServer(householdQuery);
             if (!querySnapshot.empty) {
               const foundHouseholdId = querySnapshot.docs[0].id;
               await DatabaseMonitoringService.updateDoc(userDocRef, {

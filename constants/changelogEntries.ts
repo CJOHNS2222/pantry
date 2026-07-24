@@ -20,6 +20,15 @@ export interface DetailedChangeEntry {
 
 export const RECENT_CHANGES: ChangeEntry[] = [
   {
+    "version": "3.0.14",
+    "date": "Jul 24, 2026",
+    "highlights": [
+      "Cloud Functions & Subscription Notifications — Added real-time subscription notifications handler…",
+      "Household & Data Migration — Resolved cache service imports and improved multi-user household migration handling.",
+      "Usage & Subscription Services — Enhanced usageService limits tracking and test suite coverage."
+    ]
+  },
+  {
     "version": "3.0.13",
     "date": "Jul 23, 2026",
     "highlights": [
@@ -38,20 +47,24 @@ export const RECENT_CHANGES: ChangeEntry[] = [
       "Pantry Health & Scanner Utilities — Extracted standalone pantryHealthUtils and modularized PantryScanner scan execution…",
       "Retail & Package Size Data — Added curated Walmart package size lookup options and enhanced RetailCheckoutModal item…"
     ]
-  },
-  {
-    "version": "3.0.11",
-    "date": "Jul 20, 2026",
-    "highlights": [
-      "Data Management Hook Modularization — Modularized core data management hooks under dedicated hooks/dataManagement/…",
-      "Pantry Scanner Component Streamlining — Refactored Pantry Scanner UI logic and scan handlers into usePantryScannerScan…",
-      "Stable Callback Utilities — Introduced useStableCallback hook to prevent unnecessary callback recalculations across…",
-      "Meal Planner & Community Architecture — Modularized meal plan state management and community view layers."
-    ]
   }
 ];
 
 export const ALL_CHANGES: DetailedChangeEntry[] = [
+  {
+    "version": "3.0.14",
+    "date": "Jul 24, 2026",
+    "sections": [
+      {
+        "title": "Added / Changed / Fixed",
+        "bullets": [
+          "**Cloud Functions & Subscription Notifications** — Added real-time subscription notifications handler (`subscriptionNotifications.ts`), Google Play verification helpers (`googlePlayHelpers.ts`), and household member removal logic (`removeHouseholdMember.ts`).",
+          "**Household & Data Migration** — Resolved cache service imports and improved multi-user household migration handling.",
+          "**Usage & Subscription Services** — Enhanced `usageService` limits tracking and test suite coverage."
+        ]
+      }
+    ]
+  },
   {
     "version": "3.0.13",
     "date": "Jul 23, 2026",

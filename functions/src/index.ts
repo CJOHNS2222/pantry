@@ -1,10 +1,12 @@
 export {inviteMember, inviteMemberHttp} from './inviteMember';
 export {leaveHousehold, leaveHouseholdHttp} from './leaveHousehold';
+export {removeHouseholdMember} from './removeHouseholdMember';
 export {checkInvitation} from './checkInvitation';
 export {migrateHouseholdClaims, migrateHouseholdClaimsHttp} from './migrateHouseholdClaims';
 export {getNutritionData} from './nutrition';
 export {resetWeeklyUsageLimits, resetUsageLimitsNow} from './resetUsageLimits';
 export {verifyPurchase} from './verifyPurchase';
+export {handlePlaySubscriptionNotification} from './subscriptionNotifications';
 export {deleteAccount} from './deleteAccount';
 export {sendPushNotificationOnWrite} from './sendPushNotification';
 export {sendDailyReminders} from './dailyReminders';

@@ -26,8 +26,9 @@ import { useSubscription } from '../../hooks/useSubscription';
 import { UsageService } from '../../services/usageService';
 import type { UsageLimits } from '../../services/usageService';
 import { ShoppingListCacheService } from '../../services/shoppingListCacheService';
-import { setDoc } from 'firebase/firestore';
 import { useIsAdmin } from '../../hooks/useIsAdmin';
+import { useConfirm } from '../ui/ConfirmDialog';
+import { HOUSEHOLD_LEFT_AT_KEY } from '../../hooks/useAuth';
 import { useAndroidBack } from '../../hooks/useAndroidBack';
 import { SettingsFeedbackSection } from './SettingsFeedbackSection';
 import { SettingsAppUpdatesSection } from './SettingsAppUpdatesSection';
@@ -130,6 +131,7 @@ const SettingsComponent: React.FC<SettingsProps> = ({
   setActiveCategory: propSetActiveCategory,
 }) => {
   const intl = useIntl();
+  const confirm = useConfirm();
   const [feedback, setFeedback] = useState('');
   const [sending, setSending] = useState(false);
   const { isPremium, isFamily } = useSubscription(user || null);
@@ -296,107 +298,35 @@ const SettingsComponent: React.FC<SettingsProps> = ({
 
   const removeMemberFromHousehold = async (member: Member) => {
     if (!household || !user) return;
-    
+
+    const ok = await confirm({
+      title: `Remove ${member.name}?`,
+      description: 'They will lose access to this household\'s shared inventory, meal plan, and shopping list immediately. This cannot be undone.',
+      confirmLabel: 'Remove',
+      variant: 'danger'
+    });
+    if (!ok) return;
+
     try {
-      // Copy household data to user's personal collections
-      await copyHouseholdDataToUser(member.id);
-      
-      // Remove member from household
-      const updatedMembers = household.members.filter(m => m.id !== member.id);
-      const updatedMemberIds = household.memberIds.filter(id => id !== member.id);
+      // Removing the last other member disbands the household and clears the
+      // ADMIN's own householdId too — guard useAuth's auto-heal fallback from
+      // immediately resurrecting it (see HOUSEHOLD_LEFT_AT_KEY in useAuth.ts).
+      sessionStorage.setItem(HOUSEHOLD_LEFT_AT_KEY, String(Date.now()));
 
-      const householdRef = DatabaseMonitoringService.doc('households', household.id);
-      await DatabaseMonitoringService.updateDoc(householdRef, {
-        members: updatedMembers,
-        memberIds: updatedMemberIds,
-        updatedAt: Timestamp.now()
-      });
-
-      // Update user's householdId to null
-      const userRef = DatabaseMonitoringService.doc('users', member.id);
-      await DatabaseMonitoringService.updateDoc(userRef, {
-        householdId: null
-      });
+      // Runs server-side with Admin SDK privileges so it can legitimately clear the
+      // REMOVED member's own users/{memberId}.householdId and copy their cache —
+      // a client write to another user's doc is (correctly) blocked by Firestore rules.
+      const fns = getFunctions();
+      const removeHouseholdMemberFn = httpsCallable(fns, 'removeHouseholdMember');
+      await removeHouseholdMemberFn({ householdId: household.id, memberId: member.id });
 
       log.info('Member removed from household', { memberId: member.id, householdId: household.id }, 'Settings');
       addToast?.(`${member.name} has been removed from the household`, 'info');
-      
-      // Refresh household data
-      // This would need to be implemented to refresh the household state
-      
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       const stack = error instanceof Error ? error.stack : undefined;
       log.error('Failed removing member from household', { message: msg, stack }, 'Settings');
       addToast?.('Failed to remove member from household', 'error');
-    }
-  };
-
-  const copyHouseholdDataToUser = async (userId: string) => {
-    try {
-      // Copy inventory data
-      const inventoryQuery = DatabaseMonitoringService.query(
-        DatabaseMonitoringService.collection(`households/${household!.id}/inventory`)
-      );
-      const inventorySnapshot = await DatabaseMonitoringService.getDocs(inventoryQuery);
-      
-      for (const doc of inventorySnapshot.docs) {
-        const itemData = doc.data();
-        await setDoc(
-          DatabaseMonitoringService.doc(`users/${userId}/inventory`, doc.id),
-          itemData
-        );
-      }
-
-      // Copy shopping list data
-      const shoppingQuery = DatabaseMonitoringService.query(
-        DatabaseMonitoringService.collection(`households/${household!.id}/shoppingList`)
-      );
-      const shoppingSnapshot = await DatabaseMonitoringService.getDocs(shoppingQuery);
-      
-      for (const doc of shoppingSnapshot.docs) {
-        const itemData = doc.data();
-        await setDoc(
-          DatabaseMonitoringService.doc(`users/${userId}/shoppingList`, doc.id),
-          itemData
-        );
-      }
-
-      // Copy meal plan data
-      const mealPlanQuery = DatabaseMonitoringService.query(
-        DatabaseMonitoringService.collection(`households/${household!.id}/mealPlan`)
-      );
-      const mealPlanSnapshot = await DatabaseMonitoringService.getDocs(mealPlanQuery);
-      
-      for (const doc of mealPlanSnapshot.docs) {
-        const itemData = doc.data();
-        await setDoc(
-          DatabaseMonitoringService.doc(`users/${userId}/mealPlan`, doc.id),
-          itemData
-        );
-      }
-
-      // Copy recipes data
-      const recipesQuery = DatabaseMonitoringService.query(
-        DatabaseMonitoringService.collection(`households/${household!.id}/recipes`)
-      );
-      const recipesSnapshot = await DatabaseMonitoringService.getDocs(recipesQuery);
-      
-      for (const doc of recipesSnapshot.docs) {
-        const itemData = doc.data();
-        await setDoc(
-          DatabaseMonitoringService.doc(`users/${userId}/recipes`, doc.id),
-          itemData
-        );
-      }
-
-      log.info('Household data copied to user', { userId, householdId: household!.id }, 'Settings');
-      
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      const stack = error instanceof Error ? error.stack : undefined;
-      log.error('Failed copying household data to user', { message: msg, stack }, 'Settings');
-      throw error;
     }
   };
 

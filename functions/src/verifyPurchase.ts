@@ -20,27 +20,10 @@ import {onCall, HttpsError} from "firebase-functions/v2/https";
 import {logger} from "firebase-functions/v2";
 import admin from "firebase-admin";
 import {getFirestore, Timestamp} from "firebase-admin/firestore";
-import {google} from "googleapis";
+import {PRODUCT_TIER_MAP, resolveSubscriptionState} from "./googlePlayHelpers";
 
 if (!admin.apps?.length) {
   admin.initializeApp();
-}
-
-const PACKAGE_NAME = "com.smart.pantry";
-
-const PRODUCT_TIER_MAP: Record<string, "premium" | "family"> = {
-  premium_monthly: "premium",
-  premium_yearly: "premium",
-  family_monthly: "family",
-  family_yearly: "family",
-};
-
-async function getAndroidPublisher() {
-  const auth = new google.auth.GoogleAuth({
-    scopes: ["https://www.googleapis.com/auth/androidpublisher"],
-  });
-  const authClient = await auth.getClient();
-  return google.androidpublisher({version: "v3", auth: authClient as any});
 }
 
 export const verifyPurchase = onCall(async (request) => {
@@ -78,29 +61,18 @@ export const verifyPurchase = onCall(async (request) => {
   let status: "active" | "trialing" | "cancelled" | "past_due";
 
   try {
-    const androidPublisher = await getAndroidPublisher();
-    const {data} = await androidPublisher.purchases.subscriptions.get({
-      packageName: PACKAGE_NAME,
-      subscriptionId: productId,
-      token: purchaseToken,
-    });
-
-    expiryMs = parseInt(data.expiryTimeMillis ?? "0", 10);
+    const resolved = await resolveSubscriptionState(productId, purchaseToken);
+    expiryMs = resolved.expiryMs;
+    status = resolved.status;
 
     if (expiryMs < Date.now()) {
       throw new HttpsError("failed-precondition", "Subscription has expired.");
     }
-
-    // paymentState: 0=pending, 1=received, 2=free trial, 3=deferred
-    const paymentState = data.paymentState ?? 1;
-    if (paymentState === 0) {
+    if (status === "past_due" && expiryMs >= Date.now()) {
+      // paymentState 0 (pending) at initial purchase time, not yet a real renewal
+      // failure — surface as pending rather than granting access.
       throw new HttpsError("failed-precondition", "Payment is still pending.");
     }
-
-    const isTrial = paymentState === 2;
-    const isCancelled = data.cancelReason !== undefined && data.cancelReason !== null;
-
-    status = isCancelled ? "cancelled" : isTrial ? "trialing" : "active";
   } catch (err: any) {
     if (err instanceof HttpsError) throw err;
 
@@ -131,6 +103,14 @@ export const verifyPurchase = onCall(async (request) => {
         updated_at: Timestamp.now(),
       },
     });
+
+  // purchaseToken → uid lookup for the Play RTDN webhook (subscriptionNotifications.ts),
+  // which only receives the token/subscriptionId, never the Firebase uid.
+  await db.collection("purchaseTokens").doc(purchaseToken).set({
+    uid,
+    productId,
+    updated_at: Timestamp.now(),
+  });
 
   logger.info('Subscription granted', { uid, tier, status });
 

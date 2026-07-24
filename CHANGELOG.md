@@ -1,3 +1,12 @@
+## [3.0.14] - 2026-07-24
+
+### Added / Changed / Fixed
+- **Cloud Functions & Subscription Notifications** — Added real-time subscription notifications handler (`subscriptionNotifications.ts`), Google Play verification helpers (`googlePlayHelpers.ts`), and household member removal logic (`removeHouseholdMember.ts`).
+- **Household & Data Migration** — Resolved cache service imports and improved multi-user household migration handling.
+- **Usage & Subscription Services** — Enhanced `usageService` limits tracking and test suite coverage.
+
+---
+
 ## [3.0.13] - 2026-07-23
 
 ### Added / Changed / Refactored

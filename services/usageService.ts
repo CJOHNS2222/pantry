@@ -50,6 +50,15 @@ export interface PlanLimits {
   };
 }
 
+// Fixed numeric caps for admin-set per-member presets. Not proportional to plan limits —
+// predictable regardless of tier (including unlimited family tier, where a fraction of -1
+// makes no sense). Applied as a min() against the member's actual plan limit, so a preset
+// can only cap usage down, never grant more than the plan allows.
+const MEMBER_LIMIT_PRESETS: Record<'half' | 'minimal', { searchesWeekly: number; recipesMax: number; mealPlanningWeekly: number; geminiWeekly: number }> = {
+  half: { searchesWeekly: 5, recipesMax: 10, mealPlanningWeekly: 5, geminiWeekly: 5 },
+  minimal: { searchesWeekly: 1, recipesMax: 3, mealPlanningWeekly: 2, geminiWeekly: 1 }
+};
+
 class UsageService {
   // Helper function to safely convert Firestore timestamps or Date objects to Date
   private static toDate(value: unknown): Date | null {
@@ -89,7 +98,8 @@ class UsageService {
         recipes: { max: remoteConfig.getNumber('limit_premium_recipes_max') },
         mealPlanning: {
           weeklyRecipes: remoteConfig.getNumber('limit_premium_mealplanning_weekly'),
-          twoWeekPlanning: true
+          // Two-week/monthly calendar view is a Family-exclusive perk, not Premium.
+          twoWeekPlanning: false
         },
         gemini: { weekly: remoteConfig.getNumber('limit_premium_gemini_weekly') }
       },
@@ -115,9 +125,16 @@ class UsageService {
     }
 
     // Determine effective plan tier.
+    // A subscription that's cancelled/past_due (payment failed, grace period, paused)
+    // no longer earns paid-tier limits even if the stored `tier` field hasn't been
+    // downgraded yet — RTDN-driven Firestore updates can lag a few seconds, and some
+    // notification types (CANCELED, ON_HOLD) intentionally leave `tier` untouched.
+    const subStatus = user.subscription?.status;
+    const isSubActive = subStatus === 'active' || subStatus === 'trialing';
+    let planTier = isSubActive ? (user.subscription?.tier || 'free') : 'free';
     // Free members of a family-plan household inherit the family tier for limits.
-    let planTier = user.subscription?.tier || 'free';
-    if (planTier === 'free' && user.householdId) {
+    let memberLimitPreset: 'half' | 'minimal' | undefined;
+    if (user.householdId) {
       try {
         const householdDoc = await DatabaseMonitoringService.getDoc(
           DatabaseMonitoringService.doc('households/' + user.householdId)
@@ -126,17 +143,34 @@ class UsageService {
           const hData = householdDoc.data();
           const members: Array<{ id: string; role: string }> = hData.members || [];
           const member = members.find(m => m.id === user.id);
-          if (member && member.role !== 'admin' &&
+          if (planTier === 'free' && member && member.role !== 'admin' &&
               (hData.ownerSubscriptionTier === 'family' || hData.ownerSubscriptionTier === 'premium')) {
             planTier = hData.ownerSubscriptionTier as 'premium' | 'family';
           }
+          // Admin-set per-member usage cap. Only applies to non-admins — admin can't
+          // limit themselves.
+          if (member && member.role !== 'admin') {
+            memberLimitPreset = (hData.memberLimits as Record<string, 'half' | 'minimal'> | undefined)?.[user.id];
+          }
         }
       } catch {
-        // Access revoked or network error — fall back to own tier
+        // Access revoked or network error — fall back to own tier, no member cap
       }
     }
 
-    const planLimits = this.buildPlanLimits()[planTier as keyof PlanLimits] ?? this.buildPlanLimits().free;
+    let planLimits = this.buildPlanLimits()[planTier as keyof PlanLimits] ?? this.buildPlanLimits().free;
+    if (memberLimitPreset) {
+      const cap = MEMBER_LIMIT_PRESETS[memberLimitPreset];
+      planLimits = {
+        searches: { weekly: planLimits.searches.weekly === -1 ? cap.searchesWeekly : Math.min(planLimits.searches.weekly, cap.searchesWeekly) },
+        recipes: { max: planLimits.recipes.max === -1 ? cap.recipesMax : Math.min(planLimits.recipes.max, cap.recipesMax) },
+        mealPlanning: {
+          weeklyRecipes: planLimits.mealPlanning.weeklyRecipes === -1 ? cap.mealPlanningWeekly : Math.min(planLimits.mealPlanning.weeklyRecipes, cap.mealPlanningWeekly),
+          twoWeekPlanning: false
+        },
+        gemini: { weekly: planLimits.gemini.weekly === -1 ? cap.geminiWeekly : Math.min(planLimits.gemini.weekly, cap.geminiWeekly) }
+      };
+    }
 
     const usageRef = DatabaseMonitoringService.doc('users/' + user.id + '/usage/limits');
     const usageDoc = await DatabaseMonitoringService.getDoc(usageRef);
