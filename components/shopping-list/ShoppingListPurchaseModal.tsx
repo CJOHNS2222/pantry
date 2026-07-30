@@ -4,6 +4,7 @@ import { Calendar } from 'lucide-react';
 import { ShoppingItem } from '../../types';
 import VisualQuantitySelector from '../pantry/VisualQuantitySelector';
 import { Input, Select } from '../ui';
+import { Modal } from '../ui/Modal';
 
 interface ShoppingListPurchaseModalProps {
   purchaseModalOpen: boolean;
@@ -32,14 +33,13 @@ export const ShoppingListPurchaseModal: React.FC<ShoppingListPurchaseModalProps>
 }) => {
   const intl = useIntl();
 
-  if (!purchaseModalOpen || !purchaseTargetItem) {
+  if (!purchaseTargetItem) {
     return null;
   }
 
   return (
-    <div className="fixed inset-0 z-[9999] bg-black/40 flex items-center justify-center p-4">
-      <div className="bg-theme-primary rounded-lg p-6 max-w-md w-full shadow-xl">
-        <h3 className="text-lg font-bold mb-3">Add purchase for "{purchaseTargetItem.item}"</h3>
+    <Modal isOpen={purchaseModalOpen} onClose={closePurchaseModal} title={`Add purchase for "${purchaseTargetItem.item}"`}>
+      <Modal.Body>
         <div className="space-y-3">
           <div>
             <label className="text-sm text-theme-secondary">{intl.formatMessage({ id: 'shoppingList.quantityPurchased' })}</label>
@@ -97,12 +97,12 @@ export const ShoppingListPurchaseModal: React.FC<ShoppingListPurchaseModalProps>
             </div>
           </div>
         </div>
-        <div className="flex gap-2 justify-end mt-6">
-          <button onClick={closePurchaseModal} className="px-4 py-2 rounded bg-theme-secondary">Cancel</button>
-          <button onClick={() => onConfirmPurchase(purchaseTargetItem.id)} className="px-4 py-2 rounded bg-[var(--accent-color)] text-white">Confirm</button>
-        </div>
-      </div>
-    </div>
+      </Modal.Body>
+      <Modal.Footer>
+        <button onClick={closePurchaseModal} className="px-4 py-2 rounded bg-theme-secondary">Cancel</button>
+        <button onClick={() => onConfirmPurchase(purchaseTargetItem.id)} className="px-4 py-2 rounded bg-[var(--accent-color)] text-white">Confirm</button>
+      </Modal.Footer>
+    </Modal>
   );
 };
 

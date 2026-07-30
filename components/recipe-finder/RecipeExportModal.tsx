@@ -1,8 +1,9 @@
 import React, { useState, useMemo } from 'react';
-import { X, Search, CheckSquare, Square, Download, Mail, MessageSquare, Share2, FileText } from 'lucide-react';
+import { Search, CheckSquare, Square, Download, Mail, MessageSquare, Share2, FileText } from 'lucide-react';
 import { SavedRecipe } from '../../types';
 import HapticService from '../../services/hapticService';
 import AnalyticsService from '../../services/analyticsService';
+import { Modal } from '../ui/Modal';
 
 interface RecipeExportModalProps {
   isOpen: boolean;
@@ -350,35 +351,10 @@ export const RecipeExportModal: React.FC<RecipeExportModalProps> = ({
     printWindow.document.body.appendChild(script);
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div 
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in"
-      onClick={onClose}
-    >
-      <div 
-        className="bg-theme-primary border border-theme rounded-3xl w-full max-w-md max-h-[85vh] flex flex-col shadow-2xl relative animate-slide-up"
-        onClick={e => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b border-theme flex-shrink-0">
-          <div>
-            <h2 className="text-lg font-bold font-serif text-theme-primary">Export Selection</h2>
-            <p className="text-xs text-theme-secondary opacity-65">Choose recipes and format to share</p>
-          </div>
-          <button 
-            onClick={onClose}
-            className="p-1.5 bg-theme-secondary hover:bg-theme-secondary/80 rounded-full transition-colors"
-            aria-label="Close export dialog"
-          >
-            <X className="w-5 h-5 text-theme-secondary" />
-          </button>
-        </div>
-
-        {/* Scrollable checklist & options */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-5 min-h-0">
-          
+    <Modal isOpen={isOpen} onClose={onClose} title="Export Selection" subtitle="Choose recipes and format to share">
+      <Modal.Body>
+        <div className="space-y-5">
           {/* Search bar */}
           <div className="relative">
             <Search className="absolute left-3 top-2.5 w-4 h-4 text-theme-secondary" />
@@ -493,36 +469,33 @@ export const RecipeExportModal: React.FC<RecipeExportModalProps> = ({
               </div>
             </div>
           )}
-
         </div>
-
-        {/* Footer Actions */}
-        <div className="p-5 border-t border-theme flex gap-3 flex-shrink-0">
-          <button
-            onClick={onClose}
-            className="flex-1 py-3 border border-theme rounded-xl text-xs font-bold hover:bg-theme-secondary transition-colors text-theme-secondary"
-          >
-            Cancel
-          </button>
-          <button
-            disabled={selectedRecipes.length === 0 || isExporting}
-            onClick={handleExport}
-            className="flex-1 py-3 bg-[var(--accent-color)] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--accent-color)]/90 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow"
-          >
-            {format === 'pdf' ? (
-              <>
-                <FileText className="w-4 h-4" />
-                <span>Print / Save PDF</span>
-              </>
-            ) : (
-              <>
-                <Share2 className="w-4 h-4" />
-                <span>Export Selected</span>
-              </>
-            )}
-          </button>
-        </div>
-      </div>
-    </div>
+      </Modal.Body>
+      <Modal.Footer>
+        <button
+          onClick={onClose}
+          className="flex-1 py-3 border border-theme rounded-xl text-xs font-bold hover:bg-theme-secondary transition-colors text-theme-secondary"
+        >
+          Cancel
+        </button>
+        <button
+          disabled={selectedRecipes.length === 0 || isExporting}
+          onClick={handleExport}
+          className="flex-1 py-3 bg-[var(--accent-color)] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--accent-color)]/90 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow"
+        >
+          {format === 'pdf' ? (
+            <>
+              <FileText className="w-4 h-4" />
+              <span>Print / Save PDF</span>
+            </>
+          ) : (
+            <>
+              <Share2 className="w-4 h-4" />
+              <span>Export Selected</span>
+            </>
+          )}
+        </button>
+      </Modal.Footer>
+    </Modal>
   );
 };

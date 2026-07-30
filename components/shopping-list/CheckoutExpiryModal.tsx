@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Sparkles, X, Check } from 'lucide-react';
+import { Calendar, Sparkles, Check } from 'lucide-react';
 import { ShoppingItem } from '../../types';
+import { Modal } from '../ui/Modal';
 
 interface CheckoutExpiryModalProps {
   isOpen: boolean;
@@ -57,7 +58,7 @@ export const CheckoutExpiryModal: React.FC<CheckoutExpiryModalProps> = ({
     }
   }, [isOpen, items]);
 
-  if (!isOpen || items.length === 0) return null;
+  if (items.length === 0) return null;
 
   const getComputedDate = (mode: string, customDate?: string): string | undefined => {
     if (mode === 'stable') return undefined; // No expiry / Shelf stable
@@ -133,29 +134,19 @@ export const CheckoutExpiryModal: React.FC<CheckoutExpiryModalProps> = ({
   ];
 
   return (
-    <div className="fixed inset-0 z-[99999] bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in" onClick={onClose}>
-      <div 
-        className="bg-theme-secondary w-full sm:max-w-xl rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[85dvh] sm:max-h-[90dvh] overflow-hidden border border-theme pb-[calc(var(--safe-area-bottom,0px)+76px)] sm:pb-0"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="px-5 py-4 border-b border-theme flex items-center justify-between bg-theme-primary/30">
-          <div>
-            <h3 className="text-lg font-bold text-theme-primary flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-[var(--accent-color)]" />
-              Quick Expiration Setup
-            </h3>
-            <p className="text-xs text-theme-secondary mt-0.5">Set shelf life for checked items before moving to pantry</p>
-          </div>
-          <button 
-            onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-theme-primary/60 transition-colors text-theme-secondary hover:text-theme-primary"
-            aria-label="Close dialog"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      size="lg"
+      title={
+        <span className="flex items-center gap-2">
+          <Sparkles className="w-5 h-5 text-[var(--accent-color)]" />
+          Quick Expiration Setup
+        </span>
+      }
+      subtitle="Set shelf life for checked items before moving to pantry"
+    >
+      <Modal.Body padding="none">
         {/* Bulk Actions */}
         <div className="bg-theme-primary/50 px-5 py-3 border-b border-theme">
           <span className="text-xs font-semibold text-theme-secondary uppercase tracking-wider block mb-2">Set all items to:</span>
@@ -173,7 +164,7 @@ export const CheckoutExpiryModal: React.FC<CheckoutExpiryModalProps> = ({
         </div>
 
         {/* Item List */}
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4 divide-y divide-theme/40 max-h-[50dvh]">
+        <div className="px-5 py-4 space-y-4 divide-y divide-theme/40">
           {items.map((item, _idx) => {
             const setting = expirySettings[item.id] || { mode: '1w' };
             return (
@@ -230,24 +221,22 @@ export const CheckoutExpiryModal: React.FC<CheckoutExpiryModalProps> = ({
             );
           })}
         </div>
-
-        {/* Footer Actions */}
-        <div className="px-5 py-4 border-t border-theme bg-theme-primary/30 flex items-center justify-end gap-3">
-          <button 
-            onClick={onClose} 
-            className="px-4 py-2 text-sm font-semibold rounded-lg bg-theme-primary border border-theme text-theme-secondary hover:bg-theme hover:text-theme-primary transition-colors"
-          >
-            Cancel
-          </button>
-          <button 
-            onClick={handleConfirm} 
-            className="px-4 py-2 text-sm font-bold rounded-lg bg-[var(--accent-color)] hover:bg-[var(--accent-color)]/95 text-white transition-colors flex items-center gap-1.5 shadow-md hover:shadow-lg"
-          >
-            <Check className="w-4 h-4" />
-            Confirm Checkout
-          </button>
-        </div>
-      </div>
-    </div>
+      </Modal.Body>
+      <Modal.Footer>
+        <button
+          onClick={onClose}
+          className="px-4 py-2 text-sm font-semibold rounded-lg bg-theme-primary border border-theme text-theme-secondary hover:bg-theme hover:text-theme-primary transition-colors"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={handleConfirm}
+          className="px-4 py-2 text-sm font-bold rounded-lg bg-[var(--accent-color)] hover:bg-[var(--accent-color)]/95 text-white transition-colors flex items-center gap-1.5 shadow-md hover:shadow-lg"
+        >
+          <Check className="w-4 h-4" />
+          Confirm Checkout
+        </button>
+      </Modal.Footer>
+    </Modal>
   );
 };

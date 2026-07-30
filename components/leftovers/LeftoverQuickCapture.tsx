@@ -1,6 +1,5 @@
 import React, { useState } from 'react'
-import { X } from 'lucide-react'
-import { useModalOpen } from '../../utils/useModalOpen'
+import { Modal } from '../ui/Modal'
 import { useApp } from '../../contexts/AppContext'
 import { uploadLeftoverImage } from '../../services/leftoverImageService'
 import { LeftoverService, LeftoverCreateData } from '../../services/leftoverService'
@@ -27,7 +26,6 @@ export default function LeftoverQuickCapture({
   onSaved,
   onClose
 }: LeftoverQuickCaptureProps) {
-  useModalOpen()
   const { user, household } = useApp()
   const [photoUrl, setPhotoUrl] = useState<string | undefined>(recipeImageUrl)
   const [file, setFile] = useState<File | null>(null)
@@ -86,23 +84,9 @@ export default function LeftoverQuickCapture({
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] px-4 pt-[var(--safe-area-inset-top,0px)] pb-[var(--safe-area-inset-bottom,0px)]">
-      <div className="bg-theme-primary rounded-lg shadow-xl w-full max-w-md mx-auto h-full flex flex-col border border-theme">
-        {/* Header */}
-        <div className="flex items-center justify-between pt-4 px-3 pb-3 border-b border-theme flex-shrink-0">
-          <h3 className="text-lg font-semibold text-theme-primary">Save Leftover</h3>
-          <button
-            onClick={onClose}
-            className="p-1 hover:bg-theme-secondary rounded transition-colors"
-            aria-label="Close"
-            data-testid="leftoverquickcapture-close"
-          >
-            <X className="w-5 h-5 text-theme-primary" />
-          </button>
-        </div>
-
-        {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto px-3 py-2">
+    <Modal isOpen={true} onClose={() => onClose?.()} title="Save Leftover">
+      <Modal.Body>
+        <div>
           {/* Image Upload */}
           <div className="pb-2 flex flex-col items-center gap-2">
             <div>
@@ -190,31 +174,25 @@ export default function LeftoverQuickCapture({
             )}
           </div>
         </div>
-
-        {/* Action Buttons */}
-        <div className="flex-shrink-0 border-t border-theme bg-theme-primary">
-          <div className="p-3 space-y-2">
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={onClose}
-                className="flex items-center justify-center gap-2 px-4 py-2 bg-theme-secondary text-theme-primary border border-theme rounded-lg hover:bg-theme-primary transition-colors"
-                disabled={loading}
-                data-testid="leftoverquickcapture-cancel"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSave}
-                className="flex items-center justify-center gap-2 px-4 py-2 bg-[var(--accent-color)] text-white rounded-lg hover:bg-[var(--accent-color)]/80 transition-colors"
-                disabled={loading}
-                data-testid="leftoverquickcapture-save"
-              >
-                {loading ? 'Saving…' : 'Save Leftover'}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+      </Modal.Body>
+      <Modal.Footer align="between">
+        <button
+          onClick={onClose}
+          className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-theme-secondary text-theme-primary border border-theme rounded-lg hover:bg-theme-primary transition-colors"
+          disabled={loading}
+          data-testid="leftoverquickcapture-cancel"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={handleSave}
+          className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-[var(--accent-color)] text-white rounded-lg hover:bg-[var(--accent-color)]/80 transition-colors"
+          disabled={loading}
+          data-testid="leftoverquickcapture-save"
+        >
+          {loading ? 'Saving…' : 'Save Leftover'}
+        </button>
+      </Modal.Footer>
+    </Modal>
   )
 }

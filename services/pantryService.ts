@@ -430,15 +430,15 @@ export class PantryService {
         return new Date(a.expires).getTime() - new Date(b.expires).getTime();
       });
 
-      for (const b of sorted) {
-        if (remaining <= 0) break;
+      const consumedSorted = sorted.map(b => {
+        if (remaining <= 0) return b;
         const take = Math.min(b.quantity, remaining);
         remaining -= take;
         consumed.push({ batchId: b.batchId, amount: take });
-        b.quantity = Math.max(0, b.quantity - take);
-      }
+        return { ...b, quantity: Math.max(0, b.quantity - take) };
+      });
 
-      updated.batches = sorted.filter(b => b.quantity > 0);
+      updated.batches = consumedSorted.filter(b => b.quantity > 0);
     }
 
     // Recompute aggregate if units align

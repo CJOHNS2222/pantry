@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useIntl } from 'react-intl';
-import { Plus, X } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import QuantityUnitPicker, { getSmartUnits } from '../pantry/QuantityUnitPicker';
 import { itemImages } from '../../data/item-images';
 import { Input } from '../ui';
+import { Modal } from '../ui/Modal';
 
 interface ShoppingListAddItemModalProps {
   isOpen: boolean;
@@ -71,27 +72,16 @@ export const ShoppingListAddItemModal: React.FC<ShoppingListAddItemModalProps> =
     }
   };
 
-  if (!isOpen) {
-    return null;
-  }
-
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-      <div className="bg-theme-primary w-full h-full sm:h-auto sm:max-h-[90vh] sm:rounded-2xl flex flex-col overflow-hidden shadow-xl animate-slide-up">
-        {/* Header */}
-        <div className="p-6 pb-3 border-b border-theme flex items-center justify-between flex-shrink-0">
-          <h3 className="text-xl font-bold text-theme-primary">
-            {intl.formatMessage({ id: 'shoppingList.addToList' })}
-          </h3>
-          <button onClick={closeModal} className="p-2 hover:bg-theme-secondary rounded-full transition-colors">
-            <X className="w-5 h-5 text-theme-secondary" />
-          </button>
-        </div>
-
-        {/* Form Content */}
-        <form onSubmit={addItem} className="flex-1 flex flex-col overflow-hidden">
-          <div className="flex-1 overflow-y-auto p-6 space-y-6">
-            <div className="space-y-4">
+    <Modal
+      isOpen={isOpen}
+      onClose={closeModal}
+      title={intl.formatMessage({ id: 'shoppingList.addToList' })}
+      panelClassName="h-full sm:h-auto"
+    >
+      <form onSubmit={addItem} className="flex-1 flex flex-col min-h-0">
+        <Modal.Body>
+          <div className="space-y-4">
               <div className="relative">
                 <Input
                   id="newItem"
@@ -158,21 +148,18 @@ export const ShoppingListAddItemModal: React.FC<ShoppingListAddItemModalProps> =
                 />
               </div>
             </div>
-          </div>
-
-          {/* Footer - Fixed at the bottom */}
-          <div className="p-6 border-t border-theme bg-theme-secondary/30 flex-shrink-0">
-            <button
-              type="submit"
-              className="w-full py-3.5 rounded-xl font-bold text-sm uppercase tracking-wider flex items-center justify-center gap-2 bg-[var(--accent-color)] text-white shadow-lg hover:bg-[var(--accent-color)]/90 transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-              Add Item
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        </Modal.Body>
+        <Modal.Footer>
+          <button
+            type="submit"
+            className="w-full py-3.5 rounded-xl font-bold text-sm uppercase tracking-wider flex items-center justify-center gap-2 bg-[var(--accent-color)] text-white shadow-lg hover:bg-[var(--accent-color)]/90 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            Add Item
+          </button>
+        </Modal.Footer>
+      </form>
+    </Modal>
   );
 };
 

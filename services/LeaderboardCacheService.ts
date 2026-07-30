@@ -12,7 +12,7 @@ import { log } from './logService';
  * Mirrors the pattern used by `price_cache/priceData` and the other `*CacheService`s.
  */
 
-export const CACHE_VERSION = '1.0';
+export const CACHE_VERSION = 1;
 
 const CACHE_PATH = 'leaderboard_cache/global';
 

@@ -67,17 +67,17 @@ Stock & Spoon is a cross-platform pantry and meal management app built with Reac
   - Price ranges and sample sizes for accuracy
   - Community-driven pricing for current market rates
   - Custom price overrides for personal preferences
-- **Subscription system with Stripe payment processing**
+- **Subscription system with Google Play Billing**
   - Free tier: Basic features with limits
-  - Premium tier: Unlimited recipes, meal plans, and household members
+  - Premium tier: Higher limits, still capped
+  - Family tier: Unlimited recipes, meal plans, and household members
 
 ## Subscription System
-The app includes a subscription-based monetization system with the following limits on the free tier:
-- Recipe Finder: 5 saved recipes
-- Meal Planner: 10 meals per week
-- Household: 3 members maximum
+The app includes a subscription-based monetization system with three tiers:
 
-Premium subscribers get unlimited access to all features.
+- **Free**: 2 saved recipes, 1 meal-plan search per week, 5 recipe searches per week, 2 household members maximum
+- **Premium**: 20 saved recipes, unlimited meal planning, 15 recipe searches per week, 3 household members maximum
+- **Family**: Unlimited recipes, meal plans, searches, and household members (up to 5)
 
 ### Google Play Billing Setup
 1. **Google Play Billing is now used for in-app purchases and subscriptions.**

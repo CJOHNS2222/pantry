@@ -174,30 +174,33 @@ export function useDataManagement(
             loggingOptions.updateActivityStatus('managing inventory');
           }
 
-          if (user?.isGuest) {
-            // Record to food waste analytics for guest
-            for (const itemToDelete of deletedItems) {
-              try {
+          // Record food waste analytics for all deleted items in a single atomic
+          // write (recordBulkDisposals branches on guest vs. real user internally),
+          // instead of one recordDisposal() write per item.
+          if (deletedItems.length > 0) {
+            try {
+              const disposalPayloads = deletedItems.map(itemToDelete => {
                 const daysExpired = itemToDelete.expirationDate
                   ? Math.max(0, Math.ceil((new Date().getTime() - new Date(itemToDelete.expirationDate).getTime()) / (1000 * 60 * 60 * 24)))
                   : 0;
-                const estimatedValue = itemToDelete.estimatedPrice || 2.50;
-
-                await FoodWasteAnalyticsService.recordDisposal({
+                return {
                   itemId: itemToDelete.id,
                   itemName: itemToDelete.item,
                   category: itemToDelete.category,
-                  disposalReason: 'cooked',
+                  disposalReason: 'cooked' as const,
                   daysExpired,
-                  userId: 'guest',
-                  userName: 'Guest',
-                  estimatedValue
-                });
-              } catch (err) {
-                log.warn('Failed to record guest waste disposal on recipe deduction', { error: err }, 'DataManagement');
-              }
+                  userId: user.isGuest ? 'guest' : user.id,
+                  userName: user.isGuest ? 'Guest' : user.name,
+                  estimatedValue: itemToDelete.estimatedPrice || 2.50
+                };
+              });
+              await FoodWasteAnalyticsService.recordBulkDisposals(disposalPayloads, user.householdId);
+            } catch (err) {
+              log.warn('Failed to record waste disposal on recipe deduction', { error: err }, 'DataManagement');
             }
+          }
 
+          if (user?.isGuest) {
             inventory.setInventory(finalInventory);
             try {
               localStorage.setItem(GUEST_INVENTORY_KEY, JSON.stringify(finalInventory));
@@ -205,45 +208,22 @@ export function useDataManagement(
               /* storage full */
             }
           } else {
-            // Process deletions
-            for (const itemToDelete of deletedItems) {
-              if (loggingOptions?.logItemRemoved) {
+            if (loggingOptions?.logItemRemoved) {
+              for (const itemToDelete of deletedItems) {
                 loggingOptions.logItemRemoved(itemToDelete.item, itemToDelete.id);
               }
-
-              // Record to food waste analytics
-              try {
-                const daysExpired = itemToDelete.expirationDate
-                  ? Math.max(0, Math.ceil((new Date().getTime() - new Date(itemToDelete.expirationDate).getTime()) / (1000 * 60 * 60 * 24)))
-                  : 0;
-                const estimatedValue = itemToDelete.estimatedPrice || 2.50;
-
-                await FoodWasteAnalyticsService.recordDisposal({
-                  itemId: itemToDelete.id,
-                  itemName: itemToDelete.item,
-                  category: itemToDelete.category,
-                  disposalReason: 'cooked',
-                  daysExpired,
-                  userId: user.id,
-                  userName: user.name,
-                  estimatedValue
-                }, user.householdId);
-              } catch (err) {
-                log.warn('Failed to record waste disposal on recipe deduction delete', { error: err }, 'DataManagement');
-              }
-
-              // Remove from cache
-              await InventoryCacheService.removeItemFromCache(itemToDelete.id, user.householdId, user.id);
-
-              // Record delete undo action
-              await inventory.recordUndo('delete_item', itemToDelete);
             }
 
-            // Process updates
-            for (const updated of updatedItems) {
-              await InventoryCacheService.updateItemInCache(updated.item.id, updated.updates, user.householdId, user.id);
+            // Single cache write for both deletions and updates, instead of one
+            // removeItemFromCache/updateItemInCache Firestore round-trip per item.
+            await InventoryCacheService.bulkUpdateInventoryCache(finalInventory, user.householdId, user.id);
 
-              // Record update undo action
+            // Undo history is local (IndexedDB), so per-item recording here doesn't
+            // add Firestore cost - each item still needs its own restorable entry.
+            for (const itemToDelete of deletedItems) {
+              await inventory.recordUndo('delete_item', itemToDelete);
+            }
+            for (const updated of updatedItems) {
               await inventory.recordUndo('update_item', {
                 itemId: updated.item.id,
                 previousState: updated.item,

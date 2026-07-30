@@ -1,5 +1,6 @@
 import React from 'react';
 import { Heart, Shield, Clock, TrendingUp } from 'lucide-react';
+import { Modal } from './Modal';
 
 interface RiskExplanationModalProps {
   onContinue: () => void;
@@ -11,20 +12,18 @@ export const RiskExplanationModal: React.FC<RiskExplanationModalProps> = ({
   onSkip
 }) => {
   return (
-    <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-theme-secondary rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-hidden">
-
-        {/* Header */}
-        <div className="bg-gradient-to-r from-blue-500 to-purple-500 p-6 text-white relative">
-          <div className="flex items-center justify-center gap-3">
-            <Heart className="w-6 h-6" />
-            <h2 className="text-2xl font-bold">Personalized Experience</h2>
-            <Heart className="w-6 h-6" />
-          </div>
+    <Modal isOpen={true} onClose={onSkip} size="lg" hideCloseButton closeOnBackdrop={false} panelClassName="overflow-hidden">
+      {/* Custom gradient header replaces Modal's default header */}
+      <div className="bg-gradient-to-r from-blue-500 to-purple-500 p-6 text-white relative">
+        <div className="flex items-center justify-center gap-3">
+          <Heart className="w-6 h-6" />
+          <h2 className="text-2xl font-bold">Personalized Experience</h2>
+          <Heart className="w-6 h-6" />
         </div>
+      </div>
 
-        {/* Content */}
-        <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
+      <Modal.Body>
+        <div>
 
           <div className="text-center mb-6">
             <p className="text-lg text-theme-primary font-medium mb-2">
@@ -91,7 +90,7 @@ export const RiskExplanationModal: React.FC<RiskExplanationModalProps> = ({
             </button>
           </div>
         </div>
-      </div>
-    </div>
+      </Modal.Body>
+    </Modal>
   );
 };

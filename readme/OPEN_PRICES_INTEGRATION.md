@@ -16,7 +16,7 @@ The app now uses a **3-tier fallback system** for price data:
 
 ### Base URL
 ```
-https://api.open-prices.org/
+https://prices.openfoodfacts.org/api/v1
 ```
 
 ### Data Sources

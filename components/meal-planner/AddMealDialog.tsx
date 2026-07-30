@@ -1,6 +1,7 @@
 import React from 'react';
 import { DayPlan, StructuredRecipe } from '../../types';
 import { Select } from '../ui';
+import { Modal } from '../ui/Modal';
 
 interface AddMealDialogProps {
   show: boolean;
@@ -23,15 +24,11 @@ export const AddMealDialog: React.FC<AddMealDialogProps> = ({
   onConfirm,
   onClose
 }) => {
-  if (!show || !pendingRecipe) return null;
+  if (!pendingRecipe) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-theme-primary rounded-2xl p-6 max-w-md w-full mx-4">
-        <h3 className="text-xl font-bold text-theme-text mb-4 text-center">
-          Add "{pendingRecipe.title}" to Meal Plan
-        </h3>
-
+    <Modal isOpen={show} onClose={onClose} title={`Add "${pendingRecipe.title}" to Meal Plan`}>
+      <Modal.Body>
         <div className="space-y-4">
           <div>
             <Select
@@ -64,16 +61,15 @@ export const AddMealDialog: React.FC<AddMealDialogProps> = ({
             </div>
           </div>
         </div>
-
-        <div className="flex gap-3 mt-6">
-          <button
-            onClick={onClose}
-            className="flex-1 py-3 font-medium bg-theme-secondary text-theme-text rounded-lg hover:bg-theme-primary transition-colors"
-          >
-            Cancel
-          </button>
-        </div>
-      </div>
-    </div>
+      </Modal.Body>
+      <Modal.Footer align="center">
+        <button
+          onClick={onClose}
+          className="flex-1 py-3 font-medium bg-theme-secondary text-theme-text rounded-lg hover:bg-theme-primary transition-colors"
+        >
+          Cancel
+        </button>
+      </Modal.Footer>
+    </Modal>
   );
 };

@@ -28,6 +28,10 @@ yarn-error.log*
 new-service-account.json
 old-service-account.json
 
+# Signing / IAP key material
+*.pem
+*.enc
+
 # Firebase configuration
 google-services.json
 android/app/google-services.json

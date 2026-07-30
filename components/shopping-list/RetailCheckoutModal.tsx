@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { X, Check, Search, ShoppingBag, ArrowUpRight, Link2, Save } from 'lucide-react';
+import { Check, Search, ShoppingBag, ArrowUpRight, Link2, Save } from 'lucide-react';
 import { ShoppingItem } from '../../types';
 import { Browser } from '@capacitor/browser';
 import {
@@ -8,6 +8,7 @@ import {
   hasWalmartMatch,
   wrapWithImpactTracker
 } from '../../services/groceryCheckoutService';
+import { Modal } from '../ui/Modal';
 
 interface RetailCheckoutModalProps {
   isOpen: boolean;
@@ -56,8 +57,6 @@ export const RetailCheckoutModal: React.FC<RetailCheckoutModalProps> = ({
     });
     return initial;
   });
-
-  if (!isOpen) return null;
 
   const toggleItem = (id: string) => {
     // If clicking the row while editing the link, do not toggle selection
@@ -164,22 +163,18 @@ export const RetailCheckoutModal: React.FC<RetailCheckoutModalProps> = ({
   const unmatchedCount = activeItems.length - matchedCount;
 
   return (
-    <div className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-theme-primary border border-theme rounded-2xl w-full max-w-xl shadow-2xl flex flex-col max-h-[85vh] text-theme-primary transition-colors duration-200">
-        {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b border-theme">
-          <div className="flex items-center gap-2.5">
-            <ShoppingBag className="w-6 h-6 text-[var(--accent-color)]" />
-            <h3 className="text-xl font-bold font-playfair">Order Ingredients Online</h3>
-          </div>
-          <button 
-            onClick={onClose} 
-            className="p-1 rounded-lg hover:bg-theme-secondary text-theme-secondary transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      size="lg"
+      title={
+        <span className="flex items-center gap-2.5">
+          <ShoppingBag className="w-6 h-6 text-[var(--accent-color)]" />
+          Order Ingredients Online
+        </span>
+      }
+    >
+      <Modal.Body padding="none">
         {/* Retailer Selector Grid */}
         <div className="p-4 border-b border-theme bg-theme-secondary/40 grid grid-cols-3 gap-2.5">
           {(
@@ -340,9 +335,11 @@ export const RetailCheckoutModal: React.FC<RetailCheckoutModalProps> = ({
             })
           )}
         </div>
+      </Modal.Body>
 
-        {/* Footer Summary & Action */}
-        <div className="p-5 pb-14 border-t border-theme bg-theme-secondary/20">
+      {/* Footer Summary & Action */}
+      <Modal.Footer className="flex-col items-stretch bg-theme-secondary/20" align="between">
+        <div className="w-full">
           {checkoutInitiated ? (
             <div className="space-y-4">
               <div className="text-xs text-theme-secondary space-y-1.5 bg-blue-500/10 border border-blue-500/20 p-3 rounded-xl">
@@ -406,7 +403,7 @@ export const RetailCheckoutModal: React.FC<RetailCheckoutModalProps> = ({
             </>
           )}
         </div>
-      </div>
-    </div>
+      </Modal.Footer>
+    </Modal>
   );
 };

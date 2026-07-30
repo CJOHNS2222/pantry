@@ -5,6 +5,7 @@ import { versionService, VersionCheckResult } from '../../services/versionServic
 import { AppUpdateService } from '../../services/appUpdateService';
 import { Download, AlertTriangle } from 'lucide-react';
 import { log } from '../../services/logService';
+import { Modal } from './Modal';
 
 const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=com.smart.pantry';
 const DISMISS_COOLDOWN = 7 * 24 * 60 * 60 * 1000; // 7 days
@@ -83,11 +84,17 @@ export const GlobalUpdatePrompt: React.FC<GlobalUpdatePromptProps> = ({ onDismis
     onDismiss?.();
   };
 
-  if (!showPrompt || !versionCheck) return null;
+  if (!versionCheck) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-2xl max-w-md w-full p-6">
+    <Modal
+      isOpen={showPrompt}
+      onClose={() => { if (!versionCheck.forceUpdate) dismissPrompt(); }}
+      closeOnBackdrop={!versionCheck.forceUpdate}
+      hideCloseButton
+      panelClassName="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
+    >
+      <Modal.Body>
         <div className="text-center">
           <div className="w-16 h-16 bg-orange-100 dark:bg-orange-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
             <AlertTriangle className="w-8 h-8 text-orange-600" />
@@ -136,7 +143,7 @@ export const GlobalUpdatePrompt: React.FC<GlobalUpdatePromptProps> = ({ onDismis
             </p>
           )}
         </div>
-      </div>
-    </div>
+      </Modal.Body>
+    </Modal>
   );
 };

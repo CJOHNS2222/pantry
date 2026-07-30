@@ -21,6 +21,26 @@ export interface CachedImageData {
 const memoryCache = new Map<string, CachedImage>();
 const CACHE_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
 const MAX_MEMORY_CACHE_SIZE = 300; // Maximum entries in memory to prevent unbounded growth
+
+// Negative cache: items confirmed NOT in the Firestore image cache. Without this,
+// every lookup for an item with no cached image (the common case for brand-new
+// items) re-reads Firestore on every call site that checks it (getCachedImageUrl,
+// cacheImageFromUrl), even right after a bulk getCachedImageUrls() pass already
+// confirmed the miss - turning a single "add all to pantry" batch into one
+// Firestore read per uncached item. Short TTL since a miss can become a hit
+// moments later (e.g. this same session about to cache it).
+const negativeCache = new Map<string, number>();
+const NEGATIVE_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+function isNegativelyCached(cacheKey: string): boolean {
+  const missedAt = negativeCache.get(cacheKey);
+  if (missedAt === undefined) return false;
+  if (Date.now() - missedAt > NEGATIVE_CACHE_TTL_MS) {
+    negativeCache.delete(cacheKey);
+    return false;
+  }
+  return true;
+}
 const LAST_SYNC_KEY = 'imageCacheLastSync';
 
 /** Evict LRU entries from memoryCache when it exceeds the max size */
@@ -223,6 +243,12 @@ export async function getCachedImageUrl(itemName: string): Promise<string | null
     log.error('Error reading local cache', { err });
   }
 
+  // A prior lookup (this call or a bulk getCachedImageUrls pass) already
+  // confirmed Firestore has no entry for this item - don't re-read.
+  if (isNegativelyCached(cacheKey)) {
+    return null;
+  }
+
   // Only hit Firestore if not in any cache (expensive operation)
   try {
     const cacheRef = DatabaseMonitoringService.doc('image_cache/global');
@@ -238,6 +264,7 @@ export async function getCachedImageUrl(itemName: string): Promise<string | null
         return cachedImage.cachedUrl;
       }
     }
+    negativeCache.set(cacheKey, Date.now());
   } catch (err: any) {
     log.error('Error getting cached image from Firestore', { err });
   }
@@ -296,16 +323,19 @@ export async function getCachedImageUrls(itemNames: string[]): Promise<Map<strin
     const cacheRef = DatabaseMonitoringService.doc('image_cache/global');
     const cacheDoc = await DatabaseMonitoringService.getDoc(cacheRef);
 
-    if (cacheDoc.exists()) {
-      const data = cacheDoc.data() as CachedImageData;
-      uncachedKeys.forEach(cacheKey => {
-        const cachedImage = data[cacheKey];
-        if (cachedImage) {
-          memoryCache.set(cacheKey, cachedImage);
-          results.set(cacheKey, cachedImage.cachedUrl);
-        }
-      });
-    }
+    const data = cacheDoc.exists() ? (cacheDoc.data() as CachedImageData) : {};
+    const missedAt = Date.now();
+    uncachedKeys.forEach(cacheKey => {
+      const cachedImage = data[cacheKey];
+      if (cachedImage) {
+        memoryCache.set(cacheKey, cachedImage);
+        results.set(cacheKey, cachedImage.cachedUrl);
+      } else {
+        // Confirmed miss - stops every per-item caller (getCachedImageUrl,
+        // cacheImageFromUrl) from re-reading Firestore for the same item.
+        negativeCache.set(cacheKey, missedAt);
+      }
+    });
 
     debouncedSaveLocalCache();
   } catch (err: any) {
@@ -349,15 +379,16 @@ export async function cacheImageFromUrl(originalUrl: string, itemName: string): 
   };
 
   try {
-  const cacheRef = DatabaseMonitoringService.doc('image_cache/global');
-  const cacheDoc = await DatabaseMonitoringService.getDoc(cacheRef);
-  const data = cacheDoc && cacheDoc.exists() ? cacheDoc.data() as CachedImageData : {};
-  data[cacheKey] = cachedImage;
-  await DatabaseMonitoringService.setDoc(cacheRef, data);
+    // merge:true writes just this one field - creates the doc if missing,
+    // merges into it otherwise. No read-before-write needed (was 1 extra
+    // Firestore read per newly-cached image on top of the miss lookup above).
+    const cacheRef = DatabaseMonitoringService.doc('image_cache/global');
+    await DatabaseMonitoringService.setDoc(cacheRef, { [cacheKey]: cachedImage }, { merge: true });
 
     // Update local caches
     evictLruIfNeeded();
     memoryCache.set(cacheKey, cachedImage);
+    negativeCache.delete(cacheKey);
     debouncedSaveLocalCache();
 
     return cachedUrl;

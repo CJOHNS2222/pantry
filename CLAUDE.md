@@ -4,7 +4,7 @@ Guidance for Claude Code (claude.ai/code) in this repo.
 
 ## Project
 
-**Stock & Spoon** (`package.json` name: `stockandspoon`) - household pantry, shopping list, meal planner, recipe app. Stack: React 19 + TypeScript + Vite, Firebase (Firestore/Auth/Storage/Functions/Remote Config), Capacitor (Android; iOS not added yet). Household data shared real-time via Firestore; free tier capped 5 saved recipes / 10 meals-per-week / 3 household members, premium unlimited via Google Play Billing.
+**Stock & Spoon** (`package.json` name: `stockandspoon`) - household pantry, shopping list, meal planner, recipe app. Stack: React 19 + TypeScript + Vite, Firebase (Firestore/Auth/Storage/Functions/Remote Config), Capacitor (Android; iOS not added yet). Household data shared real-time via Firestore; free tier capped 2 saved recipes / 1 meal-plan search per week / 2 household members, premium raises caps (20 recipes / unlimited meal planning / 3 members), family tier unlimited — all via Google Play Billing. Tier limit defaults live in `services/remoteConfigService.ts` (`IN_APP_DEFAULTS`), enforced in `services/usageService.ts`.
 
 ## Commands
 
@@ -43,7 +43,7 @@ All Firestore reads/writes for pantry, shopping, meal plan, recipes must go thro
 Global read state lives in `contexts/AppContext.tsx` (`useApp()`); mutation/action functions in paired `contexts/AppActionsContext.tsx`.
 
 ### Cache services (bulk-read optimization layer)
-Each domain has `*CacheService` (`inventoryCacheService`, `recipesCacheService`, `shoppingListCacheService`, `MealPlanCacheService`, `priceDataCacheService`, `imageCacheService`) serializing each Firestore document's fields into compact array (e.g. `InventoryCacheService.ITEM_FIELD_ORDER` / `pantryItemToArray()` / `arrayToPantryItem()`), stored as single versioned cache document per household/user, keyed via `getHouseholdOrUserCachePath()` in `cachePathUtils.ts`. Exists to avoid per-item document reads, not replace real Firestore documents. Changing domain type's shape → update both type and cache service's field order/serialization together, bump `CACHE_VERSION` if array layout changes.
+Each domain has `*CacheService` (`inventoryCacheService`, `recipesCacheService`, `shoppingListCacheService`, `MealPlanCacheService`, `priceDataCacheService`, `imageCacheService`) serializing each Firestore document's fields into compact array (e.g. `InventoryCacheService.ITEM_FIELD_ORDER` / `pantryItemToArray()` / `arrayToPantryItem()`), stored as single versioned cache document per household/user, keyed via `getHouseholdOrUserCachePath()` in `cachePathUtils.ts`. Exists to avoid per-item document reads, not replace real Firestore documents. Changing domain type's shape → update both type and cache service's field order/serialization together, bump `CACHE_VERSION` if array layout changes. `CACHE_VERSION` is a plain integer (`1`, `2`, `3`, ...) across all `*CacheService` files — never a string or decimal; bump by 1 to force cache invalidation.
 
 Offline support sits alongside: `offlineQueueService.ts` (queues writes while offline), `offlineDataCache.ts` (reads), `syncStateService.ts` (coordinates sync), `undoService.ts` (reversible actions). Firestore itself initialized with `persistentLocalCache` + `persistentMultipleTabManager` in `firebaseConfig.ts`.
 
@@ -99,3 +99,13 @@ Vitest + jsdom, tests under `src/test/**/*.test.{ts,tsx}`. `src/test/setup.ts` g
 
 ## Subagents (`.claude/agents/`)
 Repo has 24 predefined subagents (code/bug/security/db/perf/dep/seo/infra/ui/doc auditors, `fix-planner`, `code-fixer`, `test-runner`, `test-writer`, `browser-qa-agent`, `console-monitor`, `visual-diff`, `deploy-checker`, `env-validator`, `pr-writer`, `seed-generator`, `architect-reviewer`, `fullstack-qa-orchestrator`, `api-tester`) and documented workflows (`full-audit`, `pre-commit`, `pre-deploy`, `new-feature`, `bug-fix`, `release-prep`) in `.claude/CLAUDE.md`. Auditor outputs go to `.claude/audits/`.
+
+## graphify
+
+This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
+
+Rules:
+- For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
+- If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
+- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
+- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).

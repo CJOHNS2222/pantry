@@ -32,6 +32,7 @@ import React, {
 } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
+import { useModalOpen } from '../../utils/useModalOpen';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -186,6 +187,9 @@ export const Modal: React.FC<ModalProps> & {
   const previouslyFocused = useRef<HTMLElement | null>(null);
   const titleId = useId();
 
+  // Hides the fixed AppHeader/AppNavigation while open (see src/index.css `body.modal-open`)
+  useModalOpen(isOpen);
+
   // Lock body scroll and save previously focused element
   useEffect(() => {
     if (!isOpen) return;
@@ -236,9 +240,11 @@ export const Modal: React.FC<ModalProps> & {
         aria-hidden="true"
       />
 
-      {/* Panel */}
+      {/* Panel — padding keeps it clear of the fixed AppHeader/AppNavigation footprint,
+          even though modal-open hides them, so layout doesn't jump when they reappear on close */}
       <div
         className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
+        style={{ paddingTop: 'var(--app-header-h)', paddingBottom: 'var(--app-nav-h)' }}
         aria-hidden="false"
       >
         <div
@@ -251,9 +257,9 @@ export const Modal: React.FC<ModalProps> & {
           tabIndex={-1}
           onClick={(e) => e.stopPropagation()}
           className={[
-            'pointer-events-auto w-full flex flex-col',
+            'pointer-events-auto w-full flex flex-col modal-safe-h',
             'bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-3xl shadow-2xl',
-            'animate-slide-up max-h-[90vh] focus:outline-none',
+            'animate-slide-up focus:outline-none',
             SIZE_CLASSES[size],
             panelClassName,
           ]

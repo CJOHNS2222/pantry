@@ -34,7 +34,7 @@ export interface ShoppingListCache {
   items: CachedShoppingListData;
 }
 
-const CACHE_VERSION = 2.1; // Version bump due to schema change (removed addedAt)
+const CACHE_VERSION = 3; // Version bump due to schema change (removed addedAt)
 
 const getCachePath = (householdId?: string, userId?: string): string =>
   getHouseholdOrUserCachePath('shoppingList', householdId, userId);

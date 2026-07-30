@@ -28,17 +28,13 @@ export const RecipeModalLeftoverOverlay: React.FC<RecipeModalLeftoverOverlayProp
   if (!showLeftoverCapture || !user) return null;
 
   return (
-    <div onClick={(e) => e.stopPropagation()} className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/40 p-4">
-      <div onClick={(e) => e.stopPropagation()} className="bg-theme-secondary rounded-lg p-4">
-        <LeftoverQuickCapture
-          createdBy={user.id}
-          initialServings={servings}
-          recipeImageUrl={recipeImageUrl}
-          initialNotes={`Leftovers from ${recipeTitle}`}
-          onSaved={(id) => onSaved(id)}
-          onClose={onClose}
-        />
-      </div>
-    </div>
+    <LeftoverQuickCapture
+      createdBy={user.id}
+      initialServings={servings}
+      recipeImageUrl={recipeImageUrl}
+      initialNotes={`Leftovers from ${recipeTitle}`}
+      onSaved={(id) => onSaved(id)}
+      onClose={onClose}
+    />
   );
 };

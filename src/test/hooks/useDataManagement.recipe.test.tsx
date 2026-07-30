@@ -10,6 +10,7 @@ import { pruneNotificationsForDeletedItems } from '../../../services/notificatio
 vi.mock('../../../services/foodWasteAnalyticsService', () => ({
   default: {
     recordDisposal: vi.fn().mockResolvedValue(undefined),
+    recordBulkDisposals: vi.fn().mockResolvedValue(undefined),
     getAnalytics: vi.fn().mockResolvedValue(null),
   }
 }));
@@ -18,6 +19,7 @@ vi.mock('../../../services/inventoryCacheService', () => ({
   InventoryCacheService: {
     removeItemFromCache: vi.fn().mockResolvedValue(undefined),
     updateItemInCache: vi.fn().mockResolvedValue(undefined),
+    bulkUpdateInventoryCache: vi.fn().mockResolvedValue(undefined),
   }
 }));
 
@@ -120,23 +122,16 @@ describe('useDataManagement - Recipe Deductions (handleMarkAsMade)', () => {
     expect(tomato).toBeDefined();
     expect(tomato?.quantity?.amount).toBe(1);
 
-    // Verify cache updates
-    expect(InventoryCacheService.updateItemInCache).toHaveBeenCalledWith(
-      'item-1',
-      expect.any(Object),
-      'household-123',
-      'user-123'
-    );
-    expect(InventoryCacheService.updateItemInCache).toHaveBeenCalledWith(
-      'item-2',
-      expect.any(Object),
-      'household-123',
-      'user-123'
-    );
+    // Verify single batched cache write (not one call per item)
+    expect(InventoryCacheService.bulkUpdateInventoryCache).toHaveBeenCalledTimes(1);
+    const [cachedInventory] = (InventoryCacheService.bulkUpdateInventoryCache as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(cachedInventory.find((i: PantryItem) => i.id === 'item-1')?.quantity?.amount).toBe(1);
+    expect(cachedInventory.find((i: PantryItem) => i.id === 'item-2')?.quantity?.amount).toBe(90);
     expect(InventoryCacheService.removeItemFromCache).not.toHaveBeenCalled();
+    expect(InventoryCacheService.updateItemInCache).not.toHaveBeenCalled();
 
     // Verify no food waste analytics logging for partial deductions (only logged when deleted/fully depleted)
-    expect(FoodWasteAnalyticsService.recordDisposal).not.toHaveBeenCalled();
+    expect(FoodWasteAnalyticsService.recordBulkDisposals).not.toHaveBeenCalled();
     expect(mockAddToast).toHaveBeenCalledWith('Deducted 2 items from pantry.', 'success');
   });
 
@@ -170,28 +165,29 @@ describe('useDataManagement - Recipe Deductions (handleMarkAsMade)', () => {
     const tomato = updatedInventory.find(i => i.id === 'item-3');
     expect(tomato).toBeUndefined();
 
-    // Verify cache removal
-    expect(InventoryCacheService.removeItemFromCache).toHaveBeenCalledWith(
-      'item-3',
-      'household-123',
-      'user-123'
-    );
+    // Verify single batched cache write with tomato excluded, not a per-item removal call
+    expect(InventoryCacheService.bulkUpdateInventoryCache).toHaveBeenCalledTimes(1);
+    const [cachedInventory] = (InventoryCacheService.bulkUpdateInventoryCache as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(cachedInventory.find((i: PantryItem) => i.id === 'item-3')).toBeUndefined();
+    expect(InventoryCacheService.removeItemFromCache).not.toHaveBeenCalled();
 
     // Verify notification pruning
     expect(pruneNotificationsForDeletedItems).toHaveBeenCalledWith('user-123', ['item-3']);
 
-    // Verify food waste analytics logging
-    expect(FoodWasteAnalyticsService.recordDisposal).toHaveBeenCalledWith(
-      {
-        itemId: 'item-3',
-        itemName: 'Tomato',
-        category: 'Produce',
-        disposalReason: 'cooked',
-        daysExpired: expect.any(Number),
-        userId: 'user-123',
-        userName: 'Chef Tester',
-        estimatedValue: 2.50,
-      },
+    // Verify food waste analytics logging (single batched write)
+    expect(FoodWasteAnalyticsService.recordBulkDisposals).toHaveBeenCalledWith(
+      [
+        {
+          itemId: 'item-3',
+          itemName: 'Tomato',
+          category: 'Produce',
+          disposalReason: 'cooked',
+          daysExpired: expect.any(Number),
+          userId: 'user-123',
+          userName: 'Chef Tester',
+          estimatedValue: 2.50,
+        },
+      ],
       'household-123'
     );
 
@@ -231,26 +227,23 @@ describe('useDataManagement - Recipe Deductions (handleMarkAsMade)', () => {
     expect(updatedInventory.find(i => i.id === 'item-1')?.quantity?.amount).toBe(1);
     expect(updatedInventory.find(i => i.id === 'item-3')).toBeUndefined();
 
-    // Verify cache actions
-    expect(InventoryCacheService.updateItemInCache).toHaveBeenCalledWith(
-      'item-1',
-      expect.any(Object),
-      'household-123',
-      'user-123'
-    );
-    expect(InventoryCacheService.removeItemFromCache).toHaveBeenCalledWith(
-      'item-3',
-      'household-123',
-      'user-123'
-    );
+    // Verify a single batched cache write covers both the partial update and the deletion
+    expect(InventoryCacheService.bulkUpdateInventoryCache).toHaveBeenCalledTimes(1);
+    const [cachedInventory] = (InventoryCacheService.bulkUpdateInventoryCache as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(cachedInventory.find((i: PantryItem) => i.id === 'item-1')?.quantity?.amount).toBe(1);
+    expect(cachedInventory.find((i: PantryItem) => i.id === 'item-3')).toBeUndefined();
+    expect(InventoryCacheService.updateItemInCache).not.toHaveBeenCalled();
+    expect(InventoryCacheService.removeItemFromCache).not.toHaveBeenCalled();
 
-    // Verify food waste logging
-    expect(FoodWasteAnalyticsService.recordDisposal).toHaveBeenCalledTimes(1);
-    expect(FoodWasteAnalyticsService.recordDisposal).toHaveBeenCalledWith(
-      expect.objectContaining({
-        itemId: 'item-3',
-        disposalReason: 'cooked',
-      }),
+    // Verify food waste logging (single batched write, not one call per depleted item)
+    expect(FoodWasteAnalyticsService.recordBulkDisposals).toHaveBeenCalledTimes(1);
+    expect(FoodWasteAnalyticsService.recordBulkDisposals).toHaveBeenCalledWith(
+      [
+        expect.objectContaining({
+          itemId: 'item-3',
+          disposalReason: 'cooked',
+        }),
+      ],
       'household-123'
     );
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { DayPlan, MealPlanItem, PantryItem, StructuredRecipe, User, SavedRecipe, ShoppingItem } from '../../types';
 import RecipeModal from './RecipeModal';
+import { RecipeModalDeductPantryModal } from '../recipe-modal/RecipeModalDeductPantryModal';
 import { MealPrepPlanner } from './MealPrepPlanner';
 import { PremiumFeature } from '../settings/PremiumFeature';
 import { Tab } from '../../types/app';
@@ -28,6 +29,22 @@ import type { Settings } from '../../types';
 import { getCachedPopularRecipes } from '../../services/recipeService';
 import { rankCachedRecipesByPreferences, isRecipeSafeFromAllergies } from '../../utils/preferenceUtils';
 import { log } from '../../services/logService';
+
+const parseTimeToSeconds = (time: string | number | undefined): number => {
+  if (time === undefined || time === null || time === '') return 0;
+  if (typeof time === 'number') return Math.max(0, Math.floor(time)) * 60;
+  const match = (time || '').toString().match(/(\d+)\s*(min|minute|minutes|hour|hours|hr|h|sec|s)/i);
+  if (!match) {
+    const n = parseInt(time as string, 10);
+    return Number.isFinite(n) && !Number.isNaN(n) ? n * 60 : 0;
+  }
+  const value = parseInt(match[1], 10);
+  const unit = match[2].toLowerCase();
+  if (unit.startsWith('h')) return value * 3600;
+  if (unit.startsWith('m')) return value * 60;
+  if (unit.startsWith('s')) return value;
+  return value * 60;
+};
 
 // Utility function to generate attractive recipe placeholder images
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -112,6 +129,8 @@ const MealPlannerComponent: React.FC<MealPlannerProps> = ({ mealPlan, updateMeal
   const [dragOverMealType, setDragOverMealType] = useState<{ dayIndex: number, mealType: string } | null>(null);
   const [missingItemsCount, setMissingItemsCount] = useState(0);
   const [isAddingToShopping, setIsAddingToShopping] = useState(false);
+  const [showCookedDeductModal, setShowCookedDeductModal] = useState(false);
+  const [pendingCookedMeal, setPendingCookedMeal] = useState<MealPlanItem | null>(null);
   const [showRecipeModal, setShowRecipeModal] = useState(false);
   const [modalRecipe, setModalRecipe] = useState<StructuredRecipe | null>(null);
   const [modalContext, setModalContext] = useState<'search' | 'scheduled'>('search');
@@ -532,10 +551,15 @@ const MealPlannerComponent: React.FC<MealPlannerProps> = ({ mealPlan, updateMeal
       updateMealPlan(newPlan);
   };
 
-  const handleCookedIt = (meal: MealPlanItem) => {
-    HapticService.success();
+  const completeCookedIt = (meal: MealPlanItem, deductions: { itemId: string; ingredient: string }[]) => {
+    const recipe = meal.recipe;
+    AnalyticsService.trackRecipeCompleted(
+      recipe.id || recipe.title,
+      recipe.title,
+      parseTimeToSeconds(recipe.cookTime) / 60
+    );
     if (onMarkAsMade) {
-      onMarkAsMade(meal.recipe as StructuredRecipe);
+      onMarkAsMade(recipe as StructuredRecipe, deductions);
     }
     const suggestedServings = typeof meal.recipe?.servings === 'number' && meal.recipe.servings > 0 ? meal.recipe.servings : 2;
     setLeftoverServings(Math.max(1, Math.min(6, suggestedServings)));
@@ -545,6 +569,43 @@ const MealPlannerComponent: React.FC<MealPlannerProps> = ({ mealPlan, updateMeal
       recipe_title: meal.recipe?.title,
       household_id: household?.id,
     });
+  };
+
+  const handleCookedIt = (meal: MealPlanItem) => {
+    HapticService.success();
+    const recipe = meal.recipe;
+    const hasPantryMatch = !!(recipe.ingredients && recipe.ingredients.length > 0 && inventory && inventory.length > 0 &&
+      recipe.ingredients.some((ing, idx) => {
+        const structuredName = recipe.structuredIngredients?.[idx]?.name;
+        const name = (structuredName ?? parseIngredientForShoppingList(ing).itemName).toLowerCase().trim();
+        return inventory.some(pi => {
+          const piName = pi.item.toLowerCase();
+          return piName.includes(name) || name.includes(piName);
+        });
+      }));
+
+    if (hasPantryMatch) {
+      setPendingCookedMeal(meal);
+      setShowCookedDeductModal(true);
+      return;
+    }
+    completeCookedIt(meal, []);
+  };
+
+  const handleConfirmCookedDeductions = (deductions: { itemId: string; ingredient: string }[]) => {
+    setShowCookedDeductModal(false);
+    if (pendingCookedMeal) {
+      completeCookedIt(pendingCookedMeal, deductions);
+    }
+    setPendingCookedMeal(null);
+  };
+
+  const handleSkipCookedDeductions = () => {
+    setShowCookedDeductModal(false);
+    if (pendingCookedMeal) {
+      completeCookedIt(pendingCookedMeal, []);
+    }
+    setPendingCookedMeal(null);
   };
 
   const leftovers = useMemo(() => {
@@ -1265,6 +1326,16 @@ const MealPlannerComponent: React.FC<MealPlannerProps> = ({ mealPlan, updateMeal
           user={user}
           inventory={inventory}
           activeRecipes={activeMealPlanRecipes}
+        />
+      )}
+
+      {pendingCookedMeal && (
+        <RecipeModalDeductPantryModal
+          isOpen={showCookedDeductModal}
+          recipe={pendingCookedMeal.recipe}
+          inventory={inventory}
+          onClose={handleSkipCookedDeductions}
+          onConfirm={handleConfirmCookedDeductions}
         />
       )}
 

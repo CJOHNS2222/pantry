@@ -3,7 +3,7 @@ import { DayPlan, MealPlanItem } from '../types';
 import DatabaseMonitoringService from './databaseMonitoringService';
 import { getHouseholdOrUserCachePath } from './cachePathUtils';
 
-export const CACHE_VERSION = '1.0';
+export const CACHE_VERSION = 1;
 
 // A helper function to recursively remove undefined properties from an object
 const sanitizeObject = (obj: any): any => {
