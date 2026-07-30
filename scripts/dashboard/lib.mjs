@@ -55,14 +55,32 @@ export function parseWorkflows(claudeMdText) {
 export function parseAuditFile(filename, text, mtimeIso) {
   const { data, body } = parseFrontmatter(text || '');
   const severityCounts = {};
-  const sections = body.split(/^### (Critical|High|Medium|Low)\b/m);
-  for (let i = 1; i < sections.length; i += 2) {
-    const severity = sections[i];
-    const content = sections[i + 1] || '';
-    const items = (content.match(/^\s*\d+\.\s/gm) || []).length;
-    if (items > 0 || severity) {
-      severityCounts[severity] = items;
+  const lines = body.split(/\r?\n/);
+  let currentSeverity = null;
+  let currentContent = [];
+  for (const line of lines) {
+    const severityMatch = /^### (Critical|High|Medium|Low)\b/.exec(line);
+    if (severityMatch) {
+      if (currentSeverity) {
+        const items = currentContent.join('\n').match(/^\s*\d+\.\s/gm) || [];
+        severityCounts[currentSeverity] = (severityCounts[currentSeverity] || 0) + items.length;
+      }
+      currentSeverity = severityMatch[1];
+      currentContent = [];
+    } else if (currentSeverity && line.match(/^###/)) {
+      if (currentContent.length) {
+        const items = currentContent.join('\n').match(/^\s*\d+\.\s/gm) || [];
+        severityCounts[currentSeverity] = (severityCounts[currentSeverity] || 0) + items.length;
+      }
+      currentSeverity = null;
+      currentContent = [];
+    } else if (currentSeverity) {
+      currentContent.push(line);
     }
+  }
+  if (currentSeverity && currentContent.length) {
+    const items = currentContent.join('\n').match(/^\s*\d+\.\s/gm) || [];
+    severityCounts[currentSeverity] = (severityCounts[currentSeverity] || 0) + items.length;
   }
   return {
     file: filename,

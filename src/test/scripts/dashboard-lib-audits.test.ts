@@ -35,6 +35,44 @@ findings: 26
     expect(r.findings).toBe(null);
     expect(r.severityCounts).toEqual({});
   });
+  it('stops severity section at non-severity heading (Critical followed by Important)', () => {
+    const audit = `---
+agent: code-auditor
+---
+
+### Critical — Real bugs
+
+1. **Bug A** — crashes.
+
+2. **Bug B** — data loss.
+
+### Important — Should not count for Critical
+
+3. **Fix C** — nice to have.
+
+4. **Fix D** — enhancement.
+`;
+    const r = parseAuditFile('AUDIT_CODE.md', audit, '2026-07-30T10:00:00.000Z');
+    expect(r.severityCounts).toEqual({ Critical: 2 });
+  });
+  it('accumulates repeated severities instead of overwriting', () => {
+    const audit = `---
+agent: bug-auditor
+---
+
+### High — First batch
+
+1. **Issue A**.
+
+2. **Issue B**.
+
+### High — Second batch
+
+3. **Issue C**.
+`;
+    const r = parseAuditFile('AUDIT_BUGS.md', audit, '2026-07-30T10:00:00.000Z');
+    expect(r.severityCounts).toEqual({ High: 3 });
+  });
 });
 
 describe('parseFixesProgress', () => {
