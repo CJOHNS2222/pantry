@@ -97,3 +97,62 @@ export function parseFixesProgress(text) {
   const open = (text?.match(/[🔴🟡🟢]/gu) || []).length;
   return { done, total: done + open };
 }
+
+export const DEFAULT_CONFIG = {
+  domains: ['Audit', 'Fix & Test', 'QA & Browser', 'Release & Deploy', 'Utility', 'Skills', 'Workflows'],
+  routines: [
+    { id: 'full-audit', name: 'Full audit', cadenceDays: 7, command: 'run full-audit workflow', detect: { type: 'auditDir' } },
+    { id: 'release', name: 'Release', cadenceDays: 14, command: '/release', detect: { type: 'commitPattern', pattern: '^chore: release v' } },
+    { id: 'graphify-update', name: 'Graphify update', cadenceDays: 7, command: 'graphify update .', detect: { type: 'fileMtime', path: 'graphify-out/graph.json' } },
+    { id: 'dep-audit', name: 'Dependency audit', cadenceDays: 30, command: 'run dep-auditor agent', detect: { type: 'manual' } },
+  ],
+  customCards: [],
+  overrides: {},
+  agentDomains: {
+    'code-auditor': 'Audit', 'bug-auditor': 'Audit', 'security-auditor': 'Audit', 'doc-auditor': 'Audit',
+    'infra-auditor': 'Audit', 'ui-auditor': 'Audit', 'db-auditor': 'Audit', 'perf-auditor': 'Audit',
+    'dep-auditor': 'Audit', 'seo-auditor': 'Audit',
+    'fix-planner': 'Fix & Test', 'code-fixer': 'Fix & Test', 'test-runner': 'Fix & Test', 'test-writer': 'Fix & Test',
+    'api-tester': 'QA & Browser', 'browser-qa-agent': 'QA & Browser', 'fullstack-qa-orchestrator': 'QA & Browser',
+    'console-monitor': 'QA & Browser', 'visual-diff': 'QA & Browser',
+    'deploy-checker': 'Release & Deploy', 'env-validator': 'Release & Deploy', 'pr-writer': 'Release & Deploy',
+    'seed-generator': 'Utility', 'architect-reviewer': 'Utility',
+  },
+};
+
+export function mergeConfig(userConfig) {
+  const u = userConfig || {};
+  return {
+    domains: Array.isArray(u.domains) ? u.domains : DEFAULT_CONFIG.domains,
+    routines: Array.isArray(u.routines) ? u.routines : DEFAULT_CONFIG.routines,
+    customCards: Array.isArray(u.customCards) ? u.customCards : DEFAULT_CONFIG.customCards,
+    overrides: { ...DEFAULT_CONFIG.overrides, ...(u.overrides || {}) },
+    agentDomains: { ...DEFAULT_CONFIG.agentDomains, ...(u.agentDomains || {}) },
+  };
+}
+
+export function applyOverrides(cards, config) {
+  const out = [];
+  for (const card of cards) {
+    const o = config.overrides[card.id] || {};
+    if (o.hidden) continue;
+    let domain = o.domain;
+    if (!domain) {
+      if (card.id.startsWith('agent:')) domain = config.agentDomains[card.name] || 'Utility';
+      else if (card.id.startsWith('skill:')) domain = 'Skills';
+      else if (card.id.startsWith('workflow:')) domain = 'Workflows';
+      else domain = 'Utility';
+    }
+    out.push({ ...card, name: o.name || card.name, description: o.description || card.description, domain });
+  }
+  return out;
+}
+
+export function computeRoutineStatus(routine, lastDoneIso, nowIso) {
+  if (!lastDoneIso) return { status: 'overdue', daysSince: null };
+  const days = (new Date(nowIso) - new Date(lastDoneIso)) / 86400000;
+  const daysSince = Math.floor(days);
+  if (days >= routine.cadenceDays) return { status: 'overdue', daysSince };
+  if (days >= routine.cadenceDays * 0.75) return { status: 'due', daysSince };
+  return { status: 'ok', daysSince };
+}
