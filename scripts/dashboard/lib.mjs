@@ -67,7 +67,7 @@ export function parseAuditFile(filename, text, mtimeIso) {
       }
       currentSeverity = severityMatch[1];
       currentContent = [];
-    } else if (currentSeverity && line.match(/^###/)) {
+    } else if (currentSeverity && line.match(/^##/)) {
       if (currentContent.length) {
         const items = currentContent.join('\n').match(/^\s*\d+\.\s/gm) || [];
         severityCounts[currentSeverity] = (severityCounts[currentSeverity] || 0) + items.length;

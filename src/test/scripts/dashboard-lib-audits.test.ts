@@ -73,6 +73,26 @@ agent: bug-auditor
     const r = parseAuditFile('AUDIT_BUGS.md', audit, '2026-07-30T10:00:00.000Z');
     expect(r.severityCounts).toEqual({ High: 3 });
   });
+  it('stops severity section at level-2 heading (Medium followed by ## Metrics)', () => {
+    const audit = `---
+agent: perf-auditor
+---
+
+### Medium — Performance issues
+
+1. **Slow query** — needs indexing.
+
+2. **Memory leak** — investigate.
+
+## Metrics
+
+1. **Response time**.
+
+2. **CPU usage**.
+`;
+    const r = parseAuditFile('AUDIT_PERF.md', audit, '2026-07-30T10:00:00.000Z');
+    expect(r.severityCounts).toEqual({ Medium: 2 });
+  });
 });
 
 describe('parseFixesProgress', () => {
