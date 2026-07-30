@@ -69,3 +69,15 @@ IMPROVEMENTS_PLAN.md
 public/Screenshot*.png
 public/Screenshot*.jpg
 testlab/robo/Screenshot*.png
+
+# Local build/tool caches — regenerate on their own, shouldn't be tracked
+.firebase/hosting.*.cache
+.gradle/9.4.1/fileHashes/fileHashes.lock
+
+# graphify local working files
+graphify-out/
+.claude/settings.json.graphify-bak
+
+# Local ad-hoc audit output (not the tracked deploy-checker.md/env-validator.md pair)
+.claude/audits/AUDIT_CODE.md
+.claude/audits/AUDIT_UI.md
