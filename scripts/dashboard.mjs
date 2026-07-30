@@ -34,7 +34,7 @@ if (args.includes('--json')) {
   process.exit(0);
 }
 
-const { renderHtml } = await import('./dashboard/render.mjs').catch(() => ({ renderHtml: (d) => `<pre>${JSON.stringify(d, null, 2)}</pre>` }));
+const { renderHtml } = await import('./dashboard/render.mjs').catch(() => ({ renderHtml: (d) => `<pre>${JSON.stringify(d, null, 2).replace(/</g, '&lt;')}</pre>` }));
 fs.mkdirSync(dashDir, { recursive: true });
 fs.writeFileSync(outPath, renderHtml(data));
 console.log(`Wrote ${outPath}`);

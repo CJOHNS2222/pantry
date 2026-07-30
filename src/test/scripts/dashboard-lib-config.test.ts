@@ -41,6 +41,17 @@ describe('applyOverrides', () => {
     expect(v.description).toBe('better');
     expect(v.domain).toBe('Release & Deploy');
   });
+  it('preserves a customCard\'s own pre-set domain, override still wins', () => {
+    const customCards = [
+      { id: 'custom:My Tool', name: 'My Tool', description: 'x', invoke: 'y', domain: 'Skills' },
+    ];
+    const out = applyOverrides(customCards, DEFAULT_CONFIG);
+    expect(out.find(c => c.id === 'custom:My Tool')!.domain).toBe('Skills');
+
+    const cfg = mergeConfig({ overrides: { 'custom:My Tool': { domain: 'Audit' } } });
+    const out2 = applyOverrides(customCards, cfg);
+    expect(out2.find(c => c.id === 'custom:My Tool')!.domain).toBe('Audit');
+  });
 });
 
 describe('computeRoutineStatus', () => {

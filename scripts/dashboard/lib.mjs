@@ -136,7 +136,7 @@ export function applyOverrides(cards, config) {
   for (const card of cards) {
     const o = config.overrides[card.id] || {};
     if (o.hidden) continue;
-    let domain = o.domain;
+    let domain = o.domain || card.domain;
     if (!domain) {
       if (card.id.startsWith('agent:')) domain = config.agentDomains[card.name] || 'Utility';
       else if (card.id.startsWith('skill:')) domain = 'Skills';

@@ -25,7 +25,7 @@ function routineCard(r) {
   const badge = r.daysSince == null ? 'never' : `${r.daysSince}d ago`;
   return `<div class="card routine" data-status="${esc(r.status)}">
     <div class="row"><span class="name">${esc(r.name)}</span><span class="pill">${r.cadenceDays}d</span></div>
-    <div class="meta">last: ${fmtDate(r.lastDone)} · ${badge}</div>
+    <div class="meta">last: ${esc(fmtDate(r.lastDone))} · ${badge}</div>
     <button class="copy" data-copy="${esc(r.command)}">${esc(r.command)}</button>
   </div>`;
 }
@@ -40,7 +40,7 @@ function capabilityCard(c) {
 
 function auditRow(a) {
   const sev = Object.entries(a.severityCounts).map(([k, v]) => `${k}: ${v}`).join(' · ') || '—';
-  return `<div class="audit-row"><span class="mono">${esc(a.file)}</span><span>${a.findings ?? '?'} findings</span><span>${esc(sev)}</span><span class="meta">${fmtDate(a.updated)}</span></div>`;
+  return `<div class="audit-row"><span class="mono">${esc(a.file)}</span><span>${a.findings ?? '?'} findings</span><span>${esc(sev)}</span><span class="meta">${esc(fmtDate(a.updated))}</span></div>`;
 }
 
 export function renderHtml(data) {
