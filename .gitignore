@@ -81,3 +81,5 @@ graphify-out/
 # Local ad-hoc audit output (not the tracked deploy-checker.md/env-validator.md pair)
 .claude/audits/AUDIT_CODE.md
 .claude/audits/AUDIT_UI.md
+
+.claude/dashboard/dashboard.html

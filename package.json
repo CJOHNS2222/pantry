@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "generate:changelog": "node scripts/generate-changelog.cjs",
+    "dashboard": "node scripts/dashboard.mjs",
     "predev": "node scripts/generate-changelog.cjs",
     "prebuild": "node scripts/generate-changelog.cjs",
     "dev": "vite",

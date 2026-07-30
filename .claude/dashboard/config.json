@@ -1,0 +1,11 @@
+{
+  "domains": ["Audit", "Fix & Test", "QA & Browser", "Release & Deploy", "Utility", "Skills", "Workflows"],
+  "routines": [
+    { "id": "full-audit", "name": "Full audit", "cadenceDays": 7, "command": "run full-audit workflow", "detect": { "type": "auditDir" } },
+    { "id": "release", "name": "Release", "cadenceDays": 14, "command": "/release", "detect": { "type": "commitPattern", "pattern": "^chore: release v" } },
+    { "id": "graphify-update", "name": "Graphify update", "cadenceDays": 7, "command": "graphify update .", "detect": { "type": "fileMtime", "path": "graphify-out/graph.json" } },
+    { "id": "dep-audit", "name": "Dependency audit", "cadenceDays": 30, "command": "run dep-auditor agent", "detect": { "type": "manual" } }
+  ],
+  "customCards": [],
+  "overrides": {}
+}
