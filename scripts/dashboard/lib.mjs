@@ -51,3 +51,31 @@ export function parseWorkflows(claudeMdText) {
   }
   return out;
 }
+
+export function parseAuditFile(filename, text, mtimeIso) {
+  const { data, body } = parseFrontmatter(text || '');
+  const severityCounts = {};
+  const sections = body.split(/^### (Critical|High|Medium|Low)\b/m);
+  for (let i = 1; i < sections.length; i += 2) {
+    const severity = sections[i];
+    const content = sections[i + 1] || '';
+    const items = (content.match(/^\s*\d+\.\s/gm) || []).length;
+    if (items > 0 || severity) {
+      severityCounts[severity] = items;
+    }
+  }
+  return {
+    file: filename,
+    agent: data.agent || null,
+    status: data.status || null,
+    findings: data.findings != null && /^\d+$/.test(data.findings) ? Number(data.findings) : null,
+    severityCounts,
+    updated: mtimeIso,
+  };
+}
+
+export function parseFixesProgress(text) {
+  const done = (text?.match(/✅/g) || []).length;
+  const open = (text?.match(/[🔴🟡🟢]/gu) || []).length;
+  return { done, total: done + open };
+}
