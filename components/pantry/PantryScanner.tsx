@@ -1740,10 +1740,11 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
           <button
             onClick={() => {
               setPantryFilter(prev => {
-                const next = { ...prev, expirationStatus: 'expiring-soon' as PantryFilter['expirationStatus'] };
+                const next = { ...prev, expirationStatus: 'attention' as PantryFilter['expirationStatus'] };
                 savePantryFilter(next);
                 return next;
               });
+              document.getElementById('pantry-items-list')?.scrollIntoView({ behavior: 'smooth' });
             }}
             className="flex-1 text-left text-sm font-medium text-theme-primary"
           >
@@ -2698,7 +2699,7 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
         )}
 
         {/* Items List */}
-        <div className="mt-8 space-y-2">
+        <div id="pantry-items-list" className="mt-8 space-y-2">
           {/* Bulk mode: one-time tip + progress bar */}
           {bulkMode && showBulkTip && (
             <div className="flex items-start gap-2 px-3 py-2 mb-2 rounded-lg bg-[var(--accent-color)]/10 border border-[var(--accent-color)]/30 text-sm text-theme-primary">
@@ -2931,6 +2932,7 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
                   className="w-full px-3 py-2 bg-theme-primary border border-theme rounded-lg text-theme-primary focus:border-[var(--accent-color)] focus:outline-none"
                 >
                   <option value="all">All Items</option>
+                  <option value="attention">Needs Attention (Expired/Soon)</option>
                   <option value="expiring-soon">Expiring Soon (7 days)</option>
                   <option value="expired">Expired</option>
                   <option value="fresh">Fresh</option>

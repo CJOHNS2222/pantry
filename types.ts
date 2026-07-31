@@ -410,7 +410,7 @@ export interface CustomCategory {
 export interface PantryFilter {
   categories: string[];
   locations: string[];
-  expirationStatus: 'all' | 'expiring-soon' | 'expired' | 'fresh';
+  expirationStatus: 'all' | 'attention' | 'expiring-soon' | 'expired' | 'fresh';
   quantityStatus: 'all' | 'low-stock' | 'out-of-stock' | 'in-stock';
   sortBy: 'name' | 'expiration' | 'quantity' | 'category' | 'location';
   sortOrder: 'asc' | 'desc';

@@ -220,7 +220,7 @@ export const getAutocompleteSuggestions = (
 export interface PantryFilter {
   categories: string[];
   locations: string[];
-  expirationStatus: 'all' | 'expiring-soon' | 'expired' | 'fresh';
+  expirationStatus: 'all' | 'attention' | 'expiring-soon' | 'expired' | 'fresh';
   quantityStatus: 'all' | 'low-stock' | 'out-of-stock' | 'in-stock';
   sortBy: 'name' | 'expiration' | 'quantity' | 'category' | 'location';
   sortOrder: 'asc' | 'desc';
@@ -269,6 +269,8 @@ export const filterPantryItems = (items: PantryItem[], filter: PantryFilter): Pa
           return expDate < now;
         case 'expiring-soon':
           return expDate >= now && expDate <= threshold;
+        case 'attention':
+          return expDate <= threshold;
         case 'fresh':
           return expDate > threshold;
         default:

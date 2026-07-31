@@ -1,3 +1,12 @@
+## [3.0.15] - 2026-07-31
+
+### Added / Changed / Fixed
+- **Expiring Soon Banner Fix** — Resolved an issue where tapping the expiring soon banner did nothing. It now filters the pantry list to items that need attention (both expired and expiring-soon) and smooth-scrolls to the list.
+- **Needs Attention Filter Option** — Added a "Needs Attention (Expired/Soon)" option to the expiration status filter dropdown.
+- **Direct Quantity Input** — Added a direct text input field for item quantity in the Item Detail Modal, allowing manual number entry in addition to the plus/minus buttons.
+
+---
+
 ## [3.0.14] - 2026-07-24
 
 ### Added / Changed / Fixed

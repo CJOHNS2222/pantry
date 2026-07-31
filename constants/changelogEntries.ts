@@ -20,6 +20,15 @@ export interface DetailedChangeEntry {
 
 export const RECENT_CHANGES: ChangeEntry[] = [
   {
+    "version": "3.0.15",
+    "date": "Jul 31, 2026",
+    "highlights": [
+      "Expiring Soon Banner Fix — Resolved an issue where tapping the expiring soon banner did nothing.",
+      "Needs Attention Filter Option — Added a \"Needs Attention (Expired/Soon)\" option to the expiration status filter…",
+      "Direct Quantity Input — Added a direct text input field for item quantity in the Item Detail Modal, allowing manual…"
+    ]
+  },
+  {
     "version": "3.0.14",
     "date": "Jul 24, 2026",
     "highlights": [
@@ -37,20 +46,24 @@ export const RECENT_CHANGES: ChangeEntry[] = [
       "Service & Monitoring Enhancements — Upgraded performance monitoring, haptic feedback integration, image caching, and…",
       "UI & Component Refactoring — Enhanced focus trapping, onboarding flows, meal planning components, settings tabs, and…"
     ]
-  },
-  {
-    "version": "3.0.12",
-    "date": "Jul 20, 2026",
-    "highlights": [
-      "Architecture & Service Layer Modularization — Extracted cache path utilities and modularized inventoryCacheService,…",
-      "Household Migration & Retry Safeguards — Added dedicated householdMigrationService and useHouseholdMigrationRetry hook…",
-      "Pantry Health & Scanner Utilities — Extracted standalone pantryHealthUtils and modularized PantryScanner scan execution…",
-      "Retail & Package Size Data — Added curated Walmart package size lookup options and enhanced RetailCheckoutModal item…"
-    ]
   }
 ];
 
 export const ALL_CHANGES: DetailedChangeEntry[] = [
+  {
+    "version": "3.0.15",
+    "date": "Jul 31, 2026",
+    "sections": [
+      {
+        "title": "Added / Changed / Fixed",
+        "bullets": [
+          "**Expiring Soon Banner Fix** — Resolved an issue where tapping the expiring soon banner did nothing. It now filters the pantry list to items that need attention (both expired and expiring-soon) and smooth-scrolls to the list.",
+          "**Needs Attention Filter Option** — Added a \"Needs Attention (Expired/Soon)\" option to the expiration status filter dropdown.",
+          "**Direct Quantity Input** — Added a direct text input field for item quantity in the Item Detail Modal, allowing manual number entry in addition to the plus/minus buttons."
+        ]
+      }
+    ]
+  },
   {
     "version": "3.0.14",
     "date": "Jul 24, 2026",

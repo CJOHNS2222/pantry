@@ -47,6 +47,11 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   const [editExpirationType, setEditExpirationType] = useState(() => item.expirationType || 'best-by');
   // Local-only state while modal is open; persist on close
   const [localQuantity, setLocalQuantity] = useState<number>(getQuantityAmount(item.quantity ?? item.quantity_estimate));
+  const [qtyInputValue, setQtyInputValue] = useState<string>(String(getQuantityAmount(item.quantity ?? item.quantity_estimate)));
+
+  useEffect(() => {
+    setQtyInputValue(String(localQuantity));
+  }, [localQuantity]);
   const [localUnit, setLocalUnit] = useState<string>(getQuantityUnit(item.quantity ?? item.quantity_estimate));
   const [localStorageLocation, setLocalStorageLocation] = useState<PantryItem['storageLocation']>(item.storageLocation || 'pantry');
   const [localCategory, setLocalCategory] = useState<string>(item.category || 'Manual');
@@ -150,6 +155,25 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
       } else {
         setLocalVisualLevel(undefined);
       }
+    }
+  };
+
+  const handleInputChange = (valStr: string) => {
+    setQtyInputValue(valStr);
+    const parsed = parseFloat(valStr);
+    if (!isNaN(parsed) && parsed >= 0) {
+      handleQuantityChange(parsed);
+    }
+  };
+
+  const handleInputBlur = () => {
+    const parsed = parseFloat(qtyInputValue);
+    if (isNaN(parsed) || parsed < 0) {
+      setQtyInputValue(String(localQuantity));
+    } else {
+      const rounded = roundQty(parsed);
+      handleQuantityChange(rounded);
+      setQtyInputValue(String(rounded));
     }
   };
 
@@ -433,7 +457,17 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                 >
                   <Minus className="w-4 h-4" />
                 </button>
-                <span className="text-lg font-semibold text-theme-primary min-w-[2rem] text-center">{localQuantity}</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="any"
+                  value={qtyInputValue}
+                  onChange={(e) => handleInputChange(e.target.value)}
+                  onBlur={handleInputBlur}
+                  className="w-16 px-1.5 py-1 text-center bg-theme-primary border border-theme rounded-lg text-theme-primary text-lg font-semibold focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:border-transparent"
+                  aria-label="Item quantity"
+                  data-testid="item-qty-input"
+                />
                 <button
                   onClick={() => handleQuantityChange(roundQty(localQuantity + 0.25))}
                   className="w-9 h-9 flex items-center justify-center rounded-full border border-theme text-theme-secondary hover:bg-theme-secondary transition-colors"
