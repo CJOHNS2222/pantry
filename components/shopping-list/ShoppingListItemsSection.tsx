@@ -1,10 +1,12 @@
 import React from 'react';
 import { useIntl } from 'react-intl';
-import { ShoppingBasket, Plus } from 'lucide-react';
-import { ShoppingItem } from '../../types';
+import { Plus } from 'lucide-react';
+import { ShoppingItem, SavedRecipe, DayPlan } from '../../types';
 import { ShoppingListItemSkeleton } from '../ui/SkeletonLoader';
 import { SmartShoppingListOrganizer } from './SmartShoppingListOrganizer';
 import { EnhancedShoppingListItem } from './EnhancedShoppingListItem';
+import { EmptyState } from '../ui/EmptyState';
+import { Button } from '../ui/Button';
 
 interface ShoppingListItemsSectionProps {
   isLoadingShoppingList: boolean;
@@ -14,6 +16,9 @@ interface ShoppingListItemsSectionProps {
   householdMembers: Array<{ id: string; name: string; avatar?: string }>;
   isOffline: boolean;
   showPriceData: boolean;
+  savedRecipes?: SavedRecipe[];
+  mealPlan?: DayPlan[];
+  measurementSystem?: 'Standard' | 'Metric';
   onToggleCheck: (id: string) => void;
   onRemove: (id: string) => void;
   onQuantityChange: (id: string, quantity: string) => void;
@@ -30,6 +35,9 @@ export const ShoppingListItemsSection: React.FC<ShoppingListItemsSectionProps> =
   householdMembers,
   isOffline,
   showPriceData,
+  savedRecipes,
+  mealPlan,
+  measurementSystem,
   onToggleCheck,
   onRemove,
   onQuantityChange,
@@ -54,6 +62,9 @@ export const ShoppingListItemsSection: React.FC<ShoppingListItemsSectionProps> =
           isSelected={(id) => items.some(it => it.id === id && it.checked)}
           onLongPress={undefined}
           storeLayout={activeStoreLayout}
+          savedRecipes={savedRecipes}
+          mealPlan={mealPlan}
+          measurementSystem={measurementSystem}
         />
       ) : (
         items.map((item) => (
@@ -69,28 +80,29 @@ export const ShoppingListItemsSection: React.FC<ShoppingListItemsSectionProps> =
             isSelected={item.checked}
             onLongPress={undefined}
             showPriceData={showPriceData}
+            savedRecipes={savedRecipes}
+            mealPlan={mealPlan}
+            measurementSystem={measurementSystem}
           />
         ))
       )}
 
       {items.length === 0 && !isLoadingShoppingList && (
-        <div className="text-center py-12 opacity-60 flex flex-col items-center">
-          <ShoppingBasket className="w-12 h-12 mb-4 text-theme-secondary/50" />
-          <h3 className="text-lg font-semibold text-theme-primary mb-2">{intl.formatMessage({ id: 'shoppingList.empty' })}</h3>
-          <p className="text-theme-secondary opacity-70 mb-4">{intl.formatMessage({ id: 'shoppingList.addItems' })}</p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <button
-              onClick={onOpenAddItems}
-              className="px-4 py-2 bg-[var(--accent-color)] text-white rounded-lg hover:bg-[var(--accent-color)]/90 transition-colors flex items-center gap-2"
-            >
-              <Plus className="w-4 h-4" />
-              Add Items
-            </button>
-            <button onClick={onBrowseRecipes} className="px-4 py-2 border border-theme rounded-lg hover:bg-theme-secondary/50 transition-colors">
-              Browse Recipes
-            </button>
-          </div>
-        </div>
+        <EmptyState
+          preset="shopping"
+          title={intl.formatMessage({ id: 'shoppingList.empty' })}
+          description={intl.formatMessage({ id: 'shoppingList.addItems' })}
+          action={
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <Button variant="primary" onClick={onOpenAddItems} leadingIcon={<Plus className="w-4 h-4" />}>
+                Add Items
+              </Button>
+              <Button variant="secondary" onClick={onBrowseRecipes}>
+                Browse Recipes
+              </Button>
+            </div>
+          }
+        />
       )}
     </div>
   );

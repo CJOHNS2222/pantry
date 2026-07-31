@@ -1,11 +1,12 @@
 import {onCall, onRequest, HttpsError} from "firebase-functions/v2/https";
 import {logger} from "firebase-functions/v2";
 import admin from 'firebase-admin';
+import {getApps} from 'firebase-admin/app';
 import {getFirestore, FieldValue} from "firebase-admin/firestore";
 import { getAuth } from 'firebase-admin/auth';
 
 // Ensure the Admin SDK is initialized
-if (!admin.apps?.length) {
+if (!getApps().length) {
   admin.initializeApp();
 }
 
@@ -85,7 +86,7 @@ export const leaveHousehold = onCall(async (request) => {
 
     // Remove custom claim for the leaving user
     try {
-      await admin.auth().setCustomUserClaims(userId, { householdId: null });
+      await getAuth().setCustomUserClaims(userId, { householdId: null });
       logger.info('Custom claim householdId removed for user', { userId });
     } catch (err: any) {
       logger.error('Error removing custom claims', err);
@@ -134,7 +135,7 @@ export const leaveHousehold = onCall(async (request) => {
 
       // Remove custom claims
       try {
-        await admin.auth().setCustomUserClaims(lastMemberId, { householdId: null });
+        await getAuth().setCustomUserClaims(lastMemberId, { householdId: null });
         logger.info('Custom claim householdId removed for last remaining admin', { userId: lastMemberId });
       } catch (err: any) {
         logger.error('Error removing custom claims for last remaining admin', err);
@@ -151,11 +152,23 @@ export const leaveHousehold = onCall(async (request) => {
   }
 });
 
+// Explicit allowlist of known app origins (web hosting, marketing site, local dev, Capacitor WebView).
+const ALLOWED_ORIGINS = new Set([
+  'https://ornate-compass-478504-e1.web.app',
+  'https://ornate-compass-478504-e1.firebaseapp.com',
+  'https://stock-spoon-website.web.app',
+  'http://localhost:3000',
+  'https://localhost', // Capacitor default androidScheme/iosScheme WebView origin
+]);
+
 // HTTP wrapper for environments where callable fails
 export const leaveHouseholdHttp = onRequest(async (req, res) => {
-  // Basic CORS handling
-  res.set('Access-Control-Allow-Origin', req.get('origin') || '*');
-  res.set('Access-Control-Allow-Credentials', 'true');
+  // Basic CORS handling - explicit allowlist only, no credentials (auth is Bearer-token based)
+  const origin = req.get('origin');
+  if (origin && ALLOWED_ORIGINS.has(origin)) {
+    res.set('Access-Control-Allow-Origin', origin);
+  }
+  res.set('Vary', 'Origin');
   res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') {
     res.status(204).send();
@@ -164,7 +177,7 @@ export const leaveHouseholdHttp = onRequest(async (req, res) => {
 
   try {
     const authHeader = req.headers.authorization;
-    const idToken = (typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) ? authHeader.split('Bearer ')[1] : (typeof req.query?.idToken === 'string' ? req.query.idToken : undefined);
+    const idToken = (typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) ? authHeader.split('Bearer ')[1] : undefined;
     if (!idToken) { res.status(401).json({ error: 'Missing auth token' }); return; }
 
     const auth = getAuth();
@@ -241,7 +254,7 @@ export const leaveHouseholdHttp = onRequest(async (req, res) => {
 
     // Remove custom claim for the leaving user
     try {
-      await admin.auth().setCustomUserClaims(userId, { householdId: null });
+      await getAuth().setCustomUserClaims(userId, { householdId: null });
       logger.info('Custom claim householdId removed for user', { userId });
     } catch (err: any) {
       logger.error('Error removing custom claims', err);
@@ -290,7 +303,7 @@ export const leaveHouseholdHttp = onRequest(async (req, res) => {
 
       // Remove custom claims
       try {
-        await admin.auth().setCustomUserClaims(lastMemberId, { householdId: null });
+        await getAuth().setCustomUserClaims(lastMemberId, { householdId: null });
         logger.info('Custom claim householdId removed for last remaining admin', { userId: lastMemberId });
       } catch (err: any) {
         logger.error('Error removing custom claims for last remaining admin', err);

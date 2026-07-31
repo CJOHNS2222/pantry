@@ -6,6 +6,7 @@ import { RecipePhotoService } from '../../services/recipePhotoService';
 import AppContext from '../../contexts/AppContext';
 import { useToast } from '../ui/Toast';
 import { log } from '../../services/logService';
+import { RecipeCommunityInsights } from './RecipeCommunityInsights';
 
 interface RecipeRatingUIProps {
   recipeTitle: string;
@@ -265,6 +266,14 @@ export const RecipeRatingUI: React.FC<RecipeRatingUIProps> = ({
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Full community insights (stats, popular modifications, household reviews) —
+          only worth the extra fetches once we know there's at least some community data. */}
+      {communityStats && communityStats.totalRatings > 0 && (
+        <div className="mb-4" onClick={(e) => e.stopPropagation()}>
+          <RecipeCommunityInsights recipeTitle={recipeTitle} householdId={householdId} />
         </div>
       )}
 

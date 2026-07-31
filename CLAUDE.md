@@ -66,6 +66,9 @@ When user joins household, `householdMigrationService.migrateUserDataToHousehold
 ### Integrations
 - AI: `geminiService.ts` (Gemini), OpenRouter/Groq fallback via `openRouterService.ts` (`VITE_GEMINI_DISABLED=true` routes all AI through OpenRouter).
 - Recipes: `spoonacularRecipeClient.ts` (Spoonacular REST API, cached + rate-limited); `typescript/dist/index.ts` stubs client when generated SDK absent.
+- Nutrition: `nutritionService.ts` looks up nutrition facts (calories/protein/carbs/fat/fiber/sugar) from the free **USDA FoodData Central API** (`VITE_USDA_API_KEY`), cached in `localStorage` for 90 days - not OpenFoodFacts.
+- Barcode/product lookup: `utils/barcodeScan.ts` decodes a barcode from a captured photo on-device via `@zxing/library` (native-only, no live viewfinder); `spoonacularFoodClient.ts` (`searchGroceryProductByUPC`) resolves the UPC to a product title via **Spoonacular's** grocery product API, which then feeds `nutritionService.ts` - also not OpenFoodFacts, despite that being the common assumption for barcode-to-product lookups.
+- Currency: `currencyService.ts` converts USD-sourced grocery prices to a user-selected display currency using free rates from frankfurter.app, cached 24h.
 - Analytics/perf: Firebase Analytics + Sentry; Core Web Vitals via `performanceMonitoringService.ts`.
 
 ### Capacitor / mobile
@@ -96,6 +99,11 @@ Vitest + jsdom, tests under `src/test/**/*.test.{ts,tsx}`. `src/test/setup.ts` g
 - Avoid import cycles around `firebaseConfig.ts` - use dynamic imports if needed.
 - Image uploads capped (5-10MB), content-type restricted per `storage.rules`.
 - `npm install` needs `--legacy-peer-deps` for `@capacitor-firebase/*` due to peer conflict with `@codetrix-studio/capacitor-google-auth`.
+
+## Bash/tool hygiene
+- Use absolute paths in every Bash command; never `cd` into the repo first (the working directory is already correct, and `cd` resets across calls).
+- Use the Grep/Read/Glob tools instead of shell `grep`/`cat`/`find` - they're faster, respect `.gitignore`, and don't dump raw output into context.
+- Before claiming a change works, use the [[verify]] skill (`.claude/skills/verify/`) instead of running `tsc`/`eslint`/`vitest` inline - it scopes to changed files and returns only failures.
 
 ## Subagents (`.claude/agents/`)
 Repo has 24 predefined subagents (code/bug/security/db/perf/dep/seo/infra/ui/doc auditors, `fix-planner`, `code-fixer`, `test-runner`, `test-writer`, `browser-qa-agent`, `console-monitor`, `visual-diff`, `deploy-checker`, `env-validator`, `pr-writer`, `seed-generator`, `architect-reviewer`, `fullstack-qa-orchestrator`, `api-tester`) and documented workflows (`full-audit`, `pre-commit`, `pre-deploy`, `new-feature`, `bug-fix`, `release-prep`) in `.claude/CLAUDE.md`. Auditor outputs go to `.claude/audits/`.

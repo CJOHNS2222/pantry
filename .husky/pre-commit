@@ -1,1 +1,11 @@
 npx lint-staged
+
+# Best-effort local secret scan (defense-in-depth alongside GitHub's hosted
+# scanning and the CI gitleaks job). Non-blocking if gitleaks isn't
+# installed locally — see readme/ or https://github.com/gitleaks/gitleaks
+# for install instructions.
+if command -v gitleaks >/dev/null 2>&1; then
+  gitleaks protect --staged --redact --verbose
+else
+  echo "[pre-commit] gitleaks not found locally — skipping local secret scan (CI still runs it)."
+fi

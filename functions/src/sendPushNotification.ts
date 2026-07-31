@@ -3,8 +3,9 @@ import { getFirestore } from 'firebase-admin/firestore';
 import { getMessaging } from 'firebase-admin/messaging';
 import { logger } from 'firebase-functions/v2';
 import admin from 'firebase-admin';
+import { getApps } from 'firebase-admin/app';
 
-if (!admin.apps?.length) {
+if (!getApps().length) {
   admin.initializeApp();
 }
 
@@ -48,7 +49,7 @@ export const sendPushNotificationOnWrite = onDocumentWritten(
       return;
     }
 
-    // Filter to actionable priorities only (skip 'low' — these are in-app only)
+    // Filter to actionable priorities only (skip 'low' ï¿½ these are in-app only)
     const pushCandidates = newNotifications.filter(
       (n) => n.priority === 'urgent' || n.priority === 'high' || n.priority === 'medium'
     );
@@ -69,7 +70,7 @@ export const sendPushNotificationOnWrite = onDocumentWritten(
     const fcmTokens: string[] = Array.isArray(userData?.fcmTokens) ? (userData?.fcmTokens as string[]) : [];
 
     if (fcmTokens.length === 0) {
-      logger.info(`[sendPushNotification] No FCM tokens for user ${userId} — cannot send push.`);
+      logger.info(`[sendPushNotification] No FCM tokens for user ${userId} ï¿½ cannot send push.`);
       return;
     }
 
@@ -82,7 +83,7 @@ export const sendPushNotificationOnWrite = onDocumentWritten(
     }
 
     if (!topNotification) return;
-    const notification = topNotification; // narrowed — guaranteed non-null past this point
+    const notification = topNotification; // narrowed ï¿½ guaranteed non-null past this point
 
     const messaging = getMessaging();
     const staleTokens: string[] = [];

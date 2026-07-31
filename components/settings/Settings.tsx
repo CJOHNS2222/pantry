@@ -8,13 +8,14 @@ import { useIntl } from 'react-intl';
 import AnalyticsService from '../../services/analyticsService';
 import { useNotifications } from '../../hooks/useNotifications';
 import { FAQPage } from './FAQPage';
+import { SettingsHelpSection } from './SettingsHelpSection';
 import { User, UserProfile, CustomCategory, Member } from '../../types';
 import type { Settings as AppSettings } from '../../types';
 
 type MemberPreferences = Pick<Member, 'dietaryRestrictions' | 'allergies' | 'dietGoal' | 'favoriteCuisines' | 'specialNeeds' | 'preferredProteins' | 'dislikedIngredients'>;
 import { NotificationService, NotificationSettings } from '../../services/notificationService';
 import { DayPlan } from '../../types';
-import { Loader2, Heart, AlertTriangle, X, Settings as SettingsIcon, User as UserIcon, ChevronLeft, ChevronRight, Sliders, Bell, TrendingDown, MessageSquare, HelpCircle, RefreshCw, Sparkles } from 'lucide-react';
+import { Loader2, Heart, AlertTriangle, X, Settings as SettingsIcon, User as UserIcon, ChevronLeft, ChevronRight, Sliders, Bell, TrendingDown, MessageSquare, HelpCircle, RefreshCw, Sparkles, Shield } from 'lucide-react';
 import { userOptedInToGemini, setUserGeminiOptIn, getGeminiUsage } from '../../services/featureFlags';
 
 import { Household } from '../../types';
@@ -25,6 +26,7 @@ import { RecipesCacheService } from '../../services/recipesCacheService';
 import { useSubscription } from '../../hooks/useSubscription';
 import { UsageService } from '../../services/usageService';
 import type { UsageLimits } from '../../services/usageService';
+import { setActiveCurrency } from '../../services/currencyService';
 import { ShoppingListCacheService } from '../../services/shoppingListCacheService';
 import { useIsAdmin } from '../../hooks/useIsAdmin';
 import { useConfirm } from '../ui/ConfirmDialog';
@@ -50,6 +52,9 @@ import { SettingsSubscriptionSection } from './SettingsSubscriptionSection';
 import { SettingsThemeSection } from './SettingsThemeSection';
 import { SettingsUsageLimitsSection } from './SettingsUsageLimitsSection';
 import { SettingsTabVisibilitySection } from './SettingsTabVisibilitySection';
+import { MonitoringDashboard } from '../admin-analytics/MonitoringDashboard';
+import PerformanceMonitoringDashboard from '../admin-analytics/PerformanceMonitoringDashboard';
+import UserBehaviorAnalytics from '../admin-analytics/UserBehaviorAnalytics';
 
 const defaultStoreLayout = [
   'Produce',
@@ -175,11 +180,16 @@ const SettingsComponent: React.FC<SettingsProps> = ({
 
 
   const [scrollToPendingNotifications, setScrollToPendingNotifications] = useState(false);
+  const [scrollToHousehold, setScrollToHousehold] = useState(false);
 
   // Redirect to requested settings category if set in sessionStorage
   useEffect(() => {
     const redirectTab = sessionStorage.getItem('settings_redirect_tab');
-    if (redirectTab === 'account' || redirectTab === 'more') {
+    if (redirectTab === 'household') {
+      setActiveCategory('account_info');
+      setScrollToHousehold(true);
+      sessionStorage.removeItem('settings_redirect_tab');
+    } else if (redirectTab === 'account' || redirectTab === 'more') {
       setActiveCategory('account_info');
       sessionStorage.removeItem('settings_redirect_tab');
     } else if (redirectTab === 'preferences') {
@@ -194,6 +204,15 @@ const SettingsComponent: React.FC<SettingsProps> = ({
       sessionStorage.removeItem('settings_redirect_tab');
     }
   }, []);
+
+  // Once the account_info category has rendered, scroll the household section into view
+  useEffect(() => {
+    if (scrollToHousehold && activeCategory === 'account_info') {
+      document.querySelector('[data-section="household"]')
+        ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      setScrollToHousehold(false);
+    }
+  }, [scrollToHousehold, activeCategory]);
 
   // Once the notifications category has rendered, scroll the pending-notifications card into view
   useEffect(() => {
@@ -216,6 +235,9 @@ const SettingsComponent: React.FC<SettingsProps> = ({
   // Delete account state
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+
+  // Admin analytics dashboards state (admin-only)
+  const [adminDashboardTab, setAdminDashboardTab] = useState<'monitoring' | 'performance' | 'behavior'>('monitoring');
 
   useAndroidBack(showAvatarSelection, () => setShowAvatarSelection(false));
   useAndroidBack(showCategoryManager, () => setShowCategoryManager(false));
@@ -779,6 +801,26 @@ const SettingsComponent: React.FC<SettingsProps> = ({
               <ChevronRight className="w-4 h-4 text-theme-secondary" />
             </button>
 
+            {/* Admin Analytics (admin-only) */}
+            {isAdmin && (
+              <button
+                onClick={() => setActiveCategory('admin_analytics')}
+                className="w-full flex items-center justify-between p-4 hover:bg-theme-primary/5 transition-colors text-left focus:outline-none"
+                data-category="admin-analytics"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-[var(--accent-color)]/10 flex items-center justify-center text-[var(--accent-color)]">
+                    <Shield className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <span className="font-semibold text-theme-primary block text-sm">Admin Analytics</span>
+                    <span className="text-[11px] text-theme-secondary opacity-70">Monitoring, performance, and user behavior dashboards</span>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-theme-secondary" />
+              </button>
+            )}
+
             {/* Replay Onboarding */}
             {onReplayOnboarding && (
               <button
@@ -958,7 +1000,17 @@ const SettingsComponent: React.FC<SettingsProps> = ({
                       <p className="text-xs text-theme-secondary mt-1">This name will be used throughout the app to personalize your experience.</p>
                     </div>
                   </div>
-                  
+
+                  {/* Logout Button */}
+                  <div className="mb-4">
+                    <button
+                      onClick={onLogout}
+                      className="w-full bg-red-500 text-white px-4 py-2 rounded font-medium hover:bg-red-600"
+                    >
+                      Logout
+                    </button>
+                  </div>
+
                   {/* User Profile Information */}
                   <div className="space-y-4 mb-4">
                     <h4 className="text-sm font-medium mb-3 text-theme-primary">{intl.formatMessage({ id: 'settings.personalInfo' })}</h4>
@@ -1172,15 +1224,6 @@ const SettingsComponent: React.FC<SettingsProps> = ({
                   )}
                 </div>
 
-                {/* Logout Button */}
-                <div className="px-4 pb-4">
-                  <button
-                    onClick={onLogout}
-                    className="w-full bg-red-500 text-white px-4 py-2 rounded font-medium hover:bg-red-600 mt-4"
-                  >
-                    Logout
-                  </button>
-                </div>
               </div>
             )}
 
@@ -1249,11 +1292,13 @@ const SettingsComponent: React.FC<SettingsProps> = ({
               setSettings={setSettings}
               userProfile={userProfile}
               onMeasurementSystemChange={(value) => handleProfileChange('measurementSystem', value)}
+              onCurrencyChange={(value) => { handleProfileChange('currency', value); setActiveCurrency(value); }}
               geminiOptedIn={geminiOptedIn}
               onGeminiOptInChange={handleGeminiOptIn}
               labels={{
                 enableNotifications: intl.formatMessage({ id: 'settings.enableNotifications' }),
                 measurementSystem: intl.formatMessage({ id: 'settings.measurementSystem' }),
+                currency: 'Currency',
                 enableAiFeatures: intl.formatMessage({ id: 'settings.enableAiFeatures' }),
                 includeStaples: intl.formatMessage({ id: 'settings.includeStaples' }),
                 autoRestockStaples: intl.formatMessage({ id: 'settings.autoRestockStaples' }),
@@ -1383,11 +1428,40 @@ const SettingsComponent: React.FC<SettingsProps> = ({
           </>}
 
           {activeCategory === 'help' && (
-            <div className="bg-theme-secondary border border-theme rounded-2xl p-4 overflow-hidden shadow-sm">
-              <FAQPage 
-                onBack={() => setActiveCategory(null)} 
-                onNavigateToFeedback={() => setActiveCategory('contact_us')}
-              />
+            <SettingsHelpSection
+              title="Help"
+              description="App documentation, guides, and FAQs"
+              onOpenFAQ={() => setShowFAQModal(true)}
+              buttonLabel="Open Help & FAQ"
+            />
+          )}
+
+          {activeCategory === 'admin_analytics' && isAdmin && (
+            <div className="space-y-4">
+              <div className="flex gap-2 bg-theme-secondary border border-theme rounded-xl p-1">
+                <button
+                  onClick={() => setAdminDashboardTab('monitoring')}
+                  className={`flex-1 py-2 px-3 rounded-lg text-sm font-semibold transition-colors ${adminDashboardTab === 'monitoring' ? 'bg-[var(--accent-color)] text-white' : 'text-theme-secondary hover:text-theme-primary'}`}
+                >
+                  Monitoring
+                </button>
+                <button
+                  onClick={() => setAdminDashboardTab('performance')}
+                  className={`flex-1 py-2 px-3 rounded-lg text-sm font-semibold transition-colors ${adminDashboardTab === 'performance' ? 'bg-[var(--accent-color)] text-white' : 'text-theme-secondary hover:text-theme-primary'}`}
+                >
+                  Performance
+                </button>
+                <button
+                  onClick={() => setAdminDashboardTab('behavior')}
+                  className={`flex-1 py-2 px-3 rounded-lg text-sm font-semibold transition-colors ${adminDashboardTab === 'behavior' ? 'bg-[var(--accent-color)] text-white' : 'text-theme-secondary hover:text-theme-primary'}`}
+                >
+                  User Behavior
+                </button>
+              </div>
+
+              {adminDashboardTab === 'monitoring' && <MonitoringDashboard user={user ?? null} />}
+              {adminDashboardTab === 'performance' && <PerformanceMonitoringDashboard />}
+              {adminDashboardTab === 'behavior' && <UserBehaviorAnalytics />}
             </div>
           )}
 

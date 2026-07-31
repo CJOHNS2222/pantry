@@ -215,6 +215,15 @@ export const RecipeExportModal: React.FC<RecipeExportModalProps> = ({
     }
   };
 
+  const escapeHtml = (value: unknown): string => {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  };
+
   const triggerPDFPrint = (list: SavedRecipe[]) => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
@@ -318,16 +327,16 @@ export const RecipeExportModal: React.FC<RecipeExportModalProps> = ({
           </div>
           ${list.map(r => `
             <div class="recipe-card">
-              <h2>${r.title}</h2>
-              ${r.description ? `<p class="description">${r.description}</p>` : ''}
-              <div class="meta">Cook Time: ${r.cookTime || '—'} • Servings: ${r.servings || '—'}</div>
+              <h2>${escapeHtml(r.title)}</h2>
+              ${r.description ? `<p class="description">${escapeHtml(r.description)}</p>` : ''}
+              <div class="meta">Cook Time: ${escapeHtml(r.cookTime || '—')} • Servings: ${escapeHtml(r.servings || '—')}</div>
               <h3>Ingredients</h3>
               <ul>
-                ${(r.ingredients || []).map(i => `<li>${i}</li>`).join('')}
+                ${(r.ingredients || []).map(i => `<li>${escapeHtml(i)}</li>`).join('')}
               </ul>
               <h3>Instructions</h3>
               <ol>
-                ${(r.instructions || []).map(step => `<li>${step}</li>`).join('')}
+                ${(r.instructions || []).map(step => `<li>${escapeHtml(step)}</li>`).join('')}
               </ol>
             </div>
           `).join('')}

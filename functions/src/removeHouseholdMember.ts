@@ -17,9 +17,11 @@
 import {onCall, HttpsError} from 'firebase-functions/v2/https';
 import {logger} from 'firebase-functions/v2';
 import admin from 'firebase-admin';
+import {getApps} from 'firebase-admin/app';
 import {getFirestore, FieldValue} from 'firebase-admin/firestore';
+import {getAuth} from 'firebase-admin/auth';
 
-if (!admin.apps?.length) {
+if (!getApps().length) {
   admin.initializeApp();
 }
 
@@ -45,7 +47,7 @@ async function clearHouseholdIdFromUser(db: FirebaseFirestore.Firestore, userId:
     await userRef.update({householdId: FieldValue.delete()});
   }
   try {
-    await admin.auth().setCustomUserClaims(userId, {householdId: null});
+    await getAuth().setCustomUserClaims(userId, {householdId: null});
   } catch (err: any) {
     logger.error('Error removing custom claims', {userId, message: err.message});
   }

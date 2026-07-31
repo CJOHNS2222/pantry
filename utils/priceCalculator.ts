@@ -2,6 +2,8 @@
  * Price calculation utilities for shopping list price-per-unit comparisons
  */
 
+import { formatCurrency } from '../services/currencyService';
+
 export interface PriceOption {
   amount: number;
   unit: string;
@@ -113,8 +115,7 @@ export function comparePriceOptions(options: PriceOption[]): PriceComparison[] {
  * Format price per unit for display
  */
 export function formatPricePerUnit(pricePerUnit: number, unit: string): string {
-  const formattedPrice = pricePerUnit.toFixed(2);
-  return `$${formattedPrice}/${unit}`;
+  return `${formatCurrency(pricePerUnit)}/${unit}`;
 }
 
 /**
@@ -134,7 +135,7 @@ export function getPriceComparisonSummary(options: PriceOption[]): string {
     .reduce((sum, saving) => sum + saving, 0);
 
   if (savings > 0) {
-    return `Save $${savings.toFixed(2)} with best value option`;
+    return `Save ${formatCurrency(savings)} with best value option`;
   }
 
   return 'Compare prices to find the best value';

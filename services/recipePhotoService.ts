@@ -27,8 +27,11 @@ export class RecipePhotoService {
       const fileName = `${recipeTitle.replace(/[^a-zA-Z0-9]/g, '_')}_${userId}_${timestamp}.${file.name.split('.').pop()}`;
       const storageRef = ref(storage, `${this.PHOTOS_FOLDER}/${fileName}`);
 
-      // Upload the file
-      const snapshot = await uploadBytes(storageRef, file);
+      // Upload the file, tagging it with the uploader's uid so storage.rules can
+      // enforce that only the original uploader may later delete this photo.
+      const snapshot = await uploadBytes(storageRef, file, {
+        customMetadata: { uploader: userId }
+      });
       const downloadURL = await getDownloadURL(snapshot.ref);
 
       const photo: RecipePhoto = {

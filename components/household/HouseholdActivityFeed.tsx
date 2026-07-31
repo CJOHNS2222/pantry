@@ -2,6 +2,7 @@ import React from 'react';
 import { HouseholdActivityService } from '../../services/householdActivityService';
 import { Clock, User, Package, ShoppingCart, ChefHat, Heart } from 'lucide-react';
 import type { HouseholdActivity } from '../../types';
+import { EmptyState } from '../ui/EmptyState';
 
 interface HouseholdActivityFeedProps {
   activities: HouseholdActivity[];
@@ -34,11 +35,13 @@ export const HouseholdActivityFeed: React.FC<HouseholdActivityFeedProps> = ({
     return (
       <div className="bg-theme-secondary p-4 rounded-xl border border-theme">
         <h3 className="text-sm font-bold text-[var(--accent-color)] uppercase mb-3">Recent Activity</h3>
-        <div className="text-center py-4">
-          <Package className="w-8 h-8 text-theme-secondary opacity-30 mx-auto mb-2" />
-          <p className="text-sm text-theme-secondary opacity-70">No recent activity yet</p>
-          <p className="text-sm text-theme-secondary opacity-50 mt-1">Add pantry items or update your shopping list to see updates here.</p>
-        </div>
+        <EmptyState
+          icon={<Package className="w-8 h-8" />}
+          title="No recent activity yet"
+          description="Add pantry items or update your shopping list to see updates here."
+          size="compact"
+          bare
+        />
       </div>
     );
   }

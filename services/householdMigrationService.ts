@@ -1,3 +1,15 @@
+/**
+ * Primary, checkpointed JOIN-household migration path — invoked from the household-join UI flow
+ * (`App.tsx`) and its interrupted-migration retry hook (`useHouseholdMigrationRetry.ts`). Writes a
+ * `pending_migration_{userId}` localStorage checkpoint before starting and clears it only on full
+ * success, so a crash/close mid-migration can be detected and retried on next app load. No dedup
+ * logic - just moves personal cache contents into the household cache and clears the personal copy.
+ *
+ * Distinct from `householdDataMigrationService.ts`, which additionally supports the LEAVE direction
+ * (copying household data back to a departing member) and does name-based dedup merging; that service
+ * is invoked as a fire-and-forget best-effort pass from `householdService.ts`'s join flow, not this
+ * checkpointed path.
+ */
 import { InventoryCacheService } from './inventoryCacheService';
 import { ShoppingListCacheService } from './shoppingListCacheService';
 import { MealPlanCacheService } from './MealPlanCacheService';

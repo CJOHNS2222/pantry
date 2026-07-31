@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from 'react';
-import { ChefHat, Clock, Lightbulb, Star, ChevronDown, ChevronUp } from 'lucide-react';
+import { ChefHat, Clock, Lightbulb, Star, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
 import AnalyticsService from '../../services/analyticsService';
 import { log } from '../../services/logService';
-import { PantryItem, SavedRecipe, User } from '../../types';
+import { PantryItem, RecipeSuggestion, SavedRecipe, User } from '../../types';
 import { Tab } from '../../types/app';
 import { useSubscription } from '../../hooks/useSubscription';
 
@@ -37,9 +37,15 @@ interface SmartRecommendationsProps {
   savedRecipes: SavedRecipe[];
   user?: User | null;
   setActiveTab: (tab: Tab) => void;
+  /** Per-item expiring-soon recipe suggestions (from AppContext's `recipeSuggestions`) — drives the per-item "Use Before It Expires" list. */
+  recipeSuggestions?: RecipeSuggestion[];
+  /** Deletes a pantry item by inventory index — used by the per-item expiring list's delete action. */
+  onDeleteItem?: (index: number, disposalReason?: 'thrown_away' | 'cooked' | 'remove') => Promise<void> | void;
+  /** Pre-fills the recipe search query before navigating to the Recipes tab — used by per-item recipe suggestion chips. */
+  setInitialSearchQuery?: (query: string) => void;
 }
 
-const SmartRecommendations: React.FC<SmartRecommendationsProps> = ({ inventory, savedRecipes, user, setActiveTab }) => {
+const SmartRecommendations: React.FC<SmartRecommendationsProps> = ({ inventory, savedRecipes, user, setActiveTab, recipeSuggestions = [], onDeleteItem, setInitialSearchQuery }) => {
   const [isCollapsed, setIsCollapsed] = useState(true);
   const { isPremium } = useSubscription(user ?? null);
   const recommendations = useMemo((): SmartRecommendation[] => {
@@ -92,29 +98,8 @@ const SmartRecommendations: React.FC<SmartRecommendationsProps> = ({ inventory, 
       });
     }
 
-    // Expiring inventory alert
-    if (hasInventory) {
-      const expiringSoon = inventory.filter((item) => {
-        if (!item.expirationDate) return false;
-        const expiry = new Date(item.expirationDate);
-        const daysUntilExpiry = Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-        return daysUntilExpiry <= 3 && daysUntilExpiry > 0;
-      });
-
-      if (expiringSoon.length > 0) {
-        const names = expiringSoon.map(i => i.item).join(', ');
-        recs.push({
-          id: 'use-expiring-items',
-          type: 'recipe',
-          title: 'Use Before It Expires',
-          description: `Expiring soon: ${names}. Plan meals around them!`,
-          impact: 'high',
-          icon: <Clock className="w-5 h-5" />,
-          actionText: 'Find Recipes',
-          category: 'Inventory Alert'
-        });
-      }
-    }
+    // Expiring inventory items are rendered as their own per-item list (see `expiringItemSuggestions`
+    // below) rather than a single aggregated card here.
 
     // Premium upgrade suggestion — only show if not already on a paid plan (own or inherited)
     if (!isPremium) {
@@ -152,6 +137,33 @@ const SmartRecommendations: React.FC<SmartRecommendationsProps> = ({ inventory, 
       .slice(0, 5);
 
   }, [inventory, savedRecipes, user, isPremium]);
+
+  // Per-item expiring-soon list — top 3 items with the most urgent recipe suggestions.
+  const expiringItemSuggestions = useMemo(
+    () => recipeSuggestions.slice(0, 3),
+    [recipeSuggestions]
+  );
+
+  const handleDeleteExpiringItem = async (suggestion: RecipeSuggestion) => {
+    if (!onDeleteItem) return;
+    const idx = inventory.findIndex((it) => it.id === suggestion.itemId);
+    if (idx !== -1) {
+      await onDeleteItem(idx, 'remove');
+    }
+  };
+
+  const handleSuggestionChipClick = (recipeName: string) => {
+    if (setInitialSearchQuery) {
+      setInitialSearchQuery(recipeName);
+    }
+    setActiveTab(Tab.RECIPES);
+  };
+
+  const getUrgencyColor = (daysRemaining: number) => {
+    if (daysRemaining <= 1) return 'bg-red-100 text-red-800';
+    if (daysRemaining <= 3) return 'bg-yellow-100 text-yellow-800';
+    return 'bg-blue-100 text-blue-800';
+  };
 
   const getImpactColor = (impact: string) => {
     switch (impact) {
@@ -205,7 +217,9 @@ const SmartRecommendations: React.FC<SmartRecommendationsProps> = ({ inventory, 
     }
   };
 
-  if (recommendations.length === 0) {
+  const totalCount = recommendations.length + expiringItemSuggestions.length;
+
+  if (totalCount === 0) {
     return null;
   }
 
@@ -219,8 +233,8 @@ const SmartRecommendations: React.FC<SmartRecommendationsProps> = ({ inventory, 
         <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
           <Lightbulb className="w-5 h-5 text-blue-600 flex-shrink-0" />
           Smart Recommendations
-          {isCollapsed && recommendations.length > 0 && (
-            <span className="text-sm font-normal text-gray-500 ml-1">({recommendations.length})</span>
+          {isCollapsed && totalCount > 0 && (
+            <span className="text-sm font-normal text-gray-500 ml-1">({totalCount})</span>
           )}
         </h2>
         {isCollapsed ? <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" /> : <ChevronUp className="w-4 h-4 text-gray-400 flex-shrink-0" />}
@@ -228,6 +242,50 @@ const SmartRecommendations: React.FC<SmartRecommendationsProps> = ({ inventory, 
 
       {!isCollapsed && (
         <>
+        {expiringItemSuggestions.length > 0 && (
+          <div className="px-4 pt-3 pb-1">
+            <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2 mb-2">
+              <Clock className="w-4 h-4 text-red-600" />
+              Use Before It Expires
+            </h3>
+            <div className="space-y-2">
+              {expiringItemSuggestions.map((suggestion) => (
+                <div key={suggestion.itemId} className="bg-gray-50 rounded border border-gray-200 p-3">
+                  <div className="flex items-start justify-between mb-2">
+                    <p className="text-sm font-medium text-gray-900">{suggestion.itemName}</p>
+                    <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+                      <span className={`text-xs px-2 py-1 rounded ${getUrgencyColor(suggestion.daysRemaining)}`}>
+                        {suggestion.daysRemaining}d left
+                      </span>
+                      {onDeleteItem && (
+                        <button
+                          onClick={() => handleDeleteExpiringItem(suggestion)}
+                          className="p-1 rounded hover:bg-red-100 text-red-400 hover:text-red-600 transition-colors"
+                          aria-label={`Delete ${suggestion.itemName}`}
+                          title="Delete from inventory"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-600 mb-2">{suggestion.reason}</p>
+                  <div className="flex flex-wrap gap-1">
+                    {suggestion.suggestedRecipes.map((recipe, index) => (
+                      <button
+                        key={index}
+                        onClick={() => handleSuggestionChipClick(recipe)}
+                        className="text-xs bg-blue-100 hover:bg-blue-200 text-blue-800 px-2 py-1 rounded transition-colors"
+                      >
+                        {recipe}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         <div className="divide-y">
           {recommendations.map((rec) => (
           <div key={rec.id} className="px-4 py-3 hover:bg-gray-50 transition-colors">

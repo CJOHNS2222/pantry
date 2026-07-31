@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChefHat, ShoppingBasket, CalendarDays, UtensilsCrossed, Users, Sun } from 'lucide-react';
+import { ChefHat, ShoppingBasket, CalendarDays, UtensilsCrossed, Users, Settings } from 'lucide-react';
 import { Tab } from '../../types/app';
 
 interface AppNavigationProps {
@@ -17,7 +17,7 @@ export const AppNavigation: React.FC<AppNavigationProps> = ({ activeTab, setActi
     { id: Tab.MEALS, icon: CalendarDays, label: 'Plan' },
     { id: Tab.RECIPES, icon: UtensilsCrossed, label: 'Chef' },
     { id: Tab.COMMUNITY, icon: Users, label: 'Social' },
-    { id: Tab.SETTINGS, icon: Sun, label: 'Settings' },
+    { id: Tab.SETTINGS, icon: Settings, label: 'Settings' },
   ];
 
   // PANTRY and SETTINGS are always visible regardless of the user's preference

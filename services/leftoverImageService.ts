@@ -1,5 +1,5 @@
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { storage } from '../firebaseConfig';
+import { storage, auth } from '../firebaseConfig';
 import DatabaseMonitoringService from './databaseMonitoringService';
 import { log } from './logService';
 
@@ -18,7 +18,11 @@ export async function uploadItemImage(
     const timestamp = Date.now();
     const filename = `pantry_images/leftovers/${householdId}_${timestamp}.jpg`;
     const storageRef = ref(storage, filename);
-    await uploadBytes(storageRef, file as any);
+    // Tag with the uploader's uid so storage.rules can enforce that only the
+    // original uploader may later delete this image.
+    await uploadBytes(storageRef, file as any, {
+      customMetadata: { uploader: userId || auth.currentUser?.uid || '' }
+    });
     const downloadUrl = await getDownloadURL(storageRef);
 
     if (cacheScope !== 'none' && itemName) {

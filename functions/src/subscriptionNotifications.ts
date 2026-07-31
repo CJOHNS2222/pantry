@@ -24,10 +24,11 @@
 import {onMessagePublished} from 'firebase-functions/v2/pubsub';
 import {logger} from 'firebase-functions/v2';
 import admin from 'firebase-admin';
+import {getApps} from 'firebase-admin/app';
 import {getFirestore, Timestamp} from 'firebase-admin/firestore';
 import {resolveSubscriptionState} from './googlePlayHelpers';
 
-if (!admin.apps?.length) {
+if (!getApps().length) {
   admin.initializeApp();
 }
 

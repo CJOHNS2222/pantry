@@ -9,6 +9,7 @@ import SpoonacularFoodClient from '../../services/spoonacularFoodClient';
 import { extractReceiptItems } from '../../services/receiptOcrService';
 import { useAppActions } from '../../contexts/AppActionsContext';
 import { ReceiptScanResult } from './usePantryScan';
+import { captureAndDecodeBarcode, BarcodeDecodeError } from '../../utils/barcodeScan';
 
 type AppActionsContextValue = ReturnType<typeof useAppActions>;
 
@@ -114,67 +115,46 @@ export function usePantryScannerScan(
       // Track feature adoption
       AnalyticsService.trackFeatureFirstUse('pantry_scanner_barcode', { method: 'barcode' });
 
-      const photo = await CapacitorCamera.getPhoto({
-        resultType: CameraResultType.DataUrl,
-        source: CameraSource.Camera,
-        quality: 80,
-        width: 1920,
-        height: 1920,
-      });
+      setLoadingState(LoadingState.LOADING);
+      try {
+        const captured = await captureAndDecodeBarcode();
+        if (captured) {
+          setImagePreview(captured.dataUrl);
 
-      if (photo.dataUrl) {
-        setLoadingState(LoadingState.LOADING);
-        setImagePreview(photo.dataUrl);
+          if (captured.barcode) {
+            const barcode = captured.barcode;
+            AnalyticsService.trackPantryScan(1, 1);
 
-        // Convert data URL to ImageData for barcode detection
-        const img = new window.Image();
-        img.onload = async () => {
-          try {
-            const { BrowserMultiFormatReader } = await import('@zxing/library');
-            const codeReader = new BrowserMultiFormatReader();
-            const result = await codeReader.decodeFromImage(img);
-
-            if (result) {
-              const barcode = result.getText();
-              AnalyticsService.trackPantryScan(1, 1);
-
-              // Look up the product name via Spoonacular UPC search
-              try {
-                const product = await SpoonacularFoodClient.searchGroceryProductByUPC(barcode);
-                const p = product as { title?: string; breadcrumbs?: string[] };
-                if (product && p.title) {
-                  setNewItemText(p.title);
-                  // Use the first breadcrumb as a category hint if available
-                  if (p.breadcrumbs && p.breadcrumbs.length) {
-                    const hint = p.breadcrumbs[p.breadcrumbs.length - 1];
-                    // capitalise first letter
-                    setNewItemText(p.title);
-                    // store breadcrumb in unit field temporarily isn't clean — just pre-fill name
-                    // Category inference will run in createManualItem from the product title
-                    void hint; // acknowledged, category inferred from title downstream
-                  }
-                  appActions.addToast(`Found: ${p.title}`, 'success', 3000);
-                } else {
-                  // Product not found in database — let user edit the raw barcode text
-                  setNewItemText(`Scanned Item (${barcode})`);
-                  appActions.addToast('Product not found in database. Please edit the name.', 'warning', 4000);
-                }
-              } catch {
+            // Look up the product name via Spoonacular UPC search
+            try {
+              const product = await SpoonacularFoodClient.searchGroceryProductByUPC(barcode);
+              const p = product as { title?: string; breadcrumbs?: string[] };
+              if (product && p.title) {
+                setNewItemText(p.title);
+                appActions.addToast(`Found: ${p.title}`, 'success', 3000);
+              } else {
+                // Product not found in database — let user edit the raw barcode text
                 setNewItemText(`Scanned Item (${barcode})`);
+                appActions.addToast('Product not found in database. Please edit the name.', 'warning', 4000);
               }
-
-              setIsAddModalOpen(true);
-            } else {
-              appActions.addToast('No barcode detected. Try taking a clearer photo or use manual entry.', 'error');
+            } catch {
+              setNewItemText(`Scanned Item (${barcode})`);
             }
-          } catch (error) {
-            log.error('Barcode detection error', { error });
-            appActions.addToast('Barcode detection failed. Try taking a clearer photo or use manual entry.', 'error');
-          } finally {
-            setLoadingState(LoadingState.IDLE);
+
+            setIsAddModalOpen(true);
+          } else {
+            appActions.addToast('No barcode detected. Try taking a clearer photo or use manual entry.', 'error');
           }
-        };
-        img.src = photo.dataUrl;
+        }
+      } catch (error) {
+        if (error instanceof BarcodeDecodeError) {
+          log.error('Barcode detection error', { error });
+          appActions.addToast('Barcode detection failed. Try taking a clearer photo or use manual entry.', 'error');
+          return;
+        }
+        throw error;
+      } finally {
+        setLoadingState(LoadingState.IDLE);
       }
     } catch (err: unknown) {
       setLoadingState(LoadingState.IDLE);

@@ -1,6 +1,20 @@
 import React from 'react';
 import { Undo2 } from 'lucide-react';
 
+/**
+ * Deliberately separate from the global `undoService`/`AppHeader` undo pattern (see F62 audit note).
+ * The global undo reverses an already-committed write: an action is persisted to `undoService`'s
+ * IndexedDB log, and the header button undoes the single most recent entry after the fact. Shopping-list
+ * deletes instead use an optimistic "grace period" pattern (see `remove()`/`undoDelete()` in
+ * `ShoppingList.tsx`): the item is removed from the UI immediately but the actual cache/Firestore write is
+ * delayed 5s behind a `setTimeout`, tracked per-item in an in-memory `Map`; "undo" just cancels that timer
+ * so the delete write never happens at all, and consolidated deletes can leave several timers pending
+ * concurrently (hence the item-count banner, unlike the header's single-latest-action button). Routing this
+ * through `undoService` would mean always committing the write and reversing it afterward - losing the
+ * cancel-before-write optimization and the multi-concurrent-pending-delete support - so it stays local to
+ * the shopping list instead of being folded into the global pattern.
+ */
+
 interface ShoppingListUndoBannersProps {
   pendingDeleteCount: number;
   onUndoDelete: () => void;

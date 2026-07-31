@@ -28,6 +28,7 @@ import { NotificationBanner } from './components/ui/NotificationBanner';
 import { NotificationService, NotificationItem, NotificationSettings } from './services/notificationService';
 import { markNotificationRead, deleteNotification, snoozeNotificationInCache, updateNotificationInCache } from './services/notificationsService';
 import { log } from './services/logService';
+import { initCurrency } from './services/currencyService';
 import { destroyReceiptOcrWorker } from './services/receiptOcrService';
 import { cleanupCacheService } from './services/cacheService';
 import { pushNotificationService } from './services/pushNotificationService';
@@ -41,6 +42,7 @@ import { useStableCallback } from './hooks/useStableCallback';
 import SafeAreaService from './services/safeAreaService';
 import { GlobalUpdatePrompt } from './components/ui/GlobalUpdatePrompt';
 import { ContextualTutorial, useContextualTips } from './components/auth-onboarding/ContextualTutorial';
+import { FeatureTooltip } from './components/auth-onboarding/FeatureTooltip';
 import { joinHousehold } from './services/householdService';
 import { setAppContext, trackNavigation, trackShoppingListAction } from './services/sentryService';
 import remoteConfig from './services/remoteConfigService';
@@ -186,6 +188,11 @@ const App: React.FC = () => {
       cleanupCacheService();
     };
   }, []);
+
+  // Load exchange rates and apply the user's preferred display currency for price estimates
+  useEffect(() => {
+    initCurrency(user?.profile?.currency).catch(() => {});
+  }, [user?.profile?.currency]);
 
   // Bridge: preserve existing addToast(message, type?, ttl?, actionLabel?, action?) signature
   // so all ~30 downstream call sites (hooks/services) work unchanged.
@@ -1595,7 +1602,11 @@ const App: React.FC = () => {
               });
             }}
             onOpenHousehold={() => { setShowOnboarding(false); setShowHousehold(true); }}
-            onSkip={() => { recordMilestone('onboarding-completed'); setShowOnboarding(false); }}
+            onSkip={() => {
+              completeOnboarding().catch(error => {
+                log.error('Failed to mark onboarding complete (skip)', { error }, 'App');
+              });
+            }}
             onSaveRecipes={async (recipes) => {
               for (const r of recipes) {
                 await handleSaveRecipe(r);
@@ -1661,20 +1672,6 @@ const App: React.FC = () => {
             onDeleteItem={deleteItem}
             onAddToShoppingList={addToShoppingList}
             customCategories={customCategories}
-          />
-          </Suspense>
-        )}
-
-        {showExpiredItemsModal && (
-          <Suspense fallback={null}>
-          <ExpiredItemsModal
-            isOpen={showExpiredItemsModal}
-            onClose={() => setShowExpiredItemsModal(false)}
-            inventory={inventory}
-            onRemoveItems={handleRemoveExpiredItems}
-            householdId={household?.id}
-            userId={user?.id}
-            userName={user?.name}
           />
           </Suspense>
         )}
@@ -1859,6 +1856,20 @@ const App: React.FC = () => {
       {/* Contextual Tutorial — per-tab hints shown once on first visit */}
       {user && !showOnboarding && !newlyUnlockedBadge && contextualTips.length > 0 && (
         <ContextualTutorial tips={contextualTips} onTipDismiss={dismissContextualTip} />
+      )}
+
+      {/* Household sharing spotlight — one-time arrow tooltip pointing at the
+          household/account button in the header, shown shortly after onboarding
+          so new users (who often onboard solo) discover real-time pantry sharing. */}
+      {user && !showOnboarding && !newlyUnlockedBadge && (
+        <FeatureTooltip
+          target='[data-tutorial="household-button"]'
+          title="Share Your Pantry"
+          description="Invite household members to share your pantry, shopping list, and meal plan in real time."
+          position="bottom"
+          featureKey="household-spotlight"
+          delay={2000}
+        />
       )}
 
       {showExpiredItemsModal && (

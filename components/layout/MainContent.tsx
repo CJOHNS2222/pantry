@@ -125,7 +125,7 @@ export const MainContent: React.FC = () => {
         user={user || undefined}
         savedRecipesCount={savedRecipes.length}
         showUpgradeCTA={true}
-        onUpgrade={() => setActiveTab(Tab.SETTINGS)}
+        onUpgrade={() => { setActiveSettingsCategory('account_info'); setActiveTab(Tab.SETTINGS); }}
       />
 
 
@@ -222,6 +222,9 @@ export const MainContent: React.FC = () => {
               mealPlanLimitExceeded={mealPlanLimitExceeded}
               isLoadingSavedRecipes={isLoadingSavedRecipes}
               household={household ?? undefined}
+              recipeSuggestions={recipeSuggestions}
+              onDeleteItem={deleteItem}
+              setInitialSearchQuery={appActions.setInitialSearchQuery}
               />
             </Suspense>
           </ComponentErrorBoundary>

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Gauge } from 'lucide-react';
 import type { UsageLimits } from '../../services/usageService';
+import { PaywallPrompt } from '../ui/PaywallPrompt';
 
 interface SettingsUsageLimitsSectionProps {
   userExists: boolean;
@@ -67,7 +68,13 @@ export const SettingsUsageLimitsSection: React.FC<SettingsUsageLimitsSectionProp
                     </div>
                   )}
                   {usageLimits.gemini.weekly !== -1 && usageLimits.gemini.used >= usageLimits.gemini.weekly && (
-                    <p className="text-xs text-red-500 mt-1">⚠️ Weekly limit reached — upgrade to continue scanning</p>
+                    <PaywallPrompt
+                      variant="inline"
+                      feature="AI scans"
+                      message="Weekly limit reached — upgrade to continue scanning"
+                      onUpgrade={onOpenUpgrade}
+                      className="text-red-500 hover:text-red-600 text-xs mt-1"
+                    />
                   )}
                 </div>
 
@@ -93,7 +100,13 @@ export const SettingsUsageLimitsSection: React.FC<SettingsUsageLimitsSectionProp
                     </div>
                   )}
                   {usageLimits.recipes.max !== -1 && usageLimits.recipes.used >= usageLimits.recipes.max && (
-                    <p className="text-xs text-red-500 mt-1">⚠️ Recipe limit reached — upgrade to save more</p>
+                    <PaywallPrompt
+                      variant="inline"
+                      feature="saved recipes"
+                      message="Recipe limit reached — upgrade to save more"
+                      onUpgrade={onOpenUpgrade}
+                      className="text-red-500 hover:text-red-600 text-xs mt-1"
+                    />
                   )}
                 </div>
 
@@ -121,7 +134,13 @@ export const SettingsUsageLimitsSection: React.FC<SettingsUsageLimitsSectionProp
                     </div>
                   )}
                   {usageLimits.mealPlanning.weeklyRecipes !== -1 && usageLimits.mealPlanning.weeklyUsed >= usageLimits.mealPlanning.weeklyRecipes && (
-                    <p className="text-xs text-red-500 mt-1">⚠️ Weekly meal plan limit reached — upgrade to add more</p>
+                    <PaywallPrompt
+                      variant="inline"
+                      feature="meal plan additions"
+                      message="Weekly meal plan limit reached — upgrade to add more"
+                      onUpgrade={onOpenUpgrade}
+                      className="text-red-500 hover:text-red-600 text-xs mt-1"
+                    />
                   )}
                 </div>
 
@@ -156,7 +175,6 @@ export const SettingsUsageLimitsSection: React.FC<SettingsUsageLimitsSectionProp
                     <li>• Full grocery cost estimates</li>
                     <li>• Monthly meal plan view</li>
                   </ul>
-                  <p className="text-amber-600 text-xs mt-2">Upgrade via Settings → More → Subscription</p>
                 </div>
               )}
             </>

@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
 import { searchRecipes } from '../../services/geminiService';
 import { setUserGeminiOptIn } from '../../services/featureFlags';
 import { getCachedRecipesCache, submitRecipeForReview } from '../../services/recipeService';
-import { RecipeSearchResult, LoadingState, RecipeRating, StructuredRecipe, PantryItem, SavedRecipe, User, Household, RecipeSearchParams } from '../../types';
+import { RecipeSearchResult, LoadingState, RecipeRating, StructuredRecipe, PantryItem, SavedRecipe, User, Household, RecipeSearchParams, RecipeSuggestion } from '../../types';
 import { PremiumFeature } from '../settings/PremiumFeature';
 import { log } from '../../services/logService';
 import AnalyticsService from '../../services/analyticsService';
@@ -26,6 +27,7 @@ import { RecipeFinderTabs } from '../recipe-finder/RecipeFinderTabs';
 import { RecipeFinderModalSection } from '../recipe-finder/RecipeFinderModalSection';
 import { Tab } from '../../types/app';
 import SmartRecommendations from '../pantry/SmartRecommendations';
+import { RecipeRecommendations } from './RecipeRecommendations';
 import { FALLBACK_CSV_RECIPES } from '../../data/fallbackRecipes';
 
 /** Internal search params — partial RecipeSearchParams plus component-local filter fields */
@@ -58,12 +60,16 @@ interface RecipeFinderProps {
     isLoadingSavedRecipes?: boolean;
     // Household data for preference filtering
     household?: Household | null;
+    // Per-item expiring-soon suggestions + actions, forwarded to SmartRecommendations
+    recipeSuggestions?: RecipeSuggestion[];
+    onDeleteItem?: (index: number, disposalReason?: 'thrown_away' | 'cooked' | 'remove') => Promise<void>;
+    setInitialSearchQuery?: (query: string) => void;
 }
 
 // List of staple items to ignore in recipe calculations
 const STAPLES = ['salt', 'pepper', 'oil', 'water', 'flour', 'sugar', 'butter', 'vinegar', 'baking powder', 'baking soda', 'spices', 'seasoning', 'soy sauce', 'cornstarch', 'yeast'];
 
-const RecipeFinderComponent: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveRecipe, onDeleteRecipe, onMarkAsMade, inventory, ratings = [], onRate, savedRecipes, user, setActiveTab, persistedResult, setPersistedResult, initialSearchQuery, addToast, recipeSaveLimitExceeded = false, mealPlanLimitExceeded = false, isLoadingSavedRecipes = false, household }) => {
+const RecipeFinderComponent: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveRecipe, onDeleteRecipe, onMarkAsMade, inventory, ratings = [], onRate, savedRecipes, user, setActiveTab, persistedResult, setPersistedResult, initialSearchQuery, addToast, recipeSaveLimitExceeded = false, mealPlanLimitExceeded = false, isLoadingSavedRecipes = false, household, recipeSuggestions, onDeleteItem, setInitialSearchQuery }) => {
     const intl = useIntl();
     // Pre-computed inventory lookup data for fast feasibility calculations
     const inventoryLookup = useMemo(() => {
@@ -188,7 +194,10 @@ const RecipeFinderComponent: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSav
     // Use user's measurement preference instead of local state
     const measurement = getUserMeasurementSystem(user?.profile);
     const [strictMode, setStrictMode] = useState(false);
-    
+    // Collapsed by default — household/preference-driven recommendations (services/recipeRecommendationService.ts),
+    // shown alongside SmartRecommendations rather than replacing it.
+    const [showRecipeRecommendations, setShowRecipeRecommendations] = useState(false);
+
     // New smart filters — pre-populate from user profile
     const [dietaryRestrictions, setDietaryRestrictions] = useState<string[]>(
         user?.profile?.dietaryRestrictions ?? []
@@ -1092,7 +1101,33 @@ const RecipeFinderComponent: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSav
             savedRecipes={savedRecipes}
             user={user}
             setActiveTab={setActiveTab}
+            recipeSuggestions={recipeSuggestions}
+            onDeleteItem={onDeleteItem}
+            setInitialSearchQuery={setInitialSearchQuery}
           />
+
+          <div className="bg-white rounded-lg shadow-sm border mb-3">
+            <button
+              onClick={() => setShowRecipeRecommendations(s => !s)}
+              className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-gray-50 transition-colors"
+              aria-expanded={showRecipeRecommendations}
+            >
+              <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-[var(--accent-color)] flex-shrink-0" />
+                Recommended for You
+              </h2>
+              {showRecipeRecommendations ? <ChevronUp className="w-4 h-4 text-gray-400 flex-shrink-0" /> : <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" />}
+            </button>
+            {showRecipeRecommendations && (
+              <div className="px-4 pb-4">
+                <RecipeRecommendations
+                  pantryItems={inventoryLookup.itemsList}
+                  dietaryRestrictions={dietaryRestrictions}
+                  onRecipeSelect={(recipe) => openRecipeModal(recipe, false)}
+                />
+              </div>
+            )}
+          </div>
 
             <RecipeFinderSearchControls
               specificQuery={specificQuery}

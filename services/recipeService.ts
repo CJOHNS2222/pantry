@@ -298,33 +298,70 @@ export const rebuildCommunityRatedRecipesFromRatings = async (days: number = 30,
       .sort((a, b) => b.popularityCount - a.popularityCount || b.averageRating - a.averageRating)
       .slice(0, topN);
 
-    const results: Array<DocumentData & { id: string | null }> = [];
-    for (const item of aggregated) {
-      let recipeDoc: (DocumentData & { id: string }) | null = null;
-      // prefer recipeId if available
-      if (item.recipeIds && item.recipeIds.length > 0) {
+    // Batch-fetch recipeId lookups for all aggregated items (chunked to avoid
+    // unbounded parallel request bursts), instead of a sequential getDoc loop.
+    const CHUNK_SIZE = 25;
+    const byRecipeId: Array<(DocumentData & { id: string }) | null> = new Array(aggregated.length).fill(null);
+    for (let start = 0; start < aggregated.length; start += CHUNK_SIZE) {
+      const chunk = aggregated.slice(start, start + CHUNK_SIZE);
+      const chunkResults = await Promise.all(chunk.map(async (item) => {
+        if (!(item.recipeIds && item.recipeIds.length > 0)) return null;
         try {
           const docRef = DatabaseMonitoringService.doc(`recipes/${item.recipeIds[0]}`);
           const ds = await DatabaseMonitoringService.getDoc(docRef);
           if (ds && ds.exists && typeof ds.exists === 'function' ? ds.exists() : ds.exists) {
             const d = ds.data() as DocumentData;
-            recipeDoc = { id: ds.id, ...d };
+            return { id: ds.id, ...d } as (DocumentData & { id: string });
           }
         } catch { /* ignore */ }
-      }
+        return null;
+      }));
+      chunkResults.forEach((r, i) => { byRecipeId[start + i] = r; });
+    }
+
+    // For items that still need a fallback lookup by title, read the full
+    // 'recipes' collection once (not once per item) and match in-memory.
+    const needsTitleFallback = aggregated.some((_item, idx) => !byRecipeId[idx]);
+    let allRecipesDocs: FirestoreDocLike[] = [];
+    if (needsTitleFallback) {
+      try {
+        const allRecipesSnap = await DatabaseMonitoringService.getDocs(DatabaseMonitoringService.collection('recipes'));
+        allRecipesDocs = allRecipesSnap.docs || [];
+      } catch { /* ignore */ }
+    }
+
+    const results: Array<DocumentData & { id: string | null }> = [];
+    // Batch-fetch community stats for all items in parallel (chunked) instead
+    // of a sequential getDoc loop.
+    const statsResults: Array<DocumentData | null> = new Array(aggregated.length).fill(null);
+    for (let start = 0; start < aggregated.length; start += CHUNK_SIZE) {
+      const chunk = aggregated.slice(start, start + CHUNK_SIZE);
+      const chunkStats = await Promise.all(chunk.map(async (item) => {
+        try {
+          const statsRef = DatabaseMonitoringService.doc(`recipeCommunityStats/${item.title}`);
+          const statsSnap = await DatabaseMonitoringService.getDoc(statsRef);
+          if (statsSnap && statsSnap.exists && typeof statsSnap.exists === 'function' ? statsSnap.exists() : statsSnap.exists) {
+            return statsSnap.data() as DocumentData;
+          }
+        } catch { /* ignore */ }
+        return null;
+      }));
+      chunkStats.forEach((r, i) => { statsResults[start + i] = r; });
+    }
+
+    for (let idx = 0; idx < aggregated.length; idx++) {
+      const item = aggregated[idx];
+      let recipeDoc: (DocumentData & { id: string }) | null = byRecipeId[idx];
 
       if (!recipeDoc) {
-        try {
-          const allRecipesSnap = await DatabaseMonitoringService.getDocs(DatabaseMonitoringService.collection('recipes'));
-          const found = (allRecipesSnap.docs || []).find((rd: FirestoreDocLike) => {
-            const data = rd.data();
-            return data?.title === item.title;
-          });
-          if (found) {
-            const d = found.data();
-            recipeDoc = { id: found.id, ...d };
-          }
-        } catch { /* ignore */ }
+        const found = allRecipesDocs.find((rd: FirestoreDocLike) => {
+          const data = rd.data();
+          return data?.title === item.title;
+        });
+        if (found) {
+          const d = found.data();
+          recipeDoc = { id: found.id, ...d };
+        }
       }
 
       const entry: DocumentData & { id: string | null } = recipeDoc ? { ...recipeDoc } : { id: null, title: item.title, description: null, ingredients: [], instructions: [], image: null };
@@ -333,11 +370,7 @@ export const rebuildCommunityRatedRecipesFromRatings = async (days: number = 30,
       entry.averageRating = item.averageRating;
 
       // Attach community stats if present
-      try {
-        const statsRef = DatabaseMonitoringService.doc(`recipeCommunityStats/${item.title}`);
-        const statsSnap = await DatabaseMonitoringService.getDoc(statsRef);
-        if (statsSnap && statsSnap.exists && typeof statsSnap.exists === 'function' ? statsSnap.exists() : statsSnap.exists) entry.communityStats = statsSnap.data();
-      } catch { /* ignore */ }
+      if (statsResults[idx]) entry.communityStats = statsResults[idx];
 
       results.push(entry);
     }
@@ -959,6 +992,9 @@ export const rebuildCachedPopularRecipesFromRatings = async (days: number = 30, 
 /**
  * Search recipes in Firestore
  */
+const SEARCH_INDEX_SCAN_LIMIT = 1000;
+const RECIPE_FETCH_CHUNK_SIZE = 25;
+
 export const searchRecipesInFirestore = async (searchTerm: string): Promise<SavedRecipe[]> => {
   const perfTrace = trace(performance, 'search_recipes_firestore');
   perfTrace.start();
@@ -973,9 +1009,17 @@ export const searchRecipesInFirestore = async (searchTerm: string): Promise<Save
     // Use the search index for efficient querying
     const searchIndexRef = DatabaseMonitoringService.collection("recipe_search_index");
 
-    // Read the search index collection and filter in-memory. This avoids
-    // dependency on Firestore query builders which may be mocked in tests.
-    const querySnapshot = await DatabaseMonitoringService.getDocs(searchIndexRef);
+    // Read the search index collection and filter in-memory (substring
+    // matching across title/description/ingredients/keywords isn't
+    // expressible as a Firestore where() clause). Bound the scan with
+    // limit() instead of reading the entire, potentially unbounded,
+    // collection. This avoids dependency on Firestore query builders which
+    // may be mocked in tests.
+    const indexQuery = DatabaseMonitoringService.query(
+      searchIndexRef,
+      DatabaseMonitoringService.limit(SEARCH_INDEX_SCAN_LIMIT)
+    );
+    const querySnapshot = await DatabaseMonitoringService.getDocs(indexQuery);
 
     // Filter in memory for more flexible search (could be optimized further with Algolia)
     const searchResults = [];
@@ -998,18 +1042,20 @@ export const searchRecipesInFirestore = async (searchTerm: string): Promise<Save
     // Get full recipe details for matches (only fetch the recipes we need)
     const fullRecipes: SavedRecipe[] = [];
     if (searchResults.length > 0) {
-      // Batch get the full recipes
+      // Batch get the full recipes, chunked to avoid unbounded parallel
+      // request bursts when a search matches a large number of index entries.
       const recipeIds = searchResults.map(result => result.id);
-      const recipePromises = recipeIds.map(id =>
-        DatabaseMonitoringService.getDoc(DatabaseMonitoringService.doc("recipes/" + id))
-      );
+      for (let start = 0; start < recipeIds.length; start += RECIPE_FETCH_CHUNK_SIZE) {
+        const chunkIds = recipeIds.slice(start, start + RECIPE_FETCH_CHUNK_SIZE);
+        const recipeDocs = await Promise.all(chunkIds.map(id =>
+          DatabaseMonitoringService.getDoc(DatabaseMonitoringService.doc("recipes/" + id))
+        ));
 
-      const recipeDocs = await Promise.all(recipePromises);
-
-      for (const doc of recipeDocs as FirestoreDocLike[]) {
-        if (doc && (typeof doc.exists === 'function' ? (doc as FirestoreDocLike & { exists(): boolean }).exists() : (doc as FirestoreDocLike & { exists: boolean }).exists)) {
-          const d = doc.data();
-          fullRecipes.push({ id: doc.id, ...(d && typeof d === 'object' ? d as Record<string, unknown> : {}) } as SavedRecipe);
+        for (const doc of recipeDocs as FirestoreDocLike[]) {
+          if (doc && (typeof doc.exists === 'function' ? (doc as FirestoreDocLike & { exists(): boolean }).exists() : (doc as FirestoreDocLike & { exists: boolean }).exists)) {
+            const d = doc.data();
+            fullRecipes.push({ id: doc.id, ...(d && typeof d === 'object' ? d as Record<string, unknown> : {}) } as SavedRecipe);
+          }
         }
       }
     }
@@ -1031,10 +1077,18 @@ export const searchRecipesInFirestore = async (searchTerm: string): Promise<Save
 };
 
 // Fallback search method (original implementation)
+const FALLBACK_SEARCH_SCAN_LIMIT = 500;
+
 const searchRecipesInFirestoreFallback = async (searchTerm: string): Promise<SavedRecipe[]> => {
   try {
     const recipesRef = DatabaseMonitoringService.collection("recipes");
-    const querySnapshot = await DatabaseMonitoringService.getDocs(recipesRef);
+    // Bound the collection scan instead of reading the entire (potentially
+    // unbounded) 'recipes' collection into memory.
+    const q = DatabaseMonitoringService.query(
+      recipesRef,
+      DatabaseMonitoringService.limit(FALLBACK_SEARCH_SCAN_LIMIT)
+    );
+    const querySnapshot = await DatabaseMonitoringService.getDocs(q);
 
     const allRecipes = querySnapshot.docs.map((doc: FirestoreDocLike) => {
       const d = doc.data();

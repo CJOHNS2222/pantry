@@ -47,6 +47,7 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }
   const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'yearly'>('monthly');
   const [isCompareOpen, setIsCompareOpen] = useState(false);
   const [isContactOpen, setIsContactOpen] = useState(false);
+  const [restoreLoading, setRestoreLoading] = useState(false);
 
   useEffect(() => {
     const fetchUsageLimits = async () => {
@@ -474,12 +475,21 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }
         <button
           onClick={async () => {
             setPurchaseError(null);
-            await restorePurchases();
+            setRestoreLoading(true);
+            try {
+              await restorePurchases();
+              addToast('Checked Google Play for previous purchases. Any active subscription will appear shortly.', 'info');
+            } catch (err: unknown) {
+              log.error('Restore purchases failed', { error: err instanceof Error ? err.message : String(err) }, 'SubscriptionManager');
+              setPurchaseError('Could not restore purchases. Please try again.');
+            } finally {
+              setRestoreLoading(false);
+            }
           }}
-          disabled={!Capacitor.isNativePlatform()}
+          disabled={!Capacitor.isNativePlatform() || restoreLoading}
           className="flex-1 text-sm text-blue-500 hover:text-blue-600 disabled:text-gray-400 disabled:opacity-50 disabled:cursor-not-allowed font-medium py-2 border border-blue-200 dark:border-blue-700 disabled:border-gray-200 rounded-lg transition-colors"
         >
-          Restore Purchases
+          {restoreLoading ? 'Restoring…' : 'Restore Purchases'}
         </button>
       </div>
 

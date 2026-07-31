@@ -4,10 +4,18 @@
  * JOIN:  Merge the user's personal caches into the household caches,
  *        deduplicating by item name / recipe title / meal id so the household
  *        doesn't end up with doubled data.  Personal caches are then cleared.
+ *        `migrateUserCacheToHousehold` is called fire-and-forget from
+ *        `householdService.ts`'s join flow - a best-effort dedup pass, not the
+ *        primary checkpointed migration (see below).
  *
  * LEAVE: Copy the household caches into the user's personal caches so they
  *        keep their pantry/shopping/meal-plan/recipes after departing.
  *        The household caches are left intact for remaining members.
+ *
+ * Distinct from `householdMigrationService.ts`'s `migrateUserDataToHousehold`,
+ * which is the primary, checkpointed (localStorage-retry-safe) JOIN-only
+ * migration driven by the household-join UI flow in `App.tsx` - it has no
+ * dedup logic and no LEAVE-direction support.
  */
 
 import { InventoryCacheService } from './inventoryCacheService';

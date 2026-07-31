@@ -1,9 +1,9 @@
 import React from 'react';
-import { Lock, Crown } from 'lucide-react';
 import { useSubscription } from '../../hooks/useSubscription';
 import { useApp } from '../../contexts/AppContext';
 import { Tab } from '../../types/app';
 import { User } from '../../types';
+import { PaywallPrompt } from '../ui/PaywallPrompt';
 
 interface PremiumFeatureProps {
   children: React.ReactNode;
@@ -66,28 +66,17 @@ export const PremiumFeature: React.FC<PremiumFeatureProps> = ({
     }
 
     return (
-      <div className="premium-overlay-container">
-        <div className="premium-overlay-backdrop">
-          <div className="premium-upgrade-modal">
-            <Crown className="w-8 h-8 text-yellow-500 mx-auto mb-2" />
-            <h3 className="font-bold text-gray-900 mb-1">Ready to Unlock More?</h3>
-            <p className="text-sm text-gray-600 mb-3">
-              {fallbackMessage || `You've reached the ${limit} ${feature} limit. Join thousands of home chefs who upgraded for unlimited access!`}
-            </p>
-            <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg mb-3">
-              <p className="text-xs text-blue-800 dark:text-blue-200 font-medium">
-                ✨ Premium users save 2+ hours per week on meal planning
-              </p>
-            </div>
-              <button className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-4 py-2 rounded-lg font-medium hover:from-yellow-500 hover:to-orange-600 transition-all" onClick={onUpgrade || (() => setActiveTab(Tab.SETTINGS))}>
-              Upgrade Now - Starting at $4.99/mo
-            </button>
-          </div>
-        </div>
-        <div className="opacity-30 pointer-events-none">
-          {children}
-        </div>
-      </div>
+      <PaywallPrompt
+        variant="overlay"
+        feature={feature}
+        title="Ready to Unlock More?"
+        message={fallbackMessage || `You've reached the ${limit} ${feature} limit. Join thousands of home chefs who upgraded for unlimited access!`}
+        perks={['✨ Premium users save 2+ hours per week on meal planning']}
+        ctaLabel="Upgrade Now - Starting at $4.99/mo"
+        onUpgrade={onUpgrade || (() => setActiveTab(Tab.SETTINGS))}
+      >
+        {children}
+      </PaywallPrompt>
     );
   }
 
@@ -100,28 +89,17 @@ export const PremiumFeature: React.FC<PremiumFeatureProps> = ({
   }
 
   return (
-    <div className="premium-overlay-container">
-      <div className="premium-overlay-backdrop">
-        <div className="premium-upgrade-modal">
-          <Crown className="w-8 h-8 text-yellow-500 mx-auto mb-2" />
-          <h3 className="font-bold text-gray-900 mb-1">Premium Feature</h3>
-          <p className="text-sm text-gray-600 mb-3">
-            Unlock {feature} and discover recipes tailored to your pantry. Join 10,000+ home chefs who save time and reduce food waste!
-          </p>
-          <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg mb-3">
-            <p className="text-xs text-green-800 dark:text-green-200 font-medium">
-              🎯 Find recipes using ingredients you already have
-            </p>
-          </div>
-          <button className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-4 py-2 rounded-lg font-medium hover:from-yellow-500 hover:to-orange-600 transition-all" onClick={onUpgrade || (() => setActiveTab(Tab.SETTINGS))}>
-            Try Premium Free for 7 Days
-          </button>
-        </div>
-      </div>
-      <div className="opacity-30 pointer-events-none">
-        {children}
-      </div>
-    </div>
+    <PaywallPrompt
+      variant="overlay"
+      feature={feature}
+      title="Premium Feature"
+      message={`Unlock ${feature} and discover recipes tailored to your pantry. Join 10,000+ home chefs who save time and reduce food waste!`}
+      perks={['🎯 Find recipes using ingredients you already have']}
+      ctaLabel="Try Premium Free for 7 Days"
+      onUpgrade={onUpgrade || (() => setActiveTab(Tab.SETTINGS))}
+    >
+      {children}
+    </PaywallPrompt>
   );
 };
 
@@ -141,6 +119,7 @@ export const FeatureLimit: React.FC<FeatureLimitProps> = ({
   children
 }) => {
   const { isPremium, isActive } = useSubscription(user);
+  const { setActiveTab } = useApp();
 
   if (isPremium && isActive) {
     return <>{children}</>;
@@ -148,15 +127,14 @@ export const FeatureLimit: React.FC<FeatureLimitProps> = ({
 
   if (current >= limit) {
     return (
-      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center">
-        <Lock className="w-6 h-6 text-yellow-600 mx-auto mb-2" />
-        <p className="text-sm text-yellow-800 mb-2">
-          You've reached the free limit of {limit} {feature}
-        </p>
-        <button className="bg-yellow-500 text-white px-3 py-1 rounded text-sm hover:bg-yellow-600 transition-colors">
-          Upgrade for Unlimited
-        </button>
-      </div>
+      <PaywallPrompt
+        feature={feature}
+        limit={limit}
+        currentCount={current}
+        message={`You've reached the free limit of ${limit} ${feature}`}
+        ctaLabel="Upgrade for Unlimited"
+        onUpgrade={() => setActiveTab(Tab.SETTINGS)}
+      />
     );
   }
 

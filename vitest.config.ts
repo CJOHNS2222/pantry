@@ -6,7 +6,7 @@ export default defineConfig({
       'src/**/__tests__/**',
       'src/**/?(*.)+(spec|test).[tj]s?(x)'
     ],
-    exclude: ['e2e/**', 'node_modules/**', 'functions/**', 'functions/**/node_modules/**'],
+    exclude: ['e2e/**', 'node_modules/**', 'functions/**', 'functions/**/node_modules/**', 'src/test/rules/**'],
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
     watch: false // Disabled for CI; run `vitest --watch` for interactive dev

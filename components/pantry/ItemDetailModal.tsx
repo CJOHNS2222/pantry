@@ -7,6 +7,7 @@ import PriceTrends from './PriceTrends';
 import { getAllCategories, cleanItemNameForShopping, getFreezerShelfLifeDays, getOpenedShelfLifeDays, getItemImageCdnUrl, getPreferredItemDisplayImage } from '../../utils/appUtils';
 import { getQuantityAmount, getQuantityUnit } from '../../utils/quantityUtils';
 import { getNutritionFactsWithFallback, NutritionFacts } from '../../services/nutritionService';
+import { NutritionFactsCard } from './NutritionFactsCard';
 import { getItemTips } from '../../data/itemTips';
 import { useKeyboardNavigation } from '../../hooks/useKeyboardNavigation';
 import QuantityUnitPicker, { COMMON_UNITS, getSmartUnits } from './QuantityUnitPicker';
@@ -415,6 +416,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                 onClick={() => toggleSection('productDetails')}
                 className="p-1.5 hover:bg-theme-secondary rounded-full transition-colors"
                 aria-label="Edit item details"
+                aria-expanded={openSections.productDetails}
               >
                 <Edit3 className="w-4 h-4 text-theme-secondary" />
               </button>
@@ -528,6 +530,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
             <button
               onClick={() => toggleSection('productDetails')}
               className="w-full flex items-center justify-between px-4 py-4 text-left"
+              aria-expanded={openSections.productDetails}
             >
               <span className="text-base font-semibold text-theme-primary">Product Details</span>
               {openSections.productDetails ? <ChevronDown className="w-5 h-5 text-theme-secondary" /> : <ChevronRight className="w-5 h-5 text-theme-secondary" />}
@@ -612,6 +615,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
             <button
               onClick={() => toggleSection('storage')}
               className="w-full flex items-center justify-between px-4 py-4 text-left"
+              aria-expanded={openSections.storage}
             >
               <span className="text-base font-semibold text-theme-primary">Storage</span>
               {openSections.storage ? <ChevronDown className="w-5 h-5 text-theme-secondary" /> : <ChevronRight className="w-5 h-5 text-theme-secondary" />}
@@ -713,6 +717,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
               <button
                 onClick={() => toggleSection('nutrition')}
                 className="w-full flex items-center justify-between px-4 py-4 text-left"
+                aria-expanded={openSections.nutrition}
               >
                 <span className="text-base font-semibold text-theme-primary">Nutritional Information</span>
                 {openSections.nutrition ? <ChevronDown className="w-5 h-5 text-theme-secondary" /> : <ChevronRight className="w-5 h-5 text-theme-secondary" />}
@@ -729,85 +734,8 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                         Go to Settings → Shopping Preferences
                       </button>
                     </div>
-                  ) : loadingNutrition ? (
-                    <div className="flex items-center gap-2 text-sm text-theme-secondary py-2">
-                      <div className="w-4 h-4 border-2 border-[var(--accent-color)] border-t-transparent rounded-full animate-spin" />
-                      Loading nutrition info...
-                    </div>
-                  ) : nutrition ? (
-                    <div className="space-y-3">
-                      {/* Serving Size */}
-                      <div className="bg-theme-secondary rounded-lg p-3">
-                        <div className="text-xs text-theme-secondary">Serving Size</div>
-                        <div className="flex items-baseline justify-between">
-                          <div className="text-lg font-semibold text-theme-primary">{nutrition.servingSize || '100.0'}</div>
-                          <div className="text-sm text-theme-secondary">g/ml</div>
-                        </div>
-                      </div>
-
-                      {/* Nutrition grid - 2 columns */}
-                      <div className="grid grid-cols-2 gap-2">
-                        {nutrition.calories != null && (
-                          <div className="bg-theme-secondary rounded-lg p-3">
-                            <div className="text-xs text-theme-secondary">Calories</div>
-                            <div className="flex items-baseline justify-between">
-                              <div className="text-lg font-semibold text-theme-primary">{Math.round(nutrition.calories)}</div>
-                              <div className="text-xs text-theme-secondary">Cal</div>
-                            </div>
-                          </div>
-                        )}
-                        {nutrition.sugar != null && (
-                          <div className="bg-theme-secondary rounded-lg p-3">
-                            <div className="text-xs text-theme-secondary">Sugar</div>
-                            <div className="flex items-baseline justify-between">
-                              <div className="text-lg font-semibold text-theme-primary">{nutrition.sugar.toFixed(1)}</div>
-                              <div className="text-xs text-theme-secondary">g</div>
-                            </div>
-                          </div>
-                        )}
-                        {nutrition.fat != null && (
-                          <div className="bg-theme-secondary rounded-lg p-3">
-                            <div className="text-xs text-theme-secondary">Fat</div>
-                            <div className="flex items-baseline justify-between">
-                              <div className="text-lg font-semibold text-theme-primary">{nutrition.fat.toFixed(1)}</div>
-                              <div className="text-xs text-theme-secondary">g</div>
-                            </div>
-                          </div>
-                        )}
-                        {nutrition.fiber != null && (
-                          <div className="bg-theme-secondary rounded-lg p-3">
-                            <div className="text-xs text-theme-secondary">Fiber</div>
-                            <div className="flex items-baseline justify-between">
-                              <div className="text-lg font-semibold text-theme-primary">{nutrition.fiber.toFixed(1)}</div>
-                              <div className="text-xs text-theme-secondary">g</div>
-                            </div>
-                          </div>
-                        )}
-                        {nutrition.carbs != null && (
-                          <div className="bg-theme-secondary rounded-lg p-3">
-                            <div className="text-xs text-theme-secondary">Carbs</div>
-                            <div className="flex items-baseline justify-between">
-                              <div className="text-lg font-semibold text-theme-primary">{nutrition.carbs.toFixed(1)}</div>
-                              <div className="text-xs text-theme-secondary">g</div>
-                            </div>
-                          </div>
-                        )}
-                        {nutrition.protein != null && (
-                          <div className="bg-theme-secondary rounded-lg p-3">
-                            <div className="text-xs text-theme-secondary">Protein</div>
-                            <div className="flex items-baseline justify-between">
-                              <div className="text-lg font-semibold text-theme-primary">{nutrition.protein.toFixed(1)}</div>
-                              <div className="text-xs text-theme-secondary">g</div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                      <p className="text-xs text-theme-secondary opacity-60 mt-2">
-                        Source: USDA FoodData Central • Per {nutrition.servingSize}
-                      </p>
-                    </div>
                   ) : (
-                    <p className="text-sm text-theme-secondary py-2">Nutrition N/A</p>
+                    <NutritionFactsCard nutrition={nutrition} loading={loadingNutrition} />
                   )}
                 </div>
               )}
@@ -822,6 +750,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                 <button
                   onClick={() => toggleSection('tips')}
                   className="w-full flex items-center justify-between px-4 py-4 text-left"
+                  aria-expanded={openSections.tips}
                 >
                   <div className="flex items-center gap-2">
                     <span className="text-base font-semibold text-theme-primary">Tips</span>
@@ -852,6 +781,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
               <button
                 onClick={() => toggleSection('history')}
                 className="w-full flex items-center justify-between px-4 py-4 text-left"
+                aria-expanded={openSections.history}
               >
                 <span className="text-base font-semibold text-theme-primary">History</span>
                 {openSections.history ? <ChevronDown className="w-5 h-5 text-theme-secondary" /> : <ChevronRight className="w-5 h-5 text-theme-secondary" />}

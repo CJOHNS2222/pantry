@@ -18,6 +18,7 @@ import { useIntl } from 'react-intl';
 import AnalyticsService from '../../services/analyticsService';
 import { useConfirm } from '../ui/ConfirmDialog';
 import { HOUSEHOLD_LEFT_AT_KEY } from '../../hooks/useAuth';
+import { HouseholdStatusIndicator } from './HouseholdStatusIndicator';
 
 interface HouseholdManagerProps {
   user: User;
@@ -187,6 +188,14 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
   };
 
   const leaveHousehold = async () => {
+    const ok = await confirm({
+      title: 'Leave this household?',
+      description: 'You will lose access to this household\'s shared inventory, meal plan, and shopping list immediately. If you\'re the last admin, this may disband the household for other members. This cannot be undone.',
+      confirmLabel: 'Leave',
+      variant: 'danger'
+    });
+    if (!ok) return;
+
     try {
       // Copy household data to user's personal collection using cache services
       if (!household) {
@@ -396,16 +405,11 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
             )}
           </div>
           <div className="flex items-center gap-2">
-            <button 
+            <button
               onClick={() => {
+                sessionStorage.setItem('settings_redirect_tab', 'household');
                 setActiveTab(Tab.SETTINGS);
                 onClose();
-                setTimeout(() => {
-                  const householdSection = document.querySelector('[data-section="household"]');
-                  if (householdSection) {
-                    householdSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                  }
-                }, 100);
               }}
               className="text-theme-secondary hover:text-[var(--accent-color)] p-2 transition-colors"
               title="Household Settings"
@@ -446,7 +450,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
                 <button 
                   type="submit"
                   className="bg-[var(--accent-color)] hover:bg-[var(--accent-color)]/90 text-white px-3 py-2 rounded-lg transition-colors disabled:bg-gray-500 disabled:cursor-not-allowed flex items-center justify-center w-12"
-                  disabled={isInviting || householdMemberLimitExceeded}
+                  disabled={isInviting || householdMemberLimitExceeded || (household?.members?.length ?? 0) >= maxMembers}
                   data-testid="household-invite-submit"
                 >
                   {isInviting ? <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div> : <Plus className="w-5 h-5" />}
@@ -457,6 +461,12 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
               </p>
             </div>
           </PremiumFeature>
+
+          {household && (
+            <div className="mb-3">
+              <HouseholdStatusIndicator household={household} currentUserId={user.id} />
+            </div>
+          )}
 
           <div className="flex items-center justify-between mb-3 px-1">
             <h3 className="text-sm font-bold text-[var(--accent-color)] uppercase">{intl.formatMessage({ id: 'household.groupMembers' })}</h3>

@@ -1086,6 +1086,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
         onClose={onClose}
         household={household}
         user={user}
+        communityStats={communityStats}
       />
     </div>
   );

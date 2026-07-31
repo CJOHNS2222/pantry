@@ -1,6 +1,7 @@
 import React from 'react';
 import { SlidersHorizontal } from 'lucide-react';
 import type { Settings as AppSettings, UserProfile } from '../../types';
+import { SUPPORTED_CURRENCIES } from '../../services/currencyService';
 
 interface SettingsAppPreferencesSectionProps {
   title: string;
@@ -8,11 +9,13 @@ interface SettingsAppPreferencesSectionProps {
   setSettings: React.Dispatch<React.SetStateAction<AppSettings>>;
   userProfile: UserProfile | null | undefined;
   onMeasurementSystemChange: (value: 'Standard' | 'Metric') => void;
+  onCurrencyChange: (value: string) => void;
   geminiOptedIn: boolean;
   onGeminiOptInChange: (enabled: boolean) => void;
   labels: {
     enableNotifications: string;
     measurementSystem: string;
+    currency: string;
     enableAiFeatures: string;
     includeStaples: string;
     autoRestockStaples: string;
@@ -22,7 +25,7 @@ interface SettingsAppPreferencesSectionProps {
 }
 
 export const SettingsAppPreferencesSection: React.FC<SettingsAppPreferencesSectionProps> = ({
-  title, settings, setSettings, userProfile, onMeasurementSystemChange, geminiOptedIn, onGeminiOptInChange, labels, }) => {
+  title, settings, setSettings, userProfile, onMeasurementSystemChange, onCurrencyChange, geminiOptedIn, onGeminiOptInChange, labels, }) => {
   return (
     <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden">
       <div className="w-full flex items-center justify-between p-4 border-b border-theme bg-theme-primary/20">
@@ -80,6 +83,24 @@ export const SettingsAppPreferencesSection: React.FC<SettingsAppPreferencesSecti
                 Metric
               </button>
             </div>
+          </div>
+
+          <div className="flex items-center justify-between py-3">
+            <div className="flex-1 pr-4">
+              <p className="text-sm font-medium text-theme-primary">{labels.currency}</p>
+              <p className="text-xs text-theme-secondary mt-0.5">Currency used to display grocery cost estimates and price data</p>
+            </div>
+            <select
+              value={userProfile?.currency || 'USD'}
+              onChange={(e) => onCurrencyChange(e.target.value)}
+              className="px-2 py-1.5 text-sm border border-theme rounded-lg bg-theme-primary text-theme-primary flex-shrink-0"
+            >
+              {SUPPORTED_CURRENCIES.map((currency) => (
+                <option key={currency.code} value={currency.code}>
+                  {currency.code} ({currency.symbol})
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="flex items-center justify-between py-3">

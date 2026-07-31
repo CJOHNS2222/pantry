@@ -247,9 +247,22 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
-    // Price data cache: allow authenticated users to read/write the single global cache document.
+    // Price data cache: single global document keyed by lowercased item name, each value a
+    // PriceData record (see services/priceDataCacheService.ts). Any authenticated user may
+    // write the whole doc (client-side cache warms on demand), but the shape is validated the
+    // same way leaderboard_cache/global and system/community_rated_recipes validate theirs.
     match /price_cache/priceData {
-      allow read, write: if request.auth != null;
+      allow read: if request.auth != null;
+      // NOTE: Firestore Rules v2 has no lambda/quantifier macro for iterating an arbitrary-
+      // keyed map's values (no `.all()`/`.any()` on lists or maps - only hasAll/hasAny/
+      // hasOnly/size are supported, and per-item-name keys here are dynamic so individual
+      // fields can't be addressed directly the way leaderboard_cache/global addresses
+      // `entries`/`householdEntries`). Per-entry shape (averagePrice/minPrice/maxPrice/
+      // sampleSize/unit/lastUpdated) is therefore left to the client
+      // (services/priceDataCacheService.ts) rather than enforced here; rules are limited to
+      // top-level shape and size to keep the document from growing unbounded.
+      allow write: if request.auth != null
+        && request.resource.data.keys().size() <= 500;
     }
 
     // Global leaderboard cache: single shared document holding every opted-in user's

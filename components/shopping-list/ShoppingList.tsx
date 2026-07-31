@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { useIntl } from 'react-intl';
-import { ShoppingCart } from 'lucide-react';
+import { ShoppingCart, Barcode } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { Share } from '@capacitor/share';
 import { ShoppingItem, User, Household, Settings, PantryItem } from '../../types';
@@ -23,7 +23,9 @@ import { CheckoutExpiryModal } from './CheckoutExpiryModal';
 import { ShoppingListItemsSection } from './ShoppingListItemsSection';
 import { ShoppingListFooterActions } from './ShoppingListFooterActions';
 import { ShoppingListActionBars } from './ShoppingListActionBars';
+import { OfflineShoppingIndicator } from './OfflineShoppingIndicator';
 import { ShoppingListAddFab } from './ShoppingListAddFab';
+import NutritionScannerModal from '../pantry/NutritionScannerModal';
 import { RetailCheckoutModal } from './RetailCheckoutModal';
 import { ShoppingListUndoBanners } from './ShoppingListUndoBanners';
 import { getSmartUnits } from '../pantry/QuantityUnitPicker';
@@ -36,6 +38,7 @@ import { useApp } from '../../contexts/AppContext';
 import { useAndroidBack } from '../../hooks/useAndroidBack';
 import { groceryPriceService } from '../../services/groceryPriceService';
 import AnalyticsService from '../../services/analyticsService';
+import { getUserMeasurementSystem } from '../../utils/measurementUtils';
 
 // Firestore access is instrumented via DatabaseMonitoringService when needed
 
@@ -84,7 +87,8 @@ const ShoppingListComponent: React.FC<ShoppingListProps> = ({
   const [newItem, setNewItem] = React.useState('');
   const [canShowAdBanner, setCanShowAdBanner] = React.useState<boolean>(false);
   const { addToast } = useAppActions();
-  const { mealPlan } = useApp();
+  const { mealPlan, savedRecipes } = useApp();
+  const measurementSystem = useMemo(() => getUserMeasurementSystem(user?.profile), [user?.profile]);
 
   useEffect(() => {
     let mounted = true;
@@ -153,6 +157,7 @@ const ShoppingListComponent: React.FC<ShoppingListProps> = ({
   const [checkoutExpiryOpen, setCheckoutExpiryOpen] = useState(false);
   const [checkoutItems, setCheckoutItems] = useState<ShoppingItem[]>([]);
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
+  const [showNutritionScanner, setShowNutritionScanner] = useState(false);
 
   const uncheckedItemsCount = useMemo(() => {
     return items.filter(item => !item.checked).length;
@@ -292,7 +297,7 @@ const ShoppingListComponent: React.FC<ShoppingListProps> = ({
   }, [items, saveCurrentSession]);
 
   // Hooks for offline functionality
-  const { isOnline } = useOfflineStatus();
+  const { isOnline, syncStatus, syncNow } = useOfflineStatus();
   const addToQueue = (op: { type: 'add' | 'update' | 'delete' | 'batch'; collection: string; docId?: string; data: unknown }) => offlineQueue.enqueue(op as Parameters<typeof offlineQueue.enqueue>[0]);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const processQueue = () => offlineQueue.processQueue();
@@ -697,6 +702,7 @@ const ShoppingListComponent: React.FC<ShoppingListProps> = ({
     const targetItem = displayedItems.find(i => i.id === id);
     if (!targetItem) return;
     const targetId = targetItem.id;
+    const previousItem = { ...targetItem };
 
     setItems(prev => prev.map(item =>
       item.id === targetId ? { ...item, ...updates } : item
@@ -706,8 +712,11 @@ const ShoppingListComponent: React.FC<ShoppingListProps> = ({
     const userId = inHousehold ? undefined : user?.id;
     try {
       await ShoppingListCacheService.updateItem(targetId, updates, householdId, userId);
-    } catch (_e) {
-      // best-effort; local state already updated
+    } catch (error) {
+      log.error('Failed to save shopping list item update', { error, id: targetId, updates }, 'ShoppingList');
+      // Roll back the optimistic update so the UI doesn't show an edit that never persisted
+      setItems(prev => prev.map(item => (item.id === targetId ? previousItem : item)));
+      addToast('Failed to save change. Please try again.', 'error');
     }
   };
 
@@ -1043,6 +1052,25 @@ const ShoppingListComponent: React.FC<ShoppingListProps> = ({
         onConfirmPurchase={confirmPurchaseForItem}
       />
 
+      {Capacitor.isNativePlatform() && (
+        <button
+          onClick={() => setShowNutritionScanner(true)}
+          className="fixed right-6 z-50 bg-theme-secondary text-theme-primary border border-theme p-3 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110"
+          style={{ bottom: 'calc(7rem + 15px + 4.5rem)' }}
+          aria-label="Scan a product barcode to check nutrition facts before buying"
+        >
+          <Barcode className="w-5 h-5" />
+        </button>
+      )}
+
+      {showNutritionScanner && (
+        <NutritionScannerModal
+          isOpen={showNutritionScanner}
+          onClose={() => setShowNutritionScanner(false)}
+          onAddToShoppingList={addShoppingListItem}
+        />
+      )}
+
       <ShoppingListAddFab onOpenAddModal={() => setIsAddModalOpen(true)} />
 
       <ShoppingListAddItemModal
@@ -1066,6 +1094,16 @@ const ShoppingListComponent: React.FC<ShoppingListProps> = ({
       />
 
       <ShoppingListUndoBanners pendingDeleteCount={pendingDeleteCount} onUndoDelete={undoDelete} />
+
+      {(!isOnline || syncStatus.pendingOperations > 0) && (
+        <OfflineShoppingIndicator
+          isOffline={!isOnline}
+          lastSynced={syncStatus.lastSyncTime ?? undefined}
+          pendingChanges={syncStatus.pendingOperations}
+          onSyncNow={syncNow}
+          isSyncing={syncStatus.isSyncing}
+        />
+      )}
 
       <ShoppingListActionBars
         hasItems={items.length > 0}
@@ -1096,6 +1134,9 @@ const ShoppingListComponent: React.FC<ShoppingListProps> = ({
         householdMembers={householdMembers.map(m => ({ id: m.id, name: m.name, avatar: m.avatar }))}
         isOffline={!isOnline}
         showPriceData={settings?.shopping?.showPriceData ?? false}
+        savedRecipes={savedRecipes}
+        mealPlan={mealPlan}
+        measurementSystem={measurementSystem}
         onToggleCheck={handleItemToggle}
         onRemove={remove}
         onQuantityChange={handleQuantityChange}

@@ -1,9 +1,11 @@
 import {onCall, HttpsError} from "firebase-functions/v2/https";
 import {logger} from "firebase-functions/v2";
 import admin from 'firebase-admin';
+import {getApps} from 'firebase-admin/app';
+import {getFirestore} from 'firebase-admin/firestore';
 
 // Ensure the Admin SDK is initialized
-if (!admin.apps?.length) {
+if (!getApps().length) {
   admin.initializeApp();
 }
 
@@ -32,7 +34,7 @@ export const checkInvitation = onCall(
       throw new HttpsError("invalid-argument", "Unable to join 3: User email is required to check invitations.");
     }
 
-    const db = admin.firestore();
+    const db = getFirestore();
 
     try {
       const householdRef = db.collection("households").doc(householdId);

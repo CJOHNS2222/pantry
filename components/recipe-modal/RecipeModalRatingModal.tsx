@@ -1,5 +1,5 @@
 import React from 'react';
-import { Household, RecipeRating, SavedRecipe, StructuredRecipe } from '../../types';
+import { Household, RecipeCommunityStats, RecipeRating, SavedRecipe, StructuredRecipe } from '../../types';
 import { RecipeRatingUI } from '../recipes-meals/RecipeRating';
 import { Modal } from '../ui/Modal';
 
@@ -16,6 +16,7 @@ interface RecipeModalRatingModalProps {
     email: string;
     avatar?: string;
   };
+  communityStats?: RecipeCommunityStats | null;
 }
 
 export const RecipeModalRatingModal: React.FC<RecipeModalRatingModalProps> = ({
@@ -26,6 +27,7 @@ export const RecipeModalRatingModal: React.FC<RecipeModalRatingModalProps> = ({
   onClose,
   household,
   user,
+  communityStats,
 }) => {
   return (
     <Modal isOpen={showRatingModal} onClose={() => setShowRatingModal(false)} title={`Rate "${recipe.title}"`}>
@@ -39,6 +41,7 @@ export const RecipeModalRatingModal: React.FC<RecipeModalRatingModalProps> = ({
             setTimeout(() => onClose(), 300);
           }}
           householdId={household?.id || user?.id}
+          communityStats={communityStats ?? undefined}
         />
       </Modal.Body>
       <Modal.Footer align="center">

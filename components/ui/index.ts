@@ -59,6 +59,9 @@ export type { ToastOptions, ToastVariant, ToastPosition } from './Toast';
 
 export { NotificationBanner } from './NotificationBanner';
 
+export { PaywallPrompt } from './PaywallPrompt';
+export type { PaywallPromptProps, PaywallTier } from './PaywallPrompt';
+
 // ── Navigation ────────────────────────────────────────────────────────────────
 export { Tabs, TabsList, TabsTrigger, TabsContent } from './Tabs';
 export type {

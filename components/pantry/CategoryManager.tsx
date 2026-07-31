@@ -6,6 +6,9 @@ import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { CustomCategory } from '../../types';
 import { getCategoryIcon, getCategoryColor } from '../../utils/appUtils';
 import AnalyticsService from '../../services/analyticsService';
+import { useApp } from '../../contexts/AppContext';
+import { Tab } from '../../types/app';
+import { PaywallPrompt } from '../ui/PaywallPrompt';
 
 interface CategoryManagerProps {
   customCategories: CustomCategory[];
@@ -43,6 +46,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({
   useModalOpen(isOpen);
   useKeyboardNavigation({ onEscape: onClose, enabled: isOpen });
   const modalRef = useFocusTrap({ isActive: isOpen });
+  const { setActiveTab } = useApp();
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
@@ -114,16 +118,14 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({
         <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
           {/* Upgrade banner when at limit */}
           {maxCategories !== undefined && customCategories.length >= maxCategories && (
-            <div className="mb-4 p-3 bg-amber-50 border border-amber-300 rounded-lg flex items-start gap-3">
-              <span className="text-amber-500 text-lg flex-shrink-0">🔒</span>
-              <div>
-                <p className="text-sm font-semibold text-amber-800">Free plan limit reached</p>
-                <p className="text-sm text-amber-700 mt-0.5">
-                  You've used your 1 free custom category. Upgrade to <strong>Premium</strong> or <strong>Family</strong> for unlimited categories — starting at $4.99/mo.
-                </p>
-                <p className="text-sm text-amber-600 mt-1">Go to Settings → More → Subscription to upgrade.</p>
-              </div>
-            </div>
+            <PaywallPrompt
+              className="mb-4"
+              feature="custom categories"
+              title="Free plan limit reached"
+              message={`You've used your ${maxCategories} free custom category. Upgrade to Premium or Family for unlimited categories — starting at $4.99/mo.`}
+              subMessage="Go to Settings → More → Subscription to upgrade."
+              onUpgrade={() => setActiveTab(Tab.SETTINGS)}
+            />
           )}
           {(isAdding || editingId) && (
             <div className="mb-6 p-4 bg-theme-secondary rounded-lg">

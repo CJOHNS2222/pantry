@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { Sun, Moon, Undo2, Bell } from 'lucide-react';
+import { Sun, Moon, Undo2, Bell, X } from 'lucide-react';
 import { User, Household, HouseholdActivity } from '../../types';
 import { log } from '../../services/logService';
 import { HouseholdActivityFeed } from '../household/HouseholdActivityFeed';
@@ -58,81 +58,54 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   const touchStartX = useRef(0);
   const touchStartY = useRef(0);
   const swipeLocked = useRef<'h' | 'v' | null>(null);
-  const notifTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const notifPanelActiveRef = useRef(false);
   const notificationsContainerRef = useRef<HTMLDivElement>(null);
   const activityFeedContainerRef = useRef<HTMLDivElement>(null);
+  const notificationsTriggerRef = useRef<HTMLButtonElement>(null);
+  const activityFeedTriggerRef = useRef<HTMLButtonElement>(null);
+  const notificationsCloseBtnRef = useRef<HTMLButtonElement>(null);
+  const activityFeedCloseBtnRef = useRef<HTMLButtonElement>(null);
   const throttleMs = 5000; // UI update throttle for notifications
   const { items } = useUserNotifications(user?.id, throttleMs);
   const unreadNotificationsCount = (items || []).filter(i => !i.read).length;
 
-  const clearNotifTimer = () => {
-    if (notifTimerRef.current) {
-      clearTimeout(notifTimerRef.current);
-      notifTimerRef.current = null;
-    }
-  };
-
   const closeNotifications = useCallback(() => {
-    notifPanelActiveRef.current = false;
-    clearNotifTimer();
     setShowNotifications(false);
     setExpandedNotifId(null);
+    notificationsTriggerRef.current?.focus();
   }, []);
 
   const closeActivityFeed = useCallback(() => {
     setShowActivityFeed(false);
+    activityFeedTriggerRef.current?.focus();
   }, []);
 
-  const scheduleNotifTimer = (delayMs = 15000) => {
-    clearNotifTimer();
-    if (!showNotifications || notifPanelActiveRef.current) return;
-    notifTimerRef.current = setTimeout(() => setShowNotifications(false), delayMs);
-  };
-
+  // Move focus into the popover once it opens, for keyboard/screen-reader users.
   useEffect(() => {
     if (showNotifications) {
-      scheduleNotifTimer(15000);
-      return clearNotifTimer;
+      notificationsCloseBtnRef.current?.focus();
     }
-
-    notifPanelActiveRef.current = false;
-    clearNotifTimer();
-    return undefined;
   }, [showNotifications]);
 
-  const handleNotifPanelMouseEnter = () => {
-    notifPanelActiveRef.current = true;
-    clearNotifTimer();
-  };
-
-  const handleNotifPanelMouseLeave = () => {
-    notifPanelActiveRef.current = false;
-    scheduleNotifTimer(5000);
-  };
-
-  const handleNotifPanelTouchStart = () => {
-    notifPanelActiveRef.current = true;
-    clearNotifTimer();
-  };
-
-  const handleNotifPanelTouchEnd = () => {
-    notifPanelActiveRef.current = false;
-    scheduleNotifTimer(5000);
-  };
+  useEffect(() => {
+    if (showActivityFeed) {
+      activityFeedCloseBtnRef.current?.focus();
+    }
+  }, [showActivityFeed]);
 
   const handleToggleNotifications = () => {
     setShowActivityFeed(false);
     setShowNotifications(prev => {
       if (prev) {
-        closeNotifications();
+        setExpandedNotifId(null);
+        return false;
       }
-      return !prev;
+      return true;
     });
   };
 
   const handleToggleActivityFeed = () => {
-    closeNotifications();
+    setShowNotifications(false);
+    setExpandedNotifId(null);
     setShowActivityFeed(prev => !prev);
   };
 
@@ -216,7 +189,6 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 
   const handleToggleExpand = (notifId: string) => {
     setExpandedNotifId(prev => prev === notifId ? null : notifId);
-    scheduleNotifTimer(10000);
   };
 
   useEffect(() => {
@@ -397,10 +369,13 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             {user?.id && (
               <div className="relative" ref={notificationsContainerRef}>
                 <button
+                  ref={notificationsTriggerRef}
                   onClick={handleToggleNotifications}
                   onDoubleClick={handleNotificationBellDoubleClick}
                   className="relative p-1 text-amber-500 hover:text-amber-400 transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 rounded"
                   aria-label={`${unreadNotificationsCount} unread notifications`}
+                  aria-haspopup="menu"
+                  aria-expanded={showNotifications}
                   title="Click to view notifications, double-click to view pending notifications"
                 >
                   <Bell className="w-4 h-4" />
@@ -410,28 +385,20 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                     </span>
                   )}
                 </button>
- 
+
                 {/* Notification bell */}
                 {showNotifications && (
                   <div
                     className="absolute left-0 mt-2 w-80 max-w-[calc(100vw-1rem)] max-h-96 overflow-auto bg-theme-primary border border-theme rounded shadow-lg z-50 p-2"
-                    onMouseEnter={handleNotifPanelMouseEnter}
-                    onMouseLeave={handleNotifPanelMouseLeave}
-                    onTouchStart={handleNotifPanelTouchStart}
-                    onTouchEnd={handleNotifPanelTouchEnd}
-                    onFocusCapture={handleNotifPanelMouseEnter}
-                    onBlurCapture={(e) => {
-                      if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
-                        handleNotifPanelMouseLeave();
-                      }
-                    }}
+                    role="menu"
+                    aria-label="Notifications"
                   >
                     <div className="flex items-center justify-between mb-2">
                       <div className="text-sm font-semibold">Notifications</div>
                       <div className="flex items-center gap-2">
                         <button onClick={handleMarkAllRead} className="text-xs text-theme-secondary hover:underline">Mark all read</button>
-                        <button onClick={closeNotifications} className="text-xs text-theme-secondary hover:text-theme-primary transition-colors px-1" aria-label="Close notifications">
-                          ✕
+                        <button ref={notificationsCloseBtnRef} onClick={closeNotifications} className="text-xs text-theme-secondary hover:text-theme-primary transition-colors px-1" aria-label="Close notifications">
+                          <X className="w-3.5 h-3.5" aria-hidden="true" />
                         </button>
                       </div>
                     </div>
@@ -493,7 +460,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                                   className="flex items-center justify-center min-w-[28px] min-h-[28px] text-xs text-theme-secondary hover:text-red-400 active:text-red-400 transition-colors rounded"
                                   title="Dismiss notification"
                                   aria-label="Dismiss notification"
-                                >✕</button>
+                                ><X className="w-3.5 h-3.5" aria-hidden="true" /></button>
                               </div>
                             </div>
  
@@ -560,9 +527,12 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           {household && household.members.length > 1 && (
             <div className="relative mt-0.5" ref={activityFeedContainerRef}>
               <button
+                ref={activityFeedTriggerRef}
                 onClick={handleToggleActivityFeed}
                 className="flex items-center gap-1 px-2 py-0.5 rounded-full hover:bg-black/5 dark:hover:bg-white/5 transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]"
                 aria-label="View household activity feed"
+                aria-haspopup="dialog"
+                aria-expanded={showActivityFeed}
                 title="Tap to view household activity"
               >
                 {activityText ? (
@@ -580,14 +550,20 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
               </button>
 
               {showActivityFeed && (
-                <div className="absolute left-1/2 -translate-x-1/2 mt-2 w-80 max-w-[calc(100vw-2rem)] max-h-96 overflow-auto bg-theme-primary border border-theme rounded shadow-lg z-50 p-2">
+                <div
+                  className="absolute left-1/2 -translate-x-1/2 mt-2 w-80 max-w-[calc(100vw-2rem)] max-h-96 overflow-auto bg-theme-primary border border-theme rounded shadow-lg z-50 p-2"
+                  role="dialog"
+                  aria-modal="false"
+                  aria-label="Household Activity"
+                >
                   <div className="flex items-center justify-between mb-2">
                     <div className="text-sm font-semibold">Household Activity</div>
                     <button
+                      ref={activityFeedCloseBtnRef}
                       onClick={closeActivityFeed}
                       className="text-xs text-theme-secondary hover:text-theme-primary transition-colors px-1"
                       aria-label="Close activity feed"
-                    >✕</button>
+                    ><X className="w-3.5 h-3.5" aria-hidden="true" /></button>
                   </div>
                   <HouseholdActivityFeed
                     activities={recentActivities}

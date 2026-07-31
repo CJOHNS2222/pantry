@@ -4,8 +4,11 @@ service firebase.storage {
     match /recipes/{recipeId} {
       // Allow public read access to recipe images (anyone can view)
       allow read: if true;
-      // Allow write access to authenticated users for recipe images
+      // Recipe images are a shared cache keyed by recipeId (not user-owned), so any
+      // authenticated user may populate a missing entry, but nobody may overwrite an
+      // image another user already cached — `resource == null` means the path is empty.
       allow write: if request.auth != null &&
+                   resource == null &&
                    request.resource.size < 10 * 1024 * 1024 && // 10MB limit
                    request.resource.contentType.matches('image/.*');
     }
@@ -14,12 +17,15 @@ service firebase.storage {
     match /recipe-photos/{allPaths=**} {
       // Allow public read access to recipe photos
       allow read: if true;
-      // Allow write access to authenticated users for recipe photos
+      // Allow write access to authenticated users for recipe photos, tagging the
+      // upload with an `uploader` metadata field (mirrors pantry_images below) so
+      // ownership can be enforced on delete.
       allow write: if request.auth != null &&
                    request.resource.size < 10 * 1024 * 1024 && // 10MB limit
-                   request.resource.contentType.matches('image/.*');
-      // Allow delete access to authenticated users for their own uploads
-      allow delete: if request.auth != null;
+                   request.resource.contentType.matches('image/.*') &&
+                   request.resource.metadata['uploader'] == request.auth.uid;
+      // Allow delete access to the uploader only
+      allow delete: if request.auth != null && resource.metadata['uploader'] == request.auth.uid;
     }
 
     // Allow read/write access to user-specific content
@@ -29,8 +35,11 @@ service firebase.storage {
 
     // Pantry item images for caching (uploaded by imageCacheService)
     match /pantry_images/{allPaths=**} {
-      // Require authenticated reads for pantry images to protect personal photos
-      allow read: if request.auth != null;
+      // Require the requester to be the uploader to protect personal photos
+      // (mirrors the `uploader` metadata check used for write/delete below;
+      // household-scoped reads aren't feasible here since object paths don't
+      // embed a household id, only the owner-scoping the comment intends).
+      allow read: if request.auth != null && request.auth.uid == resource.metadata['uploader'];
       // Allow write access to authenticated users for pantry images
       allow write: if request.auth != null &&
                    request.resource.size < 5 * 1024 * 1024 && // 5MB limit (smaller for pantry items)

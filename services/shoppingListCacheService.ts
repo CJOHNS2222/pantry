@@ -96,7 +96,7 @@ const getCachedShoppingList = async (householdId?: string, userId?: string): Pro
     if (docSnap && docSnap.exists && (typeof (docSnap as any).exists === 'function' ? (docSnap as any).exists() : (docSnap as any).exists)) {
       const data = (docSnap as any).data() as ShoppingListCache;
       // V2.1 cache structure
-      if (data.metadata && data.metadata.version >= CACHE_VERSION) {
+      if (data.metadata && data.metadata.version === CACHE_VERSION) {
         const items: ShoppingItem[] = Object.entries(data.items).map(([itemId, itemObject]) => 
           objectToShoppingItem(itemId, itemObject as CachedShoppingListData[string], householdId, userId)
         );

@@ -71,6 +71,11 @@ Stock & Spoon is a cross-platform pantry and meal management app built with Reac
   - Free tier: Basic features with limits
   - Premium tier: Higher limits, still capped
   - Family tier: Unlimited recipes, meal plans, and household members
+- **Nutrition Facts & Barcode Scanning**
+  - Nutrition facts (calories, protein, carbs, fat, fiber, sugar) looked up from the USDA FoodData Central API, cached locally for 90 days
+  - Barcode scanner decodes UPC/EAN codes from a captured photo on-device (zxing), then looks up the product title via Spoonacular's grocery product API (not OpenFoodFacts) before fetching its nutrition facts
+- **Multi-Currency Price Display**
+  - All grocery price data is sourced/computed in USD; prices can be displayed in a user-selected currency (EUR, GBP, CAD, AUD, JPY, MXN, INR, BRL, CNY) using free exchange rates from frankfurter.app, cached for 24h
 
 ## Subscription System
 The app includes a subscription-based monetization system with three tiers:
@@ -127,6 +132,24 @@ The app now features a community-driven grocery price estimator that provides mo
 - Aggregated pricing data with confidence intervals
 - Regional price variations (future enhancement)
 - Integration with grocery APIs (planned)
+
+## Nutrition Facts, Barcode Scanning & Currency Display
+
+### Nutrition Facts
+
+- Nutrition data (calories, protein, carbs, fat, fiber, sugar, serving size) is fetched from the free **USDA FoodData Central API** (`services/nutritionService.ts`) — requires a free `VITE_USDA_API_KEY`, get one at <https://fdc.nal.usda.gov/api-key-signup.html>.
+- Results are cached in `localStorage` for 90 days to minimize API calls; lookups fall back from the exact item name to its inferred category if no match is found.
+- Displayed via `components/pantry/NutritionFactsCard.tsx`.
+
+### Barcode Scanning
+
+- `utils/barcodeScan.ts` captures a photo with the native camera (Capacitor) and decodes a barcode from it on-device using `@zxing/library` — there is no live viewfinder and no web fallback (native only).
+- `components/pantry/NutritionScannerModal.tsx` uses the decoded UPC/EAN to look up the product's title via **Spoonacular's** grocery product API (`services/spoonacularFoodClient.ts`, `searchGroceryProductByUPC`) — **not OpenFoodFacts** — then fetches nutrition facts for that product name from USDA FoodData Central as above.
+
+### Currency Display
+
+- `services/currencyService.ts` converts USD-denominated grocery prices (all price data in the app is sourced/computed in USD) into a user-selected display currency (EUR, GBP, CAD, AUD, JPY, MXN, INR, BRL, CNY) for display purposes only.
+- Exchange rates come from the free, no-key **frankfurter.app** API, cached in `localStorage` for 24 hours.
 
 ## Recent Changes
 - **Meal Planner Redesign**: Complete overhaul with unified calendar interface, day detail modals, and integrated recipe search
@@ -267,7 +290,7 @@ Centralized data management for all Firestore operations.
      ```
    - Do not commit this file (it's in `.gitignore`).
 4. **Configure Firebase:**
-   - Update `services/firebase.ts` (or `firebaseConfig.ts`) with your Firebase project settings.
+   - Update `firebaseConfig.ts` (SDK config values come from `VITE_firebaseConfig.ts`) with your Firebase project settings.
 5. **Build the web app:**
    ```
    npm run build
@@ -312,10 +335,6 @@ Centralized data management for all Firestore operations.
 - [Capacitor Local Notifications](https://capacitorjs.com/docs/apis/local-notifications)
 - [Firebase Analytics](https://firebase.google.com/docs/analytics)
 - [Firebase Firestore](https://firebase.google.com/docs/firestore)
-- [Stripe Documentation](https://stripe.com/docs)
-- [Stripe React SDK](https://stripe.com/docs/stripe-js/react)
-- [PayPal Developer](https://developer.paypal.com)
-- [PayPal Subscriptions](https://developer.paypal.com/docs/subscriptions/)
 
 ## Contact
 For questions or feature requests, use the feedback form in the app or open an issue on GitHub.
@@ -325,8 +344,8 @@ For questions or feature requests, use the feedback form in the app or open an i
 The following user-friendly and productivity improvements were identified during a recent code review. Items marked **(Done)** have been implemented in the codebase; others include a short implementation note.
 
 - Scan review modal: Allow users to review and edit AI-parsed items before saving (local edit, no extra API usage). **(Done)**
-- Onboarding & First-run Flow: Add interactive first-run tutorial that highlights `PantryScanner`, adding items, and the meal planner. Implementation: small modal tour persisted to `user.hasSeenTutorial` in `useAuth`.
-- Barcode/Product Lookup: Integrate OpenFoodFacts or similar for barcode->product lookup to auto-fill nutrition and images. Implementation: add fallback in `handleScanBarcode` to call lookup API and populate fields.
+- Onboarding & First-run Flow: Interactive first-run flow implemented in `components/auth-onboarding/ModernOnboardingFlow.tsx` (wraps `ModernOnboarding.tsx`), rendered from `App.tsx`. **(Done)**
+- Barcode/Product Lookup: Barcode scanner decodes UPC/EAN on-device (zxing), looks up the product title via Spoonacular's grocery product API (not OpenFoodFacts), then fetches nutrition facts via USDA. **(Done)**
 - Offline Support & Conflict Resolution: Queue writes locally (IndexedDB) when offline and present simple conflict-resolution UI on reconnect. Implementation: small write-queue service + UI to accept/merge remote changes.
 - Undo & Change History: Store recent actions per item and allow a one-step undo; add an item history view in `ItemDetailModal`.
 - Bulk Edit Actions (Move location, set expiration, add to shopping list, delete): UI available in `PantryScanner` bulk mode; implemented as a bulk-action toolbar. **(Done)**

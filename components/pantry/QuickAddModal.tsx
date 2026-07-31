@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Mic, MicOff, Camera, Search, Plus, Loader2 } from 'lucide-react';
 import { useIntl } from 'react-intl';
+import { Capacitor } from '@capacitor/core';
+import { SpeechRecognition } from '@capacitor-community/speech-recognition';
 import { BottomSheet } from '../ui';
 import { useAndroidBack } from '../../hooks/useAndroidBack';
 import { useAppActions } from '../../contexts/AppActionsContext';
@@ -122,6 +124,44 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
   }, [input, recentItems]);
 
   const handleVoiceInput = async () => {
+    if (Capacitor.isNativePlatform()) {
+      if (isListening) return;
+      try {
+        const { available } = await SpeechRecognition.available();
+        if (!available) {
+          addToast('Voice input is not available on this device.', 'error');
+          return;
+        }
+        await SpeechRecognition.requestPermissions();
+        setIsListening(true);
+        await SpeechRecognition.start({
+          language: intl.locale || 'en-US',
+          maxResults: 1,
+          popup: false,
+        });
+        let resolveMatches: ((data: { matches: string[] }) => void) | undefined;
+        const listenerHandle = await SpeechRecognition.addListener('partialResults', (data: { matches: string[] }) => {
+          resolveMatches?.(data);
+        });
+        try {
+          const { matches } = await new Promise<{ matches: string[] }>((resolve, reject) => {
+            resolveMatches = resolve;
+            setTimeout(() => reject(new Error('timeout')), 10000);
+          });
+          const transcript = matches?.[0];
+          if (transcript) setInput(transcript);
+        } finally {
+          await listenerHandle.remove();
+        }
+      } catch (error) {
+        log.error('Voice input failed', { error }, 'QuickAddModal');
+      } finally {
+        setIsListening(false);
+        await SpeechRecognition.stop().catch(() => {});
+      }
+      return;
+    }
+
     if (!recognitionRef.current) {
       // Fallback to custom voice input if available
       if (onVoiceInput) {
@@ -136,6 +176,8 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
         } finally {
           setIsListening(false);
         }
+      } else {
+        addToast('Voice input is not supported in this browser.', 'error');
       }
       return;
     }
@@ -235,6 +277,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
               disabled={!input.trim()}
               className="px-4 py-3 bg-[var(--accent-color)] text-white rounded-lg hover:bg-[var(--accent-color)]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
               data-testid="quickadd-submit"
+              aria-label="Add item"
             >
               <Plus className="w-5 h-5" />
             </button>

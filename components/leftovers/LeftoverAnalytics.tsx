@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { LeftoverService } from '../../services/leftoverService';
 import FoodWasteAnalyticsService, { FoodWasteAnalytics } from '../../services/foodWasteAnalyticsService';
+import { formatCurrency } from '../../services/currencyService';
 import { InventoryCacheService } from '../../services/inventoryCacheService';
 import { Capacitor } from '@capacitor/core';
 import { Share } from '@capacitor/share';
@@ -479,19 +480,19 @@ export const LeftoverAnalytics: React.FC<LeftoverAnalyticsProps> = ({ householdI
           <div className="space-y-2">
             <div className="flex justify-between">
               <span className="text-green-400">Value Saved (Est.):</span>
-              <span className="font-semibold text-green-400">${analytics.estimatedValueSaved.toFixed(2)}</span>
+              <span className="font-semibold text-green-400">{formatCurrency(analytics.estimatedValueSaved)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-red-400 flex items-center gap-1">
                 Potential Waste (Est.):
                 <span className="text-xs text-red-400/70" title="Assumes a 30% waste rate for leftovers older than 7 days">(30% over 7d old)</span>
               </span>
-              <span className="font-semibold text-red-400">${analytics.estimatedValueWasted.toFixed(2)}</span>
+              <span className="font-semibold text-red-400">{formatCurrency(analytics.estimatedValueWasted)}</span>
             </div>
             <div className="flex justify-between border-t border-theme pt-2">
               <span className="text-theme-primary">Net Savings (Est.):</span>
               <span className="font-semibold text-theme-primary">
-                ${(analytics.estimatedValueSaved - analytics.estimatedValueWasted).toFixed(2)}
+                {formatCurrency(analytics.estimatedValueSaved - analytics.estimatedValueWasted)}
               </span>
             </div>
           </div>
@@ -530,7 +531,7 @@ export const LeftoverAnalytics: React.FC<LeftoverAnalyticsProps> = ({ householdI
             </div>
             <div className="flex justify-between">
               <span>Total Waste Value:</span>
-              <span className="font-semibold text-red-400">${analytics.totalWasteValue.toFixed(2)}</span>
+              <span className="font-semibold text-red-400">{formatCurrency(analytics.totalWasteValue)}</span>
             </div>
           </div>
         </div>
@@ -619,7 +620,7 @@ export const LeftoverAnalytics: React.FC<LeftoverAnalyticsProps> = ({ householdI
                     <PiggyBank className="w-6 h-6" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <span className="text-2xl font-black text-theme-primary block leading-none mb-1">${analytics.moneySaved.toFixed(2)}</span>
+                    <span className="text-2xl font-black text-theme-primary block leading-none mb-1">{formatCurrency(analytics.moneySaved)}</span>
                     <h3 className="font-bold text-sm text-theme-primary">Eco Savings</h3>
                     <p className="text-xs text-theme-secondary opacity-75">Estimated budget saved by preventing food waste</p>
                   </div>

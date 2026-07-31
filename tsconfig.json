@@ -49,6 +49,7 @@
     "**/*.spec.ts",
     "**/*.spec.tsx",
     "spoonacular-api-clients",
-    "spoonacular-api-clients/**/*"
+    "spoonacular-api-clients/**/*",
+    "public"
   ]
 }

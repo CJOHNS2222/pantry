@@ -31,6 +31,21 @@
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/post-edit-typecheck.cjs",
+            "timeout": 180,
+            "async": true,
+            "asyncRewake": true,
+            "statusMessage": "Type-checking touched file..."
+          }
+        ]
+      }
     ]
   }
 }

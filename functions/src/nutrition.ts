@@ -1,9 +1,10 @@
 import {onCall, HttpsError} from "firebase-functions/v2/https";
 import {logger} from "firebase-functions/v2";
 import * as admin from 'firebase-admin';
+import {getApps} from 'firebase-admin/app';
 
 // Ensure the Admin SDK is initialized
-if (!admin.apps?.length) {
+if (!getApps().length) {
   admin.initializeApp();
 }
 
@@ -13,6 +14,10 @@ if (!admin.apps?.length) {
  */
 export const getNutritionData = onCall(async (request) => {
   try {
+    if (!request.auth?.uid) {
+      throw new HttpsError('unauthenticated', 'Authentication required.');
+    }
+
     const { query, pageSize = 5, fdcId } = request.data;
 
     // If fdcId is provided, fetch detailed nutrition information

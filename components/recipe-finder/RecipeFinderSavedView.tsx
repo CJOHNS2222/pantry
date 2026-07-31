@@ -17,6 +17,8 @@ import { Tab } from '../../types/app';
 import RecipeImportModal from './RecipeImportModal';
 import { RecipeCardSkeleton } from '../ui/SkeletonLoader';
 import { RecipeExportModal } from './RecipeExportModal';
+import { EmptyState } from '../ui/EmptyState';
+import { PaywallPrompt } from '../ui/PaywallPrompt';
 
 interface RecipeFinderSavedViewProps {
   showImportModal: boolean;
@@ -154,17 +156,12 @@ export const RecipeFinderSavedView: React.FC<RecipeFinderSavedViewProps> = ({
       {showImportModal && <RecipeImportModal open={showImportModal} onClose={() => setShowImportModal(false)} />}
 
       {recipeSaveLimitExceeded && (
-        <div className="mb-3 p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center justify-between gap-2">
-          <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">
-            Save limit reached ({savedRecipes.length} saved) - upgrade to save more
-          </p>
-          <button
-            onClick={() => setActiveTab(Tab.SETTINGS)}
-            className="text-xs font-bold text-[var(--accent-color)] shrink-0 hover:opacity-80 transition-opacity"
-          >
-            Upgrade
-          </button>
-        </div>
+        <PaywallPrompt
+          className="mb-3"
+          feature="saved recipes"
+          message={`Save limit reached (${savedRecipes.length} saved) - upgrade to save more`}
+          onUpgrade={() => setActiveTab(Tab.SETTINGS)}
+        />
       )}
 
       {/* Sub-view sliding segments */}
@@ -198,10 +195,10 @@ export const RecipeFinderSavedView: React.FC<RecipeFinderSavedViewProps> = ({
           ))}
         </div>
       ) : savedRecipes.length === 0 ? (
-        <div className="text-center py-12 opacity-35 bg-theme-secondary rounded-2xl border border-theme">
-          <Bookmark className="w-12 h-12 mx-auto mb-2 text-theme-secondary" />
-          <p className="text-sm font-medium">{intl.formatMessage({ id: 'recipes.noSaved' })}</p>
-        </div>
+        <EmptyState
+          preset="recipes"
+          title={intl.formatMessage({ id: 'recipes.noSaved' })}
+        />
       ) : (
         <>
           {/* ────────────────── VIEW MODE: ALL SAVED RECIPES ────────────────── */}
@@ -271,13 +268,12 @@ export const RecipeFinderSavedView: React.FC<RecipeFinderSavedViewProps> = ({
                   </div>
 
                   {Object.keys(collections).length === 0 ? (
-                    <div className="text-center py-12 bg-theme-secondary rounded-2xl border border-theme opacity-50 space-y-2">
-                      <FolderOpen className="w-10 h-10 mx-auto text-theme-secondary" />
-                      <h4 className="font-bold text-theme-primary text-sm">No Cookbooks Yet</h4>
-                      <p className="text-xs max-w-xs mx-auto">
-                        Create a cookbook and group your saved recipes (e.g., "Quick Dinners" or "Holiday Treats") to plan efficiently.
-                      </p>
-                    </div>
+                    <EmptyState
+                      icon={<FolderOpen className="w-10 h-10" />}
+                      title="No Cookbooks Yet"
+                      description='Create a cookbook and group your saved recipes (e.g., "Quick Dinners" or "Holiday Treats") to plan efficiently.'
+                      className="opacity-50"
+                    />
                   ) : (
                     <div className="grid grid-cols-2 gap-4">
                       {Object.entries(collections).map(([name, recipeTitles]) => (
@@ -332,13 +328,12 @@ export const RecipeFinderSavedView: React.FC<RecipeFinderSavedViewProps> = ({
 
                   {/* Cookbook Recipes Grid */}
                   {collectionRecipes.length === 0 ? (
-                    <div className="text-center py-12 bg-theme-secondary rounded-2xl border border-theme opacity-50 space-y-2">
-                      <Bookmark className="w-10 h-10 mx-auto text-theme-secondary" />
-                      <h4 className="font-bold text-theme-primary text-sm">Empty Cookbook</h4>
-                      <p className="text-xs max-w-xs mx-auto">
-                        Go to the **All Saved** tab and click the "+" icon in the top-right corner of any recipe to add it here.
-                      </p>
-                    </div>
+                    <EmptyState
+                      icon={<Bookmark className="w-10 h-10" />}
+                      title="Empty Cookbook"
+                      description='Go to the **All Saved** tab and click the "+" icon in the top-right corner of any recipe to add it here.'
+                      className="opacity-50"
+                    />
                   ) : (
                     <div className="grid grid-cols-3 gap-4">
                       {collectionRecipes.map(r => (

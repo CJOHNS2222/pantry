@@ -1,4 +1,5 @@
-import { increment, arrayUnion, Timestamp, serverTimestamp, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
+import { increment, arrayUnion, runTransaction, Timestamp, serverTimestamp, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
+import { db } from '../firebaseConfig';
 import DatabaseMonitoringService from './databaseMonitoringService';
 import {
   RecipeRating,
@@ -41,6 +42,16 @@ export class RecipeRatingService {
   static async submitRating(rating: RecipeRating, userId: string, householdId?: string): Promise<void> {
     try {
       const ratingRef = DatabaseMonitoringService.doc(this.RATINGS_COLLECTION, rating.id);
+
+      // Ratings are keyed by rating.id, which is reused when a user edits their existing
+      // rating (see components/recipes-meals/RecipeRating.tsx). Capture the prior values
+      // here so updateCommunityStats can apply a net delta instead of re-reading/recomputing
+      // the entire rating history for this recipe on every submission.
+      const existingRatingSnap = await DatabaseMonitoringService.getDoc(ratingRef);
+      const previousRating = existingRatingSnap.exists()
+        ? (existingRatingSnap.data() as RecipeRating)
+        : null;
+
       const ratingData = {
         ...rating,
         userId,
@@ -53,11 +64,20 @@ export class RecipeRatingService {
       const cleanRatingData = sanitizeForFirestore(ratingData);
       await DatabaseMonitoringService.setDoc(ratingRef, cleanRatingData);
 
+      // Update community stats incrementally (transaction-based, no full history read)
+      await this.updateCommunityStats(rating.recipeTitle, {
+        rating: rating.rating,
+        wouldMakeAgain: rating.wouldMakeAgain ?? false,
+        feedback: rating.feedback
+      }, previousRating ? {
+        rating: previousRating.rating,
+        wouldMakeAgain: previousRating.wouldMakeAgain ?? false,
+        feedback: previousRating.feedback
+      } : null);
+
       // If the rating includes recipe data, ensure it's saved to the recipes collection
       if (rating.recipe) {
         const recipeId = await this.ensureRecipeExists(rating.recipe, userId);
-        // Update community stats
-        await this.updateCommunityStats(rating.recipeTitle, householdId);
 
         // Update single-doc community-rated cache so UI can read one document
         try {
@@ -67,9 +87,6 @@ export class RecipeRatingService {
           log.warn('Failed to update community-rated cache after rating', { error: e, recipeTitle: rating.recipeTitle });
         }
       } else {
-        // Update community stats
-        await this.updateCommunityStats(rating.recipeTitle, householdId);
-
         // Update single-doc community-rated cache so UI can read one document
         try {
           await upsertCommunityRatedRecipeByTitle(rating.recipeTitle);
@@ -221,50 +238,120 @@ export class RecipeRatingService {
   }
 
   /**
-   * Update community statistics after a rating is submitted
+   * One-time full-history recompute, used only to backfill the incremental bookkeeping
+   * fields (ratingSum / wouldMakeAgainCount / feedbackCounts) on legacy stats docs that
+   * predate those fields. Once backfilled, updateCommunityStats never needs to re-read
+   * the full rating history again for that recipe.
    */
-  private static async updateCommunityStats(recipeTitle: string, _householdId?: string): Promise<void> {
+  private static async recomputeStatsFromHistory(recipeTitle: string): Promise<{
+    totalRatings: number;
+    ratingSum: number;
+    wouldMakeAgainCount: number;
+    feedbackCounts: Record<string, number>;
+  }> {
+    const ratingsQuery = DatabaseMonitoringService.query(
+      DatabaseMonitoringService.collection(this.RATINGS_COLLECTION),
+      DatabaseMonitoringService.where('recipeTitle', '==', recipeTitle)
+    );
+    const ratingsSnapshot = await DatabaseMonitoringService.getDocs(ratingsQuery);
+    const ratings = ratingsSnapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => doc.data() as RecipeRating);
+
+    const totalRatings = ratings.length;
+    const ratingSum = ratings.reduce((sum: number, r: RecipeRating) => sum + r.rating, 0);
+    const wouldMakeAgainCount = ratings.filter((r: RecipeRating) => r.wouldMakeAgain).length;
+
+    const feedbackCounts: Record<string, number> = {};
+    ratings.forEach((rating: RecipeRating) => {
+      if (rating.feedback) {
+        rating.feedback.forEach((fb: RecipeFeedback) => {
+          feedbackCounts[fb.type] = (feedbackCounts[fb.type] || 0) + 1;
+        });
+      }
+    });
+
+    return { totalRatings, ratingSum, wouldMakeAgainCount, feedbackCounts };
+  }
+
+  /**
+   * Update community statistics after a rating is submitted or edited.
+   *
+   * Runs in a Firestore transaction and updates aggregate fields incrementally
+   * (running sum + count, rather than re-reading and recomputing the entire rating
+   * history on every submission). Averages are derived from the running sum/count -
+   * never incremented directly, since an average is not itself incrementable.
+   *
+   * `previousRating` should be the prior stored values for this same rating.id when a
+   * user is editing an existing rating (ratings are keyed by id and overwritten in
+   * place), so its contribution can be netted out before the new values are applied.
+   * Pass `null` for a brand-new rating.
+   */
+  private static async updateCommunityStats(
+    recipeTitle: string,
+    newRating: { rating: number; wouldMakeAgain: boolean; feedback?: RecipeFeedback[] },
+    previousRating?: { rating: number; wouldMakeAgain: boolean; feedback?: RecipeFeedback[] } | null
+  ): Promise<void> {
     try {
-      const ratingsQuery = DatabaseMonitoringService.query(
-        DatabaseMonitoringService.collection(this.RATINGS_COLLECTION),
-        DatabaseMonitoringService.where('recipeTitle', '==', recipeTitle)
-      );
-      const ratingsSnapshot = await DatabaseMonitoringService.getDocs(ratingsQuery);
-      const ratings = ratingsSnapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => doc.data() as RecipeRating);
-
-      if (ratings.length === 0) return;
-
-      // Calculate stats
-      const totalRatings = ratings.length;
-      const averageRating = ratings.reduce((sum: number, r: RecipeRating) => sum + r.rating, 0) / totalRatings;
-      const wouldMakeAgainCount = ratings.filter((r: RecipeRating) => r.wouldMakeAgain).length;
-      const wouldMakeAgainPercentage = (wouldMakeAgainCount / totalRatings) * 100;
-
-      // Calculate top feedback
-      const feedbackCount: Record<string, number> = {};
-      ratings.forEach((rating: RecipeRating) => {
-        if (rating.feedback) {
-          rating.feedback.forEach((fb: RecipeFeedback) => {
-            feedbackCount[fb.type] = (feedbackCount[fb.type] || 0) + 1;
-          });
-        }
-      });
-
-      const topFeedback = Object.entries(feedbackCount)
-        .sort(([,a], [,b]) => b - a)
-        .slice(0, 5)
-        .map(([type]) => ({ type: type as RecipeFeedback['type'] }));
-
-      // Update stats document
       const statsRef = DatabaseMonitoringService.doc(this.COMMUNITY_STATS_COLLECTION, recipeTitle);
-      await DatabaseMonitoringService.setDoc(statsRef, {
-        totalRatings,
-        averageRating,
-        wouldMakeAgainPercentage,
-        topFeedback,
-        lastUpdated: Timestamp.now()
-      });
 
+      await runTransaction(db, async (transaction) => {
+        const statsSnap = await transaction.get(statsRef);
+        const data = statsSnap.exists() ? (statsSnap.data() as RecipeCommunityStats) : undefined;
+
+        let totalRatings = data?.totalRatings ?? 0;
+        let ratingSum = data?.ratingSum;
+        let wouldMakeAgainCount = data?.wouldMakeAgainCount;
+        let feedbackCounts = data?.feedbackCounts as Record<string, number> | undefined;
+
+        // Legacy stats doc (or first write ever) - backfill the running-aggregate fields
+        // from a one-time full history scan. All subsequent writes stay incremental.
+        if (ratingSum === undefined || wouldMakeAgainCount === undefined || feedbackCounts === undefined) {
+          const backfill = await this.recomputeStatsFromHistory(recipeTitle);
+          totalRatings = backfill.totalRatings;
+          ratingSum = backfill.ratingSum;
+          wouldMakeAgainCount = backfill.wouldMakeAgainCount;
+          feedbackCounts = { ...backfill.feedbackCounts };
+        } else {
+          feedbackCounts = { ...feedbackCounts };
+        }
+
+        // Net out the previous rating's contribution when editing an existing rating,
+        // so the aggregates reflect a swap rather than double-counting.
+        if (previousRating) {
+          ratingSum -= previousRating.rating;
+          wouldMakeAgainCount -= previousRating.wouldMakeAgain ? 1 : 0;
+          (previousRating.feedback || []).forEach((fb: RecipeFeedback) => {
+            feedbackCounts![fb.type] = Math.max(0, (feedbackCounts![fb.type] || 0) - 1);
+          });
+        } else {
+          totalRatings += 1;
+        }
+
+        ratingSum += newRating.rating;
+        wouldMakeAgainCount += newRating.wouldMakeAgain ? 1 : 0;
+        (newRating.feedback || []).forEach((fb: RecipeFeedback) => {
+          feedbackCounts![fb.type] = (feedbackCounts![fb.type] || 0) + 1;
+        });
+
+        const averageRating = totalRatings > 0 ? ratingSum / totalRatings : 0;
+        const wouldMakeAgainPercentage = totalRatings > 0 ? (wouldMakeAgainCount / totalRatings) * 100 : 0;
+
+        const topFeedback = Object.entries(feedbackCounts)
+          .filter(([, count]) => count > 0)
+          .sort(([, a], [, b]) => b - a)
+          .slice(0, 5)
+          .map(([type]) => ({ type: type as RecipeFeedback['type'] }));
+
+        transaction.set(statsRef, {
+          totalRatings,
+          ratingSum,
+          averageRating,
+          wouldMakeAgainCount,
+          wouldMakeAgainPercentage,
+          feedbackCounts,
+          topFeedback,
+          lastUpdated: Timestamp.now()
+        });
+      });
     } catch (err: unknown) {
       log.error('Failed to update community stats', { err, recipeTitle });
     }

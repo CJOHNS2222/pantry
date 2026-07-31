@@ -1,10 +1,12 @@
-import {onCall, onRequest, HttpsError} from "firebase-functions/v2/https";
+import {onCall, HttpsError} from "firebase-functions/v2/https";
 import {logger} from "firebase-functions/v2";
 import admin from 'firebase-admin';
+import {getApps} from 'firebase-admin/app';
 import {getFirestore} from "firebase-admin/firestore";
+import {getAuth} from 'firebase-admin/auth';
 
 // Ensure the Admin SDK is initialized
-if (!admin.apps?.length) {
+if (!getApps().length) {
   admin.initializeApp();
 }
 
@@ -28,7 +30,7 @@ async function migrateHouseholdClaimsCore() {
     for (const userId of memberIds) {
       try {
         // Set the custom claim for this user
-        await admin.auth().setCustomUserClaims(userId, { householdId });
+        await getAuth().setCustomUserClaims(userId, { householdId });
         usersUpdated.push(userId);
         totalUsersUpdated++;
         logger.info('Set householdId claim for user', { userId, householdId });
@@ -58,8 +60,10 @@ export const migrateHouseholdClaims = onCall(async (request) => {
     throw new HttpsError('unauthenticated', 'You must be logged in to run migrations.');
   }
 
-  // Only allow admin users to run this migration (you might want to check for admin claims)
-  // For now, allowing any authenticated user - you should restrict this in production
+  // Admin-only: caller must carry the "admin" custom claim.
+  if (request.auth.token?.admin !== true) {
+    throw new HttpsError('permission-denied', 'Only admins may run this migration.');
+  }
 
   try {
     return await migrateHouseholdClaimsCore();
@@ -68,29 +72,3 @@ export const migrateHouseholdClaims = onCall(async (request) => {
     throw new HttpsError('internal', 'Migration failed: ' + (err as Error).message);
   }
 });
-
-// HTTP version for direct calling (useful for migration scripts)
-export const migrateHouseholdClaimsHttp = onRequest(
-  { cors: true, region: "us-central1" },
-  async (req, res) => {
-    // Only allow POST requests
-    if (req.method !== 'POST') {
-      res.status(405).send('Method not allowed');
-      return;
-    }
-
-    try {
-      // For security, you might want to add authentication checks here
-      // For now, allowing any request - you should restrict this in production
-
-      const result = await migrateHouseholdClaimsCore();
-      res.status(200).json(result);
-    } catch (err: any) {
-      logger.error('HTTP Migration error', err);
-      res.status(500).json({
-        success: false,
-        error: (err as Error).message
-      });
-    }
-  }
-);

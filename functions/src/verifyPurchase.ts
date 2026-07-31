@@ -19,10 +19,11 @@
 import {onCall, HttpsError} from "firebase-functions/v2/https";
 import {logger} from "firebase-functions/v2";
 import admin from "firebase-admin";
+import {getApps} from "firebase-admin/app";
 import {getFirestore, Timestamp} from "firebase-admin/firestore";
 import {PRODUCT_TIER_MAP, resolveSubscriptionState} from "./googlePlayHelpers";
 
-if (!admin.apps?.length) {
+if (!getApps().length) {
   admin.initializeApp();
 }
 
@@ -33,21 +34,46 @@ export const verifyPurchase = onCall(async (request) => {
   }
 
   const {receipt} = (request.data ?? {}) as {receipt: any; userId: string};
-  if (!receipt) {
-    throw new HttpsError("invalid-argument", "Receipt is required.");
+  if (!receipt || typeof receipt !== "object" || Array.isArray(receipt)) {
+    throw new HttpsError("invalid-argument", "Receipt is required and must be an object.");
   }
 
-  // Extract fields from the cordova-plugin-purchase receipt
-  const transaction = receipt.transactions?.[0];
-  const purchaseToken: string | undefined =
-    transaction?.purchaseToken ?? transaction?.token;
-  const productId: string | undefined =
-    transaction?.products?.[0]?.id ?? transaction?.productId;
-
-  if (!purchaseToken || !productId) {
+  // ── Validate the cordova-plugin-purchase receipt shape before touching it ──
+  // Client input is untrusted: `receipt.transactions` must be a non-empty array,
+  // and the first entry must carry a string token + product id in one of the
+  // shapes the plugin emits, before we read anything off it.
+  if (!Array.isArray(receipt.transactions) || receipt.transactions.length === 0) {
     throw new HttpsError(
       "invalid-argument",
-      "Invalid receipt: missing purchaseToken or productId."
+      "Invalid receipt: transactions must be a non-empty array."
+    );
+  }
+
+  const transaction = receipt.transactions[0];
+  if (!transaction || typeof transaction !== "object" || Array.isArray(transaction)) {
+    throw new HttpsError("invalid-argument", "Invalid receipt: malformed transaction entry.");
+  }
+
+  const purchaseToken: string | undefined =
+    typeof transaction.purchaseToken === "string" ? transaction.purchaseToken :
+    typeof transaction.token === "string" ? transaction.token : undefined;
+
+  const rawProductId: unknown =
+    (Array.isArray(transaction.products) && transaction.products[0]?.id !== undefined
+      ? transaction.products[0].id
+      : transaction.productId);
+  const productId: string | undefined = typeof rawProductId === "string" ? rawProductId : undefined;
+
+  if (!purchaseToken || purchaseToken.trim().length === 0) {
+    throw new HttpsError(
+      "invalid-argument",
+      "Invalid receipt: missing or non-string purchaseToken."
+    );
+  }
+  if (!productId || productId.trim().length === 0) {
+    throw new HttpsError(
+      "invalid-argument",
+      "Invalid receipt: missing or non-string productId."
     );
   }
 

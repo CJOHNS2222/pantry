@@ -1,13 +1,15 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { DollarSign, Calculator, TrendingUp, Users, RefreshCw, Lock } from 'lucide-react';
+import { DollarSign, Calculator, TrendingUp, Users, RefreshCw } from 'lucide-react';
 import { DayPlan, PantryItem, ShoppingItem } from '../../types';
 import { Tab } from '../../types/app';
 import { groceryPriceService, PriceData } from '../../services/groceryPriceService';
+import { formatCurrency } from '../../services/currencyService';
 import { parseIngredientForShoppingList, consolidateShoppingList } from '../../utils/appUtils';
 import { useAppActions } from '../../contexts/AppActionsContext';
 import { useApp } from '../../contexts/AppContext';
 import { log } from '../../services/logService';
 import AnalyticsService from '../../services/analyticsService';
+import { PaywallPrompt } from '../ui/PaywallPrompt';
 
 interface GroceryCostEstimatorProps {
   mealPlan: DayPlan[];
@@ -403,6 +405,7 @@ export const GroceryCostEstimator: React.FC<GroceryCostEstimatorProps> = ({ meal
           <button
             onClick={() => toggleEstimator(false)}
             className="text-theme-secondary hover:text-theme-primary"
+            aria-label="Close"
           >
             ✕
           </button>
@@ -412,11 +415,19 @@ export const GroceryCostEstimator: React.FC<GroceryCostEstimatorProps> = ({ meal
       <div className="space-y-4">
         <div className="bg-theme-secondary/10 rounded-lg p-4">
           <div className="text-2xl font-bold text-green-600">
-            ${totalCost.toFixed(2)}
+            {formatCurrency(totalCost)}
           </div>
           <div className="text-sm text-theme-secondary">
             Estimated cost for {includeAllIngredients ? 'all' : 'missing'} ingredients
-            {lockedCount > 0 && <button onClick={() => setActiveTab(Tab.SETTINGS)} className="ml-1 inline-flex items-center gap-1 text-amber-600 hover:text-amber-700 underline text-xs"><Lock className="w-3 h-3" />first {freeItemLimit} shown — upgrade for full estimate</button>}
+            {lockedCount > 0 && (
+              <PaywallPrompt
+                variant="inline"
+                feature="grocery cost estimates"
+                message={`first ${freeItemLimit} shown — upgrade for full estimate`}
+                onUpgrade={() => setActiveTab(Tab.SETTINGS)}
+                className="ml-1 text-amber-600 hover:text-amber-700 underline text-xs"
+              />
+            )}
           </div>
         </div>
 
@@ -457,10 +468,10 @@ export const GroceryCostEstimator: React.FC<GroceryCostEstimatorProps> = ({ meal
                         )}
                       </div>
                       <div className="text-right">
-                        <span className="font-medium text-lg">${item.estimatedCost.toFixed(2)}</span>
+                        <span className="font-medium text-lg">{formatCurrency(item.estimatedCost)}</span>
                         {hasRealTimeData && (
                           <div className="text-xs text-theme-secondary/70">
-                            ${realTimeData.minPrice.toFixed(2)} - ${realTimeData.maxPrice.toFixed(2)}
+                            {formatCurrency(realTimeData.minPrice)} - {formatCurrency(realTimeData.maxPrice)}
                           </div>
                         )}
                       </div>

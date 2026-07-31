@@ -3,12 +3,14 @@ import { getFirestore } from 'firebase-admin/firestore';
 import { logger } from 'firebase-functions/v2';
 import { randomUUID } from 'node:crypto';
 import admin from 'firebase-admin';
+import {getApps} from 'firebase-admin/app';
 
-if (!admin.apps?.length) {
+if (!getApps().length) {
   admin.initializeApp();
 }
 
 const db = getFirestore();
+const USER_PAGE_SIZE = 500;
 
 /**
  * Server-side daily reminders: today's planned meals (prep nudge) and pantry items
@@ -296,37 +298,50 @@ async function buildDailyDigest(
 async function runDailyReminders(): Promise<void> {
   logger.info('Starting daily reminders (meal prep + expiring inventory)');
 
-  const usersSnapshot = await db.collection('users').get();
   const todayString = new Date().toISOString().slice(0, 10);
+  const usersRef = db.collection('users');
 
   let usersNotified = 0;
   let errors = 0;
+  let lastDocId: string | undefined;
 
-  await Promise.all(usersSnapshot.docs.map(async (userDoc) => {
-    const userId = userDoc.id;
-    try {
-      const userData = userDoc.data() as { isGuest?: boolean; householdId?: string; profile?: { notificationSettings?: NotificationSettings } };
-      if (userData.isGuest) return;
-
-      const settings: NotificationSettings = {
-        ...DEFAULT_SETTINGS,
-        ...userData.profile?.notificationSettings,
-        types: { ...DEFAULT_SETTINGS.types, ...userData.profile?.notificationSettings?.types },
-      };
-      if (!settings.enabled) return;
-
-      const householdId = userData.householdId;
-      const digest = await buildDailyDigest(userId, householdId, todayString, settings);
-
-      if (digest) {
-        await appendNotifications(userId, [digest]);
-        usersNotified++;
-      }
-    } catch (err) {
-      errors++;
-      logger.error(`Failed to build daily reminders for user ${userId}:`, err);
+  for (;;) {
+    let pageQuery = usersRef.orderBy('__name__').limit(USER_PAGE_SIZE);
+    if (lastDocId) {
+      pageQuery = pageQuery.startAfter(lastDocId);
     }
-  }));
+    const pageSnapshot = await pageQuery.get();
+    if (pageSnapshot.empty) break;
+
+    await Promise.all(pageSnapshot.docs.map(async (userDoc) => {
+      const userId = userDoc.id;
+      try {
+        const userData = userDoc.data() as { isGuest?: boolean; householdId?: string; profile?: { notificationSettings?: NotificationSettings } };
+        if (userData.isGuest) return;
+
+        const settings: NotificationSettings = {
+          ...DEFAULT_SETTINGS,
+          ...userData.profile?.notificationSettings,
+          types: { ...DEFAULT_SETTINGS.types, ...userData.profile?.notificationSettings?.types },
+        };
+        if (!settings.enabled) return;
+
+        const householdId = userData.householdId;
+        const digest = await buildDailyDigest(userId, householdId, todayString, settings);
+
+        if (digest) {
+          await appendNotifications(userId, [digest]);
+          usersNotified++;
+        }
+      } catch (err) {
+        errors++;
+        logger.error(`Failed to build daily reminders for user ${userId}:`, err);
+      }
+    }));
+
+    lastDocId = pageSnapshot.docs[pageSnapshot.docs.length - 1].id;
+    if (pageSnapshot.docs.length < USER_PAGE_SIZE) break;
+  }
 
   logger.info(`Daily reminders complete. Notified ${usersNotified} users. Errors: ${errors}`);
 }

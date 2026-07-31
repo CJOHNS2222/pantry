@@ -275,6 +275,12 @@ export interface RecipeCommunityStats {
     householdAverageRating: number;
     householdWouldMakeAgain: number;
   };
+  // Internal running-aggregate bookkeeping used by RecipeRatingService.updateCommunityStats
+  // to derive averageRating/wouldMakeAgainPercentage/topFeedback incrementally without
+  // re-reading the full rating history on every submission. Not intended for direct UI use.
+  ratingSum?: number;
+  wouldMakeAgainCount?: number;
+  feedbackCounts?: Partial<Record<RecipeFeedback['type'], number>>;
 }
 
 export enum LoadingState {
@@ -336,6 +342,9 @@ export interface UserProfile {
   leftoverPersona?: 'strict' | 'normal' | 'relaxed';
   // Measurement system preference: 'Standard' (imperial) or 'Metric'
   measurementSystem?: 'Standard' | 'Metric';
+  // Preferred display currency (ISO 4217 code, e.g. 'USD', 'EUR'). Prices are sourced/computed
+  // in USD and converted for display via services/currencyService.ts.
+  currency?: string;
   // Food preferences
   favoriteCuisines?: string[];
   preferredProteins?: string[];

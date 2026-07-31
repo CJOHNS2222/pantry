@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { groceryPriceService } from '../../services/groceryPriceService';
 import { PriceTrend } from '../../types/app';
 import { log } from '../../services/logService';
+import { Modal } from '../ui/Modal';
 
 interface PriceTrendsProps {
   ingredient: string;
@@ -43,74 +44,68 @@ const PriceTrends: React.FC<PriceTrendsProps> = ({ ingredient, onClose }) => {
   };
 
   const getTrendColor = (change: number) => {
-    if (change > 0) return 'text-red-600';
-    if (change < 0) return 'text-green-600';
-    return 'text-gray-600';
+    if (change > 0) return 'text-red-500';
+    if (change < 0) return 'text-green-500';
+    return 'text-[var(--text-secondary)]';
   };
 
   if (loading) {
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full mx-4">
+      <Modal isOpen onClose={onClose} title="Price Trends" size="sm">
+        <Modal.Body>
           <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="mt-2 text-gray-600">Loading price trends...</p>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--accent-color)] mx-auto"></div>
+            <p className="mt-2 text-[var(--text-secondary)]">Loading price trends...</p>
           </div>
-        </div>
-      </div>
+        </Modal.Body>
+      </Modal>
     );
   }
 
   if (error || !trends) {
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full mx-4">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-semibold">Price Trends</h3>
-            <button onClick={onClose} className="text-gray-500 hover:text-gray-700" data-testid="pricetrends-close">✕</button>
-          </div>
-          <p className="text-red-600">{error || 'No trend data available'}</p>
+      <Modal isOpen onClose={onClose} title="Price Trends" size="sm">
+        <Modal.Body>
+          <p className="text-red-500">{error || 'No trend data available'}</p>
+        </Modal.Body>
+        <Modal.Footer align="between">
           <button
             onClick={onClose}
-            className="mt-4 w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700"
+            data-testid="pricetrends-close"
+            className="w-full bg-[var(--accent-color)] text-white py-2 px-4 rounded-lg hover:opacity-90 transition-opacity"
           >
             Close
           </button>
-        </div>
-      </div>
+        </Modal.Footer>
+      </Modal>
     );
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full mx-4 max-h-[80vh] overflow-y-auto">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-semibold">Price Trends for {ingredient}</h3>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700" data-testid="pricetrends-close">✕</button>
-        </div>
-
+    <Modal isOpen onClose={onClose} title={`Price Trends for ${ingredient}`} size="md">
+      <Modal.Body>
         <div className="space-y-4">
           {/* Current Price */}
-          <div className="bg-gray-50 p-4 rounded-lg">
-            <h4 className="font-medium mb-2">Current Price</h4>
+          <div className="bg-[var(--bg-secondary)] p-4 rounded-lg">
+            <h4 className="font-medium mb-2 text-[var(--text-primary)]">Current Price</h4>
             <div className="flex items-center justify-between">
-              <span className="text-2xl font-bold">{formatPrice(trends.currentPrice)}</span>
-              <span className="text-sm text-gray-500">
+              <span className="text-2xl font-bold text-[var(--text-primary)]">{formatPrice(trends.currentPrice)}</span>
+              <span className="text-sm text-[var(--text-secondary)]">
                 Last updated: {formatDate(trends.lastUpdated)}
               </span>
             </div>
           </div>
 
           {/* Price Change */}
-          <div className="bg-gray-50 p-4 rounded-lg">
-            <h4 className="font-medium mb-2">Price Change</h4>
+          <div className="bg-[var(--bg-secondary)] p-4 rounded-lg">
+            <h4 className="font-medium mb-2 text-[var(--text-primary)]">Price Change</h4>
             <div className="flex items-center space-x-2">
               <span className="text-2xl">{getTrendIcon(trends.priceChange)}</span>
               <div>
                 <span className={`text-xl font-bold ${getTrendColor(trends.priceChange)}`}>
                   {trends.priceChange > 0 ? '+' : ''}{formatPrice(trends.priceChange)}
                 </span>
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-[var(--text-secondary)]">
                   {trends.priceChangePercent > 0 ? '+' : ''}{trends.priceChangePercent.toFixed(1)}% from last month
                 </p>
               </div>
@@ -119,11 +114,11 @@ const PriceTrends: React.FC<PriceTrendsProps> = ({ ingredient, onClose }) => {
 
           {/* Price History */}
           {trends.priceHistory && trends.priceHistory.length > 0 && (
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <h4 className="font-medium mb-2">Recent Price History</h4>
+            <div className="bg-[var(--bg-secondary)] p-4 rounded-lg">
+              <h4 className="font-medium mb-2 text-[var(--text-primary)]">Recent Price History</h4>
               <div className="space-y-2 max-h-40 overflow-y-auto">
                 {trends.priceHistory.slice(-10).map((entry, index) => (
-                  <div key={index} className="flex justify-between text-sm">
+                  <div key={index} className="flex justify-between text-sm text-[var(--text-primary)]">
                     <span>{formatDate(entry.date)}</span>
                     <span className="font-medium">{formatPrice(entry.price)}</span>
                   </div>
@@ -133,9 +128,9 @@ const PriceTrends: React.FC<PriceTrendsProps> = ({ ingredient, onClose }) => {
           )}
 
           {/* Trend Analysis */}
-          <div className="bg-gray-50 p-4 rounded-lg">
-            <h4 className="font-medium mb-2">Trend Analysis</h4>
-            <p className="text-sm text-gray-700">
+          <div className="bg-[var(--bg-secondary)] p-4 rounded-lg">
+            <h4 className="font-medium mb-2 text-[var(--text-primary)]">Trend Analysis</h4>
+            <p className="text-sm text-[var(--text-secondary)]">
               {trends.priceChange > 0.1
                 ? `Prices are trending upward. Consider buying now if you need ${ingredient} soon.`
                 : trends.priceChange < -0.1
@@ -144,16 +139,17 @@ const PriceTrends: React.FC<PriceTrendsProps> = ({ ingredient, onClose }) => {
             </p>
           </div>
         </div>
-
+      </Modal.Body>
+      <Modal.Footer align="between">
         <button
           onClick={onClose}
-          className="mt-6 w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700"
           data-testid="pricetrends-close"
+          className="w-full bg-[var(--accent-color)] text-white py-2 px-4 rounded-lg hover:opacity-90 transition-opacity"
         >
           Close
         </button>
-      </div>
-    </div>
+      </Modal.Footer>
+    </Modal>
   );
 };
 

@@ -2,13 +2,13 @@ import React, { useState, useRef } from 'react';
 import { useIntl } from 'react-intl';
 import { Trash2, Calculator, MessageSquare, UserCheck, X, ChevronLeft } from 'lucide-react';
 import { ShoppingItem, StructuredRecipe, SavedRecipe, DayPlan } from '../../types';
-import { useApp } from '../../contexts/AppContext';
 import { comparePriceOptions, formatPricePerUnit, getPriceComparisonSummary } from '../../utils/priceCalculator';
+import { formatCurrency } from '../../services/currencyService';
 import { useAndroidBack } from '../../hooks/useAndroidBack';
 import HapticService from '../../services/hapticService';
 import { getItemImage, parseQuantityAndUnit } from '../../utils/appUtils';
 import { getSmartUnits } from '../pantry/QuantityUnitPicker';
-import { convertUnit, getUserMeasurementSystem, convertToMetric, convertToStandard, formatScaledQuantity } from '../../utils/measurementUtils';
+import { convertUnit, convertToMetric, convertToStandard, formatScaledQuantity } from '../../utils/measurementUtils';
 
 const getRecipeTitleFromSource = (source: string | undefined): string => {
   if (!source || !source.startsWith('recipe:')) return '';
@@ -90,9 +90,12 @@ interface ShoppingListItemProps {
   isOffline?: boolean;
   lastSynced?: Date;
   showPriceData?: boolean;
+  savedRecipes?: SavedRecipe[];
+  mealPlan?: DayPlan[];
+  measurementSystem?: 'Standard' | 'Metric';
 }
 
-export const EnhancedShoppingListItem: React.FC<ShoppingListItemProps> = ({
+const EnhancedShoppingListItemComponent: React.FC<ShoppingListItemProps> = ({
   item,
   onToggleCheck,
   onRemove,
@@ -104,6 +107,9 @@ export const EnhancedShoppingListItem: React.FC<ShoppingListItemProps> = ({
   isOffline = false,
   lastSynced,
   showPriceData = false,
+  savedRecipes = [],
+  mealPlan = [],
+  measurementSystem = 'Standard',
 }) => {
   const intl = useIntl();
   const [isOpen, setIsOpen] = useState(false);
@@ -111,9 +117,6 @@ export const EnhancedShoppingListItem: React.FC<ShoppingListItemProps> = ({
   const [showNotes, setShowNotes] = useState(false);
   const [noteText, setNoteText] = useState(item.notes ?? '');
   const itemRef = useRef<HTMLDivElement>(null);
-
-  const { savedRecipes, mealPlan, user } = useApp();
-  const measurementSystem = getUserMeasurementSystem(user?.profile);
 
   const handleRecipeClick = (e: React.MouseEvent, recipeTitle: string) => {
     e.stopPropagation();
@@ -469,8 +472,8 @@ export const EnhancedShoppingListItem: React.FC<ShoppingListItemProps> = ({
 
           {showPriceData && (
             item.estimatedPrice && item.estimatedPrice > 0 ? (
-              <div className="w-16 h-[30px] flex items-center justify-center text-xs font-medium text-green-600 dark:text-green-400 bg-green-500/10 dark:bg-green-500/20 px-1 rounded border border-green-500/20 text-center truncate" title={`~$${item.estimatedPrice.toFixed(2)}`}>
-                ~${item.estimatedPrice.toFixed(2)}
+              <div className="w-16 h-[30px] flex items-center justify-center text-xs font-medium text-green-600 dark:text-green-400 bg-green-500/10 dark:bg-green-500/20 px-1 rounded border border-green-500/20 text-center truncate" title={`~${formatCurrency(item.estimatedPrice)}`}>
+                ~{formatCurrency(item.estimatedPrice)}
               </div>
             ) : (
               <div className="w-16 h-[30px] rounded border border-dashed border-theme/40 bg-theme-primary/20 flex items-center justify-center text-[10px] text-theme-secondary opacity-40">
@@ -491,7 +494,7 @@ export const EnhancedShoppingListItem: React.FC<ShoppingListItemProps> = ({
                     if (!showNotes) setNoteText(item.notes ?? '');
                     setIsOpen(false);
                   }}
-                  className="p-1 w-9 h-[22px] flex items-center justify-center bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors cursor-pointer"
+                  className="p-1 min-w-[44px] min-h-[44px] flex items-center justify-center bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors cursor-pointer"
                   title={item.notes ? 'Edit note' : 'Add note'}
                   aria-label="Edit note"
                 >
@@ -504,7 +507,7 @@ export const EnhancedShoppingListItem: React.FC<ShoppingListItemProps> = ({
                   onRemove(item.id);
                   setIsOpen(false);
                 }}
-                className="p-1 w-9 h-[22px] flex items-center justify-center bg-red-600 text-white rounded hover:bg-red-700 transition-colors cursor-pointer"
+                className="p-1 min-w-[44px] min-h-[44px] flex items-center justify-center bg-red-600 text-white rounded hover:bg-red-700 transition-colors cursor-pointer"
                 aria-label={`Remove ${item.item}`}
               >
                 <Trash2 className="w-3.5 h-3.5" />
@@ -621,7 +624,7 @@ export const EnhancedShoppingListItem: React.FC<ShoppingListItemProps> = ({
                 >
                   <div className="flex-1">
                     <div className="text-sm font-medium">
-                      {option.amount}{option.unit} for ${option.price.toFixed(2)}
+                      {option.amount}{option.unit} for {formatCurrency(option.price)}
                       {option.store && <span className="text-xs opacity-70 ml-1">at {option.store}</span>}
                     </div>
                     <div className="text-xs opacity-70">
@@ -633,7 +636,7 @@ export const EnhancedShoppingListItem: React.FC<ShoppingListItemProps> = ({
                   </div>
                   {comparison?.savings && comparison.savings > 0 && (
                     <div className="text-xs text-red-600 font-medium">
-                      Save ${comparison.savings.toFixed(2)}
+                      Save {formatCurrency(comparison.savings)}
                     </div>
                   )}
                 </div>
@@ -645,5 +648,7 @@ export const EnhancedShoppingListItem: React.FC<ShoppingListItemProps> = ({
     </div>
   );
 };
+
+export const EnhancedShoppingListItem = React.memo(EnhancedShoppingListItemComponent);
 
 export default EnhancedShoppingListItem;

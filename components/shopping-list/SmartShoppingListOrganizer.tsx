@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { ShoppingItem } from '../../types';
+import { ShoppingItem, SavedRecipe, DayPlan } from '../../types';
 import { inferCategoryFromItemName } from '../../utils/appUtils';
 import EnhancedShoppingListItem from './EnhancedShoppingListItem';
 
@@ -22,6 +22,9 @@ interface SmartShoppingListOrganizerProps {
   isSelected?: (id: string) => boolean;
   onLongPress?: (id: string) => void;
   storeLayout?: string[]; // Custom order of store aisles
+  savedRecipes?: SavedRecipe[];
+  mealPlan?: DayPlan[];
+  measurementSystem?: 'Standard' | 'Metric';
 }
 
 export const SmartShoppingListOrganizer: React.FC<SmartShoppingListOrganizerProps> = ({
@@ -35,7 +38,10 @@ export const SmartShoppingListOrganizer: React.FC<SmartShoppingListOrganizerProp
   lastSynced,
   isSelected,
   onLongPress,
-  storeLayout
+  storeLayout,
+  savedRecipes,
+  mealPlan,
+  measurementSystem
 }) => {
   const aisleGroups = useMemo(() => {
     const defaultGroups: StoreAisleGroup[] = [
@@ -189,6 +195,9 @@ export const SmartShoppingListOrganizer: React.FC<SmartShoppingListOrganizerProp
                 lastSynced={lastSynced}
                 isSelected={isSelected ? isSelected(item.id) : false}
                 onLongPress={onLongPress}
+                savedRecipes={savedRecipes}
+                mealPlan={mealPlan}
+                measurementSystem={measurementSystem}
               />
             ))}
           </div>
