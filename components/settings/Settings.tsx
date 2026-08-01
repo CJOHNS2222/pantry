@@ -1460,7 +1460,7 @@ const SettingsComponent: React.FC<SettingsProps> = ({
               </div>
 
               {adminDashboardTab === 'monitoring' && <MonitoringDashboard user={user ?? null} />}
-              {adminDashboardTab === 'performance' && <PerformanceMonitoringDashboard />}
+              {adminDashboardTab === 'performance' && <PerformanceMonitoringDashboard inline={true} />}
               {adminDashboardTab === 'behavior' && <UserBehaviorAnalytics />}
             </div>
           )}

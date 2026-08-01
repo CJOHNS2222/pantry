@@ -93,6 +93,7 @@ export const ModernOnboarding: React.FC<ModernOnboardingProps> = ({
   const [committing, setCommitting] = useState(false);
   const [savedCount, setSavedCount] = useState(0);
   const [ingredientCount, setIngredientCount] = useState(0);
+  const [isRequestingNotifications, setIsRequestingNotifications] = useState(false);
   const onCompleteCalledRef = useRef(false);
 
   const STEPS: OnboardingStep[] = ['welcome', 'notifications', 'recipe-pick', 'ready'];
@@ -219,11 +220,10 @@ export const ModernOnboarding: React.FC<ModernOnboardingProps> = ({
 
   // ── STEP 2: Notifications ────────────────────────────────────────────────────
   const renderNotificationsStep = () => {
-    const [isRequesting, setIsRequesting] = useState(false);
     const handleEnable = async () => {
-      setIsRequesting(true);
+      setIsRequestingNotifications(true);
       try { await pushNotificationService.initialize(); } catch { /* ignore */ }
-      finally { setIsRequesting(false); handleStepTransition('recipe-pick'); }
+      finally { setIsRequestingNotifications(false); handleStepTransition('recipe-pick'); }
     };
 
     return (
@@ -255,14 +255,14 @@ export const ModernOnboarding: React.FC<ModernOnboardingProps> = ({
         <div className="space-y-3">
           <button
             onClick={handleEnable}
-            disabled={isRequesting}
+            disabled={isRequestingNotifications}
             className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:opacity-90 text-white py-4 px-6 rounded-2xl font-semibold transition-all flex items-center justify-center gap-2 shadow-lg"
           >
-            {isRequesting ? <><Loader2 className="w-5 h-5 animate-spin" />Enabling…</> : <>Enable Alerts <ArrowRight className="w-5 h-5" /></>}
+            {isRequestingNotifications ? <><Loader2 className="w-5 h-5 animate-spin" />Enabling…</> : <>Enable Alerts <ArrowRight className="w-5 h-5" /></>}
           </button>
           <button
             onClick={() => handleStepTransition('recipe-pick')}
-            disabled={isRequesting}
+            disabled={isRequestingNotifications}
             className="w-full py-3 px-6 rounded-2xl font-medium text-theme-secondary text-sm transition-all"
           >
             Not now, maybe later

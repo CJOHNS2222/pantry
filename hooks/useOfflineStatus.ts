@@ -72,13 +72,28 @@ export const useOfflineStatus = () => {
         const isSyncing = offlineQueue.getProcessingStatus();
 
         if (active) {
-          setSyncStatus(prev => ({
-            ...prev,
-            pendingOperations: count,
-            hasConflicts: conflicts.length > 0,
-            isSyncing,
-            lastSyncTime: count === 0 && prev.pendingOperations > 0 ? new Date() : prev.lastSyncTime
-          }));
+          setSyncStatus(prev => {
+            const hasConflicts = conflicts.length > 0;
+            const newLastSyncTime = count === 0 && prev.pendingOperations > 0 ? new Date() : prev.lastSyncTime;
+
+            // Only update if values actually changed
+            if (
+              prev.pendingOperations === count &&
+              prev.hasConflicts === hasConflicts &&
+              prev.isSyncing === isSyncing &&
+              prev.lastSyncTime === newLastSyncTime
+            ) {
+              return prev;
+            }
+
+            return {
+              ...prev,
+              pendingOperations: count,
+              hasConflicts,
+              isSyncing,
+              lastSyncTime: newLastSyncTime
+            };
+          });
         }
       } catch (err) {
         log.error('Failed to query offline queue status', { err }, 'useOfflineStatus');

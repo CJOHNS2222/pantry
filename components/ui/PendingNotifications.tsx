@@ -3,8 +3,7 @@ import { Bell, Clock, Check, X, AlertCircle } from 'lucide-react';
 import { NotificationItem } from '../../services/notificationService';
 import { markNotificationRead, snoozeNotificationInCache, updateNotificationInCache } from '../../services/notificationsService';
 import { User } from '../../types';
-import { serverTimestamp } from 'firebase/firestore';
-import DatabaseMonitoringService from '../../services/databaseMonitoringService';
+import { joinHousehold } from '../../services/householdService';
 import { useAppActions } from '../../contexts/AppActionsContext';
 import { useApp } from '../../contexts/AppContext';
 import { Tab } from '../../types/app';
@@ -99,54 +98,23 @@ export const PendingNotifications: React.FC<PendingNotificationsProps> = ({
           break;
         }
         case 'join_household':
-          // Join household invitation
+          // Join household invitation. Delegates to joinHousehold(), which calls the
+          // acceptInvitation Cloud Function — the server re-validates the invite
+          // against the caller's own authenticated email before granting membership.
+          // (Previously this wrote memberIds/members directly from the client, which
+          // only "worked" because inviteMember used to pre-grant access at invite
+          // time; that pre-grant was itself the vulnerability and has been removed.)
           if (notification.actionData?.householdId) {
             try {
-              // Update user document with householdId
-              const userRef = DatabaseMonitoringService.doc('users', user.id);
-              await DatabaseMonitoringService.updateDoc(userRef, {
-                householdId: notification.actionData.householdId,
-                updatedAt: serverTimestamp()
-              });
-
-              // Update household document to add member
-              const householdRef = DatabaseMonitoringService.doc('households', notification.actionData.householdId);
-              const householdDoc = await DatabaseMonitoringService.getDoc(householdRef);
-              
-              if (householdDoc.exists()) {
-                const householdData = householdDoc.data();
-                
-                // Handle both array and map formats for members (same as checkInvitation function)
-                let existingMembers = [];
-                if (householdData && Array.isArray(householdData.members)) {
-                  existingMembers = householdData.members;
-                } else if (householdData?.members && typeof householdData.members === 'object') {
-                  // Convert map to array (handle legacy data where members might be stored as a map)
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  const mapMembers = householdData.members as Record<string, any>;
-                  existingMembers = Object.keys(mapMembers).map(id => ({ id, ...mapMembers[id] }));
-                }
-                
-                const updatedMemberIds = [...(householdData.memberIds || []), user.id];
-                const newMember = {
-                  id: user.id,
-                  name: user.name,
-                  email: user.email,
-                  role: 'member',
-                  status: 'active',
-                  joinedAt: new Date().toISOString()
-                };
-                const updatedMembers = [...existingMembers, newMember];
-                
-                await DatabaseMonitoringService.updateDoc(householdRef, {
-                  memberIds: updatedMemberIds,
-                  members: updatedMembers,
-                  updatedAt: serverTimestamp()
-                });
+              const updatedHousehold = await joinHousehold(notification.actionData.householdId, user);
+              if (updatedHousehold) {
+                addToast('Successfully joined household!', 'success');
+              } else {
+                addToast('Failed to join household - invitation not found', 'error');
               }
-              
             } catch (error) {
               log.error('Error joining household', { error }, 'PendingNotifications');
+              addToast('Failed to join household', 'error');
               throw error;
             }
           }

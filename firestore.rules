@@ -26,12 +26,88 @@ service cloud.firestore {
       return request.resource.data.householdEntries.diff(priorLeaderboardMap('householdEntries')).affectedKeys();
     }
 
+    // Generic "whole doc as a dynamic-keyed map" helper, for collections like
+    // image_cache/{shard} and price_cache/priceData where the document IS the map
+    // (no wrapper field) and there's no fixed field name to diff against.
+    function priorMap() {
+      return resource == null ? {} : resource.data;
+    }
+
+    // Absolute ceiling on household size, independent of per-tier enforcement in
+    // app logic/Cloud Functions (services/usageService.ts canAddHouseholdMember:
+    // free 2 / premium 3 / family 5 today). This is only a sane upper bound so a
+    // client-direct write can't grow memberIds unbounded; the real tier caps stay
+    // enforced server-side.
+    function withinHouseholdMemberCeiling() {
+      return request.resource.data.memberIds.size() <= 5;
+    }
+
+    // ownerId is immutable via client writes. The only legitimate ownership
+    // transfer today is functions/src/deleteAccount.ts (owner deletes their
+    // account -> ownership passed to another member), which runs with the Admin
+    // SDK and bypasses these rules entirely.
+    function ownerIdUnchanged() {
+      return request.resource.data.get('ownerId', null) == resource.data.get('ownerId', null);
+    }
+
+    // A plain member-initiated write may only ever remove the CALLER'S OWN uid
+    // from memberIds - never add a uid (membership grants happen exclusively via
+    // the acceptInvitation/inviteMember Cloud Functions using the Admin SDK, which
+    // bypass these rules entirely) and never remove anyone else's uid (that stays
+    // admin-gated in functions/src/removeHouseholdMember.ts / leaveHousehold.ts).
+    function memberIdsChangeAllowed() {
+      return request.resource.data.memberIds == resource.data.memberIds
+        || (
+          request.resource.data.memberIds is list
+          && request.resource.data.memberIds.size() == resource.data.memberIds.size() - 1
+          // No uid may be added.
+          && request.resource.data.memberIds.hasOnly(resource.data.memberIds)
+          // Every remaining uid was already present, and the only uid missing
+          // relative to the old list is (at most) the caller's own.
+          && resource.data.memberIds.hasOnly(request.resource.data.memberIds + [request.auth.uid])
+          // The caller must actually be the one who left.
+          && !(request.auth.uid in request.resource.data.memberIds)
+        );
+    }
+
+    // Mirrors memberIdsChangeAllowed(): `members` may only shrink by exactly one
+    // entry (removal), never grow or have an existing entry edited in place - so a
+    // member can't self-promote their own entry's role to 'admin', add an
+    // outsider's entry, or overwrite someone else's entry. Kept in lockstep with
+    // memberIds so the two arrays can't diverge.
+    function membersChangeAllowed() {
+      return request.resource.data.members == resource.data.members
+        || (
+          request.resource.data.members is list
+          && request.resource.data.members.size() == resource.data.members.size() - 1
+          && request.resource.data.members.hasOnly(resource.data.members)
+          && request.resource.data.memberIds.size() == resource.data.memberIds.size() - 1
+        );
+    }
+
+    // Helpers for the image_cache/{shard} collection (see match block below).
+    function imageCacheAffectedKeys() {
+      return request.resource.data.diff(priorMap()).affectedKeys();
+    }
+
+    function isValidImageCacheEntry(entry) {
+      return entry is map
+        && entry.cachedUrl is string
+        && entry.cachedUrl.size() < 2000
+        && entry.cachedUrl.matches('^https://firebasestorage\\.googleapis\\.com/.*');
+    }
+
     match /admins/{userId} {
       allow read: if request.auth != null && request.auth.uid == userId;
       allow write: if false;
     }
 
     // A user can create their own user document and read/write to all of their own data (documents and subcollections)
+    match /users/{userId} {
+      allow read: if request.auth != null && (request.auth.uid == userId || isAdmin());
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+
     match /users/{userId}/{documents=**} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
@@ -45,7 +121,19 @@ service cloud.firestore {
 
       // Allow only household members to read household data
       allow read: if request.auth != null && request.auth.uid in resource.data.memberIds;
-      allow update: if request.auth != null && request.auth.uid in resource.data.memberIds;
+
+      // Update: caller must already be a member. ownerId is immutable; a plain
+      // member-initiated write to memberIds/members may only remove the caller's
+      // own entry (never add anyone or edit/remove someone else's) - all other
+      // membership mutation is routed through Cloud Functions using the Admin
+      // SDK, which bypass these rules entirely.
+      allow update: if request.auth != null
+        && request.auth.uid in resource.data.memberIds
+        && ownerIdUnchanged()
+        && memberIdsChangeAllowed()
+        && membersChangeAllowed()
+        && withinHouseholdMemberCeiling();
+
       allow delete: if request.auth != null && request.auth.uid in resource.data.memberIds;
     }
 
@@ -178,12 +266,19 @@ service cloud.firestore {
           (request.resource.data.visibility in ['public', 'private'])
         );
 
-      // Update/Delete: only the owner can modify or delete their recipe. Owners can change visibility.
-      allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid
+      // Update: only the owner can modify their recipe. Owners can change visibility,
+      // but userId itself is immutable (security L1) - otherwise an owner could
+      // reassign a recipe doc to another uid or launder a stolen recipe id.
+      allow update: if request.auth != null && resource.data.userId == request.auth.uid
+        && request.resource.data.userId == resource.data.userId
         && (
           // On update, if visibility is being set ensure it's valid
           !(('visibility' in request.resource.data) && !(request.resource.data.visibility in ['public', 'private']))
         );
+
+      // Delete: only the owner. (No request.resource on delete, so this is split
+      // out from update rather than sharing one allow update, delete clause.)
+      allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
     }
 
     // Recipe submissions (recipes submitted for staff review) are stored under `recipes/submissions/{submissionId}`
@@ -234,17 +329,46 @@ service cloud.firestore {
       allow create, update: if isAdmin();
     }
 
-    // Image cache collection: limited client writes. Clients may create a small cache entry
-    // but fields are validated. Server/admin processes may manage larger cache operations.
-    match /image_cache/{docId} {
+    // Image cache: sharded into image_cache/shard_00 .. shard_NN (see
+    // IMAGE_CACHE_SHARD_COUNT in services/imageCacheService.ts) instead of one
+    // unbounded global doc, so no single doc can hit Firestore's 1MB cap.
+    // Each shard doc IS the map (keyed by lowercased item-name cache key -> a
+    // { originalUrl, cachedUrl, itemName, createdAt, lastUsed } entry) - same
+    // "dynamic keys, no per-entry field addressing" limitation as price_cache
+    // below applies for batch writes, but for the common single-entry write
+    // (services/imageCacheService.ts cacheImageFromUrl) we CAN pin down the one
+    // changed key via diff().affectedKeys().toList()[0] (same technique
+    // leaderboard_cache/global uses) and validate its cachedUrl is actually a
+    // Firebase Storage download URL - imageCacheService.ts always re-uploads any
+    // externally-sourced image to Storage before caching, so a legitimate write
+    // never needs to point cachedUrl anywhere else, and this stops a rogue
+    // authenticated client from poisoning the cache with an arbitrary/malicious URL
+    // served to every other client.
+    match /image_cache/{shardId} {
       allow read: if request.auth != null;
-      allow create: if request.auth != null
-        && request.resource.data.keys().hasAny(['itemId', 'url', 'uploader'])
-        && request.resource.data.itemId is string
-        && request.resource.data.url is string
-        && request.resource.data.uploader == request.auth.uid
-        && request.resource.data.url.size() < 2000;
-      allow update, delete: if isAdmin();
+      allow write: if request.auth != null
+        // Only real shard doc ids - no stray docs under this collection.
+        && shardId.matches('^shard_[0-9]+$')
+        // Keep an individual shard well under the 1MB cap even if app-side
+        // pruning (services/imageCacheService.ts MAX_ENTRIES_PER_SHARD) is
+        // skipped/buggy client-side.
+        && request.resource.data.keys().size() <= 400
+        // A single write may only touch a handful of entries - the real client
+        // writes one at a time (cacheImageFromUrl) or in batches of 3
+        // (cacheImagesFromUrls' batchSize); this bounds abuse rate for a rogue
+        // client trying to rewrite many entries in one call.
+        && imageCacheAffectedKeys().size() >= 1
+        && imageCacheAffectedKeys().size() <= 5
+        && (
+          // For the common single-entry write, validate the entry's URL is a
+          // Storage download URL. Multi-key batch writes fall back to the
+          // count/size bounds above only - see price_cache below for why
+          // per-entry validation of an arbitrary-keyed map's every changed
+          // entry isn't expressible in this rules language.
+          imageCacheAffectedKeys().size() != 1
+          || isValidImageCacheEntry(request.resource.data.get(imageCacheAffectedKeys().toList()[0], null))
+        );
+      allow delete: if isAdmin();
     }
 
     // Price data cache: single global document keyed by lowercased item name, each value a
@@ -260,9 +384,13 @@ service cloud.firestore {
       // `entries`/`householdEntries`). Per-entry shape (averagePrice/minPrice/maxPrice/
       // sampleSize/unit/lastUpdated) is therefore left to the client
       // (services/priceDataCacheService.ts) rather than enforced here; rules are limited to
-      // top-level shape and size to keep the document from growing unbounded.
+      // top-level shape and size to keep the document from growing unbounded. Client code
+      // (priceDataCacheService.ts) writes this doc directly today, so this stays
+      // client-writable rather than function-write-only - tightened instead with a bound on
+      // how many item entries a single write may touch.
       allow write: if request.auth != null
-        && request.resource.data.keys().size() <= 500;
+        && request.resource.data.keys().size() <= 500
+        && request.resource.data.diff(priorMap()).affectedKeys().size() <= 100;
     }
 
     // Global leaderboard cache: single shared document holding every opted-in user's

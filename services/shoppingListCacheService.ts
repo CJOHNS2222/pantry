@@ -116,6 +116,32 @@ const getCachedShoppingList = async (householdId?: string, userId?: string): Pro
   }
 };
 
+/**
+ * Strict variant of getCachedShoppingList that rethrows on read failure instead of
+ * swallowing it into `[]`. Used by the household-join migration path
+ * (`householdMigrationService.ts`) so a transient read error isn't mistaken for
+ * "user has no shopping list items", which would silently clear the migration
+ * retry checkpoint while real data is left behind. Not intended for general UI
+ * call sites; use `getCachedShoppingList` there.
+ */
+const getCachedShoppingListStrict = async (householdId?: string, userId?: string): Promise<ShoppingItem[]> => {
+  const cachePath = getCachePath(householdId, userId);
+  const cacheRef = DatabaseMonitoringService.doc(cachePath);
+  const docSnap = await DatabaseMonitoringService.getDoc(cacheRef);
+
+  if (docSnap && docSnap.exists && (typeof (docSnap as any).exists === 'function' ? (docSnap as any).exists() : (docSnap as any).exists)) {
+    const data = (docSnap as any).data() as ShoppingListCache;
+    if (data.metadata && data.metadata.version === CACHE_VERSION) {
+      const items: ShoppingItem[] = Object.entries(data.items).map(([itemId, itemObject]) =>
+        objectToShoppingItem(itemId, itemObject as CachedShoppingListData[string], householdId, userId)
+      );
+      return items.sort((a, b) => a.item.localeCompare(b.item));
+    }
+  }
+
+  return [];
+};
+
 const setCache = async (items: ShoppingItem[], householdId?: string, userId?: string): Promise<void> => {
   try {
     const cachePath = getCachePath(householdId, userId);
@@ -284,6 +310,7 @@ export const ShoppingListCacheService = {
   CACHE_VERSION,
   objectToShoppingItem,
   getCachedShoppingList,
+  getCachedShoppingListStrict,
   setCache,
   addItemToCache,
   addItemsToCache,

@@ -1,6 +1,12 @@
 import { log } from './logService';
 
 export async function fetchRecipeImage(recipeTitle: string): Promise<string | null> {
+  // TODO(FIXES.md F04): VITE_GOOGLE_CSE_API_KEY/VITE_GOOGLE_CSE_ID are read client-side
+  // and inlined into the public bundle/APK. Lower priority than the Impact Radius token
+  // (rate-limited API key, not an account-takeover credential) - eventually either proxy
+  // this search call through a Cloud Function (defineSecret) like
+  // functions/src/impactTracking.ts, or lock the key down via HTTP referrer / Android
+  // package+SHA-1 restriction in Google Cloud Console (ops action).
   const apiKey = (import.meta as any)?.env?.VITE_GOOGLE_CSE_API_KEY;
   const cseId = (import.meta as any)?.env?.VITE_GOOGLE_CSE_ID;
   if (!apiKey || !cseId) return null;

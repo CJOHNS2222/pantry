@@ -1,5 +1,5 @@
 
-import {onCall, onRequest, HttpsError} from "firebase-functions/v2/https";
+import {onCall, HttpsError} from "firebase-functions/v2/https";
 import {logger} from "firebase-functions/v2";
 import admin from 'firebase-admin';
 import {getApps} from 'firebase-admin/app';
@@ -26,6 +26,12 @@ function isValidEmail(email: unknown): email is string {
 // writes for one address.
 const INVITE_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
 
+// Per-caller global rate limit — independent of the per-email/household cooldown
+// above, this stops a single (verified-member) caller from hammering
+// getUserByEmail / notification writes across many different email addresses.
+const CALLER_RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+const CALLER_RATE_LIMIT_MAX = 20; // max invites per caller per window
+
 /** Firestore-safe doc id derived from an email — doc ids can't contain "/". */
 function emailToDocId(email: string): string {
   return email.trim().toLowerCase().replace(/[/]/g, "_");
@@ -51,13 +57,40 @@ async function assertNotInCooldown(householdId: string, email: string): Promise<
   await cooldownRef.set({ lastInvitedAt: FieldValue.serverTimestamp() }, { merge: true });
 }
 
+/** Per-caller global rate limit, checked/incremented in a transaction to avoid races. */
+async function assertCallerNotRateLimited(inviterUid: string): Promise<void> {
+  const db = getFirestore();
+  const limitRef = db.collection("users").doc(inviterUid).collection("rateLimits").doc("inviteMember");
+
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(limitRef);
+    const data = snap.data();
+    const now = Date.now();
+    const windowStart: number = data?.windowStart ?? 0;
+    const count: number = data?.count ?? 0;
+
+    if (now - windowStart > CALLER_RATE_LIMIT_WINDOW_MS) {
+      // New window
+      tx.set(limitRef, { windowStart: now, count: 1 });
+      return;
+    }
+
+    if (count >= CALLER_RATE_LIMIT_MAX) {
+      throw new HttpsError(
+        "resource-exhausted",
+        "Too many invitations sent recently. Please try again later."
+      );
+    }
+
+    tx.set(limitRef, { windowStart, count: count + 1 });
+  });
+}
+
 // Core invite logic as a function so it can be used by both callable and HTTP handlers
 async function inviteMemberCore(inviterUid: string, email: string, householdId: string) {
   if (!isValidEmail(email)) {
     throw new HttpsError("invalid-argument", "A valid email address is required.");
   }
-
-  await assertNotInCooldown(householdId, email);
 
   const db = getFirestore();
 
@@ -82,6 +115,14 @@ async function inviteMemberCore(inviterUid: string, email: string, householdId: 
   if (!isMemberByMembers && !isMemberByIds) {
     throw new HttpsError("permission-denied", "You are not a member of this household.");
   }
+
+  // Cooldown + rate-limit checks happen only AFTER membership is verified —
+  // otherwise any authenticated (non-member) caller could hammer
+  // getUserByEmail / write cooldown docs for arbitrary household/email pairs
+  // with zero authorization (DoS + a household-existence/email-enumeration
+  // oracle), and could exhaust a member's re-invite cooldown for them.
+  await assertCallerNotRateLimited(inviterUid);
+  await assertNotInCooldown(householdId, email);
 
   // Get inviter info - try from members array first, then fallback to basic info
   let inviterName = 'Someone';
@@ -137,26 +178,17 @@ async function inviteMemberCore(inviterUid: string, email: string, householdId: 
   const memberExists = currentMembers.some((m: any) => m.id === memberIdToStore);
   const updatedMembers = memberExists ? currentMembers : [...currentMembers, newMember];
   
+  // NOTE: we intentionally do NOT add memberIdToStore to householdData.memberIds
+  // here, and do NOT call setCustomUserClaims here. Doing so at invite time would
+  // grant household access (Firestore rules gate reads/writes on memberIds) and
+  // clobber the invitee's custom claims before they've consented — any existing
+  // member could force an arbitrary registered user into their household and hijack
+  // a claim they may already hold for a different household. The invitee is only
+  // added to memberIds / granted the householdId claim once they explicitly accept
+  // via the acceptInvitation callable (functions/src/acceptInvitation.ts), which
+  // re-validates the invite server-side against the caller's own auth token email.
   const updatePayload: any = { members: updatedMembers };
-  if (memberIdToStore && memberIdToStore !== email) {
-    const currentMemberIds = Array.isArray(householdData.memberIds) ? householdData.memberIds : [];
-    const memberIdExists = currentMemberIds.includes(memberIdToStore);
-    if (!memberIdExists) {
-      updatePayload.memberIds = [...currentMemberIds, memberIdToStore];
-    }
-  }
   await householdRef.update(updatePayload);
-
-  // Set custom claim for the invited user if they have a UID
-  if (memberIdToStore && memberIdToStore !== email) {
-    try {
-      await getAuth().setCustomUserClaims(memberIdToStore, { householdId });
-      // Custom claim set successfully
-    } catch (err: any) {
-      logger.error('Error setting custom claims:', err);
-      // Don't fail the invite if claim setting fails
-    }
-  }
 
   // Send notification to invited user.
   // Registered users (have a UID) → write to their per-user cache so the bell badge picks it up.
@@ -201,10 +233,14 @@ async function inviteMemberCore(inviterUid: string, email: string, householdId: 
     throw new HttpsError("internal", "Failed to send invitation notification.");
   }
 
-  return { success: true, newMember };
+  // Return only a success flag — never the resolved uid/displayName. Echoing
+  // whether `memberIdToStore` differs from the submitted email lets a caller
+  // probe arbitrary addresses for a registered Firebase account
+  // (email -> uid enumeration).
+  return { success: true };
 }
 
-export const inviteMember = onCall(async (request) => {
+export const inviteMember = onCall({ enforceAppCheck: true }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'You must be logged in to invite members.');
   const inviterUid = request.auth.uid;
   const { email, householdId } = request.data;
@@ -212,45 +248,12 @@ export const inviteMember = onCall(async (request) => {
   return await inviteMemberCore(inviterUid, email, householdId);
 });
 
-// Explicit allowlist of known app origins (web hosting, marketing site, local dev, Capacitor WebView).
-const ALLOWED_ORIGINS = new Set([
-  'https://ornate-compass-478504-e1.web.app',
-  'https://ornate-compass-478504-e1.firebaseapp.com',
-  'https://stock-spoon-website.web.app',
-  'http://localhost:3000',
-  'https://localhost', // Capacitor default androidScheme/iosScheme WebView origin
-]);
-
-// HTTP wrapper with CORS for environments where callable fails (dev fallback)
-export const inviteMemberHttp = onRequest(async (req, res) => {
-  // Basic CORS handling - explicit allowlist only, no credentials (auth is Bearer-token based)
-  const origin = req.get('origin');
-  if (origin && ALLOWED_ORIGINS.has(origin)) {
-    res.set('Access-Control-Allow-Origin', origin);
-  }
-  res.set('Vary', 'Origin');
-  res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  if (req.method === 'OPTIONS') {
-    res.status(204).send();
-    return;
-  }
-  try {
-    const authHeader = req.headers.authorization;
-    const idToken = (typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) ? authHeader.split('Bearer ')[1] : undefined;
-    if (!idToken) { res.status(401).json({ error: 'Missing auth token' }); return; }
-    const auth = getAuth();
-    const decoded = await auth.verifyIdToken(idToken).catch(() => null);
-    if (!decoded) { res.status(401).json({ error: 'Invalid auth token' }); return; }
-    const inviterUid = decoded.uid;
-    const { email, householdId } = (req.body && Object.keys(req.body).length) ? req.body : req.query;
-    if (!email || !householdId) { res.status(400).json({ error: 'email and householdId required' }); return; }
-    await inviteMemberCore(inviterUid, email as string, householdId as string);
-    res.json({ success: true });
-    return;
-  } catch (err: any) {
-    logger.error('inviteMemberHttp error:', err);
-    res.status(500).json({ error: err?.message || 'internal' });
-    return;
-  }
-});
+// NOTE: the `inviteMemberHttp` GET/POST HTTP fallback wrapper that used to live
+// here was removed (2026-08) — it was unused by any client code path (the app only
+// ever calls the `inviteMember` callable above), accepted this mutating request
+// over GET (via `req.query`) with no CSRF protection, and echoed raw
+// `error.message` back to callers. If an HTTP fallback is needed again,
+// reintroduce it as POST-only, call `inviteMemberCore` directly (no duplicated
+// logic to drift out of sync), map errors through HttpsError -> HTTP status, and
+// never forward raw internal error messages.
 

@@ -173,6 +173,33 @@ const getCachedMealPlan = async (householdId?: string, userId?: string): Promise
   }
 };
 
+/**
+ * Strict variant of getCachedMealPlan that rethrows on read failure instead of
+ * swallowing it into `[]`. Used by the household-join migration path
+ * (`householdMigrationService.ts`) so a transient read error isn't mistaken for
+ * "user has no meal plan", which would silently clear the migration retry
+ * checkpoint while real data is left behind. Not intended for general UI call
+ * sites; use `getCachedMealPlan` there.
+ */
+const getCachedMealPlanStrict = async (householdId?: string, userId?: string): Promise<DayPlan[]> => {
+  const cacheRef = getCacheRef(householdId, userId);
+  const docSnap = await DatabaseMonitoringService.getDoc(cacheRef);
+
+  if (docSnap.exists()) {
+    const data = docSnap.data();
+    if (data && data.version === CACHE_VERSION && data.days) {
+      return Object.entries(data.days).map(([date, dayData]: [string, any]) => ({
+        date,
+        dayName: dayData.dayName,
+        breakfast: dayData.breakfast || [],
+        lunch: dayData.lunch || [],
+        dinner: dayData.dinner || [],
+      }));
+    }
+  }
+  return [];
+};
+
 const setCache = updateCache;
 
 
@@ -183,5 +210,6 @@ export const MealPlanCacheService = {
   updateMeal,
   removeMeal,
   getCachedMealPlan,
+  getCachedMealPlanStrict,
   setCache,
 };

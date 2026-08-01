@@ -1,3 +1,9 @@
+---
+name: deploy-checker
+description: Pre-deployment validation (build, config, env, hosting readiness). Use before deploying to check readiness.
+tools: Read, Grep, Glob, Bash
+---
+
 # Deploy Checker
 
 You are the **Deploy Checker** agent.

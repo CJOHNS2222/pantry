@@ -53,7 +53,7 @@ async function clearHouseholdIdFromUser(db: FirebaseFirestore.Firestore, userId:
   }
 }
 
-export const removeHouseholdMember = onCall(async (request) => {
+export const removeHouseholdMember = onCall({ enforceAppCheck: true }, async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'You must be logged in.');
   }
@@ -128,6 +128,7 @@ export const removeHouseholdMember = onCall(async (request) => {
   } catch (err: any) {
     if (err instanceof HttpsError) throw err;
     logger.error('Error removing household member', {message: err.message});
-    throw new HttpsError('internal', err.message || 'Failed to remove member.');
+    // Generic message only — never forward raw internal error details to the client.
+    throw new HttpsError('internal', 'Failed to remove member.');
   }
 });

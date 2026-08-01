@@ -8,6 +8,8 @@ import {
   arrayUnion,
   serverTimestamp,
 } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
+import { functions } from '../firebaseConfig';
 import { Household, Member, User } from '../types';
 import { getPerformance, trace } from "firebase/performance";
 import { log } from './logService';
@@ -252,7 +254,19 @@ export const findHouseholdByInvite = async (
 };
 
 /**
- * Join a household (convert Invited status to Active)
+ * Join a household (convert Invited status to Active).
+ *
+ * This delegates the actual membership grant to the `acceptInvitation` Cloud
+ * Function rather than writing households/{householdId} directly. Firestore rules
+ * only allow updating a household doc if the caller is already in its `memberIds`
+ * (see firestore.rules) — which an unaccepted invitee never is — so a client-side
+ * write here would (correctly) be rejected. Server-side, acceptInvitation
+ * re-validates the invite against the caller's own auth token email (never a
+ * client-supplied one), flips the matching pending member to active, adds the uid
+ * to memberIds, stamps users/{uid}.householdId, and merges (not replaces) the
+ * householdId custom claim — closing the "any member can force-join / hijack an
+ * arbitrary registered user" hole that existed when invites granted access
+ * immediately at invite time.
  */
 export const joinHousehold = async (
   householdId: string,
@@ -262,54 +276,16 @@ export const joinHousehold = async (
   perfTrace.start();
 
   try {
-    // Check if user is invited
-    const household = await findHouseholdByInvite(householdId, user.email, user.id);
+    const acceptInvitationFn = httpsCallable(functions, 'acceptInvitation');
+    const response = await acceptInvitationFn({ householdId });
+    const data = response.data as { success: boolean; household: Household } | undefined;
 
-    if (!household) {
+    if (!data?.success || !data.household) {
       perfTrace.putAttribute('result', 'not_invited');
       throw new Error('Unable to join 6: You are not invited to this household');
     }
 
-    perfTrace.putAttribute('result', 'joining');
-
-    // Update status to active
-    await updateMemberStatus(householdId, user.email, 'active');
-
-    // Update user's ID in household if different
-    const householdRef = DatabaseMonitoringService.doc('households/' + householdId);
-    const householdSnap = await DatabaseMonitoringService.getDoc(householdRef);
-
-    if (householdSnap.exists()) {
-      const members = householdSnap.data().members || [];
-      const currentMemberIds = householdSnap.data().memberIds || [];
-      
-      const updatedMembers = members.map((m: Member) => {
-        if (m.email?.toLowerCase() === user.email?.toLowerCase()) {
-          return {
-            ...m,
-            id: user.id,
-            name: user.name || user.email?.split('@')[0] || 'Unknown',
-            status: 'active',
-          };
-        }
-        return m;
-      });
-
-      // Ensure memberIds are unique
-      const updatedMemberIds = Array.from(new Set([...currentMemberIds, user.id]));
-
-      await DatabaseMonitoringService.updateDoc(householdRef, {
-        members: updatedMembers,
-        memberIds: updatedMemberIds,
-        updatedAt: serverTimestamp(),
-      });
-    }
-
-    // Update the user document with householdId
-    await DatabaseMonitoringService.updateDoc(DatabaseMonitoringService.doc('users/' + user.id), {
-      householdId: householdId,
-      updatedAt: serverTimestamp(),
-    });
+    perfTrace.putAttribute('result', 'joined');
 
     // Merge the user's personal caches into the household caches (deduplicating).
     // Fire-and-forget: non-fatal if it fails, user is already joined.
@@ -317,13 +293,7 @@ export const joinHousehold = async (
       log.error('Cache migration failed after joining household', { err }, 'HouseholdService')
     );
 
-    // Return updated household
-    return {
-      ...household,
-      members: household.members.map((m: Member) =>
-        m.email === user.email ? { ...m, status: 'active', id: user.id } : m
-      ),
-    };
+    return data.household;
   } catch (err: any) {
     log.error('Unable to join 7: Error joining household:', { err }, 'HouseholdService');
     throw err;
@@ -335,11 +305,11 @@ export const joinHousehold = async (
 /**
  * Get all households a user belongs to (admin of or is a member of)
  */
-export const getUserHouseholds = async (userEmail: string): Promise<Household[]> => {
+export const getUserHouseholds = async (userId: string): Promise<Household[]> => {
   try {
     const householdQuery = DatabaseMonitoringService.query(
       DatabaseMonitoringService.collection('households'),
-      DatabaseMonitoringService.where('members', 'array-contains', { email: userEmail })
+      DatabaseMonitoringService.where('memberIds', 'array-contains', userId)
     );
 
     const querySnapshot = await DatabaseMonitoringService.getDocs(householdQuery);

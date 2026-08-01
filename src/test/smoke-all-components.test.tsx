@@ -2,15 +2,15 @@ import fs from 'fs';
 import path from 'path';
 import React from 'react';
 import { render as rtlRender, cleanup } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
 import { describe, test, afterEach, afterAll, vi } from 'vitest';
 
 // Minimal wrapper: skip AppProvider/AppActionsProvider to avoid useDataManagement
 // mounting on every test — their Firebase service singletons accumulate callbacks
 // across 80 renders and OOM the worker. Render errors from missing context are
 // already swallowed by the try/catch below.
+// Note: no router needed — the app has no react-router-dom usage (tab-based nav).
 function SmokeWrapper({ children }: { children?: React.ReactNode }) {
-  return <MemoryRouter>{children}</MemoryRouter>;
+  return <>{children}</>;
 }
 function render(ui: React.ReactElement) {
   return rtlRender(ui, { wrapper: SmokeWrapper });

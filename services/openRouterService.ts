@@ -23,6 +23,7 @@ import { RecipeSearchParams, RecipeSearchResult, StructuredRecipe, User, PantryI
 import { log } from './logService';
 import remoteConfig from './remoteConfigService';
 import { getUserNutritionTargets, generatePersonalizedSearchPrompt } from '../utils/nutritionUtils';
+import { UsageService } from './usageService';
 
 const DEFAULT_BASE_URL = 'https://openrouter.ai/api/v1';
 
@@ -106,14 +107,18 @@ interface OpenRouterChatResponse {
 
 export async function searchRecipesViaOpenRouter(
   params: RecipeSearchParams,
-  // user is accepted but not used for rate-limiting — this is a test/bypass path
-  _user?: User
+  user?: User
 ): Promise<RecipeSearchResult> {
   const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY as string | undefined;
   if (!apiKey) {
     throw new Error(
       'OpenRouter API key not configured. Add VITE_OPENROUTER_API_KEY to your .env.local file.'
     );
+  }
+
+  // Pre-check usage limits (mirror geminiService pattern)
+  if (user && !await UsageService.canUseGemini(user)) {
+    throw new Error('AI recipe search limit reached this week. Upgrade your plan for more searches.');
   }
 
   const baseUrl = (import.meta.env.VITE_OPENROUTER_BASE_URL as string | undefined) ?? DEFAULT_BASE_URL;
@@ -186,6 +191,15 @@ export async function searchRecipesViaOpenRouter(
   if (recipes.length === 0) {
     log.warn('OpenRouter could not parse any recipes from response', { preview: content.substring(0, 500) }, 'OpenRouterService');
     throw new Error('AI returned a response that could not be parsed into recipes. Try rephrasing your search or adjusting your ingredients.');
+  }
+
+  // Record usage after successful search (mirror geminiService pattern)
+  if (recipes.length > 0 && user) {
+    try {
+      await UsageService.recordGeminiUsage(user);
+    } catch (e) {
+      log.warn('Failed to record Gemini usage:', { e }, 'OpenRouterService');
+    }
   }
 
   return { recipes };
@@ -305,8 +319,13 @@ const PANTRY_PROMPT =
 export async function analyzePantryImageViaOpenRouter(
   base64Image: string,
   mimeType: string,
-  _user?: User,
+  user?: User,
 ): Promise<PantryItem[]> {
+  // Pre-check usage limits (mirror geminiService pattern)
+  if (user && !await UsageService.canUseGemini(user)) {
+    throw new Error('AI image analysis limit reached this week. Upgrade your plan for more scans.');
+  }
+
   const text = await callVisionModel(base64Image, mimeType, PANTRY_PROMPT, 'analyzePantry');
   const items = parseJsonArray<PantryItem>(text);
 
@@ -315,6 +334,15 @@ export async function analyzePantryImageViaOpenRouter(
     throw new Error('No pantry items could be identified from the image. Try a clearer photo with better lighting.');
   }
   log.debug('OpenRouter/analyzePantry: parsed items', { count: items.length }, 'OpenRouterService');
+
+  // Record usage after successful analysis (mirror geminiService pattern)
+  if (user) {
+    try {
+      await UsageService.recordGeminiUsage(user);
+    } catch (e) {
+      log.debug('Failed to record Gemini usage (non-fatal)', { error: e }, 'OpenRouterService');
+    }
+  }
 
   return items;
 }
@@ -334,8 +362,13 @@ const RECEIPT_PROMPT =
 export async function analyzeReceiptImageViaOpenRouter(
   base64Image: string,
   mimeType: string,
-  _user?: User,
+  user?: User,
 ): Promise<PantryItem[]> {
+  // Pre-check usage limits (mirror geminiService pattern)
+  if (user && !await UsageService.canUseGemini(user)) {
+    throw new Error('AI image analysis limit reached this week. Upgrade your plan for more scans.');
+  }
+
   const text = await callVisionModel(base64Image, mimeType, RECEIPT_PROMPT, 'analyzeReceipt');
   const items = parseJsonArray<PantryItem>(text);
 
@@ -344,6 +377,15 @@ export async function analyzeReceiptImageViaOpenRouter(
     throw new Error('No receipt items could be identified from the image. Try a clearer, well-lit photo of the receipt.');
   }
   log.debug('OpenRouter/analyzeReceipt: parsed items', { count: items.length }, 'OpenRouterService');
+
+  // Record usage after successful analysis (mirror geminiService pattern)
+  if (user) {
+    try {
+      await UsageService.recordGeminiUsage(user);
+    } catch (e) {
+      log.debug('Failed to record Gemini usage (non-fatal)', { error: e }, 'OpenRouterService');
+    }
+  }
 
   return items;
 }

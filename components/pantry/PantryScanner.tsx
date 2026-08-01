@@ -2,7 +2,7 @@ import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { useModalOpen } from '../../utils/useModalOpen';
 import { useAndroidBack } from '../../hooks/useAndroidBack';
 import { Camera as CapacitorCamera } from '@capacitor/camera';
-import { Camera, Upload, Loader2, Plus, Trash2, CheckCircle2, ShoppingBasket, X, Barcode, ChevronDown, ChevronRight, Image, ChefHat, TrendingUp, Search, Filter, Clock, Tag, FilePlus, Receipt, LayoutGrid, LayoutList, AlertTriangle } from 'lucide-react';
+import { Camera, Upload, Loader2, Plus, Trash2, CheckCircle2, ShoppingBasket, X, Barcode, ChevronDown, ChevronRight, Image, ChefHat, TrendingUp, Search, Filter, Clock, Tag, FilePlus, Receipt, LayoutGrid, LayoutList } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { FixedSizeList as ReactWindowList } from 'react-window';
 import { setUserGeminiOptIn } from '../../services/featureFlags';
@@ -100,6 +100,7 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
   onAddItems,
   onUpdateItem,
   consumptionSuggestions = [],
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   expirationAlerts = [],
   recipeSuggestions = [],
   customCategories = [],
@@ -372,27 +373,7 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
   const [showHealthDetail, setShowHealthDetail] = useState(false);
 
-  // Inline "N items expiring" banner — dismissible for the day so it doesn't nag
-  // every time the tab is reopened (the launch-sheet/modal already handles the
-  // urgent interrupt case; this is the persistent, on-your-own-terms version).
-  const [expiringBannerDismissedDate, setExpiringBannerDismissedDate] = useState<string | null>(() => {
-    try { return localStorage.getItem('pantry_expiring_banner_dismissed_date'); } catch { return null; }
-  });
-
-  const expiringSoonSummary = useMemo(() => {
-    const needsAttention = expirationAlerts.filter(a => a.alertLevel === 'expired' || a.alertLevel === 'critical' || a.alertLevel === 'warning');
-    if (needsAttention.length === 0) return null;
-    const expiredCount = needsAttention.filter(a => a.alertLevel === 'expired').length;
-    return { count: needsAttention.length, expiredCount };
-  }, [expirationAlerts]);
-
-  const todayStr = new Date().toISOString().slice(0, 10);
-  const showExpiringBanner = !!expiringSoonSummary && expiringBannerDismissedDate !== todayStr;
-
-  const dismissExpiringBanner = () => {
-    setExpiringBannerDismissedDate(todayStr);
-    try { localStorage.setItem('pantry_expiring_banner_dismissed_date', todayStr); } catch { /* ignore */ }
-  };
+  // Inline expiring items banner logic removed in favor of system notifications.
 
   // Meal prep suggestions state
   const [mealPrepSuggestions, setMealPrepSuggestions] = useState<RecipeIngredientMatch[]>([]);
@@ -470,6 +451,32 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
     } catch (e) {
       log.error('Failed to check open-pantry-add-modal from sessionStorage', { error: e }, 'PantryScanner');
     }
+  }, []);
+
+  // Listen to attention filter redirection (e.g. from notification clicks)
+  useEffect(() => {
+    const handleApplyFilter = () => {
+      setPantryFilter(prev => {
+        const next = { ...prev, expirationStatus: 'attention' as PantryFilter['expirationStatus'] };
+        savePantryFilter(next);
+        return next;
+      });
+      setTimeout(() => {
+        document.getElementById('pantry-items-list')?.scrollIntoView({ behavior: 'smooth' });
+      }, 150);
+    };
+
+    try {
+      if (sessionStorage.getItem('pantry-filter-attention') === 'true') {
+        sessionStorage.removeItem('pantry-filter-attention');
+        handleApplyFilter();
+      }
+    } catch (e) {
+      log.error('Failed to apply attention filter from sessionStorage', { error: e }, 'PantryScanner');
+    }
+
+    window.addEventListener('apply-attention-filter', handleApplyFilter);
+    return () => window.removeEventListener('apply-attention-filter', handleApplyFilter);
   }, []);
 
   // Show a one-time non-blocking tip the first time bulk mode is activated
@@ -1726,41 +1733,6 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
           className="mb-2"
           onExpand={() => setShowHealthDetail(true)}
         />
-      )}
-
-      {/* Persistent, dismissible expiring-items summary — lets users address expirations
-          on their own terms instead of only via the app-open interrupt modal/launch sheet. */}
-      {showExpiringBanner && expiringSoonSummary && (
-        <div className={`flex items-center gap-3 rounded-xl border p-3 ${
-          expiringSoonSummary.expiredCount > 0
-            ? 'bg-red-500/10 border-red-500/30'
-            : 'bg-amber-500/10 border-amber-500/30'
-        }`}>
-          <AlertTriangle className={`w-5 h-5 shrink-0 ${expiringSoonSummary.expiredCount > 0 ? 'text-red-500' : 'text-amber-500'}`} />
-          <button
-            onClick={() => {
-              setPantryFilter(prev => {
-                const next = { ...prev, expirationStatus: 'attention' as PantryFilter['expirationStatus'] };
-                savePantryFilter(next);
-                return next;
-              });
-              document.getElementById('pantry-items-list')?.scrollIntoView({ behavior: 'smooth' });
-            }}
-            className="flex-1 text-left text-sm font-medium text-theme-primary"
-          >
-            {expiringSoonSummary.expiredCount > 0
-              ? `${expiringSoonSummary.expiredCount} item${expiringSoonSummary.expiredCount > 1 ? 's' : ''} expired, ${expiringSoonSummary.count} need${expiringSoonSummary.count === 1 ? 's' : ''} attention`
-              : `${expiringSoonSummary.count} item${expiringSoonSummary.count > 1 ? 's' : ''} expiring soon`}
-            <span className="ml-1 opacity-60 font-normal">— tap to view</span>
-          </button>
-          <button
-            onClick={dismissExpiringBanner}
-            aria-label="Dismiss for today"
-            className="shrink-0 p-1 rounded-full hover:bg-theme-primary/40 text-theme-secondary"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
       )}
 
       {/* Smart suggestion carousel — combines the dinner prompt, leftover nudge, each

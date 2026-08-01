@@ -8,6 +8,12 @@ export const sendHouseholdInvitationEmail = async (params: {
   invite_link?: string;
   app_url?: string;
 }): Promise<boolean> => {
+  // TODO(FIXES.md F04): VITE_EMAILJS_SERVICE_ID/TEMPLATE_ID/PUBLIC_KEY are read
+  // client-side and inlined into the public bundle/APK. Lower priority than the Impact
+  // Radius token (EmailJS public key is meant to be public-ish/rate-limited, not an
+  // account-takeover credential) - eventually either proxy through a Cloud Function
+  // (defineSecret) like functions/src/impactTracking.ts, or lock down via EmailJS
+  // domain allowlist (ops action).
   const serviceId = import.meta.env.VITE_EMAILJS_SERVICE_ID;
   const templateId = import.meta.env.VITE_EMAILJS_TEMPLATE_ID;
   const publicKey = import.meta.env.VITE_EMAILJS_PUBLIC_KEY;

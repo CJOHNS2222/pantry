@@ -1,7 +1,7 @@
 // services/pantryService.ts
 import { PantryItem, User } from '../types';
 import { analyzePantryImage, analyzeReceiptImage } from './geminiService';
-import { getItemImage, inferCategoryFromItemName, inferStorageLocationFromItemName, getAutoExpirationDate, parseItemText, fetchExternalItemImage, combineQuantities, isImmortalItem, isCookedRiceItem } from '../utils/appUtils';
+import { getItemImage, inferCategoryFromItemName, inferStorageLocationFromItemName, getAutoExpirationDate, parseItemText, fetchExternalItemImage, combineQuantities, isImmortalItem, isCookedRiceItem, localDateString } from '../utils/appUtils';
 import { getQuantityAmount, getQuantityUnit } from '../utils/quantityUtils';
 import { validatePantryItem } from '../utils/validationUtils';
 import AnalyticsService from './analyticsService';
@@ -123,7 +123,7 @@ export class PantryService {
       if (typeof item.estimatedExpiryDays === 'number' && item.estimatedExpiryDays >= 0) {
         const date = new Date();
         date.setDate(date.getDate() + item.estimatedExpiryDays);
-        return date.toISOString().slice(0, 10);
+        return localDateString(date);
       }
       return getAutoExpirationDate(description, category, storageLocation);
     })();
@@ -399,16 +399,34 @@ export class PantryService {
    * Consume a quantity from an item using FEFO (first-expire-first-out) by default.
    * Returns updated item and record of consumed amounts per batch.
    */
-  static consumeFromItem(item: PantryItem, amount: number, strategy: 'FEFO' | 'MANUAL' = 'FEFO', targetBatchId?: string): { updatedItem: PantryItem; consumed: Array<{ batchId?: string; amount: number }> } {
+  static consumeFromItem(item: PantryItem, amount: number, strategy: 'FEFO' | 'MANUAL' = 'FEFO', targetBatchId?: string, unit?: string): { updatedItem: PantryItem; consumed: Array<{ batchId?: string; amount: number }> } {
     const updated = { ...item } as PantryItem;
     const consumed: Array<{ batchId?: string; amount: number }> = [];
     let remaining = amount;
 
     if (!updated.batches || updated.batches.length === 0) {
-      // Fallback to legacy quantity
-      if (updated.quantity && typeof updated.quantity !== 'number' && 'amount' in updated.quantity) {
-        updated.quantity.amount = Math.max(0, (updated.quantity.amount || 0) - remaining);
-        consumed.push({ amount });
+      // Fallback to legacy quantity representations. Always build a NEW
+      // object/value rather than mutating `updated.quantity` in place —
+      // `updated = { ...item }` is a shallow copy, so `updated.quantity`
+      // is still the SAME object reference as `item.quantity`; mutating it
+      // would silently corrupt the caller's item held in React state.
+      if (updated.quantity && typeof updated.quantity === 'object' && 'amount' in updated.quantity) {
+        const before = updated.quantity.amount || 0;
+        const take = Math.min(before, remaining);
+        updated.quantity = { ...updated.quantity, amount: Math.max(0, before - remaining) };
+        if (take > 0) consumed.push({ amount: take });
+      } else if (typeof updated.quantity === 'number') {
+        // Legacy numeric quantity — previously silently ignored (never decremented).
+        const before = updated.quantity;
+        const take = Math.min(before, remaining);
+        updated.quantity = Math.max(0, before - remaining);
+        if (take > 0) consumed.push({ amount: take });
+      } else if (updated.quantity_estimate) {
+        // Legacy string estimate — previously silently ignored (never decremented).
+        const before = parseFloat(updated.quantity_estimate) || 0;
+        const take = Math.min(before, remaining);
+        updated.quantity_estimate = String(Math.max(0, before - remaining));
+        if (take > 0) consumed.push({ amount: take });
       }
       return { updatedItem: updated, consumed };
     }
@@ -422,23 +440,41 @@ export class PantryService {
         return { ...b, quantity: Math.max(0, b.quantity - take) };
       }).filter(b => b.quantity > 0);
     } else {
-      // FEFO: sort batches by expires (earliest first, missing last)
-      const sorted = [...updated.batches].sort((a, b) => {
-        if (!a.expires && !b.expires) return 0;
-        if (!a.expires) return 1;
-        if (!b.expires) return -1;
-        return new Date(a.expires).getTime() - new Date(b.expires).getTime();
-      });
+      // FEFO: determine consumption order (earliest-expires first, missing
+      // expiry last) WITHOUT mutating the stored/original batch order.
+      const order = updated.batches
+        .map((b, idx) => ({ b, idx }))
+        .sort((x, y) => {
+          const a = x.b, bb = y.b;
+          if (!a.expires && !bb.expires) return 0;
+          if (!a.expires) return 1;
+          if (!bb.expires) return -1;
+          return new Date(a.expires).getTime() - new Date(bb.expires).getTime();
+        });
 
-      const consumedSorted = sorted.map(b => {
-        if (remaining <= 0) return b;
+      // Lock consumption to a single unit so mixed-unit batches are never
+      // combined (e.g. don't deduct "count" after a "g" batch is exhausted).
+      // Use the caller-specified unit if given, otherwise infer it from the
+      // first consumable (qty > 0) batch in FEFO order.
+      const targetUnit = unit ?? (order.find(({ b }) => (b.quantity || 0) > 0)?.b.unit || 'count');
+
+      const newQuantityByIdx = new Map<number, number>();
+      for (const { b, idx } of order) {
+        if (remaining <= 0) break;
+        const batchUnit = b.unit || 'count';
+        if (batchUnit !== targetUnit) continue; // skip unit-mismatched batches
         const take = Math.min(b.quantity, remaining);
+        if (take <= 0) continue;
         remaining -= take;
         consumed.push({ batchId: b.batchId, amount: take });
-        return { ...b, quantity: Math.max(0, b.quantity - take) };
-      });
+        newQuantityByIdx.set(idx, Math.max(0, b.quantity - take));
+      }
 
-      updated.batches = consumedSorted.filter(b => b.quantity > 0);
+      // Write back in the ORIGINAL batch order — a single consume must not
+      // permanently reorder purchase batches (purchase-history/display order).
+      updated.batches = updated.batches
+        .map((b, idx) => (newQuantityByIdx.has(idx) ? { ...b, quantity: newQuantityByIdx.get(idx)! } : b))
+        .filter(b => b.quantity > 0);
     }
 
     // Recompute aggregate if units align

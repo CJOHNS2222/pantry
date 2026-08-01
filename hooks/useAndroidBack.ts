@@ -1,11 +1,17 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 /**
- * Module-level LIFO stack of close callbacks.
- * Each open modal pushes itself; when the Android back button fires,
- * the top entry is popped and its close callback is called.
+ * Module-level LIFO stack of registration tokens.
+ * Each open modal pushes a stable token (once, on the isOpen false->true
+ * transition); when the Android back button fires, the top token's current
+ * close callback (read from its mutable ref) is invoked.
  */
-const _stack: (() => void)[] = [];
+type StackEntry = {
+  token: object;
+  onCloseRef: { current: () => void };
+};
+
+const _stack: StackEntry[] = [];
 
 /**
  * Close the topmost registered modal.
@@ -13,24 +19,41 @@ const _stack: (() => void)[] = [];
  */
 export function closeTopAndroidModal(): boolean {
   if (_stack.length === 0) return false;
-  const close = _stack[_stack.length - 1];
-  close();
+  const entry = _stack[_stack.length - 1];
+  entry.onCloseRef.current();
   return true;
 }
 
 /**
  * Register a modal with the Android back button stack.
- * When isOpen is true the modal is pushed onto the stack; when false (or on
- * unmount) it is removed.  Provide a stable onClose reference (useCallback).
+ *
+ * The stack is keyed by a stable per-instance token that is pushed exactly
+ * once when `isOpen` transitions to true and removed when it transitions
+ * back to false (or on unmount) - re-renders that merely produce a new
+ * `onClose` function identity do NOT reorder the stack. The latest
+ * `onClose` is always available via a mutable ref, so callers don't need to
+ * memoize it.
  */
 export function useAndroidBack(isOpen: boolean, onClose: () => void): void {
+  const tokenRef = useRef<object | null>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
   useEffect(() => {
     if (!isOpen) return;
-    _stack.push(onClose);
+
+    if (!tokenRef.current) {
+      tokenRef.current = {};
+    }
+    const token = tokenRef.current;
+    _stack.push({ token, onCloseRef });
+
     return () => {
-      // Remove this exact callback from the stack (pop from end for perf)
-      const idx = _stack.lastIndexOf(onClose);
+      const idx = _stack.findIndex((entry) => entry.token === token);
       if (idx !== -1) _stack.splice(idx, 1);
+      tokenRef.current = null;
     };
-  }, [isOpen, onClose]);
+    // Only re-run when isOpen actually flips - onClose identity changes must
+    // not reorder the stack.
+  }, [isOpen]);
 }

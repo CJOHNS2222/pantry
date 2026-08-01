@@ -216,7 +216,17 @@ export function useDataManagement(
 
             // Single cache write for both deletions and updates, instead of one
             // removeItemFromCache/updateItemInCache Firestore round-trip per item.
-            await InventoryCacheService.bulkUpdateInventoryCache(finalInventory, user.householdId, user.id);
+            // F07: pass only the items that actually changed (partial deductions) plus
+            // the deleted ids, not `finalInventory` (the full post-op array) - a
+            // field-scoped transactional write so a concurrent household member's own
+            // edits to OTHER items aren't clobbered. See bulkUpdateInventoryCache's doc
+            // comment in inventoryCacheService.ts.
+            await InventoryCacheService.bulkUpdateInventoryCache(
+              updatedItems.map(u => u.finalItem),
+              user.householdId,
+              user.id,
+              deletedItems.map(i => i.id)
+            );
 
             // Undo history is local (IndexedDB), so per-item recording here doesn't
             // add Firestore cost - each item still needs its own restorable entry.

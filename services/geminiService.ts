@@ -24,6 +24,12 @@ interface GeminiResponse {
   }[];
 }
 
+// TODO(FIXES.md F04): VITE_GEMINI_API_KEY is read client-side and gets inlined into
+// the public bundle/APK. Lower priority than the Impact Radius token (rate-limited
+// API key, not an account-takeover credential) - eventually either proxy Gemini calls
+// through a Cloud Function (defineSecret) like functions/src/impactTracking.ts, or
+// lock the key down via HTTP referrer / Android package+SHA-1 restriction in Google
+// Cloud Console (ops action).
 // Initialize Gemini Client
 const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
 
@@ -66,9 +72,10 @@ export const analyzePantryImage = async (base64Image: string, mimeType: string, 
       },
     };
 
-    const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('Image analysis timed out. Please try again.')), 60000)
-    );
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => reject(new Error('Image analysis timed out. Please try again.')), 60000);
+    });
 
     const responsePromise = ai.models.generateContent({
       model: remoteConfig.getString('gemini_model_vision'),
@@ -87,6 +94,7 @@ export const analyzePantryImage = async (base64Image: string, mimeType: string, 
     });
 
     const response = await Promise.race([responsePromise, timeoutPromise]) as unknown as GeminiResponse;
+    if (timeoutId) clearTimeout(timeoutId);  // Clear timeout on successful completion
     const jsonText = response.text;
     if (!jsonText) throw new Error('No data returned from Gemini.');
 
@@ -171,9 +179,10 @@ export const analyzeReceiptImage = async (base64Image: string, mimeType: string,
       },
     };
 
-    const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('Receipt analysis timed out. Please try again.')), 60000)
-    );
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => reject(new Error('Receipt analysis timed out. Please try again.')), 60000);
+    });
 
     const responsePromise = ai.models.generateContent({
       model: remoteConfig.getString('gemini_model_vision'),
@@ -192,6 +201,7 @@ export const analyzeReceiptImage = async (base64Image: string, mimeType: string,
     });
 
     const response = await Promise.race([responsePromise, timeoutPromise]) as unknown as GeminiResponse;
+    if (timeoutId) clearTimeout(timeoutId);  // Clear timeout on successful completion
     const jsonText = response.text;
     if (!jsonText) throw new Error('No data returned from Gemini.');
 
@@ -324,8 +334,9 @@ const performSearch = async (params: RecipeSearchParams, user: User | undefined,
 
   try {
     // Add timeout to prevent hanging requests
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Request timeout. Please try again.')), 60000); // 60 second timeout
+      timeoutId = setTimeout(() => reject(new Error('Request timeout. Please try again.')), 60000); // 60 second timeout
     });
 
     const responsePromise = ai.models.generateContent({
@@ -341,6 +352,7 @@ const performSearch = async (params: RecipeSearchParams, user: User | undefined,
     });
 
     const response = await Promise.race([responsePromise, timeoutPromise]) as unknown as GeminiResponse;
+    if (timeoutId) clearTimeout(timeoutId);  // Clear timeout on successful completion
 
     const finishReason = response.candidates?.[0]?.finishReason;
     if (finishReason && finishReason !== 'STOP') {
@@ -443,11 +455,14 @@ const performSearch = async (params: RecipeSearchParams, user: User | undefined,
       query: params.query,
     });
 
-    // Provide more specific error messages
+    // Check for 429 BEFORE wrapping — rethrow original so retry loop can detect via substring match
+    if (errMsg.includes('429') || errMsg.includes('Too Many Requests') || errMsg.includes('Resource exhausted')) {
+      throw err;  // Rethrow original error with "429" in message for retry detection
+    }
+
+    // Provide more specific error messages for other errors
     if (errMsg.includes('API_KEY')) {
       throw new Error('API configuration error. Please check your Gemini API key.', { cause: err });
-    } else if (errMsg.includes('429') || errMsg.includes('Too Many Requests') || errMsg.includes('Resource exhausted')) {
-      throw new Error('API rate limit exceeded. Please wait a moment and try again.', { cause: err });
     } else if (errMsg.includes('quota') || errMsg.includes('limit')) {
       throw new Error('API quota exceeded. Please try again later.', { cause: err });
     } else if (errMsg.includes('network') || errMsg.includes('fetch')) {
@@ -519,28 +534,15 @@ function parseNaturalLanguageRecipes(text: string): StructuredRecipe[] {
         recipes.push(recipe as StructuredRecipe);
       }
     }
-    
-    // If no recipes were parsed, create a fallback
+
+    // Return empty results on parsing failure instead of fabricated placeholder
     if (recipes.length === 0) {
-      recipes.push({
-        title: "Recipe Search Result",
-        description: "Please try rephrasing your search or check your ingredients",
-        ingredients: ["Ingredients not available"],
-        instructions: ["Instructions not available"],
-        cookTime: "Unknown"
-      });
+      log.warn('No recipes could be parsed from natural language fallback', {}, 'GeminiService');
     }
-    
+
   } catch (err: unknown) {
     log.error('Error parsing natural language recipes:', { err }, 'GeminiService');
-    // Return a basic fallback recipe
-    recipes.push({
-      title: "Search Error",
-      description: "Unable to parse recipe results. Please try again.",
-      ingredients: ["Please try a different search"],
-      instructions: ["Please try again"],
-      cookTime: "Unknown"
-    });
+    // Return empty results on error instead of fabricated placeholder
   }
   
   return recipes;

@@ -1,6 +1,9 @@
+import { httpsCallable } from 'firebase/functions';
 import { ShoppingItem } from '../types';
 import { normalizeQuantity } from '../utils/appUtils';
 import { WALMART_PACKAGE_SIZE_DATA, PackageOption } from '../data/walmartPackageSizes';
+import { functions } from '../firebaseConfig';
+import { log } from './logService';
 
 // Top ~140 most common shopping list staples mapped to standard Walmart Item IDs (UPCs / Catalog IDs)
 export const STAPLE_WALMART_MAP: Record<string, string> = {
@@ -640,23 +643,22 @@ export function generateSearchUrl(query: string, merchant: 'walmart' | 'target' 
  * Supports different redirect subdomains and campaign details based on the retailer.
  * Only wraps with affiliate tracking if the specific merchant's Campaign ID and Ad ID are configured
  * in the environment variables, falling back to direct merchant links to avoid redirect errors.
+ *
+ * The actual Impact account credentials (`VITE_IMPACT_ACCOUNT_SID` / `VITE_IMPACT_AUTH_TOKEN`)
+ * are NOT read here anymore - they were a Basic-auth account secret being inlined into the
+ * public JS bundle / Android APK (.claude/audits/FIXES.md F04). That check + URL construction
+ * now happens server-side in the `wrapImpactTrackingUrl` Cloud Function
+ * (functions/src/impactTracking.ts), which holds the credentials via Secret Manager
+ * (`defineSecret`) and is never shipped to the client. Campaign/ad/publisher IDs below are
+ * per-merchant catalog identifiers, not secrets, so they stay client-side and are just passed
+ * through to the function as call arguments.
  */
-export function wrapWithImpactTracker(
+export async function wrapWithImpactTracker(
   destinationUrl: string,
   merchant: 'walmart' | 'target' | 'kroger' | 'instacart' | 'albertsons' | 'thrive' = 'walmart'
-): string {
-  // Read configured credentials from Vite environment
-  const accountSid = import.meta.env.VITE_IMPACT_ACCOUNT_SID;
-  const authToken = import.meta.env.VITE_IMPACT_AUTH_TOKEN;
-
-  // Fallback: If no credentials configured, return the destination URL directly
-  if (!accountSid || !authToken) {
-    return destinationUrl;
-  }
-
+): Promise<string> {
   let campaignId = '';
   let adId = '';
-  let trackingDomain = '';
 
   const publisherId = import.meta.env.VITE_IMPACT_PUBLISHER_ID || '3624855';
 
@@ -664,32 +666,26 @@ export function wrapWithImpactTracker(
     case 'walmart':
       campaignId = import.meta.env.VITE_WALMART_CAMPAIGN_ID;
       adId = import.meta.env.VITE_WALMART_AD_ID;
-      trackingDomain = 'goto.walmart.com';
       break;
     case 'target':
       campaignId = import.meta.env.VITE_TARGET_CAMPAIGN_ID;
       adId = import.meta.env.VITE_TARGET_AD_ID;
-      trackingDomain = 'target.sjv.io';
       break;
     case 'kroger':
       campaignId = import.meta.env.VITE_KROGER_CAMPAIGN_ID;
       adId = import.meta.env.VITE_KROGER_AD_ID;
-      trackingDomain = 'kroger.sjv.io';
       break;
     case 'instacart':
       campaignId = import.meta.env.VITE_INSTACART_CAMPAIGN_ID;
       adId = import.meta.env.VITE_INSTACART_AD_ID;
-      trackingDomain = 'instacart.sjv.io';
       break;
     case 'albertsons':
       campaignId = import.meta.env.VITE_ALBERTSONS_CAMPAIGN_ID;
       adId = import.meta.env.VITE_ALBERTSONS_AD_ID;
-      trackingDomain = 'albertsons.sjv.io';
       break;
     case 'thrive':
       campaignId = import.meta.env.VITE_THRIVE_CAMPAIGN_ID;
       adId = import.meta.env.VITE_THRIVE_AD_ID;
-      trackingDomain = 'thrivemarket.pxf.io';
       break;
   }
 
@@ -699,6 +695,15 @@ export function wrapWithImpactTracker(
     return destinationUrl;
   }
 
-  const encodedUrl = encodeURIComponent(destinationUrl);
-  return `https://${trackingDomain}/m/${publisherId}/${adId}/${campaignId}?veh=aff&sourceid=app&u=${encodedUrl}`;
+  try {
+    const wrapFn = httpsCallable(functions, 'wrapImpactTrackingUrl');
+    const result = await wrapFn({ destinationUrl, merchant, campaignId, adId, publisherId });
+    const data = result.data as { url?: string } | undefined;
+    return data?.url || destinationUrl;
+  } catch (err: any) {
+    // Never block a checkout link on tracking-wrapper failure (e.g. offline, App Check
+    // hiccup) - fall back to the untracked destination URL.
+    log.error('[groceryCheckoutService] wrapImpactTrackingUrl call failed', { error: err?.message }, 'groceryCheckoutService');
+    return destinationUrl;
+  }
 }

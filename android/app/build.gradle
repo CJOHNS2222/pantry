@@ -22,7 +22,7 @@ android {
     defaultConfig {
         applicationId "com.smart.pantry"
         minSdk 24
-        targetSdk 35
+        targetSdk 36
         versionCode 108
         versionName "3.0.15"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"

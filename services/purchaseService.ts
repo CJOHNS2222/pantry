@@ -76,6 +76,21 @@ export async function initializePurchaseStore(userId: string): Promise<void> {
 
   const { store, ProductType, Platform } = IAP;
 
+  // Bind every purchase made through this store instance to the signed-in
+  // Firebase uid. cordova-plugin-purchase obfuscates this value (per
+  // `store.obfuscator`, default 'legacy' hashing) and sends it to Google Play
+  // as `obfuscatedAccountId` on the purchase, which Play then surfaces back
+  // to us as `obfuscatedExternalAccountId` on the purchase/subscription
+  // resource. Setting it at the store level (rather than passing
+  // `additionalData.applicationUsername` per-order) is the supported path —
+  // the per-order field is deprecated because receipt re-validation later
+  // (verifyPurchase.ts, subscriptionNotifications.ts) has no access to the
+  // original order-time additionalData and would see a stale/undefined value.
+  // This is defense-in-depth alongside the server-side purchaseTokens/{token}
+  // -> uid binding check in verifyPurchase.ts; it lets us cross-check the
+  // account association directly against Play's own record if ever needed.
+  store.applicationUsername = () => _currentUserId ?? undefined;
+
   // Register subscription products
   store.register([
     {

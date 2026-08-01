@@ -1,450 +1,234 @@
 ---
 agent: fix-planner
 status: complete
-findings: 64
-critical: 3
-high: 14
-medium: 22
-low: 25
+date: 2026-07-31
+sources: code-audit, bug-audit, security-audit, ui-audit, perf-audit, db-audit, dep-audit, doc-audit, infra-audit, seo-audit, api-audit (all 2026-07-31 pass)
+findings: 58
+p0: 12
+p1: 18
+p2: 16
+p3: 12
 ---
 
-# FIXES.md — Consolidated Fix Plan
+# FIXES.md — Consolidated Fix Plan (2026-07-31 audit pass)
 
-Sources: AUDIT_CODE, AUDIT_BUGS, AUDIT_SECURITY, AUDIT_DOCS, AUDIT_INFRA, AUDIT_UI, AUDIT_DB, AUDIT_PERF, AUDIT_DEPS, AUDIT_SEO, AUDIT_API (this pass) + prior UI+bugs-only FIXES.md (2026-07-30 pass, recovered from workflow journal after overwrite). That prior pass's P0/P1 items were already marked done and are not re-listed. Its still-open P2 (orphaned-component keep/wire/delete calls) and P3 (design-system consistency) items are folded in below as Batch 4 (F48-F64), renumbered to continue this pass's sequence.
-
-## Batch 0 — STOP THE BLEEDING (do first, today)
-
-### F1 [CRITICAL] Android release keystore committed to git
-- **File:** `android/app/pantry-release-new.keystore`
-- **Source:** infra-auditor
-- **Issue:** Signing keystore tracked in git; `.gitignore` rule (`pantry-release.keystore`) doesn't match actual filename (`pantry-release-new.keystore`), so it was never excluded.
-- **Fix:** Rotate/reissue the signing key if this repo has ever been public or shared beyond the immediate team; `git rm --cached` the file, fix the `.gitignore` glob to match the real filename pattern, purge from history (`git filter-repo`/BFG) if exposure risk is real.
-- **Effort:** M (rotation decision + history rewrite coordination)
-
-### F2 [CRITICAL] `migrateHouseholdClaims` has no authorization
-- **File:** `functions/src/migrateHouseholdClaims.ts:56,73`
-- **Source:** api-tester
-- **Issue:** Both the callable and HTTP variant let any caller rewrite auth custom claims for every user in every household — full privilege-escalation primitive. HTTP variant has zero auth check.
-- **Fix:** Require admin/service-account-only invocation (e.g. check custom claim `admin: true` or restrict to Cloud Scheduler/internal invoker), reject HTTP variant entirely or gate behind the same check with signed internal token.
-- **Effort:** S
-
-### F3 [CRITICAL] Dependency vulnerabilities in `functions/`
-- **File:** `functions/package.json`
-- **Source:** dep-auditor
-- **Issue:** protobufjs (critical, transitive via googleapis), nodemailer <=9.0.0 (critical, drags in vulnerable form-data), fast-xml-parser <=5.6.0 + websocket-driver <=0.7.4 (critical, transitive via @google-cloud/storage / aws-sdk ses).
-- **Fix:** Bump `nodemailer` to `9.0.3`; bump `googleapis` to `173.0.0` (audit call sites first — breaking major); bump `firebase-admin` to `14.2.0` to match root devDependency pin (14.1.0) and fix protobufjs range; re-run `npm audit` after to confirm fast-xml-parser/websocket-driver resolve transitively.
-- **Effort:** L (major version bumps need call-site verification + full functions test pass)
-
-## Batch 1 — HIGH severity, low-to-medium effort (this sprint)
-
-### F4 [HIGH] LeftoverAnalytics displays inflated/wrong savings figures
-- **File:** `components/leftovers/LeftoverAnalytics.tsx:483,495,623`
-- **Source:** bug-auditor
-- **Issue:** "Value Saved (Est.)" and "Net Savings (Est.)" render `analytics.moneySaved` (= `estimatedValueSaved` + `moneySavedFromCooking`) instead of `analytics.estimatedValueSaved`, duplicating the "Eco Savings" hero stat under a contradictory label and breaking reconciliation between rows.
-- **Fix:** Use `analytics.estimatedValueSaved` for the "Value Saved" line; keep `moneySaved` only where the combined total is the intended label; verify "Net Savings" math against its stated components.
-- **Effort:** S
-
-### F5 [HIGH] `inviteMemberHttp`/`leaveHouseholdHttp` CORS reflects any Origin with credentials allowed
-- **File:** `functions/src/inviteMember.ts:173-175`, `functions/src/leaveHousehold.ts:157-159`
-- **Source:** api-tester (confirmed by security-auditor, lower severity there)
-- **Issue:** Reflects arbitrary `Origin` header while setting `Access-Control-Allow-Credentials: true` — classic CORS bypass, defeats origin protection even though auth is Bearer-token based.
-- **Fix:** Replace with an explicit allowlist of known app origins (web app domain, Capacitor scheme); drop `Allow-Credentials: true` if cookies aren't actually used.
-- **Effort:** S
-
-### F6 [HIGH] ID token accepted via query string on HTTP function fallbacks
-- **File:** `functions/src/inviteMember.ts:182`, `functions/src/leaveHousehold.ts:167`
-- **Source:** api-tester (confirmed by security-auditor)
-- **Issue:** `?idToken=` query param accepted as auth fallback, risking exposure via server/proxy logs, browser history, referrer headers.
-- **Fix:** Require `Authorization: Bearer <token>` header only; remove query-string fallback.
-- **Effort:** S
-
-### F7 [HIGH] `getNutritionData` function has no auth check
-- **File:** `functions/src/nutrition.ts:14`
-- **Source:** api-tester
-- **Issue:** Open, unauthenticated relay to USDA API with no rate limiting.
-- **Fix:** Add `request.auth` check (reject unauthenticated calls) and apply existing rate-limit pattern used elsewhere in `functions/src`.
-- **Effort:** S
-
-### F8 [HIGH] `PriceTrends` modal fails accessibility basics + hardcodes light theme
-- **File:** `components/pantry/PriceTrends.tsx:52-153`
-- **Source:** ui-auditor
-- **Issue:** Hand-rolled modal bypassing `components/ui/Modal.tsx` — no `role="dialog"`, no `aria-modal`, no Escape handling, no focus trap; 14 hardcoded light-mode Tailwind classes break dark theme.
-- **Fix:** Rewrite on top of `Modal.tsx`; replace hardcoded `bg-white`/`text-gray-*`/`bg-gray-50` with theme-aware tokens matching rest of app.
-- **Effort:** M
-
-### F9 [HIGH] `Modal.tsx` still unused by feature modals (carried forward)
-- **File:** `components/ui/Modal.tsx`
-- **Source:** ui-auditor
-- **Issue:** Shared accessible modal primitive exists but isn't adopted — directly causes F8 and similar future regressions.
-- **Fix:** Track as a migration checklist; prioritize `PriceTrends.tsx` (F8) first, then audit remaining hand-rolled modals repo-wide.
-- **Effort:** L (tracking item, execute incrementally)
-
-### F10 [HIGH] Recipe rating/search N+1 and unbounded collection scans
-- **File:** `services/recipeService.ts:301-343` (`rebuildCommunityRatedRecipesFromRatings`), `services/recipeService.ts:1034-1056` (`searchRecipesInFirestoreFallback`), `services/recipeService.ts:962-1022` (`searchRecipesInFirestore`)
-- **Source:** db-auditor
-- **Issue:** Per-item loop re-scans entire `recipes` collection + sequential unbatched `getDoc` calls (up to 50 iterations); fallback search does a full unbounded collection scan on any index error; primary search reads entire `recipe_search_index` collection every call then N individual `getDoc`s.
-- **Fix:** Batch reads with chunked `Promise.all` on ID arrays; add `limit()` to fallback scan; add `where`/`limit` to search-index query instead of full-collection read.
-- **Effort:** M
-
-Skip for now........### F11 [HIGH] `PantryScanner.tsx` remains an oversized god component
-- **File:** `components/pantry/PantryScanner.tsx`
-- **Source:** code-auditor (confirmed by perf-auditor)
-- **Issue:** 3,525 lines, 48 `useState`, 14 `useEffect` — largest component in repo despite partial extraction of `usePantryScannerScan.ts`/`NutritionScannerModal.tsx`.
-- **Fix (2-part):**
-  1. Perf quick win: verify it's behind `React.lazy()` so barcode/OCR vendor chunks (zxing/tesseract) don't load for non-scanner users — check `vite.config.ts` manualChunks + import site.
-  2. Structural: continue extraction (state grouping via `useReducer` or split into scan-mode subcomponents) — larger refactor, route through `architect-reviewer` before starting.
-- **Effort:** S (lazy-load check) / XL (full decomposition — defer)
-
-### F12 [HIGH] `hooks/dataManagement/*` fully dead code (1,883 lines)
-- **File:** `hooks/dataManagement/*`
-- **Source:** code-auditor
-- **Issue:** Entirely unimported, contradicting CLAUDE.md's documented directory map.
-- **Fix:** Either delete outright (repo has precedent this pass — 11 orphaned files already removed) or wire it in if the split was intentional and mid-migration; update CLAUDE.md directory map to match reality either way.
-- **Effort:** S (delete)  <~~yes, delete>
-
-### F13 [HIGH] Recipe export modal — stored XSS via unescaped `innerHTML`
-- **File:** `components/recipe-finder/RecipeExportModal.tsx:319-337`
-- **Source:** security-auditor
-- **Issue:** Recipe title/description/ingredients/instructions interpolated unescaped into HTML then assigned via `innerHTML` in a print window; recipe content can originate from untrusted URL imports or open community submissions (Firestore rules allow arbitrary `title` strings).
-- **Fix:** HTML-escape all interpolated fields before building the print-window markup, or build DOM nodes via `textContent` instead of string-concatenated `innerHTML`.
-- **Effort:** S
-
-### F14 [HIGH] Zero CI/CD — no automated gate on push/PR
-- **File:** `.github/` (missing `workflows/`)
-- **Source:** infra-auditor
-- **Issue:** No lint/type-check/test/build gate; release process pushes directly to main via an agent-run skill with no server-side check.
-- **Fix:** Add a minimal GitHub Actions workflow: `npm run lint && npm run type-check && npm test` on PR + push to main; add a `functions/` equivalent job.
-- **Effort:** M
-
-### F15 [HIGH] EnhancedShoppingListItem not memoized, subscribes to whole AppContext
-- **File:** `components/shopping-list/EnhancedShoppingListItem.tsx`
-- **Source:** perf-auditor
-- **Issue:** 649-line row component not `React.memo`'d, calls `useApp()` directly — any unrelated app state change re-renders every visible shopping-list row (context value depends on ~25 state pieces in `App.tsx:1471-1512`).
-- **Fix:** Wrap in `React.memo`; either narrow context consumption or lift required data into props from `ShoppingListItemsSection.tsx` so the row doesn't need `useApp()` at all.
-- **Effort:** M
-
-### F16 [HIGH] Storage rules — no ownership checks on delete/write
-- **File:** `storage.rules:4-11` (recipes write), `storage.rules:14-23` (recipe-photos delete)
-- **Source:** security-auditor
-- **Issue:** Any authenticated user can delete another user's uploaded recipe photos, or overwrite public recipe images at any path — no ownership/admin check.
-- **Fix:** Add ownership check (`request.auth.uid == resource.metadata.ownerId` or equivalent) matching pattern used elsewhere in the rules file; restrict public `recipes/{recipeId}` writes to admin/service accounts or validated ownership.
-- **Effort:** S
-
-## Batch 2 — MEDIUM severity
-
-### F17 [MEDIUM] `checkInvitation` leaks household PII on probe
-- **File:** `functions/src/checkInvitation.ts:16-20`
-- **Source:** api-tester
-- **Issue:** Intentionally unauthenticated + unrate-limited; a successful email+householdId guess returns the full household doc including all members' PII.
-- **Fix:** Add rate limiting (per-IP or per-email); narrow the response to only fields needed to confirm/deny an invitation.
-- **Effort:** M
-
-### F18 [MEDIUM] `firestore.rules` — `price_cache/priceData` fully open write
-- **File:** `firestore.rules:250-253`
-- **Source:** security-auditor
-- **Issue:** Any authenticated user can overwrite the shared global pricing doc with zero validation, inconsistent with sibling caches that scope/validate writes.
-- **Fix:** Add schema/shape validation matching `leaderboard_cache`/`system/community_rated_recipes` pattern,
-- **Effort:** S
-
-### F19 [MEDIUM] Missing composite Firestore indexes for recipe ratings
-- **File:** `firestore.indexes.json`
-- **Source:** db-auditor
-- **Issue:** Missing indexes for `recipeRatings`(recipeTitle+householdId+date), `recipeModifications`(recipeTitle+helpful+date), `recipeRatings`(userId/householdId+date), `recipeRatings`(date range+wouldMakeAgain); the one declared rating-related index (`ratings` collection group) matches no actual query (code uses `recipeRatings`).
-- **Fix:** Add the four missing composite indexes; remove or repoint the dead `ratings` collection-group index.
-- **Effort:** S
-
-### F20 [MEDIUM] `updateCommunityStats` re-reads entire rating history per submission
-- **File:** `services/recipeRatingService.ts:226-271`
-- **Source:** db-auditor
-- **Issue:** Every rating submission re-reads full rating history for the recipe to recompute aggregates instead of incremental counters.
-- **Fix:** Switch to a Firestore transaction with incremental counter fields updated via `FieldValue.increment()`.
-- **Effort:** M
-
-### F21 [MEDIUM] QuickAddModal voice-input listener leak on timeout path
-- **File:** `components/pantry/QuickAddModal.tsx:127-155,142-148`
-- **Source:** code-auditor + bug-auditor (same finding, both flagged it)
-- **Issue:** Native voice-input `partialResults` listener is removed on successful recognition but never removed on the 10s timeout/no-speech path — leaks a live native plugin listener per failed attempt for the app session.
-- **Fix:** Move listener removal into a `finally`/cleanup path shared by both success and timeout branches.
-- **Effort:** S
-
-### F22 [MEDIUM] Icon-only close buttons lack accessible names
-- **File:** `components/pantry/PriceTrends.tsx:71,90`, `components/shopping-list/GroceryCostEstimator.tsx:404-409`
-- **Source:** ui-auditor
-- **Fix:** Add `aria-label="Close"` (or equivalent) to icon-only "✕" buttons.
-- **Effort:** S
-
-### F23 [MEDIUM] ItemDetailModal accordion buttons missing `aria-expanded`
-- **File:** `components/pantry/ItemDetailModal.tsx:415-421,529-535,613-619,714-720,746-752,776-782`
-- **Source:** ui-auditor
-- **Fix:** Add `aria-expanded={isOpen}` to all six disclosure buttons.
-- **Effort:** S
-
-### F24 [MEDIUM] QuickAddModal primary submit button is icon-only, no accessible name
-- **File:** `components/pantry/QuickAddModal.tsx:270-277`
-- **Source:** ui-auditor
-- **Fix:** Add `aria-label="Add item"` (or visible text) matching sibling Cancel/Voice/Scan buttons.
-- **Effort:** S
-
-### F25 [MEDIUM] `EnhancedShoppingListItem` touch targets under 44px minimum (carried forward)
-- **File:** `components/shopping-list/EnhancedShoppingListItem.tsx:495,508`
-- **Source:** ui-auditor
-- **Fix:** Increase 36×22px targets to ≥44×44px.
-- **Effort:** S
-
-### F26 [MEDIUM] Nutrition/barcode/currency feature undocumented
-- **File:** `services/nutritionService.ts`, `services/spoonacularFoodClient.ts`, `services/currencyService.ts`, `utils/barcodeScan.ts`, `components/pantry/NutritionFactsCard.tsx`, `components/pantry/NutritionScannerModal.tsx`
-- **Source:** doc-auditor
-- **Fix:** Add a section to README Key Features, FAQ,  and CLAUDE.md Integrations describing the nutrition/barcode/currency subsystem (Spoonacular-backed, not OpenFoodFacts).
-- **Effort:** S
-
-### F27 [MEDIUM] README dead Stripe/PayPal links contradict removal note
-- **File:** `README.md:315-318`
-- **Source:** doc-auditor
-- **Fix:** Remove dead links; align with line 3's "Stripe and PayPal have been removed" statement.
-- **Effort:** S
-
-### F28 [MEDIUM] README references non-existent `services/firebase.ts`
-- **File:** `README.md:270`
-- **Source:** doc-auditor
-- **Fix:** Point to `firebaseConfig.ts` / `VITE_firebaseConfig.ts` instead.
-- **Effort:** S
-
-### F29 [MEDIUM] `functions/` predeploy checks are local-only, no CI verification
-- **File:** `firebase.json:21-24`
-- **Source:** infra-auditor
-- **Fix:** Covered by F14's CI workflow — add a `functions/` lint+build job; flag single-project (no staging/prod split) as a longer-term infra improvement.
-- **Effort:** M (part of F14)
-
-### F30 [MEDIUM] No automated Firestore/Storage rules validation
-- **File:** `firestore.rules`, `storage.rules`
-- **Source:** infra-auditor
-- **Fix:** Add Firebase emulator-based rules unit tests to the CI workflow from F14 (`@firebase/rules-unit-testing`), covering household-scoping and the F16/F18 fixes at minimum.
-- **Effort:** M
-
-- **File### F31 [MEDIUM] No local/CI secret scanning (how the keystore leak went undetected)
-:** `.github/secret_scanning.yml`
-- **Source:** infra-auditor
-- **Fix:** Add `gitleaks` (or similar) as a pre-commit hook and/or CI step as defense-in-depth alongside GitHub's hosted scanning. Directly relevant given F1.
-- **Effort:** S
-
-### F32 [MEDIUM] index.html / public HTML files missing SEO metadata or pointing at wrong domain
-- **File:** `index.html:1-128`, `public/index.html:1-24`, `public/landing.html:1-24`
-- **Source:** seo-auditor
-- **Fix:** Add meta description + OG/Twitter tags + canonical link to app shell `index.html`; fix `public/index.html`/`public/landing.html` OG/Twitter metadata pointing at unowned `smartpantrychef.com` — replace with actual project domain.
-- **Effort:** S
-
-### F33 [MEDIUM] `firebase-admin`/`googleapis` version skew (root vs functions)
-- **File:** `functions/package.json:20,22`
-- **Source:** dep-auditor
-- **Fix:** Bundled with F3 — align `firebase-admin` to `14.2.0` across root devDependency and `functions/`.
-- **Effort:** Included in F3
-
-### F34 [MEDIUM] Root eslint chain + vite-plugin-pwa + puppeteer-extra vulnerable dev-only deps
-- **File:** `package.json:122-124,134`
-- **Source:** dep-auditor
-- **Issue:** eslint@9.21.0 chain high-severity via minimatch; `vite-plugin-pwa` pulls vulnerable workbox-build→jake→ejs chain; `puppeteer-extra`/`puppeteer-extra-plugin-stealth` vulnerable rimraf/glob/google-gax chain (only used by `scripts/scrape-allrecipes.js`).
-- **Fix:** Bump eslint to 10.8.0 (major, dev-only, low risk to schedule); evaluate whether `scripts/scrape-allrecipes.js` is still needed — remove if not, else accept dev-only risk; re-check vite-plugin-pwa for a patched release.
-- **Effort:** M
-
-## Batch 3 — LOW severity / cleanup
-
-### F35 [LOW] `NutritionScannerModal` slot keying causes React key collision on duplicate barcode scan
-- **File:** `components/pantry/NutritionScannerModal.tsx:58-68,142`
-- **Source:** bug-auditor
-- **Fix:** De-dupe by barcode before adding to `slots`, or key by scan-attempt id instead of raw `upc`.
-- **Effort:** S
-
-### F36 [LOW] `formatCurrency` catch fallback returns wrong currency symbol
-- **File:** `services/currencyService.ts:107-118`
-- **Source:** code-auditor
-- **Fix:** On conversion failure, either surface the raw USD amount labeled as USD, or fail loudly instead of silently mislabeling with `$`.
-- **Effort:** S
-
-### F37 [LOW] `shoppingListCacheService` cache-version check uses `>=` inconsistent with siblings
-- **File:** `services/shoppingListCacheService.ts:99`
-- **Source:** code-auditor
-- **Fix:** Change to `===` to match the invalidation contract used by other `*CacheService` files.
-- **Effort:** S
-
-### F38 [LOW] Direct `onSnapshot` bypasses `useDataManagement.ts`
-- **File:** `components/leftovers/LeftoversHotZone.tsx:2,31`
-- **Source:** code-auditor
-- **Note:** Prior audit pass found this component orphaned/unmounted — verify it's actually rendered anywhere before spending effort; if orphaned, delete instead of refactoring.
-- **Fix:** If in use: route through `useDataManagement.ts`/appropriate hook per CLAUDE.md's data-flow rule. If orphaned: delete.
-- **Effort:** S
-
-### F39 [LOW] `pantry_images` storage read rule not household/owner scoped
-- **File:** `storage.rules:31-34`
-- **Source:** security-auditor
-- **Fix:** Scope read to household members/owner, matching the comment's stated intent.
-- **Effort:** S
-
-### F40 [LOW] Duplicate dead `leaveHousehold`/`leaveHouseholdHttp` implementation
-- **File:** `functions/src/inviteMember.ts:201-465`
-- **Source:** api-tester
-- **Fix:** Delete the unexported duplicate (diverges from real implementation — no claim cleanup, wrong collections, `'admin'` vs `'Admin'` casing bug).
-- **Effort:** S
-
-### F41 [LOW] `resetUsageLimitsNow` deployed as public 403 stub
-- **File:** `functions/src/resetUsageLimits.ts:113-123`
-- **Source:** api-tester
-- **Fix:** Remove from deployment (unexport or delete) since it's permanently disabled.
-- **Effort:** S
-
-### F42 [LOW] Unbounded full-collection scans in scheduled functions
-- **File:** `functions/src/resetUsageLimits.ts:22-23`, `functions/src/dailyReminders.ts:299`
-- **Source:** api-tester
-- **Fix:** Paginate with `.limit()` + cursor loop instead of unbounded `db.collection('users').get()`.
-- **Effort:** M
-
-### F43 [LOW] Unused/dead dependencies
-- **File:** `package.json:78` (`adb`), `package.json:125` (`react-router-dom`), `functions/package.json:18-19,24` (`@paypal/paypal-server-sdk`, `@paypal/react-paypal-js`, `stripe`)
-- **Source:** dep-auditor
-- **Fix:** Remove all — zero references found; `react-router-dom` removal also clears 2 of the high-severity dep findings transitively.
-- **Effort:** S
-
-### F44 [LOW] README roadmap items stale
-- **File:** `README.md:328-329`
-- **Source:** doc-auditor
-- **Fix:** Mark "Barcode/Product Lookup" as implemented (Spoonacular-backed, not OpenFoodFacts); update onboarding roadmap note to reflect current `ModernOnboarding.tsx` design, not the deleted `FirstTimeFlow.tsx`/`ValueDemo.tsx`.
-- **Effort:** S
-
-### F45 [LOW] `householdDataMigrationService` vs `householdMigrationService` naming ambiguity
-- **File:** `services/householdDataMigrationService.ts`
-- **Source:** doc-auditor
-- **Fix:** Add a one-line doc comment distinguishing the two services' responsibilities, or merge if truly redundant.
-- **Effort:** S
-
-### F46 [LOW] SEO — sitemap/robots/landing page gaps
-- **File:** `public/landing.html:453-468` (404ing screenshots), `public/landing.html:389-393` (dead nav routes), missing `robots.txt` for app hosting site, `website/sitemap.xml` missing `<lastmod>`, `website/index.html:58-63` hardcoded `"price": "0"` in JSON-LD despite paid tiers.
-- **Source:** seo-auditor
-- **Fix:** Fix/remove broken screenshot references, remove or implement dead nav links, add app-site `robots.txt`, add `<lastmod>` to sitemap entries, correct JSON-LD pricing or omit `offers.price`.
-- **Effort:** S (batch of small fixes)
-
-### F47 [LOW] `verifyPurchase.ts` / `deleteAccount.ts` / `inviteMember.ts` minor hardening
-- **File:** `functions/src/verifyPurchase.ts:41-52`, `functions/src/deleteAccount.ts:60`, `functions/src/inviteMember.ts:16,166`
-- **Source:** api-tester
-- **Fix:** Add schema validation for receipt shape (verifyPurchase); reconcile hard-coded subcollection cleanup list with actual `*CacheService` paths + add retry checkpoint if `auth.deleteUser` fails post-cleanup (deleteAccount); add email format validation + invite cooldown (inviteMember).
-- **Effort:** M
-
-## Batch 4 — Carried forward from prior UI+bugs audit pass (2026-07-30, still unresolved)
-
-Orphaned-component keep/wire/delete calls and design-system items that were still open when the prior audit's FIXES.md was superseded by this pass. Renumbered into this sequence; not re-verified by this pass's auditors (outside their scope), so re-confirm still-orphaned status before acting.
-
-### F48 [HIGH] `UseSoonRecommendations.tsx` orphaned — core waste-reduction feature never wired in
-- **File:** `components/pantry/UseSoonRecommendations.tsx`
-- **Source:** prior UI audit (P2)
-- **Issue:** Not redundant with `SmartRecommendations.tsx` — dedicated per-item urgency view with delete-from-inventory action and multi-recipe suggestion chips that the generic component lacks. Never rendered by any live parent.
-- **Fix:**  port its per-item features into `SmartRecommendations.tsx`.
-- **Effort:** M (needs product decision first)
-
-### F49 [MEDIUM] Camera/permission UI — dead duplicate + broken generalized version
-- **File:** `components/pantry/CameraPermissionsModals.tsx`, `components/ui/ContextualPermissions.tsx`, inline duplicate in `components/pantry/PantryScanner.tsx:323-325,3273+`
-- **Source:** prior UI audit (P1 item 7 / P2)
-- **Issue:** Live permission-education UX is a byte-for-byte inline duplicate of `CameraPermissionsModals.tsx` inside `PantryScanner.tsx`, correctly wired to native `@capacitor/camera`. `ContextualPermissions.tsx` is the generalized version but uses `navigator.mediaDevices` — wrong API for native builds, broken as-is.
-- **Fix:** Extract the inline `PantryScanner.tsx` logic back into `CameraPermissionsModals.tsx` (dedupe), delete `ContextualPermissions.tsx` unless someone commits to rewriting it against the native API.
-- **Effort:** M
-
-### F50 [MEDIUM] `RecipeCommunityInsights.tsx` orphaned — ratings collected with nowhere to display
-- **File:** `components/recipe-modal/RecipeCommunityInsights.tsx`
-- **Source:** prior UI audit (P2)
-- **Issue:** Rating *submission* is live (`RecipeRatingUI` inside `RecipeModal.tsx` writes via `RecipeRatingService.submitRating`), but the aggregate display component was only reachable via the now-deleted `RecipeRatingPage.tsx`. `RecipeRating.tsx` already accepts an unused `communityStats` prop.
-- **Fix:** Wire `RecipeCommunityInsights.tsx` into `RecipeModal.tsx` via the existing `communityStats` prop path. Do not delete.
-- **Effort:** S-M
-
-### F51 [LOW] `RecipeRecommendations.tsx` newly orphaned (side effect of deleting `RecipeRatingPage.tsx`)
-- **File:** `components/recipes-meals/RecipeRecommendations.tsx`
-- **Source:** prior UI audit (P2)
-- **Issue:** Confirmed orphaned — repo-wide grep for `RecipeRecommendations`/`<RecipeRecommendations` finds only its own definition/export and an unrelated `scripts/fix-imports.mjs` path-mapping table; no JSX usage anywhere. `services/recipeRecommendationService.ts` (`getPersonalizedRecommendations`) is likewise only consumed by this component. Not redundant with the live `components/pantry/SmartRecommendations.tsx` (rendered in `RecipeFinder.tsx`): `SmartRecommendations` is a client-side heuristic dashboard nudge (pantry/saved-recipe overlap, time-of-day, expiring items, premium upsell, onboarding) with no backend service, while `RecipeRecommendations` is a server-driven personalized recommendation engine (household-loved, trending, similar-ingredients, seasonal, personal-preference types) that reads household rating data plus user cuisine/protein/dislike preferences and produces per-type confidence scoring — none of which `SmartRecommendations` does.
-- **Fix:** Keep, do not delete — offers functionality no live component covers. Recommended wire-in point: render inside `RecipeFinder.tsx` alongside/below `SmartRecommendations` (both already live there), passing current pantry item names as `pantryItems` and the user's dietary restrictions; needs a product decision on placement/visibility (e.g. collapsed section, or replacing `SmartRecommendations`' "Recipe Match" bucket) before implementing — not implemented here.
-- **Effort:** S (investigate) — wire-in itself is a separate M-effort product decision
-
-### F52 [LOW] `FeatureTooltip.tsx` orphaned — only post-onboarding feature-discovery component
-- **File:** `components/auth-onboarding/FeatureTooltip.tsx`
-- **Source:** prior UI audit (P2)
-- **Fix:**  wire in.
-- **Effort:** M
-
-### F53 [LOW] `OfflineShoppingIndicator.tsx` orphaned
-- **File:** `components/shopping-list/OfflineShoppingIndicator.tsx`
-- **Source:** prior UI audit (P2)
-- **Fix:** Complementary to `AppHeader.tsx`'s compact global connectivity icon, not a duplicate. Wire into `ShoppingList.tsx` near `ShoppingListActionBars`, using the existing `isOnline`/`offlineQueue` state.
-- **Effort:** S
-
-### F54 [LOW] `HouseholdStatusIndicator.tsx` orphaned
-- **File:** `components/household/HouseholdStatusIndicator.tsx`
-- **Source:** prior UI audit (P2)
-- **Fix:** Presence logic already duplicated as condensed text in `AppHeader.tsx`'s `activityText` memo (lines 289-357) — adding to header would be redundant. Wire into `Household.tsx`'s member list instead for a richer per-member view.
-- **Effort:** S
-
-### F55 [LOW] `SettingsHelpSection.tsx` orphaned — no Help/FAQ entry point
-- **File:** `components/settings/SettingsHelpSection.tsx`
-- **Source:** prior UI audit (P2)
-- **Fix:** Generic, logic-free FAQ card; `Settings.tsx` already has `showFAQModal`/`FAQPage` — just needs to be dropped in wired to that.
-- **Effort:** S
-
-### F56 [LOW] Admin dashboards orphaned — no consolidated admin UI
-- **File:** `components/admin-analytics/MonitoringDashboard.tsx`, `PerformanceMonitoringDashboard.tsx`, `UserBehaviorAnalytics.tsx`
-- **Source:** prior UI audit (P2)
-- **Fix:** Consolidate into one admin-gated settings menu using the existing `useIsAdmin(user?.id)` check in `Settings.tsx`, rather than deleting.
-- **Effort:** M
-
-### F57 [LOW] Remaining orphaned components — likely safe delete
-- **File:** `components/pantry/SmartCategorySelector.tsx`, `components/pantry/PantryAnalytics.tsx`, `components/ui/RiskExplanationModal.tsx`
-- **Source:** prior UI audit (P2)
-- **Fix:** Confirm zero live importers, then delete alongside the batch of 11 orphans already removed this pass.
-- **Effort:** S
-
-### F58 [LOW] `AddMealDialog.tsx` — no Escape/backdrop dismiss, no `role="dialog"`
-- **File:** `components/meal-planner/AddMealDialog.tsx:29`
-- **Source:** prior UI audit (P3)
-- **Fix:** Same `Modal.tsx` non-adoption pattern as F8/F9 — migrate onto `Modal.tsx`.
-- **Effort:** S
-
-### F59 [LOW] `EmptyState.tsx` underadopted
-- **File:** `components/ui/EmptyState.tsx`
-- **Source:** prior UI audit (P3)
-- **Fix:** Only used by `CurrentDayMealsSection.tsx`; audit other empty-list UIs for hand-rolled equivalents and migrate.
-- **Effort:** S
-
-### F60 [LOW] Settings nav icon collides visually with theme-toggle icon
-- **File:** `components/layout/AppNavigation.tsx:20`, `components/layout/AppHeader.tsx:526`
-- **Source:** prior UI audit (P3)
-- **Fix:** Both use a "Sun"-style icon; swap one for a visually distinct icon.
-- **Effort:** S
-
-### F61 [LOW] Inconsistent close-button icon
-- **File:** `components/layout/AppHeader.tsx:339,401,487` (literal `✕` glyph) vs `components/ui/Modal.tsx:286` (`<X />` icon)
-- **Source:** prior UI audit (P3)
-- **Fix:** Standardize on one close-icon component.
-- **Effort:** S
-
-### F62 [LOW] No standardized undo pattern
-- **File:** global header undo (latest-action-only) vs `components/shopping-list/ShoppingListUndoBanners.tsx` (separate local pattern)
-- **Source:** prior UI audit (P3)
-- **Fix:** Consolidate to one undo mechanism, or document why two coexist.
-- **Effort:** M
-
-### F63 [LOW] Notification/activity dropdowns aren't real popovers
-- **File:** `components/layout/AppHeader.tsx:320-452,479-496`
-- **Source:** prior UI audit (P3)
-- **Fix:** Auto-closes on a 15s timer mid-read with no `role="menu"`/focus trap. Add proper popover semantics and remove the forced timeout close.
-- **Effort:** M
-
-### F64 [LOW] No single shared paywall/"limit reached" component
-- **File:** repo-wide — each usage limit (recipes, meal plans, household) rolls its own copy/UI
-- **Source:** prior UI audit (P3)
-- **Fix:** Extract one shared `PaywallPrompt`/`LimitReachedCard` component, migrate call sites.
-- **Effort:** M
+Supersedes the 2026-07-30 FIXES.md. Cross-audit duplicates merged; each entry lists every sourcing audit. Effort: S (<1h), M (half-day), L (multi-day).
 
 ---
 
-## Suggested execution order
+## P0 — Data loss / security / payment integrity
 
-1. **Batch 0** (F1–F3) — today, before anything else touches `main` or ships.
-2. **Batch 1** (F4–F16) — this sprint; F4 (LeftoverAnalytics) and F13 (XSS) are single-file S-effort with real user/security impact, do first within the batch.
-3. **Batch 2** (F17–F34) — next sprint; group F19+F20 (db-auditor) as one PR, group F22–F25 (ui-auditor a11y) as one PR, group F27+F28+F44+F45 (doc-auditor) as one docs-only PR.
-4. **Batch 3** (F35–F47) — opportunistic/cleanup, bundle into pre-existing PRs touching the same files rather than standalone.
-5. **Batch 4** (F48–F64) — carried-forward orphan/design-system items; F48-F50 (UseSoonRecommendations, camera-permission dedupe, RecipeCommunityInsights) are the highest-value re-wires and need a product call first, route through `architect-reviewer`; F51-F57 (remaining orphans) each need their own quick keep/delete call before batching into PRs; F58-F64 (design-system) bundle into one pass whenever there's slack.
+### F01. `checkInvitation` unauthenticated household-doc PII leak — **S**
+- **Problem:** Callable allows unauth requests, trusts attacker-supplied `userEmail` over the token, and returns the entire household doc (all members' names/emails/uids).
+- **Files:** `functions/src/checkInvitation.ts:12-35,81`
+- **Fix:** Require `request.auth`; use only `request.auth.token.email`; return `{isInvited, householdName}` minimal shape; `enforceAppCheck: true`.
+- **Sources:** security H1, api 1
 
-Deferred (not a fix-batch item, tracked separately): full `PantryScanner.tsx` decomposition (F11 part 2) and `hooks/dataManagement/*` disposition (F12) both need a product/codeowner decision before execution — route through `architect-reviewer` first. Also deferred per standing decision (2026-07-29, see project memory): tab-controls triplication (`RecipeFinderTabs` vs `ShoppingListViewModeToggle` vs native `<select>`) and `App.tsx` modal-state sprawl (8+ scattered `useState(false)` flags) — both flagged again in this pass's Batch 4 context but intentionally not re-batched.
+### F02. `verifyPurchase` purchase-token replay across accounts — **S**
+- **Problem:** Same Play receipt grants premium to N accounts; `purchaseTokens/{token}` overwritten to last caller, so RTDN renewals/cancellations hit the wrong uid.
+- **Files:** `functions/src/verifyPurchase.ts:117-139`, `services/purchaseService.ts` (set `obfuscatedExternalAccountId`)
+- **Fix:** In a transaction, read `purchaseTokens/{token}`; reject `already-exists` if bound to a different uid. Pass/compare `obfuscatedExternalAccountId` = Firebase uid; acknowledge server-side.
+- **Sources:** security H3, api 3
+
+### F03. `inviteMember` grants membership + clobbers custom claims before invitee accepts — **M**
+- **Problem:** Invitee's uid is added to `memberIds` and `setCustomUserClaims` wholesale-replaces their claims at invite time — consentless membership forcing, hijacks the victim's real household binding.
+- **Files:** `functions/src/inviteMember.ts:141-159`; new `functions/src/acceptInvitation.ts`; client accept flow
+- **Fix:** Invites stay `status:'pending'`; add to `memberIds` + set claims only in a new `acceptInvitation` callable invoked by the invitee; merge (never replace) claims; validate `actionData` server-side on accept (also closes security L5's footgun).
+- **Depends:** none, but F10 (rules hardening) should land with/after it — they compound.
+- **Sources:** security H2, api 2
+
+### F04. Secret API credentials shipped in client bundle (Impact token et al.) — **M**
+- **Problem:** `VITE_IMPACT_AUTH_TOKEN` is a Basic-auth account secret inlined into the public bundle/APK; Gemini/CSE/Spoonacular/USDA/OpenRouter keys extractable for quota/billing abuse.
+- **Files:** `services/groceryCheckoutService.ts:649-650`, `services/geminiService.ts:28`, `services/imageService.ts:4-5`, `services/emailService.ts:11-13`, `vite-env.d.ts`, `.env.example:41-42`
+- **Fix:** **Rotate the Impact token now** (treat as compromised); move Impact + Gemini/OpenRouter calls behind Cloud Functions with `defineSecret`; referrer/package+SHA-1-restrict remaining client keys in Cloud Console.
+- **Sources:** security H4, infra H1
+
+### F05. Inventory cache serialization drops ~10 PantryItem fields + collapses reservations — **M**
+- **Problem:** `ITEM_FIELD_ORDER` omits `consumptionHistory`, `tags`, `cooked_rice`, `leftoverMeta`, `estimatedPrice`, `expiryDate`, `freezerZone`, `freezerLabelPhotoUrl`, `freezerPortionCount`, `originalQuantity`; `reservations` collapse to one entry with `quantity:0`. Cache doc is the **sole** persistence — every bulk rewrite permanently destroys these fields for the whole household.
+- **Files:** `services/inventoryCacheService.ts:27-153`, `types.ts`
+- **Fix:** Add missing fields to `ITEM_FIELD_ORDER` + both converters (JSON-encode complex values like `batches`); serialize full `reservations` as JSON; bump `CACHE_VERSION` to 2.
+- **Depends:** **F06 MUST ship first (or same release)** — today a version bump wipes user data.
+- **Sources:** bug H1, db H1, db H2
+
+### F06. `CACHE_VERSION` bump wipes all users' inventory (no migration path) — **M**
+- **Problem:** Listener ignores docs where `version !== CACHE_VERSION`; next mutation `setDoc`s the empty local state over the real doc. `getCachedInventory` (migration path) does no version check at all — readers disagree.
+- **Files:** `hooks/dataManagement/useInventory.ts:107-124`, `services/inventoryCacheService.ts:171-215,407-410`
+- **Fix:** On version mismatch, run a versioned read-side migrator (parse old layout → convert → rewrite doc at current version); make `getCachedInventory` apply the same versioning. Never discard the doc that is the primary store.
+- **Ordering:** Blocks F05's version bump.
+- **Sources:** bug H2, db H3
+
+### F07. Whole-doc `setDoc` on shared household cache — lost-update races delete other members' items — **M**
+- **Problem:** `deleteItems`/`addItemsToCache`/`bulkUpdateInventoryCache` rewrite the entire cache doc from one member's stale local state; concurrent member's adds/edits silently vanish. `image_cache` batch path has the same no-merge clobber.
+- **Files:** `services/inventoryCacheService.ts:220-259,296-322,393-397`, `hooks/dataManagement/useInventory.ts:556`
+- **Fix:** Field-scoped `updateDoc` with per-item paths + `deleteField()` for removals; `runTransaction` for read-modify-write; `increment(1)` for `itemCount`.
+- **Sources:** bug H3, db M5, perf 4 (partial)
+
+### F08. Household migration treats cache-read failure as "no data" → checkpoint cleared, personal data stranded — **S**
+- **Problem:** Cache getters swallow errors → `[]`; migration "succeeds", `pending_migration_{userId}` removed, retry never fires, personal pantry never reaches the household.
+- **Files:** `services/householdMigrationService.ts:40-45,98`, `services/inventoryCacheService.ts:200-206` (and sibling cache services)
+- **Fix:** Getters rethrow (or return `{ok, items}`) on the migration path; clear checkpoint only when all four reads verifiably succeeded. Also add module-level in-flight guard for the retry toast (bug L4) and clear stale checkpoint when `householdId` goes null (bug L6).
+- **Sources:** bug H4 (+L4, L6)
+
+### F09. Offline queue: poison-pill ops, conflict `ConstraintError` aborts sync, misclassified errors, duplicate adds — **M**
+- **Problem:** (a) retry-exhausted ops never removed → permanent retry loop; (b) `handleConflict` re-`add`s same key → `ConstraintError` escapes the loop, skipping remaining ops; (c) `permission-denied`/`not-found` classified as "conflicts" and parked forever; (d) `toMillis()` crashes on non-Timestamp `updatedAt`; (e) `add` ops replayed via `addDoc` → duplicate docs.
+- **Files:** `services/offlineQueueService.ts:153-247,269-272,308-311`
+- **Fix:** Remove op on give-up (dead-letter store); `store.put()` + dequeue when parking conflicts; per-op try/catch; classify permission-denied/not-found as terminal; normalize timestamps (`toMillis?.() ?? Date.parse`); replay adds via `setDoc(doc(coll, opId))` for idempotency. Fix the false "changes synced" toast (bug L5).
+- **Sources:** bug H5, bug H6, bug M7, db M2, db M3, db M4 (+bug L5)
+
+### F10. Firestore rules: any member can rewrite `memberIds`/`members`/`ownerId` — **M**
+- **Problem:** Household update rule has zero field validation — members can add outsider uids, remove members, self-promote to admin, flip ownerId; defeats leaveHousehold/removeMember admin checks and tier member caps.
+- **Files:** `firestore.rules:48`
+- **Fix:** Pin `ownerId` immutable; restrict `memberIds`/`members` mutation to remove-self-only; cap `memberIds.size()`; route all other membership mutation through existing Cloud Functions. Add `request.resource.data.userId == resource.data.userId` to recipes update (security L1) while in the file. Run `npm run test:rules`.
+- **Depends:** F03 (acceptInvitation must exist before invite-time writes are locked down).
+- **Sources:** security M1 (+L1)
+
+### F11. Uncommitted release-critical Android config — fresh clone cannot build — **S**
+- **Problem:** targetSdk 36 / AGP 8.13.2 / manifest changes are unstaged; committed AGP 8.8.2 is incompatible with the committed Gradle 9.4.1 wrapper. Plus Kotlin declared as both 2.2.10 (`variables.gradle`) and 2.4.0 (version catalog).
+- **Files:** `android/app/build.gradle`, `android/build.gradle`, `android/gradle/libs.versions.toml`, `android/app/src/main/AndroidManifest.xml`, `android/variables.gradle:17`
+- **Fix:** Commit the four android/ files (+ changelog housekeeping) as one upgrade commit; unify Kotlin on the version catalog; verify clean-clone `./gradlew assembleDebug`.
+- **Sources:** infra H2, infra H3 (+L5)
+
+I am currently using AGP 8.13.2
+
+### F12. `image_cache/global` — single shared doc: 1MB hard-fail + open-write poisoning + no-merge clobber — **M**
+- **Problem:** One global doc grows unbounded toward the 1MB cap (write failure app-wide); any authenticated user can write arbitrary `url`s served to all clients; batch path `setDoc`s without merge, clobbering concurrent writers. Same open-write applies to `system/community_rated_recipes`, `price_cache`, leaderboard values.
+- **Files:** `services/imageCacheService.ts:389-390,462-483`, `firestore.rules:239-302`
+- **Fix:** Shard by key prefix/hash; `{merge:true}` or field-path updates in batch path; size/entry cap with pruning; rules: https/host-allowlist `url`s, make `system/*` + `price_cache` function-write-only, validate leaderboard entry shape.
+- **Sources:** db H5, perf 4, security M2
+
+---
+
+## P1 — Major correctness / UX / perf
+
+### F13. Gemini 429 retry is dead code — **S**
+`performSearch` re-wraps the 429 into a friendly message before the retry loop's substring match runs, so backoff never happens. Rethrow original (or set `cause`) and match structurally. `services/geminiService.ts:273,449-450`. Also fix abandoned (not aborted) timeout races at `:69-71,174-176,327-329` and the fabricated placeholder recipe that burns quota on failure (`:524-532`). **Sources:** api 13 (+18, 21)
+
+### F14. OpenRouter path bypasses free-tier AI usage limits — **S**
+With `VITE_GEMINI_DISABLED=true` (production path) `recordGeminiUsage` is never called — caps unenforced. Pre-check limits + record usage mirroring geminiService. `services/openRouterService.ts:109-111`. **Sources:** api 17
+
+### F15. `getUserHouseholds` query can never match — **S**
+`array-contains` on `{email}` vs full member maps → always `[]`. Query `memberIds` instead. `services/householdService.ts:340-343`. **Sources:** db H4
+
+### F16. `useOfflineStatus` re-renders entire App tree every 4s forever — **S**
+Unconditional new-object `setSyncStatus` each poll tick. Return `prev` when unchanged; consider event-driven queue signals. `hooks/useOfflineStatus.ts:74-95`. **Sources:** perf 1
+
+### F17. Image cache localStorage restore breaks `Date` fields — persisted cache dead after every reload — **S**
+Revive `createdAt`/`lastUsed` (or store epoch numbers) in `loadLocalCache`. `services/imageCacheService.ts:107-126,215-230`. **Sources:** perf 3
+
+### F18. `useAndroidBack` LIFO stack reorders on re-render — back closes the wrong modal — **M**
+Key stack by stable registration token pushed once on `isOpen` flip; mutable `onClose` ref. Then have `Modal`/`BottomSheet`/`ConfirmDialog` self-register (delete 20+ per-caller registrations) and un-register `searchQuery` as a pseudo-modal. `hooks/useAndroidBack.ts:26-36`, `components/ui/Modal.tsx`, `components/pantry/PantryScanner.tsx:450`. **Sources:** ui 1, ui 2, ui 3
+
+### F19. Add-to-plan dialog: no dialog semantics + hardcoded light colors in dark mode — **S**
+Rebuild flagship recipe→plan overlay on `Modal` + theme tokens; later upgrade to a BottomSheet with the 7-day strip (ui 18). `App.tsx:1679-1700`. **Sources:** ui 5 (+18)
+
+### F20. UTC/local date mixing shifts expiry boundaries by a day — **M**
+Centralize `localDateString()` + parse date-only strings as local `new Date(y,m-1,d)`. `services/pantryService.ts:122-129`, `hooks/dataManagement/useInventory.ts:145,160-171,383-387,416-420`. **Sources:** bug M4
+
+### F21. FEFO consumption defects: in-place mutation, batch reorder, unit-blind deduction — **M**
+Fix shallow-copy mutation of `quantity` (`pantryService.ts:407-414`); consume via sorted view but write back original batch order; skip/convert unit-mismatched batches; handle legacy number/`quantity_estimate` items (currently silently not decremented). `services/pantryService.ts:407-441`. **Sources:** bug M1, bug M2 (+M5 stale aggregate)
+
+### F22. Index-based updateItem/deleteItem race vs snapshot reordering — **S**
+Address mutations by item id (pattern exists in `performUndo`). `hooks/dataManagement/useInventory.ts:331-332,369-370`. **Sources:** bug M3
+
+### F23. Monolithic AppContext + unmemoized rows — O(rows) re-renders on any state change — **M**
+`React.memo(EnhancedShoppingListItem)` + props instead of per-row `useApp()`; longer-term slice the context (ties to F41 modal reducer). `contexts/AppContext.tsx:7-61`, `components/shopping-list/EnhancedShoppingListItem.tsx`. **Sources:** perf 2
+
+### F24. inviteMember: pre-check cooldown DoS + email→uid enumeration — **S**
+Move cooldown check/write after membership verification; per-caller global rate limit; return only `{success:true}` (no resolved uid/displayName). `functions/src/inviteMember.ts:55-60,98-107,204`. **Sources:** api 4, security M3
+
+### F25. HTTP fallback wrappers: role-case drift, GET mutations, raw error leak — **S**
+`'Admin'` vs `'admin'` means the HTTP admin-leave guard never fires. Prefer deleting the wrappers; else POST-only, extract shared `leaveHouseholdCore()`, map HttpsError→status, generic messages (also `verifyPurchase.ts:108-113`, `removeHouseholdMember.ts:131`). `functions/src/leaveHousehold.ts:56,223,317-320`, `functions/src/inviteMember.ts:245-253`. **Sources:** security M5, api 5, api 6, api 8
+
+### F26. App Check effectively absent — **M**
+Add `@capacitor-firebase/app-check` with Play Integrity (Android is the primary platform); `enforceAppCheck: true` on all callables; enable Firestore/Storage enforcement after metrics. `firebaseConfig.ts:40-51`, `functions/src/*`. **Depends:** land after F01-F03 so callables are correct before locking. **Sources:** security M4
+
+### F27. Dependency hygiene batch — **S**
+`npm audit fix` (root, no --force); remove `react-router-dom` (+ swap test `MemoryRouter` → fragment, 3 files — clears both HIGH advisories); remove unused runtime deps `date-fns`, `react-swipeable`, `@opentelemetry/api`; `cd functions && npm audit fix && npm update firebase-functions-test`. **Sources:** dep 1-3, dep §1-3
+
+### F28. CI never runs the production build; hosting can deploy stale dist/ — **S**
+Add `npm run build` to CI app job; add `"predeploy": ["npm run build"]` to app hosting target; pin `gitleaks` and `firebase-tools` versions. `.github/workflows/ci.yml`, `firebase.json`. **Sources:** infra M1, M2, M3
+
+### F29. `deleteAccount` orphans subcollections; >500-doc sweeps silently partial — **S**
+Use `db.recursiveDelete` (already the pattern in leaveHousehold/removeMember). `functions/src/deleteAccount.ts:53,81-90`. **Sources:** api 9
+
+### F30. `resetUsageLimits` hardcoded defaults grant 25x the free-tier caps — **S**
+Single `set(..., {merge:true})`, no pre-read; source limits from one shared constant matching `IN_APP_DEFAULTS`. `functions/src/resetUsageLimits.ts:66-87`. **Sources:** api 11
+
+### F31. `subscriptionNotifications`: no packageName check, unknown tier defaults to premium — **S**
+Drop mismatched `packageName`; derive tier from `PRODUCT_TIER_MAP[subscriptionId]`; validate `purchaseToken` type. `functions/src/subscriptionNotifications.ts:101-130`. **Sources:** api 10
+
+### F32. Third-party client TTL/timeout defects (nutrition, currency, Spoonacular) — **M**
+Nutrition: per-entry TTL (7d negative / 90d hit) + LRU cap. Currency: TTL-aware `ratesPromise`, clear on rejection, validate rates numeric. Spoonacular: distinguish 402/401/429 from "no results", shared `fetchWithTimeout`, quota cooldown. `services/nutritionService.ts:21,58-61,182-186`, `services/currencyService.ts:39,82-85`, `services/spoonacular*Client.ts`. **Sources:** api 14, 15, 16 (+19 keys→headers, 20 brand-strip no-op)    Skip spoonacular issues for now, note for later
+
+### F33. i18n: 7 shipped locales but ~80% of UI hardcoded English — **L**
+Priority batch: nav labels, ui/ primitive defaults, toasts, empty states; add scoped `react/jsx-no-literals` lint; then double coverage (~345 keys/locale). `src/locales/*`, `components/**`. **Sources:** ui 15 (+ui 14 "Loading...")        Skip this.  note for later
+
+### F34. Non-guest `addItems` never updates local state; listener flag not in deps — **S**
+Optimistic `setInventory` in `addItems`; add `disableInventoryListeners` to effect deps. `hooks/dataManagement/useInventory.ts:594,140`. **Sources:** bug M6
+
+---
+
+## P2 — Quality / maintenance
+
+### F35. Firebase bundle: split messaging/functions/analytics out of eager `firebase-vendor` (~475kB gz pre-paint) — **M** — `vite.config.ts:69-99`, dynamic imports at first use; inspect `searchUtils` (386kB) via build:analyze. **Sources:** perf 5
+### F36. `PantryScanner.tsx` god component (3,427 lines, 48 useState) — **L** — continue extraction: VirtualizedRow → `PantryList.tsx`, quick-consume → `usePantryQuickConsume`; split scanner phases. **Sources:** code 1, perf 8
+### F37. `Community.tsx` second god component forming (1,766 lines) — **M** — split feed/actions/effects now, cheaper than at 3,000 lines; delete dead `_STAPLES` const. **Sources:** code 2 (+8)
+### F38. Twin notification services with colliding `NotificationItem` types — **M** — rename to role-based names, distinguish `ScheduledNotification` vs `UserNotification`. `services/notificationService.ts`, `services/notificationsService.ts`. **Sources:** code 3
+### F39. Blanket `no-explicit-any` disables in 3 files — **M** — scope to lines; type `AppActionsContext` first (highest blast radius). **Sources:** code 5
+### F40. Bespoke `fixed inset-0` overlays in 27 files — **L** — migrate to `Modal`/`BottomSheet`; lint-ban new ones. Includes padding-var underlap fix. **Sources:** ui 6 (+17)
+### F41. App.tsx modal sprawl → reducer-based modal router — **L** — deferred 2026-07-29, still open; unblocks F18 consolidation + F23 context slicing. `App.tsx:140-155,697-699`. **Sources:** code 4, ui 7
+### F42. Tap targets <44px in Modal close / Button xs/sm — **S** — `min-w/h-[44px]` hit areas in primitives (copy EnhancedShoppingListItem standard). **Sources:** ui 8 (+9 nav label size/dup aria, 11 contrast tokens)
+### F43. `max-w-md` hard cap wastes tablet/desktop/foldable space — **M** — per-breakpoint caps + 2-col grids; Play Store scores large-screen layouts. `App.tsx:1576` etc. **Sources:** ui 16
+### F44. Native `alert()` in 4 sites — **S** — route through `useToast`/`ConfirmDialog`; lint-ban `alert(`. **Sources:** ui 13
+### F45. Focus trap escapes to non-inert background — **S** — `inert` app root while modal open; preventDefault fallback. `components/ui/Modal.tsx:106-125`. **Sources:** ui 10
+### F46. Rating/search Firestore scans (carried) — **M** — `updateCommunityStats` → transaction + `increment()`; `recipe_search_index` full scan → `searchTokens` array-contains + `limit()` fallback. `services/recipeRatingService.ts:252-254`, `services/recipeService.ts:1018,1087`. **Sources:** db M6, M7
+### F47. Inventory/recipes cache doc 1MB risk unmonitored — **S** — track serialized size in `updateCache`, surface failure (currently swallowed), telemetry guard before sharding. `services/inventoryCacheService.ts:255-258`. **Sources:** db M1, perf 6
+### F48. Functions toolchain 2+ majors stale (TS 4.9, ESLint 8 EOL) — **M** — upgrade TS≥5, ESLint 9+, @typescript-eslint 8; clears most of functions' 16 advisories; consider scoped `@googleapis/androidpublisher` for cold starts. **Sources:** dep §2, §5, §6
+### F49. Migrate off `@codetrix-studio/capacitor-google-auth` (Capacitor-6 RC pin) — **L** — to `@capacitor-firebase/authentication` or `@capgo/capacitor-social-login`; retires `--legacy-peer-deps` + gradle patch. **Sources:** dep §4
+### F50. Android provisioning/config drift — **S** — commit or document `google-services.json` provisioning; single source for SDK versions (catalog) instead of triplication. **Sources:** infra M4, M5
+
+---
+
+## P3 — Docs / SEO / nice-to-have
+
+### F51. App canonical/OG points at marketing site + permissive robots — **S** — noindex the auth-gated app, fix `og:url`, `Disallow: /` in `public/robots.txt`. `index.html:16-30`. **Sources:** seo H1, H2
+### F52. Real 1200x630 OG image (new filename — immutable caching) + `name=` on twitter metas + `content=` on impact-verification meta — **S** — both `index.html` and `website/*.html`. **Sources:** seo H3, M1, M2
+### F53. Manifest icons claim wrong sizes; icon192/512 exist unused — **S** — point entries at real files, add maskable/description/id. `public/manifest.webmanifest`. **Sources:** seo M3
+### F54. Per-tab `document.title` in `switchTab()` — **S** — plus optional hash deep-links. **Sources:** seo M4
+### F55. Drop marketing-site SPA rewrite (soft-404s) + remove leftover `aistudiocdn.com` import map + font `@import` → preconnect links — **S** — `firebase.json`, `index.html:38,129-139`. **Sources:** seo M5, L2, L6
+### F56. CLAUDE.md corrections — **S** — changelog direction is CHANGELOG.md → changelogEntries.ts (doc says reverse); add `test:rules` + release scripts to Commands; clarify member-cap location; prune dead wiki pointer. **Sources:** doc H1-H4
+### F57. `.env.example` regeneration — **S** — add ~20 missing vars (Sentry, OpenRouter, reCAPTCHA, Unsplash, affiliate IDs...), delete stale Stripe/Functions-URL vars, default `VITE_ADMOB_ENABLED=false`; complete `vite-env.d.ts`; rename `VITE_COOLDOWN_MS` in functions. **Sources:** doc E1-E4, infra L2
+### F58. readme/ refresh — **S/M** — delete README's stale top-of-file Play Billing plan (wrong plugin named); purge Stripe from IMPROVEMENT_SUGGESTIONS; add short setup docs for nutrition/barcode, currency, Play Billing, OpenRouter. **Sources:** doc R1-R3
+### Also-P3 (one-liners): dead `cache` collection-group index — delete (db L1); dead external-image fetch in `createManualItem` (bug L1); `setFlagTemporarily` 100ms race (bug L3); `getPendingCount` → `store.count()` (db L3); tab-history back retrace + Settings sub-state reset (ui 4, 19, 20); public-read recipe-photos decision + persistence race (security L3, L4); CI path filters (infra L4); drop `msw`/`ts-node`/`puppeteer` devDeps + minor `npm update` batch (dep 6); `useDataListener` callback refs (perf 7); metadata/item-id key collision — fold into next cache version (db L4).
+
+---
+
+## Dependencies / ordering constraints
+
+1. **F06 → F05**: the CACHE_VERSION migration path must exist before F05's field additions bump the version, or every user's pantry is wiped. Ship as one unit: F06 migrator, then F05 fields, `CACHE_VERSION = 2`.
+2. **F03 → F10**: `acceptInvitation` callable must exist before firestore.rules lock down membership mutation, or accept flow breaks. F01/F24 (same file family) land alongside.
+3. **F02 before F26**: get verifyPurchase semantics right, then App Check enforcement wraps all callables (F26 amplifies F01-F03's fixes).
+4. **F07 pairs with F05/F06**: bulk-path rewrite touches the same functions; do in the same PR series to avoid re-serializing twice.
+5. **F11 first among infra**: unblocks anyone cloning; F28 (CI build) will fail until F11 is committed anyway.
+6. **F41 (modal router) unblocks** F18's final cleanup and F23's context slicing — but F18's stack fix itself must NOT wait on F41.
+7. **F27 before F48**: root audit fix is independent; functions toolchain upgrade is its own PR.
+8. **F04 rotation is immediate** (ops action) even before the code move lands.
+
+## Suggested execution sequence
+
+**Wave 0 — same-day quick wins (all S):**
+F11 (commit android), F04-rotate (rotate Impact token in Impact dashboard), F01, F02, F08, F15, F16, F17, F27, F28, F30, F31, F29.
+
+**Wave 1 — P0 cache/data-integrity batch (one PR series, in order):**
+F06 → F05 → F07 → F09 → F12. Verify with `/verify` + `npm run test:rules` + manual two-member household smoke test.
+
+**Wave 2 — P0/P1 security batch:**
+F03 (acceptInvitation) → F10 (rules) → F24 → F25 → F26 (App Check) → F04 (server-side proxy completion).
+
+**Wave 3 — P1 correctness/UX:**
+F13, F14, F20, F21, F22, F34, F18, F19, F23, F32.
+
+**Wave 4 — P2 maintenance (interleave as capacity allows):**
+F35, F42, F44, F45, F47, F50 (small) → F37, F38, F39, F46, F48, F43 (medium) → F36, F40, F41, F49, F33 (large).
+
+**Wave 5 — P3 docs/SEO sweep:** F51-F58 in one or two housekeeping PRs.

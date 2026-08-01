@@ -10,25 +10,25 @@ if (!getApps().length) {
 }
 
 export const checkInvitation = onCall(
-  { 
+  {
     region: "us-central1",
-    enforceAppCheck: false,
+    enforceAppCheck: true,
     cors: true
   },
   async (request) => {
-    // Check if user is authenticated
+    // Require authentication - never trust a client-supplied email.
     if (!request.auth) {
-      // Allow unauthenticated requests for email-based invite checks
+      throw new HttpsError("unauthenticated", "You must be signed in to check invitations.");
     }
 
-    const { householdId, userEmail } = request.data;
-    
+    const { householdId } = request.data;
+
     if (!householdId || typeof householdId !== 'string') {
       throw new HttpsError("invalid-argument", "Unable to join 2: Household ID is required and must be a string.");
     }
 
-    // Use provided email or fall back to auth token email (or allow unauthenticated for debugging)
-    const email = userEmail || (request.auth ? request.auth.token.email : null);
+    // Only ever use the authenticated caller's own token email.
+    const email = request.auth.token.email;
 
     if (!email) {
       throw new HttpsError("invalid-argument", "Unable to join 3: User email is required to check invitations.");
@@ -78,7 +78,10 @@ export const checkInvitation = onCall(
         throw new HttpsError("internal", "Unable to join 4: Failed to check invitation status.");
       }
       
-      return { isInvited, household: isInvited ? household : null };
+      return {
+        isInvited,
+        householdName: isInvited && typeof household.name === 'string' ? household.name : undefined,
+      };
     } catch (err: any) {
       logger.error('Error checking invitation', err);
       throw new HttpsError("internal", "Unable to join 4: Failed to check invitation.");

@@ -4,6 +4,7 @@ import DatabaseMonitoringService from './services/databaseMonitoringService';
 import { Login } from './components/auth-onboarding/Login';
 import ErrorBoundary from './components/ui/ErrorBoundary';
 import { AppLoadingScreen } from './components/ui/AppLoadingScreen';
+import { Modal } from './components/ui/Modal';
 import { AppHeader } from './components/layout/AppHeader';
 import { AppNavigation } from './components/layout/AppNavigation';
 import { MainContent } from './components/layout/MainContent';
@@ -52,6 +53,7 @@ import HapticService from './services/hapticService';
 import { ShoppingListCacheService } from './services/shoppingListCacheService';
 import { groceryPriceService } from './services/groceryPriceService';
 import { PriceDataCacheService } from './services/priceDataCacheService'; // Import the service
+import { initializePurchaseStore } from './services/purchaseService';
 import ExpiredItemsLaunchSheet, { getExpiredLaunchEnabled } from './components/pantry/ExpiredItemsLaunchSheet';
 import { recordMilestone } from './services/onboardingMilestoneService';
 import { useIntl } from 'react-intl';
@@ -356,6 +358,15 @@ const App: React.FC = () => {
       PriceDataCacheService.loadPriceData();
     }
   }, [isAuthReady, user?.id]);
+
+  // Initialize IAP store on Android on app launch
+  useEffect(() => {
+    if (user?.id && Capacitor.isNativePlatform()) {
+      initializePurchaseStore(user.id).catch((err: unknown) => {
+        log.error('Startup IAP store init error', { error: err instanceof Error ? err.message : String(err) }, 'App');
+      });
+    }
+  }, [user?.id]);
 
   // Load notification settings from user profile
   useEffect(() => {
@@ -877,6 +888,12 @@ const App: React.FC = () => {
             } else {
               addToast('Items no longer found in pantry', 'info');
             }
+          } else if (actionData?.filterAttention) {
+            try {
+              sessionStorage.setItem('pantry-filter-attention', 'true');
+            } catch { /* ignore */ }
+            setActiveTab(Tab.PANTRY);
+            window.dispatchEvent(new Event('apply-attention-filter'));
           } else {
             // Single item - show ItemDetailModal
             const itemId = actionData?.items?.[0]?.itemId
@@ -1677,16 +1694,27 @@ const App: React.FC = () => {
         )}
 
         {showAddToPlanDialog && pendingRecipeForPlan && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-theme-primary p-6 rounded-lg shadow-lg max-w-md w-full mx-4">
-              <h3 className="text-lg font-semibold mb-4 text-theme-text">{intl.formatMessage({ id: 'mealPlanner.addToMealPlan' })}</h3>
-              <p className="mb-4 text-theme-text-secondary">Select a day and meal for "{pendingRecipeForPlan.title}"</p>
-              
+          <Modal
+            isOpen={showAddToPlanDialog}
+            onClose={() => {
+              setShowAddToPlanDialog(false);
+              setPendingRecipeForPlan(null);
+            }}
+            title={intl.formatMessage({ id: 'mealPlanner.addToMealPlan' })}
+            size="sm"
+          >
+            <Modal.Body>
+              <p className="mb-4 text-[var(--text-secondary)]">
+                Select a day and meal for "{pendingRecipeForPlan.title}"
+              </p>
+
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium mb-2 text-theme-text">{intl.formatMessage({ id: 'mealPlanner.day' })}</label>
-                  <select 
-                    className="w-full p-2 border border-theme-border rounded bg-white text-black"
+                  <label className="block text-sm font-medium mb-2 text-[var(--text-primary)]">
+                    {intl.formatMessage({ id: 'mealPlanner.day' })}
+                  </label>
+                  <select
+                    className="w-full p-2 border border-[var(--border-color)] rounded bg-[var(--bg-secondary)] text-[var(--text-primary)]"
                     onChange={(e) => setSelectedDayForPlan(parseInt(e.target.value))}
                     value={selectedDayForPlan ?? 0}
                   >
@@ -1697,11 +1725,13 @@ const App: React.FC = () => {
                     ))}
                   </select>
                 </div>
-                
+
                 <div>
-                  <label className="block text-sm font-medium mb-2 text-theme-text">{intl.formatMessage({ id: 'mealPlanner.meal' })}</label>
-                  <select 
-                    className="w-full p-2 border border-theme-border rounded bg-white text-black"
+                  <label className="block text-sm font-medium mb-2 text-[var(--text-primary)]">
+                    {intl.formatMessage({ id: 'mealPlanner.meal' })}
+                  </label>
+                  <select
+                    className="w-full p-2 border border-[var(--border-color)] rounded bg-[var(--bg-secondary)] text-[var(--text-primary)]"
                     onChange={(e) => setSelectedMealForPlan(e.target.value as 'breakfast' | 'lunch' | 'dinner')}
                     value={selectedMealForPlan ?? 'dinner'}
                   >
@@ -1711,30 +1741,28 @@ const App: React.FC = () => {
                   </select>
                 </div>
               </div>
-              
-              <div className="flex gap-3 mt-6">
-                <button
-                  onClick={() => {
-                    setShowAddToPlanDialog(false);
-                    setPendingRecipeForPlan(null);
-                  }}
-                  className="flex-1 px-4 py-2 border border-theme-border rounded text-theme-text hover:bg-theme-hover"
-                >
-                  {intl.formatMessage({ id: 'common.cancel' })}
-                </button>
-                <button
-                  onClick={() => {
-                    if (selectedDayForPlan !== null && selectedMealForPlan) {
-                      confirmAddToPlan(selectedDayForPlan, selectedMealForPlan);
-                    }
-                  }}
-                  className="flex-1 px-4 py-2 bg-[var(--accent-color)] text-white rounded border border-[var(--accent-color)] hover:opacity-90"
-                >
-                  Add to Plan
-                </button>
-              </div>
-            </div>
-          </div>
+            </Modal.Body>
+            <Modal.Footer>
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setShowAddToPlanDialog(false);
+                  setPendingRecipeForPlan(null);
+                }}
+              >
+                {intl.formatMessage({ id: 'common.cancel' })}
+              </Button>
+              <Button
+                onClick={() => {
+                  if (selectedDayForPlan !== null && selectedMealForPlan) {
+                    confirmAddToPlan(selectedDayForPlan, selectedMealForPlan);
+                  }
+                }}
+              >
+                Add to Plan
+              </Button>
+            </Modal.Footer>
+          </Modal>
         )}
 
         <AppHeader

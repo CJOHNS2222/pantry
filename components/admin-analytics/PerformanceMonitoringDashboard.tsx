@@ -27,8 +27,12 @@ interface NetworkRequest {
   timestamp: number;
 }
 
-const PerformanceMonitoringDashboard: React.FC = () => {
-  const [isVisible, setIsVisible] = useState(false);
+interface PerformanceMonitoringDashboardProps {
+  inline?: boolean;
+}
+
+const PerformanceMonitoringDashboard: React.FC<PerformanceMonitoringDashboardProps> = ({ inline = false }) => {
+  const [isVisible, setIsVisible] = useState(inline);
   const [activeTab, setActiveTab] = useState<'overview' | 'webVitals' | 'components' | 'network'>('overview');
   const [coreWebVitals, setCoreWebVitals] = useState<CoreWebVitals>({
     lcp: null,
@@ -179,12 +183,12 @@ const PerformanceMonitoringDashboard: React.FC = () => {
 
   const getVitalsColor = (value: number | null, thresholds: { good: number; poor: number }): string => {
     if (value === null) return 'text-gray-500';
-    if (value <= thresholds.good) return 'text-green-600';
-    if (value <= thresholds.poor) return 'text-yellow-600';
-    return 'text-red-600';
+    if (value <= thresholds.good) return 'text-green-600 dark:text-green-400';
+    if (value <= thresholds.poor) return 'text-yellow-600 dark:text-yellow-400';
+    return 'text-red-600 dark:text-red-400';
   };
 
-  if (!isVisible) {
+  if (!isVisible && !inline) {
     return (
       <button
         onClick={() => setIsVisible(true)}
@@ -192,6 +196,261 @@ const PerformanceMonitoringDashboard: React.FC = () => {
       >
         📊 Performance
       </button>
+    );
+  }
+
+  // Common inner content
+  const renderDashboardContent = () => (
+    <>
+      {/* Tab Navigation */}
+      <div className={`flex border-b ${inline ? 'border-theme' : 'border-gray-200'}`}>
+        {[
+          { id: 'overview', label: 'Overview', icon: '📊' },
+          { id: 'webVitals', label: 'Web Vitals', icon: '⚡' },
+          { id: 'components', label: 'Components', icon: '🧩' },
+          { id: 'network', label: 'Network', icon: '🌐' }
+        ].map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id as 'overview' | 'webVitals' | 'components' | 'network')}
+            className={`flex-1 py-2 px-3 text-sm font-semibold transition-colors border-b-2 ${
+              activeTab === tab.id
+                ? 'text-[var(--accent-color)] border-[var(--accent-color)] bg-theme-primary/10'
+                : inline
+                  ? 'text-theme-secondary border-transparent hover:text-theme-primary'
+                  : 'text-gray-500 border-transparent hover:text-gray-700'
+            }`}
+          >
+            {tab.icon} {tab.label}
+          </button>
+        ))}
+      </div>
+
+      <div className={`p-4 max-h-[400px] overflow-y-auto ${inline ? 'bg-theme-secondary' : ''}`}>
+        {activeTab === 'overview' && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className={`p-3 rounded-lg ${inline ? 'bg-blue-50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-300' : 'bg-blue-50 text-blue-800'}`}>
+                <div className={`${inline ? 'text-blue-600 dark:text-blue-400' : 'text-blue-700'} font-medium text-sm`}>Database Reads</div>
+                <div className="text-2xl font-bold">
+                  {dbMetrics?.reads || 0}
+                </div>
+                <div className="text-sm">
+                  {dbMetrics ? Math.round((dbMetrics.reads / dbMetrics.sessionDuration) * 60000) : 0}/min
+                </div>
+              </div>
+
+              <div className={`p-3 rounded-lg ${inline ? 'bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-300' : 'bg-green-50 text-green-800'}`}>
+                <div className={`${inline ? 'text-green-600 dark:text-green-400' : 'text-green-700'} font-medium text-sm`}>LCP</div>
+                <div className={`text-2xl font-bold ${getVitalsColor(coreWebVitals.lcp, { good: 2500, poor: 4000 })}`}>
+                  {coreWebVitals.lcp ? formatTime(coreWebVitals.lcp) : 'N/A'}
+                </div>
+                <div className="text-sm">Largest Contentful Paint</div>
+              </div>
+
+              <div className={`p-3 rounded-lg ${inline ? 'bg-yellow-50 dark:bg-yellow-950/20 text-yellow-700 dark:text-yellow-300' : 'bg-yellow-50 text-yellow-800'}`}>
+                <div className={`${inline ? 'text-yellow-600 dark:text-yellow-400' : 'text-yellow-700'} font-medium text-sm`}>FID</div>
+                <div className={`text-2xl font-bold ${getVitalsColor(coreWebVitals.fid, { good: 100, poor: 300 })}`}>
+                  {coreWebVitals.fid ? formatTime(coreWebVitals.fid) : 'N/A'}
+                </div>
+                <div className="text-sm">First Input Delay</div>
+              </div>
+
+              <div className={`p-3 rounded-lg ${inline ? 'bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-300' : 'bg-red-50 text-red-800'}`}>
+                <div className={`${inline ? 'text-red-600 dark:text-red-400' : 'text-red-700'} font-medium text-sm`}>CLS</div>
+                <div className={`text-2xl font-bold ${getVitalsColor(coreWebVitals.cls, { good: 0.1, poor: 0.25 })}`}>
+                  {coreWebVitals.cls ? coreWebVitals.cls.toFixed(3) : 'N/A'}
+                </div>
+                <div className="text-sm">Layout Shift</div>
+              </div>
+            </div>
+
+            <div className={`text-sm ${inline ? 'text-theme-secondary opacity-70' : 'text-gray-600'}`}>
+              <div>Session Duration: {dbMetrics ? formatTime(dbMetrics.sessionDuration) : '0ms'}</div>
+              <div>Network Requests: {networkRequests.length}</div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'webVitals' && (
+          <div className="space-y-4">
+            <div className="grid gap-4">
+              <div className={`border rounded-lg p-4 ${inline ? 'bg-theme-secondary border-theme text-theme-primary' : 'bg-white border-gray-200 text-gray-800'}`}>
+                <h4 className="font-semibold mb-2">Largest Contentful Paint (LCP)</h4>
+                <div className="flex items-center justify-between">
+                  <span className={`text-2xl font-bold ${getVitalsColor(coreWebVitals.lcp, { good: 2500, poor: 4000 })}`}>
+                    {coreWebVitals.lcp ? formatTime(coreWebVitals.lcp) : 'Not measured'}
+                  </span>
+                  <span className={`text-sm ${inline ? 'text-theme-secondary opacity-70' : 'text-gray-500'}`}>
+                    {coreWebVitals.lcp && coreWebVitals.lcp <= 2500 ? 'Good' :
+                     coreWebVitals.lcp && coreWebVitals.lcp <= 4000 ? 'Needs improvement' : 'Poor'}
+                  </span>
+                </div>
+                <div className={`text-sm mt-1 ${inline ? 'text-theme-secondary opacity-70' : 'text-gray-500'}`}>Should be &lt; 2.5s</div>
+              </div>
+
+              <div className={`border rounded-lg p-4 ${inline ? 'bg-theme-secondary border-theme text-theme-primary' : 'bg-white border-gray-200 text-gray-800'}`}>
+                <h4 className="font-semibold mb-2">First Input Delay (FID)</h4>
+                <div className="flex items-center justify-between">
+                  <span className={`text-2xl font-bold ${getVitalsColor(coreWebVitals.fid, { good: 100, poor: 300 })}`}>
+                    {coreWebVitals.fid ? formatTime(coreWebVitals.fid) : 'Not measured'}
+                  </span>
+                  <span className={`text-sm ${inline ? 'text-theme-secondary opacity-70' : 'text-gray-500'}`}>
+                    {coreWebVitals.fid && coreWebVitals.fid <= 100 ? 'Good' :
+                     coreWebVitals.fid && coreWebVitals.fid <= 300 ? 'Needs improvement' : 'Poor'}
+                  </span>
+                </div>
+                <div className={`text-sm mt-1 ${inline ? 'text-theme-secondary opacity-70' : 'text-gray-500'}`}>Should be &lt; 100ms</div>
+              </div>
+
+              <div className={`border rounded-lg p-4 ${inline ? 'bg-theme-secondary border-theme text-theme-primary' : 'bg-white border-gray-200 text-gray-800'}`}>
+                <h4 className="font-semibold mb-2">Cumulative Layout Shift (CLS)</h4>
+                <div className="flex items-center justify-between">
+                  <span className={`text-2xl font-bold ${getVitalsColor(coreWebVitals.cls, { good: 0.1, poor: 0.25 })}`}>
+                    {coreWebVitals.cls ? coreWebVitals.cls.toFixed(3) : 'Not measured'}
+                  </span>
+                  <span className={`text-sm ${inline ? 'text-theme-secondary opacity-70' : 'text-gray-500'}`}>
+                    {coreWebVitals.cls && coreWebVitals.cls <= 0.1 ? 'Good' :
+                     coreWebVitals.cls && coreWebVitals.cls <= 0.25 ? 'Needs improvement' : 'Poor'}
+                  </span>
+                </div>
+                <div className={`text-sm mt-1 ${inline ? 'text-theme-secondary opacity-70' : 'text-gray-500'}`}>Should be &lt; 0.1</div>
+              </div>
+
+              <div className={`border rounded-lg p-4 ${inline ? 'bg-theme-secondary border-theme text-theme-primary' : 'bg-white border-gray-200 text-gray-800'}`}>
+                <h4 className="font-semibold mb-2">First Contentful Paint (FCP)</h4>
+                <div className="flex items-center justify-between">
+                  <span className={`text-2xl font-bold ${getVitalsColor(coreWebVitals.fcp, { good: 1800, poor: 3000 })}`}>
+                    {coreWebVitals.fcp ? formatTime(coreWebVitals.fcp) : 'Not measured'}
+                  </span>
+                  <span className={`text-sm ${inline ? 'text-theme-secondary opacity-70' : 'text-gray-500'}`}>
+                    {coreWebVitals.fcp && coreWebVitals.fcp <= 1800 ? 'Good' :
+                     coreWebVitals.fcp && coreWebVitals.fcp <= 3000 ? 'Needs improvement' : 'Poor'}
+                  </span>
+                </div>
+                <div className={`text-sm mt-1 ${inline ? 'text-theme-secondary opacity-70' : 'text-gray-500'}`}>Should be &lt; 1.8s</div>
+              </div>
+
+              <div className={`border rounded-lg p-4 ${inline ? 'bg-theme-secondary border-theme text-theme-primary' : 'bg-white border-gray-200 text-gray-800'}`}>
+                <h4 className="font-semibold mb-2">Time to First Byte (TTFB)</h4>
+                <div className="flex items-center justify-between">
+                  <span className={`text-2xl font-bold ${getVitalsColor(coreWebVitals.ttfb, { good: 800, poor: 1800 })}`}>
+                    {coreWebVitals.ttfb ? formatTime(coreWebVitals.ttfb) : 'Not measured'}
+                  </span>
+                  <span className={`text-sm ${inline ? 'text-theme-secondary opacity-70' : 'text-gray-500'}`}>
+                    {coreWebVitals.ttfb && coreWebVitals.ttfb <= 800 ? 'Good' :
+                     coreWebVitals.ttfb && coreWebVitals.ttfb <= 1800 ? 'Needs improvement' : 'Poor'}
+                  </span>
+                </div>
+                <div className={`text-sm mt-1 ${inline ? 'text-theme-secondary opacity-70' : 'text-gray-500'}`}>Should be &lt; 800ms</div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'components' && (
+          <div className="space-y-4">
+            <div className={`text-sm ${inline ? 'text-theme-secondary opacity-80' : 'text-gray-600'}`}>
+              Component render tracking is enabled in development mode.
+              This feature tracks render counts and performance for React components.
+            </div>
+
+            <div className={`border rounded-lg p-3 ${inline ? 'bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900/30' : 'bg-yellow-50 border-yellow-200'}`}>
+              <div className={`font-semibold text-sm ${inline ? 'text-amber-800 dark:text-amber-300' : 'text-yellow-800'}`}>Note</div>
+              <div className={`text-sm mt-1 ${inline ? 'text-amber-700 dark:text-amber-400' : 'text-yellow-700'}`}>
+                Detailed component metrics require React DevTools or additional instrumentation.
+                This dashboard provides a foundation for performance monitoring.
+              </div>
+            </div>
+
+            <div className={`text-sm ${inline ? 'text-theme-secondary opacity-70' : 'text-gray-500'}`}>
+              <div>• Database operations are tracked in real-time</div>
+              <div>• Network requests are monitored automatically</div>
+              <div>• Core Web Vitals are measured continuously</div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'network' && (
+          <div className="space-y-4">
+            <div className={`text-sm mb-2 ${inline ? 'text-theme-secondary opacity-80' : 'text-gray-600'}`}>
+              Recent network requests ({networkRequests.length})
+            </div>
+
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {networkRequests.slice(-10).reverse().map((request, index) => (
+                <div key={index} className={`border rounded p-2 text-sm ${inline ? 'bg-theme-primary/5 border-theme text-theme-primary' : 'bg-gray-50 border-gray-200 text-gray-800'}`}>
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold truncate">
+                        {request.url.split('/').pop() || request.url}
+                      </div>
+                      <div className={inline ? 'text-theme-secondary opacity-70' : 'text-gray-500'}>
+                        {request.method} • {request.status} • {formatTime(request.duration)}
+                      </div>
+                    </div>
+                    <div className={inline ? 'text-theme-secondary opacity-80 ml-2' : 'text-gray-600 ml-2'}>
+                      {formatBytes(request.size)}
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              {networkRequests.length === 0 && (
+                <div className={`text-center py-4 ${inline ? 'text-theme-secondary opacity-75' : 'text-gray-500'}`}>
+                  No network requests recorded yet. Open a screen or trigger an action to capture them here.
+                </div>
+              )}
+            </div>
+
+            <div className={`text-sm border-t pt-2 ${inline ? 'text-theme-secondary opacity-70 border-theme' : 'text-gray-500 border-gray-200'}`}>
+              Network waterfall shows the last 10 requests. Full monitoring available in browser DevTools.
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className={`p-3 flex gap-2 border-t ${inline ? 'border-theme bg-theme-secondary' : 'border-gray-200 bg-white'}`}>
+        <button
+          onClick={() => {
+            DatabaseMonitoringService.logCurrentMetrics();
+            log.info('Core Web Vitals', { coreWebVitals }, 'PerformanceMonitoringDashboard');
+            log.debug('Network Requests', { networkRequests }, 'PerformanceMonitoringDashboard');
+          }}
+          className={`flex-1 px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
+            inline
+              ? 'bg-theme-primary text-theme-primary hover:bg-theme-secondary/20 border border-theme'
+              : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+          }`}
+        >
+          Log Metrics
+        </button>
+        <button
+          onClick={() => {
+            setCoreWebVitals({ lcp: null, fid: null, cls: null, fcp: null, ttfb: null });
+            setNetworkRequests([]);
+            DatabaseMonitoringService.resetMetrics();
+          }}
+          className={`flex-1 px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
+            inline
+              ? 'bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 border border-red-200 dark:border-red-900'
+              : 'bg-red-100 hover:bg-red-200 text-red-700'
+          }`}
+        >
+          Reset All
+        </button>
+      </div>
+    </>
+  );
+
+  if (inline) {
+    return (
+      <div className="bg-theme-secondary border border-theme rounded-xl overflow-hidden text-theme-primary">
+        <div className="flex justify-between items-center p-4 border-b border-theme">
+          <h3 className="text-lg font-bold text-[var(--accent-color)]">Performance Dashboard</h3>
+        </div>
+        {renderDashboardContent()}
+      </div>
     );
   }
 
@@ -206,235 +465,7 @@ const PerformanceMonitoringDashboard: React.FC = () => {
           ×
         </button>
       </div>
-
-      {/* Tab Navigation */}
-      <div className="flex border-b border-gray-200">
-        {[
-          { id: 'overview', label: 'Overview', icon: '📊' },
-          { id: 'webVitals', label: 'Web Vitals', icon: '⚡' },
-          { id: 'components', label: 'Components', icon: '🧩' },
-          { id: 'network', label: 'Network', icon: '🌐' }
-        ].map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id as 'overview' | 'webVitals' | 'components' | 'network')}
-            className={`flex-1 py-2 px-3 text-sm font-medium ${
-              activeTab === tab.id
-                ? 'text-purple-600 border-b-2 border-purple-600'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            {tab.icon} {tab.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="p-4 max-h-96 overflow-y-auto">
-        {activeTab === 'overview' && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-blue-50 p-3 rounded-lg">
-                <div className="text-blue-700 font-medium text-sm">Database Reads</div>
-                <div className="text-2xl font-bold text-blue-800">
-                  {dbMetrics?.reads || 0}
-                </div>
-                <div className="text-sm text-blue-600">
-                  {dbMetrics ? Math.round((dbMetrics.reads / dbMetrics.sessionDuration) * 60000) : 0}/min
-                </div>
-              </div>
-
-              <div className="bg-green-50 p-3 rounded-lg">
-                <div className="text-green-700 font-medium text-sm">LCP</div>
-                <div className={`text-2xl font-bold ${getVitalsColor(coreWebVitals.lcp, { good: 2500, poor: 4000 })}`}>
-                  {coreWebVitals.lcp ? formatTime(coreWebVitals.lcp) : 'N/A'}
-                </div>
-                <div className="text-sm text-green-600">Largest Contentful Paint</div>
-              </div>
-
-              <div className="bg-yellow-50 p-3 rounded-lg">
-                <div className="text-yellow-700 font-medium text-sm">FID</div>
-                <div className={`text-2xl font-bold ${getVitalsColor(coreWebVitals.fid, { good: 100, poor: 300 })}`}>
-                  {coreWebVitals.fid ? formatTime(coreWebVitals.fid) : 'N/A'}
-                </div>
-                <div className="text-sm text-yellow-600">First Input Delay</div>
-              </div>
-
-              <div className="bg-red-50 p-3 rounded-lg">
-                <div className="text-red-700 font-medium text-sm">CLS</div>
-                <div className={`text-2xl font-bold ${getVitalsColor(coreWebVitals.cls, { good: 0.1, poor: 0.25 })}`}>
-                  {coreWebVitals.cls ? coreWebVitals.cls.toFixed(3) : 'N/A'}
-                </div>
-                <div className="text-sm text-red-600">Layout Shift</div>
-              </div>
-            </div>
-
-            <div className="text-sm text-gray-600">
-              <div>Session Duration: {dbMetrics ? formatTime(dbMetrics.sessionDuration) : '0ms'}</div>
-              <div>Network Requests: {networkRequests.length}</div>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'webVitals' && (
-          <div className="space-y-4">
-            <div className="grid gap-4">
-              <div className="bg-white border border-gray-200 rounded-lg p-4">
-                <h4 className="font-medium text-gray-800 mb-2">Largest Contentful Paint (LCP)</h4>
-                <div className="flex items-center justify-between">
-                  <span className={`text-2xl font-bold ${getVitalsColor(coreWebVitals.lcp, { good: 2500, poor: 4000 })}`}>
-                    {coreWebVitals.lcp ? formatTime(coreWebVitals.lcp) : 'Not measured'}
-                  </span>
-                  <span className="text-sm text-gray-500">
-                    {coreWebVitals.lcp && coreWebVitals.lcp <= 2500 ? 'Good' :
-                     coreWebVitals.lcp && coreWebVitals.lcp <= 4000 ? 'Needs improvement' : 'Poor'}
-                  </span>
-                </div>
-                <div className="text-sm text-gray-500 mt-1">Should be &lt; 2.5s</div>
-              </div>
-
-              <div className="bg-white border border-gray-200 rounded-lg p-4">
-                <h4 className="font-medium text-gray-800 mb-2">First Input Delay (FID)</h4>
-                <div className="flex items-center justify-between">
-                  <span className={`text-2xl font-bold ${getVitalsColor(coreWebVitals.fid, { good: 100, poor: 300 })}`}>
-                    {coreWebVitals.fid ? formatTime(coreWebVitals.fid) : 'Not measured'}
-                  </span>
-                  <span className="text-sm text-gray-500">
-                    {coreWebVitals.fid && coreWebVitals.fid <= 100 ? 'Good' :
-                     coreWebVitals.fid && coreWebVitals.fid <= 300 ? 'Needs improvement' : 'Poor'}
-                  </span>
-                </div>
-                <div className="text-sm text-gray-500 mt-1">Should be &lt; 100ms</div>
-              </div>
-
-              <div className="bg-white border border-gray-200 rounded-lg p-4">
-                <h4 className="font-medium text-gray-800 mb-2">Cumulative Layout Shift (CLS)</h4>
-                <div className="flex items-center justify-between">
-                  <span className={`text-2xl font-bold ${getVitalsColor(coreWebVitals.cls, { good: 0.1, poor: 0.25 })}`}>
-                    {coreWebVitals.cls ? coreWebVitals.cls.toFixed(3) : 'Not measured'}
-                  </span>
-                  <span className="text-sm text-gray-500">
-                    {coreWebVitals.cls && coreWebVitals.cls <= 0.1 ? 'Good' :
-                     coreWebVitals.cls && coreWebVitals.cls <= 0.25 ? 'Needs improvement' : 'Poor'}
-                  </span>
-                </div>
-                <div className="text-sm text-gray-500 mt-1">Should be &lt; 0.1</div>
-              </div>
-
-              <div className="bg-white border border-gray-200 rounded-lg p-4">
-                <h4 className="font-medium text-gray-800 mb-2">First Contentful Paint (FCP)</h4>
-                <div className="flex items-center justify-between">
-                  <span className={`text-2xl font-bold ${getVitalsColor(coreWebVitals.fcp, { good: 1800, poor: 3000 })}`}>
-                    {coreWebVitals.fcp ? formatTime(coreWebVitals.fcp) : 'Not measured'}
-                  </span>
-                  <span className="text-sm text-gray-500">
-                    {coreWebVitals.fcp && coreWebVitals.fcp <= 1800 ? 'Good' :
-                     coreWebVitals.fcp && coreWebVitals.fcp <= 3000 ? 'Needs improvement' : 'Poor'}
-                  </span>
-                </div>
-                <div className="text-sm text-gray-500 mt-1">Should be &lt; 1.8s</div>
-              </div>
-
-              <div className="bg-white border border-gray-200 rounded-lg p-4">
-                <h4 className="font-medium text-gray-800 mb-2">Time to First Byte (TTFB)</h4>
-                <div className="flex items-center justify-between">
-                  <span className={`text-2xl font-bold ${getVitalsColor(coreWebVitals.ttfb, { good: 800, poor: 1800 })}`}>
-                    {coreWebVitals.ttfb ? formatTime(coreWebVitals.ttfb) : 'Not measured'}
-                  </span>
-                  <span className="text-sm text-gray-500">
-                    {coreWebVitals.ttfb && coreWebVitals.ttfb <= 800 ? 'Good' :
-                     coreWebVitals.ttfb && coreWebVitals.ttfb <= 1800 ? 'Needs improvement' : 'Poor'}
-                  </span>
-                </div>
-                <div className="text-sm text-gray-500 mt-1">Should be &lt; 800ms</div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'components' && (
-          <div className="space-y-4">
-            <div className="text-sm text-gray-600">
-              Component render tracking is enabled in development mode.
-              This feature tracks render counts and performance for React components.
-            </div>
-
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-              <div className="text-yellow-800 font-medium text-sm">Note</div>
-              <div className="text-yellow-700 text-sm mt-1">
-                Detailed component metrics require React DevTools or additional instrumentation.
-                This dashboard provides a foundation for performance monitoring.
-              </div>
-            </div>
-
-            <div className="text-sm text-gray-500">
-              <div>• Database operations are tracked in real-time</div>
-              <div>• Network requests are monitored automatically</div>
-              <div>• Core Web Vitals are measured continuously</div>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'network' && (
-          <div className="space-y-4">
-            <div className="text-sm text-gray-600 mb-2">
-              Recent network requests ({networkRequests.length})
-            </div>
-
-            <div className="space-y-2 max-h-64 overflow-y-auto">
-              {networkRequests.slice(-10).reverse().map((request, index) => (
-                <div key={index} className="bg-gray-50 border border-gray-200 rounded p-2 text-sm">
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium text-gray-800 truncate">
-                        {request.url.split('/').pop() || request.url}
-                      </div>
-                      <div className="text-gray-500">
-                        {request.method} • {request.status} • {formatTime(request.duration)}
-                      </div>
-                    </div>
-                    <div className="text-gray-600 ml-2">
-                      {formatBytes(request.size)}
-                    </div>
-                  </div>
-                </div>
-              ))}
-
-              {networkRequests.length === 0 && (
-                <div className="text-center text-gray-500 py-4">
-                  No network requests recorded yet. Open a screen or trigger an action to capture them here.
-                </div>
-              )}
-            </div>
-
-            <div className="text-sm text-gray-500 border-t border-gray-200 pt-2">
-              Network waterfall shows the last 10 requests. Full monitoring available in browser DevTools.
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className="border-t border-gray-200 p-3 flex gap-2">
-        <button
-          onClick={() => {
-            DatabaseMonitoringService.logCurrentMetrics();
-            log.info('Core Web Vitals', { coreWebVitals }, 'PerformanceMonitoringDashboard');
-            log.debug('Network Requests', { networkRequests }, 'PerformanceMonitoringDashboard');
-          }}
-          className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1 rounded text-sm"
-        >
-          Log Metrics
-        </button>
-        <button
-          onClick={() => {
-            setCoreWebVitals({ lcp: null, fid: null, cls: null, fcp: null, ttfb: null });
-            setNetworkRequests([]);
-            DatabaseMonitoringService.resetMetrics();
-          }}
-          className="flex-1 bg-red-100 hover:bg-red-200 text-red-700 px-3 py-1 rounded text-sm"
-        >
-          Reset All
-        </button>
-      </div>
+      {renderDashboardContent()}
     </div>
   );
 };

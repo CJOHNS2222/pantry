@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { User, Household, Member } from '../../types';
+import { User, Household } from '../../types';
 import { Users, Mail, Plus, X, Settings, ChefHat } from 'lucide-react';
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { PremiumFeature } from '../settings/PremiumFeature';
@@ -79,8 +79,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
         return;
       }
 
-      const result = await inviteMember({ email: inviteEmail, householdId: household.id });
-      const { newMember } = result.data as { newMember: Member };
+      await inviteMember({ email: inviteEmail, householdId: household.id });
 
       await UsageService.recordHouseholdMemberAdd(user.id);
 
@@ -100,18 +99,12 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
       await auth.currentUser?.getIdToken(true);
 
       setInviteEmail('');
-      // If the Cloud Function couldn't resolve the email to an existing UID, it stores the email
-      // itself as the member ID (pending member). Surface this to the inviter.
-      const hasPendingAccount = newMember.id === inviteEmail;
-      if (hasPendingAccount) {
-        addToast(
-          `Invitation sent! No account found for ${inviteEmail} — they will be added automatically once they sign up.`,
-          'info'
-        );
-      } else {
-        addToast(`Invitation sent! ${newMember.name || inviteEmail} has been added to your household.`, 'info');
-      }
-      log.info('Invitation sent', { email: inviteEmail, householdId: household.id, pending: hasPendingAccount }, 'Household');
+      // The function intentionally no longer reports whether `inviteEmail`
+      // resolved to an existing account — echoing that back would let a
+      // caller enumerate which arbitrary emails have a registered account.
+      // Show one generic confirmation regardless of account status.
+      addToast(`Invitation sent to ${inviteEmail}.`, 'info');
+      log.info('Invitation sent', { email: inviteEmail, householdId: household.id }, 'Household');
 
     } catch (error: unknown) {
       log.error('Error sending invitation', error, 'Household');

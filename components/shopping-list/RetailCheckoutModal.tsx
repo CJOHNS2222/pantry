@@ -135,7 +135,7 @@ export const RetailCheckoutModal: React.FC<RetailCheckoutModalProps> = ({
       if (matchedItems.length > 0) {
         const cartUrl = generateWalmartCartUrl(matchedItems);
         if (cartUrl) {
-          const trackedUrl = wrapWithImpactTracker(cartUrl, 'walmart');
+          const trackedUrl = await wrapWithImpactTracker(cartUrl, 'walmart');
           await Browser.open({ url: trackedUrl });
         }
       }
@@ -143,7 +143,7 @@ export const RetailCheckoutModal: React.FC<RetailCheckoutModalProps> = ({
       // 2. For unmatched items, open search URLs
       if (unmatchedItems.length > 0) {
         const searchUrl = generateSearchUrl(unmatchedItems[0].item, 'walmart');
-        const trackedSearchUrl = wrapWithImpactTracker(searchUrl, 'walmart');
+        const trackedSearchUrl = await wrapWithImpactTracker(searchUrl, 'walmart');
         await Browser.open({ url: trackedSearchUrl });
       }
     } else {
@@ -151,7 +151,7 @@ export const RetailCheckoutModal: React.FC<RetailCheckoutModalProps> = ({
       // Open the search query for the first selected item to drop the cookie!
       const firstItem = activeItems[0];
       const searchUrl = generateSearchUrl(firstItem.item, selectedRetailer);
-      const trackedSearchUrl = wrapWithImpactTracker(searchUrl, selectedRetailer);
+      const trackedSearchUrl = await wrapWithImpactTracker(searchUrl, selectedRetailer);
       await Browser.open({ url: trackedSearchUrl });
     }
 
@@ -277,7 +277,7 @@ export const RetailCheckoutModal: React.FC<RetailCheckoutModalProps> = ({
                                 onClick={async (e) => {
                                   e.stopPropagation();
                                   const searchUrl = generateSearchUrl(item.item, 'walmart');
-                                  const trackedSearchUrl = wrapWithImpactTracker(searchUrl, 'walmart');
+                                  const trackedSearchUrl = await wrapWithImpactTracker(searchUrl, 'walmart');
                                   await Browser.open({ url: trackedSearchUrl });
                                 }}
                                 className="p-1 rounded bg-theme-secondary text-theme-secondary hover:bg-theme-primary transition-colors border border-theme"
@@ -291,7 +291,7 @@ export const RetailCheckoutModal: React.FC<RetailCheckoutModalProps> = ({
                               onClick={async (e) => {
                                 e.stopPropagation();
                                 const searchUrl = generateSearchUrl(item.item, 'walmart');
-                                const trackedSearchUrl = wrapWithImpactTracker(searchUrl, 'walmart');
+                                const trackedSearchUrl = await wrapWithImpactTracker(searchUrl, 'walmart');
                                 await Browser.open({ url: trackedSearchUrl });
                               }}
                               className="text-xs px-2.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-500 font-semibold flex items-center gap-1 hover:bg-amber-500/20 transition-colors"

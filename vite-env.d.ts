@@ -11,8 +11,10 @@ interface ImportMetaEnv {
   readonly VITE_GEMINI_API_KEY: string
   readonly VITE_SPOONACULAR_API_KEY: string
   readonly VITE_ADMOB_USE_TEST?: string
-  readonly VITE_IMPACT_ACCOUNT_SID?: string
-  readonly VITE_IMPACT_AUTH_TOKEN?: string
+  // VITE_IMPACT_ACCOUNT_SID / VITE_IMPACT_AUTH_TOKEN intentionally removed - the Impact
+  // Radius account credentials moved server-side (functions/src/impactTracking.ts,
+  // Secret Manager) per .claude/audits/FIXES.md F04. Do NOT reintroduce these as
+  // client-readable VITE_* vars.
     // Stripe and PayPal variables removed for Google Play Billing migration
 }
 

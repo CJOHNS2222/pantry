@@ -113,6 +113,24 @@ export class NotificationService {
   }
 
   /**
+   * Create attention summary alert notification for items expiring soon
+   */
+  static async createAttentionSummaryAlert(userId: string, count: number): Promise<string> {
+    if (count <= 0) return '';
+    return this.createNotification(userId, {
+      type: 'expiration',
+      title: 'Pantry Expiration Alert',
+      message: `${count} item${count > 1 ? 's' : ''} expiring soon -- tap to view`,
+      actionLabel: 'View Items',
+      actionType: 'view_item',
+      actionData: { filterAttention: true },
+      priority: 'medium',
+      dedupeKey: `expiration_attention_summary_${new Date().toISOString().slice(0, 10)}`,
+      expiresAt: Timestamp.fromDate(new Date(Date.now() + 2 * 24 * 60 * 60 * 1000))
+    });
+  }
+
+  /**
    * Create notification stack for multiple expiring items (prevents notification fatigue)
    */
   static async createNotificationStack(

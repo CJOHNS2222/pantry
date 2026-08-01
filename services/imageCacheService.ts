@@ -22,6 +22,84 @@ const memoryCache = new Map<string, CachedImage>();
 const CACHE_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
 const MAX_MEMORY_CACHE_SIZE = 300; // Maximum entries in memory to prevent unbounded growth
 
+// The Firestore-side cache used to be a single `image_cache/global` document
+// holding every cached image mapping for every household - unbounded growth
+// toward Firestore's 1MB per-document hard cap (a write failure app-wide once
+// hit). It's now sharded into `image_cache/shard_00` .. `shard_{N-1}`, keyed by
+// a cheap string hash of the (lowercased, trimmed) cache key mod
+// IMAGE_CACHE_SHARD_COUNT, so no single shard can grow unbounded and firestore.rules
+// can validate/bound each shard independently. Matches the `shard_[0-9]+` doc-id
+// pattern enforced in firestore.rules' `image_cache/{shardId}` match block.
+const IMAGE_CACHE_SHARD_COUNT = 32;
+// Soft cap on entries per shard; approached, oldest-lastUsed entries are pruned
+// on write. Not perfectly LRU (only pruned on the writes that happen to push a
+// shard over the cap), just enough to keep growth bounded. Kept comfortably
+// under firestore.rules' hard `keys().size() <= 400` ceiling for the shard doc.
+const MAX_ENTRIES_PER_SHARD = 300;
+
+/** Deterministic string hash (djb2-ish) used only to pick a shard - not for security. */
+function hashCacheKey(cacheKey: string): number {
+  let hash = 0;
+  for (let i = 0; i < cacheKey.length; i++) {
+    hash = (hash * 31 + cacheKey.charCodeAt(i)) >>> 0;
+  }
+  return hash;
+}
+
+/**
+ * Firestore path for the shard a given (already-normalized) cache key belongs to.
+ * Exported so other direct writers into the `image_cache` collection (e.g.
+ * services/leftoverImageService.ts) land on the same rules-compliant shard
+ * doc-id scheme (firestore.rules only allows `image_cache/shard_[0-9]+` doc ids)
+ * instead of inventing their own doc-naming scheme.
+ */
+export function imageCacheShardPath(cacheKey: string): string {
+  const shard = hashCacheKey(cacheKey) % IMAGE_CACHE_SHARD_COUNT;
+  return `image_cache/shard_${String(shard).padStart(2, '0')}`;
+}
+
+/** Groups cache keys by the shard doc path they belong to. */
+function groupKeysByShard(cacheKeys: string[]): Map<string, string[]> {
+  const groups = new Map<string, string[]>();
+  for (const key of cacheKeys) {
+    const path = imageCacheShardPath(key);
+    const existing = groups.get(path);
+    if (existing) {
+      existing.push(key);
+    } else {
+      groups.set(path, [key]);
+    }
+  }
+  return groups;
+}
+
+function lastUsedMillis(entry: CachedImage | undefined): number {
+  if (!entry) return 0;
+  const value = entry.lastUsed as unknown;
+  if (value instanceof Date) return value.getTime();
+  const parsed = new Date(value as any).getTime();
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+/**
+ * Given a shard's current data plus the new entries about to be merged in,
+ * returns the keys (if any) that should be evicted to keep the shard under
+ * MAX_ENTRIES_PER_SHARD, oldest-lastUsed first.
+ */
+function computeShardEvictions(existingData: CachedImageData, incomingKeys: string[]): string[] {
+  const resultingKeys = new Set([...Object.keys(existingData), ...incomingKeys]);
+  const overBy = resultingKeys.size - MAX_ENTRIES_PER_SHARD;
+  if (overBy <= 0) return [];
+
+  // Only entries not part of this very write are eviction candidates.
+  const incomingSet = new Set(incomingKeys);
+  const candidates = Object.entries(existingData)
+    .filter(([key]) => !incomingSet.has(key))
+    .sort((a, b) => lastUsedMillis(a[1]) - lastUsedMillis(b[1]));
+
+  return candidates.slice(0, overBy).map(([key]) => key);
+}
+
 // Negative cache: items confirmed NOT in the Firestore image cache. Without this,
 // every lookup for an item with no cached image (the common case for brand-new
 // items) re-reads Firestore on every call site that checks it (getCachedImageUrl,
@@ -102,6 +180,17 @@ async function uploadImageToStorage(blob: Blob, itemName: string): Promise<strin
 }
 
 /**
+ * Revive Date fields in a cached image that was deserialized from JSON
+ */
+function reviveCachedImage(data: any): CachedImage {
+  return {
+    ...data,
+    createdAt: data.createdAt instanceof Date ? data.createdAt : new Date(data.createdAt),
+    lastUsed: data.lastUsed instanceof Date ? data.lastUsed : new Date(data.lastUsed)
+  };
+}
+
+/**
  * Load cache from localStorage
  */
 function loadLocalCache(): void {
@@ -113,7 +202,7 @@ function loadLocalCache(): void {
       const cacheAge = Date.now() - (cacheData.timestamp || 0);
       if (cacheAge < CACHE_EXPIRY_MS) {
         Object.entries(cacheData.cache).forEach(([key, value]) => {
-          memoryCache.set(key, value as CachedImage);
+          memoryCache.set(key, reviveCachedImage(value));
         });
       } else {
         // Clear expired cache
@@ -146,57 +235,17 @@ function saveLocalCache(): void {
 const debouncedSaveLocalCache = debounce(saveLocalCache, 500);
 
 /**
- * Sync cache with Firestore (only when needed)
+ * Formerly eagerly pulled the entire `image_cache/global` doc into memory on a
+ * ~1hr interval to pre-warm the session cache. Now that Firestore-side storage
+ * is sharded (image_cache/shard_00..shard_{N-1}, see IMAGE_CACHE_SHARD_COUNT),
+ * there's no single doc to enumerate - doing the equivalent would mean reading
+ * all shards up front regardless of which items this session actually needs,
+ * which is worse than the per-lookup shard reads getCachedImageUrl(s) already
+ * do on demand. Kept as a no-op (just stamps LAST_SYNC_KEY) so
+ * initializeImageCache()'s call site doesn't need to change.
  */
 async function syncCacheWithFirestore(): Promise<void> {
-  const lastSync = localStorage.getItem(LAST_SYNC_KEY);
-  const now = Date.now();
-  const SYNC_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
-
-  // Only sync if it's been more than an hour
-  if (lastSync && (now - parseInt(lastSync)) < SYNC_INTERVAL_MS) {
-    return;
-  }
-
-  // Check if Firebase is initialized
-  try {
-    // Import db to check if it's available
-    const { db } = await import('../firebaseConfig');
-    if (!db) {
-      // Firebase not initialized yet, skipping image cache sync
-      return;
-    }
-  } catch (_err) {
-    // Firebase config not available, skipping image cache sync
-    return;
-  }
-
-  try {
-    // Syncing image cache with Firestore
-    const cacheRef = DatabaseMonitoringService.doc('image_cache/global');
-    const snapshot = await DatabaseMonitoringService.getDoc(cacheRef);
-
-    if (snapshot.exists()) {
-      const data = snapshot.data() as CachedImageData;
-      for (const [cacheKey, cachedImage] of Object.entries(data)) {
-        if (cacheKey !== 'lastUpdated' && cacheKey !== 'version') {
-          evictLruIfNeeded();
-          memoryCache.set(cacheKey, cachedImage);
-        }
-      }
-    }
-
-    debouncedSaveLocalCache();
-    localStorage.setItem(LAST_SYNC_KEY, now.toString());
-    // Synced cached images
-  } catch (err: any) {
-    // Handle permission errors gracefully - Firestore sync is optional
-    if (err?.code === 'permission-denied' || err?.message?.includes('insufficient permissions')) {
-      // Image cache Firestore sync skipped due to permissions (this is normal)
-    } else {
-      log.error('Error syncing cache with Firestore', { err });
-    }
-  }
+  localStorage.setItem(LAST_SYNC_KEY, Date.now().toString());
 }
 
 /**
@@ -238,9 +287,10 @@ export async function getCachedImageUrl(itemName: string): Promise<string | null
       const cacheData = JSON.parse(localCache);
       const cached = cacheData.cache[cacheKey];
       if (cached) {
-        // Load into memory cache
-        memoryCache.set(cacheKey, cached);
-        return cached.cachedUrl;
+        // Load into memory cache, reviving Date fields
+        const revivedCache = reviveCachedImage(cached);
+        memoryCache.set(cacheKey, revivedCache);
+        return revivedCache.cachedUrl;
       }
     }
   } catch (err: any) {
@@ -255,7 +305,7 @@ export async function getCachedImageUrl(itemName: string): Promise<string | null
 
   // Only hit Firestore if not in any cache (expensive operation)
   try {
-    const cacheRef = DatabaseMonitoringService.doc('image_cache/global');
+    const cacheRef = DatabaseMonitoringService.doc(imageCacheShardPath(cacheKey));
     const cacheDoc = await DatabaseMonitoringService.getDoc(cacheRef);
 
     if (cacheDoc.exists()) {
@@ -306,8 +356,9 @@ export async function getCachedImageUrls(itemNames: string[]): Promise<Map<strin
       uncachedKeys.forEach(cacheKey => {
         const cached = cacheData.cache[cacheKey];
         if (cached) {
-          memoryCache.set(cacheKey, cached);
-          results.set(cacheKey, cached.cachedUrl);
+          const revivedCache = reviveCachedImage(cached);
+          memoryCache.set(cacheKey, revivedCache);
+          results.set(cacheKey, revivedCache.cachedUrl);
         }
       });
       // Remove found items from uncached list
@@ -322,24 +373,31 @@ export async function getCachedImageUrls(itemNames: string[]): Promise<Map<strin
     return results; // All found in local cache
   }
 
-  // Only hit Firestore for remaining items (batch operation)
+  // Only hit Firestore for remaining items (batch operation) - group by shard so
+  // this is at most IMAGE_CACHE_SHARD_COUNT reads, not one per item.
   try {
-    const cacheRef = DatabaseMonitoringService.doc('image_cache/global');
-    const cacheDoc = await DatabaseMonitoringService.getDoc(cacheRef);
-
-    const data = cacheDoc.exists() ? (cacheDoc.data() as CachedImageData) : {};
+    const shardGroups = groupKeysByShard(uncachedKeys);
     const missedAt = Date.now();
-    uncachedKeys.forEach(cacheKey => {
-      const cachedImage = data[cacheKey];
-      if (cachedImage) {
-        memoryCache.set(cacheKey, cachedImage);
-        results.set(cacheKey, cachedImage.cachedUrl);
-      } else {
-        // Confirmed miss - stops every per-item caller (getCachedImageUrl,
-        // cacheImageFromUrl) from re-reading Firestore for the same item.
-        negativeCache.set(cacheKey, missedAt);
-      }
-    });
+
+    await Promise.all(
+      Array.from(shardGroups.entries()).map(async ([shardPath, keysInShard]) => {
+        const cacheRef = DatabaseMonitoringService.doc(shardPath);
+        const cacheDoc = await DatabaseMonitoringService.getDoc(cacheRef);
+        const data = cacheDoc.exists() ? (cacheDoc.data() as CachedImageData) : {};
+
+        keysInShard.forEach(cacheKey => {
+          const cachedImage = data[cacheKey];
+          if (cachedImage) {
+            memoryCache.set(cacheKey, cachedImage);
+            results.set(cacheKey, cachedImage.cachedUrl);
+          } else {
+            // Confirmed miss - stops every per-item caller (getCachedImageUrl,
+            // cacheImageFromUrl) from re-reading Firestore for the same item.
+            negativeCache.set(cacheKey, missedAt);
+          }
+        });
+      })
+    );
 
     debouncedSaveLocalCache();
   } catch (err: any) {
@@ -383,16 +441,39 @@ export async function cacheImageFromUrl(originalUrl: string, itemName: string): 
   };
 
   try {
-    // merge:true writes just this one field - creates the doc if missing,
-    // merges into it otherwise. No read-before-write needed (was 1 extra
-    // Firestore read per newly-cached image on top of the miss lookup above).
-    const cacheRef = DatabaseMonitoringService.doc('image_cache/global');
-    await DatabaseMonitoringService.setDoc(cacheRef, { [cacheKey]: cachedImage }, { merge: true });
+    const cacheRef = DatabaseMonitoringService.doc(imageCacheShardPath(cacheKey));
+
+    // Only read the shard when it's plausibly near the entry cap - not on every
+    // single write, to keep this close to the prior no-read-before-write cost for
+    // the common case. We can't know the shard's current size without a read, so
+    // this is a light heuristic: only bother pruning every so often, keyed off the
+    // cache key's hash, rather than reading on literally every cache miss.
+    let evictions: string[] = [];
+    if (hashCacheKey(cacheKey) % 8 === 0) {
+      const existingDoc = await DatabaseMonitoringService.getDoc(cacheRef);
+      const existingData = existingDoc.exists() ? (existingDoc.data() as CachedImageData) : {};
+      // Cap evictions so this write's total affected-key count (1 new entry +
+      // evictions) stays within firestore.rules' image_cache write bound (<=5).
+      evictions = computeShardEvictions(existingData, [cacheKey]).slice(0, 4);
+    }
+
+    const payload: Record<string, unknown> = { [cacheKey]: cachedImage };
+    for (const evictedKey of evictions) {
+      payload[evictedKey] = DatabaseMonitoringService.deleteField();
+    }
+
+    // merge:true upserts just these fields - creates the doc if missing, merges
+    // into it otherwise - instead of the old whole-doc setDoc(), so a concurrent
+    // writer caching a different item into the same shard doesn't get clobbered.
+    await DatabaseMonitoringService.setDoc(cacheRef, payload, { merge: true });
 
     // Update local caches
     evictLruIfNeeded();
     memoryCache.set(cacheKey, cachedImage);
     negativeCache.delete(cacheKey);
+    for (const evictedKey of evictions) {
+      memoryCache.delete(evictedKey);
+    }
     debouncedSaveLocalCache();
 
     return cachedUrl;
@@ -459,28 +540,54 @@ export async function cacheImagesFromUrls(imageMap: Map<string, string>): Promis
 
     if (validResults.length > 0) {
       try {
-      const cacheRef = DatabaseMonitoringService.doc('image_cache/global');
-      const cacheDoc = await DatabaseMonitoringService.getDoc(cacheRef);
-      const data = cacheDoc && cacheDoc.exists() ? cacheDoc.data() as CachedImageData : {};
-      const now = new Date();
-
+        const now = new Date();
+        const newImagesByKey = new Map<string, CachedImage>();
         validResults.forEach(({ itemName, cachedUrl, cacheKey }) => {
-          const cachedImage: CachedImage = {
+          newImagesByKey.set(cacheKey, {
             originalUrl: imageMap.get(itemName)!,
             cachedUrl,
             itemName,
             createdAt: now,
             lastUsed: now
-          };
+          });
+        });
 
-          data[cacheKey] = cachedImage;
+        // This batch (size 3) can span multiple shards - write each shard doc
+        // separately, field-scoped with merge:true, so a concurrent writer
+        // caching a different item into the same shard doesn't get clobbered
+        // (the old code setDoc()'d the whole shared doc without merge).
+        const shardGroups = groupKeysByShard(Array.from(newImagesByKey.keys()));
 
-          // Update local caches
+        await Promise.all(
+          Array.from(shardGroups.entries()).map(async ([shardPath, keysInShard]) => {
+            const cacheRef = DatabaseMonitoringService.doc(shardPath);
+            const existingDoc = await DatabaseMonitoringService.getDoc(cacheRef);
+            const existingData = existingDoc.exists() ? (existingDoc.data() as CachedImageData) : {};
+
+            // Cap evictions so this write's total affected-key count (new
+            // entries + evictions) stays within firestore.rules' image_cache
+            // write bound (<=5).
+            const evictions = computeShardEvictions(existingData, keysInShard)
+              .slice(0, Math.max(0, 5 - keysInShard.length));
+
+            const payload: Record<string, unknown> = {};
+            keysInShard.forEach(key => {
+              payload[key] = newImagesByKey.get(key);
+            });
+            for (const evictedKey of evictions) {
+              payload[evictedKey] = DatabaseMonitoringService.deleteField();
+              memoryCache.delete(evictedKey);
+            }
+
+            await DatabaseMonitoringService.setDoc(cacheRef, payload, { merge: true });
+          })
+        );
+
+        validResults.forEach(({ itemName, cachedUrl, cacheKey }) => {
+          const cachedImage = newImagesByKey.get(cacheKey)!;
           memoryCache.set(cacheKey, cachedImage);
           results.set(itemName, cachedUrl);
         });
-
-        await DatabaseMonitoringService.setDoc(cacheRef, data);
         // Successfully cached images in this batch
       } catch (err: any) {
         log.error('Error batch saving to Firestore', { err });

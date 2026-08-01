@@ -110,6 +110,36 @@ export class RecipesCacheService {
   }
 
   /**
+   * Strict variant of getCachedRecipes that rethrows on read failure instead of
+   * swallowing it into `[]`. Used by the household-join migration path
+   * (`householdMigrationService.ts`) so a transient read error isn't mistaken for
+   * "user has no saved recipes", which would silently clear the migration retry
+   * checkpoint while real data is left behind. Not intended for general UI call
+   * sites; use `getCachedRecipes` there.
+   */
+  static async getCachedRecipesStrict(householdId?: string, userId?: string): Promise<SavedRecipe[]> {
+    const cachePath = this.getCachePath(householdId, userId);
+    const cacheRef = DatabaseMonitoringService.doc(cachePath);
+    const docSnap = await DatabaseMonitoringService.getDoc(cacheRef);
+
+    if (docSnap.exists()) {
+      const data = docSnap.data() as CachedRecipesData & RecipesCacheMetadata;
+
+      if (data.version === this.CACHE_VERSION) {
+        const recipes: SavedRecipe[] = [];
+        for (const [recipeId, recipeArray] of Object.entries(data)) {
+          if (recipeId !== 'lastUpdated' && recipeId !== 'version' && recipeId !== 'totalRecipes') {
+            recipes.push(this.arrayToSavedRecipe(recipeId, recipeArray));
+          }
+        }
+        return recipes.sort((a, b) => b.dateSaved.localeCompare(a.dateSaved));
+      }
+    }
+
+    return [];
+  }
+
+  /**
    * Update the entire saved recipes cache
    */
   static async updateCache(recipes: SavedRecipe[], householdId?: string, userId?: string): Promise<void> {

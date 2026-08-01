@@ -4,9 +4,10 @@ import { log } from './logService';
 
 // IndexedDB setup
 const DB_NAME = 'SmartPantryQueue';
-const DB_VERSION = 2; // Incremented for new schema
+const DB_VERSION = 3; // Incremented for dead-letter store (fix F09)
 const QUEUE_STORE = 'operations';
 const CONFLICT_STORE = 'conflicts';
+const DEAD_LETTER_STORE = 'deadLetter';
 
 interface QueuedOperation {
   id: string;
@@ -26,6 +27,14 @@ interface ConflictResolution {
   localData: any;
   resolved: boolean;
   resolution?: 'server' | 'local' | 'merge';
+  timestamp: number;
+}
+
+interface DeadLetterEntry {
+  id: string;
+  operation: QueuedOperation;
+  errorMessage: string;
+  errorCode?: string;
   timestamp: number;
 }
 
@@ -67,6 +76,13 @@ class OfflineQueueService {
         if (!db.objectStoreNames.contains(CONFLICT_STORE)) {
           const conflictStore = db.createObjectStore(CONFLICT_STORE, { keyPath: 'id' });
           conflictStore.createIndex('timestamp', 'timestamp');
+        }
+
+        // Dead-letter store (fix F09a/c): ops that exhausted retries or hit a
+        // terminal error land here instead of looping in QUEUE_STORE forever.
+        if (!db.objectStoreNames.contains(DEAD_LETTER_STORE)) {
+          const deadLetterStore = db.createObjectStore(DEAD_LETTER_STORE, { keyPath: 'id' });
+          deadLetterStore.createIndex('timestamp', 'timestamp');
         }
       };
     });
@@ -158,7 +174,12 @@ class OfflineQueueService {
         } catch (err: unknown) {
             const errorMessage = err instanceof Error ? err.message : 'Unknown error';
 
-            if (this.isConflictError(err)) {
+            if (this.isTerminalError(err)) {
+            // permission-denied / not-found will never resolve via conflict
+            // resolution or retry - dead-letter immediately (fix F09c).
+            await this.moveToDeadLetter(op, errorMessage, (err as { code?: string })?.code);
+            progress.failed++;
+          } else if (this.isConflictError(err)) {
             // Handle conflict resolution
             await this.handleConflict(op, err);
             progress.conflicts++;
@@ -185,7 +206,11 @@ class OfflineQueueService {
     const { type, collection: coll, docId, data } = op;
 
     if (type === 'add') {
-      await DatabaseMonitoringService.addDoc(DatabaseMonitoringService.collection(coll), data);
+      // Replay via setDoc with the op's own stable id instead of addDoc, so
+      // replaying this op more than once (e.g. after a partial failure) is
+      // idempotent rather than creating duplicate documents (fix F09e).
+      const docRef = DatabaseMonitoringService.doc(coll, op.id);
+      await DatabaseMonitoringService.setDoc(docRef, data);
     } else if (type === 'update' && docId) {
       // Check for conflicts before updating
       const docRef = DatabaseMonitoringService.doc(coll, docId);
@@ -195,9 +220,17 @@ class OfflineQueueService {
         const serverData = docSnap.data();
         const serverTimestampValue = serverData.updatedAt || serverData.timestamp;
 
-        // Simple conflict detection: if server data is newer than our operation
-        if (serverTimestampValue && serverTimestampValue.toMillis() > op.timestamp) {
-          throw Object.assign(new Error(`Conflict detected for ${coll}/${docId}`), { _serverData: serverData });
+        // Simple conflict detection: if server data is newer than our operation.
+        // Normalize since some legacy queued/server values are ISO strings
+        // rather than Firestore Timestamps (fix F09d).
+        if (serverTimestampValue) {
+          const serverMillis = typeof serverTimestampValue.toMillis === 'function'
+            ? serverTimestampValue.toMillis()
+            : Date.parse(serverTimestampValue);
+
+          if (!Number.isNaN(serverMillis) && serverMillis > op.timestamp) {
+            throw Object.assign(new Error(`Conflict detected for ${coll}/${docId}`), { _serverData: serverData });
+          }
         }
       }
 
@@ -207,10 +240,14 @@ class OfflineQueueService {
     }
   }
 
+  private isTerminalError(error: any): boolean {
+    // These will never resolve via conflict resolution or retry - dead-letter
+    // them immediately instead of parking as a conflict (fix F09c).
+    return error?.code === 'permission-denied' || error?.code === 'not-found';
+  }
+
   private isConflictError(error: any): boolean {
-    return error?.message?.includes('Conflict detected') ||
-           error?.code === 'permission-denied' ||
-           error?.code === 'not-found';
+    return error?.message?.includes('Conflict detected');
   }
 
   private async handleConflict(op: QueuedOperation, error: any): Promise<void> {
@@ -226,14 +263,21 @@ class OfflineQueueService {
       timestamp: Date.now()
     };
 
-    return new Promise((resolve, reject) => {
+    await new Promise<void>((resolve, reject) => {
       const transaction = this.db!.transaction([CONFLICT_STORE], 'readwrite');
       const store = transaction.objectStore(CONFLICT_STORE);
-      const request = store.add(conflict);
+      // put() upserts - if this op was already parked as a conflict (e.g.
+      // reprocessed before the queue removal below took effect), add() would
+      // throw ConstraintError and abort the rest of the sync pass (fix F09b).
+      const request = store.put(conflict);
 
       request.onerror = () => reject(request.error);
       request.onsuccess = () => resolve();
     });
+
+    // Dequeue from the main queue now that it's parked as a conflict, so it
+    // isn't picked up and reprocessed on the next sync pass (fix F09b).
+    await this.remove(op.id);
   }
 
   private async handleRetry(op: QueuedOperation, errorMessage: string): Promise<void> {
@@ -241,8 +285,11 @@ class OfflineQueueService {
     const retryCount = (op.retryCount || 0) + 1;
 
     if (retryCount >= maxRetries) {
-      // Move to failed operations or notify user
+      // Retry budget exhausted - move to the dead-letter store instead of
+      // leaving it in QUEUE_STORE, where it would retry forever on every
+      // subsequent sync pass (fix F09a).
       log.error(`Operation failed after ${maxRetries} retries`, { op, errorMessage }, 'offlineQueueService');
+      await this.moveToDeadLetter(op, errorMessage);
       return;
     }
 
@@ -262,6 +309,45 @@ class OfflineQueueService {
 
       request.onerror = () => reject(request.error);
       request.onsuccess = () => resolve();
+    });
+  }
+
+  // Move an op that has exhausted retries or hit a terminal error into the
+  // dead-letter store and remove it from the active queue (fix F09a/c).
+  private async moveToDeadLetter(op: QueuedOperation, errorMessage: string, errorCode?: string): Promise<void> {
+    if (!this.db) await this.init();
+
+    const entry: DeadLetterEntry = {
+      id: op.id,
+      operation: op,
+      errorMessage,
+      errorCode,
+      timestamp: Date.now()
+    };
+
+    await new Promise<void>((resolve, reject) => {
+      const transaction = this.db!.transaction([DEAD_LETTER_STORE], 'readwrite');
+      const store = transaction.objectStore(DEAD_LETTER_STORE);
+      const request = store.put(entry);
+
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve();
+    });
+
+    await this.remove(op.id);
+  }
+
+  // Get dead-lettered operations (for diagnostics / manual inspection)
+  async getDeadLetterQueue(): Promise<DeadLetterEntry[]> {
+    if (!this.db) await this.init();
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction([DEAD_LETTER_STORE], 'readonly');
+      const store = transaction.objectStore(DEAD_LETTER_STORE);
+      const request = store.getAll();
+
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve(request.result);
     });
   }
 
@@ -327,15 +413,18 @@ class OfflineQueueService {
     });
   }
 
-  // Legacy method for backward compatibility
-  async processQueue(): Promise<void> {
+  // Legacy method for backward compatibility. Returns the sync outcome (rather
+  // than void) so callers can gate success messaging on whether anything
+  // actually failed or was parked as a conflict (fix L5).
+  async processQueue(): Promise<SyncProgress | undefined> {
     if (this.isProcessing) {
       log.debug('Sync already in progress, skipping', undefined, 'OfflineQueueService');
-      return;
+      return undefined;
     }
     log.debug('Starting to process offline queue', undefined, 'OfflineQueueService');
     const result = await this.processQueueWithSync();
     log.info('Processed offline queue', { total: result.total, completed: result.completed, failed: result.failed, conflicts: result.conflicts }, 'OfflineQueueService');
+    return result;
   }
 
   getProcessingStatus(): boolean {

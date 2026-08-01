@@ -1,5 +1,23 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ShoppingItem } from '../../../types';
+
+// wrapWithImpactTracker now delegates the Impact Radius credential check + URL build
+// to the `wrapImpactTrackingUrl` Cloud Function (functions/src/impactTracking.ts) -
+// the account SID/auth token are Secret-Manager-only server-side, never client env
+// vars (.claude/audits/FIXES.md F04). Mock httpsCallable to simulate that function.
+const mockHttpsCallable = vi.fn();
+vi.mock('firebase/functions', () => ({
+  httpsCallable: (...args: any[]) => mockHttpsCallable(...args),
+}));
+vi.mock('../../../firebaseConfig', () => ({
+  db: {},
+  storage: {},
+  auth: {},
+  analytics: {},
+  performance: {},
+  functions: {},
+}));
+
 import {
   getWalmartItemId,
   hasWalmartMatch,
@@ -210,7 +228,7 @@ describe('groceryCheckoutService', () => {
     const originalEnv = { ...import.meta.env };
 
     beforeEach(() => {
-      vi.resetModules();
+      mockHttpsCallable.mockReset();
     });
 
     afterEach(() => {
@@ -218,61 +236,76 @@ describe('groceryCheckoutService', () => {
       Object.assign(import.meta.env, originalEnv);
     });
 
-    it('should return direct URL if environment variables are not set', () => {
-      import.meta.env.VITE_IMPACT_ACCOUNT_SID = '';
-      import.meta.env.VITE_IMPACT_AUTH_TOKEN = '';
-
-      const target = 'https://www.walmart.com/some-path';
-      expect(wrapWithImpactTracker(target, 'walmart')).toBe(target);
-    });
-
-    it('should build Walmart tracking redirect link when credentials and campaign IDs exist', () => {
-      import.meta.env.VITE_IMPACT_ACCOUNT_SID = 'test-sid';
-      import.meta.env.VITE_IMPACT_AUTH_TOKEN = 'test-token';
-      import.meta.env.VITE_WALMART_CAMPAIGN_ID = '11463';
-      import.meta.env.VITE_WALMART_AD_ID = '1126749';
-
-      const target = 'https://www.walmart.com/some-path';
-      const result = wrapWithImpactTracker(target, 'walmart');
-
-      expect(result).toContain('https://goto.walmart.com/m/3624855/1126749/11463');
-      expect(result).toContain('u=https%3A%2F%2Fwww.walmart.com%2Fsome-path');
-    });
-
-    it('should build Target tracking redirect link when credentials and campaign IDs exist', () => {
-      import.meta.env.VITE_IMPACT_ACCOUNT_SID = 'test-sid';
-      import.meta.env.VITE_IMPACT_AUTH_TOKEN = 'test-token';
-      import.meta.env.VITE_TARGET_CAMPAIGN_ID = '11466';
-      import.meta.env.VITE_TARGET_AD_ID = '1126750';
-
-      const target = 'https://www.target.com/s?searchTerm=eggs';
-      const result = wrapWithImpactTracker(target, 'target');
-
-      expect(result).toContain('https://target.sjv.io/m/3624855/1126750/11466');
-    });
-
-    it('should build Kroger tracking redirect link when credentials and campaign IDs exist', () => {
-      import.meta.env.VITE_IMPACT_ACCOUNT_SID = 'test-sid';
-      import.meta.env.VITE_IMPACT_AUTH_TOKEN = 'test-token';
-      import.meta.env.VITE_KROGER_CAMPAIGN_ID = '11468';
-      import.meta.env.VITE_KROGER_AD_ID = '1126751';
-
-      const target = 'https://www.kroger.com/search?query=milk';
-      const result = wrapWithImpactTracker(target, 'kroger');
-
-      expect(result).toContain('https://kroger.sjv.io/m/3624855/1126751/11468');
-    });
-
-    it('should fallback to direct link when specific campaign IDs are missing', () => {
-      import.meta.env.VITE_IMPACT_ACCOUNT_SID = 'test-sid';
-      import.meta.env.VITE_IMPACT_AUTH_TOKEN = 'test-token';
+    it('should return direct URL without calling the Cloud Function if campaign/ad IDs are not set', async () => {
       import.meta.env.VITE_WALMART_CAMPAIGN_ID = '';
       import.meta.env.VITE_WALMART_AD_ID = '';
 
       const target = 'https://www.walmart.com/some-path';
-      const result = wrapWithImpactTracker(target, 'walmart');
+      const result = await wrapWithImpactTracker(target, 'walmart');
 
       expect(result).toBe(target);
+      expect(mockHttpsCallable).not.toHaveBeenCalled();
+    });
+
+    it('should call wrapImpactTrackingUrl with the Walmart campaign/ad IDs and return its url', async () => {
+      import.meta.env.VITE_WALMART_CAMPAIGN_ID = '11463';
+      import.meta.env.VITE_WALMART_AD_ID = '1126749';
+
+      const target = 'https://www.walmart.com/some-path';
+      const trackedUrl = 'https://goto.walmart.com/m/3624855/1126749/11463?veh=aff&sourceid=app&u=https%3A%2F%2Fwww.walmart.com%2Fsome-path';
+      const callable = vi.fn().mockResolvedValue({ data: { url: trackedUrl } });
+      mockHttpsCallable.mockReturnValue(callable);
+
+      const result = await wrapWithImpactTracker(target, 'walmart');
+
+      expect(mockHttpsCallable).toHaveBeenCalledWith({}, 'wrapImpactTrackingUrl');
+      expect(callable).toHaveBeenCalledWith({
+        destinationUrl: target,
+        merchant: 'walmart',
+        campaignId: '11463',
+        adId: '1126749',
+        publisherId: '3624855',
+      });
+      expect(result).toBe(trackedUrl);
+    });
+
+    it('should call wrapImpactTrackingUrl with the Target campaign/ad IDs', async () => {
+      import.meta.env.VITE_TARGET_CAMPAIGN_ID = '11466';
+      import.meta.env.VITE_TARGET_AD_ID = '1126750';
+
+      const target = 'https://www.target.com/s?searchTerm=eggs';
+      const trackedUrl = 'https://target.sjv.io/m/3624855/1126750/11466?veh=aff&sourceid=app&u=x';
+      const callable = vi.fn().mockResolvedValue({ data: { url: trackedUrl } });
+      mockHttpsCallable.mockReturnValue(callable);
+
+      const result = await wrapWithImpactTracker(target, 'target');
+
+      expect(callable).toHaveBeenCalledWith(expect.objectContaining({ campaignId: '11466', adId: '1126750', merchant: 'target' }));
+      expect(result).toBe(trackedUrl);
+    });
+
+    it('should fall back to the destination URL if the Cloud Function call fails', async () => {
+      import.meta.env.VITE_KROGER_CAMPAIGN_ID = '11468';
+      import.meta.env.VITE_KROGER_AD_ID = '1126751';
+
+      const target = 'https://www.kroger.com/search?query=milk';
+      const callable = vi.fn().mockRejectedValue(new Error('network error'));
+      mockHttpsCallable.mockReturnValue(callable);
+
+      const result = await wrapWithImpactTracker(target, 'kroger');
+
+      expect(result).toBe(target);
+    });
+
+    it('should fallback to direct link when specific campaign IDs are missing', async () => {
+      import.meta.env.VITE_WALMART_CAMPAIGN_ID = '';
+      import.meta.env.VITE_WALMART_AD_ID = '';
+
+      const target = 'https://www.walmart.com/some-path';
+      const result = await wrapWithImpactTracker(target, 'walmart');
+
+      expect(result).toBe(target);
+      expect(mockHttpsCallable).not.toHaveBeenCalled();
     });
   });
 });

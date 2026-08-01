@@ -114,6 +114,24 @@ export function useAuth() {
           }
         }
 
+        // Update lastActiveAt if missing or older than 1 hour (3,600,000 ms) to avoid write congestion
+        const lastActiveAt = userData?.lastActiveAt;
+        const now = new Date();
+        const oneHourAgo = now.getTime() - 60 * 60 * 1000;
+        const shouldUpdateActive = !lastActiveAt || 
+          (lastActiveAt instanceof Date ? lastActiveAt.getTime() < oneHourAgo : 
+           (typeof lastActiveAt === 'string' ? new Date(lastActiveAt).getTime() < oneHourAgo : 
+            (lastActiveAt && typeof lastActiveAt.toDate === 'function' ? lastActiveAt.toDate().getTime() < oneHourAgo : true)));
+
+        if (shouldUpdateActive) {
+          // Perform silent write without triggering state updates or blocking
+          DatabaseMonitoringService.updateDoc(userDocRef, {
+            lastActiveAt: now
+          }).catch(err => {
+            log.error('Failed to update lastActiveAt timestamp:', err, 'useAuth');
+          });
+        }
+
         // Synchronize onboarding milestones from Firestore if they exist
         if (Array.isArray(userData?.onboardingMilestones)) {
           syncFromFirestore(userData.onboardingMilestones);
@@ -151,6 +169,7 @@ export function useAuth() {
           discoveredFeatures: userData?.discoveredFeatures || [],
           dismissedTutorialTips: userData?.dismissedTutorialTips || [],
           cookingStreakDates: userData?.cookingStreakDates || [],
+          lastActiveAt: userData?.lastActiveAt || now,
         });
 
         // Merge the server's cooking-streak history into the local cache so a streak

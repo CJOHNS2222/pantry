@@ -30,6 +30,7 @@
       "site": "ornate-compass-478504-e1",
       "public": "dist",
       "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+      "predeploy": ["npm run build"],
       "rewrites": [
         {
           "source": "**",

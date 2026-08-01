@@ -20,32 +20,96 @@ export function getMigrationCheckpointKey(userId: string): string {
   return `pending_migration_${userId}`;
 }
 
+// Module-level in-flight guard: prevents the join flow and a concurrent
+// "Retry now" toast action (see useHouseholdMigrationRetry) from both running
+// a migration for the same user at once, which could interleave meal-plan
+// read-merge-write cycles and resurrect/drop days (bug-audit L6).
+const inFlightMigrations = new Map<string, Promise<boolean>>();
+
 /**
  * Merges a user's personal data (inventory, shopping list, meal plan, saved recipes)
  * into the household they just joined, then clears the personal copies.
  *
- * A localStorage checkpoint is written before migration begins and cleared only on
- * full success. If the app is closed mid-migration or a step fails, the checkpoint
- * persists so the caller can retry on next load (see useHouseholdMigrationRetry).
+ * A localStorage checkpoint is written before migration begins and cleared only
+ * after all four personal-data reads have verifiably succeeded (not merely
+ * returned an empty array - a read failure is distinguished from "no data" via
+ * the cache services' `*Strict` getters, which rethrow instead of swallowing
+ * errors into `[]`). If the app is closed mid-migration, a read fails, or a
+ * write step fails, the checkpoint persists so the caller can retry on next
+ * load (see useHouseholdMigrationRetry).
  */
 export async function migrateUserDataToHousehold(householdId: string, userId: string): Promise<boolean> {
+  const existing = inFlightMigrations.get(userId);
+  if (existing) {
+    return existing;
+  }
+
+  const promise = migrateUserDataToHouseholdInternal(householdId, userId).finally(() => {
+    inFlightMigrations.delete(userId);
+  });
+  inFlightMigrations.set(userId, promise);
+  return promise;
+}
+
+async function migrateUserDataToHouseholdInternal(householdId: string, userId: string): Promise<boolean> {
   const CHECKPOINT_KEY = getMigrationCheckpointKey(userId);
 
   // Write checkpoint so we can retry if the app crashes mid-migration
   localStorage.setItem(CHECKPOINT_KEY, JSON.stringify({ householdId, timestamp: Date.now() }));
 
   let allSucceeded = true;
+  let userInventory: Awaited<ReturnType<typeof InventoryCacheService.getCachedInventoryStrict>> = [];
+  let userShoppingList: Awaited<ReturnType<typeof ShoppingListCacheService.getCachedShoppingListStrict>> = [];
+  let userMealPlan: Awaited<ReturnType<typeof MealPlanCacheService.getCachedMealPlanStrict>> = [];
+  let userRecipes: Awaited<ReturnType<typeof RecipesCacheService.getCachedRecipesStrict>> = [];
 
   try {
-    const [userInventory, userShoppingList, userMealPlan, userRecipes] = await Promise.all([
-      InventoryCacheService.getCachedInventory(undefined, userId),
-      ShoppingListCacheService.getCachedShoppingList(undefined, userId),
-      MealPlanCacheService.getCachedMealPlan(undefined, userId),
-      RecipesCacheService.getCachedRecipes(undefined, userId),
+    // Use the *Strict getters here (not the plain getCached* ones used elsewhere
+    // in the app) so a transient read failure surfaces as a rejected promise
+    // instead of silently resolving to `[]`, which would be indistinguishable
+    // from "user genuinely has no data" and would let the checkpoint below get
+    // cleared while real personal data is stranded.
+    const [invRes, shopRes, mealRes, recRes] = await Promise.allSettled([
+      InventoryCacheService.getCachedInventoryStrict(undefined, userId),
+      ShoppingListCacheService.getCachedShoppingListStrict(undefined, userId),
+      MealPlanCacheService.getCachedMealPlanStrict(undefined, userId),
+      RecipesCacheService.getCachedRecipesStrict(undefined, userId),
     ]);
 
+    if (invRes.status === 'fulfilled') {
+      userInventory = invRes.value;
+    } else {
+      allSucceeded = false;
+      log.error('Migration: inventory read failed - skipping to avoid data loss', { userId, householdId, error: invRes.reason }, 'App');
+    }
+
+    if (shopRes.status === 'fulfilled') {
+      userShoppingList = shopRes.value;
+    } else {
+      allSucceeded = false;
+      log.error('Migration: shopping list read failed - skipping to avoid data loss', { userId, householdId, error: shopRes.reason }, 'App');
+    }
+
+    if (mealRes.status === 'fulfilled') {
+      userMealPlan = mealRes.value;
+    } else {
+      allSucceeded = false;
+      log.error('Migration: meal plan read failed - skipping to avoid data loss', { userId, householdId, error: mealRes.reason }, 'App');
+    }
+
+    if (recRes.status === 'fulfilled') {
+      userRecipes = recRes.value;
+    } else {
+      allSucceeded = false;
+      log.error('Migration: recipes read failed - skipping to avoid data loss', { userId, householdId, error: recRes.reason }, 'App');
+    }
+
     // Run each step sequentially so a failure in one doesn't cancel the others
-    // and the user cache is only cleared when that step is confirmed written
+    // and the user cache is only cleared when that step is confirmed written.
+    // Note: if a domain's initial read (above) failed, its list here is `[]`,
+    // so its migration/clear block below is skipped entirely rather than
+    // mistakenly treating the failed read as "nothing to migrate" - and
+    // `allSucceeded` is already false so the checkpoint is preserved either way.
 
     if (userInventory.length > 0) {
       try {

@@ -27,7 +27,7 @@ if (!getApps().length) {
   admin.initializeApp();
 }
 
-export const verifyPurchase = onCall(async (request) => {
+export const verifyPurchase = onCall({ enforceAppCheck: true }, async (request) => {
   const uid = request.auth?.uid;
   if (!uid) {
     throw new HttpsError("unauthenticated", "Authentication required.");
@@ -103,22 +103,44 @@ export const verifyPurchase = onCall(async (request) => {
     if (err instanceof HttpsError) throw err;
 
     // Play API not accessible — likely missing IAM permissions.
-    // Log the config error but do NOT fall back to trusting the client.
-    logger.error('Android Publisher API call failed', { message: err.message });
-    throw new HttpsError(
-      "internal",
-      `Play verification failed: ${err.message}. ` +
-      "Ensure the Cloud Functions service account has Android Publisher API access " +
-      "(see setup instructions in functions/src/verifyPurchase.ts)."
+    // Log the config error server-side (with full detail) but do NOT fall back to
+    // trusting the client, and do NOT forward the raw error message to it —
+    // internal API/config details (service account, project setup) shouldn't
+    // leak to callers.
+    logger.error(
+      'Android Publisher API call failed. Ensure the Cloud Functions service account ' +
+      'has Android Publisher API access (see setup instructions in functions/src/verifyPurchase.ts).',
+      { message: err.message }
     );
+    throw new HttpsError("internal", "Purchase verification failed. Please try again later.");
   }
 
   // ── Update Firestore ────────────────────────────────────────────────────────
+  // purchaseToken → uid binding must be established (or checked) and the
+  // entitlement grant must happen atomically in the same transaction. A single
+  // Play purchase token belongs to exactly one Firebase account for its
+  // lifetime — without this check, a shared/leaked receipt token could be
+  // replayed from any number of accounts, and each replay would silently
+  // steal the `purchaseTokens/{token}` -> uid mapping (which the RTDN webhook
+  // in subscriptionNotifications.ts relies on to route renewal/cancellation
+  // events), pointing future Play webhooks at the wrong user.
   const db = getFirestore();
-  await db
-    .collection("users")
-    .doc(uid)
-    .update({
+  const tokenRef = db.collection("purchaseTokens").doc(purchaseToken);
+  const userRef = db.collection("users").doc(uid);
+
+  await db.runTransaction(async (tx) => {
+    const tokenSnap = await tx.get(tokenRef);
+    if (tokenSnap.exists) {
+      const existingUid = tokenSnap.data()?.uid;
+      if (existingUid && existingUid !== uid) {
+        throw new HttpsError(
+          "already-exists",
+          "This purchase is already associated with a different account."
+        );
+      }
+    }
+
+    tx.update(userRef, {
       subscription: {
         tier,
         status,
@@ -130,14 +152,27 @@ export const verifyPurchase = onCall(async (request) => {
       },
     });
 
-  // purchaseToken → uid lookup for the Play RTDN webhook (subscriptionNotifications.ts),
-  // which only receives the token/subscriptionId, never the Firebase uid.
-  await db.collection("purchaseTokens").doc(purchaseToken).set({
-    uid,
-    productId,
-    updated_at: Timestamp.now(),
+    // purchaseToken → uid lookup for the Play RTDN webhook (subscriptionNotifications.ts),
+    // which only receives the token/subscriptionId, never the Firebase uid.
+    // merge:true so re-verification/renewal of the same (token, uid) pair
+    // just refreshes updated_at rather than requiring the doc to pre-exist.
+    tx.set(
+      tokenRef,
+      {
+        uid,
+        productId,
+        updated_at: Timestamp.now(),
+      },
+      {merge: true}
+    );
   });
 
+  // Only acknowledge/grant once the transaction above has committed — the
+  // client's store.validator() callback (purchaseService.ts) only calls
+  // receipt.finish() (which acknowledges the purchase to Play) after this
+  // function resolves with {ok: true}. If the transaction threw above, this
+  // line is never reached and the client's `.unverified()` handler fires
+  // instead, so the purchase is never acknowledged.
   logger.info('Subscription granted', { uid, tier, status });
 
   return {ok: true, tier, status, expiryMs};
