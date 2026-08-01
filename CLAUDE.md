@@ -1,10 +1,10 @@
 # CLAUDE.md
 
-Guidance for Claude Code (claude.ai/code) in this repo.
+Guidance for Claude Code (claude.ai/code) here.
 
 ## Project
 
-**Stock & Spoon** (`package.json` name: `stockandspoon`) - household pantry, shopping list, meal planner, recipe app. Stack: React 19 + TypeScript + Vite, Firebase (Firestore/Auth/Storage/Functions/Remote Config), Capacitor (Android; iOS not added yet). Household data shared real-time via Firestore; free tier capped 2 saved recipes / 1 meal-plan search per week / 2 household members, premium raises caps (20 recipes / unlimited meal planning / 3 members), family tier unlimited (5 members) — all via Google Play Billing. Search/recipe/meal-planning/Gemini-usage tier defaults live in `services/remoteConfigService.ts` (`IN_APP_DEFAULTS`), enforced in `services/usageService.ts`. Household **member** caps are a separate hardcoded tier switch in `usageService.ts` (`canAddHouseholdMember`, 2/3/5 by tier) — not part of `IN_APP_DEFAULTS` — with a flat `memberIds.size() <= 5` ceiling also enforced server-side in `firestore.rules`.
+**Stock & Spoon** (`package.json` name: `stockandspoon`) - household pantry, shopping list, meal planner, recipe app. Stack: React 19 + TypeScript + Vite, Firebase (Firestore/Auth/Storage/Functions/Remote Config), Capacitor (Android; iOS not added yet). Household data shared real-time via Firestore; free tier capped 2 saved recipes / 1 meal-plan search per week / 2 household members, premium raises caps (20 recipes / unlimited meal planning / 3 members), family tier unlimited (5 members) - all via Google Play Billing. Search/recipe/meal-planning/Gemini-usage tier defaults live in `services/remoteConfigService.ts` (`IN_APP_DEFAULTS`), enforced in `services/usageService.ts`. Household **member** caps separate hardcoded tier switch in `usageService.ts` (`canAddHouseholdMember`, 2/3/5 by tier) - not part of `IN_APP_DEFAULTS` - flat `memberIds.size() <= 5` ceiling also enforced server-side in `firestore.rules`.
 
 ## Commands
 
@@ -43,18 +43,18 @@ Also wires global `error`/`unhandledrejection` handlers (-> Sentry + Crashlytics
 
 No router (react-router-dom dependency but unused for navigation). `App.tsx` tab-based single-page shell: `activeTab` state using `Tab` enum (`types/app.ts`), `switchTab()` also tracks analytics + Android hardware-back history stack, numerous modals toggled via local state. Layout components in `components/layout/` (`AppHeader`, `AppNavigation`, `MainContent`).
 
-### Data flow - rule that matters most
+### Data flow - rule matter most
 All Firestore reads/writes for pantry, shopping, meal plan, recipes must go through **`hooks/useDataManagement.ts`** (central data hook) - never ad-hoc Firestore calls from UI component. Domain logic belongs in `services/`, not components.
 
 Global read state lives in `contexts/AppContext.tsx` (`useApp()`); mutation/action functions in paired `contexts/AppActionsContext.tsx`.
 
 ### Cache services (bulk-read optimization layer)
-Each domain has `*CacheService` (`inventoryCacheService`, `recipesCacheService`, `shoppingListCacheService`, `MealPlanCacheService`, `priceDataCacheService`, `imageCacheService`) serializing each Firestore document's fields into compact array (e.g. `InventoryCacheService.ITEM_FIELD_ORDER` / `pantryItemToArray()` / `arrayToPantryItem()`), stored as single versioned cache document per household/user, keyed via `getHouseholdOrUserCachePath()` in `cachePathUtils.ts`. Exists to avoid per-item document reads, not replace real Firestore documents. Changing domain type's shape → update both type and cache service's field order/serialization together, bump `CACHE_VERSION` if array layout changes. `CACHE_VERSION` is a plain integer (`1`, `2`, `3`, ...) across all `*CacheService` files — never a string or decimal; bump by 1 to force cache invalidation.
+Each domain has `*CacheService` (`inventoryCacheService`, `recipesCacheService`, `shoppingListCacheService`, `MealPlanCacheService`, `priceDataCacheService`, `imageCacheService`) serializing each Firestore document's fields into compact array (e.g. `InventoryCacheService.ITEM_FIELD_ORDER` / `pantryItemToArray()` / `arrayToPantryItem()`), stored as single versioned cache document per household/user, keyed via `getHouseholdOrUserCachePath()` in `cachePathUtils.ts`. Exists to avoid per-item document reads, not replace real Firestore documents. Change domain type's shape → update both type and cache service's field order/serialization together, bump `CACHE_VERSION` if array layout changes. `CACHE_VERSION` plain integer (`1`, `2`, `3`, ...) across all `*CacheService` files - never string or decimal; bump by 1 to force cache invalidation.
 
 Offline support sits alongside: `offlineQueueService.ts` (queues writes while offline), `offlineDataCache.ts` (reads), `syncStateService.ts` (coordinates sync), `undoService.ts` (reversible actions). Firestore itself initialized with `persistentLocalCache` + `persistentMultipleTabManager` in `firebaseConfig.ts`.
 
 ### Firebase setup
-`firebaseConfig.ts` initializes `auth`, `db`, `storage`, `functions`, conditional App Check (skipped in dev), conditional Analytics, feature-detected FCM messaging. Auth persistence platform-based: `browserLocalPersistence` on web vs `indexedDBLocalPersistence` on native (`Capacitor.getPlatform()`). Actual SDK config values come from `VITE_firebaseConfig.ts` (not generic env example). `databaseMonitoringService` dynamically imported there to avoid circular import.
+`firebaseConfig.ts` initializes `auth`, `db`, `storage`, `functions`, conditional App Check (skipped in dev), conditional Analytics, feature-detected FCM messaging. Auth persistence platform-based: `browserLocalPersistence` on web vs `indexedDBLocalPersistence` on native (`Capacitor.getPlatform()`). Actual SDK config values come from `VITE_firebaseConfig.ts` (not generic env example). `databaseMonitoringService` dynamically imported there, avoid circular import.
 
 Household/ownership scoping enforced in `firestore.rules`, mirrored in app logic (`isHouseholdMember()` checks) - `users/{uid}/...` user-scoped, `households/{householdId}/...` shared. Preserve these checks in any new read/write path.
 
@@ -64,7 +64,7 @@ Household/ownership scoping enforced in `firestore.rules`, mirrored in app logic
 Key types in `types.ts` / `types/`: `PantryItem`, `ShoppingItem`, `SavedRecipe`, `DayPlan`, `Household`, `User`. Notable pantry item conventions: multi-`batches` per item with independent expirations (FEFO consumption), opened-item tracking (`isOpened`/`openedAt`/`openedExpiry`), quantity reservations for recipes, flags (`is_immortal`, `is_leftover`, `cooked_rice`, `is_frozen`), legacy `quantity_estimate` (string) vs current `quantity` (number/object) split - use `getQuantityValue()` rather than reading either field directly. Dates ISO strings. Preserve immutable update patterns (no in-place mutation).
 
 ### Household join migration
-When user joins household, `householdMigrationService.migrateUserDataToHousehold()` merges personal inventory/shopping-list/meal-plan/saved-recipes (read via `*CacheService`s) into household's shared copies, then clears personal ones. Writes `pending_migration_{userId}` localStorage checkpoint before starting, only clears on full success, so `hooks/useHouseholdMigrationRetry.ts` can detect and retry interrupted migration on next app load.
+User joins household → `householdMigrationService.migrateUserDataToHousehold()` merges personal inventory/shopping-list/meal-plan/saved-recipes (read via `*CacheService`s) into household's shared copies, then clears personal ones. Writes `pending_migration_{userId}` localStorage checkpoint before start, only clears on full success, so `hooks/useHouseholdMigrationRetry.ts` can detect + retry interrupted migration on next app load.
 
 ### Errors and observability
 `services/sentryService.ts` provides domain-specific JS error helpers (`reportDatabaseError`, `reportSyncIssue`, `reportGeminiError`, `setUserContext`). `services/crashlyticsService.ts` wraps native Firebase Crashlytics - call this, never `@capacitor-firebase/crashlytics` directly, wrapper handles `isNativePlatform()` guard, no-op on web. `ErrorBoundary.tsx` / `ComponentErrorBoundary.tsx` report to both. Errors use `AppError` class with codes/context.
@@ -72,13 +72,13 @@ When user joins household, `householdMigrationService.migrateUserDataToHousehold
 ### Integrations
 - AI: `geminiService.ts` (Gemini), OpenRouter/Groq fallback via `openRouterService.ts` (`VITE_GEMINI_DISABLED=true` routes all AI through OpenRouter).
 - Recipes: `spoonacularRecipeClient.ts` (Spoonacular REST API, cached + rate-limited); `typescript/dist/index.ts` stubs client when generated SDK absent.
-- Nutrition: `nutritionService.ts` looks up nutrition facts (calories/protein/carbs/fat/fiber/sugar) from the free **USDA FoodData Central API** (`VITE_USDA_API_KEY`), cached in `localStorage` for 90 days - not OpenFoodFacts.
-- Barcode/product lookup: `utils/barcodeScan.ts` decodes a barcode from a captured photo on-device via `@zxing/library` (native-only, no live viewfinder); `spoonacularFoodClient.ts` (`searchGroceryProductByUPC`) resolves the UPC to a product title via **Spoonacular's** grocery product API, which then feeds `nutritionService.ts` - also not OpenFoodFacts, despite that being the common assumption for barcode-to-product lookups.
-- Currency: `currencyService.ts` converts USD-sourced grocery prices to a user-selected display currency using free rates from frankfurter.app, cached 24h.
+- Nutrition: `nutritionService.ts` looks up nutrition facts (calories/protein/carbs/fat/fiber/sugar) from free **USDA FoodData Central API** (`VITE_USDA_API_KEY`), cached in `localStorage` 90 days - not OpenFoodFacts.
+- Barcode/product lookup: `utils/barcodeScan.ts` decodes barcode from captured photo on-device via `@zxing/library` (native-only, no live viewfinder); `spoonacularFoodClient.ts` (`searchGroceryProductByUPC`) resolves UPC to product title via **Spoonacular's** grocery product API, feeds `nutritionService.ts` - also not OpenFoodFacts, despite common assumption for barcode-to-product lookups.
+- Currency: `currencyService.ts` converts USD-sourced grocery prices to user-selected display currency using free rates from frankfurter.app, cached 24h.
 - Analytics/perf: Firebase Analytics + Sentry; Core Web Vitals via `performanceMonitoringService.ts`.
 
 ### Capacitor / mobile
-`capacitor.config.ts`: `appId: com.smart.pantry`, `webDir: dist`. Android project in `android/` (Gradle); no `ios/` yet. Native plugins in use: App, Device, PushNotifications, Calendar, SafeArea, Haptics, Browser, GoogleAuth, plus Firebase Crashlytics/Analytics/AdMob and `cordova-plugin-purchase` for IAP. Guard platform-specific behavior with `Capacitor.getPlatform()` / `Capacitor.isNativePlatform()`, following pattern in `firebaseConfig.ts`.
+`capacitor.config.ts`: `appId: com.smart.pantry`, `webDir: dist`. Android project in `android/` (Gradle); no `ios/` yet. Native plugins in use: App, Device, PushNotifications, Calendar, SafeArea, Haptics, Browser, GoogleAuth, plus Firebase Crashlytics/Analytics/AdMob and `cordova-plugin-purchase` for IAP. Guard platform-specific behavior with `Capacitor.getPlatform()` / `Capacitor.isNativePlatform()`, follow pattern in `firebaseConfig.ts`.
 
 ### Directory map
 - `components/` - feature-organized UI (`pantry/`, `shopping-list/`, `meal-planner/`, `recipe-finder/`, `recipe-modal/`, `household/`, `settings/`, `layout/`, shared primitives in `ui/`).
@@ -107,18 +107,18 @@ Vitest + jsdom, tests under `src/test/**/*.test.{ts,tsx}`. `src/test/setup.ts` g
 - `npm install` needs `--legacy-peer-deps` for `@capacitor-firebase/*` due to peer conflict with `@codetrix-studio/capacitor-google-auth`.
 
 ## Bash/tool hygiene
-- Use absolute paths in every Bash command; never `cd` into the repo first (the working directory is already correct, and `cd` resets across calls).
-- Use the Grep/Read/Glob tools instead of shell `grep`/`cat`/`find` - they're faster, respect `.gitignore`, and don't dump raw output into context.
-- Before claiming a change works, use the [[verify]] skill (`.claude/skills/verify/`) instead of running `tsc`/`eslint`/`vitest` inline - it scopes to changed files and returns only failures.
+- Use absolute paths in every Bash command; never `cd` into repo first (working directory already correct, `cd` resets across calls).
+- Use Grep/Read/Glob tools instead of shell `grep`/`cat`/`find` - faster, respect `.gitignore`, don't dump raw output into context.
+- Before claiming change works, use [[verify]] skill (`.claude/skills/verify/`) instead of running `tsc`/`eslint`/`vitest` inline - scopes to changed files, returns only failures.
 
 ## Subagents (`.claude/agents/`)
 Repo has 24 predefined subagents (code/bug/security/db/perf/dep/seo/infra/ui/doc auditors, `fix-planner`, `code-fixer`, `test-runner`, `test-writer`, `browser-qa-agent`, `console-monitor`, `visual-diff`, `deploy-checker`, `env-validator`, `pr-writer`, `seed-generator`, `architect-reviewer`, `fullstack-qa-orchestrator`, `api-tester`) and documented workflows (`full-audit`, `pre-commit`, `pre-deploy`, `new-feature`, `bug-fix`, `release-prep`) in `.claude/CLAUDE.md`. Auditor outputs go to `.claude/audits/`.
 
 ## graphify
 
-This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
+Project has knowledge graph at graphify-out/ with god nodes, community structure, cross-file relationships.
 
 Rules:
-- For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
-- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
-- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).
+- Codebase questions: run `graphify query "<question>"` first when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships, `graphify explain "<concept>"` for focused concepts. Returns scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
+- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain don't surface enough context.
+- After modifying code, run `graphify update .` to keep graph current (AST-only, no API cost).

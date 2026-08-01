@@ -20,6 +20,15 @@ export interface DetailedChangeEntry {
 
 export const RECENT_CHANGES: ChangeEntry[] = [
   {
+    "version": "3.0.16",
+    "date": "Aug 1, 2026",
+    "highlights": [
+      "Food Auto-Categorization Expansion — Expanded keyword auto-categorization mapping for pantry items with hundreds of new…",
+      "Popular Recipes Categorization — Fixed categorization of desserts (chocolate cake, fudge, ice cream, etc.) in the…",
+      "Build & Compiling Fixes — Resolved type safety compilation warnings in groceryCheckoutService.ts."
+    ]
+  },
+  {
     "version": "3.0.15",
     "date": "Jul 31, 2026",
     "highlights": [
@@ -36,20 +45,24 @@ export const RECENT_CHANGES: ChangeEntry[] = [
       "Household & Data Migration — Resolved cache service imports and improved multi-user household migration handling.",
       "Usage & Subscription Services — Enhanced usageService limits tracking and test suite coverage."
     ]
-  },
-  {
-    "version": "3.0.13",
-    "date": "Jul 23, 2026",
-    "highlights": [
-      "Daily Reminders & Push Functions — Implemented dedicated background daily reminder cloud function dailyReminders.ts.",
-      "Leaderboards & Cooking Streaks — Added LeaderboardCacheService and cookingStreakService for tracking user engagement…",
-      "Service & Monitoring Enhancements — Upgraded performance monitoring, haptic feedback integration, image caching, and…",
-      "UI & Component Refactoring — Enhanced focus trapping, onboarding flows, meal planning components, settings tabs, and…"
-    ]
   }
 ];
 
 export const ALL_CHANGES: DetailedChangeEntry[] = [
+  {
+    "version": "3.0.16",
+    "date": "Aug 1, 2026",
+    "sections": [
+      {
+        "title": "Added / Changed / Fixed",
+        "bullets": [
+          "**Food Auto-Categorization Expansion** — Expanded keyword auto-categorization mapping for pantry items with hundreds of new common ingredients, produce, meats, dairy, condiments, and breakfast foods.",
+          "**Popular Recipes Categorization** — Fixed categorization of desserts (chocolate cake, fudge, ice cream, etc.) in the popular recipes finder, preventing them from falling into the breakfast category, and added dynamic cuisine classification.",
+          "**Build & Compiling Fixes** — Resolved type safety compilation warnings in `groceryCheckoutService.ts`."
+        ]
+      }
+    ]
+  },
   {
     "version": "3.0.15",
     "date": "Jul 31, 2026",

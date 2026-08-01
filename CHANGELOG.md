@@ -1,3 +1,12 @@
+## [3.0.16] - 2026-08-01
+
+### Added / Changed / Fixed
+- **Food Auto-Categorization Expansion** — Expanded keyword auto-categorization mapping for pantry items with hundreds of new common ingredients, produce, meats, dairy, condiments, and breakfast foods.
+- **Popular Recipes Categorization** — Fixed categorization of desserts (chocolate cake, fudge, ice cream, etc.) in the popular recipes finder, preventing them from falling into the breakfast category, and added dynamic cuisine classification.
+- **Build & Compiling Fixes** — Resolved type safety compilation warnings in `groceryCheckoutService.ts`.
+
+---
+
 ## [3.0.15] - 2026-07-31
 
 ### Added / Changed / Fixed
