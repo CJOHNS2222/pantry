@@ -263,10 +263,231 @@ export function filterRecipesByHouseholdPreferences(
 
 export type CacheMealTypeFilter = '' | 'breakfast' | 'lunch' | 'dinner' | 'dessert';
 
+function isDessertRecipe(recipe: StructuredRecipe | SavedRecipe): boolean {
+  const title = (recipe.title || '').toLowerCase();
+  const desc = (recipe.description || '').toLowerCase();
+  const type = (recipe.type || '').toLowerCase();
+  const mealType = ((recipe as StructuredRecipe & { mealType?: string }).mealType || '').toLowerCase();
+
+  // If explicitly labeled as dessert
+  if (type.includes('dessert') || mealType.includes('dessert')) {
+    return true;
+  }
+
+  // Dessert keywords in title
+  const dessertTitleKeywords = [
+    'fudge', 'ice cream', 'brownie', 'cookie', 'cupcake', 'tiramisu',
+    'mousse', 'pudding', 'sorbet', 'gelato', 'cheesecake', 'macaron',
+    'custard', 'cobbler', 'baklava', 'chocolate truffle', 'ganache',
+    'blondie', 'crème brûlée', 'creme brulee', 'panna cotta', 'cannoli',
+    'sundae', 'fraise', 'butterscotch', 'caramel popcorn', 'sweet roll',
+    'doughnut', 'donut', 'fruit pie', 'pastry'
+  ];
+
+  if (dessertTitleKeywords.some(keyword => title.includes(keyword))) {
+    return true;
+  }
+
+  // Check 'cake' in title, but exclude savory cakes
+  if (title.includes('cake') && 
+      !title.includes('crab cake') && 
+      !title.includes('fish cake') && 
+      !title.includes('rice cake') && 
+      !title.includes('potato cake') && 
+      !title.includes('meat cake') && 
+      !title.includes('corn cake') && 
+      !title.includes('pancake') &&
+      !title.includes('johnnycake')) {
+    return true;
+  }
+
+  // Check 'pie' in title, but exclude savory pies
+  if (title.includes('pie') && 
+      !title.includes('pot pie') && 
+      !title.includes('shepherd') && 
+      !title.includes('meat pie') && 
+      !title.includes('cottage pie') && 
+      !title.includes('pizza')) {
+    return true;
+  }
+
+  // Check 'tart' in title, but exclude pop-tarts and savory tarts
+  if (title.includes('tart') && 
+      !title.includes('pop-tart') && 
+      !title.includes('poptart') && 
+      !title.includes('onion tart') && 
+      !title.includes('savory tart')) {
+    return true;
+  }
+
+  // Check description and type for dessert indicators
+  if (type.includes('sweet') || 
+      desc.includes('decadent dessert') || 
+      desc.includes('perfect dessert') || 
+      desc.includes('sweet treat') ||
+      desc.includes('rich dessert') ||
+      desc.includes('delicious dessert')) {
+    return true;
+  }
+
+  return false;
+}
+
+function isBreakfastRecipe(recipe: StructuredRecipe | SavedRecipe): boolean {
+  const title = (recipe.title || '').toLowerCase();
+  const type = (recipe.type || '').toLowerCase();
+  const mealType = ((recipe as StructuredRecipe & { mealType?: string }).mealType || '').toLowerCase();
+
+  // If explicitly dessert, it shouldn't be breakfast (even if it contains sweet bread/muffins/cinnamon rolls)
+  if (isDessertRecipe(recipe)) {
+    return false;
+  }
+
+  if (type.includes('breakfast') || type.includes('brunch') || mealType.includes('breakfast') || mealType.includes('brunch')) {
+    return true;
+  }
+
+  const breakfastTitleKeywords = [
+    'pancake', 'waffle', 'oatmeal', 'french toast', 'crepe', 'frittata',
+    'omelet', 'omelette', 'scrambled egg', 'hash brown', 'muesli', 'granola',
+    'shakshuka', 'quiche', 'smoothie bowl', 'breakfast burrito', 'benedict',
+    'overnight oats'
+  ];
+
+  if (breakfastTitleKeywords.some(keyword => title.includes(keyword))) {
+    return true;
+  }
+
+  // Muffins / Cinnamon rolls / Bagels / Croissants (unless it's a lunch sandwich)
+  if ((title.includes('muffin') || title.includes('cinnamon roll') || title.includes('bagel') || title.includes('croissant')) && 
+      !title.includes('sandwich') && 
+      !title.includes('burger')) {
+    return true;
+  }
+
+  return false;
+}
+
+function isLunchRecipe(recipe: StructuredRecipe | SavedRecipe): boolean {
+  const title = (recipe.title || '').toLowerCase();
+  const type = (recipe.type || '').toLowerCase();
+  const mealType = ((recipe as StructuredRecipe & { mealType?: string }).mealType || '').toLowerCase();
+
+  if (type.includes('lunch') || mealType.includes('lunch')) {
+    return true;
+  }
+
+  const lunchTitleKeywords = [
+    'sandwich', 'wrap', 'panini', 'quesadilla', 'quesadillas', 'blt', 'bento',
+    'grain bowl', 'buddha bowl', 'salad bowl'
+  ];
+
+  if (lunchTitleKeywords.some(keyword => title.includes(keyword))) {
+    return true;
+  }
+
+  return false;
+}
+
+function inferRecipeCuisine(recipe: StructuredRecipe | SavedRecipe): string {
+  const labeledCuisine = normalizeIngredient((recipe as StructuredRecipe & { cuisine?: string }).cuisine || '');
+  
+  // If already labeled with a valid specific cuisine, return it
+  const validCuisines = ['italian', 'mexican', 'greek', 'american', 'chinese', 'japanese', 'indian', 'french', 'thai', 'mediterranean', 'spanish', 'middle eastern', 'korean'];
+  if (labeledCuisine && validCuisines.includes(labeledCuisine)) {
+    return labeledCuisine;
+  }
+
+  const title = (recipe.title || '').toLowerCase();
+  const desc = (recipe.description || '').toLowerCase();
+  const type = (recipe.type || '').toLowerCase();
+
+  // Helper check
+  const hasKeyword = (keywords: string[]) => 
+    keywords.some(keyword => title.includes(keyword) || desc.includes(keyword) || type.includes(keyword));
+
+  // 1. Italian
+  if (hasKeyword(['pasta', 'spaghetti', 'lasagna', 'ravioli', 'carbonara', 'alfredo', 'bolognese', 'parmesan', 'mozzarella', 'pesto', 'tiramisu', 'cavatelli', 'pizza', 'risotto', 'bruschetta', 'gnocchi', 'fettuccine', 'penne', 'marinara', 'italian'])) {
+    return 'italian';
+  }
+
+  // 2. Mexican
+  if (hasKeyword(['taco', 'burrito', 'quesadilla', 'salsa', 'guacamole', 'enchilada', 'fajita', 'queso', 'nacho', 'picada', 'arrachera', 'chimichanga', 'carnitas', 'flauta', 'mexican'])) {
+    return 'mexican';
+  }
+
+  // 3. Korean
+  if (hasKeyword(['kimchi', 'jjigae', 'gochujang', 'bulgogi', 'bibimpap', 'naengmyeon', 'dongchimi', 'korean', 'kroeung', 'gimbap'])) {
+    return 'korean';
+  }
+
+  // 4. Japanese
+  if (hasKeyword(['ramen', 'udon', 'sushi', 'tempura', 'teriyaki', 'miso', 'soba', 'japanese', 'katsu', 'yakitori'])) {
+    return 'japanese';
+  }
+
+  // 5. Chinese
+  if (hasKeyword(['chow mein', 'lo mein', 'stir-fry', 'stir fry', 'fried rice', 'wonton', 'kung pao', 'szechuan', 'peking', 'potsticker', 'dumpling', 'egg roll', 'chinese'])) {
+    return 'chinese';
+  }
+
+  // 6. Indian
+  if (hasKeyword(['curry', 'tikka', 'masala', 'korma', 'naan', 'biryani', 'tandoori', 'samosa', 'paneer', 'dal', 'indian', 'sambar'])) {
+    return 'indian';
+  }
+
+  // 7. Thai
+  if (hasKeyword(['pad thai', 'tom yum', 'thai curry', 'coconut soup', 'satay', 'thai'])) {
+    return 'thai';
+  }
+
+  // 8. Greek
+  if (hasKeyword(['greek', 'tzatziki', 'feta', 'souvlaki', 'gyro', 'moussaka'])) {
+    return 'greek';
+  }
+
+  // 9. French
+  if (hasKeyword(['croissant', 'quiche', 'crepe', 'baguette', 'bouillabaisse', 'ratatouille', 'coq au vin', 'brie', 'french toast', 'french'])) {
+    return 'french';
+  }
+
+  // 10. Middle Eastern
+  if (hasKeyword(['hummus', 'falafel', 'shawarma', 'kebab', 'tahini', 'pita', 'middle eastern'])) {
+    return 'middle eastern';
+  }
+
+  // 11. Spanish
+  if (hasKeyword(['paella', 'tapas', 'sangria', 'chorizo', 'gazpacho', 'empanada', 'spanish'])) {
+    return 'spanish';
+  }
+
+  // 12. American
+  if (hasKeyword(['burger', 'hot dog', 'meatloaf', 'barbecue', 'bbq', 'buffalo wings', 'mac and cheese', 'pot pie', 'coleslaw', 'corn dog', 'biscuit', 'american', 'ranch dressing'])) {
+    return 'american';
+  }
+
+  return labeledCuisine || 'other';
+}
+
 function getRecipeMealType(recipe: StructuredRecipe | SavedRecipe): string {
+  // 1. Dessert check first to fix DB/AI mislabeling
+  if (isDessertRecipe(recipe)) {
+    return 'dessert';
+  }
+
+  // 2. Breakfast check second
+  if (isBreakfastRecipe(recipe)) {
+    return 'breakfast';
+  }
+
   const normalizedMealType = normalizeIngredient(((recipe as StructuredRecipe & { mealType?: string }).mealType || ''));
   if (normalizedMealType === 'breakfast' || normalizedMealType === 'lunch' || normalizedMealType === 'dinner' || normalizedMealType === 'dessert') {
     return normalizedMealType;
+  }
+
+  // 3. Lunch check third
+  if (isLunchRecipe(recipe)) {
+    return 'lunch';
   }
 
   const normalizedType = normalizeIngredient(recipe.type || '');
@@ -283,8 +504,7 @@ function getRecipeMealType(recipe: StructuredRecipe | SavedRecipe): string {
 }
 
 function getRecipeCuisine(recipe: StructuredRecipe | SavedRecipe): string {
-  const labeledCuisine = (recipe as StructuredRecipe & { cuisine?: string }).cuisine;
-  return normalizeIngredient(labeledCuisine || 'other');
+  return inferRecipeCuisine(recipe);
 }
 
 /**

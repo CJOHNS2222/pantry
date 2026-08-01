@@ -42,12 +42,6 @@
       "site": "stock-spoon-website",
       "public": "website",
       "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
-      "rewrites": [
-        {
-          "source": "**",
-          "destination": "/index.html"
-        }
-      ],
       "headers": [
         {
           "source": "**/*.@(js|css|png|jpg|svg|ico|json)",

@@ -1,25 +1,7 @@
-## Google Play Billing Integration (Android)
+## Google Play Billing (Android)
 
-The app now uses Google Play Billing for in-app purchases and subscriptions on Android. Stripe and PayPal have been removed for Play Store compliance.
+In-app purchases and subscriptions on Android are implemented via [`cordova-plugin-purchase`](https://github.com/j3k0/cordova-plugin-purchase) (Play Billing backend), not a Capacitor-native billing plugin. Server-side receipt verification lives in `functions/src/verifyPurchase.ts`; client purchase flow in `services/purchaseService.ts`. See `readme/PLAY_BILLING_SETUP.md` for the full setup/testing walkthrough. Stripe and PayPal have been removed for Play Store compliance.
 
-### Integration Plan
-1. **Install Capacitor Google Play Billing plugin**
-  - Use `@capacitor-community/play-billing` or similar plugin for Android billing.
-2. **Update Settings > Subscription tab**
-  - Replace Stripe/PayPal UI with Google Play Billing purchase flow.
-3. **Handle purchase and subscription events**
-  - Use plugin APIs to initiate purchase, check subscription status, and handle upgrades/cancels.
-4. **Sync subscription status to Firestore**
-  - Store subscription state in Firestore for cross-device sync.
-5. **Test with Google Play Console test accounts**
-  - Use Play Console to test subscription flows and edge cases.
-6. **Update documentation and agent instructions**
-  - Remove Stripe/PayPal references and clarify Google Play Billing usage.
-
-### Useful Links
-- [Capacitor Google Play Billing Plugin](https://github.com/capacitor-community/play-billing)
-- [Google Play Billing Documentation](https://developer.android.com/google/play/billing)
-- [Play Console Testing](https://developer.android.com/google/play/billing/test)
 # Stock & Spoon
 
 ## Overview

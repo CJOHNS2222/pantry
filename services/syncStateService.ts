@@ -4,6 +4,7 @@
  */
 class SyncStateService {
   private flags = new Map<string, any>();
+  private flagTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
   /**
    * Set a sync flag to prevent infinite loops
@@ -31,6 +32,8 @@ class SyncStateService {
    */
   clearAll(): void {
     this.flags.clear();
+    this.flagTimers.forEach((timer) => clearTimeout(timer));
+    this.flagTimers.clear();
   }
 
   /**
@@ -38,9 +41,18 @@ class SyncStateService {
    */
   setFlagTemporarily(key: string, value: any, durationMs: number = 100): void {
     this.setFlag(key, value);
-    setTimeout(() => {
+    // Clear any previously-scheduled cleanup for this key so a fresh call
+    // extends the flag's lifetime instead of racing with a stale timeout
+    // that would delete the flag right after it was just re-set.
+    const existingTimer = this.flagTimers.get(key);
+    if (existingTimer) {
+      clearTimeout(existingTimer);
+    }
+    const timer = setTimeout(() => {
       this.flags.delete(key);
+      this.flagTimers.delete(key);
     }, durationMs);
+    this.flagTimers.set(key, timer);
   }
 
   /**

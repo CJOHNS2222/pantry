@@ -112,14 +112,20 @@ if (typeof window !== 'undefined') {
 }
 export { messaging };
 
-// Set auth persistence based on platform
-if (Capacitor.getPlatform() === 'web') {
-  // Use localStorage persistence for web browsers (including Capacitor WebView)
-  setPersistence(auth, browserLocalPersistence);
-} else {
-  // Use indexedDB persistence for native platforms
-  setPersistence(auth, indexedDBLocalPersistence);
-}
+// Set auth persistence based on platform.
+// `setPersistence` is async - a sign-in call racing this promise can land in
+// Firebase's default in-memory persistence for that one session (security L4).
+// Exported so call sites that kick off sign-in immediately at startup can
+// `await authPersistenceReady` first; existing call sites are unaffected.
+export const authPersistenceReady: Promise<void> = (
+  Capacitor.getPlatform() === 'web'
+    // Use localStorage persistence for web browsers (including Capacitor WebView)
+    ? setPersistence(auth, browserLocalPersistence)
+    // Use indexedDB persistence for native platforms
+    : setPersistence(auth, indexedDBLocalPersistence)
+).catch((error) => {
+  log.error('Failed to set auth persistence', { error }, 'firebaseConfig');
+});
 
 // Initialize analytics only if measurementId is configured. `firebase/analytics` is
 // dynamically imported so it doesn't force-bundle into the eager firebase-vendor chunk.

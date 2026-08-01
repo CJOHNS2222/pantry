@@ -663,28 +663,28 @@ export async function wrapWithImpactTracker(
 
   switch (merchant) {
     case 'walmart':
-      campaignId = import.meta.env.VITE_WALMART_CAMPAIGN_ID;
-      adId = import.meta.env.VITE_WALMART_AD_ID;
+      campaignId = import.meta.env.VITE_WALMART_CAMPAIGN_ID || '';
+      adId = import.meta.env.VITE_WALMART_AD_ID || '';
       break;
     case 'target':
-      campaignId = import.meta.env.VITE_TARGET_CAMPAIGN_ID;
-      adId = import.meta.env.VITE_TARGET_AD_ID;
+      campaignId = import.meta.env.VITE_TARGET_CAMPAIGN_ID || '';
+      adId = import.meta.env.VITE_TARGET_AD_ID || '';
       break;
     case 'kroger':
-      campaignId = import.meta.env.VITE_KROGER_CAMPAIGN_ID;
-      adId = import.meta.env.VITE_KROGER_AD_ID;
+      campaignId = import.meta.env.VITE_KROGER_CAMPAIGN_ID || '';
+      adId = import.meta.env.VITE_KROGER_AD_ID || '';
       break;
     case 'instacart':
-      campaignId = import.meta.env.VITE_INSTACART_CAMPAIGN_ID;
-      adId = import.meta.env.VITE_INSTACART_AD_ID;
+      campaignId = import.meta.env.VITE_INSTACART_CAMPAIGN_ID || '';
+      adId = import.meta.env.VITE_INSTACART_AD_ID || '';
       break;
     case 'albertsons':
-      campaignId = import.meta.env.VITE_ALBERTSONS_CAMPAIGN_ID;
-      adId = import.meta.env.VITE_ALBERTSONS_AD_ID;
+      campaignId = import.meta.env.VITE_ALBERTSONS_CAMPAIGN_ID || '';
+      adId = import.meta.env.VITE_ALBERTSONS_AD_ID || '';
       break;
     case 'thrive':
-      campaignId = import.meta.env.VITE_THRIVE_CAMPAIGN_ID;
-      adId = import.meta.env.VITE_THRIVE_AD_ID;
+      campaignId = import.meta.env.VITE_THRIVE_CAMPAIGN_ID || '';
+      adId = import.meta.env.VITE_THRIVE_AD_ID || '';
       break;
   }
 

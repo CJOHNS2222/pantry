@@ -25,6 +25,13 @@ export interface RecipesCacheMetadata {
  * Each recipe is stored as: recipeId -> [title, description, ingredients[], instructions[], cookTime, type, image, dateSaved, imagePlaceholder]
  */
 export class RecipesCacheService {
+  // TODO(next CACHE_VERSION bump): recipe entries are distinguished from
+  // metadata purely by excluding the hardcoded key names 'lastUpdated' /
+  // 'version' / 'totalRecipes' (see getCachedRecipes/getCachedRecipesStrict
+  // below) - a saved recipe whose id happens to equal one of those strings
+  // would be silently dropped. Migrate to a nested `{ recipes: {}, metadata:
+  // {} }` shape on the next version bump instead of a flat keyspace shared
+  // with metadata. See .claude/audits/FIXES.md P3 one-liners (db L4).
   public static readonly CACHE_VERSION = 2;
 
   /**

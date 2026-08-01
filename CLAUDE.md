@@ -4,20 +4,26 @@ Guidance for Claude Code (claude.ai/code) in this repo.
 
 ## Project
 
-**Stock & Spoon** (`package.json` name: `stockandspoon`) - household pantry, shopping list, meal planner, recipe app. Stack: React 19 + TypeScript + Vite, Firebase (Firestore/Auth/Storage/Functions/Remote Config), Capacitor (Android; iOS not added yet). Household data shared real-time via Firestore; free tier capped 2 saved recipes / 1 meal-plan search per week / 2 household members, premium raises caps (20 recipes / unlimited meal planning / 3 members), family tier unlimited — all via Google Play Billing. Tier limit defaults live in `services/remoteConfigService.ts` (`IN_APP_DEFAULTS`), enforced in `services/usageService.ts`.
+**Stock & Spoon** (`package.json` name: `stockandspoon`) - household pantry, shopping list, meal planner, recipe app. Stack: React 19 + TypeScript + Vite, Firebase (Firestore/Auth/Storage/Functions/Remote Config), Capacitor (Android; iOS not added yet). Household data shared real-time via Firestore; free tier capped 2 saved recipes / 1 meal-plan search per week / 2 household members, premium raises caps (20 recipes / unlimited meal planning / 3 members), family tier unlimited (5 members) — all via Google Play Billing. Search/recipe/meal-planning/Gemini-usage tier defaults live in `services/remoteConfigService.ts` (`IN_APP_DEFAULTS`), enforced in `services/usageService.ts`. Household **member** caps are a separate hardcoded tier switch in `usageService.ts` (`canAddHouseholdMember`, 2/3/5 by tier) — not part of `IN_APP_DEFAULTS` — with a flat `memberIds.size() <= 5` ceiling also enforced server-side in `firestore.rules`.
 
 ## Commands
 
 ```
 npm install                  # use --legacy-peer-deps if @capacitor-firebase/* conflicts with capacitor-google-auth
 npm run dev                  # vite dev server, port 3000
-npm run build                # production build (predev/prebuild regenerate CHANGELOG.md)
+npm run build                # production build (predev/prebuild regenerate constants/changelogEntries.ts from CHANGELOG.md)
 npm run build:analyze        # build + rollup-plugin-visualizer treemap at dist/stats.html
 npm run lint                 # eslint .
 npm run type-check           # tsc --noEmit (run with increased heap: already set in the script)
 npm test                     # vitest (single run, not watch)
+npm run test:rules           # Firestore security-rules tests (vitest.rules.config.ts) - run after any firestore.rules change
 npm run test:ui              # vitest --ui
 npm run e2e:playwright       # playwright test (e2e/playwright.config.ts)
+npm run generate:changelog   # manually regenerate constants/changelogEntries.ts from CHANGELOG.md
+npm run dashboard            # regenerate .claude/dashboard/summary.md
+npm run build:release        # sync-release-notes then build - release pipeline entry point
+npm run sync-release-notes   # sync CHANGELOG.md/changelogEntries.ts into release notes
+npm run version:publish      # publish a new version (release pipeline)
 npx cap sync android         # sync web build into the Android native project
 npx cap run android          # build + run on device/emulator
 ```
@@ -114,6 +120,5 @@ This project has a knowledge graph at graphify-out/ with god nodes, community st
 
 Rules:
 - For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
-- If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
 - Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
 - After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).

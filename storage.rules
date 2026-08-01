@@ -15,8 +15,12 @@ service firebase.storage {
 
     // Recipe photos uploaded by users (for ratings and results)
     match /recipe-photos/{allPaths=**} {
-      // Allow public read access to recipe photos
-      allow read: if true;
+      // These are user-uploaded photos (may show kitchens/faces, unlike the
+      // shared stock recipe images under /recipes above), so read access is
+      // restricted to signed-in app users rather than `if true` - the app is
+      // auth-gated anyway, so every legitimate viewer already has a session.
+      // See .claude/audits/FIXES.md P3 one-liners (security L3).
+      allow read: if request.auth != null;
       // Allow write access to authenticated users for recipe photos, tagging the
       // upload with an `uploader` metadata field (mirrors pantry_images below) so
       // ownership can be enforced on delete.

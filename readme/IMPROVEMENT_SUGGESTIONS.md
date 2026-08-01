@@ -493,7 +493,7 @@ export const APP_CONFIG = {
 function validateEnvironment() {
   const required = [
     'VITE_GEMINI_API_KEY',
-    'VITE_STRIPE_PUBLISHABLE_KEY',
+    'VITE_API_KEY',
   ];
   
   const missing = required.filter(key => !import.meta.env[key as any]);

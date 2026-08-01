@@ -109,30 +109,55 @@ const App: React.FC = () => {
   const [newlyUnlockedBadge, setNewlyUnlockedBadge] = useState<{ id: string; title: string; icon: string; description: string; color: string } | null>(null);
   const { canvasRef: fireworksCanvasRef, triggerCelebration } = useCelebrationFireworks();
 
-  // Custom tab switching function that resets scroll position
-  const switchTab = (tab: Tab) => {
-    PerformanceMonitoringService.mark(`tab_switch_start_${tab}`);
-    
-    const tabNames: Record<Tab, string> = {
-      [Tab.PANTRY]: 'pantry',
-      [Tab.PANTRY_CACHE_TEST]: 'pantry_cache_test',
-      [Tab.SHOPPING]: 'shopping',
-      [Tab.MEALS]: 'meals',
-      [Tab.RECIPES]: 'recipes',
-      [Tab.SETTINGS]: 'settings',
-      [Tab.COMMUNITY]: 'community'
-    } as Record<Tab, string>;
-    
-    trackNavigation(tabNames[activeTab] || 'unknown', tabNames[tab] || 'unknown');
-    HapticService.light();
-    // Record the current tab in the back-navigation history before switching.
-    // Keep a cap of 20 entries so it never grows unbounded.
-    tabHistoryRef.current = [...tabHistoryRef.current.slice(-19), activeTab];
+  const tabNames: Record<Tab, string> = {
+    [Tab.PANTRY]: 'pantry',
+    [Tab.PANTRY_CACHE_TEST]: 'pantry_cache_test',
+    [Tab.SHOPPING]: 'shopping',
+    [Tab.MEALS]: 'meals',
+    [Tab.RECIPES]: 'recipes',
+    [Tab.SETTINGS]: 'settings',
+    [Tab.COMMUNITY]: 'community'
+  } as Record<Tab, string>;
+
+  const tabTitles: Record<Tab, string> = {
+    [Tab.PANTRY]: 'Pantry',
+    [Tab.PANTRY_CACHE_TEST]: 'Pantry',
+    [Tab.SHOPPING]: 'Shopping List',
+    [Tab.MEALS]: 'Meal Planner',
+    [Tab.RECIPES]: 'Recipes',
+    [Tab.SETTINGS]: 'Settings',
+    [Tab.COMMUNITY]: 'Community'
+  } as Record<Tab, string>;
+
+  // Side effects that must run on every tab change (both forward navigation
+  // via switchTab and hardware-back retrace) - kept separate from history
+  // bookkeeping so the back-button path doesn't re-push/duplicate history.
+  const applyTabChange = (tab: Tab) => {
     setActiveTab(tab);
     window.scrollTo(0, 0);
     if (tab === Tab.SETTINGS) {
       setActiveSettingsCategory(null);
     }
+    const tabTitle = tabTitles[tab];
+    document.title = tabTitle ? `${tabTitle} - Stock & Spoon` : 'Stock & Spoon';
+    if (typeof window !== 'undefined') {
+      const nextHash = `#${tabNames[tab] || ''}`;
+      if (window.location.hash !== nextHash) {
+        window.history.replaceState(null, '', nextHash);
+      }
+    }
+  };
+
+  // Custom tab switching function that resets scroll position
+  const switchTab = (tab: Tab) => {
+    PerformanceMonitoringService.mark(`tab_switch_start_${tab}`);
+
+    trackNavigation(tabNames[activeTab] || 'unknown', tabNames[tab] || 'unknown');
+    HapticService.light();
+    // Record the current tab in the back-navigation history before switching.
+    // Keep a cap of 20 entries so it never grows unbounded.
+    tabHistoryRef.current = [...tabHistoryRef.current.slice(-19), activeTab];
+    applyTabChange(tab);
 
     PerformanceMonitoringService.mark(`tab_switch_end_${tab}`);
     PerformanceMonitoringService.measure(`tab_switch_${tab}`, `tab_switch_start_${tab}`, `tab_switch_end_${tab}`);
@@ -1157,7 +1182,7 @@ const App: React.FC = () => {
       if (tabHistoryRef.current.length > 0) {
         const prev = tabHistoryRef.current[tabHistoryRef.current.length - 1];
         tabHistoryRef.current = tabHistoryRef.current.slice(0, -1);
-        setActiveTab(prev);
+        applyTabChange(prev);
         return;
       }
 

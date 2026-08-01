@@ -353,8 +353,16 @@ class OfflineQueueService {
 
   // Get pending operations count
   async getPendingCount(): Promise<number> {
-    const operations = await this.dequeue();
-    return operations.length;
+    if (!this.db) await this.init();
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction([QUEUE_STORE], 'readonly');
+      const store = transaction.objectStore(QUEUE_STORE);
+      const request = store.count();
+
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve(request.result);
+    });
   }
 
   // Get unresolved conflicts

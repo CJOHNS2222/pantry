@@ -192,22 +192,11 @@ export class PantryService {
     const category = inferCategoryFromItemName(itemName);
     const now = new Date().toISOString();
 
-    // Try to get local image first
-    let image = getItemImage(itemName, category);
-
-    // If it's a placeholder, try to fetch an external image asynchronously
-    if (image === '/images/placeholder.svg') {
-      try {
-        // fetchExternalItemImage returns a Promise; use then to avoid making this function async
-        fetchExternalItemImage(itemName)
-          .then(ext => {
-            if (ext) image = ext;
-          })
-          .catch(e => log.debug('Failed to fetch external image for', itemName, e));
-      } catch (err: any) {
-        log.debug('Failed to fetch external image for', itemName, err);
-      }
-    }
+    // Local image only - this function is synchronous and returns before any
+    // async fetch could resolve, so an external-image fetch here would be
+    // dead code (its result could never reach the already-returned object).
+    // See .claude/audits/FIXES.md P3 one-liners (bug L1).
+    const image = getItemImage(itemName, category);
 
     // Track pantry item addition
     AnalyticsService.trackPantryItemAdd(itemName, 'Manual', quantity, 'manual');
