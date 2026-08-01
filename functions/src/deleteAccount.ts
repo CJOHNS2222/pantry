@@ -23,7 +23,7 @@ const ACCOUNT_DELETIONS_COLLECTION = 'accountDeletions';
  *
  * The client should call onLogout() immediately after receiving a successful response.
  */
-export const deleteAccount = onCall(async (request) => {
+export const deleteAccount = onCall({ enforceAppCheck: true }, async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'You must be signed in to delete your account.');
   }
@@ -64,7 +64,7 @@ export const deleteAccount = onCall(async (request) => {
     logger.error('deleteAccount household cleanup error', { uid: uid.substring(0, 8), err });
   }
 
-  // 2. Delete user subcollections in batches.
+  // 2. Delete user subcollections via recursiveDelete.
   // Reconciled against the actual paths written by services/*CacheService.ts (via
   // getHouseholdOrUserCachePath()) and functions/src usage: every per-user cache
   // document — inventory, mealPlan, shoppingList, savedRecipes, notifications —
@@ -73,17 +73,18 @@ export const deleteAccount = onCall(async (request) => {
   // `pantryCache`/`shoppingCache`/`mealPlanCache` (no service ever writes those
   // subcollection names) and a standalone `savedRecipes` subcollection (it's
   // actually a doc inside `cache`, already swept up by deleting `cache` itself).
+  //
+  // recursiveDelete (rather than a manual limit(500) batch) matches the pattern
+  // already used in leaveHousehold.ts / removeHouseholdMember.ts: a plain batch
+  // silently leaves data behind past 500 docs and doesn't cascade into any nested
+  // subcollections, whereas recursiveDelete removes the whole subtree regardless
+  // of size.
   const userRef = db.collection('users').doc(uid);
   const subcollections = ['cache', 'usage'];
 
   for (const subcollection of subcollections) {
     try {
-      const snapshot = await userRef.collection(subcollection).limit(500).get();
-      if (!snapshot.empty) {
-        const batch = db.batch();
-        snapshot.docs.forEach(doc => batch.delete(doc.ref));
-        await batch.commit();
-      }
+      await db.recursiveDelete(userRef.collection(subcollection));
     } catch {
       // Non-fatal: continue
     }

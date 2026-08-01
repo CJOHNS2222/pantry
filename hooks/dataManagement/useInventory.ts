@@ -4,7 +4,7 @@ import { User, PantryItem, Settings } from '../../types';
 import { hasPantryItemsChanged } from '../../utils/comparisonUtils';
 import { setRemoteInventoryUpdate } from '../../services/syncStateService';
 import { log } from '../../services/logService';
-import { generateRecipeSuggestions, shouldShowExpiryAlert } from '../../utils/appUtils';
+import { generateRecipeSuggestions, shouldShowExpiryAlert, generateExpirationAlerts, localDateString, parseLocalDateString } from '../../utils/appUtils';
 import { offlineQueue } from '../../services/offlineQueueService';
 import { undoService, UndoAction } from '../../services/undoService';
 import { NotificationService } from '../../services/notificationService';
@@ -104,21 +104,23 @@ export function useInventory(
       unsubs.push(DatabaseMonitoringService.onSnapshot(DatabaseMonitoringService.doc(inventoryPath), snap => {
         if (snap.exists()) {
           const data = snap.data() as CachedInventoryData & CacheMetadata;
-          if (data.version === InventoryCacheService.CACHE_VERSION) {
-            const items: PantryItem[] = [];
-            for (const itemId in data) {
-              // Skip metadata and the embedded food waste counters field
-              if (itemId === 'lastUpdated' || itemId === 'version' || itemId === 'itemCount' || itemId === '_foodWaste') {
-                continue;
-              }
-              const item = InventoryCacheService.arrayToPantryItem(itemId, data[itemId] as string[]);
-              items.push(item);
-            }
-            InventoryCacheService.setLocalInventoryCache(inventoryPath, items);
-            if (hasPantryItemsChanged(items, inventoryRef.current)) {
-              setRemoteInventoryUpdate(true);
-              setInventory(items);
-            }
+          // F06: parse via the shared versioned reader instead of gating on an exact
+          // version match. A version mismatch used to be treated as "no data" here,
+          // and the very next mutation would setDoc that empty local state back over
+          // the real document - permanently destroying the household's pantry. Always
+          // parse (and, if stale, migrate) instead of discarding.
+          const { items, storedVersion } = InventoryCacheService.parseCacheDocument(data);
+          InventoryCacheService.setLocalInventoryCache(inventoryPath, items);
+          if (hasPantryItemsChanged(items, inventoryRef.current)) {
+            setRemoteInventoryUpdate(true);
+            setInventory(items);
+          }
+          if (storedVersion < InventoryCacheService.CACHE_VERSION) {
+            // Fire-and-forget: re-persist at the current version so the doc converges
+            // and future reads/writes stop needing to re-migrate. Must not block the
+            // UI update above on this write succeeding.
+            InventoryCacheService.migrateCacheDocumentIfNeeded(items, storedVersion, user.householdId, user.id)
+              .catch(migrateErr => log.warn('Inventory cache migration failed', { migrateErr }, 'useDataManagement'));
           }
         } else {
           InventoryCacheService.setLocalInventoryCache(inventoryPath, []);
@@ -137,12 +139,12 @@ export function useInventory(
     return () => {
       unsubs.forEach(unsub => unsub());
     };
-  }, [user?.id, user?.householdId]);
+  }, [user?.id, user?.householdId, options?.disableInventoryListeners]);
 
   useEffect(() => {
     if (!inventory.length || !user?.id || user.isGuest) return;
 
-    const todayString = new Date().toISOString().slice(0, 10);
+    const todayString = localDateString();
     const lastCheckDate = localStorage.getItem('lastExpirationCheckDate');
 
     // Only run expiration checks once per calendar day, or if it's never been checked
@@ -161,21 +163,28 @@ export function useInventory(
           // Never notify or create alerts for immortal items
           if (item.is_immortal) return false;
           if (!item.expirationDate) return false;
-          const daysUntilExpiry = Math.ceil((new Date(item.expirationDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+          const daysUntilExpiry = Math.ceil((parseLocalDateString(item.expirationDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
           // Include expired items (daysUntilExpiry <= 0) and items expiring within 7 days
           return daysUntilExpiry <= 7;
         });
 
         // Build danger-list for aggregation: prioritize items expiring within 3 days (including expired)
         const dangerCandidates = itemsExpiringSoon.map(item => {
-          const daysUntilExpiry = Math.ceil((new Date(item.expirationDate!).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+          const daysUntilExpiry = Math.ceil((parseLocalDateString(item.expirationDate!).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
           return { itemId: item.id, itemName: item.item, daysUntilExpiry, risk_level: item.productRiskLevel };
         }).filter(x => x.daysUntilExpiry <= 3).slice(0, 6);
 
         try {
+          const alerts = generateExpirationAlerts(inventory);
+          const needsAttentionCount = alerts.filter(a =>
+            a.alertLevel === 'expired' || a.alertLevel === 'critical' || a.alertLevel === 'warning'
+          ).length;
+          if (needsAttentionCount > 0) {
+            await NotificationService.createAttentionSummaryAlert(user.id, needsAttentionCount);
+          }
+
           if (dangerCandidates.length >= 2) {
             // Create a single aggregated Danger Zone notification
-
             await NotificationService.createDangerZoneAlert(user.id, dangerCandidates as Parameters<typeof NotificationService.createDangerZoneAlert>[1]);
           } else {
             // Fetch once and reuse for all items to avoid redundant Firestore queries
@@ -216,8 +225,19 @@ export function useInventory(
   // stale-closure repeated-toast issue that originally caused this to be disabled.
   useEffect(() => {
     if (isOnline) {
-      offlineQueue.processQueue().then(() => {
-        addToastRef.current?.('Back online — changes synced.', 'success');
+      offlineQueue.processQueue().then((result) => {
+        // Only report success if everything actually synced cleanly - a
+        // "changes synced" toast was previously shown even when ops had
+        // failed or were parked as conflicts (fix L5).
+        if (!result || result.failed > 0 || result.conflicts > 0) {
+          if (result && result.completed > 0) {
+            addToastRef.current?.('Back online — some changes could not be synced.', 'error');
+          }
+          return;
+        }
+        if (result.completed > 0) {
+          addToastRef.current?.('Back online — changes synced.', 'success');
+        }
       }).catch(err => {
         log.error('Failed to process offline queue', err, 'DataManagement');
       });
@@ -336,7 +356,10 @@ export function useInventory(
 
     if (user?.isGuest) {
       setInventory(prev => {
-        const updated = prev.map((item, i) => i === index ? updatedItem : item);
+        // Address by id, not the index captured at call time — `prev` may
+        // have been reordered/mutated (e.g. by a remote listener update)
+        // between now and when `index` was resolved.
+        const updated = prev.map(item => item.id === currentItem.id ? updatedItem : item);
         try { localStorage.setItem(GUEST_INVENTORY_KEY, JSON.stringify(updated)); } catch { /* storage full */ }
         return updated;
       });
@@ -349,7 +372,8 @@ export function useInventory(
       updates
     });
 
-    setInventory(prev => prev.map((item, i) => i === index ? updatedItem : item));
+    // Address by id — see guest-branch comment above.
+    setInventory(prev => prev.map(item => item.id === currentItem.id ? updatedItem : item));
 
     await InventoryCacheService.updateItemInCache(currentItem.id, updates, user?.householdId, user?.id);
 
@@ -380,11 +404,11 @@ export function useInventory(
     if (user?.isGuest) {
       // Record to food waste analytics for guest
       try {
-        const today = new Date().toISOString().slice(0, 10);
+        const today = localDateString();
         const isExpired = itemToDelete.expirationDate && !itemToDelete.is_immortal && itemToDelete.expirationDate <= today;
         const reason = disposalReason || (isExpired ? 'thrown_away' : 'remove');
         const daysExpired = itemToDelete.expirationDate
-          ? Math.max(0, Math.ceil((new Date().getTime() - new Date(itemToDelete.expirationDate).getTime()) / (1000 * 60 * 60 * 24)))
+          ? Math.max(0, Math.ceil((new Date().getTime() - parseLocalDateString(itemToDelete.expirationDate).getTime()) / (1000 * 60 * 60 * 24)))
           : 0;
         const estimatedValue = itemToDelete.estimatedPrice || 2.50;
 
@@ -403,7 +427,8 @@ export function useInventory(
       }
 
       setInventory(prev => {
-        const updated = prev.filter((_, i) => i !== index);
+        // Address by id — see updateItem's guest-branch comment.
+        const updated = prev.filter(item => item.id !== itemToDelete.id);
         try { localStorage.setItem(GUEST_INVENTORY_KEY, JSON.stringify(updated)); } catch { /* storage full */ }
         return updated;
       });
@@ -413,11 +438,11 @@ export function useInventory(
     // Record food waste analytics if user is authenticated
     if (user?.id) {
       try {
-        const today = new Date().toISOString().slice(0, 10);
+        const today = localDateString();
         const isExpired = itemToDelete.expirationDate && !itemToDelete.is_immortal && itemToDelete.expirationDate <= today;
         const reason = disposalReason || (isExpired ? 'thrown_away' : 'remove');
         const daysExpired = itemToDelete.expirationDate
-          ? Math.max(0, Math.ceil((new Date().getTime() - new Date(itemToDelete.expirationDate).getTime()) / (1000 * 60 * 60 * 24)))
+          ? Math.max(0, Math.ceil((new Date().getTime() - parseLocalDateString(itemToDelete.expirationDate).getTime()) / (1000 * 60 * 60 * 24)))
           : 0;
         const estimatedValue = itemToDelete.estimatedPrice || 2.50;
 
@@ -439,7 +464,8 @@ export function useInventory(
     await recordUndo('delete_item', itemToDelete);
 
     HapticService.medium();
-    setInventory(prev => prev.filter((_, i) => i !== index));
+    // Address by id — see updateItem's guest-branch comment.
+    setInventory(prev => prev.filter(item => item.id !== itemToDelete.id));
 
     await InventoryCacheService.removeItemFromCache(itemToDelete.id, user?.householdId, user?.id);
 
@@ -552,8 +578,11 @@ export function useInventory(
     const updatedInventory = inventory.filter((_, i) => !indexSet.has(i));
     setInventory(updatedInventory);
 
-    // Single cache write instead of N individual removeItemFromCache calls
-    await InventoryCacheService.bulkUpdateInventoryCache(updatedInventory, user?.householdId, user?.id);
+    // Single cache write instead of N individual removeItemFromCache calls.
+    // F07: pass only the deleted ids (field-scoped delete via a transaction), not the
+    // caller's full remaining-inventory snapshot - see bulkUpdateInventoryCache's doc
+    // comment for why passing the "final array" would clobber concurrent members' edits.
+    await InventoryCacheService.bulkUpdateInventoryCache([], user?.householdId, user?.id, itemsToDelete.map(i => i.id));
 
     // Dismiss any notifications that only reference the deleted items
     if (user?.id) {
@@ -591,6 +620,16 @@ export function useInventory(
       }
       return;
     }
+
+    // Optimistic local update — mirrors the singular addItem() above. Without
+    // this, the UI didn't reflect the add until the Firestore listener fired
+    // (only the guest path updated local state synchronously).
+    setInventory(prev => {
+      const byId = new Map(prev.map(p => [p.id, p]));
+      items.forEach(item => byId.set(item.id, item));
+      return Array.from(byId.values());
+    });
+
     await InventoryCacheService.addItemsToCache(items, user?.householdId, user?.id);
   };
 

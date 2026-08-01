@@ -26,7 +26,7 @@ import {logger} from 'firebase-functions/v2';
 import admin from 'firebase-admin';
 import {getApps} from 'firebase-admin/app';
 import {getFirestore, Timestamp} from 'firebase-admin/firestore';
-import {resolveSubscriptionState} from './googlePlayHelpers';
+import {PACKAGE_NAME, PRODUCT_TIER_MAP, resolveSubscriptionState} from './googlePlayHelpers';
 
 if (!getApps().length) {
   admin.initializeApp();
@@ -98,6 +98,16 @@ export const handlePlaySubscriptionNotification = onMessagePublished(
       return;
     }
 
+    // Reject notifications for a different app — RTDN topics are per-project, but
+    // guard against a misconfigured/shared topic delivering another app's payload
+    // and mutating our users' subscriptions.
+    if (payload.packageName !== PACKAGE_NAME) {
+      logger.warn('Ignoring Play RTDN with mismatched packageName', {
+        packageName: payload.packageName,
+      });
+      return;
+    }
+
     const notification = payload.subscriptionNotification;
     if (!notification) {
       // Play also sends testNotification / oneTimeProductNotification payloads —
@@ -109,6 +119,13 @@ export const handlePlaySubscriptionNotification = onMessagePublished(
     const {notificationType, purchaseToken, subscriptionId} = notification;
     if (!ACTIONABLE_TYPES.has(notificationType)) {
       logger.info('Ignoring non-actionable notification type', {notificationType});
+      return;
+    }
+    if (typeof purchaseToken !== 'string' || purchaseToken.trim().length === 0) {
+      logger.warn('Ignoring Play RTDN with missing/non-string purchaseToken', {
+        notificationType,
+        subscriptionId,
+      });
       return;
     }
 
@@ -127,7 +144,21 @@ export const handlePlaySubscriptionNotification = onMessagePublished(
     const userRef = db.collection('users').doc(uid);
     const userSnap = await userRef.get();
     const currentSub = userSnap.data()?.subscription;
-    const tier = currentSub?.tier ?? 'premium';
+    // Derive tier from the product catalog rather than defaulting to 'premium' —
+    // an unrecognized subscriptionId (typo'd product id, new product not yet added
+    // to PRODUCT_TIER_MAP, etc.) must never silently grant premium access. Fall
+    // back to whatever tier the user already has on file (e.g. a renewal
+    // notification for an existing subscriber); if neither resolves, skip.
+    const tier = PRODUCT_TIER_MAP[subscriptionId] ?? currentSub?.tier;
+
+    if (!tier) {
+      logger.warn('Ignoring Play RTDN — unknown subscriptionId with no existing tier on file', {
+        uid,
+        subscriptionId,
+        notificationType,
+      });
+      return;
+    }
 
     if (IMMEDIATE_DOWNGRADE_TYPES.has(notificationType)) {
       // Set tier to 'free' too (not just status) — access is genuinely gone (refund
