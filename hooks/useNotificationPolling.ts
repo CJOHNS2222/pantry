@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { getAuth } from 'firebase/auth';
 import { User } from '../types';
-import { NotificationService, NotificationItem, NotificationSettings } from '../services/notificationService';
+import { NotificationService, AppNotification, NotificationSettings } from '../services/notificationService';
 import { log } from '../services/logService';
 
 const POLL_INTERVAL_MS = 5 * 60 * 1000;
@@ -22,7 +22,7 @@ function getPriorityWeight(priority: string): number {
  * dismiss/snooze/mark-read handlers elsewhere can mutate it via the returned setter.
  */
 export function useNotificationPolling(user: User | null | undefined, notificationSettings: NotificationSettings) {
-  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
 
   useEffect(() => {
     if (!user?.id) return;

@@ -17,8 +17,7 @@
  */
 
 import { Capacitor } from '@capacitor/core';
-import { httpsCallable } from 'firebase/functions';
-import { functions } from '../firebaseConfig';
+import { getCallableFunction } from '../firebaseConfig';
 import { log } from './logService';
 
 // Product IDs — must exactly match what is created in Google Play Console
@@ -116,9 +115,9 @@ export async function initializePurchaseStore(userId: string): Promise<void> {
   ]);
 
   // Server-side receipt validator — calls our verifyPurchase Cloud Function
-  const verifyFn = httpsCallable(functions, 'verifyPurchase');
   store.validator = async (receipt: any, callback: any) => {
     try {
+      const verifyFn = await getCallableFunction('verifyPurchase');
       const result = await verifyFn({ receipt, userId: _currentUserId });
       callback({ ok: true, data: result.data as any });
     } catch (err: any) {

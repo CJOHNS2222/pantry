@@ -953,21 +953,174 @@ export function getStorageLocationImage(location: string): string {
 export function inferCategoryFromItemName(itemName: string | undefined): string {
   if (!itemName || typeof itemName !== 'string') return 'Other';
   const item = itemName.toLowerCase();
-  if (item.includes('apple') || item.includes('banana') || item.includes('orange') || item.includes('grape') || item.includes('strawberry') || item.includes('berry')) return 'Fruits & Vegetables';
-  if (item.includes('carrot') || item.includes('potato') || item.includes('onion') || item.includes('broccoli') || item.includes('spinach') || item.includes('lettuce') || item.includes('tomato')) return 'Fruits & Vegetables';
-  if (item.includes('milk') || item.includes('cheese') || item.includes('yogurt') || item.includes('butter') || item.includes('egg')) return 'Dairy & Eggs';
-  if (item.includes('chicken') || item.includes('beef') || item.includes('pork') || item.includes('turkey') || item.includes('bacon') || item.includes('sausage')) return 'Meat & Poultry';
-  if (item.includes('salmon') || item.includes('fish') || item.includes('shrimp') || item.includes('tuna')) return 'Seafood';
-  if (item.includes('pasta') || item.includes('noodle') || item.includes('spaghetti') || item.includes('macaroni') || item.includes('lasagna') || item.includes('ravioli') || item.includes('tortellini') || item.includes('ramen') || item.includes('udon') || item.includes('soba') || item.includes('rice noodle')) return 'Pasta & Noodles';
-  if (item.includes('bread') || item.includes('rice') || item.includes('cereal') || item.includes('flour') || item.includes('oat') || item.includes('quinoa') || item.includes('barley')) return 'Grains & Bread';
-  if (item.includes('ketchup') || item.includes('mustard') || item.includes('mayo') || item.includes('sauce') || item.includes('oil')) return 'Condiments & Sauces';
-  if (item.includes('salt') || item.includes('pepper') || item.includes('garlic') || item.includes('spice') || item.includes('herb')) return 'Spices & Herbs';
-  if (item.includes('peanut') || item.includes('almond') || item.includes('nut')) return 'Snacks';
-  if (item.includes('chip') || item.includes('cookie') || item.includes('cracker') || item.includes('candy')) return 'Snacks';
-  if (item.includes('soda') || item.includes('juice') || item.includes('coffee') || item.includes('tea') || item.includes('water')) return 'Beverages';
-  if (item.includes('frozen') || item.includes('ice cream') || item.includes('pizza')) return 'Frozen Foods';
-  if (item.includes('sugar') || item.includes('baking') || item.includes('vanilla') || item.includes('chocolate')) return 'Baking Supplies';
-  if (item.includes('canned') || item.includes('can ') || item.includes('soup') || item.includes('bean')) return 'Canned Goods';
+
+  // Leftovers
+  if (item.includes('leftover')) return 'Leftovers';
+
+  // Seafood (check specific fish names before generic meat/canned)
+  if (item.includes('salmon') || item.includes('fish') || item.includes('shrimp') || item.includes('tuna') || 
+      item.includes('crab') || item.includes('lobster') || item.includes('cod') || item.includes('tilapia') || 
+      item.includes('scallop') || item.includes('oyster') || item.includes('clam') || item.includes('mussel') || 
+      item.includes('halibut') || item.includes('haddock') || item.includes('sardine') || item.includes('anchovy') || 
+      item.includes('trout') || item.includes('seafood') || item.includes('snapper') || item.includes('sea bass')) {
+    return 'Seafood';
+  }
+
+  // Meat & Poultry (check meat types)
+  if (item.includes('chicken') || item.includes('beef') || item.includes('pork') || item.includes('turkey') || 
+      item.includes('bacon') || item.includes('sausage') || item.includes('steak') || item.includes('ham') || 
+      item.includes('lamb') || item.includes('veal') || item.includes('mutton') || item.includes('meatball') || 
+      item.includes('ribs') || item.includes('salami') || item.includes('pepperoni') || item.includes('hot dog') || 
+      item.includes('frankfurter') || item.includes('duck') || item.includes('venison') || item.includes('meat') ||
+      item.includes('prosciutto') || item.includes('bologna') || item.includes('chorizo') || item.includes('bratwurst')) {
+    return 'Meat & Poultry';
+  }
+
+  // Dairy & Eggs
+  if (item.includes('milk') || item.includes('cheese') || item.includes('yogurt') || item.includes('butter') || 
+      item.includes('egg') || item.includes('cream') || item.includes('sour cream') || item.includes('cream cheese') || 
+      item.includes('cottage cheese') || item.includes('half & half') || item.includes('whipped cream') || 
+      item.includes('margarine') || item.includes('whey') || item.includes('ghee') || item.includes('provodone') ||
+      item.includes('mozzarella') || item.includes('cheddar') || item.includes('parmesan') || item.includes('swiss cheese')) {
+    return 'Dairy & Eggs';
+  }
+
+  // Specific produce (bell pepper, chili pepper, fresh garlic, fresh ginger) first to prevent getting miscategorized as spices
+  if (item.includes('bell pepper') || item.includes('chili pepper') || item.includes('jalapeno') || 
+      item.includes('habanero') || item.includes('poblano') || item.includes('sweet pepper') ||
+      item.includes('serrano') || item.includes('cayenne pepper') || 
+      (item.includes('garlic') && !item.includes('garlic powder') && !item.includes('garlic salt')) ||
+      (item.includes('ginger') && !item.includes('ginger powder') && !item.includes('ground ginger')) ||
+      item.includes('fresh herb') || item.includes('fresh basil') || item.includes('fresh parsley') ||
+      item.includes('fresh cilantro') || item.includes('fresh thyme') || item.includes('fresh rosemary') ||
+      item.includes('fresh oregano') || item.includes('fresh dill') || item.includes('fresh mint') ||
+      item.includes('green onion') || item.includes('scallion') || item.includes('chive')) {
+    return 'Fruits & Vegetables';
+  }
+
+  // Fruits
+  if (item.includes('apple') || item.includes('banana') || item.includes('orange') || item.includes('grape') || 
+      item.includes('strawberry') || item.includes('berry') || item.includes('blueberry') || item.includes('raspberry') || 
+      item.includes('blackberry') || item.includes('lemon') || item.includes('lime') || item.includes('peach') || 
+      item.includes('pear') || item.includes('plum') || item.includes('cherry') || item.includes('melon') || 
+      item.includes('watermelon') || item.includes('avocado') || item.includes('mango') || item.includes('pineapple') || 
+      item.includes('kiwi') || item.includes('apricot') || item.includes('fig') || item.includes('nectarine') || 
+      item.includes('cantaloupe') || item.includes('pomegranate') || item.includes('grapefruit') || item.includes('mandarin') || 
+      item.includes('clementine') || item.includes('papaya') || item.includes('coconut') || item.includes('cranberry') ||
+      item.includes('raisin') || item.includes('date') || item.includes('prune') || item.includes('fruit')) {
+    return 'Fruits & Vegetables';
+  }
+
+  // Vegetables
+  if (item.includes('carrot') || item.includes('potato') || item.includes('onion') || item.includes('broccoli') || 
+      item.includes('spinach') || item.includes('lettuce') || item.includes('tomato') || item.includes('celery') || 
+      item.includes('cucumber') || item.includes('cabbage') || item.includes('zucchini') || item.includes('squash') || 
+      item.includes('asparagus') || item.includes('mushroom') || item.includes('cauliflower') || item.includes('corn') || 
+      item.includes('pea') || item.includes('green bean') || item.includes('kale') || item.includes('radish') || 
+      item.includes('beet') || item.includes('eggplant') || item.includes('brussels sprout') || item.includes('sweet potato') || 
+      item.includes('yam') || item.includes('shallot') || item.includes('leek') || item.includes('okra') || 
+      item.includes('artichoke') || item.includes('turnip') || item.includes('parsnip') || item.includes('pumpkin') ||
+      item.includes('vegetable') || item.includes('salad') || item.includes('greens') || item.includes('sprout')) {
+    return 'Fruits & Vegetables';
+  }
+
+  // Breakfast Foods
+  if (item.includes('waffle') || item.includes('pancake') || item.includes('oatmeal') || 
+      item.includes('hash brown') || item.includes('granola') || item.includes('maple syrup') ||
+      item.includes('muesli') || item.includes('bagel') || item.includes('pop-tart') ||
+      item.includes('cereal') || item.includes('french toast') || item.includes('crepe')) {
+    return 'Breakfast Foods';
+  }
+
+  // Pasta & Noodles
+  if (item.includes('pasta') || item.includes('noodle') || item.includes('spaghetti') || item.includes('macaroni') || 
+      item.includes('lasagna') || item.includes('ravioli') || item.includes('tortellini') || item.includes('ramen') || 
+      item.includes('udon') || item.includes('soba') || item.includes('rice noodle') || item.includes('fettuccine') || 
+      item.includes('penne') || item.includes('rotini') || item.includes('linguine') || item.includes('orzo') || 
+      item.includes('couscous') || item.includes('rigatoni') || item.includes('gnocchi')) {
+    return 'Pasta & Noodles';
+  }
+
+  // Grains & Bread
+  if (item.includes('bread') || item.includes('rice') || item.includes('flour') || 
+      item.includes('oat') || item.includes('quinoa') || item.includes('barley') || item.includes('tortilla') || 
+      item.includes('wrap') || item.includes('croissant') || item.includes('bun') || item.includes('roll') || 
+      item.includes('pita') || item.includes('naan') || item.includes('toast') || item.includes('wheat') || 
+      item.includes('rye') || item.includes('grain') || item.includes('millet') || item.includes('baguette') ||
+      item.includes('pita bread') || item.includes('english muffin') || item.includes('sourdough')) {
+    return 'Grains & Bread';
+  }
+
+  // Condiments & Sauces
+  if (item.includes('ketchup') || item.includes('mustard') || item.includes('mayo') || item.includes('mayonnaise') || 
+      item.includes('sauce') || item.includes('oil') || item.includes('vinegar') || item.includes('barbecue') || 
+      item.includes('bbq') || item.includes('soy sauce') || item.includes('hot sauce') || item.includes('salad dressing') || 
+      item.includes('honey') || item.includes('syrup') || item.includes('jam') || item.includes('jelly') || 
+      item.includes('peanut butter') || item.includes('almond butter') || item.includes('hummus') || item.includes('pesto') || 
+      item.includes('salsa') || item.includes('guacamole') || item.includes('marinade') || item.includes('dip') || 
+      item.includes('relish') || item.includes('spread') || item.includes('gravy') || item.includes('vinaigrette') ||
+      item.includes('sriracha') || item.includes('teriyaki') || item.includes('pesto') || item.includes('tahini')) {
+    return 'Condiments & Sauces';
+  }
+
+  // Spices & Herbs
+  if (item.includes('salt') || item.includes('pepper') || item.includes('garlic') || item.includes('spice') || 
+      item.includes('herb') || item.includes('cumin') || item.includes('paprika') || item.includes('oregano') || 
+      item.includes('basil') || item.includes('thyme') || item.includes('rosemary') || item.includes('cinnamon') || 
+      item.includes('nutmeg') || item.includes('curry') || item.includes('chili powder') || item.includes('seasoning') || 
+      item.includes('rub') || item.includes('parsley') || item.includes('cilantro') || item.includes('sage') || 
+      item.includes('dill') || item.includes('clove') || item.includes('seasoned') || item.includes('cardamom') || 
+      item.includes('coriander') || item.includes('tumeric') || item.includes('ginger powder') || 
+      item.includes('vanilla extract') || item.includes('allspice') || item.includes('cayenne') || 
+      item.includes('bay leaf') || item.includes('bay leaves') || item.includes('saffron') || 
+      item.includes('onion powder') || item.includes('garlic powder') || item.includes('garlic salt')) {
+    return 'Spices & Herbs';
+  }
+
+  // Snacks
+  if (item.includes('chip') || item.includes('cookie') || item.includes('cracker') || item.includes('candy') || 
+      item.includes('peanut') || item.includes('almond') || item.includes('nut') || item.includes('popcorn') || 
+      item.includes('pretzel') || item.includes('jerky') || item.includes('chocolate bar') || item.includes('gummy') || 
+      item.includes('snack') || item.includes('cashew') || item.includes('pistachio') || item.includes('walnut') || 
+      item.includes('pecan') || item.includes('hazelnut') || item.includes('trail mix') || item.includes('raisin') ||
+      item.includes('donut') || item.includes('pastry') || item.includes('bars') || item.includes('seeds')) {
+    return 'Snacks';
+  }
+
+  // Beverages
+  if (item.includes('soda') || item.includes('juice') || item.includes('coffee') || item.includes('tea') || 
+      item.includes('water') || item.includes('beer') || item.includes('wine') || item.includes('milkshake') || 
+      item.includes('cider') || item.includes('smoothie') || item.includes('drink') || item.includes('beverage') || 
+      item.includes('coca-cola') || item.includes('pepsi') || item.includes('sprite') || item.includes('seltzer') || 
+      item.includes('ale') || item.includes('lager') || item.includes('rum') || item.includes('vodka') || 
+      item.includes('whiskey') || item.includes('tonic') || item.includes('club soda') || item.includes('kombucha')) {
+    return 'Beverages';
+  }
+
+  // Frozen Foods (check after meat/veggies since frozen meat goes to Meat, etc.)
+  if (item.includes('frozen') || item.includes('ice cream') || item.includes('pizza') || 
+      item.includes('tater tots') || item.includes('sorbet') || item.includes('gelato') || 
+      item.includes('frozen meal') || item.includes('frozen dinner') || item.includes('popsicle') ||
+      item.includes('frozen food') || item.includes('sherbet')) {
+    return 'Frozen Foods';
+  }
+
+  // Baking Supplies
+  if (item.includes('sugar') || item.includes('baking') || item.includes('vanilla') || item.includes('chocolate') || 
+      item.includes('cocoa') || item.includes('yeast') || item.includes('baking powder') || item.includes('baking soda') || 
+      item.includes('extract') || item.includes('sprinkles') || item.includes('frosting') || item.includes('icing') ||
+      item.includes('chocolate chip') || item.includes('sprinkle') || item.includes('shortening') ||
+      item.includes('molasses') || item.includes('cornstarch') || item.includes('marshmallow')) {
+    return 'Baking Supplies';
+  }
+
+  // Canned Goods
+  if (item.includes('canned') || item.includes('can ') || item.includes('soup') || item.includes('bean') || 
+      item.includes('broth') || item.includes('stock') || item.includes('canned tomato') || item.includes('chili') || 
+      item.includes('paste') || item.includes('bouillon') || item.includes('lentil') || item.includes('chickpea')) {
+    return 'Canned Goods';
+  }
+
   return 'Uncategorized'; // Default fallback
 }
 

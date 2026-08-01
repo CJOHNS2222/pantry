@@ -69,8 +69,15 @@ function createSearchIndexEntry(recipe) {
       recipe.description || '',
       ...(recipe.ingredients || [])
     ].join(' ').toLowerCase(),
-    // Keywords for better search
-    keywords: extractKeywords(recipe)
+    // Keywords for better search (legacy field — kept for back-compat with
+    // pre-searchTokens index entries; new consumers should prefer searchTokens)
+    keywords: extractKeywords(recipe),
+    // searchTokens: same token set as `keywords`, the field name the app's indexed
+    // array-contains query (services/recipeService.ts searchRecipesInFirestore)
+    // checks first. Kept as a distinct field (rather than renaming `keywords`) so this
+    // script can be re-run to backfill existing `recipe_search_index` docs without a
+    // separate one-off migration.
+    searchTokens: extractKeywords(recipe)
   };
 }
 

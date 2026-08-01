@@ -3,10 +3,8 @@ import { getAuth, setPersistence, browserLocalPersistence, indexedDBLocalPersist
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 import type { Analytics } from "firebase/analytics";
-import { getAnalytics } from "firebase/analytics";
-import { getFunctions } from "firebase/functions";
+import type { Functions } from "firebase/functions";
 import type { Messaging } from "firebase/messaging";
-import { getMessaging, isSupported } from "firebase/messaging";
 import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
 import { Capacitor } from '@capacitor/core';
 import webFirebaseConfig from './VITE_firebaseConfig';
@@ -32,7 +30,38 @@ export const db = initializeFirestore(app, {
   }),
 });
 export const storage = getStorage(app);
-export const functions = getFunctions(app);
+
+// `firebase/functions` is dynamically imported on first use (see `getFunctionsInstance`)
+// so it — and `firebase/messaging`/`firebase/analytics` below — don't get pulled into the
+// eager `firebase-vendor` chunk alongside core `firebase/auth`/`firebase/firestore`, which
+// blocks first paint (perf audit F35).
+let functionsInstance: Functions | undefined;
+let functionsInitPromise: Promise<Functions> | undefined;
+export const getFunctionsInstance = (): Promise<Functions> => {
+  if (functionsInstance) {
+    return Promise.resolve(functionsInstance);
+  }
+  if (!functionsInitPromise) {
+    functionsInitPromise = import('firebase/functions').then(({ getFunctions }) => {
+      functionsInstance = getFunctions(app);
+      return functionsInstance;
+    });
+  }
+  return functionsInitPromise;
+};
+
+// Convenience helper: resolves a callable Cloud Function without any caller needing a
+// static `import { httpsCallable } from 'firebase/functions'` (which would otherwise pull
+// the module back into the eager bundle regardless of `getFunctionsInstance` above).
+export const getCallableFunction = async <RequestData = unknown, ResponseData = unknown>(
+  name: string
+) => {
+  const [instance, { httpsCallable }] = await Promise.all([
+    getFunctionsInstance(),
+    import('firebase/functions'),
+  ]);
+  return httpsCallable<RequestData, ResponseData>(instance, name);
+};
 
 // Firebase App Check — prevents unauthorized clients from hitting Firestore/Storage.
 // Requires VITE_RECAPTCHA_SITE_KEY in .env.local (web) or device attestation (native).
@@ -67,13 +96,16 @@ if (appCheckSiteKey && !import.meta.env.DEV) {
   }
 })();
 
-// Initialize messaging (FCM) - only on supported platforms
+// Initialize messaging (FCM) - only on supported platforms. `firebase/messaging` is
+// dynamically imported so it doesn't force-bundle into the eager firebase-vendor chunk.
 let messaging: Messaging | null = null;
 if (typeof window !== 'undefined') {
-  isSupported().then(supported => {
-    if (supported) {
-      messaging = getMessaging(app);
-    }
+  import('firebase/messaging').then(({ isSupported, getMessaging }) => {
+    return isSupported().then(supported => {
+      if (supported) {
+        messaging = getMessaging(app);
+      }
+    });
   }).catch(error => {
     log.debug('FCM not supported:', error);
   });
@@ -89,9 +121,14 @@ if (Capacitor.getPlatform() === 'web') {
   setPersistence(auth, indexedDBLocalPersistence);
 }
 
-// Initialize analytics only if measurementId is configured
+// Initialize analytics only if measurementId is configured. `firebase/analytics` is
+// dynamically imported so it doesn't force-bundle into the eager firebase-vendor chunk.
 let analytics: Analytics | undefined;
 if ((config as { measurementId?: string }).measurementId) {
-  analytics = getAnalytics(app);
+  import('firebase/analytics').then(({ getAnalytics }) => {
+    analytics = getAnalytics(app);
+  }).catch(error => {
+    log.debug('Analytics failed to initialize:', error);
+  });
 }
 export { analytics };

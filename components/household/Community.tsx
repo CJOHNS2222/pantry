@@ -1,40 +1,38 @@
-import React, { useEffect, useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useApp } from '../../contexts/AppContext';
 import { useAppActions } from '../../contexts/AppActionsContext';
 import { useConfirm } from '../ui/ConfirmDialog';
+import { useToast } from '../ui/Toast';
 import { Tab } from '../../types/app';
 import { ProgressBar, BottomSheet } from '../ui';
 import { PantryHealthScore } from '../pantry/PantryHealthScore';
-import { 
-  Star, 
-  Plus, 
-  UtensilsCrossed, 
-  Trophy, 
-  Award, 
-  Flame, 
-  Lock, 
-  CheckCircle, 
-  TrendingUp, 
-  Sparkles, 
-  Share2, 
-  Users, 
-  User, 
-  Info, 
+import {
+  Trophy,
+  Award,
+  Flame,
+  Lock,
+  CheckCircle,
+  TrendingUp,
+  Sparkles,
+  Share2,
+  Users,
+  User,
+  Info,
   DollarSign,
   ChevronDown,
   ChevronUp,
   X
 } from 'lucide-react';
-import { RecipeRating, StructuredRecipe } from '../../types';
+import { StructuredRecipe } from '../../types';
 import RecipeModal from '../recipes-meals/RecipeModal';
-import { getCachedCommunityRatedRecipes } from '../../services/recipeService';
 import { log } from '../../services/logService';
 import { useAndroidBack } from '../../hooks/useAndroidBack';
-import { hasMilestone } from '../../services/onboardingMilestoneService';
-import { LeaderboardCacheService, GlobalLeaderboardEntries, GlobalHouseholdLeaderboardEntries } from '../../services/LeaderboardCacheService';
-
-// Staple items to ignore in ingredient display
-const _STAPLES = ['salt', 'pepper', 'oil', 'water', 'flour', 'sugar', 'butter', 'vinegar', 'baking powder', 'baking soda', 'spices', 'seasoning', 'soy sauce', 'cornstarch', 'yeast'];
+import { useCelebrationFireworks } from '../../hooks/useCelebrationFireworks';
+import { useCommunityLeaderboard } from './useCommunityLeaderboard';
+import { useCommunityAchievements } from './useCommunityAchievements';
+import { useCommunityChecklist } from './useCommunityChecklist';
+import { useCommunityRatings, RecipeStats } from './useCommunityRatings';
+import { CommunityRecipesFeed, findRecipeForStat } from './CommunityRecipesFeed';
 
 interface CommunityProps {
   onAddToPlan: (recipe: StructuredRecipe) => void;
@@ -50,298 +48,68 @@ interface CommunityProps {
   };
 }
 
-interface RecipeStats {
-  title: string;
-  totalRating: number;
-  count: number;
-  comments: RecipeRating[];
-}
-
-interface LeaderboardEntry {
-  rank: number;
-  name: string;
-  isUser: boolean;
-  score: number;
-  /** null when this is a real household member whose individual streak isn't tracked (streaks are device-local). */
-  streak: number | null;
-  /** null when this is a real household member whose individual badge count isn't tracked. */
-  badges: number | null;
-  isHousehold: boolean;
-  /** True for real household members (not the current user, not simulated peers) — same shared pantry score, unknown streak/badges. */
-  isRealMember?: boolean;
-}
-
-import { calculatePantryScore, getCookingStreak, AchievementBadge } from '../../utils/achievementUtils';
+import { AchievementBadge } from '../../utils/achievementUtils';
 
 const CommunityComponent: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecipe, user }) => {
   const app = useApp();
   const { isLoadingRatings, setLoadingRatingsComplete, inventory = [], savedRecipes = [], mealPlan = [], household = null } = app;
   const { setActiveTab, onRateRecipe, addToast } = useAppActions();
   const confirm = useConfirm();
+  const toast = useToast();
   
   // Navigation & Toggle State
   const [subTab, setSubTab] = useState<'recipes' | 'leaderboard' | 'achievements'>('recipes');
-  const [leaderboardType, setLeaderboardType] = useState<'individual' | 'household'>('individual');
-  const [leaderboardTimeframe, setLeaderboardTimeframe] = useState<'weekly' | 'monthly'>('weekly');
-  
-  // Leaderboard Opt-In State
-  const [optedIn, setOptedIn] = useState(() => localStorage.getItem('pantryLeaderboardOptIn') === 'true');
-  const [leaderboardName, setLeaderboardName] = useState(() => localStorage.getItem('pantryLeaderboardName') || user?.name || 'Pantry Champ');
-  const [isAnonymous, setIsAnonymous] = useState(() => localStorage.getItem('pantryLeaderboardAnon') === 'true');
 
-  // Global leaderboard cache: everyone opted-in shares one document (individual entries
-  // keyed by uid, household entries keyed by householdId), so loading it is 1 read and
-  // logging a score is 1 write each (see LeaderboardCacheService).
-  const [globalEntries, setGlobalEntries] = useState<GlobalLeaderboardEntries>({});
-  const [globalHouseholdEntries, setGlobalHouseholdEntries] = useState<GlobalHouseholdLeaderboardEntries>({});
-
-  useEffect(() => {
-    let cancelled = false;
-    LeaderboardCacheService.getGlobalLeaderboard().then(({ entries, householdEntries }) => {
-      if (!cancelled) {
-        setGlobalEntries(entries);
-        setGlobalHouseholdEntries(householdEntries);
-      }
-    });
-    return () => { cancelled = true; };
-  }, []);
-
-  const handleLeaveLeaderboard = async () => {
-    const ok = await confirm({
-      title: 'Leave the leaderboard?',
-      description: 'Your profile and rankings will no longer be visible to other members.',
-      variant: 'danger',
-      confirmLabel: 'Leave Leaderboard',
-      cancelLabel: 'Stay',
-    });
-    if (ok) {
-      localStorage.removeItem('pantryLeaderboardOptIn');
-      setOptedIn(false);
-      if (user?.id) {
-        LeaderboardCacheService.removeMyEntry(user.id).catch(() => {});
-        setGlobalEntries(prev => {
-          const next = { ...prev };
-          delete next[user.id];
-          return next;
-        });
-      }
-      if (household?.id) {
-        LeaderboardCacheService.removeMyHouseholdEntry(household.id).catch(() => {});
-        setGlobalHouseholdEntries(prev => {
-          const next = { ...prev };
-          delete next[household.id];
-          return next;
-        });
-      }
-    }
-  };
-  
   // Modals state
   const [showModal, setShowModal] = useState(false);
-  const [selectedRecipe, setSelectedRecipe] = useState<{ title: string, comments: RecipeRating[] } | null>(null);
+  const [selectedRecipe, setSelectedRecipe] = useState<RecipeStats | null>(null);
   const [selectedBadge, setSelectedBadge] = useState<AchievementBadge | null>(null);
   const [showWasteReport, setShowWasteReport] = useState(false);
   const [showHealthDetail, setShowHealthDetail] = useState(false);
 
-  const [localLoading, setLocalLoading] = useState(false);
-  const [ratingsState, setRatingsState] = useState<RecipeRating[]>([]);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const celebrationFrameRef = useRef<number | null>(null);
+  const { canvasRef, triggerCelebration } = useCelebrationFireworks();
 
-  useEffect(() => {
-    return () => {
-      if (celebrationFrameRef.current !== null) {
-        cancelAnimationFrame(celebrationFrameRef.current);
-      }
-    };
-  }, []);
+  const hasMealsPlanned = useMemo(() => {
+    return mealPlan.some(day => (day.breakfast?.length || 0) + (day.lunch?.length || 0) + (day.dinner?.length || 0) > 0);
+  }, [mealPlan]);
 
-  // Onboarding checklist tracking relocated to Social tab
-  const [isChecklistCollapsed, setIsChecklistCollapsed] = useState(true);
-  const [isChecklistDismissed, setIsChecklistDismissed] = useState(() => {
-    try {
-      return localStorage.getItem('onboarding-checklist-dismissed') === 'true';
-    } catch {
-      return false;
-    }
+  // Live pantry-score stats + gamified achievement badges (F37: components/household/useCommunityAchievements.ts)
+  const { userScore, userStreak, expiredCount, achievementsList, unlockedBadgesCount } = useCommunityAchievements({
+    inventory,
+    savedRecipes,
+    household,
+    hasMealsPlanned,
   });
 
-  interface ChecklistStep {
-    id: string;
-    label: string;
-    description: string;
-    isCompleted: boolean;
-    action: () => void;
-    actionLabel: string;
-  }
+  // Onboarding checklist tracking relocated to Social tab (F37: components/household/useCommunityChecklist.ts)
+  const {
+    checklistSteps,
+    completedChecklistCount,
+    isChecklistCollapsed,
+    setIsChecklistCollapsed,
+    isChecklistDismissed,
+    dismissChecklist,
+  } = useCommunityChecklist(inventory.length, setActiveTab);
 
-  const checklistSteps = useMemo((): ChecklistStep[] => {
-    const pSaved = hasMilestone('first-recipe-saved');
-    const mPlanned = hasMilestone('first-meal-planned');
-    const hSetup = hasMilestone('household-setup');
-    const lLogged = hasMilestone('first-leftover-logged');
-    const pItemsCount = inventory.length;
-    
-    return [
-      {
-        id: 'add-items',
-        label: 'Add 5 Pantry Items',
-        description: `Add ingredients to unlock smart recommendations. (${pItemsCount}/5)`,
-        isCompleted: pItemsCount >= 5,
-        action: () => {
-          try {
-            sessionStorage.setItem('open-pantry-add-modal', 'true');
-          } catch (e) {
-            log.error('Failed to write open-pantry-add-modal to sessionStorage', { error: e }, 'Community');
-            return;
-          }
-          if (setActiveTab) setActiveTab(Tab.PANTRY);
-        },
-        actionLabel: 'Add Items'
-      },
-      {
-        id: 'save-recipe',
-        label: 'Save a Recipe',
-        description: 'Explore recipes in the Chef tab and heart one to save it.',
-        isCompleted: pSaved,
-        action: () => { if (setActiveTab) setActiveTab(Tab.RECIPES); },
-        actionLabel: 'Browse Recipes'
-      },
-      {
-        id: 'plan-meal',
-        label: 'Plan a Meal',
-        description: 'Add a planned meal or saved recipe to your weekly calendar.',
-        isCompleted: mPlanned,
-        action: () => { if (setActiveTab) setActiveTab(Tab.MEALS); },
-        actionLabel: 'Open Planner'
-      },
-      {
-        id: 'household-share',
-        label: 'Set up Household Sharing',
-        description: 'Invite family members or roommates to sync in real-time.',
-        isCompleted: hSetup,
-        action: () => { if (setActiveTab) setActiveTab(Tab.SETTINGS); },
-        actionLabel: 'Set up Sharing'
-      },
-      {
-        id: 'log-leftover',
-        label: 'Record a Leftover',
-        description: 'Log leftovers with a tap to track food safety and waste.',
-        isCompleted: lLogged,
-        action: () => {
-          try {
-            sessionStorage.setItem('open-pantry-add-modal', 'true');
-          } catch (e) {
-            log.error('Failed to write open-pantry-add-modal to sessionStorage', { error: e }, 'Community');
-            return;
-          }
-          if (setActiveTab) setActiveTab(Tab.PANTRY);
-        },
-        actionLabel: 'Log Leftover'
-      }
-    ];
-  }, [inventory.length, setActiveTab]);
+  // Pantry-score leaderboard opt-in, cache sync, and rankings (F37: components/household/useCommunityLeaderboard.ts)
+  const {
+    leaderboardType,
+    setLeaderboardType,
+    leaderboardTimeframe,
+    setLeaderboardTimeframe,
+    optedIn,
+    leaderboardName,
+    setLeaderboardName,
+    isAnonymous,
+    setIsAnonymous,
+    leaderboardData,
+    userRank,
+    handleJoinLeaderboard,
+    handleLeaveLeaderboard,
+  } = useCommunityLeaderboard({ user, household, userScore, userStreak, unlockedBadgesCount, confirm });
 
-  const completedChecklistCount = useMemo(() => {
-    return checklistSteps.filter(s => s.isCompleted).length;
-  }, [checklistSteps]);
-
-  const dismissChecklist = () => {
-    setIsChecklistDismissed(true);
-    try {
-      localStorage.setItem('onboarding-checklist-dismissed', 'true');
-    } catch (e) {
-      log.error('Failed to save onboarding-checklist-dismissed to localStorage', { error: e }, 'Community');
-      return;
-    }
-  };
-
-  const triggerCelebration = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-
-    interface Particle {
-      x: number;
-      y: number;
-      vx: number;
-      vy: number;
-      color: string;
-      size: number;
-      alpha: number;
-      decay: number;
-      gravity: number;
-    }
-
-    const particles: Particle[] = [];
-    const colors = ['#ff0055', '#00ffcc', '#ffcc00', '#ff6600', '#9900ff', '#33ccff', '#ff33aa', '#00ff66'];
-
-    const createExplosion = (x: number, y: number) => {
-      const count = 50 + Math.random() * 30;
-      for (let i = 0; i < count; i++) {
-        const angle = Math.random() * Math.PI * 2;
-        const speed = 1.5 + Math.random() * 6;
-        particles.push({
-          x,
-          y,
-          vx: Math.cos(angle) * speed,
-          vy: Math.sin(angle) * speed - (0.5 + Math.random() * 1.5),
-          color: colors[Math.floor(Math.random() * colors.length)],
-          size: 2 + Math.random() * 3,
-          alpha: 1,
-          decay: 0.012 + Math.random() * 0.015,
-          gravity: 0.12,
-        });
-      }
-    };
-
-    const w = canvas.width;
-    const h = canvas.height;
-    
-    // Burst fireworks in a sequence
-    createExplosion(w / 2, h / 2);
-    setTimeout(() => createExplosion(w * 0.25, h * 0.45), 200);
-    setTimeout(() => createExplosion(w * 0.75, h * 0.45), 400);
-    setTimeout(() => createExplosion(w * 0.5, h * 0.35), 600);
-
-    const drawFrame = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      for (let i = particles.length - 1; i >= 0; i--) {
-        const p = particles[i];
-        p.x += p.vx;
-        p.y += p.vy;
-        p.vy += p.gravity;
-        p.alpha -= p.decay;
-
-        if (p.alpha <= 0) {
-          particles.splice(i, 1);
-          continue;
-        }
-
-        ctx.save();
-        ctx.globalAlpha = p.alpha;
-        ctx.fillStyle = p.color;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-      }
-
-      if (particles.length > 0) {
-        celebrationFrameRef.current = requestAnimationFrame(drawFrame);
-      } else {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        celebrationFrameRef.current = null;
-      }
-    };
-
-    celebrationFrameRef.current = requestAnimationFrame(drawFrame);
-  };
+  // Cached community-rated recipes + derived per-recipe stats (F37: components/household/useCommunityRatings.ts)
+  const { localLoading, sortedRecipes } = useCommunityRatings(setLoadingRatingsComplete);
 
   const handleBadgeClick = (badge: AchievementBadge) => {
     setSelectedBadge(badge);
@@ -360,458 +128,10 @@ const CommunityComponent: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecip
   });
   useAndroidBack(showHealthDetail, () => setShowHealthDetail(false));
 
-  // Load community-rated cache once
-  useEffect(() => {
-    let mounted = true;
-    const load = async () => {
-      try {
-        setLocalLoading(true);
-        const cached = await getCachedCommunityRatedRecipes();
-        if (!mounted) return;
-
-        if (Array.isArray(cached) && cached.length > 0) {
-          const first = cached[0] as unknown as Record<string, unknown>;
-          if (first && (first.recipeTitle || first.comment || first.userName)) {
-            const ratings: RecipeRating[] = cached.map((r) => {
-              const item = r as unknown as Record<string, unknown>;
-              return {
-                id: String(item.id || ''),
-                recipeTitle: String(item.recipeTitle || ''),
-                rating: Number(item.rating || 0),
-                comment: String(item.comment || ''),
-                userName: String(item.userName || ''),
-                date: String(item.date || ''),
-                recipe: item.recipe as StructuredRecipe | undefined
-              };
-            });
-            setRatingsState(ratings);
-          } else {
-            const synthetic: RecipeRating[] = cached.map((r, i: number) => {
-              const item = r as unknown as Record<string, unknown>;
-              const averageRating = item.averageRating;
-              const lastUpdated = item.lastUpdated;
-              return {
-                id: r.id || `community_${i}`,
-                recipeTitle: r.title || 'Untitled',
-                rating: (typeof averageRating === 'number' ? Math.round(averageRating * 10) / 10 : 0),
-                comment: r.description || '',
-                userName: 'Community',
-                date: String(lastUpdated || r.dateSaved || new Date().toISOString()),
-                recipe: r
-              };
-            });
-            setRatingsState(synthetic);
-          }
-        }
-      } catch (e) {
-        log.error('Failed to load cached community recipes', { error: e }, 'Community');
-        return;
-      } finally {
-        if (mounted) {
-          setLocalLoading(false);
-          setLoadingRatingsComplete();
-        }
-      }
-    };
-    load();
-    return () => { mounted = false; };
-  }, []);
-
-  // Group ratings by recipe title and calculate average
-  const recipeStats = ratingsState.reduce((acc, curr) => {
-    const key = curr.recipeTitle || 'Untitled';
-    if (!key || key === 'Untitled' || !curr.recipeTitle) {
-      return acc;
-    }
-    if (!acc[key]) {
-      acc[key] = {
-        title: key,
-        totalRating: 0,
-        count: 0,
-        comments: []
-      };
-    }
-    acc[key].totalRating += (typeof curr.rating === 'number' ? curr.rating : 0);
-    acc[key].count += 1;
-    acc[key].comments.push(curr);
-    return acc;
-  }, {} as Record<string, RecipeStats>);
-
-  const sortedRecipes = Object.values(recipeStats)
-    .filter((stat): stat is RecipeStats => {
-      const s = stat as RecipeStats;
-      return !!(s && typeof s === 'object' && 'count' in s && 'title' in s &&
-             s.count > 0 && s.title && s.title !== 'Untitled');
-    })
-    .sort((a, b) => (b.totalRating / Math.max(1, b.count)) - (a.totalRating / Math.max(1, a.count)));
-    
-  const [showAll, setShowAll] = useState(false);
-  
-  const findRecipeForStat = (stat: { comments: RecipeRating[] }) => {
-    const ratingWithRecipe = stat.comments.find(c => c.recipe);
-    return ratingWithRecipe ? ratingWithRecipe.recipe : null;
-  };
-
-  const sanitizeRecipeForSave = (r: StructuredRecipe): StructuredRecipe => {
-    const placeholderPattern = /Full recipe not available in this rating/i;
-    const sanitized: StructuredRecipe = {
-      title: r.title || '',
-      description: r.description || '',
-      ingredients: Array.isArray(r.ingredients) ? [...r.ingredients] : [],
-      instructions: Array.isArray(r.instructions) ? [...r.instructions] : [],
-      cookTime: r.cookTime || '',
-      image: r.image
-    };
-
-    if (sanitized.ingredients.length === 1 && placeholderPattern.test(String(sanitized.ingredients[0]))) {
-      sanitized.ingredients = [];
-    }
-    if (sanitized.instructions.length === 1 && placeholderPattern.test(String(sanitized.instructions[0]))) {
-      sanitized.instructions = [];
-    }
-
-    return sanitized;
-  };
-
-  // Live Stats Calculation
-  const userScore = useMemo(() => calculatePantryScore(inventory), [inventory]);
-  const userStreak = useMemo(() => getCookingStreak(), []);
-  
-  const expiredCount = useMemo(() => {
-    return inventory.filter(i => {
-      if (!i.expirationDate) return false;
-      return new Date(i.expirationDate).getTime() < Date.now();
-    }).length;
-  }, [inventory]);
-
-  const uniqueCategoriesCount = useMemo(() => {
-    return new Set(inventory.map(i => i.category || 'other')).size;
-  }, [inventory]);
-
-  const hasMealsPlanned = useMemo(() => {
-    return mealPlan.some(day => (day.breakfast?.length || 0) + (day.lunch?.length || 0) + (day.dinner?.length || 0) > 0);
-  }, [mealPlan]);
-
-  // Dynamic Achievements Badges System
-  const achievementsList = useMemo((): AchievementBadge[] => {
-    const list: Omit<AchievementBadge, 'isUnlocked'>[] = [
-      {
-        id: 'waste_warrior',
-        title: 'Waste Warrior',
-        description: 'Have zero expired items in your pantry with at least 5 items tracked.',
-        icon: '🥬',
-        color: 'from-green-400 to-emerald-600',
-        targetValue: 5,
-        currentValue: expiredCount === 0 ? Math.min(5, inventory.length) : 0,
-        unit: 'items',
-        tip: expiredCount > 0 ? `Remove the ${expiredCount} expired items to unlock this badge!` : 'Keep your pantry clean of expired goods.'
-      },
-      {
-        id: 'master_chef',
-        title: 'Master Chef',
-        description: 'Save at least 5 delicious recipes to your personal recipe box.',
-        icon: '🍳',
-        color: 'from-orange-400 to-red-600',
-        targetValue: 5,
-        currentValue: savedRecipes.length,
-        unit: 'recipes',
-        tip: 'Find recipes you love under the Chef tab and tap Save Recipe.'
-      },
-      {
-        id: 'pantry_architect',
-        title: 'Pantry Architect',
-        description: 'Diversify your inventory by stocking items across 4 distinct categories.',
-        icon: '🌈',
-        color: 'from-purple-400 to-indigo-600',
-        targetValue: 4,
-        currentValue: uniqueCategoriesCount,
-        unit: 'categories',
-        tip: 'Try adding items in different categories like Produce, Grains, Dairy, and Spices.'
-      },
-      {
-        id: 'scan_master',
-        title: 'Scan Master',
-        description: 'Add at least 10 items to your pantry to build a healthy stock.',
-        icon: '📦',
-        color: 'from-blue-400 to-cyan-600',
-        targetValue: 10,
-        currentValue: inventory.length,
-        unit: 'items',
-        tip: 'Quick Add or scan barcodes to log your staples and ingredients.'
-      },
-      {
-        id: 'streak_builder',
-        title: 'Streak Builder',
-        description: 'Reach a consecutive 2-day cooking streak by preparing planned meals.',
-        icon: '🔥',
-        color: 'from-amber-400 to-orange-500',
-        targetValue: 2,
-        currentValue: userStreak,
-        unit: 'days',
-        tip: 'Mark your planned meals as made on consecutive days to maintain your cooking streak.'
-      },
-      {
-        id: 'freshness_guru',
-        title: 'Freshness Guru',
-        description: 'Maintain an excellent Pantry Health Score of 85 or above.',
-        icon: '💎',
-        color: 'from-teal-400 to-emerald-500',
-        targetValue: 85,
-        currentValue: userScore,
-        unit: 'points',
-        tip: 'Keep your items fresh, track expiration dates, and restock regularly.'
-      },
-      {
-        id: 'meal_planner',
-        title: 'Meal Planner',
-        description: 'Schedule at least one meal in your calendar to prepare for the week.',
-        icon: '📅',
-        color: 'from-pink-400 to-rose-500',
-        targetValue: 1,
-        currentValue: hasMealsPlanned ? 1 : 0,
-        unit: 'meals',
-        tip: 'Go to the Plan tab and add any recipe to your breakfast, lunch, or dinner slots.'
-      },
-      {
-        id: 'eco_collaborator',
-        title: 'Eco Collaborator',
-        description: 'Link your pantry with a household member to coordinate shopping and waste.',
-        icon: '🤝',
-        color: 'from-violet-400 to-fuchsia-600',
-        targetValue: 1,
-        currentValue: household ? 1 : 0,
-        unit: 'collaborators',
-        tip: 'Invite a family member or roommate to join your household from Settings!'
-      }
-    ];
-
-    return list.map(badge => {
-      let isUnlocked: boolean;
-      if (badge.id === 'waste_warrior') {
-        isUnlocked = inventory.length >= 5 && expiredCount === 0;
-      } else if (badge.id === 'freshness_guru') {
-        isUnlocked = userScore >= 85 && inventory.length > 0;
-      } else {
-        isUnlocked = badge.currentValue >= badge.targetValue;
-      }
-      return { ...badge, isUnlocked };
-    });
-  }, [inventory.length, expiredCount, savedRecipes.length, uniqueCategoriesCount, userStreak, userScore, hasMealsPlanned, household]);
-
-  const unlockedBadgesCount = useMemo(() => {
-    return achievementsList.filter(a => a.isUnlocked).length;
-  }, [achievementsList]);
-
-  // Log this user's own score, and (if in a household) the household's shared score,
-  // to the shared global leaderboard doc — 1 write each — whenever they change,
-  // debounced so scrolling/rerenders don't spam Firestore.
-  useEffect(() => {
-    if (!optedIn || !user?.id) return;
-    const entry = {
-      name: isAnonymous ? 'Pantry Champ' : leaderboardName,
-      score: userScore,
-      streak: userStreak,
-      badges: unlockedBadgesCount,
-      isHousehold: household !== null,
-      isAnonymous,
-      updatedAt: new Date().toISOString(),
-    };
-    const householdEntry = household ? {
-      name: household.name,
-      score: userScore,
-      streak: userStreak,
-      badges: unlockedBadgesCount,
-      memberCount: (household.members || []).filter(m => m.status === 'active').length,
-      updatedAt: new Date().toISOString(),
-    } : null;
-    const timeout = setTimeout(() => {
-      LeaderboardCacheService.upsertMyEntry(user.id, entry).catch(() => {});
-      setGlobalEntries(prev => ({ ...prev, [user.id]: entry }));
-      if (household?.id && householdEntry) {
-        LeaderboardCacheService.upsertMyHouseholdEntry(household.id, householdEntry).catch(() => {});
-        setGlobalHouseholdEntries(prev => ({ ...prev, [household.id]: householdEntry }));
-      }
-    }, 2000);
-    return () => clearTimeout(timeout);
-  }, [optedIn, user?.id, isAnonymous, leaderboardName, userScore, userStreak, unlockedBadgesCount, household]);
-
-  // Dynamic Leaderboard Rankings
-  const leaderboardData = useMemo((): LeaderboardEntry[] => {
-    // Generate realistic peers with scores centered around the user's performance
-    const basePeers: Omit<LeaderboardEntry, 'rank'>[] = [
-      {
-        name: 'The Greenfield Home',
-        isUser: false,
-        score: 95,
-        streak: 8,
-        badges: 7,
-        isHousehold: true
-      },
-      {
-        name: 'Chef Sarah',
-        isUser: false,
-        score: 91,
-        streak: 5,
-        badges: 6,
-        isHousehold: false
-      },
-      {
-        name: 'ZeroWasteFam',
-        isUser: false,
-        score: 87,
-        streak: 12,
-        badges: 5,
-        isHousehold: true
-      },
-      {
-        name: 'BudgetBites',
-        isUser: false,
-        score: 82,
-        streak: 4,
-        badges: 4,
-        isHousehold: false
-      },
-      {
-        name: 'FreshStart',
-        isUser: false,
-        score: 69,
-        streak: 1,
-        badges: 2,
-        isHousehold: false
-      },
-      {
-        name: 'StaplesOnly',
-        isUser: false,
-        score: 54,
-        streak: 0,
-        badges: 1,
-        isHousehold: false
-      }
-    ];
-
-    // Add user entry (individual view)
-    const userEntry: Omit<LeaderboardEntry, 'rank'> = {
-      name: isAnonymous ? 'Pantry Champ (You)' : `${leaderboardName} (You)`,
-      isUser: true,
-      score: userScore,
-      streak: userStreak,
-      badges: unlockedBadgesCount,
-      isHousehold: false
-    };
-
-    // The current user's household, as its own leaderboard row (household view). Only
-    // present when the user actually belongs to a household.
-    const householdSelfEntry: Omit<LeaderboardEntry, 'rank'> | null = household ? {
-      name: `${household.name} (You)`,
-      isUser: true,
-      score: userScore,
-      streak: userStreak,
-      badges: unlockedBadgesCount,
-      isHousehold: true
-    } : null;
-
-    // Other opted-in households' real scores, read from the shared global leaderboard cache.
-    const globalHouseholdPeerEntries: Omit<LeaderboardEntry, 'rank'>[] = Object.entries(globalHouseholdEntries)
-      .filter(([id]) => id !== household?.id)
-      .map(([, e]) => ({
-        name: e.name,
-        isUser: false,
-        score: e.score,
-        streak: e.streak,
-        badges: e.badges,
-        isHousehold: true,
-        isRealMember: true,
-      }));
-
-    // Real household members share the same pantry (and therefore the same score) as the
-    // current user — streak/badges are device-local and not tracked per-member, so those
-    // are left unknown (null) rather than fabricated.
-    const realMemberEntries: Omit<LeaderboardEntry, 'rank'>[] = (household?.members || [])
-      .filter(m => m.id !== user?.id && m.status === 'active')
-      .map(m => ({
-        name: m.name,
-        isUser: false,
-        score: userScore,
-        streak: null,
-        badges: null,
-        isHousehold: false,
-        isRealMember: true,
-      }));
-
-    // Other opted-in users' real scores, read from the shared global leaderboard cache.
-    // Individual view membership doesn't depend on whether that user also belongs to a
-    // household — every opted-in user gets one row here.
-    const globalPeerEntries: Omit<LeaderboardEntry, 'rank'>[] = Object.entries(globalEntries)
-      .filter(([id]) => id !== user?.id)
-      .map(([, e]) => ({
-        name: e.name,
-        isUser: false,
-        score: e.score,
-        streak: e.streak,
-        badges: e.badges,
-        isHousehold: false,
-        isRealMember: true,
-      }));
-
-    // Simulated filler entries only pad each view while few real opted-in
-    // users/households exist yet, so the leaderboard doesn't look empty early on.
-    const fillerIndividualPeers = basePeers.filter(p => !p.isHousehold);
-    const fillerHouseholdPeers = basePeers.filter(p => p.isHousehold);
-    const fillerPeers = leaderboardType === 'household'
-      ? (globalHouseholdPeerEntries.length >= 3 ? [] : fillerHouseholdPeers.slice(0, 3 - globalHouseholdPeerEntries.length))
-      : (globalPeerEntries.length >= 3 ? [] : fillerIndividualPeers.slice(0, 3 - globalPeerEntries.length));
-
-    const allEntries = leaderboardType === 'household'
-      ? [...fillerPeers, ...globalHouseholdPeerEntries, ...(householdSelfEntry ? [householdSelfEntry] : [])]
-      : [...fillerPeers, ...globalPeerEntries, ...realMemberEntries, userEntry];
-
-    // allEntries is already scoped to the active view (individual vs household) above.
-    let filtered = allEntries;
-
-    // Weekly vs Monthly slight score adjustments for dynamic feeling — only applied to
-    // simulated peers; real entries (the user and real household members) keep their actual data.
-    if (leaderboardTimeframe === 'monthly') {
-      filtered = filtered.map(e => {
-        if (e.isUser || e.isRealMember) return e;
-        return {
-          ...e,
-          score: Math.max(40, Math.min(100, e.score + (e.score % 3 === 0 ? 2 : -2))),
-          streak: (e.streak ?? 0) * 4
-        };
-      });
-    }
-
-    // Sort: Score desc, then streak desc (unknown streaks sort last), then badges desc
-    return filtered
-      .sort((a, b) => {
-        if (b.score !== a.score) return b.score - a.score;
-        if ((b.streak ?? -1) !== (a.streak ?? -1)) return (b.streak ?? -1) - (a.streak ?? -1);
-        return (b.badges ?? -1) - (a.badges ?? -1);
-      })
-      .map((e, index) => ({
-        ...e,
-        rank: index + 1
-      }));
-  }, [userScore, userStreak, unlockedBadgesCount, household, leaderboardType, leaderboardTimeframe, isAnonymous, leaderboardName, user?.id, globalEntries, globalHouseholdEntries]);
-
-  const userRank = useMemo(() => {
-    const entry = leaderboardData.find(e => e.isUser);
-    return entry ? entry.rank : 1;
-  }, [leaderboardData]);
-
-  // Handle Leaderboard Join
-  const handleJoinLeaderboard = (e: React.FormEvent) => {
-    e.preventDefault();
-    localStorage.setItem('pantryLeaderboardOptIn', 'true');
-    localStorage.setItem('pantryLeaderboardName', leaderboardName);
-    localStorage.setItem('pantryLeaderboardAnon', String(isAnonymous));
-    setOptedIn(true);
-  };
-
   return (
     <div className="space-y-6 pb-24 animate-fade-in">
       {/* Dynamic Tab Switcher */}
-      <div className="sticky top-0 z-40 bg-theme-primary py-3 -mx-4 px-4 border-b border-theme/40 shadow-sm md:-mx-8 md:px-8">
+      <div className="sticky top-0 z-10 bg-theme-primary py-3 -mx-4 px-4 border-b border-theme/40 shadow-sm md:-mx-8 md:px-8">
         <div className="flex bg-theme-secondary rounded-xl p-1 border border-theme shadow-sm">
           <button
             onClick={() => setSubTab('recipes')}
@@ -848,195 +168,17 @@ const CommunityComponent: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecip
 
       {/* ────────────────── SUBTAB 1: COMMUNITY RECIPES ────────────────── */}
       {subTab === 'recipes' && (
-        <>
-          {(isLoadingRatings || localLoading) && (
-            <div className="text-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--accent-color)] mx-auto mb-4"></div>
-              <p className="text-theme-secondary opacity-70">Loading community ratings…</p>
-            </div>
-          )}
-          <div className="text-center mb-2">
-            <h2 className="text-3xl font-serif font-bold text-theme-secondary">Community Favorites</h2>
-            <p className="text-theme-secondary opacity-60 text-sm mt-1">Top rated recipes by our users</p>
-          </div>
-
-          <div className="space-y-4">
-            {sortedRecipes.length === 0 ? (
-              <div className="text-center py-12">
-                <Star className="w-16 h-16 text-amber-500/30 mx-auto mb-4" />
-                <h3 className="text-lg font-bold text-theme-secondary mb-2">No Community Ratings Yet</h3>
-                <p className="text-theme-secondary opacity-60 text-sm mb-4">
-                  Be the first to rate a recipe! Save and rate recipes to see them here.
-                </p>
-                <p className="text-sm text-theme-secondary opacity-70 mb-4">
-                  Start by opening Chef and rating one of your saved recipes.
-                </p>
-                <button
-                  onClick={() => setActiveTab(Tab.RECIPES)}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--accent-color)] text-white text-sm font-semibold hover:opacity-90 transition-opacity"
-                >
-                  <UtensilsCrossed className="w-4 h-4" />
-                  Find &amp; Rate Recipes
-                </button>
-              </div>
-            ) : (
-              <>
-                {(showAll ? sortedRecipes : sortedRecipes.slice(0, 5)).map((stat) => {
-                  const avg = (stat.totalRating / stat.count).toFixed(1);
-                  const latestComment = stat.comments && stat.comments[0] ? stat.comments[0] : null;
-                  const fullRecipe = findRecipeForStat(stat);
-                  
-                  return (
-                    <div 
-                      key={stat.title} 
-                      className="bg-theme-secondary rounded-xl border border-theme shadow-lg overflow-hidden group hover:shadow-xl transition-all cursor-pointer"
-                      onClick={() => { setSelectedRecipe(stat); setShowModal(true); }}
-                      role="button"
-                      tabIndex={0}
-                      aria-label={`Open community ratings for ${stat.title}`}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault();
-                          setSelectedRecipe(stat);
-                          setShowModal(true);
-                        }
-                      }}
-                    >
-                      {/* Recipe Image Header */}
-                      <div className="h-32 bg-gray-200 relative overflow-hidden">
-                        {fullRecipe?.image ? (
-                          <img
-                            src={fullRecipe?.image}
-                            alt={stat.title}
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement;
-                              if (target) {
-                                target.style.display = 'none';
-                                const fallback = target.parentElement?.querySelector('.fallback-text') as HTMLElement;
-                                if (fallback) fallback.style.display = 'flex';
-                              }
-                            }}
-                          />
-                        ) : null}
-                        <div className={`absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-amber-500/10 via-theme-primary to-orange-500/5 dark:from-amber-500/5 dark:to-orange-500/5 ${fullRecipe?.image ? 'hidden fallback-text' : ''}`}>
-                          <div className="w-12 h-12 rounded-full bg-white/50 dark:bg-black/20 shadow-sm flex items-center justify-center mb-2 backdrop-blur-sm border border-white/20 dark:border-white/5">
-                            <UtensilsCrossed className="w-6 h-6 text-amber-600/60 dark:text-amber-400/50" />
-                          </div>
-                          <span className="font-serif text-amber-700/60 dark:text-amber-300/50 font-medium tracking-wide text-xs px-4 text-center line-clamp-1">{stat.title || 'Recipe'}</span>
-                        </div>
-                        <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black/80 to-transparent p-4">
-                          <h3 className="text-white font-bold font-serif text-lg leading-tight">{stat.title}</h3>
-                        </div>
-                      </div>
-                      
-                      <div className="p-4">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center gap-1 bg-amber-100 dark:bg-amber-900/30 px-2 py-1 rounded text-amber-600 dark:text-amber-400">
-                            <Star className="w-4 h-4 fill-current" />
-                            <span className="font-bold text-sm">{avg}</span>
-                            <span className="text-xs opacity-70">({stat.count})</span>
-                          </div>
-                        </div>
-
-                        {latestComment && (
-                          <div className="bg-theme-primary p-3 rounded-lg mb-4 border border-theme">
-                            <div className="flex items-center gap-2 mb-1">
-                              <div className="w-4 h-4 rounded-full bg-[var(--accent-color)] text-[8px] text-white flex items-center justify-center">
-                                {(latestComment && latestComment.userName) ? String(latestComment.userName).charAt(0) : '?'}
-                              </div>
-                              <span className="text-sm font-bold text-theme-secondary opacity-80">{latestComment.userName}</span>
-                            </div>
-                            <p className="text-sm text-theme-secondary italic line-clamp-2">"{latestComment.comment}"</p>
-                          </div>
-                        )}
-                        
-                        {/* Quick inline star rating */}
-                        <div className="flex items-center gap-1 mb-3" onClick={(e) => e.stopPropagation()}>
-                          <span className="text-sm text-theme-secondary opacity-60 mr-1">Rate:</span>
-                          {[1, 2, 3, 4, 5].map((star) => (
-                            <button
-                              key={star}
-                              aria-label={`Rate ${star} star${star !== 1 ? 's' : ''}`}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onRateRecipe({
-                                  id: Date.now().toString(),
-                                  recipeTitle: stat.title,
-                                  rating: star,
-                                  comment: '',
-                                  userName: user?.name || 'User',
-                                  userAvatar: user?.avatar,
-                                  recipe: fullRecipe ?? undefined
-                                });
-                              }}
-                              className="text-amber-400 hover:text-amber-500 transition-colors"
-                            >
-                              <Star className="w-4 h-4 fill-current" />
-                            </button>
-                          ))}
-                        </div>
-
-                        <div className="flex gap-2">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (fullRecipe) {
-                                onAddToPlan(fullRecipe);
-                              } else {
-                                const mockRecipe: StructuredRecipe = {
-                                  title: stat.title,
-                                  description: 'Community favorite',
-                                  ingredients: ['Full recipe not available in this rating. Please save it first.'],
-                                  instructions: ['Full recipe not available in this rating. Please save it first.'],
-                                  cookTime: 'N/A'
-                                };
-                                onAddToPlan(mockRecipe);
-                              }
-                            }}
-                            className="flex-1 py-2 bg-[var(--accent-color)]/10 text-[var(--accent-color)] font-bold text-xs uppercase tracking-wider rounded-lg hover:bg-[var(--accent-color)] hover:text-white transition-all flex items-center justify-center gap-2"
-                          >
-                            <Plus className="w-4 h-4" /> Add to Schedule
-                          </button>
-
-                          {onSaveRecipe && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (fullRecipe) {
-                                  onSaveRecipe(sanitizeRecipeForSave(fullRecipe));
-                                } else {
-                                  const mockRecipe: StructuredRecipe = {
-                                    title: stat.title,
-                                    description: 'Community favorite',
-                                    ingredients: ['Full recipe not available in this rating. Please save it first.'],
-                                    instructions: ['Full recipe not available in this rating. Please save it first.'],
-                                    cookTime: 'N/A'
-                                  };
-                                  onSaveRecipe(sanitizeRecipeForSave(mockRecipe));
-                                }
-                              }}
-                              className="py-2 px-3 bg-theme-primary border border-theme rounded-lg text-sm font-semibold hover:bg-theme-secondary transition-colors"
-                            >
-                              Save
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-                {sortedRecipes.length > 5 && (
-                  <div className="flex justify-center mt-4">
-                    <button onClick={() => setShowAll(prev => !prev)} className="px-4 py-2 rounded bg-[var(--accent-color)] text-white text-sm font-bold shadow hover:opacity-90 transition-opacity">
-                      {showAll ? 'Show Less' : `Show More (${sortedRecipes.length - 5})`}
-                    </button>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        </>
+        <CommunityRecipesFeed
+          isLoadingRatings={isLoadingRatings}
+          localLoading={localLoading}
+          sortedRecipes={sortedRecipes}
+          onOpenRecipeDetail={(stat) => { setSelectedRecipe(stat); setShowModal(true); }}
+          onAddToPlan={onAddToPlan}
+          onSaveRecipe={onSaveRecipe}
+          onRateRecipe={onRateRecipe}
+          user={user}
+          setActiveTab={setActiveTab}
+        />
       )}
 
       {/* ────────────────── SUBTAB 2: PANTRY SCORE LEADERBOARD ────────────────── */}
@@ -1597,7 +739,7 @@ const CommunityComponent: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecip
                       }).catch(err => log.info('User cancelled sharing or sharing failed', { error: err }));
                     } else {
                       navigator.clipboard.writeText(`I just earned the ${selectedBadge.title} badge on Stock & Spoon! My pantry score is ${userScore}/100. Can you beat me?`);
-                      alert('Share text copied to clipboard!');
+                      toast.success('Share text copied to clipboard!');
                     }
                   }}
                   className="w-full py-3 bg-[var(--accent-color)] hover:bg-[var(--accent-color)]/90 text-white font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"

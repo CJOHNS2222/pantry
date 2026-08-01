@@ -99,7 +99,7 @@ interface ParsedInventoryItem {
 
 // Mirrors InventoryCacheService.arrayToPantryItem's field order (services/inventoryCacheService.ts)
 function parseInventoryItem(itemId: string, arr: string[]): ParsedInventoryItem {
-  let batches: Array<{ expires?: string }> = [];
+  let batches: Array<{ expires?: string }>;
   try {
     batches = arr[12] ? JSON.parse(arr[12]) : [];
   } catch {

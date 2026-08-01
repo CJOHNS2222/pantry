@@ -21,8 +21,15 @@ android {
     compileSdk libs.versions.compileSdk.get().toInteger()
     defaultConfig {
         applicationId "com.smart.pantry"
-        minSdk 24
-        targetSdk 36
+        // minSdk/targetSdk come from android/variables.gradle (rootProject.ext) — the same
+        // source every Capacitor plugin under node_modules/@capacitor/*/android/build.gradle
+        // reads its own minSdk/targetSdk/compileSdk from, so the app module and plugin
+        // modules can't drift apart (F50). compileSdk above intentionally comes from the
+        // gradle/libs.versions.toml version catalog instead — TOML catalogs can't reference
+        // Groovy `ext` properties, so keep variables.gradle's compileSdkVersion numerically
+        // in sync with libs.versions.toml's `compileSdk` by hand.
+        minSdk rootProject.ext.minSdkVersion
+        targetSdk rootProject.ext.targetSdkVersion
         versionCode 108
         versionName "3.0.15"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"

@@ -61,44 +61,45 @@ interface AppActionsProviderProps {
   value?: AppActionsContextValue;
 }
 
-const noop = () => {};
-
-/* eslint-disable @typescript-eslint/no-explicit-any */
+// Inert defaults used only before a real AppActionsProvider value is supplied (e.g. in
+// tests/storybook-style rendering). Each stub is written against its real parameter/return
+// type instead of casting a shared `noop` through `any` (F39) — TS structurally allows a
+// zero-arg `() => {}` / `async () => {}` to satisfy a function type with more parameters,
+// so no `any` is needed here at all.
 const defaultAppActionsContextValue: AppActionsContextValue = {
-  setActiveTab: noop as any,
+  setActiveTab: () => {},
   updateItem: async () => {},
   deleteItem: async () => {},
   deleteItems: async () => {},
   addItem: async () => {},
   addItems: async () => {},
-  setInventory: noop as any,
-  setShoppingList: noop as any,
-  setMealPlan: noop as any,
-  updateMealPlan: noop as any,
-  onAddToPlan: noop as any,
-  onSaveRecipe: noop as any,
-  onDeleteRecipe: noop as any,
-  onRateRecipe: noop as any,
-  handleMarkAsMade: noop as any,
-  onMoveToPantry: noop as any,
-  onAddToShoppingList: noop as any,
-  addShoppingListItem: noop as any,
-  setSettings: noop as any,
-  onAddCustomCategory: noop as any,
-  onUpdateCustomCategory: noop as any,
-  onDeleteCustomCategory: noop as any,
-  setActiveSettingsCategory: noop as any,
-  addToast: noop as any,
-  setInitialSearchQuery: noop as any,
-  setPersistedRecipeResult: noop as any,
-  onLogout: noop as any,
-  onShowHousehold: noop as any,
+  setInventory: () => {},
+  setShoppingList: () => {},
+  setMealPlan: () => {},
+  updateMealPlan: () => {},
+  onAddToPlan: () => {},
+  onSaveRecipe: () => {},
+  onDeleteRecipe: () => {},
+  onRateRecipe: () => {},
+  handleMarkAsMade: () => {},
+  onMoveToPantry: () => {},
+  onAddToShoppingList: async () => {},
+  addShoppingListItem: () => {},
+  setSettings: () => {},
+  onAddCustomCategory: () => {},
+  onUpdateCustomCategory: () => {},
+  onDeleteCustomCategory: () => {},
+  setActiveSettingsCategory: () => {},
+  addToast: () => {},
+  setInitialSearchQuery: () => {},
+  setPersistedRecipeResult: () => {},
+  onLogout: () => {},
+  onShowHousehold: () => {},
   checkRecipeSaveLimit: async () => false,
   checkMealPlanLimit: async () => false,
   refreshAllData: async () => {},
   onReplayOnboarding: () => {},
 };
-/* eslint-enable @typescript-eslint/no-explicit-any */
 
 export const AppActionsProvider: React.FC<AppActionsProviderProps> = ({ children, value }) => {
   const providerValue = value ?? defaultAppActionsContextValue;

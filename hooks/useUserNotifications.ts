@@ -1,8 +1,8 @@
 import { useEffect, useState, useRef } from 'react';
-import { listenToUserNotifications, NotificationItem } from '../services/notificationsService';
+import { listenToUserNotifications, NotificationCacheItem } from '../services/notificationsService';
 
 export function useUserNotifications(uid?: string, throttleMs = 1000) {
-  const [items, setItems] = useState<NotificationItem[]>([]);
+  const [items, setItems] = useState<NotificationCacheItem[]>([]);
   const unsubRef = useRef<() => void | null>(null);
 
   useEffect(() => {

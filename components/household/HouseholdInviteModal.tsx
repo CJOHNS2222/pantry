@@ -2,16 +2,16 @@ import React, { useState } from 'react';
 import { Users, Check, X, Bell } from 'lucide-react';
 import { useModalOpen } from '../../utils/useModalOpen';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
-import { NotificationItem } from '../../services/notificationService';
+import { AppNotification } from '../../services/notificationService';
 import { User } from '../../types';
 import { log } from '../../services/logService';
 
 interface HouseholdInviteModalProps {
-  invites: NotificationItem[];
+  invites: AppNotification[];
   user: User;
   onClose: () => void;
-  onAccept: (invite: NotificationItem) => Promise<void>;
-  onDecline: (invite: NotificationItem) => Promise<void>;
+  onAccept: (invite: AppNotification) => Promise<void>;
+  onDecline: (invite: AppNotification) => Promise<void>;
 }
 
 export const HouseholdInviteModal: React.FC<HouseholdInviteModalProps> = ({
@@ -25,7 +25,7 @@ export const HouseholdInviteModal: React.FC<HouseholdInviteModalProps> = ({
   const [processing, setProcessing] = useState<string | null>(null);
   const modalRef = useFocusTrap({ isActive: invites.length > 0, onEscape: onClose });
 
-  const handleAccept = async (invite: NotificationItem) => {
+  const handleAccept = async (invite: AppNotification) => {
     setProcessing(invite.id);
     try {
       await onAccept(invite);
@@ -36,7 +36,7 @@ export const HouseholdInviteModal: React.FC<HouseholdInviteModalProps> = ({
     }
   };
 
-  const handleDecline = async (invite: NotificationItem) => {
+  const handleDecline = async (invite: AppNotification) => {
     setProcessing(invite.id);
     try {
       await onDecline(invite);

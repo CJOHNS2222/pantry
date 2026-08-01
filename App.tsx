@@ -26,7 +26,7 @@ import { isHouseholdMember, inferCategoryFromItemName, inferStorageLocationFromI
 import { getUserMeasurementSystem, convertIngredientString } from './utils/measurementUtils';
 import { getQuantityAmount } from './utils/quantityUtils';
 import { NotificationBanner } from './components/ui/NotificationBanner';
-import { NotificationService, NotificationItem, NotificationSettings } from './services/notificationService';
+import { NotificationService, AppNotification, NotificationSettings } from './services/notificationService';
 import { markNotificationRead, deleteNotification, snoozeNotificationInCache, updateNotificationInCache } from './services/notificationsService';
 import { log } from './services/logService';
 import { initCurrency } from './services/currencyService';
@@ -153,7 +153,7 @@ const App: React.FC = () => {
   const [pendingRecipeForPlan, setPendingRecipeForPlan] = useState<StructuredRecipe | null>(null);
   const [selectedDayForPlan, setSelectedDayForPlan] = useState<number | null>(null);
   const [selectedMealForPlan, setSelectedMealForPlan] = useState<'breakfast' | 'lunch' | 'dinner' | null>(null);
-  const [householdInvites, setHouseholdInvites] = useState<NotificationItem[]>([]);
+  const [householdInvites, setHouseholdInvites] = useState<AppNotification[]>([]);
   const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>({
     enabled: true,
     quietHours: {
@@ -842,7 +842,7 @@ const App: React.FC = () => {
     }
   };
 
-  const handleNotificationAction = async (notification: NotificationItem) => {
+  const handleNotificationAction = async (notification: AppNotification) => {
     try {
       if (user && user.id) {
         try {
@@ -952,7 +952,7 @@ const App: React.FC = () => {
     }
   };
 
-  const handleHouseholdInviteAccept = async (invite: NotificationItem) => {
+  const handleHouseholdInviteAccept = async (invite: AppNotification) => {
     if (!user) return;
 
     try {
@@ -995,7 +995,7 @@ const App: React.FC = () => {
     }
   };
 
-  const handleHouseholdInviteDecline = async (invite: NotificationItem) => {
+  const handleHouseholdInviteDecline = async (invite: AppNotification) => {
     if (!user) return;
 
     try {
@@ -1590,7 +1590,7 @@ const App: React.FC = () => {
   return (
     <SubscriptionProvider user={user}>
       <ErrorBoundary>
-        <div className="h-screen flex flex-col max-w-md mx-auto shadow-2xl relative border-x border-theme transition-colors duration-300 overflow-x-hidden">
+        <div className="h-screen flex flex-col max-w-md md:max-w-lg lg:max-w-2xl mx-auto shadow-2xl relative border-x border-theme transition-colors duration-300 overflow-x-hidden">
         {showHousehold && (
           <Suspense fallback={null}>
             <HouseholdManager
@@ -1810,7 +1810,7 @@ const App: React.FC = () => {
         {/* Persistent household invite banner — stays visible until acted on */}
         {householdInvites.length > 0 && !showHouseholdInviteModal && (
           <div
-            className="sticky top-[calc(var(--safe-area-top,0px)+56px)] z-10 mx-auto max-w-md px-3 pt-1"
+            className="sticky top-[calc(var(--safe-area-top,0px)+56px)] z-10 mx-auto max-w-md md:max-w-lg lg:max-w-2xl px-3 pt-1"
           >
             <button
               onClick={() => setShowHouseholdInviteModal(true)}

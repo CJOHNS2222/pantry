@@ -1,8 +1,22 @@
 import { analytics } from '../firebaseConfig';
-import { logEvent, setUserProperties, setUserId } from 'firebase/analytics';
 import { log } from './logService';
 import { FirebaseAnalytics } from '@capacitor-firebase/analytics';
 import { Capacitor } from '@capacitor/core';
+
+// `firebase/analytics` is dynamically imported here (instead of a static import) so this
+// service doesn't pull it back into the eager bundle regardless of firebaseConfig.ts's own
+// dynamic import (perf audit F35) - this service is reachable from hooks/useAuth.ts, which
+// loads at app boot. Vite/Rollup dedupe both dynamic import('firebase/analytics') calls to
+// the same lazily-loaded chunk, so this doesn't fetch the module twice.
+type AnalyticsFns = typeof import('firebase/analytics');
+let analyticsFns: AnalyticsFns | undefined;
+if (typeof window !== 'undefined') {
+  import('firebase/analytics').then(mod => {
+    analyticsFns = mod;
+  }).catch(err => {
+    log.debug('firebase/analytics module failed to load', { err });
+  });
+}
 
 // Analytics service for tracking user interactions and app performance
 class AnalyticsService {
@@ -37,10 +51,10 @@ class AnalyticsService {
         });
       }
     } else {
-      if (analytics) {
-        setUserId(analytics, userId);
+      if (analytics && analyticsFns) {
+        analyticsFns.setUserId(analytics, userId);
         if (properties) {
-          setUserProperties(analytics, properties);
+          analyticsFns.setUserProperties(analytics, properties);
         }
       }
     }
@@ -52,8 +66,8 @@ class AnalyticsService {
         Object.entries(properties).forEach(([key, value]) => {
           FirebaseAnalytics.setUserProperty({ key, value: String(value) });
         });
-      } else if (analytics) {
-        setUserProperties(analytics, properties);
+      } else if (analytics && analyticsFns) {
+        analyticsFns.setUserProperties(analytics, properties);
       }
     }
   }
@@ -504,8 +518,8 @@ class AnalyticsService {
           name: eventName,
           params: cleanParams
         });
-      } else if (analytics) {
-        logEvent(analytics, eventName, cleanParams);
+      } else if (analytics && analyticsFns) {
+        analyticsFns.logEvent(analytics, eventName, cleanParams);
       }
     } catch (err: any) {
       log.warn('Analytics event failed', { err });

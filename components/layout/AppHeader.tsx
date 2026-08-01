@@ -7,7 +7,7 @@ import { SyncIndicator } from '../ui/SyncIndicator';
 import { OnlineIndicator } from '../ui/OnlineIndicator';
 import { SyncStatus } from '../../hooks/useOfflineStatus';
 import useUserNotifications from '../../hooks/useUserNotifications';
-import { markAllNotificationsRead, markNotificationRead, deleteNotification, NotificationItem } from '../../services/notificationsService';
+import { markAllNotificationsRead, markNotificationRead, deleteNotification, NotificationCacheItem } from '../../services/notificationsService';
 import { AppSettings } from '../../hooks/useSettings';
 import { UndoAction } from '../../services/undoService';
 
@@ -22,7 +22,7 @@ interface AppHeaderProps {
   syncStatus: SyncStatus;
   onSyncClick?: () => void;
   onNavigateToSettings?: () => void;
-  onNotificationAction?: (notification: NotificationItem) => void;
+  onNotificationAction?: (notification: NotificationCacheItem) => void;
   recentActivities?: HouseholdActivity[];
   isLoadingActivities?: boolean;
 }
@@ -181,7 +181,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
     swipeLocked.current = null;
   };
 
-  const handleNotifActionClick = (e: React.MouseEvent, n: NotificationItem) => {
+  const handleNotifActionClick = (e: React.MouseEvent, n: NotificationCacheItem) => {
     e.stopPropagation();
     closeNotifications();
     onNotificationAction?.(n);
@@ -330,7 +330,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 
   return (
     <header 
-      className="bg-theme-secondary p-3 fixed top-0 left-0 right-0 max-w-md mx-auto z-20 shadow-md border-b border-theme transition-colors duration-300"
+      className="bg-theme-secondary p-3 fixed top-0 left-0 right-0 max-w-md mx-auto z-30 shadow-md border-b border-theme transition-colors duration-300"
       style={{ paddingTop: 'max(12px, env(safe-area-inset-top))' }}
       role="banner"
     >
@@ -403,7 +403,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                       </div>
                     </div>
                     <div className="space-y-1.5">
-                      {(items || []).filter(n => !n.read).slice().reverse().slice(0, visibleNotifCount).map((n: NotificationItem) => {
+                      {(items || []).filter(n => !n.read).slice().reverse().slice(0, visibleNotifCount).map((n: NotificationCacheItem) => {
                         const isExpanded = expandedNotifId === n.id;
                         const bodyText = n.message || n.body;
                         const isSwiping = swipingId === n.id;

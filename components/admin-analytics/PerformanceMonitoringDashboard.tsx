@@ -192,7 +192,7 @@ const PerformanceMonitoringDashboard: React.FC<PerformanceMonitoringDashboardPro
     return (
       <button
         onClick={() => setIsVisible(true)}
-        className="fixed bottom-20 right-4 bg-purple-600 text-white px-4 py-2 rounded-lg shadow-lg hover:bg-purple-700 transition-colors z-50"
+        className="fixed bottom-20 right-4 bg-purple-600 text-white px-4 py-2 rounded-lg shadow-lg hover:bg-purple-700 transition-colors z-20"
       >
         📊 Performance
       </button>

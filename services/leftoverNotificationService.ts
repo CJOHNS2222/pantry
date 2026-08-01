@@ -1,5 +1,5 @@
 import { LeftoverService } from './leftoverService'
-import { NotificationService, NotificationItem } from './notificationService'
+import { NotificationService, AppNotification } from './notificationService'
 import { pruneNotificationsForDeletedItems } from './notificationsService'
 import AnalyticsService from './analyticsService'
 import { log } from './logService'
@@ -51,7 +51,7 @@ export class LeftoverNotificationService {
       // Filter unread notifications from the last 30 days
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      const cachedNotifications: NotificationItem[] = allNotifications.filter((n: any) => {
+      const cachedNotifications: AppNotification[] = allNotifications.filter((n: any) => {
         if (n.read) return false;
         let createdAt: Date | null = null;
         if (n.createdAt) {

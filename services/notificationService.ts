@@ -10,7 +10,18 @@ import { appendNotificationToUser, snoozeNotificationInCache, updateNotification
 import { formatDangerSummary, DangerItem } from './notificationHelpers';
 import { getFoodRiskLevel, generateExpirationMessage, getNotificationTone, generateNotificationStackMessage, generateWasteNotificationMessage } from '../utils/foodRiskClassification';
 
-export interface NotificationItem {
+/**
+ * A fully-formed, business-logic notification record produced by
+ * `NotificationService` (expiration alerts, recipe suggestions, household
+ * activity, etc.) — the shape surfaced to in-app notification UI
+ * (PendingNotifications, NotificationBanner, invite prompts). Distinct from
+ * `NotificationCacheItem` in `notificationsService.ts`, which is the generic
+ * shape of whatever is actually stored in the per-user Firestore cache
+ * document (a superset, since it also accepts entries written without going
+ * through this service). Renamed (F38) from a same-named type that used to
+ * collide with the one in `notificationsService.ts`.
+ */
+export interface AppNotification {
   id: string;
   userId: string;
   type: 'expiration' | 'recipe_suggestion' | 'household_activity' | 'shopping_reminder' | 'system' | 'allergy_alert' | 'household_invite';
@@ -54,7 +65,7 @@ export class NotificationService {
    */
   static async createNotification(
     userId: string,
-    notification: Omit<NotificationItem, 'id' | 'userId' | 'read' | 'createdAt'>
+    notification: Omit<AppNotification, 'id' | 'userId' | 'read' | 'createdAt'>
   ): Promise<string> {
     // Use per-user cached notifications to reduce reads/writes
     const id = crypto.randomUUID();
@@ -224,7 +235,7 @@ export class NotificationService {
     itemId: string,
     userRiskLevel?: number,
     itemCategory?: string,
-    cachedNotifications?: NotificationItem[]
+    cachedNotifications?: AppNotification[]
   ): Promise<string> {
     // Check if notification already exists for this item
     const existingNotifications = cachedNotifications ?? await NotificationService.getUnreadNotifications(userId);
@@ -483,7 +494,7 @@ export class NotificationService {
   /**
    * Get unread notifications for user
    */
-  static async getUnreadNotifications(userId: string, _userEmail?: string): Promise<NotificationItem[]> {
+  static async getUnreadNotifications(userId: string, _userEmail?: string): Promise<AppNotification[]> {
     try {
       // Read from per-user cache document instead of querying root collection
       const cacheRef = DatabaseMonitoringService.doc(`users/${userId}/cache/notifications`);
@@ -500,7 +511,7 @@ export class NotificationService {
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-      const unreadNotifications = allNotifications.filter((n: NotificationItem) => {
+      const unreadNotifications = allNotifications.filter((n: AppNotification) => {
         if (n.read) return false;
 
         // Check if notification is within 30 days
@@ -518,8 +529,8 @@ export class NotificationService {
       });
 
       // Sort by createdAt desc and limit to 20
-      const sorted = unreadNotifications.slice().sort((a: NotificationItem, b: NotificationItem) => {
-        const getTime = (n: NotificationItem): number => {
+      const sorted = unreadNotifications.slice().sort((a: AppNotification, b: AppNotification) => {
+        const getTime = (n: AppNotification): number => {
           if (!n.createdAt) return 0;
           if (typeof n.createdAt === 'string') {
             return new Date(n.createdAt).getTime();
@@ -568,12 +579,12 @@ export class NotificationService {
             createdAt = raw.createdAt.toDate().toISOString();
           }
         }
-        const migrated: NotificationItem = {
+        const migrated: AppNotification = {
           ...raw,
           id: d.id,
           userId, // rewrite to actual UID
           createdAt,
-        } as NotificationItem;
+        } as AppNotification;
 
         await appendNotificationToUser(userId, migrated);
         // Delete the root doc so it isn't processed again
@@ -612,7 +623,7 @@ export class NotificationService {
    * Check if notification should be shown based on user settings and timing
    */
   static shouldShowNotification(
-    notification: NotificationItem,
+    notification: AppNotification,
     settings: NotificationSettings
   ): boolean {
     // Check if notifications are enabled
@@ -709,7 +720,7 @@ export class NotificationService {
 
       // Filter out notifications older than 30 days
       const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-      const recentNotifications = allNotifications.filter((n: NotificationItem) => {
+      const recentNotifications = allNotifications.filter((n: AppNotification) => {
         let createdAt: Date | null = null;
         if (n.createdAt) {
           if (typeof n.createdAt === 'string') {
@@ -747,7 +758,7 @@ export class NotificationService {
       const allNotifications = Array.isArray(data.items) ? data.items : [];
 
       // Filter out daily pantry check notifications
-      const filteredNotifications = allNotifications.filter((n: NotificationItem) => {
+      const filteredNotifications = allNotifications.filter((n: AppNotification) => {
         return !(n.type === 'system' && n.title === 'Daily Pantry Check');
       });
 
@@ -769,7 +780,7 @@ export class NotificationService {
     daysUntilExpiry: number,
     leftoverId: string,
     isCookedRice: boolean = false,
-    cachedNotifications?: NotificationItem[]
+    cachedNotifications?: AppNotification[]
   ): Promise<string> {
     const existingNotifications = cachedNotifications ?? await NotificationService.getUnreadNotifications(userId);
     const existingNotification = existingNotifications.find(n =>
@@ -849,7 +860,7 @@ export class NotificationService {
   static async createLeftoverAttentionAlert(
     userId: string,
     urgentLeftovers: Array<{ id: string; name: string; daysUntilExpiry: number; isCookedRice: boolean }>,
-    cachedNotifications?: NotificationItem[]
+    cachedNotifications?: AppNotification[]
   ): Promise<string> {
     if (!urgentLeftovers || urgentLeftovers.length === 0) return ''
 

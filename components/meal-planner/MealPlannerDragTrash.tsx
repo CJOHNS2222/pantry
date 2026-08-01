@@ -22,7 +22,7 @@ export const MealPlannerDragTrash: React.FC<MealPlannerDragTrashProps> = ({
 
   return (
     <div
-      className={`fixed bottom-24 right-4 z-50 w-16 h-16 rounded-full border-2 border-dashed flex items-center justify-center transition-all duration-200 ${
+      className={`fixed bottom-24 right-4 z-20 w-16 h-16 rounded-full border-2 border-dashed flex items-center justify-center transition-all duration-200 ${
         dragOverTrash
           ? 'border-red-500 bg-red-500/10 shadow-lg scale-110'
           : 'border-red-400 bg-red-400/5'

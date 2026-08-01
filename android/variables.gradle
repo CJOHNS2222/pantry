@@ -1,3 +1,14 @@
+// Authoritative source for Android SDK levels + androidx versions consumed via
+// `rootProject.ext.*` by every Capacitor plugin under
+// node_modules/@capacitor/*/android/build.gradle (their build.gradle files are
+// third-party/generated — not something we can point at gradle/libs.versions.toml
+// instead) AND by android/app/build.gradle's minSdk/targetSdk (F50).
+//
+// compileSdkVersion here must be kept numerically in sync by hand with `compileSdk` in
+// gradle/libs.versions.toml — the app module reads compileSdk from the version catalog
+// (the modern Gradle pattern), but TOML catalogs can't reference these Groovy `ext`
+// properties, so the two can't be mechanically unified without patching third-party
+// plugin build.gradle files.
 ext {
     minSdkVersion = 24
     compileSdkVersion = 36

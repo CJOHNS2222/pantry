@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { Bell, X, Clock, Settings } from 'lucide-react';
-import { NotificationItem } from '../../services/notificationService';
+import { AppNotification } from '../../services/notificationService';
 
 interface NotificationBannerProps {
-  notification: NotificationItem;
+  notification: AppNotification;
   onDismiss: (notificationId: string) => void;
-  onAction: (notification: NotificationItem) => void;
+  onAction: (notification: AppNotification) => void;
   onSnooze: (notificationId: string, minutes: number) => void;
 }
 

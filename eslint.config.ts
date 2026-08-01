@@ -39,6 +39,16 @@ export default defineConfig([
         "destructuredArrayIgnorePattern": "^_"
       }],
       "@typescript-eslint/no-explicit-any": "error",
+      "no-restricted-syntax": [
+        "error",
+        {
+          // Scoped to `alert(...)` only (not `confirm`/`prompt`, which `no-alert` would
+          // also ban and which have pre-existing, out-of-scope call sites elsewhere) —
+          // use useToast/ConfirmDialog instead. See .claude/audits/FIXES.md F44.
+          selector: "CallExpression[callee.name='alert']",
+          message: "Use useToast()/ConfirmDialog instead of native alert().",
+        },
+      ],
       "react/no-unescaped-entities": "off", // Disable quote escaping warnings
       "react/prop-types": "off", // TypeScript handles prop validation
       "@typescript-eslint/no-require-imports": "off", // Allow require in scripts

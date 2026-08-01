@@ -16,6 +16,9 @@ vi.mock('../../../firebaseConfig', () => ({
   analytics: {},
   performance: {},
   functions: {},
+  // getCallableFunction replaced the static `functions` + `httpsCallable` import pattern
+  // (perf audit F35 — lazy-loads firebase/functions instead of eagerly bundling it).
+  getCallableFunction: (name: string) => mockHttpsCallable({}, name),
 }));
 
 import {

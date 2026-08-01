@@ -33,6 +33,16 @@ old-service-account.json
 *.enc
 
 # Firebase configuration
+# NOTE (F50, .claude/audits/FIXES.md): google-services.json is intentionally left
+# untracked here, unlike the equivalent web config (VITE_firebaseConfig.ts, which IS
+# committed — Firebase web/Android client config isn't a secret by itself; access is
+# enforced by Firestore rules/App Check, not by hiding these values). It's kept out of
+# git specifically because it's generated per-developer from the Firebase console and
+# tends to drift/duplicate across local setups; committing a stale or wrong one silently
+# breaks `google-services` plugin builds for everyone else. Any dev building android/
+# must download their own copy from the Firebase console (Project settings > Android
+# app) and drop it at android/app/google-services.json before `./gradlew assembleDebug`
+# / `npx cap run android` will work.
 google-services.json
 android/app/google-services.json
 

@@ -8,8 +8,7 @@ import {
   arrayUnion,
   serverTimestamp,
 } from 'firebase/firestore';
-import { httpsCallable } from 'firebase/functions';
-import { functions } from '../firebaseConfig';
+import { getCallableFunction } from '../firebaseConfig';
 import { Household, Member, User } from '../types';
 import { getPerformance, trace } from "firebase/performance";
 import { log } from './logService';
@@ -276,7 +275,7 @@ export const joinHousehold = async (
   perfTrace.start();
 
   try {
-    const acceptInvitationFn = httpsCallable(functions, 'acceptInvitation');
+    const acceptInvitationFn = await getCallableFunction('acceptInvitation');
     const response = await acceptInvitationFn({ householdId });
     const data = response.data as { success: boolean; household: Household } | undefined;
 

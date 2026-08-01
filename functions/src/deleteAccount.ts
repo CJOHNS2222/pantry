@@ -91,7 +91,7 @@ export const deleteAccount = onCall({ enforceAppCheck: true }, async (request) =
   }
 
   // 3. Delete the user document itself
-  await userRef.delete().catch((_) => { /* Non-fatal: ignore deletion errors */ });
+  await userRef.delete().catch(() => { /* Non-fatal: ignore deletion errors */ });
 
   // 3b. Checkpoint: Firestore data is gone at this point, but the Auth record
   // isn't yet. Record that fact so a failure right after this line doesn't

@@ -2092,7 +2092,7 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
           }
         }}
         data-testid="pantry-add-button"
-        className={`fixed bottom-28 right-6 z-50 bg-[var(--accent-color)] text-white p-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:ring-offset-2 ${
+        className={`fixed bottom-28 right-6 z-20 bg-[var(--accent-color)] text-white p-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:ring-offset-2 ${
           shouldGlowAddButton ? 'tutorial-glow' : ''
         }`}
         style={{ bottom: 'calc(7rem + 15px)' }}

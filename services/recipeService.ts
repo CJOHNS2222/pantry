@@ -993,7 +993,34 @@ export const rebuildCachedPopularRecipesFromRatings = async (days: number = 30, 
  * Search recipes in Firestore
  */
 const SEARCH_INDEX_SCAN_LIMIT = 1000;
+const SEARCH_TOKENS_QUERY_LIMIT = 50;
 const RECIPE_FETCH_CHUNK_SIZE = 25;
+
+/**
+ * Fetch full recipe docs for a set of `recipe_search_index` entries, chunked to avoid
+ * unbounded parallel request bursts. Shared by the indexed (`searchTokens`/`keywords`
+ * array-contains) lookup and the bounded full-scan fallback.
+ */
+const fetchRecipesForSearchResults = async (
+  searchResults: Array<{ id: string }>
+): Promise<SavedRecipe[]> => {
+  const fullRecipes: SavedRecipe[] = [];
+  const recipeIds = searchResults.map(result => result.id);
+  for (let start = 0; start < recipeIds.length; start += RECIPE_FETCH_CHUNK_SIZE) {
+    const chunkIds = recipeIds.slice(start, start + RECIPE_FETCH_CHUNK_SIZE);
+    const recipeDocs = await Promise.all(chunkIds.map(id =>
+      DatabaseMonitoringService.getDoc(DatabaseMonitoringService.doc("recipes/" + id))
+    ));
+
+    for (const doc of recipeDocs as FirestoreDocLike[]) {
+      if (doc && (typeof doc.exists === 'function' ? (doc as FirestoreDocLike & { exists(): boolean }).exists() : (doc as FirestoreDocLike & { exists: boolean }).exists)) {
+        const d = doc.data();
+        fullRecipes.push({ id: doc.id, ...(d && typeof d === 'object' ? d as Record<string, unknown> : {}) } as SavedRecipe);
+      }
+    }
+  }
+  return fullRecipes;
+};
 
 export const searchRecipesInFirestore = async (searchTerm: string): Promise<SavedRecipe[]> => {
   const perfTrace = trace(performance, 'search_recipes_firestore');
@@ -1009,11 +1036,54 @@ export const searchRecipesInFirestore = async (searchTerm: string): Promise<Save
     // Use the search index for efficient querying
     const searchIndexRef = DatabaseMonitoringService.collection("recipe_search_index");
 
-    // Read the search index collection and filter in-memory (substring
-    // matching across title/description/ingredients/keywords isn't
-    // expressible as a Firestore where() clause). Bound the scan with
-    // limit() instead of reading the entire, potentially unbounded,
-    // collection. This avoids dependency on Firestore query builders which
+    // Primary lookup: indexed `array-contains` query against the `searchTokens` field
+    // (falls back to the legacy `keywords` field written by
+    // scripts/create-recipe-search-index.js for docs not yet backfilled with
+    // `searchTokens` — see follow-up note below). Bounded by limit(), no full-collection
+    // scan needed when the token matches.
+    // Note: this only matches whole tokens (e.g. "chicken"), not substrings — multi-word
+    // search terms are reduced to their first significant token for the indexed path.
+    const primaryToken = searchTermLower.split(/\s+/).find(w => w.length > 0) ?? searchTermLower;
+    let tokenMatchedDocs: DocumentData[] = [];
+    try {
+      const tokenQuery = DatabaseMonitoringService.query(
+        searchIndexRef,
+        DatabaseMonitoringService.where('searchTokens', 'array-contains', primaryToken),
+        DatabaseMonitoringService.limit(SEARCH_TOKENS_QUERY_LIMIT)
+      );
+      const tokenSnapshot = await DatabaseMonitoringService.getDocs(tokenQuery);
+      tokenMatchedDocs = tokenSnapshot.docs.map((doc: FirestoreDocLike) => doc.data());
+
+      if (tokenMatchedDocs.length === 0) {
+        // `searchTokens` isn't backfilled onto existing docs yet — fall back to the
+        // legacy `keywords` array (populated by the index-creation script) so the
+        // indexed path still works pre-backfill.
+        const keywordsQuery = DatabaseMonitoringService.query(
+          searchIndexRef,
+          DatabaseMonitoringService.where('keywords', 'array-contains', primaryToken),
+          DatabaseMonitoringService.limit(SEARCH_TOKENS_QUERY_LIMIT)
+        );
+        const keywordsSnapshot = await DatabaseMonitoringService.getDocs(keywordsQuery);
+        tokenMatchedDocs = keywordsSnapshot.docs.map((doc: FirestoreDocLike) => doc.data());
+      }
+    } catch (indexedErr: unknown) {
+      // Missing composite index, mocked test env, etc. — fall through to the full scan.
+      log.debug('Indexed recipe search query failed, falling back to full scan', { error: indexedErr });
+    }
+
+    if (tokenMatchedDocs.length > 0) {
+      const fullRecipes = await fetchRecipesForSearchResults(tokenMatchedDocs as Array<{ id: string }>);
+      perfTrace.putMetric('search_term_length', searchTerm.length);
+      perfTrace.putMetric('search_index_size', tokenMatchedDocs.length);
+      perfTrace.putMetric('results_found', fullRecipes.length);
+      perfTrace.putAttribute('search_path', 'indexed');
+      return fullRecipes;
+    }
+
+    // Fallback: bounded full scan + in-memory substring filter (substring matching across
+    // title/description/ingredients/keywords isn't expressible as a Firestore where()
+    // clause). Bound the scan with limit() instead of reading the entire, potentially
+    // unbounded, collection. This avoids dependency on Firestore query builders which
     // may be mocked in tests.
     const indexQuery = DatabaseMonitoringService.query(
       searchIndexRef,
@@ -1038,6 +1108,8 @@ export const searchRecipesInFirestore = async (searchTerm: string): Promise<Save
         searchResults.push(searchEntry);
       }
     }
+
+    perfTrace.putAttribute('search_path', 'full_scan');
 
     // Get full recipe details for matches (only fetch the recipes we need)
     const fullRecipes: SavedRecipe[] = [];

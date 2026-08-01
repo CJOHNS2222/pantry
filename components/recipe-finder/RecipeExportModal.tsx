@@ -4,6 +4,7 @@ import { SavedRecipe } from '../../types';
 import HapticService from '../../services/hapticService';
 import AnalyticsService from '../../services/analyticsService';
 import { Modal } from '../ui/Modal';
+import { useToast } from '../ui/Toast';
 
 interface RecipeExportModalProps {
   isOpen: boolean;
@@ -32,6 +33,7 @@ export const RecipeExportModal: React.FC<RecipeExportModalProps> = ({
   const [format, setFormat] = useState<ExportFormat>('pdf');
   const [method, setMethod] = useState<ShareMethod>('download');
   const [isExporting, setIsExporting] = useState(false);
+  const toast = useToast();
 
   // Filter recipes by search query
   const filteredRecipes = useMemo(() => {
@@ -119,7 +121,7 @@ export const RecipeExportModal: React.FC<RecipeExportModalProps> = ({
     } catch (err: unknown) {
       const errMsg = err instanceof Error ? err.message : String(err);
       AnalyticsService.trackFeatureUsage('recipe_export', { success: false, error: errMsg });
-      alert(`Export failed: ${errMsg}`);
+      toast.error(`Export failed: ${errMsg}`);
     } finally {
       setIsExporting(false);
     }
@@ -227,7 +229,7 @@ export const RecipeExportModal: React.FC<RecipeExportModalProps> = ({
   const triggerPDFPrint = (list: SavedRecipe[]) => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
-      alert('Pop-up blocked! Please allow pop-ups to print PDF.');
+      toast.error('Pop-up blocked! Please allow pop-ups to print PDF.');
       return;
     }
 

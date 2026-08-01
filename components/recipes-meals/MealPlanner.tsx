@@ -1069,7 +1069,7 @@ const MealPlannerComponent: React.FC<MealPlannerProps> = ({ mealPlan, updateMeal
 
   return (
     <div className="space-y-6 pb-24 animate-fade-in">
-      <div className="sticky top-0 z-40 bg-theme-primary py-3 -mx-4 px-4 border-b border-theme/40 shadow-sm md:-mx-8 md:px-8">
+      <div className="sticky top-0 z-10 bg-theme-primary py-3 -mx-4 px-4 border-b border-theme/40 shadow-sm md:-mx-8 md:px-8">
         <div className="flex bg-theme-secondary rounded-xl p-1 border border-theme shadow-sm">
           <button
             onClick={() => setSubTab('schedule')}

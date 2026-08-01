@@ -2,9 +2,7 @@ import { useState, useEffect } from 'react';
 import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth';
 import { getDocsFromServer } from 'firebase/firestore';
 import DatabaseMonitoringService from '../services/databaseMonitoringService';
-import { logEvent } from 'firebase/analytics';
 import { User } from '../types';
-import { analytics } from '../firebaseConfig';
 import AnalyticsService from '../services/analyticsService';
 import { setUserContext, clearUserContext, trackAuthEvent } from '../services/sentryService';
 import { PriceDataCacheService } from '../services/priceDataCacheService';
@@ -194,9 +192,9 @@ export function useAuth() {
   const handleLogin = (loggedInUser: User) => {
     setUser(loggedInUser); // This might be redundant if onAuthStateChanged works as expected
     trackAuthEvent('login', { method: loggedInUser.provider });
-    if (analytics) {
-      logEvent(analytics, 'login', { method: loggedInUser.provider });
-    }
+    // Routed through AnalyticsService (rather than calling firebase/analytics directly)
+    // so `firebase/analytics` stays a dynamic import and out of the eager bundle (F35).
+    AnalyticsService.logEvent('login', { method: loggedInUser.provider });
   };
 
   const handleLogout = async () => {

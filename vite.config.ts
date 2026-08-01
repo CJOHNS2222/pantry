@@ -67,8 +67,22 @@ export default defineConfig(({ mode }) => {
         rollupOptions: {
           output: {
             manualChunks: (id) => {
-              // Firebase and database operations
-              if (id.includes('firebase/')) {
+              // Firebase core (auth/firestore/storage/app/app-check) - eagerly needed at
+              // boot by firebaseConfig.ts, so these are deliberately grouped into one
+              // named vendor chunk together.
+              // messaging/functions/analytics are EXCLUDED here on purpose (perf audit
+              // F35): firebaseConfig.ts dynamically imports those three, and merging them
+              // into this same manualChunks bucket would force the whole bucket to load
+              // eagerly (a manualChunks-forced chunk loads eagerly if ANY module inside it
+              // is reached via a static import, even if other modules in the same chunk
+              // are only reached dynamically). Leaving them unmatched here lets Rollup's
+              // automatic splitting put them in their own lazily-loaded chunk(s) instead.
+              if (
+                id.includes('firebase/') &&
+                !id.includes('firebase/messaging') &&
+                !id.includes('firebase/functions') &&
+                !id.includes('firebase/analytics')
+              ) {
                 return 'firebase-vendor';
               }
               // Note: first-party app files (geminiService, analyticsService, appUtils) are

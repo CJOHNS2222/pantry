@@ -1031,7 +1031,7 @@ const RecipeFinderComponent: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSav
 
   return (
     <div className="space-y-6 pb-24 max-w-2xl mx-auto animate-fade-in" role="main" aria-label="Recipe finder">
-      <div className="sticky top-0 z-40 bg-theme-primary py-3 -mx-4 px-4 border-b border-theme/40 shadow-sm md:-mx-8 md:px-8">
+      <div className="sticky top-0 z-10 bg-theme-primary py-3 -mx-4 px-4 border-b border-theme/40 shadow-sm md:-mx-8 md:px-8">
         <RecipeFinderTabs activeView={activeView} setActiveView={setActiveView} savedCount={savedRecipes.length} />
       </div>
 

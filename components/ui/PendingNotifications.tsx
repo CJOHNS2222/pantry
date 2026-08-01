@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Bell, Clock, Check, X, AlertCircle } from 'lucide-react';
-import { NotificationItem } from '../../services/notificationService';
+import { AppNotification } from '../../services/notificationService';
 import { markNotificationRead, snoozeNotificationInCache, updateNotificationInCache } from '../../services/notificationsService';
 import { User } from '../../types';
 import { joinHousehold } from '../../services/householdService';
@@ -43,11 +43,11 @@ export const PendingNotifications: React.FC<PendingNotificationsProps> = ({
       .map(n => ({
         id: n.id,
         userId: user.id,
-        type: (n as { type?: NotificationItem['type'] }).type as NotificationItem['type'] || 'system',
+        type: (n as { type?: AppNotification['type'] }).type as AppNotification['type'] || 'system',
         title: n.title,
         message: n.message || n.body || n.title,
         actionLabel: n.actionLabel,
-        actionType: n.actionType as NotificationItem['actionType'],
+        actionType: n.actionType as AppNotification['actionType'],
         actionData: n.actionData,
         priority: n.priority || 'low',
         read: n.read || false,
@@ -63,7 +63,7 @@ export const PendingNotifications: React.FC<PendingNotificationsProps> = ({
       .slice(0, mode === 'history' ? 50 : 20);
   }, [rawNotifications, user.id, mode]);
 
-  const handleAcceptNotification = async (notification: NotificationItem) => {
+  const handleAcceptNotification = async (notification: AppNotification) => {
     setProcessing(notification.id);
     try {
       // Handle different action types
@@ -135,7 +135,7 @@ export const PendingNotifications: React.FC<PendingNotificationsProps> = ({
     }
   };
 
-  const handleSnoozeNotification = async (notification: NotificationItem, minutes: number) => {
+  const handleSnoozeNotification = async (notification: AppNotification, minutes: number) => {
     setProcessing(notification.id);
     try {
       if (user?.id) {
@@ -148,7 +148,7 @@ export const PendingNotifications: React.FC<PendingNotificationsProps> = ({
     }
   };
 
-  const handleDismissNotification = async (notification: NotificationItem) => {
+  const handleDismissNotification = async (notification: AppNotification) => {
     setProcessing(notification.id);
     try {
       // Mark notification as read - try both methods

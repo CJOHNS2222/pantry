@@ -1,8 +1,7 @@
-import { httpsCallable } from 'firebase/functions';
 import { ShoppingItem } from '../types';
 import { normalizeQuantity } from '../utils/appUtils';
 import { WALMART_PACKAGE_SIZE_DATA, PackageOption } from '../data/walmartPackageSizes';
-import { functions } from '../firebaseConfig';
+import { getCallableFunction } from '../firebaseConfig';
 import { log } from './logService';
 
 // Top ~140 most common shopping list staples mapped to standard Walmart Item IDs (UPCs / Catalog IDs)
@@ -696,7 +695,7 @@ export async function wrapWithImpactTracker(
   }
 
   try {
-    const wrapFn = httpsCallable(functions, 'wrapImpactTrackingUrl');
+    const wrapFn = await getCallableFunction('wrapImpactTrackingUrl');
     const result = await wrapFn({ destinationUrl, merchant, campaignId, adId, publisherId });
     const data = result.data as { url?: string } | undefined;
     return data?.url || destinationUrl;

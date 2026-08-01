@@ -3,7 +3,17 @@ import { doc, runTransaction, onSnapshot, DocumentReference } from 'firebase/fir
 import remoteConfig from './remoteConfigService';
 import { log } from './logService';
 
-export interface NotificationItem {
+/**
+ * The generic shape of whatever is actually stored as one entry in a user's
+ * per-user Firestore notifications cache document (`users/{uid}/cache/notifications`).
+ * This is a superset covering both plain push-style entries (title/body/data)
+ * and the richer records `NotificationService` builds (priority/actionType/etc,
+ * see `AppNotification` in `notificationService.ts`) — this file only reads/
+ * writes/prunes the cache document and doesn't care which shape a given entry
+ * originally had. Renamed (F38) from a same-named type that used to collide
+ * with the one in `notificationService.ts`.
+ */
+export interface NotificationCacheItem {
   id: string;
   title: string;
   body?: string;
@@ -51,17 +61,17 @@ function serializeWrite(uid: string, fn: () => Promise<void>): Promise<void> {
  * Calls are serialized per-uid and retried on failed-precondition (optimistic
  * concurrency conflicts that Firebase does not auto-retry).
  */
-export async function appendNotificationToUser(uid: string, notification: NotificationItem, maxItems = remoteConfig.getNumber('notifications_max_stored')) {
+export async function appendNotificationToUser(uid: string, notification: NotificationCacheItem, maxItems = remoteConfig.getNumber('notifications_max_stored')) {
   return serializeWrite(uid, () => _appendWithRetry(uid, notification, maxItems));
 }
 
-async function _appendWithRetry(uid: string, notification: NotificationItem, maxItems: number, attempt = 0): Promise<void> {
+async function _appendWithRetry(uid: string, notification: NotificationCacheItem, maxItems: number, attempt = 0): Promise<void> {
   const ref = getNotificationsDocRef(uid);
   try {
     await runTransaction(db, async (tx) => {
       const snap = await tx.get(ref as any);
       const data = snap.exists() ? (snap.data() as any) : {};
-      const existing = Array.isArray(data.items) ? (data.items as NotificationItem[]) : [];
+      const existing = Array.isArray(data.items) ? (data.items as NotificationCacheItem[]) : [];
       const createdAtValue = notification && typeof notification.createdAt === 'string'
         ? notification.createdAt
         : new Date().toISOString();
@@ -81,7 +91,7 @@ async function _appendWithRetry(uid: string, notification: NotificationItem, max
         }
       });
 
-      let next: NotificationItem[];
+      let next: NotificationCacheItem[];
       if (newItem.dedupeKey) {
         // Replace any existing notification with the same dedupeKey, preserving array position order
         const idx = pruned.findIndex(n => n.dedupeKey === newItem.dedupeKey);
@@ -123,10 +133,10 @@ async function _appendWithRetry(uid: string, notification: NotificationItem, max
  * Listen to a user's notifications cache document with a throttled callback.
  * Returns an unsubscribe function.
  */
-export function listenToUserNotifications(uid: string, onChange: (items: NotificationItem[]) => void, throttleMs = 1000) {
+export function listenToUserNotifications(uid: string, onChange: (items: NotificationCacheItem[]) => void, throttleMs = 1000) {
   const ref = getNotificationsDocRef(uid);
   let timer: any = null;
-  let lastPayload: NotificationItem[] | null = null;
+  let lastPayload: NotificationCacheItem[] | null = null;
 
   const unsub = onSnapshot(ref as any, (snapshot: any) => {
     const data = snapshot.exists() ? (snapshot.data() as any).items : [];
@@ -153,14 +163,14 @@ export default {
   listenToUserNotifications
 };
 
-export async function getNotificationsOnce(uid: string): Promise<NotificationItem[]> {
+export async function getNotificationsOnce(uid: string): Promise<NotificationCacheItem[]> {
   const ref = getNotificationsDocRef(uid);
   // use a transaction read to be safe
   try {
     const result = await runTransaction(db, async (tx) => {
       const s = await tx.get(ref as any);
       const data = s.exists() ? (s.data() as any) : {};
-      return Array.isArray(data.items) ? (data.items as NotificationItem[]) : [];
+      return Array.isArray(data.items) ? (data.items as NotificationCacheItem[]) : [];
     });
     return result;
   } catch (_err) {
@@ -181,7 +191,7 @@ export async function deleteNotification(uid: string, notificationId: string) {
     const snap = await tx.get(ref as any);
     if (!snap.exists()) return;
     const data = snap.data() as any;
-    const items = Array.isArray(data.items) ? data.items as NotificationItem[] : [];
+    const items = Array.isArray(data.items) ? data.items as NotificationCacheItem[] : [];
     const filtered = items.filter(i => i.id !== notificationId);
     tx.set(ref as any, { items: filtered }, { merge: true });
   });
@@ -192,13 +202,13 @@ export async function deleteNotification(uid: string, notificationId: string) {
  * This is a best-effort update for clients that cannot write to the
  * top-level `notifications` collection (e.g., due to security rules).
  */
-export async function updateNotificationInCache(uid: string, notificationId: string, patch: Partial<NotificationItem>) {
+export async function updateNotificationInCache(uid: string, notificationId: string, patch: Partial<NotificationCacheItem>) {
   const ref = getNotificationsDocRef(uid);
   await runTransaction(db, async (tx) => {
     const snap = await tx.get(ref as any);
     if (!snap.exists()) return;
     const data = snap.data() as any;
-    const items = Array.isArray(data.items) ? data.items as NotificationItem[] : [];
+    const items = Array.isArray(data.items) ? data.items as NotificationCacheItem[] : [];
     const updated = items.map(i => i.id === notificationId ? { ...i, ...patch } : i);
     tx.set(ref as any, { items: updated }, { merge: true });
   });
@@ -210,7 +220,7 @@ export async function snoozeNotificationInCache(uid: string, notificationId: str
     const snap = await tx.get(ref as any);
     if (!snap.exists()) return;
     const data = snap.data() as any;
-    const items = Array.isArray(data.items) ? data.items as NotificationItem[] : [];
+    const items = Array.isArray(data.items) ? data.items as NotificationCacheItem[] : [];
     const snoozedUntil = new Date(Date.now() + minutes * 60 * 1000).toISOString();
     const updated = items.map(i => i.id === notificationId ? { ...i, snoozedUntil } : i);
     tx.set(ref as any, { items: updated }, { merge: true });
@@ -223,7 +233,7 @@ export async function markAllNotificationsRead(uid: string) {
     const snap = await tx.get(ref as any);
     if (!snap.exists()) return;
     const data = snap.data() as any;
-    const items = Array.isArray(data.items) ? data.items as NotificationItem[] : [];
+    const items = Array.isArray(data.items) ? data.items as NotificationCacheItem[] : [];
     const updated = items.map(i => ({ ...i, read: true }));
     tx.set(ref as any, { items: updated }, { merge: true });
   });
@@ -245,7 +255,7 @@ export async function pruneNotificationsForDeletedItems(uid: string, deletedItem
     const snap = await tx.get(ref as any);
     if (!snap.exists()) return;
     const data = snap.data() as any;
-    const items = Array.isArray(data.items) ? data.items as NotificationItem[] : [];
+    const items = Array.isArray(data.items) ? data.items as NotificationCacheItem[] : [];
 
     const kept = items.filter(n => {
       // Multi-item notification: actionData.items[].itemId

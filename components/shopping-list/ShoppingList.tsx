@@ -966,7 +966,7 @@ const ShoppingListComponent: React.FC<ShoppingListProps> = ({
       {uncheckedItemsCount > 0 && (
         <button
           onClick={() => setIsCheckoutModalOpen(true)}
-          className="fixed right-6 z-50 bg-[var(--accent-color)] text-white p-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 active:scale-95 flex items-center justify-center theme-transition"
+          className="fixed right-6 z-20 bg-[var(--accent-color)] text-white p-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 active:scale-95 flex items-center justify-center theme-transition"
           style={{ bottom: 'calc(7rem + 15px + 70px)' }}
           aria-label="Order ingredients online"
           title="Order online"
@@ -1055,7 +1055,7 @@ const ShoppingListComponent: React.FC<ShoppingListProps> = ({
       {Capacitor.isNativePlatform() && (
         <button
           onClick={() => setShowNutritionScanner(true)}
-          className="fixed right-6 z-50 bg-theme-secondary text-theme-primary border border-theme p-3 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110"
+          className="fixed right-6 z-20 bg-theme-secondary text-theme-primary border border-theme p-3 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110"
           style={{ bottom: 'calc(7rem + 15px + 4.5rem)' }}
           aria-label="Scan a product barcode to check nutrition facts before buying"
         >

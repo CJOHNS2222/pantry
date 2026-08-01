@@ -40,6 +40,11 @@ export class InventoryCacheService {
   // parseCacheDocument/migrateCacheDocumentIfNeeded and VERSION_PARSERS.
   public static readonly CACHE_VERSION = 2;
 
+  // Firestore hard-caps a document at 1MB (1,048,576 bytes). Warn well before that so
+  // there's time to react (e.g. shard the doc) before writes start outright failing (F47).
+  private static readonly INVENTORY_CACHE_DOC_SIZE_WARN_BYTES = 800 * 1024;
+  private static readonly INVENTORY_CACHE_DOC_SIZE_ERROR_BYTES = 950 * 1024;
+
   // Define the order of fields in the item array - MATCHING actual PantryItem fields.
   // IMPORTANT: only ever APPEND new fields to this list. Every existing index must
   // keep its meaning forever, because:
@@ -488,10 +493,31 @@ export class InventoryCacheService {
         cachedData[item.id] = this.pantryItemToArray(item);
       });
 
+      // Firestore hard-caps documents at 1MB. Track the serialized payload size before
+      // writing so we get advance warning as households approach that limit (db M1 / perf 6)
+      // instead of only finding out when a write starts failing.
+      const payloadSize = new Blob([JSON.stringify(cachedData)]).size;
+      if (payloadSize > this.INVENTORY_CACHE_DOC_SIZE_ERROR_BYTES) {
+        log.error("Inventory cache document approaching/exceeding Firestore's 1MB limit", {
+          payloadSize,
+          itemCount: items.length,
+          cachePath,
+        });
+      } else if (payloadSize > this.INVENTORY_CACHE_DOC_SIZE_WARN_BYTES) {
+        log.warn("Inventory cache document size approaching Firestore's 1MB limit", {
+          payloadSize,
+          itemCount: items.length,
+          cachePath,
+        });
+      }
+
       await DatabaseMonitoringService.setDoc(cacheRef, cachedData);
     } catch (err: any) {
       log.error("Error updating inventory cache", { err });
-      // Don't throw - caching failures shouldn't break the app
+      // Surface the failure to the caller instead of silently swallowing it — callers
+      // (e.g. household migration, cache-version migration) need to know a write didn't
+      // land so they don't treat stale/partial state as successfully persisted (F47).
+      throw err;
     }
   }
 

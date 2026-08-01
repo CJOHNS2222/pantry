@@ -35,7 +35,7 @@ export const ShoppingListUndoBanners: React.FC<ShoppingListUndoBannersProps> = (
         </button>
       </div>
 
-      <div className="fixed bottom-20 left-0 right-0 flex justify-center px-4 z-50 pointer-events-none">
+      <div className="fixed bottom-20 left-0 right-0 flex justify-center px-4 z-40 pointer-events-none">
         <div className="bg-theme-secondary border border-theme shadow-lg rounded-xl px-4 py-3 flex items-center gap-3 pointer-events-auto">
           <span className="text-sm text-theme-primary">
             {pendingDeleteCount === 1 ? '1 item removed' : `${pendingDeleteCount} items removed`}

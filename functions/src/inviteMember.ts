@@ -165,7 +165,7 @@ async function inviteMemberCore(inviterUid: string, email: string, householdId: 
   }
   
   // Ensure members is an array and add the new member (only if not already present)
-  let currentMembers = [];
+  let currentMembers: any[];
   if (Array.isArray(householdData.members)) {
     currentMembers = householdData.members;
   } else if (householdData.members && typeof householdData.members === 'object') {

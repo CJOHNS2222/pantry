@@ -286,7 +286,7 @@ export const Modal: React.FC<ModalProps> & {
                 <button
                   type="button"
                   onClick={onClose}
-                  className="flex-shrink-0 p-1.5 rounded-full hover:bg-[var(--bg-secondary)] text-[var(--text-secondary)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-color)]"
+                  className="flex-shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full hover:bg-[var(--bg-secondary)] text-[var(--text-secondary)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-color)]"
                   aria-label="Close dialog"
                 >
                   <X className="w-5 h-5" aria-hidden="true" />

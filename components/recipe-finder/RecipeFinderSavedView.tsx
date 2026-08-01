@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useIntl } from 'react-intl';
 import { useConfirm } from '../ui/ConfirmDialog';
+import { useToast } from '../ui/Toast';
 import { 
   Bookmark, 
   Plus, 
@@ -51,6 +52,7 @@ export const RecipeFinderSavedView: React.FC<RecipeFinderSavedViewProps> = ({
 }) => {
   const intl = useIntl();
   const confirm = useConfirm();
+  const toast = useToast();
   const [showExportModal, setShowExportModal] = useState(false);
 
   // Collections State
@@ -80,7 +82,7 @@ export const RecipeFinderSavedView: React.FC<RecipeFinderSavedViewProps> = ({
     const trimmed = name.trim();
     if (!trimmed) return;
     if (collections[trimmed]) {
-      alert('A collection with this name already exists.');
+      toast.error('A collection with this name already exists.');
       return;
     }
     setCollections(prev => ({

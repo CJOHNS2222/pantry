@@ -68,8 +68,8 @@ const VARIANT_BASE: Record<ButtonVariant, string> = {
 };
 
 const SIZE_CLASSES: Record<ButtonSize, { button: string; iconOnly: string; spinnerSize: string }> = {
-  xs: { button: 'h-7 px-2.5 text-[10px] rounded-lg gap-1', iconOnly: 'h-7 w-7 rounded-lg', spinnerSize: 'w-3 h-3' },
-  sm: { button: 'h-8 px-3 text-xs rounded-xl gap-1.5', iconOnly: 'h-8 w-8 rounded-xl', spinnerSize: 'w-3.5 h-3.5' },
+  xs: { button: 'h-7 px-2.5 text-[10px] rounded-lg gap-1 min-w-[44px] min-h-[44px]', iconOnly: 'h-7 w-7 rounded-lg min-w-[44px] min-h-[44px]', spinnerSize: 'w-3 h-3' },
+  sm: { button: 'h-8 px-3 text-xs rounded-xl gap-1.5 min-w-[44px] min-h-[44px]', iconOnly: 'h-8 w-8 rounded-xl min-w-[44px] min-h-[44px]', spinnerSize: 'w-3.5 h-3.5' },
   md: { button: 'h-10 px-4 text-sm rounded-xl gap-2', iconOnly: 'h-10 w-10 rounded-xl', spinnerSize: 'w-4 h-4' },
   lg: { button: 'h-12 px-6 text-base rounded-2xl gap-2.5', iconOnly: 'h-12 w-12 rounded-2xl', spinnerSize: 'w-5 h-5' },
 };
