@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Star, Clock, UtensilsCrossed, Globe } from 'lucide-react';
 import { useIntl } from 'react-intl';
 import { StructuredRecipe, RecipeRating, SavedRecipe, PantryItem, Household, RecipeCommunityStats, User, UserProfile } from '../../types';
@@ -798,7 +799,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
     setTimeout(() => onClose(), 300);
   };
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center px-4 pt-[var(--safe-area-inset-top,0px)] pb-[var(--safe-area-inset-bottom,0px)]" onClick={onClose}>
       <RecipeModalLeftoverOverlay
         showLeftoverCapture={showLeftoverCapture}
@@ -1088,7 +1089,8 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
         user={user}
         communityStats={communityStats}
       />
-    </div>
+    </div>,
+    document.body
   );
 };
 

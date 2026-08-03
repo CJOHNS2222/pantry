@@ -11,6 +11,7 @@ import { NotificationService } from '../../services/notificationService';
 import { pruneNotificationsForDeletedItems } from '../../services/notificationsService';
 import { auth } from '../../firebaseConfig';
 import { InventoryCacheService, CachedInventoryData, CacheMetadata } from '../../services/inventoryCacheService';
+import { PantryService } from '../../services/pantryService';
 import HapticService from '../../services/hapticService';
 import FoodWasteAnalyticsService from '../../services/foodWasteAnalyticsService';
 import { GUEST_INVENTORY_KEY, GUEST_ITEM_CAP, getQuantityValue } from './shared';
@@ -624,13 +625,19 @@ export function useInventory(
     // Optimistic local update — mirrors the singular addItem() above. Without
     // this, the UI didn't reflect the add until the Firestore listener fired
     // (only the guest path updated local state synchronously).
-    setInventory(prev => {
-      const byId = new Map(prev.map(p => [p.id, p]));
-      items.forEach(item => byId.set(item.id, item));
-      return Array.from(byId.values());
+    // Fold each incoming item into current inventory by name (not id) so a scan
+    // that re-detects an item already in the pantry appends a batch instead of
+    // creating a second, duplicate entry (matches the single addItem()/createManualItem() flow).
+    let merged = inventoryRef.current;
+    const touchedNames = new Set<string>();
+    items.forEach(item => {
+      merged = PantryService.mergeItemWithInventory(item, merged);
+      touchedNames.add(item.item.toLowerCase());
     });
+    setInventory(merged);
 
-    await InventoryCacheService.addItemsToCache(items, user?.householdId, user?.id);
+    const itemsToWrite = merged.filter(p => touchedNames.has(p.item.toLowerCase()));
+    await InventoryCacheService.addItemsToCache(itemsToWrite, user?.householdId, user?.id);
   };
 
   const generateRecipeSuggestionsOnDemand = useCallback(() => {

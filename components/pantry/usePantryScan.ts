@@ -10,6 +10,7 @@ export interface ReceiptScanResult {
   category: string;
   quantity_estimate: string;
   estimatedPrice?: number;
+  confidence?: number;
   priceOptions?: {
     amount: number;
     unit: string;

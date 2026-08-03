@@ -8,10 +8,25 @@ interface ThemeSettings {
   textColor?: string;
 }
 
+function getContrastColor(hexColor: string): string {
+  if (!hexColor || !hexColor.startsWith('#')) return '#ffffff';
+  try {
+    const r = parseInt(hexColor.slice(1, 3), 16);
+    const g = parseInt(hexColor.slice(3, 5), 16);
+    const b = parseInt(hexColor.slice(5, 7), 16);
+    if (isNaN(r) || isNaN(g) || isNaN(b)) return '#ffffff';
+    const yiq = (r * 299 + g * 587 + b * 114) / 1000;
+    return yiq >= 128 ? '#111827' : '#ffffff';
+  } catch {
+    return '#ffffff';
+  }
+}
+
 export function useTheme(themeSettings: ThemeSettings) {
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', themeSettings.mode);
     document.documentElement.style.setProperty('--accent-color', themeSettings.accentColor);
+    document.documentElement.style.setProperty('--accent-text', getContrastColor(themeSettings.accentColor));
 
     if (themeSettings.backgroundColor) {
       // Apply custom background color to body and override theme defaults

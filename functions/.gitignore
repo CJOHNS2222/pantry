@@ -8,3 +8,11 @@ typings/
 # Node.js dependency directory
 node_modules/
 *.local
+
+# Runtime env vars (functions v2 dotenv) - never commit real secrets
+.env
+.env.*
+!.env.example
+
+# Legacy functions:config runtime config - contains live secrets when present locally
+.runtimeconfig.json

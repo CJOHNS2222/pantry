@@ -242,11 +242,11 @@ const VisualQuantitySelector: React.FC<VisualQuantitySelectorProps> = ({
               onClick={() => handleLevelClick(level.value)}
               className={`flex flex-col items-center p-2 rounded-lg transition-all ${
                 Math.abs(value - level.value) < 0.1
-                  ? 'bg-[var(--accent-color)] text-white'
-                  : 'hover:bg-theme-secondary'
+                  ? 'bg-[var(--accent-color)] text-[var(--accent-text,white)] font-semibold shadow-sm'
+                  : 'hover:bg-theme-secondary text-theme-secondary hover:text-theme-primary'
               }`}
             >
-              <span className="text-2xl mb-1">{level.icon}</span>
+              <span className="text-2xl mb-1" aria-hidden="true">{level.icon}</span>
               <span className="text-xs font-medium">{level.label}</span>
             </button>
           ))}
@@ -269,6 +269,7 @@ const VisualQuantitySelector: React.FC<VisualQuantitySelectorProps> = ({
             max={smartMaxValue}
             step={stepValue}
             value={value}
+            aria-label="Quantity slider"
             onChange={handleSliderChange}
             onMouseDown={() => setIsDragging(true)}
             onMouseUp={() => setIsDragging(false)}
@@ -286,14 +287,15 @@ const VisualQuantitySelector: React.FC<VisualQuantitySelectorProps> = ({
         <button
           onClick={handleDecrement}
           disabled={value <= 0}
-          className="w-10 h-10 rounded-full bg-theme-primary border border-theme flex items-center justify-center text-theme-primary hover:bg-theme-secondary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          aria-label="Decrease quantity"
+          className="w-11 h-11 rounded-full bg-theme-primary border border-theme flex items-center justify-center text-theme-primary hover:bg-theme-secondary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           <Minus className="w-5 h-5" />
         </button>
 
         {showVisualLevels ? (
           <div className="flex flex-col items-center">
-            <span className="text-2xl">{currentLevel.icon}</span>
+            <span className="text-2xl" aria-hidden="true">{currentLevel.icon}</span>
             <span className="text-sm font-medium text-theme-primary">{currentLevel.label}</span>
           </div>
         ) : (
@@ -306,7 +308,8 @@ const VisualQuantitySelector: React.FC<VisualQuantitySelectorProps> = ({
         <button
           onClick={handleIncrement}
           disabled={value >= smartMaxValue}
-          className="w-10 h-10 rounded-full bg-theme-primary border border-theme flex items-center justify-center text-theme-primary hover:bg-theme-secondary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          aria-label="Increase quantity"
+          className="w-11 h-11 rounded-full bg-theme-primary border border-theme flex items-center justify-center text-theme-primary hover:bg-theme-secondary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           <Plus className="w-5 h-5" />
         </button>

@@ -422,6 +422,8 @@ export interface Household {
   name: string;
   members: Member[];
   memberIds: string[]; // For querying households by user ID
+  /** Uid of the member who created the household. Set at creation; only functions/src/deleteAccount.ts reassigns it (owner leaving), via the Admin SDK. Absent on households created before this field existed. */
+  ownerId?: string;
   /** Live presence map written by householdActivityService — keyed by userId */
   memberActivity?: Record<string, { isOnline?: boolean; lastSeen?: { toDate(): Date } | string; currentActivity?: string }>;
   /**

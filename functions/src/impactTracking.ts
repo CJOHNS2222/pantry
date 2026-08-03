@@ -1,12 +1,10 @@
 import {onCall, HttpsError} from "firebase-functions/v2/https";
 import {logger} from "firebase-functions/v2";
-import {defineSecret} from "firebase-functions/params";
-import admin from 'firebase-admin';
-import {getApps} from 'firebase-admin/app';
+import {getApps, initializeApp} from 'firebase-admin/app';
 
 // Ensure the Admin SDK is initialized
 if (!getApps().length) {
-  admin.initializeApp();
+  initializeApp();
 }
 
 /**
@@ -15,13 +13,13 @@ if (!getApps().length) {
  * `VITE_IMPACT_AUTH_TOKEN` in services/groceryCheckoutService.ts, which shipped the
  * token inside the public JS bundle / Android APK — see .claude/audits/FIXES.md F04.
  *
- * Held here via Secret Manager instead. One-time setup (after rotating the leaked
- * value in the Impact Radius dashboard):
- *   firebase functions:secrets:set IMPACT_ACCOUNT_SID
- *   firebase functions:secrets:set IMPACT_AUTH_TOKEN
+ * Held here as a plain functions env var (not Secret Manager - avoids per-secret
+ * billing) instead of the old client-bundled VITE_* var. One-time setup (after
+ * rotating the leaked value in the Impact Radius dashboard): add to
+ * functions/.env (gitignored, never committed):
+ *   IMPACT_ACCOUNT_SID=...
+ *   IMPACT_AUTH_TOKEN=...
  */
-const IMPACT_ACCOUNT_SID = defineSecret("IMPACT_ACCOUNT_SID");
-const IMPACT_AUTH_TOKEN = defineSecret("IMPACT_AUTH_TOKEN");
 
 type Merchant = 'walmart' | 'target' | 'kroger' | 'instacart' | 'albertsons' | 'thrive';
 
@@ -52,14 +50,13 @@ const SAFE_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
  * secret read: the account SID / auth token are never included in the built URL
  * (Impact's public redirect links don't take Basic Auth), they're used purely as the
  * "is affiliate tracking configured for this deployment" gate - but that gate has to
- * live server-side now since the credentials are Secret-Manager-only.
+ * live server-side now since the credentials are no longer in the client bundle.
  */
 export const wrapImpactTrackingUrl = onCall(
   {
     region: "us-central1",
     enforceAppCheck: true,
     cors: true,
-    secrets: [IMPACT_ACCOUNT_SID, IMPACT_AUTH_TOKEN],
   },
   async (request) => {
     if (!request.auth) {
@@ -77,8 +74,8 @@ export const wrapImpactTrackingUrl = onCall(
     }
 
     try {
-      const accountSid = IMPACT_ACCOUNT_SID.value();
-      const authToken = IMPACT_AUTH_TOKEN.value();
+      const accountSid = process.env.IMPACT_ACCOUNT_SID;
+      const authToken = process.env.IMPACT_AUTH_TOKEN;
 
       // Fallback: if Impact isn't configured for this deployment, return the
       // destination URL directly (matches prior client-side behavior).

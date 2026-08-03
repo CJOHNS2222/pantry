@@ -45,7 +45,7 @@ export const AppNavigation: React.FC<AppNavigationProps> = ({ activeTab, setActi
               className={`flex flex-col items-center justify-center flex-1 py-2 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:ring-offset-2 focus:ring-offset-theme-secondary ${
                 isActive ? '-translate-y-1' : 'opacity-60 hover:opacity-100'
               }`}
-              aria-label={`${tab.label} ${isActive ? '(current page)' : ''}`}
+              aria-label={tab.label}
               aria-current={isActive ? 'page' : undefined}
             >
               <div className={`p-1.5 rounded-full mb-0.5 transition-all ${
@@ -57,7 +57,7 @@ export const AppNavigation: React.FC<AppNavigationProps> = ({ activeTab, setActi
                   aria-hidden="true"
                 />
               </div>
-              <span className="text-[9px] uppercase font-bold tracking-wider text-theme-secondary">
+              <span className="text-[11px] uppercase font-bold tracking-wider text-theme-secondary">
                 {tab.label}
               </span>
             </button>

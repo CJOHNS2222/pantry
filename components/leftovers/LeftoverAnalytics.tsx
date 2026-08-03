@@ -189,7 +189,7 @@ const generateAchievementImage = (
     ctx.textAlign = 'center';
     ctx.fillStyle = '#10b981';
     ctx.font = 'bold 32px sans-serif';
-    ctx.fillText('Join the movement at stockandspoon.com', 540, 1150);
+    ctx.fillText('Join the movement at stock-spoon-website.web.app', 540, 1150);
 
     ctx.fillStyle = '#64748b';
     ctx.font = '24px sans-serif';

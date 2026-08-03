@@ -56,7 +56,9 @@ Offline support sits alongside: `offlineQueueService.ts` (queues writes while of
 ### Firebase setup
 `firebaseConfig.ts` initializes `auth`, `db`, `storage`, `functions`, conditional App Check (skipped in dev), conditional Analytics, feature-detected FCM messaging. Auth persistence platform-based: `browserLocalPersistence` on web vs `indexedDBLocalPersistence` on native (`Capacitor.getPlatform()`). Actual SDK config values come from `VITE_firebaseConfig.ts` (not generic env example). `databaseMonitoringService` dynamically imported there, avoid circular import.
 
-Household/ownership scoping enforced in `firestore.rules`, mirrored in app logic (`isHouseholdMember()` checks) - `users/{uid}/...` user-scoped, `households/{householdId}/...` shared. Preserve these checks in any new read/write path.
+Household/ownership scoping enforced in `firestore.rules`, mirrored in app logic (`isHouseholdMember()` checks) - `users/{uid}/...` user-scoped, `households/{householdId}/...` shared. Preserve these checks in any new read/write path. Convention for fields a plain client write must never change (`ownerId`, `subscription`): a `xUnchanged()` helper comparing `request.resource.data.get('x', null) == resource.data.get('x', null)`, gated into the relevant `allow update` - the field's real mutation path always goes through a Cloud Function using the Admin SDK, which bypasses rules entirely. Follow this pattern rather than inventing a new one when locking down a field.
+
+`households/{householdId}` deletion is owner-only (`ownerId` match), with a fallback to any-member delete when `ownerId` is absent - some households predate that field and would otherwise be permanently un-deletable.
 
 `functions/` separate Firebase Cloud Functions project (own `package.json`/`tsconfig.json`) covering household invitations/membership (`checkInvitation.ts`, `inviteMember.ts`, `leaveHousehold.ts`), account deletion, usage-limit resets, push notifications, IAP verification (`verifyPurchase.ts`), nutrition logic.
 
@@ -75,6 +77,7 @@ User joins household → `householdMigrationService.migrateUserDataToHousehold()
 - Nutrition: `nutritionService.ts` looks up nutrition facts (calories/protein/carbs/fat/fiber/sugar) from free **USDA FoodData Central API** (`VITE_USDA_API_KEY`), cached in `localStorage` 90 days - not OpenFoodFacts.
 - Barcode/product lookup: `utils/barcodeScan.ts` decodes barcode from captured photo on-device via `@zxing/library` (native-only, no live viewfinder); `spoonacularFoodClient.ts` (`searchGroceryProductByUPC`) resolves UPC to product title via **Spoonacular's** grocery product API, feeds `nutritionService.ts` - also not OpenFoodFacts, despite common assumption for barcode-to-product lookups.
 - Currency: `currencyService.ts` converts USD-sourced grocery prices to user-selected display currency using free rates from frankfurter.app, cached 24h.
+- Billing: Google Play Billing via `cordova-plugin-purchase` (not a Capacitor-native billing plugin) - client flow in `services/purchaseService.ts`, server-side receipt verification + entitlement grant (writes `users/{uid}.subscription`) in `functions/src/verifyPurchase.ts`. Stripe/PayPal removed for Play Store compliance - Google Play is the only payment path.
 - Analytics/perf: Firebase Analytics + Sentry; Core Web Vitals via `performanceMonitoringService.ts`.
 
 ### Capacitor / mobile

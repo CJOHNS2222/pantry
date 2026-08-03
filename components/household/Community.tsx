@@ -383,7 +383,7 @@ const CommunityComponent: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecip
                           ) : entry.rank === 3 ? (
                             <span className="text-xl">🥉</span>
                           ) : (
-                            <span className="text-sm font-black text-theme-secondary opacity-50">
+                            <span className="text-sm font-black text-theme-muted">
                               {entry.rank}
                             </span>
                           )}

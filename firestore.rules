@@ -102,10 +102,28 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // `subscription` (tier/status/expiry) is the paywall entitlement - only
+    // functions/src/verifyPurchase.ts and subscriptionNotifications.ts may set
+    // it, both via the Admin SDK (bypasses these rules). A plain client write
+    // must leave it untouched on update, and on create may only write the
+    // hardcoded free-tier default hooks/useAuth.ts sets for a brand-new doc -
+    // otherwise a client could self-grant premium/family with set({subscription:{tier:'family'}}).
+    function newSubscriptionIsFree() {
+      return !('subscription' in request.resource.data)
+        || (request.resource.data.subscription.tier == 'free'
+            && request.resource.data.subscription.status == 'active');
+    }
+
+    function subscriptionUnchanged() {
+      return request.resource.data.get('subscription', null) == resource.data.get('subscription', null);
+    }
+
     // A user can create their own user document and read/write to all of their own data (documents and subcollections)
     match /users/{userId} {
       allow read: if request.auth != null && (request.auth.uid == userId || isAdmin());
-      allow write: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null && request.auth.uid == userId && newSubscriptionIsFree();
+      allow update: if request.auth != null && request.auth.uid == userId && subscriptionUnchanged();
+      allow delete: if request.auth != null && request.auth.uid == userId;
     }
 
     match /users/{userId}/{documents=**} {
@@ -134,7 +152,16 @@ service cloud.firestore {
         && membersChangeAllowed()
         && withinHouseholdMemberCeiling();
 
-      allow delete: if request.auth != null && request.auth.uid in resource.data.memberIds;
+      // Owner-only: any-member delete let a non-owner nuke the household doc,
+      // whose subcollection rules then null out memberIds and lock everyone
+      // else out too. Ownership transfer stays admin-gated (see ownerIdUnchanged()).
+      // Fallback: households created before ownerId existed have no owner on
+      // file - fall back to the old any-member behavior for those only, so
+      // this doesn't brick delete for every pre-existing household.
+      allow delete: if request.auth != null && (
+        resource.data.get('ownerId', null) == request.auth.uid
+        || (resource.data.get('ownerId', null) == null && request.auth.uid in resource.data.memberIds)
+      );
     }
 
     // Household subcollections: check membership in household document

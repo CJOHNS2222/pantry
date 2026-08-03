@@ -612,7 +612,7 @@ const SettingsComponent: React.FC<SettingsProps> = ({
           user_id: 'u_wtW48BWFmZnstig',
           template_params: {
             from_name: user?.name || 'User',
-            from_email: user?.email || 'no-email@stockandspoon.com',
+            from_email: user?.email || 'no-email@stock-spoon-website.web.app',
             message: feedback,
             to_email: 'chrisj221986@gmail.com, cjohns22@duck.com'
           }
@@ -1410,15 +1410,15 @@ const SettingsComponent: React.FC<SettingsProps> = ({
             <SettingsPrivacyLegalSection
               title={intl.formatMessage({ id: 'settings.privacy' })}
               onViewPrivacyPolicy={() => {
-                const privacyUrl = (window as Window & { PRIVACY_POLICY_URL?: string }).PRIVACY_POLICY_URL || 'https://smartpantrymobile.page.gd/privacy.html';
+                const privacyUrl = (window as Window & { PRIVACY_POLICY_URL?: string }).PRIVACY_POLICY_URL || 'https://stock-spoon-website.firebaseapp.com/privacy.html';
                 window.open(privacyUrl, '_blank');
               }}
               onViewTermsOfService={() => {
-                const termsUrl = (window as Window & { TERMS_OF_SERVICE_URL?: string }).TERMS_OF_SERVICE_URL || 'https://ornate-compass-478504-e1.web.app/terms.html';
+                const termsUrl = (window as Window & { TERMS_OF_SERVICE_URL?: string }).TERMS_OF_SERVICE_URL || 'https://stock-spoon-website.firebaseapp.com/terms.html';
                 window.open(termsUrl, '_blank');
               }}
               onCopyPrivacyUrl={() => {
-                const privacyUrl = (window as Window & { PRIVACY_POLICY_URL?: string }).PRIVACY_POLICY_URL || 'https://smartpantrymobile.page.gd/privacy.html';
+                const privacyUrl = (window as Window & { PRIVACY_POLICY_URL?: string }).PRIVACY_POLICY_URL || 'https://stock-spoon-website.firebaseapp.com/privacy.html';
                 if (navigator.clipboard) navigator.clipboard.writeText(privacyUrl);
                 addToast?.('Privacy policy URL copied to clipboard', 'success');
               }}

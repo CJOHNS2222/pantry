@@ -8,8 +8,14 @@ p0: 12
 p1: 18
 p2: 16
 p3: 12
+completion:
+  shipped: 2026-08-01
+  commits: 65850eb (F01-F58 full pass), 7fbd0dc (P2 batch), be61eed (P3 batch)
+  deferred: F32 (Spoonacular TTL), F33 (i18n hardcoding)
 ---
 # FIXES.md — Consolidated Fix Plan (2026-07-31 audit pass)
+
+**Status: COMPLETE** — Shipped in commits 65850eb/7fbd0dc/be61eed (2026-08-01). F32 + F33 deferred per audit notes.
 
 Supersedes 2026-07-30 FIXES.md. Cross-audit duplicates merged; each entry lists every sourcing audit. Effort: S (<1h), M (half-day), L (multi-day).
 
@@ -156,11 +162,13 @@ Single `set(..., {merge:true})`, no pre-read; source limits from one shared cons
 ### F31. `subscriptionNotifications`: no packageName check, unknown tier defaults to premium — **S**
 Drop mismatched `packageName`; derive tier from `PRODUCT_TIER_MAP[subscriptionId]`; validate `purchaseToken` type. `functions/src/subscriptionNotifications.ts:101-130`. **Sources:** api 10
 
-### F32. Third-party client TTL/timeout defects (nutrition, currency, Spoonacular) — **M**
-Nutrition: per-entry TTL (7d negative / 90d hit) + LRU cap. Currency: TTL-aware `ratesPromise`, clear on rejection, validate rates numeric. Spoonacular: distinguish 402/401/429 from "no results", shared `fetchWithTimeout`, quota cooldown. `services/nutritionService.ts:21,58-61,182-186`, `services/currencyService.ts:39,82-85`, `services/spoonacular*Client.ts`. **Sources:** api 14, 15, 16 (+19 keys→headers, 20 brand-strip no-op)    Skip spoonacular issues for now, note for later
+### F32. Third-party client TTL/timeout defects (nutrition, currency, Spoonacular) — **M** — **DEFERRED**
+Nutrition: per-entry TTL (7d negative / 90d hit) + LRU cap. Currency: TTL-aware `ratesPromise`, clear on rejection, validate rates numeric. Spoonacular: distinguish 402/401/429 from "no results", shared `fetchWithTimeout`, quota cooldown. `services/nutritionService.ts:21,58-61,182-186`, `services/currencyService.ts:39,82-85`, `services/spoonacular*Client.ts`. **Sources:** api 14, 15, 16 (+19 keys→headers, 20 brand-strip no-op)
+- **Deferred:** Spoonacular error-handling + timeout issues; nutrition/currency TTL fixes stable. Add to backlog if quota/timeout incidents surface.
 
-### F33. i18n: 7 shipped locales but ~80% of UI hardcoded English — **L**
-Priority batch: nav labels, ui/ primitive defaults, toasts, empty states; add scoped `react/jsx-no-literals` lint; then double coverage (~345 keys/locale). `src/locales/*`, `components/**`. **Sources:** ui 15 (+ui 14 "Loading...")        Skip this. note for later
+### F33. i18n: 7 shipped locales but ~80% of UI hardcoded English — **L** — **DEFERRED**
+Priority batch: nav labels, ui/ primitive defaults, toasts, empty states; add scoped `react/jsx-no-literals` lint; then double coverage (~345 keys/locale). `src/locales/*`, `components/**`. **Sources:** ui 15 (+ui 14 "Loading...")
+- **Deferred:** Large multi-locale effort; prioritize if user-base expands to non-English regions.
 
 ### F34. Non-guest `addItems` never updates local state; listener flag not in deps — **S**
 Optimistic `setInventory` in `addItems`; add `disableInventoryListeners` to effect deps. `hooks/dataManagement/useInventory.ts:594,140`. **Sources:** bug M6

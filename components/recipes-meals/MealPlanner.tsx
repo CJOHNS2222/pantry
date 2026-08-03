@@ -1013,10 +1013,11 @@ const MealPlannerComponent: React.FC<MealPlannerProps> = ({ mealPlan, updateMeal
         itemNameLower.includes(pantryItem.item.toLowerCase())
       );
       
-      // Check if ingredient is already in shopping list for this specific recipe
-      const inShoppingList = shoppingList.some(shoppingItem => 
-        shoppingItem.item.toLowerCase() === itemNameLower && 
-        shoppingItem.source?.includes(item.recipeName)
+      // Check if ingredient is already on the shopping list (any source, not just
+      // this specific recipe's auto-add) and not yet purchased/checked off
+      const inShoppingList = shoppingList.some(shoppingItem =>
+        !shoppingItem.checked &&
+        shoppingItem.item.toLowerCase() === itemNameLower
       );
       
       return !inInventory && !inShoppingList;

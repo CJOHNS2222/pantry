@@ -23,13 +23,12 @@
 
 import {onMessagePublished} from 'firebase-functions/v2/pubsub';
 import {logger} from 'firebase-functions/v2';
-import admin from 'firebase-admin';
-import {getApps} from 'firebase-admin/app';
+import {getApps, initializeApp} from 'firebase-admin/app';
 import {getFirestore, Timestamp} from 'firebase-admin/firestore';
 import {PACKAGE_NAME, PRODUCT_TIER_MAP, resolveSubscriptionState} from './googlePlayHelpers';
 
 if (!getApps().length) {
-  admin.initializeApp();
+  initializeApp();
 }
 
 // https://developer.android.com/google/play/billing/rtdn-reference#sub

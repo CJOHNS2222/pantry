@@ -173,6 +173,7 @@ const App: React.FC = () => {
   const [showExpiredLaunchSheet, setShowExpiredLaunchSheet] = useState(false);
   const [expiredLaunchItems, setExpiredLaunchItems] = useState<PantryItem[]>([]);
   const hasShownExpiredLaunchRef = useRef(false);
+  const retryIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [notificationViewItem, setNotificationViewItem] = useState<{ item: PantryItem; index: number } | null>(null);
   const [showAddToPlanDialog, setShowAddToPlanDialog] = useState(false);
   const [pendingRecipeForPlan, setPendingRecipeForPlan] = useState<StructuredRecipe | null>(null);
@@ -1295,8 +1296,9 @@ const App: React.FC = () => {
     if (!user || inventory.length === 0) return;
     if (!getExpiredLaunchEnabled()) return;
 
-    const timer = setTimeout(() => {
-      if (hasShownExpiredLaunchRef.current) return;
+    // Returns true once resolved (shown, or nothing to show) so the retry loop can stop.
+    const tryShow = (): boolean => {
+      if (hasShownExpiredLaunchRef.current) return true;
       const today = new Date().toISOString().slice(0, 10);
       const expired = inventory.filter(item => {
         if (!item.expirationDate || item.is_immortal) return false;
@@ -1306,13 +1308,29 @@ const App: React.FC = () => {
         }
         return item.expirationDate <= today;
       });
-      if (expired.length > 0) {
-        hasShownExpiredLaunchRef.current = true;
-        setExpiredLaunchItems(expired);
-        setShowExpiredLaunchSheet(true);
-      }
+      if (expired.length === 0) return true;
+      // Don't steal the top-of-stack from a modal the user already has open
+      // (e.g. Add Items) - portaled overlays share z-50, so popping this up
+      // mid-flow makes the other modal's buttons/inputs unclickable underneath it.
+      if (document.body.classList.contains('modal-open')) return false;
+      hasShownExpiredLaunchRef.current = true;
+      setExpiredLaunchItems(expired);
+      setShowExpiredLaunchSheet(true);
+      return true;
+    };
+
+    const timer = setTimeout(() => {
+      if (tryShow()) return;
+      // Blocked by an open modal - keep checking rather than silently giving up for the session.
+      const retryInterval = setInterval(() => {
+        if (tryShow()) clearInterval(retryInterval);
+      }, 2000);
+      retryIntervalRef.current = retryInterval;
     }, 1500);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      if (retryIntervalRef.current) clearInterval(retryIntervalRef.current);
+    };
   }, [user, inventory]);
 
   const completeOnboarding = async () => {

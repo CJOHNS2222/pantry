@@ -2,11 +2,10 @@ import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { getFirestore } from 'firebase-admin/firestore';
 import { logger } from 'firebase-functions/v2';
 import { randomUUID } from 'node:crypto';
-import admin from 'firebase-admin';
-import {getApps} from 'firebase-admin/app';
+import {getApps, initializeApp} from 'firebase-admin/app';
 
 if (!getApps().length) {
-  admin.initializeApp();
+  initializeApp();
 }
 
 const db = getFirestore();

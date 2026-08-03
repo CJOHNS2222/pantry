@@ -1,8 +1,7 @@
 
 import {onCall, HttpsError} from "firebase-functions/v2/https";
 import {logger} from "firebase-functions/v2";
-import admin from 'firebase-admin';
-import {getApps} from 'firebase-admin/app';
+import {getApps, initializeApp} from 'firebase-admin/app';
 import {getFirestore, FieldValue} from "firebase-admin/firestore";
 import { getAuth } from 'firebase-admin/auth';
 
@@ -10,7 +9,7 @@ import { getAuth } from 'firebase-admin/auth';
 
 // Ensure the Admin SDK is initialized
 if (!getApps().length) {
-  admin.initializeApp();
+  initializeApp();
 }
 
 // Same shape as PATTERNS.email in src/utils/validation.ts (client-side); duplicated

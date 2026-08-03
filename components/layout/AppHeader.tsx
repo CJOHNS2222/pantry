@@ -372,7 +372,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                   ref={notificationsTriggerRef}
                   onClick={handleToggleNotifications}
                   onDoubleClick={handleNotificationBellDoubleClick}
-                  className="relative p-1 text-amber-500 hover:text-amber-400 transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 rounded"
+                  className="relative p-3 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full text-amber-500 hover:text-amber-400 transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2"
                   aria-label={`${unreadNotificationsCount} unread notifications`}
                   aria-haspopup="menu"
                   aria-expanded={showNotifications}
@@ -380,7 +380,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                 >
                   <Bell className="w-4 h-4" />
                   {unreadNotificationsCount > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-medium text-[10px]">
+                    <span className="absolute top-1.5 right-1.5 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-medium text-[10px]">
                       {unreadNotificationsCount > 99 ? '99+' : unreadNotificationsCount}
                     </span>
                   )}
@@ -580,12 +580,12 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             {recentActions.length > 0 && onUndo && (
               <button
                 onClick={() => onUndo(recentActions[0])}
-                className="p-2 text-theme-secondary opacity-70 hover:opacity-100 relative focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:ring-offset-2"
+                className="p-3 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full text-theme-secondary opacity-70 hover:opacity-100 relative focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:ring-offset-2"
                 aria-label={`Undo last action (${recentActions.length} available)`}
                 title="Undo last action"
               >
                 <Undo2 className="w-5 h-5" aria-hidden="true" />
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                <span className="absolute top-1 right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
                   {recentActions.length}
                 </span>
               </button>
@@ -599,7 +599,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                   mode: prev.theme.mode === 'dark' ? 'light' : 'dark'
                 }
               }))}
-              className="p-2 text-theme-secondary opacity-70 hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:ring-offset-2"
+              className="p-3 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full text-theme-secondary opacity-70 hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:ring-offset-2"
               aria-label={`Switch to ${settings.theme.mode === 'dark' ? 'light' : 'dark'} theme`}
             >
               {settings.theme.mode === 'dark' ? <Sun className="w-5 h-5" aria-hidden="true" /> : <Moon className="w-5 h-5" aria-hidden="true" />}

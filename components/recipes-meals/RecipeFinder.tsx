@@ -492,6 +492,22 @@ const RecipeFinderComponent: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSav
 
     const params = { query: specificQuery, ingredients: '' };
     await performSearch(params);
+    scrollToSearchResults();
+  };
+
+  // Both the top search box and the Popular section's "search entire database"
+  // shortcut render into the same results area (right below the top search box) —
+  // scroll there after either fires so the results a search just produced are
+  // actually visible instead of appearing to do nothing off-screen.
+  const scrollToSearchResults = () => {
+    const element = document.getElementById('recipeSearchResults') || document.getElementById('specificQuery');
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const behavior = prefersReducedMotion ? 'auto' : 'smooth';
+    if (element && typeof element.scrollIntoView === 'function') {
+      element.scrollIntoView({ behavior, block: 'start' });
+    } else {
+      window.scrollTo({ top: 0, behavior });
+    }
   };
 
   const performSearchRef = useRef<(params: RecipeFinderSearchParams) => Promise<void>>(async () => {});
@@ -544,14 +560,7 @@ const RecipeFinderComponent: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSav
           cuisineFilter: cuisine
       };
       await performSearch(params);
-
-      // Scroll to the search input / results section
-      const element = document.getElementById('specificQuery');
-      if (element && typeof element.scrollIntoView === 'function') {
-          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      } else {
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-      }
+      scrollToSearchResults();
   };
 
     const performSearch = async (params: RecipeFinderSearchParams) => {
@@ -1163,26 +1172,28 @@ const RecipeFinderComponent: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSav
               onGenerate={handleGenerate}
             />
 
-            <RecipeFinderResultStates
-              loadingState={loadingState}
-              searchError={searchError}
-              result={result}
-              isResultFromCache={isResultFromCache}
-              renderRecipeTile={renderRecipeTile}
-              onEnableAiSearch={() => {
-                setUserGeminiOptIn(user.id, true);
-                setSearchError(null);
-                setLoadingState(LoadingState.IDLE);
-                const params = { ingredients: inventoryString, strictMode: strictMode };
-                performSearchRef.current(params);
-              }}
-              onRetry={() => {
-                setSearchError(null);
-                setLoadingState(LoadingState.IDLE);
-                handleGenerate(new Event('submit') as unknown as React.FormEvent);
-              }}
-              onSuggestionClick={setSpecificQuery}
-            />
+            <div id="recipeSearchResults">
+              <RecipeFinderResultStates
+                loadingState={loadingState}
+                searchError={searchError}
+                result={result}
+                isResultFromCache={isResultFromCache}
+                renderRecipeTile={renderRecipeTile}
+                onEnableAiSearch={() => {
+                  setUserGeminiOptIn(user.id, true);
+                  setSearchError(null);
+                  setLoadingState(LoadingState.IDLE);
+                  const params = { ingredients: inventoryString, strictMode: strictMode };
+                  performSearchRef.current(params);
+                }}
+                onRetry={() => {
+                  setSearchError(null);
+                  setLoadingState(LoadingState.IDLE);
+                  handleGenerate(new Event('submit') as unknown as React.FormEvent);
+                }}
+                onSuggestionClick={setSpecificQuery}
+              />
+            </div>
 
             <RecipeFinderPopularSection
               title={intl.formatMessage({ id: 'recipes.popular' })}

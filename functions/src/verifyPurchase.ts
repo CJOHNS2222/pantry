@@ -18,13 +18,12 @@
 
 import {onCall, HttpsError} from "firebase-functions/v2/https";
 import {logger} from "firebase-functions/v2";
-import admin from "firebase-admin";
-import {getApps} from "firebase-admin/app";
+import {getApps, initializeApp} from "firebase-admin/app";
 import {getFirestore, Timestamp} from "firebase-admin/firestore";
 import {PRODUCT_TIER_MAP, resolveSubscriptionState} from "./googlePlayHelpers";
 
 if (!getApps().length) {
-  admin.initializeApp();
+  initializeApp();
 }
 
 export const verifyPurchase = onCall({ enforceAppCheck: true }, async (request) => {
@@ -54,7 +53,11 @@ export const verifyPurchase = onCall({ enforceAppCheck: true }, async (request) 
     throw new HttpsError("invalid-argument", "Invalid receipt: malformed transaction entry.");
   }
 
+  // On GooglePlay, cordova-plugin-purchase v13 puts purchaseToken on the Receipt
+  // object, not the Transaction — CdvPurchase.GooglePlay.Receipt.purchaseToken,
+  // vs the base CdvPurchase.Transaction class which carries no token field at all.
   const purchaseToken: string | undefined =
+    typeof receipt.purchaseToken === "string" ? receipt.purchaseToken :
     typeof transaction.purchaseToken === "string" ? transaction.purchaseToken :
     typeof transaction.token === "string" ? transaction.token : undefined;
 
@@ -87,7 +90,15 @@ export const verifyPurchase = onCall({ enforceAppCheck: true }, async (request) 
   let status: "active" | "trialing" | "cancelled" | "past_due";
 
   try {
-    const resolved = await resolveSubscriptionState(productId, purchaseToken);
+    // Right after checkout, Play's Developer API can briefly still report
+    // paymentState 0 (pending) for a purchase that already succeeded client-side —
+    // propagation lag, not a real payment failure. Retry a few times with backoff
+    // before surfacing it as pending.
+    let resolved = await resolveSubscriptionState(productId, purchaseToken);
+    for (let attempt = 0; resolved.status === "past_due" && resolved.expiryMs >= Date.now() && attempt < 3; attempt++) {
+      await new Promise((r) => setTimeout(r, 2000 * (attempt + 1)));
+      resolved = await resolveSubscriptionState(productId, purchaseToken);
+    }
     expiryMs = resolved.expiryMs;
     status = resolved.status;
 
@@ -95,8 +106,7 @@ export const verifyPurchase = onCall({ enforceAppCheck: true }, async (request) 
       throw new HttpsError("failed-precondition", "Subscription has expired.");
     }
     if (status === "past_due" && expiryMs >= Date.now()) {
-      // paymentState 0 (pending) at initial purchase time, not yet a real renewal
-      // failure — surface as pending rather than granting access.
+      // Still pending after retries — a real hold/decline, not propagation lag.
       throw new HttpsError("failed-precondition", "Payment is still pending.");
     }
   } catch (err: any) {

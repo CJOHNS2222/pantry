@@ -279,7 +279,7 @@ export const Modal: React.FC<ModalProps> & {
                   </h2>
                 )}
                 {subtitle && (
-                  <p className="text-xs text-[var(--text-secondary)] opacity-70">{subtitle}</p>
+                  <p className="text-xs text-theme-muted">{subtitle}</p>
                 )}
               </div>
               {!hideCloseButton && (

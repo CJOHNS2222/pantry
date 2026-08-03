@@ -1,11 +1,8 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { useModalOpen } from '../../utils/useModalOpen';
 import { useAndroidBack } from '../../hooks/useAndroidBack';
-import { Camera as CapacitorCamera } from '@capacitor/camera';
-import { Camera, Upload, Loader2, Plus, Trash2, CheckCircle2, ShoppingBasket, X, Barcode, ChevronDown, ChevronRight, Image, ChefHat, TrendingUp, Search, Filter, Clock, Tag, FilePlus, Receipt, LayoutGrid, LayoutList } from 'lucide-react';
-import { Capacitor } from '@capacitor/core';
+import { Camera, Loader2, Plus, Trash2, ShoppingBasket, X, ChevronDown, ChevronRight, ChefHat, Search, Filter, Clock, FilePlus, LayoutGrid, LayoutList } from 'lucide-react';
 import { FixedSizeList as ReactWindowList } from 'react-window';
-import { setUserGeminiOptIn } from '../../services/featureFlags';
 import StorageLocationIndicator from './StorageLocationIndicator';
 import { PantryItem, LoadingState, ConsumptionSuggestion, ExpirationAlert, CustomCategory, RecipeSuggestion, PantryFilter, User, ShoppingItem, StructuredRecipe, SavedRecipe } from '../../types';
 
@@ -18,43 +15,23 @@ type DisplayedPantryItem = PantryItem & {
 };
 import { Tab } from '../../types/app';
 import AnalyticsService from '../../services/analyticsService';
-import { GeminiLoadingOverlay, IMAGE_ANALYSIS_STAGES } from '../ui/GeminiLoadingOverlay';
 import { log } from '../../services/logService';
-import { usePantryScan } from './usePantryScan';
-import { usePantryScannerScan } from './usePantryScannerScan';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const VirtualizedRow = ({ index, style, data }: { index: number; style: React.CSSProperties; data: any }) => {
   return data.renderRow(index, style);
 };
 
-// Temporary interface for receipt scan results that may include price data
-interface ReceiptScanResult {
-  id: string;
-  item: string;
-  category: string;
-  quantity_estimate: string;
-  estimatedPrice?: number;
-  priceOptions?: {
-    amount: number;
-    unit: string;
-    price: number;
-  }[];
-  image?: string;
-}
 import FreezerService from '../../services/freezerService';
-import VisualQuantitySelector from './VisualQuantitySelector';
-import QuantityUnitPicker, { getSmartUnits } from './QuantityUnitPicker';
 import PriceTrends from './PriceTrends';
 import ItemDetailModal from './ItemDetailModal';
 import { ProgressiveImage } from '../ui/ProgressiveImage';
 import { PantryItemSkeleton } from '../ui/SkeletonLoader';
-import { generateIntelligentRecipeQuery, searchPantryItems, getEnhancedAutocompleteSuggestions, filterPantryItems, savePantryFilter, loadPantryFilter, defaultPantryFilter, saveSearchToHistory, getRecentSearchSuggestions, AutocompleteSuggestion, getMealPrepSuggestions, RecipeIngredientMatch } from '../../utils/searchUtils';
+import { generateIntelligentRecipeQuery, searchPantryItems, filterPantryItems, savePantryFilter, loadPantryFilter, defaultPantryFilter, getMealPrepSuggestions, RecipeIngredientMatch } from '../../utils/searchUtils';
 import { debounce } from '../../utils/debounceUtils';
-import { formatItemQuantity, getExpirationColor, getAllCategories, getPreferredItemDisplayImage } from '../../utils/appUtils';
+import { formatItemQuantity, getExpirationColor, getPreferredItemDisplayImage } from '../../utils/appUtils';
 import { getQuantityAmount } from '../../utils/quantityUtils';
 import { PantryService } from '../../services/pantryService';
-import { groceryPriceService } from '../../services/groceryPriceService';
 import { useApp } from '../../contexts/AppContext';
 import { useAppActions } from '../../contexts/AppActionsContext';
 import { useKeyboardNavigation } from '../../hooks/useKeyboardNavigation';
@@ -65,10 +42,13 @@ import FreezeTransitionModal from './FreezeTransitionModal';
 
 import { InventoryCacheService } from '../../services/inventoryCacheService';
 import PantryImportModal from './PantryImportModal';
-import NutritionScannerModal from './NutritionScannerModal';
 import { PantryHealthScore } from './PantryHealthScore';
-import { CameraPermissionsModals } from './modals/CameraPermissionsModals';
 import { BottomSheet } from '../ui';
+import { AddItemsModal } from './AddItemsModal';
+import { ScanReviewModal } from './ScanReviewModal';
+import { BulkQuantityEditModal } from './BulkQuantityEditModal';
+import { PantrySearchModal } from './PantrySearchModal';
+import { ReceiptScanResult } from './usePantryScan';
 
 // Constants for virtualization threshold
 
@@ -186,41 +166,11 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
       setLoadingState(LoadingState.IDLE);
     }
   };
-
-
-
-  const {
-    imagePreview,
-    setImagePreview,
-    rawBase64,
-    setRawBase64,
-    mimeType,
-    setMimeType,
-    loadingState,
-    imageAnalyzeError,
-    setImageAnalyzeError,
-    scanResults,
-    showScanReviewModal,
-    receiptDestination,
-    setReceiptDestination,
-    setShowScanReviewModal,
-    setScanResults,
-    setLoadingState
-  } = usePantryScan(appActions.addToast);
-  const [newItemText, setNewItemText] = useState('');
-  const [newQty, setNewQty] = useState(1);
-  const [newUnit, setNewUnit] = useState('count');
+  const [scanResults, setScanResults] = useState<ReceiptScanResult[] | null>(null);
+  const [showScanReviewModal, setShowScanReviewModal] = useState(false);
+  const [receiptDestination, setReceiptDestination] = useState<'pantry' | 'shopping'>('pantry');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-
-  // Auto-suggest unit based on item name
-  useEffect(() => {
-    if (newItemText) {
-      const smartUnits = getSmartUnits(newItemText);
-      if (smartUnits && smartUnits.length > 0) {
-        setNewUnit(smartUnits[0]);
-      }
-    }
-  }, [newItemText]);
+  const [addModalInitialAction, setAddModalInitialAction] = useState<'photo' | 'barcode' | 'receipt' | 'nutrition' | null>(null);
 
   const [hasTappedAddButton, setHasTappedAddButton] = useState(() => {
     try {
@@ -242,8 +192,8 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
     }
   }, [hasTappedAddButton, isAddModalOpen]);
 
+  const [loadingState, setLoadingState] = useState<LoadingState>(LoadingState.IDLE);
   const [showImportModal, setShowImportModal] = useState(false);
-  const [showNutritionScanner, setShowNutritionScanner] = useState(false);
   const [lastImportedBatch, setLastImportedBatch] = useState<import('../../types').PantryItem[] | null>(null);
   const importedTimerRef = useRef<number | null>(null);
   const [bulkMode, setBulkMode] = useState(false);
@@ -318,60 +268,16 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
     });
   };
 
-  // Hide header/nav when any internal overlay is open
-  useModalOpen(isAddModalOpen || showScanReviewModal || showBulkQuantityEdit);
-  useAndroidBack(isAddModalOpen, () => setIsAddModalOpen(false));
-
-  const [showPermissionEducator, setShowPermissionEducator] = useState(false);
-  const [showSettingsFallback, setShowSettingsFallback] = useState(false);
-  const [pendingCameraAction, setPendingCameraAction] = useState<(() => Promise<void>) | null>(null);
-
-  useAndroidBack(showPermissionEducator, () => {
-    setShowPermissionEducator(false);
-    setPendingCameraAction(null);
-  });
-  useAndroidBack(showSettingsFallback, () => {
-    setShowSettingsFallback(false);
-    setPendingCameraAction(null);
-  });
-
-  const executeCameraActionWithPermissionCheck = useCallback(async (action: () => Promise<void>, type: 'camera' | 'photos' = 'camera') => {
-    if (!Capacitor.isNativePlatform()) {
-      await action();
-      return;
-    }
-
-    try {
-      const status = await CapacitorCamera.checkPermissions();
-      const permissionState = type === 'camera' ? status.camera : status.photos;
-      
-      if (permissionState === 'granted') {
-        await action();
-      } else if (permissionState === 'denied') {
-        setPendingCameraAction(() => action);
-        setShowSettingsFallback(true);
-      } else {
-        setPendingCameraAction(() => action);
-        setShowPermissionEducator(true);
-      }
-    } catch (err) {
-      log.error('Failed to check camera permissions', { err }, 'PantryScanner');
-      await action();
-    }
-  }, []);
-  useAndroidBack(showScanReviewModal, () => setShowScanReviewModal(false));
-  useAndroidBack(showBulkQuantityEdit, () => setShowBulkQuantityEdit(false));
-  
   // Search and filter state
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [pantryFilter, setPantryFilter] = useState<PantryFilter>(loadPantryFilter());
-  const [autocompleteSuggestions, setAutocompleteSuggestions] = useState<AutocompleteSuggestion[]>([]);
-  const [showAutocomplete, setShowAutocomplete] = useState(false);
-  const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
   const [showHealthDetail, setShowHealthDetail] = useState(false);
+
+  // Hide header/nav when any internal overlay is open
+  useModalOpen(isAddModalOpen || showScanReviewModal || showBulkQuantityEdit || isSearchModalOpen);
 
   // Inline expiring items banner logic removed in favor of system notifications.
 
@@ -429,17 +335,8 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
   useAndroidBack(showRecipeModal, () => setShowRecipeModal(false));
   useAndroidBack(showFilters, () => setShowFilters(false));
   useAndroidBack(searchQuery.length > 0, () => setSearchQuery(''));
-  useAndroidBack(isSearchModalOpen, () => setIsSearchModalOpen(false));
   useAndroidBack(showHealthDetail, () => setShowHealthDetail(false));
-
-  // Auto-set smart unit when item name changes in the quick-add form
-  useEffect(() => {
-    if (newItemText.trim().length > 1) {
-      setNewUnit(getSmartUnits(newItemText)[0]);
-    } else {
-      setNewUnit('count');
-    }
-  }, [newItemText]);
+  useAndroidBack(isSearchModalOpen, () => setIsSearchModalOpen(false));
 
   // Automatically open the add items modal if redirected from achievements setup checklist
   useEffect(() => {
@@ -496,7 +393,6 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
     return undefined;
   }, [bulkMode]);
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const gestureStartRef = useRef<{ x: number; y: number } | null>(null);
   const longPressTimerRef = useRef<number | null>(null);
   const gestureActionTriggeredRef = useRef(false);
@@ -638,30 +534,6 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
     }
   }, []);
 
-  // Update autocomplete suggestions when the debounced search query changes
-  // (uses debouncedSearchQuery, not the raw keystroke value, to avoid an O(n)
-  // scan over inventory on every keystroke — see PERF-032)
-  React.useEffect(() => {
-    if (debouncedSearchQuery.length >= 1) {
-      const suggestions = getEnhancedAutocompleteSuggestions(inventory, debouncedSearchQuery, 8);
-      setAutocompleteSuggestions(suggestions);
-      setShowAutocomplete(suggestions.length > 0);
-    } else {
-      // Load recent searches but don't show dropdown automatically
-      const recent = getRecentSearchSuggestions('pantry', 5);
-      setRecentSearches(recent);
-      setShowAutocomplete(false); // Don't show dropdown on initial load
-      setAutocompleteSuggestions([]);
-    }
-  }, [debouncedSearchQuery, inventory]);
-
-  // Save search to history when user performs a meaningful search
-  React.useEffect(() => {
-    if (searchQuery.length >= 2) {
-      saveSearchToHistory(searchQuery, 'pantry');
-    }
-  }, [searchQuery]);
-
   // Debounced search for pantry items
   const debouncedPantrySearch = React.useMemo(
     () => debounce(() => {
@@ -701,13 +573,11 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
       if (showScanReviewModal) {
         setShowScanReviewModal(false);
         setScanResults(null);
-      } else if (isAddModalOpen) {
-        closeModal();
       } else if (selectedItemIndex !== null) {
         setSelectedItemIndex(null);
       }
     },
-    enabled: showScanReviewModal || isAddModalOpen || selectedItemIndex !== null
+    enabled: showScanReviewModal || selectedItemIndex !== null
   });
 
   // Process inventory with search and filters
@@ -726,59 +596,10 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
     return filtered.map((item) => ({ ...item, originalIndex: inventory.indexOf(item) }));
   }, [inventory, debouncedSearchQuery, pantryFilter]);
 
-  const {
-    handleTakePhoto,
-    handleSelectFromGallery,
-    handleScanBarcode,
-    handleScanReceipt,
-    handleFileChange,
-    handleAnalyze,
-  } = usePantryScannerScan(
-    appActions, user, rawBase64, mimeType,
-    setImagePreview, setRawBase64, setMimeType, setLoadingState, setImageAnalyzeError,
-    setScanResults, setShowScanReviewModal, setNewItemText, setIsAddModalOpen,
-  );
-
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const removeItem = useCallback(async (index: number) => {
     await onDeleteItem(index);
   }, [onDeleteItem]);
-
-  const handleManualAdd = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    try {
-      const newItem = PantryService.createManualItem(newItemText, newQty, inventory, newUnit);
-      await onAddItem(newItem);
-      setNewItemText('');
-      setNewQty(1);
-      setNewUnit('count');
-      setIsAddModalOpen(false); // Close modal after adding
-    } catch (err) {
-      appActions.addToast(err instanceof Error ? err.message : 'Failed to add item. Please try again.', 'error');
-    }
-  }, [newItemText, newQty, newUnit, inventory, onAddItem, setIsAddModalOpen]);
-
-  const closeModal = useCallback(() => {
-    setIsAddModalOpen(false);
-    setImagePreview(null);
-    setRawBase64(null);
-    setMimeType("");
-    setLoadingState(LoadingState.IDLE);
-    setNewItemText('');
-    setNewQty(1);
-    setNewUnit('count');
-  }, []);
-
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const incrementQty = useCallback(() => {
-    setNewQty(prev => prev + 1);
-  }, [setNewQty]);
-
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const decrementQty = useCallback(() => {
-    setNewQty(prev => Math.max(1, prev - 1));
-  }, [setNewQty]);
 
   // Bulk operations
   const toggleBulkMode = useCallback(() => {
@@ -852,24 +673,33 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
   // Bulk actions
   const bulkChangeLocation = useCallback(async (newLocation: 'pantry' | 'fridge' | 'freezer' | 'spices' | 'other') => {
     if (selectedItems.size === 0) return;
-    const indicesToUpdate = Array.from(selectedItems);
-    for (const index of indicesToUpdate) {
-      await onUpdateItem(index, { storageLocation: newLocation });
+    // Resolve to item ids up front, not raw indices - inventory may have
+    // reordered (remote sync) between when the checkboxes were selected and
+    // this running, and indices captured at selection time would then update
+    // the wrong items. Re-resolve each id's current index right before use.
+    const idsToUpdate = Array.from(selectedItems).map(idx => inventory[idx]?.id).filter((id): id is string => !!id);
+    for (const id of idsToUpdate) {
+      const currentIndex = inventory.findIndex(item => item.id === id);
+      if (currentIndex === -1) continue;
+      await onUpdateItem(currentIndex, { storageLocation: newLocation });
     }
     setSelectedItems(new Set());
     setBulkMode(false);
-  }, [selectedItems, onUpdateItem, setSelectedItems, setBulkMode]);
+  }, [selectedItems, inventory, onUpdateItem, setSelectedItems, setBulkMode]);
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const bulkSetExpiration = useCallback(async (isoDate: string) => {
     if (selectedItems.size === 0) return;
-    const indicesToUpdate = Array.from(selectedItems);
-    for (const index of indicesToUpdate) {
-      await onUpdateItem(index, { expirationDate: isoDate, expirationType: 'best-by' });
+    // See bulkChangeLocation above for why this resolves by id, not index.
+    const idsToUpdate = Array.from(selectedItems).map(idx => inventory[idx]?.id).filter((id): id is string => !!id);
+    for (const id of idsToUpdate) {
+      const currentIndex = inventory.findIndex(item => item.id === id);
+      if (currentIndex === -1) continue;
+      await onUpdateItem(currentIndex, { expirationDate: isoDate, expirationType: 'best-by' });
     }
     setSelectedItems(new Set());
     setBulkMode(false);
-  }, [selectedItems, onUpdateItem, setSelectedItems, setBulkMode]);
+  }, [selectedItems, inventory, onUpdateItem, setSelectedItems, setBulkMode]);
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const bulkAddToShoppingListWithRemove = useCallback(async () => {
@@ -1981,16 +1811,17 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
             </div>
 
             {slides.length > 1 && (
-              <div className="flex items-center justify-center gap-1.5 mt-2" role="tablist" aria-label="Suggestions">
+              <div className="flex items-center justify-center gap-1.5 mt-2">
                 {slides.map((s, i) => (
                   <button
                     key={s.key}
                     onClick={() => scrollToSlide(i)}
-                    role="tab"
-                    aria-selected={i === activeIndex}
                     aria-label={`Suggestion ${i + 1} of ${slides.length}`}
-                    className={`h-1.5 rounded-full transition-all ${i === activeIndex ? 'w-5 bg-[var(--text-primary)]' : 'w-1.5 bg-[var(--text-primary)]/30'}`}
-                  />
+                    aria-current={i === activeIndex ? 'step' : undefined}
+                    className="p-3 -m-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-color)]"
+                  >
+                    <span className={`h-1.5 rounded-full transition-all ${i === activeIndex ? 'w-5 bg-[var(--text-primary)]' : 'w-1.5 bg-[var(--text-primary)]/30'}`} />
+                  </button>
                 ))}
               </div>
             )}
@@ -2067,19 +1898,6 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
         />
       )}
 
-      {showNutritionScanner && (
-        <NutritionScannerModal
-          isOpen={showNutritionScanner}
-          onClose={() => setShowNutritionScanner(false)}
-          inventory={inventory}
-          onAddItem={onAddItem}
-        />
-      )}
-
-
-
-
-
       {/* Floating Action Button */}
       <button
         onClick={() => {
@@ -2102,445 +1920,38 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
         <Plus className="w-6 h-6" aria-hidden="true" />
       </button>
 
-      {/* Add Items Modal */}
-      {isAddModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start sm:items-center justify-center z-[9999] px-4 pt-[var(--safe-area-inset-top,0px)] pb-[var(--safe-area-inset-bottom,0px)]">
-          <div className="bg-theme-primary rounded-lg shadow-xl w-full max-w-md mx-auto h-full flex flex-col border border-theme">
-            {/* Header - Fixed */}
-            <div className="flex items-center justify-between p-4 pb-3 border-b border-theme flex-shrink-0 rounded-t-lg">
-              <h3 className="text-lg font-semibold text-theme-primary">Add Items</h3>
-              <button
-                onClick={closeModal}
-                data-testid="pantry-add-modal-close"
-                aria-label="Close add items"
-                className="p-2 hover:bg-theme-secondary rounded-full transition-colors"
-              >
-                <X className="w-5 h-5 text-theme-secondary" />
-              </button>
-            </div>
-            {/* Scrollable Content */}
-            <div className="flex-1 overflow-y-auto p-4">
+      <AddItemsModal
+        isOpen={isAddModalOpen}
+        onClose={() => {
+          setIsAddModalOpen(false);
+          setAddModalInitialAction(null);
+        }}
+        onAddItem={onAddItem}
+        inventory={inventory}
+        user={user}
+        initialAction={addModalInitialAction}
+        onOpenImport={() => setShowImportModal(true)}
+        onScanResultsReady={(results) => {
+          setScanResults(results);
+          setShowScanReviewModal(true);
+        }}
+      />
 
-              {/* Camera/File Upload Section */}
-              <div className="bg-theme-secondary p-4 rounded-2xl border border-theme shadow-lg mb-6">
-                <div 
-                  className="relative group cursor-pointer transition-all duration-300"
-                  onClick={async () => {
-                    // Use Capacitor Camera if available, else fallback to file input
-                    if (Capacitor.isNativePlatform()) {
-                      await executeCameraActionWithPermissionCheck(handleTakePhoto);
-                    } else {
-                      fileInputRef.current?.click();
-                    }
-                  }}
-                >
-                  {imagePreview ? (
-                    <div className="relative rounded-xl overflow-hidden aspect-[4/3] ring-2 ring-[var(--accent-color)]">
-                      <img src={imagePreview} alt="Preview" className="w-full h-full object-cover opacity-80" />
-                      <GeminiLoadingOverlay
-                        isActive={loadingState === LoadingState.LOADING}
-                        totalSeconds={60}
-                        stages={IMAGE_ANALYSIS_STAGES}
-                        variant="overlay"
-                        onTimeout={() => {
-                          setLoadingState(LoadingState.ERROR);
-                          setImageAnalyzeError('Image analysis timed out. Please try again with a clearer photo.');
-                          appActions.addToast('Image analysis timed out. Please try again.', 'error');
-                        }}
-                      />
-                    </div>
-                  ) : (
-                    <div className="border-2 border-dashed border-theme rounded-xl bg-theme-primary hover:bg-[var(--accent-color)]/5 transition-all aspect-[4/3] flex flex-col items-center justify-center gap-3">
-                      <div className="p-3 bg-theme-secondary rounded-full shadow-lg group-hover:scale-110 transition-transform">
-                        <Upload className="w-6 h-6 text-[var(--accent-color)]" />
-                      </div>
-                      <div className="text-center">
-                        <p className="text-theme-secondary opacity-70 text-sm font-medium">Scan receipt or pantry</p>
-                        <p className="text-theme-secondary opacity-50 text-xs mt-1">Tap to take photo, choose from gallery, or upload image</p>
-                      </div>
-                    </div>
-                  )}
-                  <input 
-                    type="file" 
-                    ref={fileInputRef}
-                    data-testid="pantry-file-input"
-                    onChange={handleFileChange}
-                    accept="image/*"
-                    capture="environment"
-                    className="hidden"
-                  />
-                </div>
-
-                {/* Action Buttons — Row 1: image capture */}
-                <div className="flex gap-2 mt-4">
-                  <button
-                    onClick={async () => {
-                      if (Capacitor.isNativePlatform()) {
-                        await executeCameraActionWithPermissionCheck(handleTakePhoto);
-                      } else {
-                        fileInputRef.current?.click();
-                      }
-                    }}
-                    data-testid="pantry-photo-button"
-                    className="flex-1 py-2 px-3 rounded-lg border border-theme text-theme-secondary hover:bg-theme-primary transition-colors flex items-center justify-center gap-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:ring-offset-2"
-                    aria-label="Take photo with camera to scan pantry items"
-                  >
-                    <Camera className="w-4 h-4" aria-hidden="true" />
-                    Photo
-                  </button>
-                  
-                  <button
-                    onClick={async () => {
-                      if (Capacitor.isNativePlatform()) {
-                        await executeCameraActionWithPermissionCheck(handleSelectFromGallery, 'photos');
-                      } else {
-                        fileInputRef.current?.click();
-                      }
-                    }}
-                    data-testid="pantry-gallery-button"
-                    className="flex-1 py-2 px-3 rounded-lg border border-theme text-theme-secondary hover:bg-theme-primary transition-colors flex items-center justify-center gap-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:ring-offset-2"
-                    aria-label="Select photo from gallery to scan pantry items"
-                  >
-                    <Image className="w-4 h-4" aria-hidden="true" />
-                    Gallery
-                  </button>
-                  
-                {Capacitor.isNativePlatform() && (
-                  <button
-                    onClick={() => executeCameraActionWithPermissionCheck(handleScanBarcode)}
-                    data-testid="pantry-barcode-button"
-                    disabled={loadingState === LoadingState.LOADING}
-                    className="flex-1 py-2 px-3 rounded-lg border border-theme text-theme-secondary hover:bg-theme-primary transition-colors flex items-center justify-center gap-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                    aria-label="Scan barcode to identify product"
-                    aria-disabled={loadingState === LoadingState.LOADING}
-                  >
-                    <Barcode className="w-4 h-4" aria-hidden="true" />
-                    Barcode
-                  </button>
-                )}
-                </div>
-
-                {/* Action Buttons — Row 2: receipt & import */}
-                <div className="flex gap-2 mt-2">
-                  <button
-                    onClick={() => executeCameraActionWithPermissionCheck(handleScanReceipt)}
-                    data-testid="pantry-receipt-button"
-                    disabled={loadingState === LoadingState.LOADING}
-                    className="flex-1 py-2 px-3 rounded-lg border border-theme text-theme-secondary hover:bg-theme-primary transition-colors flex items-center justify-center gap-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                    aria-label="Scan receipt to add grocery items"
-                    aria-disabled={loadingState === LoadingState.LOADING}
-                  >
-                    <Receipt className="w-4 h-4" aria-hidden="true" />
-                    Scan Receipt
-                  </button>
-                  
-                  <button
-                    onClick={() => setShowImportModal(true)}
-                    data-testid="pantry-import-button"
-                    className={`flex-1 py-2 px-3 rounded-lg border text-sm flex items-center justify-center gap-2 transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:ring-offset-2 ${
-                      inventory.length === 0
-                        ? 'border-[var(--accent-color)]/40 bg-[var(--accent-color)]/5 text-[var(--accent-color)] font-semibold hover:bg-[var(--accent-color)]/10'
-                        : 'border-theme text-theme-secondary hover:bg-theme-primary'
-                    }`}
-                    aria-label="Import pantry items from CSV file or from a recipe URL"
-                  >
-                    <FilePlus className="w-4 h-4" aria-hidden="true" />
-                    Import{inventory.length === 0 ? ' your pantry' : ' / URL'}
-                  </button>
-
-                  {Capacitor.isNativePlatform() && (
-                    <button
-                      onClick={() => executeCameraActionWithPermissionCheck(async () => { setShowNutritionScanner(true); })}
-                      data-testid="pantry-nutrition-scanner-button"
-                      className="flex-1 py-2 px-3 rounded-lg border border-theme text-theme-secondary hover:bg-theme-primary transition-colors flex items-center justify-center gap-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:ring-offset-2"
-                      aria-label="Scan a product barcode to check nutrition facts"
-                    >
-                      <Barcode className="w-4 h-4" aria-hidden="true" />
-                      Nutrition
-                    </button>
-                  )}
-                </div>
-
-                {imagePreview && loadingState !== LoadingState.SUCCESS && (
-                  <button
-                    onClick={handleAnalyze}
-                    data-testid="pantry-process-image-button"
-                    disabled={loadingState === LoadingState.LOADING}
-                    className="w-full mt-4 flex items-center justify-center gap-2 px-4 py-2 bg-[var(--accent-color)] text-white rounded-lg hover:bg-[var(--accent-color)]/80 transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                    aria-label="Process image with AI to identify pantry items"
-                    aria-disabled={loadingState === LoadingState.LOADING}
-                  >
-                    {loadingState === LoadingState.LOADING ? (
-                      <>
-                        <Loader2 className="animate-spin w-4 h-4" aria-hidden="true" />
-                        <span>Analyzing Image...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Image className="w-4 h-4" aria-hidden="true" />
-                        <span>Process Image</span>
-                      </>
-                    )}
-                  </button>
-                )}
-
-                {/* Success State */}
-                {loadingState === LoadingState.SUCCESS && (
-                  <div className="w-full mt-4 py-4 rounded-lg bg-green-50 border border-green-200 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <CheckCircle2 className="w-6 h-6 text-green-600" />
-                      <div>
-                        <p className="text-green-800 font-semibold">Items Added Successfully!</p>
-                        <p className="text-green-600 text-sm">Closing automatically...</p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => {
-                        setImagePreview(null);
-                        setRawBase64(null);
-                        setLoadingState(LoadingState.IDLE);
-                      }}
-                      className="text-green-600 hover:text-green-800 p-1"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                )}
-
-                {/* Error State */}
-                {loadingState === LoadingState.ERROR && (
-                  <div className="w-full mt-4 py-3 px-4 rounded-lg bg-red-50 border border-red-200 flex flex-col items-center justify-center gap-2 text-center">
-                    {imageAnalyzeError?.includes('opt-in required') ? (
-                      <>
-                        <span className="text-red-800 text-sm">AI scanning requires your permission.</span>
-                        <button
-                          onClick={() => {
-                            if (user) setUserGeminiOptIn(user.id, true);
-                            setImageAnalyzeError(null);
-                            setLoadingState(LoadingState.IDLE);
-                            handleAnalyze();
-                          }}
-                          className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors"
-                        >
-                          ✨ Enable AI &amp; Scan
-                        </button>
-                      </>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <X className="w-5 h-5 text-red-600 shrink-0" />
-                        <span className="text-red-800 text-sm">Failed to analyze image. Please try again.</span>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Manual Add Section */}
-              <div className="bg-theme-secondary p-4 rounded-2xl border border-theme shadow-lg">
-                <h4 className="text-lg font-semibold text-theme-secondary mb-4">Quick Add</h4>
-                <form id="manual-add-form" onSubmit={handleManualAdd} className="space-y-4" role="form" aria-label="Add item manually">
-                  <div className="space-y-3">
-                    <input 
-                      type="text"
-                      value={newItemText}
-                      onChange={(e) => setNewItemText(e.target.value)}
-                      placeholder="Enter item name..."
-                      className="w-full bg-theme-primary border border-theme rounded-lg px-4 py-3 text-theme-secondary shadow-sm outline-none focus:border-[var(--accent-color)] focus:ring-2 focus:ring-[var(--accent-color)]/20"
-                      aria-label="Item name"
-                      aria-required="true"
-                      minLength={2}
-                      maxLength={50}
-                    />
-                    <QuantityUnitPicker
-                      quantity={newQty}
-                      unit={newUnit}
-                      onQuantityChange={setNewQty}
-                      onUnitChange={setNewUnit}
-                      itemName={newItemText}
-                      showControls={true}
-                      maxQuantity={999}
-                    />
-                  </div>
-                </form>
-              </div>
-            </div>
-
-            {/* Action Buttons - Fixed at bottom */}
-            <div className="flex-shrink-0 border-t border-theme bg-theme-primary p-4 rounded-b-lg">
-              <button
-                type="submit"
-                form="manual-add-form"
-                className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-[var(--accent-color)] text-white rounded-lg hover:bg-[var(--accent-color)]/80 transition-colors"
-                aria-label="Add item to pantry"
-              >
-                <Plus className="w-4 h-4" aria-hidden="true" />
-                Add Item to Pantry
-              </button>
-            </div>
-
-            {/* Scan Review Modal (appears after analyze) */}
-            {showScanReviewModal && scanResults && (
-              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start sm:items-center justify-center z-[9999] px-4 pt-[var(--safe-area-inset-top,0px)] pb-[var(--safe-area-inset-bottom,0px)]">
-                <div className="bg-theme-primary rounded-lg shadow-xl w-full max-w-sm sm:max-w-2xl mx-auto h-full flex flex-col border border-theme">
-                  {/* Header - Fixed */}
-                  <div className="flex items-center justify-between p-4 pb-3 border-b border-theme flex-shrink-0 rounded-t-lg">
-                    <h3 className="text-sm sm:text-lg font-bold text-theme-secondary">Review Scanned Items ({scanResults.length})</h3>
-                    <button onClick={() => { setShowScanReviewModal(false); setScanResults(null); }} className="p-2 rounded hover:bg-theme-secondary">
-                      <X className="w-5 h-5 text-theme-secondary" />
-                    </button>
-                  </div>
-
-                  {/* Scrollable Content */}
-                  <div className="flex-1 overflow-y-auto p-4">
-
-                  {/* Destination Selector */}
-                  <div className="mb-4 p-3 bg-theme-secondary rounded-lg border border-theme">
-                    <label className="block text-sm font-medium text-theme-secondary mb-2">Add items to:</label>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => setReceiptDestination('pantry')}
-                        className={`px-3 py-2 rounded text-sm font-medium transition-colors ${
-                          receiptDestination === 'pantry'
-                            ? 'bg-[var(--accent-color)] text-white'
-                            : 'bg-theme-primary border border-theme text-theme-secondary hover:bg-theme-secondary'
-                        }`}
-                      >
-                        🏠 Pantry
-                      </button>
-                      <button
-                        onClick={() => setReceiptDestination('shopping')}
-                        className={`px-3 py-2 rounded text-sm font-medium transition-colors ${
-                          receiptDestination === 'shopping'
-                            ? 'bg-[var(--accent-color)] text-white'
-                            : 'bg-theme-primary border border-theme text-theme-secondary hover:bg-theme-secondary'
-                        }`}
-                      >
-                        🛒 Shopping List
-                      </button>
-                    </div>
-                    <p className="text-xs text-theme-secondary opacity-70 mt-2">
-                      {receiptDestination === 'pantry'
-                        ? 'Items will be added to your pantry inventory'
-                        : 'Items will be added to your shopping list with price comparison options'
-                      }
-                    </p>
-                  </div>
-
-                  <div className="space-y-3">
-                    {scanResults.map((sItem, idx) => (
-                      <div key={sItem.id} className="bg-theme-secondary p-3 rounded-lg border border-theme">
-                        <div className="flex items-start gap-3">
-                            <img src={getPreferredItemDisplayImage(sItem.item, sItem.category, sItem.image)} alt={sItem.item} className="w-12 h-12 rounded object-cover flex-shrink-0" onError={(e) => { (e.target as HTMLImageElement).src = '/images/placeholder.svg'; }} />
-                          <div className="flex-1 min-w-0">
-                            <input value={sItem.item} onChange={(e) => {
-                              const updated = [...scanResults];
-                              updated[idx] = { ...updated[idx], item: e.target.value };
-                              setScanResults(updated);
-                            }} className="w-full px-2 py-1 rounded bg-theme-primary border border-theme text-theme-primary text-sm" />
-                            <div className="flex flex-wrap gap-2 mt-2">
-                              <input type="number" min="0" value={parseInt(sItem.quantity_estimate || '1')} onChange={(e) => {
-                                const updated = [...scanResults];
-                                updated[idx] = { ...updated[idx], quantity_estimate: e.target.value };
-                                setScanResults(updated);
-                              }} className="w-20 px-2 py-1 text-sm rounded bg-theme-primary border border-theme text-theme-primary" placeholder="Qty" />
-                              <select value={sItem.category || 'Uncategorized'} onChange={(e) => {
-                                const updated = [...scanResults];
-                                updated[idx] = { ...updated[idx], category: e.target.value };
-                                setScanResults(updated);
-                              }} className="px-2 py-1 text-sm rounded bg-theme-primary border border-theme text-theme-primary">
-                                {getAllCategories(customCategories).map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                              </select>
-                              <div className="flex items-center gap-1 bg-theme-primary border border-theme rounded px-2">
-                                <span className="text-theme-secondary text-sm">$</span>
-                                <input type="number" min="0" step="0.01" value={sItem.estimatedPrice || ''} onChange={(e) => {
-                                  const updated = [...scanResults];
-                                  updated[idx] = { ...updated[idx], estimatedPrice: parseFloat(e.target.value) || undefined };
-                                  setScanResults(updated);
-                                }} className="w-16 py-1 text-sm bg-transparent outline-none text-theme-primary" placeholder="Cost" />
-                              </div>
-                              {('confidence' in sItem) && (
-                                <div className="text-sm text-theme-secondary opacity-80">Conf: {(sItem as ReceiptScanResult & { confidence?: string | number }).confidence}</div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                          <div className="flex justify-end mt-2">
-                          <button onClick={() => {
-                            const updated = scanResults.filter((_, i) => i !== idx);
-                            setScanResults(updated.length ? updated : null);
-                            if (updated.length === 0) setShowScanReviewModal(false);
-                          }} className="px-3 py-1 text-sm rounded bg-red-600 text-white hover:bg-red-700" aria-label={`Remove ${sItem.item} from scan results`}>Remove</button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  </div>
-
-                  {/* Action Buttons - Fixed at bottom */}
-                  <div className="flex-shrink-0 border-t border-theme bg-theme-primary p-4 rounded-b-lg flex gap-2">
-                    <button onClick={async () => {
-                      if (!scanResults) return;
-
-                      if (receiptDestination === 'pantry') {
-                        // Add to pantry (existing behavior)
-                        await onAddItems(scanResults as PantryItem[]);
-                        
-                        // Submit extracted prices to the price database
-                        if (user) {
-                          for (const item of scanResults) {
-                            if (item.estimatedPrice && item.estimatedPrice > 0) {
-                              const unit = 'each'; // default for receipt items
-                              groceryPriceService.submitPriceUpdate(item.item, item.estimatedPrice, unit, user.id).catch(e => {
-                                log.warn('Failed to log price:', { error: e }, 'PantryScanner');
-                              });
-                            }
-                          }
-                        }
-                      } else {
-                        // Add to shopping list with price options
-                        if (!addShoppingListItem) {
-                          appActions.addToast('Shopping list integration not available from this view.', 'info');
-                          return;
-                        }
-
-                        // Convert PantryItems to ShoppingItems with price options
-                        for (const item of scanResults) {
-                          const shoppingItem: Omit<ShoppingItem, 'id'> = {
-                            item: item.item,
-                            category: item.category,
-                            checked: false,
-                            quantity: item.quantity_estimate,
-                            source: 'receipt_scan',
-                            addedAt: new Date(),
-                            estimatedPrice: item.estimatedPrice,
-                            priceOptions: item.priceOptions || (item.estimatedPrice ? [{
-                              amount: 1,
-                              unit: 'count',
-                              price: item.estimatedPrice
-                            }] : undefined)
-                          };
-
-                          await addShoppingListItem(shoppingItem);
-                        }
-                      }
-
-                      setShowScanReviewModal(false);
-                      setScanResults(null);
-                      setImagePreview(null);
-                      setRawBase64(null);
-                      setLoadingState(LoadingState.IDLE);
-                    }} className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-[var(--accent-color)] text-white rounded-lg hover:bg-[var(--accent-color)]/80 transition-colors" aria-label={`Add all scanned items to ${receiptDestination === 'pantry' ? 'pantry' : 'shopping list'}`}>
-                      Add All to {receiptDestination === 'pantry' ? 'Pantry' : 'Shopping List'}
-                    </button>
-                    <button onClick={() => { setShowScanReviewModal(false); setScanResults(null); }} className="flex items-center justify-center gap-2 px-4 py-2 bg-theme-secondary text-theme-primary border border-theme rounded-lg hover:bg-theme-primary transition-colors" aria-label="Cancel and discard scan results">Cancel</button>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      <ScanReviewModal
+        isOpen={showScanReviewModal && scanResults !== null}
+        onClose={() => {
+          setShowScanReviewModal(false);
+          setScanResults(null);
+        }}
+        scanResults={scanResults || []}
+        setScanResults={setScanResults}
+        receiptDestination={receiptDestination}
+        setReceiptDestination={setReceiptDestination}
+        customCategories={customCategories}
+        onAddItems={onAddItems}
+        addShoppingListItem={addShoppingListItem}
+        user={user}
+      />
 
       <div className="space-y-1">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mb-4 mx-1">
@@ -2974,13 +2385,9 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
                 {/* AI Scanner Card */}
                 <button
-                  onClick={async () => {
+                  onClick={() => {
+                    setAddModalInitialAction('photo');
                     setIsAddModalOpen(true);
-                    if (Capacitor.isNativePlatform()) {
-                      await executeCameraActionWithPermissionCheck(handleTakePhoto);
-                    } else {
-                      fileInputRef.current?.click();
-                    }
                   }}
                   className="flex flex-col items-center p-5 bg-theme-secondary rounded-2xl border border-theme hover:border-[var(--accent-color)]/50 hover:shadow-md hover:scale-[1.02] transition-all text-center group"
                 >
@@ -3049,100 +2456,24 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
       )}
 
       {/* Bulk Quantity Edit Modal */}
-      {showBulkQuantityEdit && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] px-4 pt-[var(--safe-area-inset-top,0px)] pb-[var(--safe-area-inset-bottom,0px)]">
-          <div className="bg-theme-primary rounded-lg shadow-xl w-full max-w-md mx-auto h-full overflow-y-auto border border-theme">
-            <div className="p-6 pb-2.5">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-bold text-theme-secondary">Edit Quantities</h3>
-                <button
-                  onClick={() => {
-                    setShowBulkQuantityEdit(false);
-                    setBulkQuantityEditItems([]);
-                  }}
-                  className="p-2 hover:bg-theme-secondary rounded-full transition-colors"
-                >
-                  <X className="w-5 h-5 text-theme-secondary" />
-                </button>
-              </div>
-
-              <p className="text-sm text-theme-secondary opacity-70 mb-4">
-                Update quantities for the items you just added:
-              </p>
-
-              <div className="space-y-4">
-                {bulkQuantityEditItems.map((item, index) => (
-                  <div key={item.id} className="flex items-center gap-3 p-3 bg-theme-secondary rounded-lg">
-                    <img
-                      src={getPreferredItemDisplayImage(item.item, item.category, item.image)}
-                      alt={item.item}
-                      className="w-10 h-10 rounded-lg object-cover"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        target.src = '/images/placeholder.svg';
-                      }}
-                    />
-                    <div className="flex-1">
-                      <span className="font-medium text-theme-primary">{item.item}</span>
-                      <div className="mt-2">
-                        <VisualQuantitySelector
-                          value={parseInt(item.quantity_estimate) || 1}
-                          onChange={(newQty) => {
-                            const updatedItems = [...bulkQuantityEditItems];
-                            updatedItems[index] = {
-                              ...updatedItems[index],
-                              quantity_estimate: newQty.toString()
-                            };
-                            setBulkQuantityEditItems(updatedItems);
-                          }}
-                          itemName={item.item}
-                          unit="items"
-                          maxValue={20}
-                          showTypicalAmounts={false}
-                          showVisualLevels={false}
-                          className="scale-90"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="flex gap-3 mt-6">
-                <button
-                  onClick={() => {
-                    setShowBulkQuantityEdit(false);
-                    setBulkQuantityEditItems([]);
-                  }}
-                  className="flex-1 py-3 rounded-lg font-bold text-sm uppercase tracking-wider bg-theme-secondary text-theme-secondary hover:bg-theme-primary transition-colors"
-                  aria-label="Skip quantity editing and keep current quantities"
-                >
-                  Skip
-                </button>
-                <button
-                  onClick={async () => {
-                    // Update all items with their new quantities
-                    const updatePromises = bulkQuantityEditItems.map(async (item) => {
-                      const inventoryIndex = inventory.findIndex(i => i.id === item.id);
-                      if (inventoryIndex !== -1) {
-                        await updateItem(inventoryIndex, { quantity_estimate: item.quantity_estimate });
-                      }
-                    });
-                    
-                    await Promise.all(updatePromises);
-                    setShowBulkQuantityEdit(false);
-                    setBulkQuantityEditItems([]);
-                  }}
-                  className="flex-1 py-3 rounded-lg font-bold text-sm uppercase tracking-wider bg-[var(--accent-color)] text-white shadow-lg hover:bg-[var(--accent-color)]/90 transition-colors"
-                  aria-label="Save all updated quantities"
-                >
-                  Save All
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <BulkQuantityEditModal
+        isOpen={showBulkQuantityEdit}
+        onClose={() => {
+          setShowBulkQuantityEdit(false);
+          setBulkQuantityEditItems([]);
+        }}
+        items={bulkQuantityEditItems}
+        onSave={async (updatedItems) => {
+          const updatePromises = updatedItems.map(async (item) => {
+            const inventoryIndex = inventory.findIndex(i => i.id === item.id);
+            if (inventoryIndex !== -1) {
+              await updateItem(inventoryIndex, { quantity_estimate: item.quantity_estimate });
+            }
+          });
+          await Promise.all(updatePromises);
+          setBulkQuantityEditItems([]);
+        }}
+      />
 
       {/* Item Detail Modal */}
       {selectedItemIndex !== null && (
@@ -3245,151 +2576,16 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
         />
       )}
 
-      <CameraPermissionsModals
-        showPermissionEducator={showPermissionEducator}
-        setShowPermissionEducator={setShowPermissionEducator}
-        showSettingsFallback={showSettingsFallback}
-        setShowSettingsFallback={setShowSettingsFallback}
-        pendingCameraAction={pendingCameraAction}
-        setPendingCameraAction={setPendingCameraAction}
-        setIsAddModalOpen={setIsAddModalOpen}
-        onPermissionError={(message) => appActions.addToast(message, 'error')}
-      />
+
 
       {/* Search Modal Overlay */}
-      {isSearchModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-start justify-center z-[9999] px-4 pt-20" onClick={() => setIsSearchModalOpen(false)}>
-          <div 
-            className="bg-theme-secondary border border-theme rounded-2xl shadow-2xl w-full max-w-md p-5 space-y-4 relative animate-fade-in-up"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold text-theme-primary">Search Pantry Items</h3>
-              <button
-                onClick={() => setIsSearchModalOpen(false)}
-                className="p-1.5 hover:bg-theme-primary rounded-full text-theme-secondary hover:text-theme-primary transition-colors flex items-center justify-center"
-                aria-label="Close search"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-theme-secondary opacity-50" />
-              <input
-                type="text"
-                autoFocus
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onFocus={() => {
-                  if (searchQuery.length >= 1 && autocompleteSuggestions.length > 0) {
-                    setShowAutocomplete(true);
-                  } else if (searchQuery.length === 0 && recentSearches.length > 0) {
-                    setShowAutocomplete(true);
-                  }
-                }}
-                onBlur={() => setTimeout(() => setShowAutocomplete(false), 250)}
-                placeholder="Search pantry items..."
-                className="w-full pl-10 pr-10 py-2.5 bg-theme-primary border border-theme rounded-lg text-theme-primary placeholder-theme-primary/50 focus:border-[var(--accent-color)] focus:outline-none"
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-theme-secondary opacity-50 hover:opacity-100"
-                  aria-label="Clear search"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              )}
-            </div>
-            
-            {/* Autocomplete Suggestions inside modal */}
-            {showAutocomplete && (
-              <div className="absolute left-5 right-5 bg-theme-primary border border-theme rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
-                {/* Recent Searches */}
-                {searchQuery.length === 0 && recentSearches.length > 0 && (
-                  <>
-                    <div className="px-4 py-2 text-xs font-semibold text-theme-secondary opacity-70 uppercase tracking-wider border-b border-theme">
-                      Recent Searches
-                    </div>
-                    {recentSearches.map((recentQuery, index) => (
-                      <button
-                        key={`recent-${index}`}
-                        onClick={() => {
-                          setSearchQuery(recentQuery);
-                          setShowAutocomplete(false);
-                          setIsSearchModalOpen(false);
-                        }}
-                        className="w-full text-left px-4 py-2 hover:bg-theme-secondary text-theme-primary flex items-center gap-2"
-                      >
-                        <Clock className="w-3 h-3 text-theme-secondary opacity-50" />
-                        <span>{recentQuery}</span>
-                      </button>
-                    ))}
-                    {autocompleteSuggestions.length > 0 && (
-                      <div className="px-4 py-2 text-xs font-semibold text-theme-secondary opacity-70 uppercase tracking-wider border-b border-theme">
-                        Suggestions
-                      </div>
-                    )}
-                  </>
-                )}
-
-                {/* Enhanced Suggestions */}
-                {autocompleteSuggestions.map((suggestion, index) => (
-                  <button
-                    key={`suggestion-${index}`}
-                    onClick={() => {
-                      setSearchQuery(suggestion.text);
-                      saveSearchToHistory(suggestion.text, 'pantry');
-                      setShowAutocomplete(false);
-                      setIsSearchModalOpen(false);
-                    }}
-                    className="w-full text-left px-4 py-2 hover:bg-theme-secondary text-theme-primary flex items-center gap-2"
-                  >
-                    <div className="flex items-center gap-1 min-w-0 flex-1">
-                      {suggestion.type === 'recent' && (
-                        <Clock className="w-3 h-3 text-blue-500 flex-shrink-0" />
-                      )}
-                      {suggestion.type === 'popular' && (
-                        <TrendingUp className="w-3 h-3 text-green-500 flex-shrink-0" />
-                      )}
-                      {suggestion.type === 'category' && (
-                        <Tag className="w-3 h-3 text-purple-500 flex-shrink-0" />
-                      )}
-                      {suggestion.type === 'match' && (
-                        <Search className="w-3 h-3 text-theme-secondary opacity-50 flex-shrink-0" />
-                      )}
-                      <span className="truncate">{suggestion.text}</span>
-                    </div>
-
-                    <div className="flex items-center gap-1 text-xs text-theme-secondary opacity-60">
-                      {suggestion.category && suggestion.type !== 'category' && (
-                        <span className="bg-theme-secondary px-1.5 py-0.5 rounded text-[10px]">
-                          {suggestion.category}
-                        </span>
-                      )}
-                      {suggestion.count && suggestion.count > 1 && (
-                        <span className="text-[10px]">
-                          ×{suggestion.count}
-                        </span>
-                      )}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-            
-            <div className="flex justify-end pt-2">
-              <button
-                onClick={() => setIsSearchModalOpen(false)}
-                className="px-5 py-2.5 bg-[var(--accent-color)] text-white font-bold rounded-xl hover:opacity-90 transition-opacity text-sm shadow-md"
-              >
-                Done
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <PantrySearchModal
+        isOpen={isSearchModalOpen}
+        onClose={() => setIsSearchModalOpen(false)}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        inventory={inventory}
+      />
 
       {canShowAdBanner && <AdMobBanner />}
     </div>

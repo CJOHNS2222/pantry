@@ -2,11 +2,10 @@ import { onDocumentWritten } from 'firebase-functions/v2/firestore';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getMessaging } from 'firebase-admin/messaging';
 import { logger } from 'firebase-functions/v2';
-import admin from 'firebase-admin';
-import { getApps } from 'firebase-admin/app';
+import { getApps, initializeApp } from 'firebase-admin/app';
 
 if (!getApps().length) {
-  admin.initializeApp();
+  initializeApp();
 }
 
 const db = getFirestore();

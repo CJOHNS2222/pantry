@@ -197,7 +197,7 @@ class CalendarService {
         .map(m => `${m.type}: ${m.recipe?.title || 'Unknown'}`)
         .join('\\n');
 
-      const uid = `stockandspoon-${day.date}-${Math.random().toString(36).substr(2, 6)}@stockandspoon.app`;
+      const uid = `stockandspoon-${day.date}-${Math.random().toString(36).substr(2, 6)}@stock-spoon-website.web.app`;
 
       lines.push(
         'BEGIN:VEVENT',

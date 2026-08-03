@@ -1,13 +1,12 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import {logger} from "firebase-functions/v2";
-import admin from 'firebase-admin';
-import { getApps } from 'firebase-admin/app';
+import { getApps, initializeApp } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { getAuth } from 'firebase-admin/auth';
 
 if (!getApps().length) {
-  admin.initializeApp();
+  initializeApp();
 }
 
 // Checkpoint collection for the "data cleaned up but auth record not yet deleted"

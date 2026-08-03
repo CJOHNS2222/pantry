@@ -31,6 +31,8 @@ body.modal-open nav.fixed {
   --bg-secondary: #f3f4f6;
   --text-primary: #111827;
   --text-secondary: #374151;
+  --text-muted: #4b5563;
+  --accent-text: #FFFFFF;
   --border-color: #d1d5db;
 }
 
@@ -39,6 +41,8 @@ body.modal-open nav.fixed {
   --bg-secondary: #374151;
   --text-primary: #f9fafb;
   --text-secondary: #d1d5db;
+  --text-muted: #9ca3af;
+  --accent-text: #1F2937;
   --border-color: #4b5563;
 }
 
@@ -47,7 +51,14 @@ body.modal-open nav.fixed {
 .bg-theme-secondary { background-color: var(--bg-secondary); }
 .text-theme-primary { color: var(--text-primary); }
 .text-theme-secondary { color: var(--text-secondary); }
+.text-theme-muted { color: var(--text-muted); }
 .border-theme { border-color: var(--border-color); }
+
+/* Accessibility overrides for accessible contrast */
+.bg-\[var\(--accent-color\)\]\.text-white,
+.bg-\[var\(--accent-color\)\] .text-white {
+  color: var(--accent-text) !important;
+}
 
 .theme-transition {
   transition: all 0.3s ease;

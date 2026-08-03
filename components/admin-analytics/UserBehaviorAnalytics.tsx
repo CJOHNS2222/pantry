@@ -192,83 +192,9 @@ const UserBehaviorAnalytics: React.FC = () => {
           ]
         });
       } catch (error) {
-        log.error('Failed to load real user behavior metrics from Firestore, using fallbacks:', error);
-        
-        // Fail-safe scaled metrics
-        const totalUsers = 1250;
-        const activeUsers = 890;
-        setMetrics({
-          totalUsers,
-          activeUsers,
-          sessionDuration: 8.5,
-          featureUsage: {
-            pantryScanner: 1450,
-            recipeSearch: 3200,
-            mealPlanning: 980,
-            shoppingList: 2100,
-            analyticsView: 340
-          },
-          conversionFunnel: {
-            appOpens: 5000,
-            tutorialStarts: 1200,
-            tutorialCompletes: 850,
-            premiumUpgrades: 120
-          },
-          popularFeatures: [
-            {
-              name: 'Recipe Search',
-              usage: 3200,
-              growth: 15.2,
-              icon: <ChefHat className="w-5 h-5" />
-            },
-            {
-              name: 'Shopping List',
-              usage: 2100,
-              growth: 8.7,
-              icon: <ShoppingCart className="w-5 h-5" />
-            },
-            {
-              name: 'Pantry Scanner',
-              usage: 1450,
-              growth: 22.1,
-              icon: <Camera className="w-5 h-5" />
-            },
-            {
-              name: 'Meal Planning',
-              usage: 980,
-              growth: 12.5,
-              icon: <Calendar className="w-5 h-5" />
-            },
-            {
-              name: 'Recipe Ratings',
-              usage: 650,
-              growth: 5.3,
-              icon: <Star className="w-5 h-5" />
-            }
-          ],
-          userJourneys: [
-            {
-              path: 'Pantry → Recipe Search → Shopping List',
-              users: 450,
-              conversion: 68.2
-            },
-            {
-              path: 'Recipe Search → Meal Planning → Shopping List',
-              users: 320,
-              conversion: 54.7
-            },
-            {
-              path: 'Pantry Scanner → Recipe Search → Save Recipe',
-              users: 280,
-              conversion: 42.1
-            },
-            {
-              path: 'Tutorial → Recipe Search → Premium Upgrade',
-              users: 95,
-              conversion: 31.8
-            }
-          ]
-        });
+        log.error('Failed to load user behavior metrics from Firestore:', error);
+        // Set null to show error state instead of fake data
+        setMetrics(null);
       }
     };
 
@@ -288,8 +214,10 @@ const UserBehaviorAnalytics: React.FC = () => {
 
   if (!metrics) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--accent-color)]"></div>
+      <div className="flex flex-col items-center justify-center py-12 gap-3">
+        <BarChart3 className="w-12 h-12 text-gray-400" />
+        <p className="text-theme-muted">Unable to load analytics data</p>
+        <p className="text-xs text-theme-muted">Check your connection and try again</p>
       </div>
     );
   }

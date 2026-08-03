@@ -146,7 +146,7 @@ export async function searchRecipesViaOpenRouter(
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type':  'application/json',
         // OpenRouter requires these headers to identify the calling app
-        'HTTP-Referer':  'https://stockandspoon.app',
+        'HTTP-Referer':  'https://stock-spoon-website.web.app',
         'X-Title':       'Stock & Spoon',
       },
       body: JSON.stringify({
@@ -240,7 +240,7 @@ async function callVisionModel(
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type':  'application/json',
-        'HTTP-Referer':  'https://stockandspoon.app',
+        'HTTP-Referer':  'https://stock-spoon-website.web.app',
         'X-Title':       'Stock & Spoon',
       },
       body: JSON.stringify({

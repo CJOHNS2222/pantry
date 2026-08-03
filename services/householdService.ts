@@ -94,6 +94,7 @@ export const createHousehold = async (
         },
       ],
       memberIds: [user.id],
+      ownerId: user.id,
     };
 
     // Add custom metrics

@@ -742,6 +742,28 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                     </div>
                   )}
                 </div>
+
+                {/* Per-batch breakdown — same item merged from multiple purchases keeps each
+                    batch's own quantity/expiration instead of collapsing to one date */}
+                {item.batches && item.batches.length > 1 && (
+                  <div className="bg-theme-secondary rounded-lg p-3">
+                    <div className="text-xs text-theme-secondary mb-2">Batches ({item.batches.length})</div>
+                    <div className="space-y-1.5">
+                      {item.batches.map(batch => (
+                        <div key={batch.batchId} className="flex items-center justify-between text-sm">
+                          <span className="text-theme-primary font-medium">
+                            {batch.quantity} {batch.unit || localUnit}
+                          </span>
+                          <span className="text-theme-secondary">
+                            {batch.expires
+                              ? `exp ${new Date(batch.expires).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}`
+                              : 'no expiry'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
