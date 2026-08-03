@@ -20,6 +20,13 @@ export interface DetailedChangeEntry {
 
 export const RECENT_CHANGES: ChangeEntry[] = [
   {
+    "version": "3.0.17",
+    "date": "Aug 3, 2026",
+    "highlights": [
+      "Accessibility Improvements (F3-F18) — Remediated 16 accessibility findings: enabled viewport pinch-zoom, implemented…"
+    ]
+  },
+  {
     "version": "3.0.16",
     "date": "Aug 1, 2026",
     "highlights": [
@@ -36,19 +43,22 @@ export const RECENT_CHANGES: ChangeEntry[] = [
       "Needs Attention Filter Option — Added a \"Needs Attention (Expired/Soon)\" option to the expiration status filter…",
       "Direct Quantity Input — Added a direct text input field for item quantity in the Item Detail Modal, allowing manual…"
     ]
-  },
-  {
-    "version": "3.0.14",
-    "date": "Jul 24, 2026",
-    "highlights": [
-      "Cloud Functions & Subscription Notifications — Added real-time subscription notifications handler…",
-      "Household & Data Migration — Resolved cache service imports and improved multi-user household migration handling.",
-      "Usage & Subscription Services — Enhanced usageService limits tracking and test suite coverage."
-    ]
   }
 ];
 
 export const ALL_CHANGES: DetailedChangeEntry[] = [
+  {
+    "version": "3.0.17",
+    "date": "Aug 3, 2026",
+    "sections": [
+      {
+        "title": "Added / Changed / Fixed",
+        "bullets": [
+          "**Accessibility Improvements (F3-F18)** — Remediated 16 accessibility findings: enabled viewport pinch-zoom, implemented dynamic YIQ-based text contrast for accent backgrounds, enforced minimum 44px touch targets on buttons/controls, implemented WAI-ARIA combobox/listbox specifications, added focus indicator styles, translated modal strings, and respected prefers-reduced-motion media query."
+        ]
+      }
+    ]
+  },
   {
     "version": "3.0.16",
     "date": "Aug 1, 2026",

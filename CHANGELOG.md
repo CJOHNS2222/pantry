@@ -1,3 +1,10 @@
+## [3.0.17] - 2026-08-03
+
+### Added / Changed / Fixed
+- **Accessibility Improvements (F3-F18)** — Remediated 16 accessibility findings: enabled viewport pinch-zoom, implemented dynamic YIQ-based text contrast for accent backgrounds, enforced minimum 44px touch targets on buttons/controls, implemented WAI-ARIA combobox/listbox specifications, added focus indicator styles, translated modal strings, and respected prefers-reduced-motion media query.
+
+---
+
 ## [3.0.16] - 2026-08-01
 
 ### Added / Changed / Fixed
