@@ -1,192 +1,69 @@
-import React, { useState, useEffect, useRef, useMemo, Suspense, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { serverTimestamp } from 'firebase/firestore';
 import DatabaseMonitoringService from './services/databaseMonitoringService';
 import { Login } from './components/auth-onboarding/Login';
 import ErrorBoundary from './components/ui/ErrorBoundary';
 import { AppLoadingScreen } from './components/ui/AppLoadingScreen';
-import { Modal } from './components/ui/Modal';
 import { AppHeader } from './components/layout/AppHeader';
 import { AppNavigation } from './components/layout/AppNavigation';
 import { MainContent } from './components/layout/MainContent';
-import { User, PantryItem, StructuredRecipe, Household, ShoppingItem, RecipeSearchResult, UserProfile, Batch } from './types';
+import { AppGlobalModals } from './components/layout/AppGlobalModals';
+import { User, Household, RecipeSearchResult, UserProfile } from './types';
 import { Tab } from './types/app';
 import { useAuth } from './hooks/useAuth';
 import { useTheme } from './hooks/useTheme';
 import { useSettings } from './hooks/useSettings';
 import { useToast } from './components/ui/Toast';
-import { Button } from './components/ui/Button';
 import { useDataManagement } from './hooks/useDataManagement';
 import { useHouseholdActivity } from './hooks/useHouseholdActivity';
 import { HouseholdActivityService } from './services/householdActivityService';
 import { useOfflineStatus } from './hooks/useOfflineStatus';
 import AnalyticsService from './services/analyticsService';
 import { SubscriptionProvider } from './hooks/useSubscription';
-
-import { isHouseholdMember, inferCategoryFromItemName, inferStorageLocationFromItemName, parseIngredientForShoppingList, getItemImage, fetchExternalItemImage, parseQuantityAndUnit } from './utils/appUtils';
-import { getUserMeasurementSystem, convertIngredientString } from './utils/measurementUtils';
-import { getQuantityAmount } from './utils/quantityUtils';
 import { NotificationBanner } from './components/ui/NotificationBanner';
-import { NotificationService, AppNotification, NotificationSettings } from './services/notificationService';
-import { markNotificationRead, deleteNotification, snoozeNotificationInCache, updateNotificationInCache } from './services/notificationsService';
-import { log } from './services/logService';
-import { initCurrency } from './services/currencyService';
-import { destroyReceiptOcrWorker } from './services/receiptOcrService';
-import { cleanupCacheService } from './services/cacheService';
-import { pushNotificationService } from './services/pushNotificationService';
-import { App as CapacitorApp } from '@capacitor/app';
-import { Capacitor, PluginListenerHandle } from '@capacitor/core';
-import { PushNotifications } from '@capacitor/push-notifications';
-import { AdMob } from '@capacitor-community/admob';
+import { NotificationSettings } from './services/notificationService';
+import { setAppContext } from './services/sentryService';
 import { AppProvider } from './contexts/AppContext';
 import { AppActionsProvider } from './contexts/AppActionsContext';
 import { useStableCallback } from './hooks/useStableCallback';
-import SafeAreaService from './services/safeAreaService';
 import { GlobalUpdatePrompt } from './components/ui/GlobalUpdatePrompt';
-import { ContextualTutorial, useContextualTips } from './components/auth-onboarding/ContextualTutorial';
-import { FeatureTooltip } from './components/auth-onboarding/FeatureTooltip';
-import { joinHousehold } from './services/householdService';
-import { setAppContext, trackNavigation, trackShoppingListAction } from './services/sentryService';
 import remoteConfig from './services/remoteConfigService';
 import { useIsAdmin } from './hooks/useIsAdmin';
-import PerformanceMonitoringService from './services/performanceMonitoringService';
-import HapticService from './services/hapticService';
-import { ShoppingListCacheService } from './services/shoppingListCacheService';
-import { groceryPriceService } from './services/groceryPriceService';
-import { PriceDataCacheService } from './services/priceDataCacheService'; // Import the service
-import { initializePurchaseStore } from './services/purchaseService';
-import ExpiredItemsLaunchSheet, { getExpiredLaunchEnabled } from './components/pantry/ExpiredItemsLaunchSheet';
-import { recordMilestone } from './services/onboardingMilestoneService';
-import { useIntl } from 'react-intl';
-import { useAndroidBack, closeTopAndroidModal } from './hooks/useAndroidBack';
 import { useKeyboard } from './hooks/useKeyboard';
-import { cameraRestoredStore } from './utils/cameraRestoredStore';
-import { getUnlockedBadges } from './utils/achievementUtils';
-import { useCelebrationFireworks } from './hooks/useCelebrationFireworks';
 import { useNotificationPolling } from './hooks/useNotificationPolling';
 import { useHouseholdMigrationRetry } from './hooks/useHouseholdMigrationRetry';
-import { migrateUserDataToHousehold } from './services/householdMigrationService';
 
-// Lazy load monitoring components
-const DatabaseAnalytics = React.lazy(() => import('./components/admin-analytics/DatabaseAnalytics').then(module => ({ default: module.default })));
-
-// Lazy load modal-only components — these are only needed after a specific user
-// action (household setup, onboarding, recipe search, etc.) so keeping them out
-// of the initial bundle shrinks first-load JS for every user.
-const HouseholdManager = React.lazy(() => import('./components/household/Household').then(m => ({ default: m.HouseholdManager })));
-const HouseholdInviteModal = React.lazy(() => import('./components/household/HouseholdInviteModal').then(m => ({ default: m.HouseholdInviteModal })));
-const ModernOnboardingFlow = React.lazy(() => import('./components/auth-onboarding/ModernOnboardingFlow').then(m => ({ default: m.ModernOnboardingFlow })));
-const RiskAssessmentQuestionnaire = React.lazy(() => import('./components/ui/RiskAssessmentQuestionnaire'));
-const ItemDetailModal = React.lazy(() => import('./components/pantry/ItemDetailModal'));
-const ExpiredItemsModal = React.lazy(() => import('./components/pantry/ExpiredItemsModal'));
-const RecipeFinderModalSection = React.lazy(() => import('./components/recipe-finder/RecipeFinderModalSection').then(m => ({ default: m.RecipeFinderModalSection })));
-const GeminiTokenDebugger = React.lazy(() => import('./components/ui/GeminiTokenDebugger').then(m => ({ default: m.GeminiTokenDebugger })));
-const WhatsNewModal = React.lazy(() => import('./components/auth-onboarding/WhatsNewModal').then(m => ({ default: m.WhatsNewModal })));
-const FeatureDiscoveryManager = React.lazy(() => import('./components/auth-onboarding/FeatureDiscovery').then(m => ({ default: m.FeatureDiscoveryManager })));
-
-// Loading component for lazy-loaded components
-const LoadingSpinner: React.FC = () => (
-  <div className="flex items-center justify-center py-4">
-    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[var(--accent-color)]"></div>
-  </div>
-);
-
-
+// Modular hooks for App orchestrator
+import { useNavigationState } from './hooks/useNavigationState';
+import { useAppLifecycle } from './hooks/useAppLifecycle';
+import { useAppModals } from './hooks/useAppModals';
+import { useNotificationHandlers } from './hooks/useNotificationHandlers';
+import { useFeatureMilestones } from './hooks/useFeatureMilestones';
+import { usePantryShoppingActions } from './hooks/usePantryShoppingActions';
 
 const App: React.FC = () => {
-  const intl = useIntl();
-  const [activeTab, setActiveTab] = useState<Tab>(Tab.PANTRY); // Default to pantry
-  const prevActiveTabRef = useRef<Tab>(activeTab);
-  const [activeSettingsCategory, setActiveSettingsCategory] = useState<string | null>(null);
-  // Stack of previously-visited tabs used by the hardware back button to navigate backwards.
-  const tabHistoryRef = useRef<Tab[]>([]);
-  // Track which tabs the user has already visited this session (for contextual tips)
-  const visitedTabsRef = useRef<Set<Tab>>(new Set<Tab>());
+  const { user, setUser, handleLogout, isAuthReady } = useAuth();
+  const { settings, setSettings } = useSettings();
+  useTheme(settings.theme);
+  const toast = useToast();
+
+  const {
+    activeTab,
+    setActiveTab,
+    switchTab,
+    applyTabChange,
+    tabHistoryRef,
+    activeSettingsCategory,
+    setActiveSettingsCategory,
+  } = useNavigationState(settings.navigation?.hiddenTabs);
+
   const [persistedRecipeResult, setPersistedRecipeResult] = useState<RecipeSearchResult | null>(null);
   const [initialSearchQuery, setInitialSearchQuery] = useState<string>('');
   const isKeyboardVisible = useKeyboard();
 
-  // Global achievement state and celebration ref
-  const [newlyUnlockedBadge, setNewlyUnlockedBadge] = useState<{ id: string; title: string; icon: string; description: string; color: string } | null>(null);
-  const { canvasRef: fireworksCanvasRef, triggerCelebration } = useCelebrationFireworks();
-
-  const tabNames: Record<Tab, string> = {
-    [Tab.PANTRY]: 'pantry',
-    [Tab.PANTRY_CACHE_TEST]: 'pantry_cache_test',
-    [Tab.SHOPPING]: 'shopping',
-    [Tab.MEALS]: 'meals',
-    [Tab.RECIPES]: 'recipes',
-    [Tab.SETTINGS]: 'settings',
-    [Tab.COMMUNITY]: 'community'
-  } as Record<Tab, string>;
-
-  const tabTitles: Record<Tab, string> = {
-    [Tab.PANTRY]: 'Pantry',
-    [Tab.PANTRY_CACHE_TEST]: 'Pantry',
-    [Tab.SHOPPING]: 'Shopping List',
-    [Tab.MEALS]: 'Meal Planner',
-    [Tab.RECIPES]: 'Recipes',
-    [Tab.SETTINGS]: 'Settings',
-    [Tab.COMMUNITY]: 'Community'
-  } as Record<Tab, string>;
-
-  // Side effects that must run on every tab change (both forward navigation
-  // via switchTab and hardware-back retrace) - kept separate from history
-  // bookkeeping so the back-button path doesn't re-push/duplicate history.
-  const applyTabChange = (tab: Tab) => {
-    setActiveTab(tab);
-    window.scrollTo(0, 0);
-    if (tab === Tab.SETTINGS) {
-      setActiveSettingsCategory(null);
-    }
-    const tabTitle = tabTitles[tab];
-    document.title = tabTitle ? `${tabTitle} - Stock & Spoon` : 'Stock & Spoon';
-    if (typeof window !== 'undefined') {
-      const nextHash = `#${tabNames[tab] || ''}`;
-      if (window.location.hash !== nextHash) {
-        window.history.replaceState(null, '', nextHash);
-      }
-    }
-  };
-
-  // Custom tab switching function that resets scroll position
-  const switchTab = (tab: Tab) => {
-    PerformanceMonitoringService.mark(`tab_switch_start_${tab}`);
-
-    trackNavigation(tabNames[activeTab] || 'unknown', tabNames[tab] || 'unknown');
-    HapticService.light();
-    // Record the current tab in the back-navigation history before switching.
-    // Keep a cap of 20 entries so it never grows unbounded.
-    tabHistoryRef.current = [...tabHistoryRef.current.slice(-19), activeTab];
-    applyTabChange(tab);
-
-    PerformanceMonitoringService.mark(`tab_switch_end_${tab}`);
-    PerformanceMonitoringService.measure(`tab_switch_${tab}`, `tab_switch_start_${tab}`, `tab_switch_end_${tab}`);
-  };
-
-  // UI States
-  const [showHousehold, setShowHousehold] = useState(false);
-  const [showOnboarding, setShowOnboarding] = useState(false);
-  const [showNotificationsModal, setShowNotificationsModal] = useState(false);
-  const [showHouseholdInviteModal, setShowHouseholdInviteModal] = useState(false);
-  const [showExpiredItemsModal, setShowExpiredItemsModal] = useState(false);
-  const [expiredItemsModalSpecificItems, setExpiredItemsModalSpecificItems] = useState<PantryItem[] | undefined>(undefined);
-  const [showExpiredLaunchSheet, setShowExpiredLaunchSheet] = useState(false);
-  const [expiredLaunchItems, setExpiredLaunchItems] = useState<PantryItem[]>([]);
-  const hasShownExpiredLaunchRef = useRef(false);
-  const retryIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const [notificationViewItem, setNotificationViewItem] = useState<{ item: PantryItem; index: number } | null>(null);
-  const [showAddToPlanDialog, setShowAddToPlanDialog] = useState(false);
-  const [pendingRecipeForPlan, setPendingRecipeForPlan] = useState<StructuredRecipe | null>(null);
-  const [selectedDayForPlan, setSelectedDayForPlan] = useState<number | null>(null);
-  const [selectedMealForPlan, setSelectedMealForPlan] = useState<'breakfast' | 'lunch' | 'dinner' | null>(null);
-  const [householdInvites, setHouseholdInvites] = useState<AppNotification[]>([]);
   const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>({
     enabled: true,
-    quietHours: {
-      enabled: false,
-      start: '22:00',
-      end: '08:00'
-    },
+    quietHours: { enabled: false, start: '22:00', end: '08:00' },
     types: {
       expiration: 'day_before',
       recipe_suggestion: true,
@@ -199,31 +76,8 @@ const App: React.FC = () => {
     }
   });
 
-  const backButtonListenerRef = useRef<PluginListenerHandle | null>(null);
-  const appUrlOpenListenerRef = useRef<PluginListenerHandle | null>(null);
-
-  const { user, setUser, handleLogout, isAuthReady } = useAuth(); // Use isAuthReady
-  const { tips: contextualTips, addTip: addContextualTip, dismissTip: dismissContextualTip } = useContextualTips(user);
-  const { settings, setSettings } = useSettings();
-  const toast = useToast();
   const { notifications, setNotifications } = useNotificationPolling(user, notificationSettings);
 
-  // Root lifecycle cleanup for monitoring and background workers (PERF-018, PERF-019, PERF-021)
-  useEffect(() => {
-    return () => {
-      DatabaseMonitoringService.cleanup();
-      destroyReceiptOcrWorker();
-      cleanupCacheService();
-    };
-  }, []);
-
-  // Load exchange rates and apply the user's preferred display currency for price estimates
-  useEffect(() => {
-    initCurrency(user?.profile?.currency).catch(() => {});
-  }, [user?.profile?.currency]);
-
-  // Bridge: preserve existing addToast(message, type?, ttl?, actionLabel?, action?) signature
-  // so all ~30 downstream call sites (hooks/services) work unchanged.
   const addToast = useCallback((
     message: string,
     type: 'success' | 'error' | 'info' | 'warning' = 'info',
@@ -242,298 +96,25 @@ const App: React.FC = () => {
       default:        toast.info(message, opts);    break;
     }
   }, [toast]);
+
   const { syncStatus, syncNow, updateSyncStatus } = useOfflineStatus();
   const { isAdmin } = useIsAdmin(user?.id);
 
-  // Feature discovery cards — shown once per featureId via localStorage gate,
-  // and only after the user has reached the associated behaviour milestone to
-  // avoid cognitive overload right after sign-up (audit item #18).
-  const featureDiscoveries = useMemo(() => [
-    {
-      featureId: 'ai-scan',
-      title: 'AI-Powered Pantry Scan',
-      description: 'Tap the "+" button on the Pantry tab and select Photo to instantly identify and add multiple items to your pantry — quantities and expiry dates included.',
-      position: 'bottom-right' as const,
-      actionLabel: 'Open Pantry',
-      onAction: () => setActiveTab(Tab.PANTRY),
-      autoHideDelay: 10000,
-      // Show right after onboarding — no pantry items required yet
-      requiredMilestone: 'onboarding-completed' as const,
-    },
-    {
-      featureId: 'smart-recipe-search',
-      title: 'Smart Recipe Search',
-      description: 'Search by ingredient or cuisine — or let AI suggest meals based on what\'s already in your pantry.',
-      position: 'bottom-right' as const,
-      actionLabel: 'Find Recipes',
-      onAction: () => setActiveTab(Tab.RECIPES),
-      autoHideDelay: 10000,
-      // Only relevant once the user has pantry items to search against
-      requiredMilestone: 'first-pantry-item' as const,
-    },
-    {
-      featureId: 'leftover-tracker',
-      title: 'Track Your Leftovers',
-      description: 'Log leftovers with a tap and get reminders before they expire — cut food waste without any effort.',
-      position: 'bottom-right' as const,
-      actionLabel: 'Add a Leftover',
-      onAction: () => setActiveTab(Tab.PANTRY),
-      autoHideDelay: 10000,
-      // Surfaces naturally once the user is actively managing their pantry
-      requiredMilestone: 'first-pantry-item' as const,
-    },
-    {
-      featureId: 'meal-planner',
-      title: 'Weekly Meal Planner',
-      description: 'Plan meals for the whole week and auto-generate a shopping list for any missing ingredients.',
-      position: 'bottom-right' as const,
-      actionLabel: 'Plan Meals',
-      onAction: () => setActiveTab(Tab.MEALS),
-      autoHideDelay: 10000,
-      // Most useful once the user is tracking their shopping
-      requiredMilestone: 'first-shopping-item' as const,
-    },
-    {
-      featureId: 'leftover-persona-tip',
-      title: 'Leftover Safety Personas',
-      description: 'You logged a leftover! Stock & Spoon tracks expiration based on your safety persona. Check Settings → Food Safety to customize it.',
-      position: 'bottom-right' as const,
-      actionLabel: 'Customize Persona',
-      onAction: () => setActiveTab(Tab.SETTINGS),
-      autoHideDelay: 10000,
-      requiredMilestone: 'first-leftover-logged' as const,
-    },
-    {
-      featureId: 'recipe-badging-tip',
-      title: 'Smart Recipe Badging',
-      description: 'Great choice! The Chef tab displays badge icons on recipes to show if you already have the required ingredients in your pantry.',
-      position: 'bottom-right' as const,
-      actionLabel: 'Browse Recipes',
-      onAction: () => setActiveTab(Tab.RECIPES),
-      autoHideDelay: 10000,
-      requiredMilestone: 'first-recipe-saved' as const,
-    },
-    {
-      featureId: 'household-collab-tip',
-      title: 'Real-time Collaboration',
-      description: 'You are now collaborating! Pantry items, shopping lists, and meal plans are synchronized in real-time across all household members.',
-      position: 'bottom-right' as const,
-      actionLabel: 'View Household',
-      onAction: () => setShowHousehold(true),
-      autoHideDelay: 10000,
-      requiredMilestone: 'household-setup' as const,
-    },
-    {
-      featureId: 'first-recipe-saved-tip',
-      title: 'Ready to Cook? 🍳',
-      description: 'Great pick! Tap any saved recipe → "Start Cooking" to open our distraction-free, screen-on Cooking Mode with inline timers and step-by-step guidance.',
-      position: 'bottom-right' as const,
-      actionLabel: 'View Saved Recipes',
-      onAction: () => setActiveTab(Tab.RECIPES),
-      autoHideDelay: 10000,
-      requiredMilestone: 'first-recipe-saved' as const,
-    },
-    {
-      featureId: 'first-meal-planned-tip',
-      title: 'Pro Tip: Repeat Weekly Plans',
-      description: 'You planned your first meal! Tap the copy icon in the Meal Planner to easily duplicate this week\'s plan for next week and save meal-prep time.',
-      position: 'bottom-right' as const,
-      actionLabel: 'View Meal Planner',
-      onAction: () => setActiveTab(Tab.MEALS),
-      autoHideDelay: 10000,
-      requiredMilestone: 'first-meal-planned' as const,
-    },
-    {
-      featureId: 'pantry-health-score-tip',
-      title: 'Check Your Pantry Health 📊',
-      description: 'Your Pantry Health Score grades your food freshness, variety, and waste reduction. Tap the score circle on the Pantry tab to see a detailed breakdown!',
-      position: 'bottom-right' as const,
-      actionLabel: 'View Pantry',
-      onAction: () => setActiveTab(Tab.PANTRY),
-      autoHideDelay: 10000,
-      requiredMilestone: 'pantry-health-visible' as const,
-    },
-  ], [setActiveTab, setShowHousehold]);
+  // App lifecycle listeners (camera restore, back button, push, admob, currency)
+  useAppLifecycle({
+    user,
+    activeTab,
+    applyTabChange,
+    tabHistoryRef,
+    addToast,
+    isAuthReady,
+  });
 
-  // Register all App-level modals on the shared LIFO back-button stack so every
-  // modal (App-level and sub-component) is handled through the same mechanism.
-  useAndroidBack(showOnboarding, () => setShowOnboarding(false));
-  useAndroidBack(showAddToPlanDialog, () => setShowAddToPlanDialog(false));
-  useAndroidBack(notificationViewItem !== null, () => setNotificationViewItem(null));
-  useAndroidBack(showNotificationsModal, () => setShowNotificationsModal(false));
-  useAndroidBack(showHouseholdInviteModal, () => setShowHouseholdInviteModal(false));
-  useAndroidBack(showExpiredItemsModal, () => setShowExpiredItemsModal(false));
-  useAndroidBack(showExpiredLaunchSheet, () => setShowExpiredLaunchSheet(false));
-  useAndroidBack(showHousehold, () => setShowHousehold(false));
-  useAndroidBack(newlyUnlockedBadge !== null, () => setNewlyUnlockedBadge(null));
-  const maintenanceInfo = remoteConfig.getMaintenanceInfo();
-  const announcementInfo = remoteConfig.getAnnouncementInfo();
-
-  // Apply theme to document
-  useTheme(settings.theme);
-
-  // Enforce active tab is pantry on load
-  useEffect(() => {
-    setActiveTab(Tab.PANTRY);
-  }, []);
-
-  // Load price data once auth is ready and we have a user
-  useEffect(() => {
-    if (isAuthReady && user) {
-      log.debug("Auth is ready and user is logged in, loading price data...");
-      PriceDataCacheService.loadPriceData();
-    }
-  }, [isAuthReady, user?.id]);
-
-  // Initialize IAP store on Android on app launch
-  useEffect(() => {
-    if (user?.id && Capacitor.isNativePlatform()) {
-      initializePurchaseStore(user.id).catch((err: unknown) => {
-        log.error('Startup IAP store init error', { error: err instanceof Error ? err.message : String(err) }, 'App');
-      });
-    }
-  }, [user?.id]);
-
-  // Load notification settings from user profile
-  useEffect(() => {
-    // Some older user profile shapes may not include notificationSettings.
-    const ns = (user as User & { profile?: UserProfile & { notificationSettings?: NotificationSettings } })?.profile?.notificationSettings;
-    if (ns) setNotificationSettings(ns as NotificationSettings);
-  }, [user]);
-
-  // Contextual tutorial tips — shown once per tab on first visit (globally gated via localStorage)
-  useEffect(() => {
-    if (!user) return;
-    if (visitedTabsRef.current.has(activeTab)) return;
-    visitedTabsRef.current.add(activeTab);
-
-    const tipsByTab: Partial<Record<Tab, Parameters<typeof addContextualTip>[0]>> = {
-      [Tab.PANTRY]: {
-        id: 'tip-pantry-scan',
-        title: 'Scan Your Pantry',
-        description: 'Tap the "+" button at the bottom right and select Photo to AI-scan multiple items at once — no barcode needed.',
-        position: 'bottom',
-        autoHideDelay: 10000,
-      },
-      [Tab.SHOPPING]: {
-        id: 'tip-shopping-recipe',
-        title: 'Add from Recipes',
-        description: 'Open any recipe and tap "Add to Shopping List" to automatically add missing ingredients.',
-        position: 'bottom',
-        autoHideDelay: 10000,
-      },
-      [Tab.RECIPES]: {
-        id: 'tip-recipes-pantry',
-        title: 'Recipes from Your Pantry',
-        description: 'Look for the "Can Make" badge — these recipes use ingredients you already have at home.',
-        position: 'bottom',
-        autoHideDelay: 10000,
-      },
-      [Tab.MEALS]: {
-        id: 'tip-meals-plan',
-        title: 'Build Your Meal Plan',
-        description: 'Save recipes you like, then tap any day on the calendar to assign them to your meal plan.',
-        position: 'bottom',
-        autoHideDelay: 10000,
-      },
-      [Tab.COMMUNITY]: {
-        id: 'tip-community-browse',
-        title: 'Community Recipes',
-        description: 'Browse top-rated recipes submitted by other home chefs. Rate and review recipes to share your culinary feedback!',
-        position: 'bottom',
-        autoHideDelay: 10000,
-      },
-      [Tab.SETTINGS]: {
-        id: 'tip-settings-setup',
-        title: 'Preferences & Sharing',
-        description: 'Set up household sharing, adjust diet restrictions under Food Safety, or hide unused bottom tabs.',
-        position: 'bottom',
-        autoHideDelay: 10000,
-      },
-    };
-
-    const tip = tipsByTab[activeTab];
-    if (tip) addContextualTip(tip);
-    // addContextualTip is stable within a render cycle; visitedTabsRef prevents repeat calls
-  }, [activeTab, user]);
-
-  // Function to add items to shopping list
-  const addToShoppingList = async (items: (string | { item: string; source: string; notes?: string })[], defaultSource: string = 'manual') => {
-    PerformanceMonitoringService.mark('shopping_list_add_start');
-    
-    trackShoppingListAction('add_item', { count: items.length, source: defaultSource });
-    HapticService.itemAdded();
-    
-    const inHousehold = household?.id && isHouseholdMember(household, user);
-    const householdId = inHousehold ? household?.id : undefined;
-    const userId = inHousehold ? undefined : user?.id;
-    
-    const measurementSystem = getUserMeasurementSystem(user?.profile);
-
-    // Fetch prices in parallel
-    const pricePromises = items.map(async (inputItem) => {
-      const itemStr = typeof inputItem === 'string' ? inputItem : inputItem.item;
-      const itemSource = typeof inputItem === 'string' ? defaultSource : inputItem.source;
-      const itemNotes = typeof inputItem === 'string' ? undefined : inputItem.notes;
-      
-      const convertedItemStr = convertIngredientString(itemStr, measurementSystem);
-      const parsed = parseIngredientForShoppingList(convertedItemStr);
-      const priceData = await groceryPriceService.getIngredientPrice(parsed.itemName).catch((error) => {
-        log.warn('Failed to fetch ingredient price', { itemName: parsed.itemName, error }, 'App');
-        return null;
-      });
-      
-      let finalNotes = itemNotes || '';
-      if (parsed.prepNotes) {
-        finalNotes = finalNotes ? `${finalNotes} (${parsed.prepNotes})` : parsed.prepNotes;
-      }
-
-      return {
-        parsed,
-        source: itemSource,
-        notes: finalNotes || undefined,
-        estimatedPrice: priceData?.averagePrice || 0
-      };
-    });
-    
-    const priceResults = await Promise.all(pricePromises);
-    
-    const newItems: ShoppingItem[] = [];
-    for (const { parsed, estimatedPrice, source: itemSource, notes: itemNotes } of priceResults) {
-      const { amount, unit } = parseQuantityAndUnit(parsed.quantity, parsed.itemName);
-      newItems.push({
-        id: Math.random().toString(36).substr(2, 9),
-        item: parsed.itemName,
-        quantity: amount === 1 && (unit === 'pcs' || unit === 'pieces') ? '1' : `${amount} ${unit}`,
-        amount,
-        unit,
-        category: inferCategoryFromItemName(parsed.itemName),
-        checked: false,
-        source: itemSource,
-        notes: itemNotes,
-        addedAt: new Date(),
-        estimatedPrice
-      });
-    }
-    
-    setShoppingList((prev: ShoppingItem[]) => [...prev, ...newItems]);
-    
-    await ShoppingListCacheService.addItemsToCache(newItems, householdId, userId);
-    
-    setActiveTab(Tab.SHOPPING);
-    
-    PerformanceMonitoringService.mark('shopping_list_add_end');
-    PerformanceMonitoringService.measure('shopping_list_add', 'shopping_list_add_start', 'shopping_list_add_end');
-  };
-
-  // Household activity tracking — activityHousehold is synced from useDataManagement below
-  // so the subscription only starts after the real household is loaded.
+  // Household activity stream
   const [activityHousehold, setActivityHousehold] = useState<Household | null>(null);
   const {
     recentActivities,
     isLoadingActivities,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    logActivity,
     logItemAdded,
     logItemRemoved,
     logShoppingAdded,
@@ -542,14 +123,19 @@ const App: React.FC = () => {
     updateActivityStatus
   } = useHouseholdActivity(user, activityHousehold);
 
+  // Forward ref for addToShoppingList so useDataManagement can invoke it safely
+  const addToShoppingListRef = useRef<(items: (string | { item: string; source: string; notes?: string })[], defaultSource?: string) => Promise<void>>(() => Promise.resolve());
+  const handleAddToShoppingListWrapper = useCallback((items: (string | { item: string; source: string; notes?: string })[], defaultSource?: string) => {
+    return addToShoppingListRef.current(items, defaultSource);
+  }, []);
+
+  // Core data management hook
   const {
     inventory,
     setInventory,
     shoppingList,
     setShoppingList,
     savedRecipes,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    setSavedRecipes,
     ratings,
     mealPlan,
     setMealPlan,
@@ -563,16 +149,10 @@ const App: React.FC = () => {
     addCustomCategory,
     updateCustomCategory,
     deleteCustomCategory,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    generateRecipeSuggestionsOnDemand,
     handleAddToPlan,
     handleSaveRecipe,
     handleDeleteRecipe,
     submitRating,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    getRatingsForRecipe,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    getCommunityRatings,
     handleMarkAsMade,
     updateItem,
     deleteItem,
@@ -580,16 +160,12 @@ const App: React.FC = () => {
     addItem,
     addItems,
     recentActions,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    recordUndo,
     performUndo,
     recipeSaveLimitExceeded,
     mealPlanLimitExceeded,
     checkRecipeSaveLimit,
     checkMealPlanLimit,
     addShoppingListItem,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    updateShoppingListItems,
     removeShoppingListItems,
     isLoadingInventory,
     isLoadingShoppingList,
@@ -601,7 +177,7 @@ const App: React.FC = () => {
     handleRiskQuestionnaireComplete,
     refreshAllData,
     setLoadingRatingsComplete,
-  } = useDataManagement(user, addToast, addToShoppingList, updateSyncStatus, {
+  } = useDataManagement(user, addToast, handleAddToShoppingListWrapper, updateSyncStatus, {
     logItemAdded,
     logItemRemoved,
     logShoppingAdded,
@@ -610,38 +186,90 @@ const App: React.FC = () => {
     updateActivityStatus
   }, {
     onShowAddToPlanDialog: (recipe) => {
-      setPendingRecipeForPlan(recipe);
-      // Default to tomorrow's date if it exists in the plan, otherwise first day
+      modals.setPendingRecipeForPlan(recipe);
       const tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 1);
       const tomorrowStr = tomorrow.toISOString().slice(0, 10);
       const tomorrowIndex = mealPlan?.findIndex(day => day.date?.slice(0, 10) === tomorrowStr) ?? -1;
-      setSelectedDayForPlan(tomorrowIndex >= 0 ? tomorrowIndex : 0);
-      setSelectedMealForPlan('dinner');
-      setShowAddToPlanDialog(true);
+      modals.setSelectedDayForPlan(tomorrowIndex >= 0 ? tomorrowIndex : 0);
+      modals.setSelectedMealForPlan('dinner');
+      modals.setShowAddToPlanDialog(true);
     },
     settings
   });
 
-  // Sync household into activityHousehold so the activity subscription activates
-  // once the household is loaded (avoids circular dependency at hook call site).
+  // Pantry & Shopping List action helpers
+  const { addToShoppingList, handleMoveToPantry } = usePantryShoppingActions({
+    user,
+    household,
+    setShoppingList,
+    setActiveTab,
+    addItems,
+    removeShoppingListItems,
+    syncNow,
+    addToast,
+  });
+
+  useEffect(() => {
+    addToShoppingListRef.current = addToShoppingList;
+  }, [addToShoppingList]);
+
+  // App Modals manager
+  const modals = useAppModals({
+    user,
+    inventory,
+    savedRecipes,
+    mealPlan,
+    household,
+    isLoadingInventory,
+    isLoadingSavedRecipes,
+    isLoadingMealPlan,
+    isLoadingHousehold,
+  });
+
+  // Notification handlers
+  const notificationHandlers = useNotificationHandlers({
+    user,
+    setUser,
+    setHousehold,
+    inventory,
+    addToShoppingList,
+    setActiveTab,
+    addToast,
+    setNotifications,
+    setShowHouseholdInviteModal: modals.setShowHouseholdInviteModal,
+    householdInvites: modals.householdInvites,
+    setHouseholdInvites: modals.setHouseholdInvites,
+    setExpiredItemsModalSpecificItems: modals.setExpiredItemsModalSpecificItems,
+    setShowExpiredItemsModal: modals.setShowExpiredItemsModal,
+    setNotificationViewItem: modals.setNotificationViewItem,
+  });
+
+  // Progressive feature disclosure & contextual tips
+  const featureMilestones = useFeatureMilestones({
+    user,
+    activeTab,
+    inventory,
+    shoppingList,
+    mealPlan,
+    savedRecipes,
+    household,
+    setActiveTab,
+    setShowHousehold: modals.setShowHousehold,
+  });
+
+  // Sync household to activity stream
   useEffect(() => {
     setActivityHousehold(household ?? null);
   }, [household]);
 
-  // Record behaviour milestones used to gate progressive feature-discovery tips
-  // (audit item #18 — trigger by milestone rather than showing all tips at once).
+  // Sync notification settings from profile
   useEffect(() => {
-    if (inventory.length > 0) recordMilestone('first-pantry-item');
-    // Matches PantryHealthScore's own >=3 render gate — no point tipping toward a card that isn't shown yet.
-    if (inventory.length >= 3) recordMilestone('pantry-health-visible');
-  }, [inventory.length]);
+    const ns = (user as User & { profile?: UserProfile & { notificationSettings?: NotificationSettings } })?.profile?.notificationSettings;
+    if (ns) setNotificationSettings(ns as NotificationSettings);
+  }, [user]);
 
-  // Toast household members' activity as it streams in, so it's noticed without opening
-  // the header dropdown. Skips the initial batch on mount/household-switch (that's history,
-  // not something that "just happened") and never toasts the current user's own actions.
-  // recentActivities is server-sorted newest-first and capped at 20 (subscribeToActivities),
-  // so a single "last seen id" boundary is enough — no need to accumulate a growing id set.
+  // Toast activity stream updates from household members
   const lastSeenActivityIdRef = useRef<string | null>(null);
   useEffect(() => {
     if (!recentActivities.length) return;
@@ -651,8 +279,6 @@ const App: React.FC = () => {
       return;
     }
     const lastSeenIndex = recentActivities.findIndex(a => a.id === lastSeenId);
-    // If the boundary scrolled out of the 20-item window (activity burst), don't
-    // flood-toast everything currently in view — just re-anchor silently.
     const newActivities = lastSeenIndex === -1 ? [] : recentActivities.slice(0, lastSeenIndex);
     for (let i = newActivities.length - 1; i >= 0; i--) {
       const activity = newActivities[i];
@@ -668,109 +294,6 @@ const App: React.FC = () => {
   }, [activityHousehold?.id]);
 
   useEffect(() => {
-    if (shoppingList.length > 0) recordMilestone('first-shopping-item');
-  }, [shoppingList.length]);
-
-  useEffect(() => {
-    if (mealPlan && mealPlan.some(day => day.breakfast.length > 0 || day.lunch.length > 0 || day.dinner.length > 0)) {
-      recordMilestone('first-meal-planned');
-    }
-  }, [mealPlan]);
-
-  useEffect(() => {
-    if (inventory.some(item => item.is_leftover)) {
-      recordMilestone('first-leftover-logged');
-    }
-  }, [inventory]);
-
-  useEffect(() => {
-    if (savedRecipes.length > 0) {
-      recordMilestone('first-recipe-saved');
-    }
-  }, [savedRecipes.length]);
-
-  useEffect(() => {
-    if (household?.id) {
-      recordMilestone('household-setup');
-    }
-  }, [household?.id]);
-
-  // Effect to monitor and trigger new achievements instantly
-  useEffect(() => {
-    // Hold off while onboarding owns the screen — recheck once it closes so the
-    // celebration isn't lost, just deferred (avoids stacking with onboarding UI).
-    if (!user || isLoadingInventory || isLoadingSavedRecipes || isLoadingMealPlan || isLoadingHousehold || showOnboarding) return;
-
-    const unlocked = getUnlockedBadges(inventory, savedRecipes, mealPlan, household);
-    const unlockedIds = unlocked.map(b => b.id);
-
-    const savedUnlockedRaw = localStorage.getItem('pantry_unlocked_achievements');
-    let savedUnlockedIds: string[] = [];
-    if (savedUnlockedRaw) {
-      try {
-        savedUnlockedIds = JSON.parse(savedUnlockedRaw);
-      } catch {
-        savedUnlockedIds = [];
-      }
-    } else {
-      // Initialize on first load with current state to prevent spamming historic achievements
-      localStorage.setItem('pantry_unlocked_achievements', JSON.stringify(unlockedIds));
-      return;
-    }
-
-    // Find any badge that is in unlockedIds but not in savedUnlockedIds
-    const newlyUnlocked = unlocked.find(b => !savedUnlockedIds.includes(b.id));
-
-    if (newlyUnlocked) {
-      setNewlyUnlockedBadge(newlyUnlocked);
-      localStorage.setItem('pantry_unlocked_achievements', JSON.stringify([...savedUnlockedIds, newlyUnlocked.id]));
-      setTimeout(() => {
-        triggerCelebration();
-      }, 300);
-    }
-  }, [inventory, savedRecipes, mealPlan, household, user, isLoadingInventory, isLoadingSavedRecipes, isLoadingMealPlan, isLoadingHousehold, showOnboarding]);
-
-  // Global Recipe Modal states
-  const [globalModalRecipe, setGlobalModalRecipe] = useState<StructuredRecipe | null>(null);
-  const [showGlobalRecipeModal, setShowGlobalRecipeModal] = useState(false);
-  const [globalModalIsSavedView, setGlobalModalIsSavedView] = useState(false);
-
-  // Global handler to open recipe modal from anywhere without switching tabs
-  useEffect(() => {
-    const handleOpenRecipeModal = (event: CustomEvent) => {
-      const { recipe, isSavedView, isFromMealPlanner } = event.detail;
-      if (isFromMealPlanner) return; // MealPlanner handles its own modal locally!
-      setGlobalModalRecipe(recipe);
-      setGlobalModalIsSavedView(Boolean(isSavedView));
-      setShowGlobalRecipeModal(true);
-    };
-    window.addEventListener('openRecipeModal', handleOpenRecipeModal as EventListener);
-    return () => window.removeEventListener('openRecipeModal', handleOpenRecipeModal as EventListener);
-  }, []);
-
-  // Confirm add to plan from dialog
-  const confirmAddToPlan = (dayIndex: number, mealType: 'breakfast' | 'lunch' | 'dinner') => {
-    if (pendingRecipeForPlan && handleAddToPlan) {
-      handleAddToPlan(pendingRecipeForPlan, dayIndex, mealType);
-      setPendingRecipeForPlan(null);
-      setShowAddToPlanDialog(false);
-    }
-  };
-
-  useEffect(() => {
-    // Community component handles its own data loading
-    prevActiveTabRef.current = activeTab;
-  }, [activeTab]);
-
-  // If the user hides the currently-active tab, fall back to PANTRY
-  useEffect(() => {
-    const hidden = settings.navigation?.hiddenTabs ?? [];
-    if (hidden.includes(activeTab)) {
-      setActiveTab(Tab.PANTRY);
-    }
-  }, [settings.navigation?.hiddenTabs]);
-
-  useEffect(() => {
     if (user?.id && household?.id) {
       const activityMap = {
         [Tab.PANTRY]: 'viewing pantry',
@@ -781,294 +304,12 @@ const App: React.FC = () => {
         [Tab.SETTINGS]: 'viewing settings',
         [Tab.COMMUNITY]: 'viewing community'
       };
-
       const currentActivity = activityMap[activeTab] || 'using app';
       updateActivityStatus(currentActivity);
     }
   }, [user?.id, household?.id, activeTab, updateActivityStatus]);
 
-  useEffect(() => {
-    SafeAreaService.initialize().catch(error => log.error('Failed to initialize safe area service', { error }, 'App'));
-  }, []);
-
-  // Initialize AdMob on native platforms
-  useEffect(() => {
-    if (Capacitor.getPlatform() !== 'web') {
-      const useTestAds = import.meta.env.MODE !== 'production' || import.meta.env.VITE_ADMOB_USE_TEST === 'true';
-      AdMob.initialize({
-        initializeForTesting: useTestAds,
-      }).catch((error) => {
-        log.warn('AdMob failed to initialize on startup', error);
-      });
-    }
-  }, []);
-
-  // Handle Capacitor Camera restore after Android app restart due to low memory
-  useEffect(() => {
-    const handleRestoredResult = (data: import('@capacitor/app').RestoredListenerEvent) => {
-      if (data.pluginId === 'Camera' && data.methodName === 'getPhoto' && data.success) {
-        log.info('Recovered photo from appRestoredResult', undefined, 'App');
-        const intent = localStorage.getItem('camera_intent');
-        localStorage.removeItem('camera_intent');
-        cameraRestoredStore.setRestoredData(data.data as import('@capacitor/camera').Photo, intent);
-        window.dispatchEvent(new CustomEvent('cameraRestored'));
-      }
-    };
-
-    const listener = CapacitorApp.addListener('appRestoredResult', handleRestoredResult);
-    return () => {
-      listener.then(l => l.remove()).catch(() => {});
-    };
-  }, []);
-
-  useEffect(() => {
-    PerformanceMonitoringService.init();
-    PerformanceMonitoringService.mark('app_open');
-    return () => {
-      PerformanceMonitoringService.cleanup();
-    };
-  }, []);
-
-  useEffect(() => {
-    if (user?.id) {
-      const checkAndInitializePush = async () => {
-        if (Capacitor.isNativePlatform()) {
-          try {
-            const status = await PushNotifications.checkPermissions();
-            if (status.receive === 'granted') {
-              await pushNotificationService.initialize(user.id);
-            } else {
-              log.debug('Skipping push notification initialization on startup: permission not granted', { status }, 'App');
-            }
-          } catch (error) {
-            log.error('Failed to check push notification permissions', { error }, 'App');
-          }
-        } else {
-          // Web or other platform
-          await pushNotificationService.initialize(user.id);
-        }
-      };
-      checkAndInitializePush();
-    }
-  }, [user?.id]);
-
-  useEffect(() => {
-    if (user?.id) {
-      // Database monitoring is now initialized in firebaseConfig.ts
-    }
-  }, [user?.id]);
-
-  const handleNotificationDismiss = async (notificationId: string) => {
-    try {
-      if (user?.id) await markNotificationRead(user.id, notificationId);
-      else await NotificationService.markAsRead('', notificationId);
-      setNotifications(prev => prev.filter(n => n.id !== notificationId));
-    } catch (err) {
-      log.error('Failed to mark read', { err }, 'App');
-    }
-  };
-
-  const handleNotificationAction = async (notification: AppNotification) => {
-    try {
-      if (user && user.id) {
-        try {
-          await markNotificationRead(user.id, notification.id);
-        } catch {
-          // Notification lives in per-user cache only (no top-level collection doc) — fall back
-          await updateNotificationInCache(user.id, notification.id, { read: true });
-        }
-      } else {
-        await NotificationService.markAsRead('', notification.id);
-      }
-      setNotifications(prev => prev.filter(n => n.id !== notification.id));
-
-      const actionData = notification.actionData;
-      switch (notification.actionType) {
-        case 'add_to_shopping':
-          if (actionData?.itemName) {
-            addToShoppingList([actionData.itemName]);
-            addToast(`Added "${actionData.itemName}" to shopping list`, 'success');
-          } else if (actionData?.items?.[0]?.itemName) {
-            const names = actionData.items.map((i: {itemName: string}) => i.itemName) as string[];
-            addToShoppingList(names);
-            addToast(`Added ${names.length} item${names.length > 1 ? 's' : ''} to shopping list`, 'success');
-          }
-          break;
-        case 'view_recipe':
-          setActiveTab(Tab.RECIPES);
-          addToast('Viewing your saved recipes', 'info');
-          break;
-        case 'view_item': {
-          // Check if this notification contains multiple items
-          const notificationItems = actionData?.items;
-          if (notificationItems && notificationItems.length > 1) {
-            // Show ExpiredItemsModal for multiple items
-            const specificItems = notificationItems
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              .map((item: any) => inventory.find(invItem => invItem.id === item.itemId))
-              .filter((item: PantryItem | undefined): item is PantryItem => item !== undefined);
-            
-            if (specificItems.length > 0) {
-              setExpiredItemsModalSpecificItems(specificItems);
-              setShowExpiredItemsModal(true);
-            } else {
-              addToast('Items no longer found in pantry', 'info');
-            }
-          } else if (actionData?.filterAttention) {
-            try {
-              sessionStorage.setItem('pantry-filter-attention', 'true');
-            } catch { /* ignore */ }
-            setActiveTab(Tab.PANTRY);
-            window.dispatchEvent(new Event('apply-attention-filter'));
-          } else {
-            // Single item - show ItemDetailModal
-            const itemId = actionData?.items?.[0]?.itemId
-              ?? actionData?.itemId;
-            const found = itemId
-              ? inventory.findIndex(i => i.id === itemId)
-              : -1;
-            if (found !== -1) {
-              setActiveTab(Tab.PANTRY);
-              setNotificationViewItem({ item: inventory[found], index: found });
-            } else if (actionData?.tab === 'shopping') {
-              setActiveTab(Tab.SHOPPING);
-            } else {
-              setActiveTab(Tab.PANTRY);
-              addToast('Item no longer found in pantry', 'info');
-            }
-          }
-          break;
-        }
-        case 'join_household':
-          if (actionData?.householdId && user) {
-            try {
-              const updatedHousehold = await joinHousehold(actionData.householdId, user);
-              
-              if (updatedHousehold) {
-                setUser({ ...user, householdId: actionData.householdId });
-                setHousehold(updatedHousehold);
-                addToast('Successfully joined household!', 'success');
-              } else {
-                addToast('Failed to join household - invitation not found', 'error');
-              }
-            } catch (error: unknown) {
-              log.error('Error joining household', { error }, 'App');
-              let message = 'Failed to join household';
-              if (error instanceof Error && error.message?.includes('not invited')) {
-                message = 'Unable to join: You are not invited to this household or have already joined';
-              }
-              addToast(message, 'error');
-            }
-          }
-          break;
-      }
-    } catch (error) {
-      log.error('Error handling notification action', { error }, 'App');
-      addToast('Failed to process notification', 'error');
-    }
-  };
-
-  const handleNotificationSnooze = async (notificationId: string, minutes: number) => {
-    try {
-      if (user?.id) await snoozeNotificationInCache(user.id, notificationId, minutes);
-      else await NotificationService.snoozeNotification('', notificationId, minutes);
-      setNotifications(prev => prev.filter(n => n.id !== notificationId));
-    } catch (err) {
-      log.error('Failed to snooze notification', { err }, 'App');
-    }
-  };
-
-  const handleHouseholdInviteAccept = async (invite: AppNotification) => {
-    if (!user) return;
-
-    try {
-      // Mark notification as read first
-      await markNotificationRead(user.id, invite.id);
-
-      // Join the household
-      const updatedHousehold = await joinHousehold(invite.actionData.householdId, user);
-      
-      if (updatedHousehold) {
-        const joinedHouseholdId = invite.actionData.householdId;
-        setUser({ ...user, householdId: joinedHouseholdId });
-        setHousehold(updatedHousehold);
-        setHouseholdInvites(prev => prev.filter(i => i.id !== invite.id));
-        
-        // Close modal if no more invites
-        if (householdInvites.length <= 1) {
-          setShowHouseholdInviteModal(false);
-        }
-
-        // Migrate personal inventory/lists/recipes into the household
-        const migrationOk = await migrateUserDataToHousehold(joinedHouseholdId, user.id);
-        
-        addToast(
-          migrationOk
-            ? 'Successfully joined household! Your personal data has been merged in.'
-            : 'Joined household, but some data could not be migrated. You can retry from Settings.',
-          migrationOk ? 'success' : 'warning'
-        );
-      } else {
-        addToast('Failed to join household - invitation not found', 'error');
-      }
-    } catch (error: unknown) {
-      log.error('Error accepting household invite', { error }, 'App');
-      let message = 'Failed to join household';
-      if (error instanceof Error && error.message?.includes('not invited')) {
-        message = 'Unable to join: You are not invited to this household or have already joined';
-      }
-      addToast(message, 'error');
-    }
-  };
-
-  const handleHouseholdInviteDecline = async (invite: AppNotification) => {
-    if (!user) return;
-
-    try {
-      // Delete the notification (declined invites are removed)
-      await deleteNotification(user.id, invite.id);
-      
-      // Remove from invites list
-      setHouseholdInvites(prev => prev.filter(i => i.id !== invite.id));
-      
-      // Close modal if no more invites
-      if (householdInvites.length <= 1) {
-        setShowHouseholdInviteModal(false);
-      }
-      
-      addToast('Household invitation declined and removed', 'info');
-    } catch (error: unknown) {
-      log.error('Error declining household invite', { error }, 'App');
-      addToast('Failed to decline invitation', 'error');
-    }
-  };
-
-  const handleRemoveExpiredItems = async (itemIds: string[], disposalReason?: string) => {
-    try {
-      // Find the indices of the items in the current inventory array
-      const indices = itemIds
-        .map(id => inventory.findIndex(item => item.id === id))
-        .filter(index => index !== -1);
-
-      if (indices.length > 0) {
-        // Map the string disposalReason safely to the expected literal union
-        const reason = (disposalReason === 'cooked' || disposalReason === 'remove')
-          ? disposalReason
-          : 'thrown_away';
-
-        // Delegate to the core deleteItems hook, which handles state updates,
-        // cache sync, activity logging, and food waste analytics recording
-        await deleteItems(indices, reason);
-      }
-    } catch (error) {
-      log.error('Failed to remove expired items', { error }, 'App');
-      addToast('Failed to remove expired items', 'error');
-      throw error;
-    }
-  };
-
   const handleLogin = async (loggedInUser: User) => {
-    // Guest users have no Firebase Auth UID — skip all Firestore ops and onboarding
     if (loggedInUser.isGuest) {
       setUser({ ...loggedInUser, hasSeenTutorial: true });
       AnalyticsService.trackLogin('guest');
@@ -1077,7 +318,6 @@ const App: React.FC = () => {
 
     const userRef = DatabaseMonitoringService.doc('users', loggedInUser.id);
     const userDoc = await DatabaseMonitoringService.getDoc(userRef);
-
     let finalUser = loggedInUser;
 
     if (!userDoc.exists()) {
@@ -1103,7 +343,6 @@ const App: React.FC = () => {
           updatedAt: serverTimestamp()
         });
       }
-      // Merge Firestore data with the logged in user data
       finalUser = {
         ...loggedInUser,
         hasSeenTutorial: userData?.hasSeenTutorial ?? false,
@@ -1120,238 +359,13 @@ const App: React.FC = () => {
       has_seen_tutorial: finalUser.hasSeenTutorial
     });
 
-    // Show onboarding if not completed (check both Firestore flag and localStorage for cross-device support)
     if (!finalUser.hasSeenTutorial && localStorage.getItem('onboarding-completed') !== 'true') {
-      setShowOnboarding(true);
+      modals.setShowOnboarding(true);
     }
   };
 
-  const handleDiscoveryDismiss = async (featureId: string) => {
-    if (user && !user.isGuest) {
-      try {
-        const userRef = DatabaseMonitoringService.doc('users', user.id);
-        const updatedDiscoveries = user.discoveredFeatures
-          ? [...user.discoveredFeatures, featureId]
-          : [featureId];
-        await DatabaseMonitoringService.updateDoc(userRef, {
-          discoveredFeatures: updatedDiscoveries
-        });
-        setUser(prev => prev ? { ...prev, discoveredFeatures: updatedDiscoveries } : prev);
-      } catch (error) {
-        log.error('Failed to sync discovered feature to Firestore', { error, featureId }, 'App');
-      }
-    }
-  };
-
-  useEffect(() => {
-    import('./services/imageCacheService')
-      .then(({ initializeImageCache }) => {
-        initializeImageCache().catch(error => {
-          log.error('Failed to initialize image cache', { error }, 'App');
-        });
-      })
-      .catch(error => {
-        log.error('Failed to dynamically import image cache service', { error }, 'App');
-      });
-
-    AnalyticsService.trackAppOpen();
-
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        AnalyticsService.trackAppBackground();
-      } else {
-        AnalyticsService.trackAppForeground();
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, []);
-
-  const lastBackPressRef = useRef<number>(0);
-  useEffect(() => {
-    const handleBackButton = () => {
-      // Delegate to the shared LIFO modal stack first.
-      // All App-level and sub-component modals register themselves via
-      // useAndroidBack, so this single call handles every open modal.
-      if (closeTopAndroidModal()) return;
-
-      // Navigate back through tab history
-      if (tabHistoryRef.current.length > 0) {
-        const prev = tabHistoryRef.current[tabHistoryRef.current.length - 1];
-        tabHistoryRef.current = tabHistoryRef.current.slice(0, -1);
-        applyTabChange(prev);
-        return;
-      }
-
-      const currentTime = Date.now();
-      const timeDiff = currentTime - lastBackPressRef.current;
-
-      if (timeDiff < 2000) {
-        CapacitorApp.exitApp();
-      } else {
-        addToast('Press back again to exit', 'info', 2000);
-        lastBackPressRef.current = currentTime;
-      }
-    };
-
-    CapacitorApp.addListener('backButton', handleBackButton).then((listener) => {
-      backButtonListenerRef.current = listener;
-    }).catch((error) => {
-      log.error('Failed to add back button listener', { error }, 'App');
-    });
-
-    // Handle app URL open for Firebase auth redirects
-    CapacitorApp.addListener('appUrlOpen', (event) => {
-      log.debug('App opened with URL:', event.url);
-      // Check if this is a Firebase auth redirect
-      if (event.url && event.url.startsWith('com.smart.pantry://')) {
-        log.debug('Firebase auth redirect detected, URL:', event.url);
-        // The redirect result will be handled by the Login component
-        // when it mounts and calls getRedirectResult
-      }
-    }).then((listener) => {
-      appUrlOpenListenerRef.current = listener;
-    }).catch((error) => {
-      log.error('Failed to add app URL open listener', { error }, 'App');
-    });
-
-    return () => {
-      if (backButtonListenerRef.current && backButtonListenerRef.current.remove) {
-        backButtonListenerRef.current.remove();
-        backButtonListenerRef.current = null;
-      }
-      if (appUrlOpenListenerRef.current && appUrlOpenListenerRef.current.remove) {
-        appUrlOpenListenerRef.current.remove();
-        appUrlOpenListenerRef.current = null;
-      }
-    };
-  }, [addToast]);
-
-  const [previousTab, setPreviousTab] = useState<Tab>(Tab.PANTRY);
-  useEffect(() => {
-    if (activeTab !== previousTab) {
-      AnalyticsService.trackTabSwitch(previousTab, activeTab);
-      setPreviousTab(activeTab);
-    }
-  }, [activeTab, previousTab]);
-
-  // Check for household invites when user logs in
-  useEffect(() => {
-    const checkHouseholdInvites = async () => {
-      if (!user) return;
-
-      log.debug('Checking household invites for user', { userId: user.id });
-
-      // Always migrate any pre-registration email-addressed invites from the root
-      // /notifications/ collection into the per-user cache, regardless of whether
-      // the user already belongs to a household.
-      if (user.email) {
-        await NotificationService.migrateRootInviteNotifications(user.id, user.email);
-      }
-
-      // Only surface the invite modal when the user isn't yet in a household
-      if (!user.householdId) {
-        try {
-          const unreadNotifications = await NotificationService.getUnreadNotifications(user.id, user.email);
-          log.debug('Unread notifications count:', unreadNotifications.length);
-          const invites = unreadNotifications.filter(n => n.type === 'household_invite' && n.actionType === 'join_household');
-          log.debug('Household invites found:', invites.length);
-          if (invites.length > 0) {
-            setHouseholdInvites(invites);
-            setShowHouseholdInviteModal(true);
-            // Surface a toast with action so the user can't miss it
-            addToast(
-              `You have ${invites.length === 1 ? 'a household invitation' : `${invites.length} household invitations`}!`,
-              'info',
-              0, // persistent until dismissed
-              'View',
-              () => setShowHouseholdInviteModal(true)
-            );
-          }
-        } catch (error) {
-          log.error('Error checking household invites', { error }, 'App');
-        }
-      } else {
-        log.debug('Skipping invite modal - user already has a household');
-      }
-
-      // Clear the 5-minute banner throttle so any cached notifications surface
-      // immediately after login rather than being silently blocked.
-      localStorage.removeItem('lastNotificationShown');
-    };
-
-    checkHouseholdInvites();
-  }, [user]);
-
-  // Retry any pending data migration that was interrupted (app crash / network failure)
   useHouseholdMigrationRetry(user, addToast);
 
-  // Show expired items launch sheet once per session when the user has opted in
-  useEffect(() => {
-    if (hasShownExpiredLaunchRef.current) return;
-    if (!user || inventory.length === 0) return;
-    if (!getExpiredLaunchEnabled()) return;
-
-    // Returns true once resolved (shown, or nothing to show) so the retry loop can stop.
-    const tryShow = (): boolean => {
-      if (hasShownExpiredLaunchRef.current) return true;
-      const today = new Date().toISOString().slice(0, 10);
-      const expired = inventory.filter(item => {
-        if (!item.expirationDate || item.is_immortal) return false;
-        if (item.is_frozen || item.storageLocation === 'freezer') {
-          const ref = item.freezerExpiry || item.expirationDate;
-          return ref <= today;
-        }
-        return item.expirationDate <= today;
-      });
-      if (expired.length === 0) return true;
-      // Don't steal the top-of-stack from a modal the user already has open
-      // (e.g. Add Items) - portaled overlays share z-50, so popping this up
-      // mid-flow makes the other modal's buttons/inputs unclickable underneath it.
-      if (document.body.classList.contains('modal-open')) return false;
-      hasShownExpiredLaunchRef.current = true;
-      setExpiredLaunchItems(expired);
-      setShowExpiredLaunchSheet(true);
-      return true;
-    };
-
-    const timer = setTimeout(() => {
-      if (tryShow()) return;
-      // Blocked by an open modal - keep checking rather than silently giving up for the session.
-      const retryInterval = setInterval(() => {
-        if (tryShow()) clearInterval(retryInterval);
-      }, 2000);
-      retryIntervalRef.current = retryInterval;
-    }, 1500);
-    return () => {
-      clearTimeout(timer);
-      if (retryIntervalRef.current) clearInterval(retryIntervalRef.current);
-    };
-  }, [user, inventory]);
-
-  const completeOnboarding = async () => {
-    setShowOnboarding(false);
-    localStorage.setItem('onboarding-completed', 'true');
-    recordMilestone('onboarding-completed');
-    if (user?.id) {
-      const userRef = DatabaseMonitoringService.doc('users', user.id);
-      await DatabaseMonitoringService.updateDoc(userRef, { hasSeenTutorial: true });
-      setUser(prev => prev ? { ...prev, hasSeenTutorial: true } : prev);
-    }
-  };
-
-  const savePersona = async (persona: string) => {
-    if (user?.id) {
-      const userRef = DatabaseMonitoringService.doc('users', user.id);
-      await DatabaseMonitoringService.updateDoc(userRef, { 'profile.leftoverPersona': persona });
-    }
-  };
-
-  // Set Sentry App Context on theme change
   useEffect(() => {
     if (settings?.theme?.mode) {
       setAppContext(
@@ -1362,11 +376,6 @@ const App: React.FC = () => {
     }
   }, [settings?.theme?.mode]);
 
-  // ─── PERF-029: stable handler identities + memoized context provider values ─
-  // Every function handed to a context provider gets a stable identity via
-  // useStableCallback, so the useMemo'd provider objects below only change
-  // when their underlying data changes. Previously both provider values were
-  // fresh object literals on every App render, re-rendering every consumer.
   const stableSwitchTab = useStableCallback(switchTab);
   const stableSetActiveTab = useStableCallback(setActiveTab);
   const stableSetInventory = useStableCallback(setInventory);
@@ -1399,141 +408,16 @@ const App: React.FC = () => {
   const stableCheckMealPlanLimit = useStableCallback(checkMealPlanLimit);
   const stableRefreshAllData = useStableCallback(refreshAllData);
 
-  const handleShowHousehold = useStableCallback(() => setShowHousehold(true));
-
+  const handleShowHousehold = useStableCallback(() => modals.setShowHousehold(true));
   const handleReplayOnboarding = useStableCallback(() => {
     localStorage.removeItem('onboarding-completed');
     localStorage.removeItem('onboarding-checklist-dismissed');
-    setShowOnboarding(true);
+    modals.setShowOnboarding(true);
   });
 
-  const handleMoveToPantry = useStableCallback(async (items: ShoppingItem[]) => {
-    // Bulk lookup cached images first to populate the cache and avoid N Firestore reads
-    try {
-      const { getCachedImageUrls } = await import('./services/imageCacheService');
-      await getCachedImageUrls(items.map(i => i.item));
-    } catch (error) {
-      log.error('Failed to pre-fetch cached image URLs', { error }, 'App');
-    }
-
-    const processedItems = await Promise.all(items.map(async (i) => {
-      const category = inferCategoryFromItemName(i.item);
-      let image = getItemImage(i.item, category);
-
-      if (image === '/images/placeholder.svg') {
-        try {
-          const externalImage = await fetchExternalItemImage(i.item);
-          if (externalImage) {
-            image = externalImage;
-          }
-        } catch (error) {
-          log.debug('Failed to fetch external image', { item: i.item, error }, 'App');
-        }
-      }
-
-      let addQty = getQuantityAmount(i.purchasedQuantity ?? i.quantity ?? i.purchasedBatch ?? 1);
-      if (addQty < 1) addQty = 1;
-
-      const reservations: { recipeId: string; recipeName: string; quantity: number; unit: string }[] = [];
-      if (i.source && i.source.startsWith('recipe: need ')) {
-        const match = i.source.match(/recipe: need (.+?) for "(.+?)"/);
-        if (match) {
-          const qtyStr = match[1];
-          const recipeName = match[2];
-          const qtyMatch = qtyStr.match(/(\d+(?:\.\d+)?)\s*(.+)/);
-          if (qtyMatch) {
-            const quantity = parseFloat(qtyMatch[1]);
-            const unit = qtyMatch[2];
-            reservations.push({
-              recipeId: `recipe_${recipeName.replace(/\s+/g, '_').toLowerCase()}`,
-              recipeName,
-              quantity,
-              unit
-            });
-          }
-        }
-      }
-
-      // Build pantry item and convert any purchased batch/quantity into batches[]
-      const batches: Batch[] = [];
-      const nowIso = new Date().toISOString();
-
-      if (i.purchasedBatch) {
-        batches.push({
-          batchId: Math.random().toString(36).substr(2,9),
-          quantity: Math.abs(i.purchasedBatch.amount) || Math.abs(addQty),
-          unit: i.purchasedBatch.unit || (i.purchasedQuantity?.unit ?? undefined),
-          expires: i.purchasedBatch.expires,
-          purchaseDate: nowIso,
-          note: i.purchasedBatch.note || i.notes || (i.source && i.source.startsWith('recipe:') ? i.source : undefined)
-        });
-      } else if (i.purchasedQuantity) {
-        batches.push({
-          batchId: Math.random().toString(36).substr(2,9),
-          quantity: Math.abs(i.purchasedQuantity.amount) || Math.abs(addQty),
-          unit: i.purchasedQuantity.unit || undefined,
-          purchaseDate: nowIso,
-          note: i.notes || (i.source && i.source.startsWith('recipe:') ? i.source : undefined)
-        });
-      } else {
-        // Fallback: create a batch from the generic quantity field.
-        // Preserve the unit if quantity is a string like "225 g" or "800 ml".
-        const qStr = typeof i.quantity === 'string' ? i.quantity.trim() : '';
-        const unitMatch = qStr.match(/^\d+(?:[./]\d+)?(?:\.\d+)?\s+(\S+)/);
-        const fallbackUnit = unitMatch?.[1] ?? undefined;
-        batches.push({
-          batchId: Math.random().toString(36).substr(2,9),
-          quantity: Math.abs(addQty),
-          unit: fallbackUnit,
-          purchaseDate: nowIso,
-          note: i.notes || (i.source && i.source.startsWith('recipe:') ? i.source : undefined)
-        });
-      }
-
-      return {
-        id: Math.random().toString(36).substr(2,9),
-        item: i.item,
-        category,
-        quantity_estimate: Math.abs(addQty).toString(),
-        storageLocation: inferStorageLocationFromItemName(i.item),
-        image,
-        originalQuantity: i.purchasedQuantity ? `${i.purchasedQuantity.amount} ${i.purchasedQuantity.unit}` : (typeof i.quantity === 'string' ? i.quantity : undefined),
-        reservations,
-        batches,
-        dateAdded: nowIso,
-        lastRestocked: nowIso,
-        notes: i.notes || (i.source && i.source.startsWith('recipe:') ? i.source : undefined)
-      };
-    }));
-
-    const addedItems = await addItems(processedItems);
-
-    setShoppingList(prev => prev.filter(item => !items.find(moved => moved.id === item.id)));
-    await removeShoppingListItems(items.map(i => i.id));
-
-    setTimeout(() => {
-      syncNow();
-    }, 100);
-
-    addToast(
-      `Added ${items.length} item${items.length > 1 ? 's' : ''} to pantry. Edit quantities?`,
-      'info',
-      8000,
-      'Edit Quantities',
-      () => {
-        localStorage.setItem('pendingQuantityEdits', JSON.stringify(addedItems));
-        setActiveTab(Tab.PANTRY);
-      }
-    );
-  });
-
-  // Stable callbacks above are intentionally omitted from the memo deps below —
-  // their identities never change by construction.
   const appContextValue = useMemo(() => ({
     activeTab,
     setActiveTab: stableSwitchTab,
-    // The provider tree only renders after the `!user` early-return below,
-    // so `user` is always non-null when this value is actually consumed.
     user: user as User,
     household: household ?? undefined,
     inventory,
@@ -1572,8 +456,6 @@ const App: React.FC = () => {
     isLoadingMealPlan, isLoadingSavedRecipes, isLoadingHousehold, isLoadingRatings,
     consumptionSuggestions, expirationAlerts, recipeSuggestions, recentActivities, isLoadingActivities]);
 
-  // Every entry is identity-stable, so this value never changes and
-  // action-only consumers never re-render from context churn.
   const appActionsValue = useMemo(() => ({
     setActiveTab: stableSetActiveTab,
     updateItem: stableUpdateItem,
@@ -1616,7 +498,6 @@ const App: React.FC = () => {
     stableSetPersistedRecipeResult, stableHandleLogout, handleShowHousehold, stableCheckRecipeSaveLimit,
     stableCheckMealPlanLimit, stableRefreshAllData, handleReplayOnboarding]);
 
-  // Show a branded loading screen while waiting for auth to be ready
   if (!isAuthReady) {
     return <AppLoadingScreen />;
   }
@@ -1624,444 +505,127 @@ const App: React.FC = () => {
   if (!user) return <Login onLogin={handleLogin} />;
 
   const navigateToNotifications = () => {
-    // Settings.tsx reads this on mount and switches to the notifications
-    // category, then scrolls the Pending Notifications card into view.
     sessionStorage.setItem('settings_redirect_tab', 'notifications');
     setActiveTab(Tab.SETTINGS);
   };
+
+  const maintenanceInfo = remoteConfig.getMaintenanceInfo();
+  const announcementInfo = remoteConfig.getAnnouncementInfo();
 
   return (
     <SubscriptionProvider user={user}>
       <ErrorBoundary>
         <div className="h-screen flex flex-col max-w-md md:max-w-lg lg:max-w-2xl mx-auto shadow-2xl relative border-x border-theme transition-colors duration-300 overflow-x-hidden">
-        {showHousehold && (
-          <Suspense fallback={null}>
-            <HouseholdManager
-                user={user}
-                household={household}
-                setHousehold={setHousehold}
-                onClose={() => setShowHousehold(false)}
-                setActiveTab={setActiveTab}
-                addToast={addToast}
-            />
-          </Suspense>
-        )}
-
-        {showOnboarding && user && (
-          <Suspense fallback={null}>
-          <ModernOnboardingFlow
-            user={user}
-            onComplete={() => {
-              completeOnboarding().catch(error => {
-                log.error('Failed to mark onboarding complete', { error }, 'App');
-              });
-            }}
-            onPersonaSelected={(persona) => {
-              savePersona(persona).catch(error => {
-                log.error('Failed to save leftover persona from onboarding', { error }, 'App');
-              });
-            }}
-            onOpenHousehold={() => { setShowOnboarding(false); setShowHousehold(true); }}
-            onSkip={() => {
-              completeOnboarding().catch(error => {
-                log.error('Failed to mark onboarding complete (skip)', { error }, 'App');
-              });
-            }}
-            onSaveRecipes={async (recipes) => {
-              for (const r of recipes) {
-                await handleSaveRecipe(r);
-              }
-            }}
-            onAddIngredientsToList={async (items) => {
-              await addToShoppingList(items.map(i => ({ item: i, source: 'onboarding' })));
-            }}
-            onScheduleRecipes={async (recipes, _startFromTomorrow) => {
-              const today = new Date();
-              for (let i = 0; i < recipes.length; i++) {
-                const day = new Date(today);
-                day.setDate(today.getDate() + 1 + i); // start from tomorrow
-                const dateStr = day.toISOString().slice(0, 10);
-                const dayIndex = mealPlan?.findIndex(d => d.date?.slice(0, 10) === dateStr) ?? -1;
-                await handleAddToPlan(recipes[i], dayIndex >= 0 ? dayIndex : undefined, 'dinner');
-              }
-            }}
-          />
-          </Suspense>
-        )}
-
-        {showRiskQuestionnaire && (
-          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-md flex flex-col justify-end sm:justify-center overflow-hidden">
-            <div className="bg-theme-secondary w-full sm:max-w-2xl sm:mx-auto sm:rounded-3xl shadow-2xl relative flex flex-col max-h-[90vh] rounded-t-3xl mt-10 sm:mt-0 overflow-y-auto">
-              <Suspense fallback={null}>
-              <RiskAssessmentQuestionnaire
-                userId={user.id}
-                onComplete={(level: number, sensitive?: boolean) => {
-                  handleRiskQuestionnaireComplete(level, sensitive)
-                    .then(() => {
-                      setUser(prev => prev ? { ...prev, profile: { ...prev.profile, riskLevel: level, sensitiveHealthMode: !!sensitive } } : prev);
-                    })
-                    .catch(error => {
-                      log.debug('Risk questionnaire complete handler failed', { error }, 'App');
-                    });
-                }}
-              />
-              </Suspense>
-            </div>
-          </div>
-        )}
-
-        {showHouseholdInviteModal && user && (
-          <Suspense fallback={null}>
-          <HouseholdInviteModal
-            invites={householdInvites}
-            user={user}
-            onClose={() => setShowHouseholdInviteModal(false)}
-            onAccept={handleHouseholdInviteAccept}
-            onDecline={handleHouseholdInviteDecline}
-          />
-          </Suspense>
-        )}
-
-        {notificationViewItem && (
-          <Suspense fallback={null}>
-          <ItemDetailModal
-            item={notificationViewItem.item}
-            originalIndex={notificationViewItem.index}
-            onClose={() => setNotificationViewItem(null)}
-            onUpdateItem={updateItem}
-            onDeleteItem={deleteItem}
-            onAddToShoppingList={addToShoppingList}
-            customCategories={customCategories}
-          />
-          </Suspense>
-        )}
-
-        {showAddToPlanDialog && pendingRecipeForPlan && (
-          <Modal
-            isOpen={showAddToPlanDialog}
-            onClose={() => {
-              setShowAddToPlanDialog(false);
-              setPendingRecipeForPlan(null);
-            }}
-            title={intl.formatMessage({ id: 'mealPlanner.addToMealPlan' })}
-            size="sm"
-          >
-            <Modal.Body>
-              <p className="mb-4 text-[var(--text-secondary)]">
-                Select a day and meal for "{pendingRecipeForPlan.title}"
-              </p>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-[var(--text-primary)]">
-                    {intl.formatMessage({ id: 'mealPlanner.day' })}
-                  </label>
-                  <select
-                    className="w-full p-2 border border-[var(--border-color)] rounded bg-[var(--bg-secondary)] text-[var(--text-primary)]"
-                    onChange={(e) => setSelectedDayForPlan(parseInt(e.target.value))}
-                    value={selectedDayForPlan ?? 0}
-                  >
-                    {mealPlan?.map((day, index) => (
-                      <option key={day.date} value={index}>
-                        {day.dayName} ({new Date(day.date).toLocaleDateString()})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-[var(--text-primary)]">
-                    {intl.formatMessage({ id: 'mealPlanner.meal' })}
-                  </label>
-                  <select
-                    className="w-full p-2 border border-[var(--border-color)] rounded bg-[var(--bg-secondary)] text-[var(--text-primary)]"
-                    onChange={(e) => setSelectedMealForPlan(e.target.value as 'breakfast' | 'lunch' | 'dinner')}
-                    value={selectedMealForPlan ?? 'dinner'}
-                  >
-                    <option value="breakfast">{intl.formatMessage({ id: 'mealPlanner.breakfast' })}</option>
-                    <option value="lunch">{intl.formatMessage({ id: 'mealPlanner.lunch' })}</option>
-                    <option value="dinner">{intl.formatMessage({ id: 'mealPlanner.dinner' })}</option>
-                  </select>
-                </div>
-              </div>
-            </Modal.Body>
-            <Modal.Footer>
-              <Button
-                variant="ghost"
-                onClick={() => {
-                  setShowAddToPlanDialog(false);
-                  setPendingRecipeForPlan(null);
-                }}
-              >
-                {intl.formatMessage({ id: 'common.cancel' })}
-              </Button>
-              <Button
-                onClick={() => {
-                  if (selectedDayForPlan !== null && selectedMealForPlan) {
-                    confirmAddToPlan(selectedDayForPlan, selectedMealForPlan);
-                  }
-                }}
-              >
-                Add to Plan
-              </Button>
-            </Modal.Footer>
-          </Modal>
-        )}
-
-        <AppHeader
-          user={user}
-          household={household}
-          settings={settings}
-          setSettings={setSettings}
-          onShowHousehold={() => setShowHousehold(true)}
-          recentActions={recentActions}
-          onUndo={performUndo}
-          syncStatus={syncStatus}
-          onSyncClick={syncNow}
-          onNavigateToSettings={navigateToNotifications}
-          onNotificationAction={n => handleNotificationAction(n as Parameters<typeof handleNotificationAction>[0])}
-          recentActivities={recentActivities}
-          isLoadingActivities={isLoadingActivities}
-        />
-
-        {maintenanceInfo.active && maintenanceInfo.message && (
-          <div className="sticky top-[calc(var(--safe-area-top,0px)+56px)] z-20 mx-auto max-w-3xl px-3 pt-2">
-            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900 shadow-sm">
-              <div className="font-semibold">Maintenance Mode</div>
-              <div className="mt-1 opacity-90">{maintenanceInfo.message}</div>
-            </div>
-          </div>
-        )}
-
-        {announcementInfo.enabled && announcementInfo.message && !maintenanceInfo.active && (
-          <div className="sticky top-[calc(var(--safe-area-top,0px)+56px)] z-20 mx-auto max-w-3xl px-3 pt-2">
-            <div
-              className={`rounded-xl border px-4 py-3 text-sm shadow-sm ${
-                announcementInfo.type === 'error'
-                  ? 'border-red-200 bg-red-50 text-red-900'
-                  : announcementInfo.type === 'warning'
-                    ? 'border-amber-200 bg-amber-50 text-amber-900'
-                    : 'border-blue-200 bg-blue-50 text-blue-900'
-              }`}
-            >
-              <div className="font-semibold">Announcement</div>
-              <div className="mt-1 opacity-90">{announcementInfo.message}</div>
-            </div>
-          </div>
-        )}
-
-        {/* Persistent household invite banner — stays visible until acted on */}
-        {householdInvites.length > 0 && !showHouseholdInviteModal && (
-          <div
-            className="sticky top-[calc(var(--safe-area-top,0px)+56px)] z-10 mx-auto max-w-md md:max-w-lg lg:max-w-2xl px-3 pt-1"
-          >
-            <button
-              onClick={() => setShowHouseholdInviteModal(true)}
-              className="w-full flex items-center justify-between gap-2 bg-[var(--accent-color)] text-[var(--accent-text,white)] px-4 py-2 rounded-lg shadow-md text-sm font-medium animate-pulse-subtle"
-            >
-              <span>🏠 You have {householdInvites.length === 1 ? 'a pending household invitation' : `${householdInvites.length} household invitations`}</span>
-              <span className="underline whitespace-nowrap">View →</span>
-            </button>
-          </div>
-        )}
-        
-        <SubscriptionProvider user={user}>
-        <AppProvider value={appContextValue}>
-          <AppActionsProvider value={appActionsValue}>
-            <MainContent />
-          </AppActionsProvider>
-        </AppProvider>
-        </SubscriptionProvider>
-        <AppNavigation activeTab={activeTab} setActiveTab={switchTab} hiddenTabs={settings.navigation?.hiddenTabs} isKeyboardVisible={isKeyboardVisible} />
-        
-        {showHousehold && (
-          <Suspense fallback={null}>
-          <HouseholdManager
+          <AppHeader
             user={user}
             household={household}
-            setHousehold={setHousehold}
-            onClose={() => setShowHousehold(false)}
-            setActiveTab={switchTab}
-            addToast={addToast}
+            settings={settings}
+            setSettings={setSettings}
+            onShowHousehold={() => modals.setShowHousehold(true)}
+            recentActions={recentActions}
+            onUndo={performUndo}
+            syncStatus={syncStatus}
+            onSyncClick={syncNow}
+            onNavigateToSettings={navigateToNotifications}
+            onNotificationAction={n => notificationHandlers.handleNotificationAction(n as Parameters<typeof notificationHandlers.handleNotificationAction>[0])}
+            recentActivities={recentActivities}
+            isLoadingActivities={isLoadingActivities}
           />
-          </Suspense>
-        )}
 
-        {notifications.length > 0 && (
-          <div className="fixed top-4 left-0 right-0 z-50 flex flex-col items-center gap-2 pointer-events-none pb-4 px-4 overflow-y-auto max-h-[50vh]">
-            {notifications.map((notification) => (
-              <div key={notification.id} className="pointer-events-auto w-full">
-                <NotificationBanner
-                  notification={notification}
-                  onDismiss={handleNotificationDismiss}
-                  onAction={handleNotificationAction}
-                  onSnooze={handleNotificationSnooze}
-                />
+          {maintenanceInfo.active && maintenanceInfo.message && (
+            <div className="sticky top-[calc(var(--safe-area-top,0px)+56px)] z-20 mx-auto max-w-3xl px-3 pt-2">
+              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900 shadow-sm">
+                <div className="font-semibold">Maintenance Mode</div>
+                <div className="mt-1 opacity-90">{maintenanceInfo.message}</div>
               </div>
-            ))}
-          </div>
-        )}
+            </div>
+          )}
 
-        {/* Toasts are now rendered by ToastProvider portal in index.tsx */}
-      </div>
+          {announcementInfo.enabled && announcementInfo.message && !maintenanceInfo.active && (
+            <div className="sticky top-[calc(var(--safe-area-top,0px)+56px)] z-20 mx-auto max-w-3xl px-3 pt-2">
+              <div
+                className={`rounded-xl border px-4 py-3 text-sm shadow-sm ${
+                  announcementInfo.type === 'error'
+                    ? 'border-red-200 bg-red-50 text-red-900'
+                    : announcementInfo.type === 'warning'
+                      ? 'border-amber-200 bg-amber-50 text-amber-900'
+                      : 'border-blue-200 bg-blue-50 text-blue-900'
+                }`}
+              >
+                <div className="font-semibold">Announcement</div>
+                <div className="mt-1 opacity-90">{announcementInfo.message}</div>
+              </div>
+            </div>
+          )}
+
+          {modals.householdInvites.length > 0 && !modals.showHouseholdInviteModal && (
+            <div className="sticky top-[calc(var(--safe-area-top,0px)+56px)] z-10 mx-auto max-w-md md:max-w-lg lg:max-w-2xl px-3 pt-1">
+              <button
+                onClick={() => modals.setShowHouseholdInviteModal(true)}
+                className="w-full flex items-center justify-between gap-2 bg-[var(--accent-color)] text-[var(--accent-text,white)] px-4 py-2 rounded-lg shadow-md text-sm font-medium animate-pulse-subtle"
+              >
+                <span>🏠 You have {modals.householdInvites.length === 1 ? 'a pending household invitation' : `${modals.householdInvites.length} household invitations`}</span>
+                <span className="underline whitespace-nowrap">View →</span>
+              </button>
+            </div>
+          )}
+
+          <AppProvider value={appContextValue}>
+            <AppActionsProvider value={appActionsValue}>
+              <MainContent />
+            </AppActionsProvider>
+          </AppProvider>
+
+          <AppNavigation activeTab={activeTab} setActiveTab={switchTab} hiddenTabs={settings.navigation?.hiddenTabs} isKeyboardVisible={isKeyboardVisible} />
+
+          {notifications.length > 0 && (
+            <div className="fixed top-4 left-0 right-0 z-50 flex flex-col items-center gap-2 pointer-events-none pb-4 px-4 overflow-y-auto max-h-[50vh]">
+              {notifications.map((notification) => (
+                <div key={notification.id} className="pointer-events-auto w-full">
+                  <NotificationBanner
+                    notification={notification}
+                    onDismiss={notificationHandlers.handleNotificationDismiss}
+                    onAction={notificationHandlers.handleNotificationAction}
+                    onSnooze={notificationHandlers.handleNotificationSnooze}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+
+          <AppGlobalModals
+            user={user}
+            setUser={setUser}
+            household={household}
+            setHousehold={setHousehold}
+            inventory={inventory}
+            mealPlan={mealPlan}
+            savedRecipesCount={savedRecipes.length}
+            customCategories={customCategories}
+            isAdmin={isAdmin}
+            recipeSaveLimitExceeded={recipeSaveLimitExceeded}
+            mealPlanLimitExceeded={mealPlanLimitExceeded}
+            showRiskQuestionnaire={showRiskQuestionnaire}
+            handleRiskQuestionnaireComplete={handleRiskQuestionnaireComplete}
+            updateItem={updateItem}
+            deleteItem={deleteItem}
+            deleteItems={deleteItems}
+            handleAddToPlan={handleAddToPlan}
+            handleSaveRecipe={handleSaveRecipe}
+            handleDeleteRecipe={handleDeleteRecipe}
+            submitRating={submitRating}
+            handleMarkAsMade={handleMarkAsMade}
+            addToShoppingList={addToShoppingList}
+            setActiveTab={setActiveTab}
+            addToast={addToast}
+            modals={modals}
+            notificationHandlers={notificationHandlers}
+            featureMilestones={featureMilestones}
+          />
+        </div>
       </ErrorBoundary>
 
       <GlobalUpdatePrompt />
-      <Suspense fallback={null}>
-        <WhatsNewModal suppress={showOnboarding || newlyUnlockedBadge !== null} />
-      </Suspense>
-
-      {/* Feature Discovery — one-time "New Feature!" cards for logged-in users.
-          Suppressed while onboarding or the achievement modal owns the screen so
-          only one attention-grabbing overlay is ever visible at a time. */}
-      {user && !showOnboarding && !newlyUnlockedBadge && (
-        <Suspense fallback={null}>
-          <FeatureDiscoveryManager
-            discoveries={featureDiscoveries}
-            user={user}
-            onDiscoveryDismiss={handleDiscoveryDismiss}
-          />
-        </Suspense>
-      )}
-
-      {/* Contextual Tutorial — per-tab hints shown once on first visit */}
-      {user && !showOnboarding && !newlyUnlockedBadge && contextualTips.length > 0 && (
-        <ContextualTutorial tips={contextualTips} onTipDismiss={dismissContextualTip} />
-      )}
-
-      {/* Household sharing spotlight — one-time arrow tooltip pointing at the
-          household/account button in the header, shown shortly after onboarding
-          so new users (who often onboard solo) discover real-time pantry sharing. */}
-      {user && !showOnboarding && !newlyUnlockedBadge && (
-        <FeatureTooltip
-          target='[data-tutorial="household-button"]'
-          title="Share Your Pantry"
-          description="Invite household members to share your pantry, shopping list, and meal plan in real time."
-          position="bottom"
-          featureKey="household-spotlight"
-          delay={2000}
-        />
-      )}
-
-      {showExpiredItemsModal && (
-        <Suspense fallback={null}>
-          <ExpiredItemsModal
-            isOpen={showExpiredItemsModal}
-            onClose={() => {
-              setShowExpiredItemsModal(false);
-              setExpiredItemsModalSpecificItems(undefined);
-            }}
-            inventory={inventory}
-            onRemoveItems={handleRemoveExpiredItems}
-            householdId={household?.id}
-            userId={user?.id}
-            userName={user?.name}
-            specificItems={expiredItemsModalSpecificItems}
-          />
-        </Suspense>
-      )}
-
-      {/* Launch-time expired items bottom sheet */}
-      {showExpiredLaunchSheet && (
-        <ExpiredItemsLaunchSheet
-          isOpen={showExpiredLaunchSheet}
-          onClose={() => setShowExpiredLaunchSheet(false)}
-          expiredItems={expiredLaunchItems}
-          onRemoveItems={async (ids) => {
-            try {
-              await handleRemoveExpiredItems(ids);
-            } catch (error) {
-              log.error('Failed to remove expired items on launch', { error }, 'App');
-            }
-          }}
-        />
-      )}
-
-      {notificationViewItem && (
-        <Suspense fallback={null}>
-          <ItemDetailModal
-            item={notificationViewItem.item}
-            onClose={() => setNotificationViewItem(null)}
-            onUpdateItem={updateItem}
-            onDeleteItem={deleteItem}
-            onAddToShoppingList={addToShoppingList}
-            customCategories={customCategories}
-            originalIndex={notificationViewItem.index}
-          />
-        </Suspense>
-      )}
-
-      <Suspense fallback={null}>
-        <RecipeFinderModalSection
-          showRecipeModal={showGlobalRecipeModal}
-          modalRecipe={globalModalRecipe}
-          setShowRecipeModal={setShowGlobalRecipeModal}
-          onAddToPlan={handleAddToPlan}
-          handleModalSaveRecipe={handleSaveRecipe}
-          onDeleteRecipe={handleDeleteRecipe}
-          onRate={submitRating}
-          onMarkAsMade={handleMarkAsMade}
-          modalIsSavedView={globalModalIsSavedView}
-          recipeSaveLimitExceeded={recipeSaveLimitExceeded}
-          mealPlanLimitExceeded={mealPlanLimitExceeded}
-          savedRecipesCount={savedRecipes.length}
-          user={user}
-          inventory={inventory}
-        />
-      </Suspense>
-
-      {isAdmin && (
-        <Suspense fallback={<LoadingSpinner />}>
-          <DatabaseAnalytics />
-        </Suspense>
-      )}
-      <Suspense fallback={null}>
-        <GeminiTokenDebugger isAdmin={isAdmin} />
-      </Suspense>
-
-      {/* Canvas for global achievement fireworks */}
-      <canvas
-        ref={fireworksCanvasRef}
-        className="pointer-events-none fixed inset-0 z-[9999] w-full h-full"
-      />
-
-      {/* Global Achievement Unlocked Modal */}
-      {newlyUnlockedBadge && (
-        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-          <div className="bg-theme-secondary border border-theme rounded-2xl p-6 max-w-sm w-full text-center shadow-2xl relative overflow-hidden animate-scale-in">
-            {/* Elegant glowing background element */}
-            <div className={`absolute -top-24 -left-24 w-48 h-48 rounded-full bg-gradient-to-br ${newlyUnlockedBadge.color} opacity-20 blur-2xl`} />
-            <div className={`absolute -bottom-24 -right-24 w-48 h-48 rounded-full bg-gradient-to-br ${newlyUnlockedBadge.color} opacity-20 blur-2xl`} />
-
-            <div className="relative z-10">
-              {/* Badge Icon */}
-              <div className={`w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br ${newlyUnlockedBadge.color} flex items-center justify-center text-4xl shadow-lg mb-4 animate-bounce`}>
-                {newlyUnlockedBadge.icon}
-              </div>
-
-              {/* Congratulations Text */}
-              <span className="text-xs font-bold uppercase tracking-wider text-[var(--accent-color)]">Achievement Unlocked!</span>
-              <h3 className="text-2xl font-extrabold text-theme-primary mt-1 mb-2">{newlyUnlockedBadge.title}</h3>
-              <p className="text-sm text-theme-secondary opacity-95 mb-6">{newlyUnlockedBadge.description}</p>
-
-              {/* Action Buttons */}
-              <div className="space-y-2">
-                <Button
-                  variant="primary"
-                  size="lg"
-                  fullWidth
-                  onClick={() => {
-                    setNewlyUnlockedBadge(null);
-                    HapticService.light();
-                  }}
-                >
-                  Awesome! 🚀
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </SubscriptionProvider>
   );
 };

@@ -1,3 +1,16 @@
+## [3.0.18] - 2026-08-04
+
+### Added / Changed / Fixed
+- **App & Pantry Modularization** — Refactored core monoliths into modular custom hooks and sub-components (`PantryItemRow`, `PantryItemTile`, `PantryBulkActionBar`, `PantrySearchBar`, `usePantryFilterSort`).
+- **Ubiquitous Haptic Feedback** — Integrated haptic feedback across all buttons, shopping list actions, settings menus, and pull-to-refresh touch gestures.
+- **Hands-Free Cooking Mode Voice Commands** — Added voice recognition & text-to-speech step reader to Cooking Mode ("Next", "Back", "Repeat").
+- **Mobile Touch Pull-To-Refresh & Nav Badges** — Added pull-to-refresh touch gesture wrapper and dynamic navigation badge indicators (expired items dot, shopping item count, today's meal plan dot).
+- **Social Tab & Guest Banners** — Added warm `EmptyState` household invitation CTA banner for solo users and guest storage limitation warning banners to Login, Settings, Pantry, and Shopping List screens.
+- **Recipe Finder Search Experience** — Added dynamic cycling search placeholders (`Try searching for "Chicken Fajita"...`) in Recipe Finder search controls.
+- **Cloud Functions Engine Upgrade** — Upgraded Cloud Functions runtime to Node.js 22.
+
+---
+
 ## [3.0.17] - 2026-08-03
 
 ### Added / Changed / Fixed

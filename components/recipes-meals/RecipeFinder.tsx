@@ -501,7 +501,9 @@ const RecipeFinderComponent: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSav
   // actually visible instead of appearing to do nothing off-screen.
   const scrollToSearchResults = () => {
     const element = document.getElementById('recipeSearchResults') || document.getElementById('specificQuery');
-    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const prefersReducedMotion = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      : false;
     const behavior = prefersReducedMotion ? 'auto' : 'smooth';
     if (element && typeof element.scrollIntoView === 'function') {
       element.scrollIntoView({ behavior, block: 'start' });

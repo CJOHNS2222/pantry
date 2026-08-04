@@ -1,56 +1,38 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { useModalOpen } from '../../utils/useModalOpen';
 import { useAndroidBack } from '../../hooks/useAndroidBack';
-import { Camera, Loader2, Plus, Trash2, ShoppingBasket, X, ChevronDown, ChevronRight, ChefHat, Search, Filter, Clock, FilePlus, LayoutGrid, LayoutList } from 'lucide-react';
-import { FixedSizeList as ReactWindowList } from 'react-window';
-import StorageLocationIndicator from './StorageLocationIndicator';
-import { PantryItem, LoadingState, ConsumptionSuggestion, ExpirationAlert, CustomCategory, RecipeSuggestion, PantryFilter, User, ShoppingItem, StructuredRecipe, SavedRecipe } from '../../types';
+import { Camera, Plus, ChefHat, FilePlus } from 'lucide-react';
+import { PantryItem, LoadingState, ExpirationAlert, CustomCategory, PantryFilter, User, ShoppingItem, StructuredRecipe, SavedRecipe } from '../../types';
 
-/** Processed list item — PantryItem enriched with display-time index info */
-type DisplayedPantryItem = PantryItem & {
-  originalIndex: number;
-  originalIndices?: number[];
-  combinedItems?: PantryItem[];
-  totalQuantity?: number;
-};
 import { Tab } from '../../types/app';
 import AnalyticsService from '../../services/analyticsService';
 import { log } from '../../services/logService';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const VirtualizedRow = ({ index, style, data }: { index: number; style: React.CSSProperties; data: any }) => {
-  return data.renderRow(index, style);
-};
-
-import FreezerService from '../../services/freezerService';
-import PriceTrends from './PriceTrends';
 import ItemDetailModal from './ItemDetailModal';
-import { ProgressiveImage } from '../ui/ProgressiveImage';
 import { PantryItemSkeleton } from '../ui/SkeletonLoader';
-import { generateIntelligentRecipeQuery, searchPantryItems, filterPantryItems, savePantryFilter, loadPantryFilter, defaultPantryFilter, getMealPrepSuggestions, RecipeIngredientMatch } from '../../utils/searchUtils';
-import { debounce } from '../../utils/debounceUtils';
-import { formatItemQuantity, getExpirationColor, getPreferredItemDisplayImage } from '../../utils/appUtils';
+import { generateIntelligentRecipeQuery, savePantryFilter, defaultPantryFilter, RecipeIngredientMatch } from '../../utils/searchUtils';
 import { getQuantityAmount } from '../../utils/quantityUtils';
 import { PantryService } from '../../services/pantryService';
 import { useApp } from '../../contexts/AppContext';
 import { useAppActions } from '../../contexts/AppActionsContext';
-import { useKeyboardNavigation } from '../../hooks/useKeyboardNavigation';
 import RecipeModal from '../recipes-meals/RecipeModal';
 import { AdMobBanner } from '../ui/AdMobBanner';
 import { canShowAds } from '../../utils/appUtils';
+import { SettingsGuestBanner } from '../settings/SettingsGuestBanner';
 import FreezeTransitionModal from './FreezeTransitionModal';
 
-import { InventoryCacheService } from '../../services/inventoryCacheService';
-import PantryImportModal from './PantryImportModal';
 import { PantryHealthScore } from './PantryHealthScore';
 import { BottomSheet } from '../ui';
-import { AddItemsModal } from './AddItemsModal';
-import { ScanReviewModal } from './ScanReviewModal';
 import { BulkQuantityEditModal } from './BulkQuantityEditModal';
 import { PantrySearchModal } from './PantrySearchModal';
 import { ReceiptScanResult } from './usePantryScan';
 
-// Constants for virtualization threshold
+// New modular components & hook for PantryScanner
+import { usePantryFilterSort, DisplayedPantryItem } from './usePantryFilterSort';
+import { PantryItemRow } from './PantryItemRow';
+import { PantryItemTile } from './PantryItemTile';
+import { PantryBulkActionBar } from './PantryBulkActionBar';
+import { PantrySearchBar } from './PantrySearchBar';
 
 interface PantryScannerProps {
   inventory: PantryItem[];
@@ -74,29 +56,51 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
   inventory,
   isLoadingInventory = false,
   addToShoppingList,
-  addShoppingListItem,
+  addShoppingListItem: _addShoppingListItem,
   onDeleteItem,
-  onAddItem,
-  onAddItems,
+  onAddItem: _onAddItem,
+  onAddItems: _onAddItems,
   onUpdateItem,
-  consumptionSuggestions = [],
+  consumptionSuggestions: _consumptionSuggestions = [],
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   expirationAlerts = [],
-  recipeSuggestions = [],
+  recipeSuggestions: _recipeSuggestions = [],
   customCategories = [],
   setActiveTab,
   setInitialSearchQuery,
   user
 }) => {
-  // Use context hooks
   const appState = useApp();
   const appActions = useAppActions();
-
-  // Destructure needed values
   const { household, savedRecipes, recipeSaveLimitExceeded, settings, mealPlan } = appState;
   const { onSaveRecipe, onRateRecipe } = appActions;
 
   const [canShowAdBanner, setCanShowAdBanner] = React.useState<boolean>(false);
+
+  // Modular filter, sort, search, section grouping hook
+  const {
+    searchQuery,
+    setSearchQuery,
+    debouncedSearchQuery: _debouncedSearchQuery,
+    showFilters,
+    setShowFilters,
+    pantryFilter,
+    setPantryFilter,
+    viewMode,
+    setViewMode,
+    sortBy,
+    setSortBy,
+    displayLayout,
+    toggleDisplayLayout,
+    expandedCategories: _expandedCategories,
+    categoryOrder,
+    storageSectionOrder,
+    processedInventory: _processedInventory,
+    sortedInventory,
+    toggleCategory: _toggleCategory,
+    toggleStorageLocation: _toggleStorageLocation,
+    collapseAllCategories: _collapseAllCategories,
+  } = usePantryFilterSort(inventory);
 
   useEffect(() => {
     let mounted = true;
@@ -112,7 +116,7 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
     return () => { mounted = false; };
   }, [user]);
 
-  // Cleanup imported timer on unmount
+  const importedTimerRef = useRef<number | null>(null);
   useEffect(() => {
     return () => {
       if (importedTimerRef.current) {
@@ -122,21 +126,14 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
     };
   }, []);
 
-  // Constants for virtualization threshold
-  const CATEGORY_VIRTUALIZE_THRESHOLD = 20;
-  // Grid layout can't use react-window's fixed-height list (tiles are responsive/aspect-square,
-  // so row height isn't a stable pixel value) — cap initial render per section instead and let
-  // the user expand, keyed per section so a large pantry doesn't render hundreds of tile DOM nodes at once.
-  const [gridExpandedSections, setGridExpandedSections] = useState<Set<string>>(new Set());
-  const expandGridSection = useCallback((key: string) => {
+  const [_gridExpandedSections, setGridExpandedSections] = useState<Set<string>>(new Set());
+  const _expandGridSection = useCallback((key: string) => {
     setGridExpandedSections(prev => new Set(prev).add(key));
   }, []);
 
-  // Inventory management functions using cache service
   const updateItem = async (index: number, updates: Partial<PantryItem>) => {
     const item = inventory[index];
     if (!item) return;
-    
     try {
       await onUpdateItem(index, updates);
     } catch (error) {
@@ -144,20 +141,16 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
     }
   };
 
-  const handleWhatCanICookTonight = async () => {
+  const _handleWhatCanICookTonight = async () => {
     try {
       setLoadingState(LoadingState.LOADING);
-      
       const query = generateIntelligentRecipeQuery(inventory, user?.profile?.dietaryRestrictions);
-      
       if (!query) {
         appActions.addToast('No pantry items found. Add some items first!', 'info');
         return;
       }
-      
       setInitialSearchQuery?.(query);
       setActiveTab?.(Tab.RECIPES);
-      
       appActions.addToast('Found some meal ideas!', 'success');
     } catch (error) {
       log.error('Failed to get meal suggestions', { error });
@@ -166,21 +159,18 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
       setLoadingState(LoadingState.IDLE);
     }
   };
-  const [scanResults, setScanResults] = useState<ReceiptScanResult[] | null>(null);
-  const [showScanReviewModal, setShowScanReviewModal] = useState(false);
-  const [receiptDestination, setReceiptDestination] = useState<'pantry' | 'shopping'>('pantry');
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [addModalInitialAction, setAddModalInitialAction] = useState<'photo' | 'barcode' | 'receipt' | 'nutrition' | null>(null);
 
-  const [hasTappedAddButton, setHasTappedAddButton] = useState(() => {
-    try {
-      return sessionStorage.getItem('clicked-pantry-add-button') === 'true';
-    } catch {
-      return false;
-    }
+  const [_scanResults, _setScanResults] = useState<ReceiptScanResult[] | null>(null);
+  const [_showScanReviewModal, _setShowScanReviewModal] = useState(false);
+  const [_receiptDestination, _setReceiptDestination] = useState<'pantry' | 'shopping'>('pantry');
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [_addModalInitialAction, setAddModalInitialAction] = useState<'photo' | 'barcode' | 'receipt' | 'nutrition' | null>(null);
+
+  const [hasTappedAddButton, _setHasTappedAddButton] = useState(() => {
+    try { return sessionStorage.getItem('clicked-pantry-add-button') === 'true'; } catch { return false; }
   });
 
-  const shouldGlowAddButton = useMemo(() => {
+  const _shouldGlowAddButton = useMemo(() => {
     if (hasTappedAddButton || isAddModalOpen) return false;
     try {
       const dismissed = localStorage.getItem('dismissed-tutorial-tips');
@@ -192,62 +182,44 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
     }
   }, [hasTappedAddButton, isAddModalOpen]);
 
-  const [loadingState, setLoadingState] = useState<LoadingState>(LoadingState.IDLE);
-  const [showImportModal, setShowImportModal] = useState(false);
-  const [lastImportedBatch, setLastImportedBatch] = useState<import('../../types').PantryItem[] | null>(null);
-  const importedTimerRef = useRef<number | null>(null);
+  const [_loadingState, setLoadingState] = useState<LoadingState>(LoadingState.IDLE);
+  const [_showImportModal, setShowImportModal] = useState(false);
+  const [_lastImportedBatch, _setLastImportedBatch] = useState<import('../../types').PantryItem[] | null>(null);
   const [bulkMode, setBulkMode] = useState(false);
   const [selectedItems, setSelectedItems] = useState<Set<number>>(new Set());
   const [bulkLocationValue, setBulkLocationValue] = useState<string>('');
-  const [bulkProgress, setBulkProgress] = useState<{ current: number; total: number } | null>(null);
-  const [showBulkTip, setShowBulkTip] = useState(false);
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
-  const [categoryOrder, setCategoryOrder] = useState<string[]>([]);
-  const [viewMode, setViewMode] = useState<'category' | 'storage'>('storage');
-  const [sortBy, setSortBy] = useState<'name' | 'lastAdded' | 'expiration' | 'category' | 'location'>('location');
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [storageOrder, setStorageOrder] = useState<string[]>(['pantry', 'fridge', 'freezer', 'spices', 'other']);
-  const [storageSectionOrder, setStorageSectionOrder] = useState<string[]>(['leftovers', 'pantry', 'fridge', 'freezer', 'spices', 'other']);
-  const [showPriceTrends, setShowPriceTrends] = useState<string | null>(null);
+  const [_bulkProgress, setBulkProgress] = useState<{ current: number; total: number } | null>(null);
+  const [_showBulkTip, setShowBulkTip] = useState(false);
+  const [_storageOrder] = useState<string[]>(['pantry', 'fridge', 'freezer', 'spices', 'other']);
+  const [_showPriceTrends, _setShowPriceTrends] = useState<string | null>(null);
   const [selectedItemIndex, setSelectedItemIndex] = useState<number | null>(null);
   const [bulkQuantityEditItems, setBulkQuantityEditItems] = useState<PantryItem[]>([]);
   const [showBulkQuantityEdit, setShowBulkQuantityEdit] = useState(false);
 
-  const { showDinnerCard, showLeftoverChip } = useMemo(() => {
-    // 1. Calculate showDinnerCard
+  const { showDinnerCard: _showDinnerCard, showLeftoverChip: _showLeftoverChip } = useMemo(() => {
     let dinnerCard = false;
     const currentHour = new Date().getHours();
     const isDinnerTime = currentHour >= 16 && currentHour < 20;
     if (isDinnerTime) {
       const todayStr = (() => {
         const d = new Date();
-        const year = d.getFullYear();
-        const month = String(d.getMonth() + 1).padStart(2, '0');
-        const date = String(d.getDate()).padStart(2, '0');
-        return `${year}-${month}-${date}`;
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       })();
       const todayPlan = mealPlan?.find(day => day.date === todayStr);
-      const hasDinner = todayPlan && Array.isArray(todayPlan.dinner) && todayPlan.dinner.length > 0;
-      dinnerCard = !hasDinner;
+      dinnerCard = !todayPlan || !Array.isArray(todayPlan.dinner) || todayPlan.dinner.length === 0;
     }
 
-    // 2. Calculate showLeftoverChip
     let leftoverChip = false;
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
-    const yyyyMmDd = (d: Date) => d.toISOString().slice(0, 10);
-    const yesterdayStr = yyyyMmDd(yesterday);
+    const yesterdayStr = yesterday.toISOString().slice(0, 10);
     const yesterdayPlan = mealPlan?.find(day => day.date === yesterdayStr);
-    const hadMealYesterday = yesterdayPlan && (
-      (yesterdayPlan.dinner?.length ?? 0) > 0 ||
-      (yesterdayPlan.lunch?.length ?? 0) > 0
-    );
+    const hadMealYesterday = yesterdayPlan && ((yesterdayPlan.dinner?.length ?? 0) > 0 || (yesterdayPlan.lunch?.length ?? 0) > 0);
 
     if (hadMealYesterday) {
       const mostRecentUpdate = inventory.reduce((latest, item) => {
         const t = item.lastRestocked ? new Date(item.lastRestocked).getTime()
-                : item.dateAdded    ? new Date(item.dateAdded).getTime()
-                : 0;
+                : item.dateAdded ? new Date(item.dateAdded).getTime() : 0;
         return t > latest ? t : latest;
       }, 0);
       const twentyFourHoursAgo = Date.now() - 24 * 60 * 60 * 1000;
@@ -256,89 +228,26 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
 
     return { showDinnerCard: dinnerCard, showLeftoverChip: leftoverChip };
   }, [mealPlan, inventory]);
-  const [displayLayout, setDisplayLayout] = useState<'list' | 'grid'>(() => {
-    try { return (localStorage.getItem('pantry_display_layout') as 'list' | 'grid') || 'list'; } catch { return 'list'; }
-  });
 
-  const toggleDisplayLayout = () => {
-    setDisplayLayout(prev => {
-      const next = prev === 'list' ? 'grid' : 'list';
-      try { localStorage.setItem('pantry_display_layout', next); } catch (e) { console.debug('Failed to write display layout preference:', e); }
-      return next;
-    });
-  };
-
-  // Search and filter state
-  const [searchQuery, setSearchQuery] = useState('');
-  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
-  const [showFilters, setShowFilters] = useState(false);
-  const [pantryFilter, setPantryFilter] = useState<PantryFilter>(loadPantryFilter());
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
   const [showHealthDetail, setShowHealthDetail] = useState(false);
 
-  // Hide header/nav when any internal overlay is open
-  useModalOpen(isAddModalOpen || showScanReviewModal || showBulkQuantityEdit || isSearchModalOpen);
+  useModalOpen(isAddModalOpen || _showScanReviewModal || showBulkQuantityEdit || isSearchModalOpen);
 
-  // Inline expiring items banner logic removed in favor of system notifications.
+  const [_mealPrepSuggestions, setMealPrepSuggestions] = useState<RecipeIngredientMatch[]>([]);
 
-  // Meal prep suggestions state
-  const [mealPrepSuggestions, setMealPrepSuggestions] = useState<RecipeIngredientMatch[]>([]);
-
-  // Which slide of the consolidated "smart suggestion" carousel is active
-  const [suggestionSlide, setSuggestionSlide] = useState(0);
-  const carouselRef = useRef<HTMLDivElement>(null);
-
-  // Measured height of the fixed app header, so the sticky storage-location chip row
-  // can sit flush against it instead of guessing at an offset via CSS vars.
-  const [headerHeight, setHeaderHeight] = useState(0);
-  useEffect(() => {
-    const headerEl = document.querySelector('header');
-    if (!headerEl) return;
-    const update = () => setHeaderHeight(headerEl.getBoundingClientRect().height);
-    update();
-    const ro = new ResizeObserver(update);
-    ro.observe(headerEl);
-    return () => ro.disconnect();
-  }, []);
-
-  // Measured height of the sticky chip row itself, so jump-to-section scrolling
-  // (see toggleStorageLocation / toggleCategory) lands sections just below it
-  // instead of partially hidden underneath.
-  const chipRowRef = useRef<HTMLDivElement>(null);
-  const [chipRowHeight, setChipRowHeight] = useState(0);
-  useEffect(() => {
-    const el = chipRowRef.current;
-    if (!el) return;
-    const update = () => setChipRowHeight(el.getBoundingClientRect().height);
-    update();
-    const ro = new ResizeObserver(update);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [viewMode]);
-
-  // Smoothly bring a just-reordered section into view, right below the sticky
-  // header + chip row, instead of leaving the user scrolled wherever they were
-  // (or worse, looking like the page jumped back to the top).
-  const scrollSectionIntoView = useCallback((elementId: string) => {
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        document.getElementById(elementId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      });
-    });
-  }, []);
-
-  // Recipe modal state
+  const _chipRowRef = useRef<HTMLDivElement>(null);
   const [showRecipeModal, setShowRecipeModal] = useState(false);
-  const [modalRecipe, setModalRecipe] = useState<StructuredRecipe | SavedRecipe | null>(null);
-  const [modalContext, setModalContext] = useState<'search' | 'scheduled'>('search');
+  const [modalRecipe, _setModalRecipe] = useState<StructuredRecipe | SavedRecipe | null>(null);
+  const [modalContext, _setModalContext] = useState<'search' | 'scheduled'>('search');
   const [freezeTargetIndex, setFreezeTargetIndex] = useState<number | null>(null);
+
   useAndroidBack(showRecipeModal, () => setShowRecipeModal(false));
   useAndroidBack(showFilters, () => setShowFilters(false));
   useAndroidBack(searchQuery.length > 0, () => setSearchQuery(''));
   useAndroidBack(showHealthDetail, () => setShowHealthDetail(false));
   useAndroidBack(isSearchModalOpen, () => setIsSearchModalOpen(false));
 
-  // Automatically open the add items modal if redirected from achievements setup checklist
   useEffect(() => {
     try {
       if (sessionStorage.getItem('open-pantry-add-modal') === 'true') {
@@ -350,7 +259,6 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
     }
   }, []);
 
-  // Listen to attention filter redirection (e.g. from notification clicks)
   useEffect(() => {
     const handleApplyFilter = () => {
       setPantryFilter(prev => {
@@ -374,9 +282,8 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
 
     window.addEventListener('apply-attention-filter', handleApplyFilter);
     return () => window.removeEventListener('apply-attention-filter', handleApplyFilter);
-  }, []);
+  }, [setPantryFilter]);
 
-  // Show a one-time non-blocking tip the first time bulk mode is activated
   useEffect(() => {
     if (bulkMode) {
       if (localStorage.getItem('tip-bulk-select') !== 'seen') {
@@ -419,10 +326,7 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
     const updates: Partial<PantryItem> = {
       quantity: updatedItem.quantity,
       batches: updatedItem.batches,
-      quantity_estimate: (() => {
-        const current = Number(original.quantity_estimate || 0);
-        return String(Math.max(0, current - 1));
-      })(),
+      quantity_estimate: String(Math.max(0, Number(original.quantity_estimate || 0) - 1)),
       consumptionHistory: [...(original.consumptionHistory || []), new Date().toISOString()],
     };
 
@@ -431,13 +335,12 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
       await onUpdateItem(item.originalIndex, previous);
     });
 
-    // Check if this is a staple and quantity reached 0, auto-readd to shopping list
     const newQuantity = getQuantityAmount(updatedItem.quantity ?? updatedItem.quantity_estimate);
     if (original.isStaple && newQuantity <= 0 && (settings.shopping?.autoReaddStaples !== false)) {
       addToShoppingList([original.item]);
       appActions.addToast(`${original.item} auto-added to shopping list (staple)`, 'info');
     }
-  }, [inventory, onUpdateItem, appActions, addToShoppingList]);
+  }, [inventory, onUpdateItem, appActions, addToShoppingList, settings.shopping?.autoReaddStaples]);
 
   const applyQuickAddToShopping = useCallback((item: DisplayedPantryItem) => {
     addToShoppingList([item.item]);
@@ -505,23 +408,19 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
     };
   }, [bulkMode, applyQuickConsume, applyQuickAddToShopping]);
 
-  // Calculate meal prep suggestions when recipes or inventory change
-  React.useEffect(() => {
+  useEffect(() => {
     if (savedRecipes.length > 0 && inventory.length > 0) {
-      const suggestions = getMealPrepSuggestions(savedRecipes, inventory, 60); // 60% match minimum
+      const suggestions = getMealPrepSuggestions(savedRecipes, inventory, 60);
       setMealPrepSuggestions(suggestions);
     } else {
       setMealPrepSuggestions([]);
     }
-  }, [savedRecipes, inventory]); // Re-calculate when recipes or inventory change
+  }, [savedRecipes, inventory]);
 
-  // Check for pending quantity edits
-  React.useEffect(() => {
+  useEffect(() => {
     const pendingEdits = localStorage.getItem('pendingQuantityEdits');
     if (pendingEdits) {
-      // Clear the pending edits
       localStorage.removeItem('pendingQuantityEdits');
-      
       try {
         const itemsToEdit = JSON.parse(pendingEdits);
         if (itemsToEdit.length > 0) {
@@ -534,89 +433,20 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
     }
   }, []);
 
-  // Debounced search for pantry items
-  const debouncedPantrySearch = React.useMemo(
-    () => debounce(() => {
-      setDebouncedSearchQuery(searchQuery);
-    }, 300), // 300ms delay for pantry search
-    [searchQuery]
-  );
-
-  // Effect to trigger debounced search when query changes
-  React.useEffect(() => {
-    if (searchQuery.trim()) {
-      debouncedPantrySearch();
-    } else {
-      setDebouncedSearchQuery('');
-    }
-  }, [searchQuery, debouncedPantrySearch]);
-
-  // Handle recipe modal opening from meal prep suggestions
-  React.useEffect(() => {
-    const handleOpenRecipeModal = (event: CustomEvent) => {
-      const { recipe } = event.detail;
-      setModalRecipe(recipe);
-      setModalContext('search');
-      setShowRecipeModal(true);
-    };
-
-    window.addEventListener('openRecipeModal', handleOpenRecipeModal as EventListener);
-
-    return () => {
-      window.removeEventListener('openRecipeModal', handleOpenRecipeModal as EventListener);
-    };
-  }, []);
-
-  // Keyboard navigation support for modals
-  useKeyboardNavigation({
-    onEscape: () => {
-      if (showScanReviewModal) {
-        setShowScanReviewModal(false);
-        setScanResults(null);
-      } else if (selectedItemIndex !== null) {
-        setSelectedItemIndex(null);
-      }
-    },
-    enabled: showScanReviewModal || selectedItemIndex !== null
-  });
-
-  // Process inventory with search and filters
-  const processedInventory = React.useMemo(() => {
-    let filtered = [...inventory];
-
-    // Apply search (use debounced query for performance)
-    if (debouncedSearchQuery.trim()) {
-      filtered = searchPantryItems(filtered, debouncedSearchQuery);
-    }
-
-    // Apply filters
-    filtered = filterPantryItems(filtered, pantryFilter);
-
-    // Add original index for bulk operations
-    return filtered.map((item) => ({ ...item, originalIndex: inventory.indexOf(item) }));
-  }, [inventory, debouncedSearchQuery, pantryFilter]);
-
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const removeItem = useCallback(async (index: number) => {
-    await onDeleteItem(index);
-  }, [onDeleteItem]);
-
-  // Bulk operations
   const toggleBulkMode = useCallback(() => {
     setBulkMode(!bulkMode);
     setSelectedItems(new Set());
     setBulkLocationValue('');
-  }, [bulkMode, setBulkMode, setSelectedItems, setBulkLocationValue]);
+  }, [bulkMode]);
 
   const toggleItemSelection = useCallback((index: number) => {
-    const newSelected = new Set(selectedItems);
-    if (newSelected.has(index)) {
-      newSelected.delete(index);
-    } else {
-      newSelected.add(index);
-    }
-    setSelectedItems(newSelected);
-  }, [selectedItems, setSelectedItems]);
+    setSelectedItems(prev => {
+      const next = new Set(prev);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
+    });
+  }, []);
 
   const selectAllItems = useCallback(() => {
     if (selectedItems.size === inventory.length) {
@@ -624,24 +454,32 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
     } else {
       setSelectedItems(new Set(inventory.map((_, idx) => idx)));
     }
-  }, [selectedItems.size, inventory.length, setSelectedItems]);
+  }, [selectedItems.size, inventory]);
 
   const bulkDelete = useCallback(async () => {
     if (selectedItems.size === 0) return;
-    const count = selectedItems.size;
     const indicesToDelete = Array.from(selectedItems);
-    setBulkProgress({ current: 0, total: count });
+    setBulkProgress({ current: 0, total: indicesToDelete.length });
     await appActions.deleteItems(indicesToDelete);
     setBulkProgress(null);
     setSelectedItems(new Set());
     setBulkMode(false);
-    // deleteItems already shows a single toast — no extra toast needed here
-  }, [selectedItems, appActions, setSelectedItems, setBulkMode]);
+  }, [selectedItems, appActions]);
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const bulkChangeLocation = useCallback(async (newLocation: 'pantry' | 'fridge' | 'freezer' | 'spices' | 'other') => {
+    if (selectedItems.size === 0) return;
+    const idsToUpdate = Array.from(selectedItems).map(idx => inventory[idx]?.id).filter((id): id is string => !!id);
+    for (const id of idsToUpdate) {
+      const currentIndex = inventory.findIndex(item => item.id === id);
+      if (currentIndex === -1) continue;
+      await onUpdateItem(currentIndex, { storageLocation: newLocation });
+    }
+    setSelectedItems(new Set());
+    setBulkMode(false);
+  }, [selectedItems, inventory, onUpdateItem]);
+
   const bulkMoveToShoppingList = useCallback(async () => {
     if (selectedItems.size === 0) return;
-
     const indicesToMove = Array.from(selectedItems);
     const itemsToMove = PantryService.bulkMoveToShoppingList(inventory, indicesToMove);
     addToShoppingList(itemsToMove);
@@ -651,911 +489,66 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
     setSelectedItems(new Set());
     setBulkMode(false);
     appActions.addToast(`Moved ${itemsToMove.length} item${itemsToMove.length > 1 ? 's' : ''} to shopping list`, 'success');
-  }, [selectedItems, inventory, addToShoppingList, appActions, setSelectedItems, setBulkMode]);
+  }, [selectedItems, inventory, addToShoppingList, appActions]);
 
-  const toggleCategory = useCallback((category: string) => {
-    const newExpanded = new Set(expandedCategories);
-    if (newExpanded.has(category)) {
-      newExpanded.delete(category);
-    } else {
-      newExpanded.add(category);
-    }
-    setExpandedCategories(newExpanded);
-
-    // Bring clicked category to the top
-    setCategoryOrder(prev => {
-      const filtered = prev.filter(c => c !== category);
-      return [category, ...filtered];
+  // Group items by storage location
+  const storageItemsArrays = useMemo(() => {
+    const map: Record<string, DisplayedPantryItem[]> = {
+      leftovers: [],
+      pantry: [],
+      fridge: [],
+      freezer: [],
+      spices: [],
+      other: [],
+    };
+    sortedInventory.forEach(item => {
+      if (item.is_leftover) {
+        map.leftovers.push(item);
+      } else {
+        const loc = item.storageLocation || 'pantry';
+        if (!map[loc]) map[loc] = [];
+        map[loc].push(item);
+      }
     });
-    scrollSectionIntoView(`category-section-${category}`);
-  }, [expandedCategories, setExpandedCategories, setCategoryOrder, scrollSectionIntoView]);
+    return map;
+  }, [sortedInventory]);
 
-  // Bulk actions
-  const bulkChangeLocation = useCallback(async (newLocation: 'pantry' | 'fridge' | 'freezer' | 'spices' | 'other') => {
-    if (selectedItems.size === 0) return;
-    // Resolve to item ids up front, not raw indices - inventory may have
-    // reordered (remote sync) between when the checkboxes were selected and
-    // this running, and indices captured at selection time would then update
-    // the wrong items. Re-resolve each id's current index right before use.
-    const idsToUpdate = Array.from(selectedItems).map(idx => inventory[idx]?.id).filter((id): id is string => !!id);
-    for (const id of idsToUpdate) {
-      const currentIndex = inventory.findIndex(item => item.id === id);
-      if (currentIndex === -1) continue;
-      await onUpdateItem(currentIndex, { storageLocation: newLocation });
-    }
-    setSelectedItems(new Set());
-    setBulkMode(false);
-  }, [selectedItems, inventory, onUpdateItem, setSelectedItems, setBulkMode]);
-
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const bulkSetExpiration = useCallback(async (isoDate: string) => {
-    if (selectedItems.size === 0) return;
-    // See bulkChangeLocation above for why this resolves by id, not index.
-    const idsToUpdate = Array.from(selectedItems).map(idx => inventory[idx]?.id).filter((id): id is string => !!id);
-    for (const id of idsToUpdate) {
-      const currentIndex = inventory.findIndex(item => item.id === id);
-      if (currentIndex === -1) continue;
-      await onUpdateItem(currentIndex, { expirationDate: isoDate, expirationType: 'best-by' });
-    }
-    setSelectedItems(new Set());
-    setBulkMode(false);
-  }, [selectedItems, inventory, onUpdateItem, setSelectedItems, setBulkMode]);
-
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const bulkAddToShoppingListWithRemove = useCallback(async () => {
-    if (selectedItems.size === 0) return;
-    const indicesToMove = Array.from(selectedItems);
-    const itemsToMove = PantryService.bulkMoveToShoppingList(inventory, indicesToMove);
-    addToShoppingList(itemsToMove);
-    await appActions.deleteItems(indicesToMove);
-    setSelectedItems(new Set());
-    setBulkMode(false);
-    appActions.addToast(`Moved ${itemsToMove.length} item${itemsToMove.length > 1 ? 's' : ''} to shopping list`, 'success');
-  }, [selectedItems, inventory, addToShoppingList, appActions, setSelectedItems, setBulkMode]);
-
-  const toggleStorageLocation = useCallback((location: string) => {
-    // Bring clicked storage location section to the top
-    setStorageSectionOrder(prev => {
-      const filtered = prev.filter(l => l !== location);
-      return [location, ...filtered];
+  // Group items by category
+  const categoryItemsArrays = useMemo(() => {
+    const map: Record<string, DisplayedPantryItem[]> = {};
+    sortedInventory.forEach(item => {
+      const cat = item.category || 'Other';
+      if (!map[cat]) map[cat] = [];
+      map[cat].push(item);
     });
-    scrollSectionIntoView(`storage-section-${location}`);
-  }, [setStorageSectionOrder, scrollSectionIntoView]);
+    return map;
+  }, [sortedInventory]);
 
-  const collapseAllCategories = useCallback(() => {
-    setExpandedCategories(new Set());
-  }, [setExpandedCategories]);
+  const sortedCategories = useMemo(() => {
+    const cats = Object.keys(categoryItemsArrays);
+    if (categoryOrder.length === 0) return cats.sort();
+    return [...categoryOrder, ...cats.filter(c => !categoryOrder.includes(c))];
+  }, [categoryItemsArrays, categoryOrder]);
 
-  // Sort inventory based on selected criteria
-  const sortedInventory = useMemo(() => [...processedInventory].sort((a, b) => {
-    switch (sortBy) {
-      case 'name':
-        return a.item.localeCompare(b.item);
-      case 'lastAdded': {
-        const aDate = a.lastRestocked || a.dateAdded || '';
-        const bDate = b.lastRestocked || b.dateAdded || '';
-        return new Date(bDate).getTime() - new Date(aDate).getTime(); // Most recent first
-      }
-      case 'expiration': {
-        const aExp = a.expirationDate || '9999-12-31';
-        const bExp = b.expirationDate || '9999-12-31';
-        return new Date(aExp).getTime() - new Date(bExp).getTime(); // Soonest first
-      }
-      case 'category':
-        return (a.category || '').localeCompare(b.category || '');
-      case 'location': {
-        const locationOrder: Record<string, number> = { pantry: 1, fridge: 2, freezer: 3, spices: 4, other: 5 };
-        const aLoc = a.storageLocation || 'pantry';
-        const bLoc = b.storageLocation || 'pantry';
-        return locationOrder[aLoc] - locationOrder[bLoc];
-      }
-      default:
-        return 0;
-    }
-  }), [processedInventory, sortBy]);
-
-  // Group inventory by category (combine like items within categories)
-  const groupedItems = useMemo(() => sortedInventory.reduce((acc, item) => {
-    // Show a dedicated "Leftovers" category for leftover items so it's
-    // visible in the category view only when leftovers exist.
-    const category = item.is_leftover ? 'Leftovers' : (item.category || 'Uncategorized');
-    if (!acc[category]) {
-      acc[category] = {};
-    }
-
-    // Group by item ID to keep entries separate
-    const itemKey = item.id;
-    if (!acc[category][itemKey]) {
-      acc[category][itemKey] = {
-        ...item,
-        combinedItems: [item],
-        totalQuantity: getQuantityAmount(item.quantity ?? item.quantity_estimate),
-        originalIndices: [item.originalIndex],
-        originalIndex: item.originalIndex // Keep for backward compatibility
-      };
-    } else {
-      // Combine quantities
-      const currentAmount = getQuantityAmount(acc[category][itemKey].quantity ?? acc[category][itemKey].quantity_estimate);
-      const newAmount = getQuantityAmount(item.quantity ?? item.quantity_estimate);
-      const combinedAmount = currentAmount + newAmount;
-
-      // Update the combined item
-      acc[category][itemKey].combinedItems.push(item);
-      acc[category][itemKey].totalQuantity = combinedAmount;
-      acc[category][itemKey].originalIndices.push(item.originalIndex);
-
-      // Update quantity field - prefer structured quantity if available
-      if (typeof acc[category][itemKey].quantity === 'object' && acc[category][itemKey].quantity !== null) {
-        acc[category][itemKey].quantity = {
-          ...acc[category][itemKey].quantity,
-          amount: combinedAmount
-        };
-      } else if (typeof item.quantity === 'object' && item.quantity !== null) {
-        acc[category][itemKey].quantity = {
-          ...item.quantity,
-          amount: combinedAmount
-        };
-      } else {
-        acc[category][itemKey].quantity = combinedAmount;
-      }
-    }
-    return acc;
-  }, {} as Record<string, Record<string, PantryItem & { combinedItems: PantryItem[]; totalQuantity: number; originalIndices: number[]; originalIndex: number }>>), [sortedInventory]);
-
-  // Convert grouped items to arrays for display
-  const categoryItemsArrays = useMemo(() => Object.keys(groupedItems).reduce((acc, category) => {
-    acc[category] = Object.values(groupedItems[category]);
-    return acc;
-  }, {} as Record<string, (PantryItem & { combinedItems: PantryItem[]; totalQuantity: number; originalIndices: number[]; originalIndex: number })[]>), [groupedItems]);
-
-  // Group inventory by storage location (combine like items within locations)
-  const groupedByStorage = useMemo(() => sortedInventory.reduce((acc, item) => {
-    const location = item.is_leftover ? 'leftovers' : (item.storageLocation || 'pantry'); // Default to pantry if not set
-    if (!acc[location]) {
-      acc[location] = {};
-    }
-
-    // Group by item ID to keep entries separate
-    const itemKey = item.id;
-    if (!acc[location][itemKey]) {
-      acc[location][itemKey] = {
-        ...item,
-        combinedItems: [item],
-        totalQuantity: getQuantityAmount(item.quantity ?? item.quantity_estimate),
-        originalIndices: [item.originalIndex],
-        originalIndex: item.originalIndex // Keep for backward compatibility
-      };
-    } else {
-      // Combine quantities
-      const currentAmount = getQuantityAmount(acc[location][itemKey].quantity ?? acc[location][itemKey].quantity_estimate);
-      const newAmount = getQuantityAmount(item.quantity ?? item.quantity_estimate);
-      const combinedAmount = currentAmount + newAmount;
-
-      // Update the combined item
-      acc[location][itemKey].combinedItems.push(item);
-      acc[location][itemKey].totalQuantity = combinedAmount;
-      acc[location][itemKey].originalIndices.push(item.originalIndex);
-
-      // Update quantity field - prefer structured quantity if available
-      if (typeof acc[location][itemKey].quantity === 'object' && acc[location][itemKey].quantity !== null) {
-        acc[location][itemKey].quantity = {
-          ...acc[location][itemKey].quantity,
-          amount: combinedAmount
-        };
-      } else if (typeof item.quantity === 'object' && item.quantity !== null) {
-        acc[location][itemKey].quantity = {
-          ...item.quantity,
-          amount: combinedAmount
-        };
-      } else {
-        acc[location][itemKey].quantity = combinedAmount;
-      }
-    }
-    return acc;
-  }, {} as Record<string, Record<string, PantryItem & { combinedItems: PantryItem[]; totalQuantity: number; originalIndices: number[]; originalIndex: number }>>), [sortedInventory]);
-
-  // Convert grouped storage items to arrays for display
-  const storageItemsArrays = Object.keys(groupedByStorage).reduce((acc, location) => {
-    acc[location] = Object.values(groupedByStorage[location]);
-    return acc;
-  }, {} as Record<string, (PantryItem & { combinedItems: PantryItem[]; totalQuantity: number; originalIndices: number[]; originalIndex: number })[]>);
-
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const storageLocations = ['leftovers', 'pantry', 'fridge', 'freezer', 'spices', 'other'] as const;
-  const storageLabels = {
-    leftovers: 'Leftovers',
-    pantry: 'Pantry',
-    fridge: 'Refrigerator', 
-    freezer: 'Freezer',
-    spices: 'Spices & Herbs',
-    other: 'Other'
+  const storageLabels: Record<string, string> = {
+    leftovers: '🍱 Leftovers',
+    pantry: '📦 Pantry',
+    fridge: '🧊 Fridge',
+    freezer: '❄️ Freezer',
+    spices: '🌿 Spices',
+    other: '📦 Other',
   };
-
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const updateStorageLocation = async (itemIndex: number, newLocation: 'pantry' | 'freezer' | 'fridge' | 'spices' | 'other') => {
-    await onUpdateItem(itemIndex, { storageLocation: newLocation });
-  };
-
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const updateCategory = async (itemIndex: number, newCategory: string) => {
-    await onUpdateItem(itemIndex, { category: newCategory });
-  };
-
-  // Sort categories by categoryOrder, then alphabetically
-  const sortedCategories = Object.keys(groupedItems).sort((a, b) => {
-    const aIndex = categoryOrder.indexOf(a);
-    const bIndex = categoryOrder.indexOf(b);
-    if (aIndex === -1 && bIndex === -1) return a.localeCompare(b);
-    if (aIndex === -1) return 1;
-    if (bIndex === -1) return -1;
-    return aIndex - bIndex;
-  });
-
-  // Prepare view content
-  const categoryViewContent = sortedCategories.map(category => {
-    const items = categoryItemsArrays[category] || [];
-    return (
-      <div
-        key={category}
-        id={`category-section-${category}`}
-        style={{ scrollMarginTop: headerHeight + chipRowHeight }}
-        className="bg-theme-secondary rounded-lg border border-theme overflow-hidden"
-      >
-        <div
-          onClick={() => toggleCategory(category)}
-          className="w-full flex items-center p-4 bg-[var(--accent-color)]/10 hover:bg-[var(--accent-color)]/20 transition-colors cursor-pointer"
-        >
-          <div className="flex items-center gap-3">
-            <div
-              className="p-1 rounded hover:bg-theme-primary/50 transition-colors cursor-pointer"
-              onClick={(e) => {
-                e.stopPropagation();
-                toggleCategory(category);
-              }}
-            >
-              {expandedCategories.has(category) ? (
-                <ChevronDown className="w-5 h-5 text-theme-primary" />
-              ) : (
-                <ChevronRight className="w-5 h-5 text-theme-primary" />
-              )}
-            </div>
-            <h4 className="font-semibold text-theme-primary">{category}</h4>
-            <span className="text-sm text-theme-secondary opacity-70">
-              ({items.length} item{items.length !== 1 ? 's' : ''})
-            </span>
-          </div>
-        </div>
-
-        {expandedCategories.has(category) && (
-          <div className="border-t border-theme">
-            {displayLayout === 'grid' ? (
-              <>
-                <div className="grid grid-cols-3 gap-2 p-2">
-                  {(gridExpandedSections.has(`category-${category}`) ? items : items.slice(0, CATEGORY_VIRTUALIZE_THRESHOLD)).map(renderTileItem)}
-                </div>
-                {!gridExpandedSections.has(`category-${category}`) && items.length > CATEGORY_VIRTUALIZE_THRESHOLD && (
-                  <button
-                    onClick={() => expandGridSection(`category-${category}`)}
-                    className="w-full py-2 text-sm font-medium text-[var(--accent-color)] hover:underline"
-                  >
-                    Show all {items.length} items
-                  </button>
-                )}
-              </>
-            ) : items.length > CATEGORY_VIRTUALIZE_THRESHOLD ? (
-              <ReactWindowList
-                height={Math.min(400, items.length * 64)}
-                itemCount={items.length}
-                itemSize={64}
-                width={'100%'}
-                itemData={{
-                  selectedItems,
-                  bulkMode,
-                  items,
-                  renderRow: (index: number, style: React.CSSProperties) => renderCategoryItem({ index, style, category })
-                }}
-              >
-                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                {VirtualizedRow as any}
-              </ReactWindowList>
-            ) : (
-              items.map(renderListItem)
-            )}
-          </div>
-        )}
-      </div>
-    );
-  });
-
-  const storageViewContent = storageSectionOrder.map(location => {
-    const items = storageItemsArrays[location] || [];
-    const locationLabel = (storageLabels as Record<string, string>)[location] || location;
-
-    return (
-      <div
-        key={location}
-        id={`storage-section-${location}`}
-        style={{ scrollMarginTop: headerHeight + chipRowHeight }}
-        className="bg-theme-secondary rounded-lg border border-theme overflow-hidden"
-      >
-        <div className="w-full flex items-center px-4 py-2 bg-theme-primary">
-          <div className="flex items-center gap-3">
-            <StorageLocationIndicator
-              location={location as 'pantry' | 'freezer' | 'fridge' | 'spices' | 'other' | 'leftovers'}
-              size="md"
-            />
-            <h4 className="font-semibold text-theme-primary">{locationLabel}</h4>
-            <span className="text-sm text-theme-secondary">
-              ({items.length} item{items.length !== 1 ? 's' : ''})
-            </span>
-          </div>
-        </div>
-
-        <div className="border-t border-theme">
-          {items.length === 0 ? (
-            <div className="p-4 text-center text-theme-secondary opacity-50 text-sm">
-              No items in {locationLabel.toLowerCase()}
-            </div>
-          ) : displayLayout === 'grid' ? (
-            <>
-              <div className="grid grid-cols-3 gap-2 p-2">
-                {(gridExpandedSections.has(`storage-${location}`) ? items : items.slice(0, CATEGORY_VIRTUALIZE_THRESHOLD)).map(renderTileItem)}
-              </div>
-              {!gridExpandedSections.has(`storage-${location}`) && items.length > CATEGORY_VIRTUALIZE_THRESHOLD && (
-                <button
-                  onClick={() => expandGridSection(`storage-${location}`)}
-                  className="w-full py-2 text-sm font-medium text-[var(--accent-color)] hover:underline"
-                >
-                  Show all {items.length} items
-                </button>
-              )}
-            </>
-          ) : items.length > CATEGORY_VIRTUALIZE_THRESHOLD ? (
-            <ReactWindowList
-              height={Math.min(400, items.length * 64)}
-              itemCount={items.length}
-              itemSize={64}
-              width={'100%'}
-              itemData={{
-                selectedItems,
-                bulkMode,
-                items,
-                renderRow: (index: number, style: React.CSSProperties) => renderStorageItem({ index, style, location })
-              }}
-            >
-              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-              {VirtualizedRow as any}
-            </ReactWindowList>
-          ) : (
-            items.map(renderListItem)
-          )}
-        </div>
-      </div>
-    );
-  });
-
-
-  // Virtualized category item renderer
-  const renderCategoryItem = ({ index, style, category }: { index: number; style: React.CSSProperties; category: string }) => {
-    const items = categoryItemsArrays[category] || [];
-    const item = items[index];
-    if (!item) return null;
-    const expirationHeatClass = (d?: number) => {
-      if (d == null || item.is_immortal || item.category?.toLowerCase() === 'canned goods') return '';
-      if (d <= 0) return 'bg-red-500/10 dark:bg-red-500/15 border-l-4 border-l-red-500';
-      if (d <= 3) return 'bg-yellow-500/10 dark:bg-yellow-500/15 border-l-4 border-l-yellow-500';
-      return '';
-    };
-    const daysRemaining = item.expirationDate ? Math.ceil((new Date(item.expirationDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : undefined;
-
-    // Use the first original index for combined items
-    const primaryIndex = item.originalIndices ? item.originalIndices[0] : item.originalIndex;
-
-    return (
-      <div style={style} key={primaryIndex} className={`flex items-center justify-between px-2 py-1 border-b border-theme last:border-b-0 transition-all cursor-pointer ${
-        expirationHeatClass(daysRemaining)
-      } ${
-        bulkMode && item.originalIndices ? item.originalIndices.some((idx: number) => selectedItems.has(idx)) :
-        bulkMode && selectedItems.has(primaryIndex)
-          ? 'bg-[var(--accent-color)]/10 border-[var(--accent-color)]/30'
-          : 'hover:bg-theme-primary/50'
-      }`}
-      {...getRowActionHandlers(item)}
-      onClick={() => {
-        if (gestureActionTriggeredRef.current) {
-          gestureActionTriggeredRef.current = false;
-          return;
-        }
-        if (!bulkMode) setSelectedItemIndex(primaryIndex)
-      }}
-      >
-        {bulkMode && (
-          <input
-            type="checkbox"
-            checked={item.originalIndices ? item.originalIndices.some((idx: number) => selectedItems.has(idx)) : selectedItems.has(primaryIndex)}
-            onChange={() => {
-              if (item.originalIndices) {
-                // For combined items, toggle all indices
-                const allSelected = item.originalIndices.every((idx: number) => selectedItems.has(idx));
-                if (allSelected) {
-                  item.originalIndices.forEach((idx: number) => selectedItems.delete(idx));
-                } else {
-                  item.originalIndices.forEach((idx: number) => selectedItems.add(idx));
-                }
-                setSelectedItems(new Set(selectedItems));
-              } else {
-                toggleItemSelection(primaryIndex);
-              }
-            }}
-            className="mr-3 w-4 h-4 text-[var(--accent-color)] bg-theme-primary border-theme rounded focus:ring-[var(--accent-color)]"
-          />
-        )}
-
-        <div className="flex items-center gap-3 min-w-0 flex-1">
-          <ProgressiveImage
-            src={getPreferredItemDisplayImage(item.item, item.category, item.image)}
-            alt={item.item}
-            className="w-10 h-10 rounded-lg object-cover bg-theme-primary border border-theme flex-shrink-0"
-            placeholderSrc="/images/placeholder.svg"
-            lazy={true}
-          />
-          <div className="font-medium text-theme-primary truncate">{item.item}</div>
-        </div>
-
-        {/* Right section: Expiration, Quantity, Actions, Chevron */}
-        <div className="flex items-center gap-3 flex-shrink-0 ml-4">
-          {/* Expiration date */}
-          <div className="flex items-center gap-1.5">
-            {item.expirationDate && !item.is_immortal && item.category?.toLowerCase() !== 'canned goods' && (() => {
-              const daysRemaining = Math.ceil((new Date(item.expirationDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-              const color = getExpirationColor(daysRemaining, item.expirationType);
-              const expiryLabel = daysRemaining <= 0
-                ? `${item.item} has expired`
-                : `${item.item} expires in ${daysRemaining} day${daysRemaining === 1 ? '' : 's'} — ${color === 'red' ? 'critical' : color === 'yellow' ? 'warning' : 'ok'}`;
-              return (
-                <div
-                  className={`text-xs px-1.5 py-0.5 rounded font-medium flex-shrink-0 ${
-                    color === 'red' ? 'bg-red-100 text-red-800' :
-                    color === 'yellow' ? 'bg-yellow-100 text-yellow-800' :
-                    'bg-green-100 text-green-800'
-                  }`}
-                  aria-label={expiryLabel}
-                >
-                  {daysRemaining}d
-                </div>
-              );
-            })()}
-            {item.expiryAlertShown && (
-              <Clock className="w-4 h-4 text-orange-500 flex-shrink-0" />
-            )}
-            {item.is_immortal && (
-              <span className="text-xs px-1.5 py-0.5 rounded font-medium bg-blue-100 text-blue-800 flex items-center gap-1 flex-shrink-0">
-                <span aria-hidden>∞</span>
-                <span className="opacity-90">Shelf Stable</span>
-              </span>
-            )}
-          </div>
-
-          {/* Quantity */}
-          <div className="text-xs text-theme-secondary opacity-70 bg-theme-secondary px-2 py-0.5 rounded border border-theme flex-shrink-0">
-            Qty: {formatItemQuantity(item)}
-          </div>
-
-          {/* Action Buttons & Chevron */}
-          {!bulkMode && (
-            <div className="flex items-center gap-2 text-theme-secondary opacity-50 flex-shrink-0">
-              {household?.id && item.id && item.storageLocation !== 'freezer' && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setFreezeTargetIndex(primaryIndex);
-                  }}
-                  className="px-2 py-1 rounded bg-theme-secondary hover:bg-theme-primary text-xs"
-                  title="Move to freezer"
-                >
-                  ❄️ Freeze
-                </button>
-              )}
-              {household?.id && item.id && (item.storageLocation === 'freezer' || item.is_frozen) && (
-                <button
-                  onClick={async (e) => {
-                    e.stopPropagation();
-                    const hhId = household?.id;
-                    if (!hhId) {
-                      appActions.addToast('No household selected', 'error');
-                      return;
-                    }
-                    try {
-                      const cookingToday = false; // default defrost window; user can adjust expiry after
-                      const prev = { storageLocation: item.storageLocation, is_frozen: item.is_frozen, expirationDate: item.expirationDate };
-                      const result = await FreezerService.moveToFridgeFromFreezer(hhId, item.id, { cookingToday });
-                      await onUpdateItem(primaryIndex, { storageLocation: 'fridge', is_frozen: false, expirationDate: result.newExpiry });
-                      appActions.addToast(
-                        cookingToday ? 'Defrosted for today' : 'Defrosted to fridge',
-                        'success',
-                        5000,
-                        'Undo',
-                        async () => {
-                          try {
-                            await onUpdateItem(primaryIndex, { storageLocation: prev.storageLocation, is_frozen: prev.is_frozen, expirationDate: prev.expirationDate });
-                          } catch (err) {
-                            console.error('Failed to undo defrost item update:', err);
-                          }
-                        }
-                      );
-                    } catch {
-                      appActions.addToast('Failed to defrost item', 'error');
-                    }
-                  }}
-                  className="px-2 py-1 rounded bg-theme-secondary hover:bg-theme-primary text-xs"
-                  title="Move to fridge (defrost)"
-                >
-                  🌡️ Defrost
-                </button>
-              )}
-              <ChevronRight className="w-5 h-5 flex-shrink-0" />
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  };
-
-  // Virtualized storage item renderer
-  const renderStorageItem = ({ index, style, location }: { index: number; style: React.CSSProperties; location: string }) => {
-    const items = storageItemsArrays[location] || [];
-    const item = items[index];
-    if (!item) return null;
-    const daysRemaining = item.expirationDate ? Math.ceil((new Date(item.expirationDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : undefined;
-    const expirationBorderClass = (d?: number) => {
-      if (d == null || item.is_immortal || item.category?.toLowerCase() === 'canned goods') return '';
-      const c = getExpirationColor(d, item.expirationType);
-      return c === 'red' ? 'ring-2 ring-red-300/40' : c === 'yellow' ? 'ring-2 ring-yellow-300/30' : '';
-    };
-    const expirationHeatClass = (d?: number) => {
-      if (d == null || item.is_immortal || item.category?.toLowerCase() === 'canned goods') return '';
-      if (d <= 0) return 'bg-red-500/10 dark:bg-red-500/15 border-l-4 border-l-red-500';
-      if (d <= 3) return 'bg-yellow-500/10 dark:bg-yellow-500/15 border-l-4 border-l-yellow-500';
-      return '';
-    };
-
-    // Use the first original index for combined items
-    const primaryIndex = item.originalIndices ? item.originalIndices[0] : item.originalIndex;
-
-    return (
-      <div style={style} key={primaryIndex} className={`flex items-center justify-between px-2 py-1 border-b border-theme last:border-b-0 transition-all cursor-pointer ${expirationBorderClass(daysRemaining)} ${expirationHeatClass(daysRemaining)} ${
-        bulkMode && item.originalIndices ? item.originalIndices.some((idx: number) => selectedItems.has(idx)) :
-        bulkMode && selectedItems.has(primaryIndex)
-          ? 'bg-[var(--accent-color)]/10 border-[var(--accent-color)]/30'
-          : 'hover:bg-theme-primary/50'
-      }`}
-      {...getRowActionHandlers(item)}
-      onClick={() => {
-        if (gestureActionTriggeredRef.current) {
-          gestureActionTriggeredRef.current = false;
-          return;
-        }
-        if (!bulkMode) setSelectedItemIndex(primaryIndex)
-      }}
-      >
-        {bulkMode && (
-          <input
-            type="checkbox"
-            checked={item.originalIndices ? item.originalIndices.some((idx: number) => selectedItems.has(idx)) : selectedItems.has(primaryIndex)}
-            onChange={() => {
-              if (item.originalIndices) {
-                // For combined items, toggle all indices
-                const allSelected = item.originalIndices.every((idx: number) => selectedItems.has(idx));
-                if (allSelected) {
-                  item.originalIndices.forEach((idx: number) => selectedItems.delete(idx));
-                } else {
-                  item.originalIndices.forEach((idx: number) => selectedItems.add(idx));
-                }
-                setSelectedItems(new Set(selectedItems));
-              } else {
-                toggleItemSelection(primaryIndex);
-              }
-            }}
-            className="mr-3 w-4 h-4 text-[var(--accent-color)] bg-theme-primary border-theme rounded focus:ring-[var(--accent-color)]"
-          />
-        )}
-
-        <div className="flex items-center gap-3 min-w-0 flex-1">
-          <ProgressiveImage
-            src={getPreferredItemDisplayImage(item.item, item.category, item.image)}
-            alt={item.item}
-            className="w-10 h-10 rounded-lg object-cover bg-theme-primary border border-theme flex-shrink-0"
-            placeholderSrc="/images/placeholder.svg"
-            lazy={true}
-          />
-          <div className="font-medium text-theme-primary truncate">{item.item}</div>
-        </div>
-
-        {/* Right section: Expiration, Quantity, Actions, Chevron */}
-        <div className="flex items-center gap-3 flex-shrink-0 ml-4">
-          {/* Expiration date */}
-          <div className="flex items-center gap-1.5">
-            {item.expirationDate && !item.is_immortal && item.category?.toLowerCase() !== 'canned goods' && (() => {
-              const daysRemaining = Math.ceil((new Date(item.expirationDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-              const color = getExpirationColor(daysRemaining, item.expirationType);
-              const expiryLabel = daysRemaining <= 0
-                ? `${item.item} has expired`
-                : `${item.item} expires in ${daysRemaining} day${daysRemaining === 1 ? '' : 's'} — ${color === 'red' ? 'critical' : color === 'yellow' ? 'warning' : 'ok'}`;
-              return (
-                <div
-                  className={`text-xs px-1.5 py-0.5 rounded font-medium flex-shrink-0 ${
-                    color === 'red' ? 'bg-red-100 text-red-800' :
-                    color === 'yellow' ? 'bg-yellow-100 text-yellow-800' :
-                    'bg-green-100 text-green-800'
-                  }`}
-                  aria-label={expiryLabel}
-                >
-                  {daysRemaining}d
-                </div>
-              );
-            })()}
-            {item.expiryAlertShown && (
-              <Clock className="w-4 h-4 text-orange-500 flex-shrink-0" />
-            )}
-            {item.is_immortal && (
-              <span className="text-xs px-1.5 py-0.5 rounded font-medium bg-blue-100 text-blue-800 flex items-center gap-1 flex-shrink-0">
-                <span aria-hidden>∞</span>
-                <span className="opacity-90">Shelf Stable</span>
-              </span>
-            )}
-          </div>
-
-          {/* Quantity */}
-          <div className="text-xs text-theme-secondary opacity-70 bg-theme-secondary px-2 py-0.5 rounded border border-theme flex-shrink-0">
-            Qty: {formatItemQuantity(item)}
-          </div>
-
-          {/* Action Buttons & Chevron */}
-          {!bulkMode && (
-            <div className="flex items-center gap-2 text-theme-secondary opacity-50 flex-shrink-0">
-              <ChevronRight className="w-5 h-5 flex-shrink-0" />
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  };
-
-  // Simple list item renderer used for non-virtualized lists
-  function renderListItem(item: DisplayedPantryItem) {
-    const daysRemaining = item.expirationDate ? Math.ceil((new Date(item.expirationDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : undefined;
-    const expirationBorderClass = (d?: number) => {
-      if (d == null || item.is_immortal || item.category?.toLowerCase() === 'canned goods') return '';
-      const c = getExpirationColor(d, item.expirationType);
-      return c === 'red' ? 'ring-2 ring-red-300/40' : c === 'yellow' ? 'ring-2 ring-yellow-300/30' : '';
-    };
-    const expirationHeatClass = (d?: number) => {
-      if (d == null || item.is_immortal || item.category?.toLowerCase() === 'canned goods') return '';
-      if (d <= 0) return 'bg-red-500/10 dark:bg-red-500/15 border-l-4 border-l-red-500';
-      if (d <= 3) return 'bg-yellow-500/10 dark:bg-yellow-500/15 border-l-4 border-l-yellow-500';
-      return '';
-    };
-    // Use the first original index for combined items
-    const primaryIndex = item.originalIndices ? item.originalIndices[0] : item.originalIndex;
-
-    return (
-      <div
-        key={primaryIndex}
-        className={`flex items-center justify-between px-2 py-1 border-b border-theme last:border-b-0 transition-all cursor-pointer ${expirationBorderClass(daysRemaining)} ${expirationHeatClass(daysRemaining)} ${
-          bulkMode && item.originalIndices ? item.originalIndices.some((idx: number) => selectedItems.has(idx)) :
-          bulkMode && selectedItems.has(primaryIndex)
-            ? 'bg-[var(--accent-color)]/10 border-[var(--accent-color)]/30'
-            : 'hover:bg-theme-primary/50'
-        }`}
-        {...getRowActionHandlers(item)}
-        onClick={() => {
-          if (gestureActionTriggeredRef.current) {
-            gestureActionTriggeredRef.current = false;
-            return;
-          }
-          if (!bulkMode) setSelectedItemIndex(primaryIndex)
-        }}
-      >
-        {bulkMode && (
-          <input
-            type="checkbox"
-            checked={item.originalIndices ? item.originalIndices.some((idx: number) => selectedItems.has(idx)) : selectedItems.has(primaryIndex)}
-            onChange={() => {
-              if (item.originalIndices) {
-                // For combined items, toggle all indices
-                const allSelected = item.originalIndices.every((idx: number) => selectedItems.has(idx));
-                if (allSelected) {
-                  item.originalIndices.forEach((idx: number) => selectedItems.delete(idx));
-                } else {
-                  item.originalIndices.forEach((idx: number) => selectedItems.add(idx));
-                }
-                setSelectedItems(new Set(selectedItems));
-              } else {
-                toggleItemSelection(primaryIndex);
-              }
-            }}
-            className="mr-3 w-4 h-4 text-[var(--accent-color)] bg-theme-primary border-theme rounded focus:ring-[var(--accent-color)]"
-          />
-        )}
-
-        <div className="flex items-center gap-3 min-w-0 flex-1">
-          <img
-            src={getPreferredItemDisplayImage(item.item, item.category, item.image)}
-            alt={item.item}
-            className="w-10 h-10 rounded-lg object-cover bg-theme-primary border border-theme flex-shrink-0"
-            onError={(e) => { (e.target as HTMLImageElement).src = '/images/placeholder.svg'; }}
-          />
-          <div className="font-medium text-theme-primary truncate">{item.item}</div>
-        </div>
-
-        {/* Right section: Expiration, Quantity, Actions, Chevron */}
-        <div className="flex items-center gap-3 flex-shrink-0 ml-4">
-          {/* Expiration date */}
-          <div className="flex items-center gap-1.5">
-            {typeof daysRemaining === 'number' && !item.is_immortal && item.category?.toLowerCase() !== 'canned goods' && (() => {
-              const color = getExpirationColor(daysRemaining, item.expirationType);
-              const expiryLabel = daysRemaining <= 0
-                ? `${item.item} has expired`
-                : `${item.item} expires in ${daysRemaining} day${daysRemaining === 1 ? '' : 's'} — ${color === 'red' ? 'critical' : color === 'yellow' ? 'warning' : 'ok'}`;
-              return (
-                <div
-                  className={`text-xs px-1.5 py-0.5 rounded font-medium flex-shrink-0 ${
-                    color === 'red' ? 'bg-red-100 text-red-800' :
-                    color === 'yellow' ? 'bg-yellow-100 text-yellow-800' :
-                    'bg-green-100 text-green-800'
-                  }`}
-                  aria-label={expiryLabel}
-                >
-                  {daysRemaining}d
-                </div>
-              );
-            })()}
-            {item.expiryAlertShown && (
-              <Clock className="w-4 h-4 text-orange-500 flex-shrink-0" aria-label="Expires within 7 days" />
-            )}
-            {item.is_immortal && (
-              <span className="text-xs px-1.5 py-0.5 rounded font-medium bg-blue-100 text-blue-800 flex items-center gap-1 flex-shrink-0">
-                <span aria-hidden>∞</span>
-                <span className="opacity-90">Shelf Stable</span>
-              </span>
-            )}
-          </div>
-
-          {/* Quantity */}
-          <div className="text-xs text-theme-secondary opacity-70 bg-theme-secondary px-2 py-0.5 rounded border border-theme flex-shrink-0">
-            Qty: {formatItemQuantity(item)}
-          </div>
-
-          {/* Action Buttons & Chevron */}
-          {!bulkMode && (
-            <div className="flex items-center gap-2 text-theme-secondary opacity-50 flex-shrink-0">
-              <ChevronRight className="w-5 h-5 flex-shrink-0" />
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  function renderTileItem(item: DisplayedPantryItem) {
-    const daysRemaining = item.expirationDate
-      ? Math.ceil((new Date(item.expirationDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
-      : undefined;
-    const primaryIndex = item.originalIndices ? item.originalIndices[0] : item.originalIndex;
-    const isSelected = item.originalIndices
-      ? item.originalIndices.some((idx: number) => selectedItems.has(idx))
-      : selectedItems.has(primaryIndex);
-    const expiryColor = typeof daysRemaining === 'number' ? getExpirationColor(daysRemaining, item.expirationType) : null;
-
-    const toggleSelect = (e?: React.MouseEvent) => {
-      e?.stopPropagation();
-      if (item.originalIndices) {
-        const allSelected = item.originalIndices.every((idx: number) => selectedItems.has(idx));
-        if (allSelected) {
-          item.originalIndices.forEach((idx: number) => selectedItems.delete(idx));
-        } else {
-          item.originalIndices.forEach((idx: number) => selectedItems.add(idx));
-        }
-        setSelectedItems(new Set(selectedItems));
-      } else {
-        toggleItemSelection(primaryIndex);
-      }
-    };
-
-    return (
-      <div
-        key={primaryIndex}
-        className={`bg-theme-secondary rounded-xl border overflow-hidden flex flex-col transition-all cursor-pointer ${
-          isSelected && bulkMode ? 'border-[var(--accent-color)] ring-2 ring-[var(--accent-color)]/30' : 'border-theme'
-        }`}
-        onClick={() => {
-          if (bulkMode) { toggleSelect(); } else { setSelectedItemIndex(primaryIndex); }
-        }}
-      >
-        {/* Image area */}
-        <div className="relative aspect-square bg-theme-primary">
-          <img
-            src={getPreferredItemDisplayImage(item.item, item.category, item.image)}
-            alt={item.item}
-            className="w-full h-full object-contain p-1"
-            onError={(e) => { (e.target as HTMLImageElement).src = '/images/placeholder.svg'; }}
-          />
-
-          {/* Expiry badge — top left */}
-          {typeof daysRemaining === 'number' && item.category?.toLowerCase() !== 'canned goods' && (
-            <div className={`absolute top-1.5 left-1.5 flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
-              expiryColor === 'red' ? 'bg-red-600/90 text-white' :
-              expiryColor === 'yellow' ? 'bg-yellow-500/90 text-white' :
-              'bg-green-600/90 text-white'
-            }`}>
-              <Clock className="w-2.5 h-2.5" />
-              {Math.abs(daysRemaining)}d
-            </div>
-          )}
-
-          {/* Checkbox — top right */}
-          <button
-            onClick={(e) => toggleSelect(e)}
-            className={`absolute top-1.5 right-1.5 w-6 h-6 rounded flex items-center justify-center border-2 transition-colors ${
-              isSelected
-                ? 'bg-[var(--accent-color)] border-[var(--accent-color)]'
-                : 'bg-black/30 border-white/60'
-            }`}
-            aria-label={isSelected ? `Deselect ${item.item}` : `Select ${item.item}`}
-          >
-            {isSelected && (
-              <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="none">
-                <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            )}
-          </button>
-
-          {/* Detail shortcut — bottom right */}
-          <button
-            onClick={(e) => { e.stopPropagation(); setSelectedItemIndex(primaryIndex); }}
-            className="absolute bottom-1.5 right-1.5 w-8 h-8 rounded-full bg-white/90 dark:bg-gray-800/90 flex items-center justify-center shadow-md hover:scale-105 transition-transform"
-            aria-label={`View details for ${item.item}`}
-          >
-            <ChefHat className="w-4 h-4 text-theme-primary" />
-          </button>
-        </div>
-
-        {/* Item name */}
-        <div className="px-2 pt-1.5 pb-0.5">
-          <p className="text-xs font-medium text-theme-primary truncate leading-tight">{item.item}</p>
-        </div>
-
-        {/* Actions row */}
-        <div className="flex items-center justify-between px-2 pb-2 mt-auto">
-          <button
-            onClick={(e) => { e.stopPropagation(); onDeleteItem(primaryIndex); }}
-            className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
-            aria-label={`Delete ${item.item}`}
-          >
-            <Trash2 className="w-3.5 h-3.5 text-theme-secondary" />
-          </button>
-          <span className="text-[11px] text-theme-secondary text-center leading-none">{formatItemQuantity(item) || '—'}</span>
-          <button
-            onClick={(e) => { e.stopPropagation(); setSelectedItemIndex(primaryIndex); }}
-            className="w-7 h-7 flex items-center justify-center rounded-full border border-theme hover:bg-theme-primary transition-colors"
-            aria-label={`Edit quantity for ${item.item}`}
-          >
-            <Plus className="w-3.5 h-3.5 text-theme-secondary" />
-          </button>
-        </div>
-      </div>
-    );
-  }
-
 
   return (
     <div className="space-y-6 pb-24 max-w-2xl mx-auto animate-fade-in relative">
+      {/* Pantry health score strip */}
+      {user?.isGuest && (
+        <SettingsGuestBanner
+          isGuest={true}
+          onLogout={() => setActiveTab?.(Tab.SETTINGS)}
+        />
+      )}
 
-
-
-
-
-      {/* Pantry status strip: health score + item count + expiring count, one row */}
       {inventory.length >= 3 && (
         <PantryHealthScore
           inventory={inventory}
@@ -1565,893 +558,292 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
         />
       )}
 
-      {/* Smart suggestion carousel — combines the dinner prompt, leftover nudge, each
-          "recipe you can make now" suggestion, shopping suggestions, and the "what can
-          I cook" fallback into one swipeable, full-width carousel with a shared dot
-          pager, instead of stacking them as separate cards. */}
-      {inventory.length > 0 && (() => {
-        type CarouselSlide = {
-          key: string;
-          tone: 'accent' | 'amber' | 'purple' | 'blue' | 'green';
-          icon: React.ReactNode;
-          content: React.ReactNode;
-        };
+      {/* Toolbar & Filter Controls */}
+      <PantrySearchBar
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        viewMode={viewMode}
+        setViewMode={setViewMode}
+        sortBy={sortBy}
+        setSortBy={setSortBy}
+        displayLayout={displayLayout}
+        toggleDisplayLayout={toggleDisplayLayout}
+        showFilters={showFilters}
+        setShowFilters={setShowFilters}
+        pantryFilter={pantryFilter}
+        bulkMode={bulkMode}
+        toggleBulkMode={toggleBulkMode}
+        onOpenSearchModal={() => setIsSearchModalOpen(true)}
+      />
 
-        const slides: CarouselSlide[] = [];
-
-        if (showLeftoverChip) {
-          slides.push({
-            key: 'leftover',
-            tone: 'amber',
-            icon: <span className="text-xl">🥡</span>,
-            content: (
-              <>
-                <h3 className="font-serif font-bold text-base text-theme-primary">Did you have leftovers last night?</h3>
-                <p className="text-sm text-theme-secondary opacity-80 mt-0.5 mb-3">Log them to track food waste and update your pantry.</p>
+      {/* Filter panel */}
+      {showFilters && (
+        <div className="bg-theme-secondary p-4 rounded-xl border border-theme shadow-md mt-2 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-theme-primary mb-2">Categories</label>
+            <div className="flex flex-wrap gap-2">
+              {Array.from(new Set(inventory.map(item => item.category).filter(Boolean))).map(category => (
                 <button
-                  onClick={() => setIsAddModalOpen(true)}
-                  className="px-3 py-1.5 rounded-lg bg-amber-500 text-white text-xs font-bold hover:bg-amber-600 transition-colors shadow-sm"
+                  key={category}
+                  onClick={() => {
+                    const newFilter = { ...pantryFilter };
+                    if (newFilter.categories.includes(category!)) {
+                      newFilter.categories = newFilter.categories.filter(c => c !== category);
+                    } else {
+                      newFilter.categories.push(category!);
+                    }
+                    setPantryFilter(newFilter);
+                    savePantryFilter(newFilter);
+                  }}
+                  className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                    pantryFilter.categories.includes(category!)
+                      ? 'bg-[var(--accent-color)] text-[var(--accent-text,white)]'
+                      : 'bg-theme-primary text-theme-secondary border border-theme hover:bg-theme-secondary'
+                  }`}
                 >
-                  Log now
+                  {category}
                 </button>
-              </>
-            ),
-          });
-        }
-
-        if (showDinnerCard) {
-          slides.push({
-            key: 'dinner',
-            tone: 'purple',
-            icon: <ChefHat className="w-6 h-6 animate-pulse" />,
-            content: (
-              <>
-                <h3 className="font-serif font-bold text-base text-theme-primary">What's for dinner tonight?</h3>
-                <p className="text-sm text-theme-secondary opacity-80 mt-0.5 mb-3">You don't have dinner planned yet. Tap below to search recipes using what you have in your pantry!</p>
-                <button onClick={handleWhatCanICookTonight} className="text-xs font-bold text-theme-primary hover:underline">Find a recipe →</button>
-              </>
-            ),
-          });
-        }
-
-        recipeSuggestions.slice(0, 3).forEach((suggestion) => {
-          slides.push({
-            key: `useSoon-${suggestion.itemId}`,
-            tone: 'green',
-            icon: <Clock className="w-5 h-5" />,
-            content: (
-              <>
-                <div className="flex items-start justify-between gap-2">
-                  <h3 className="font-serif font-bold text-base text-theme-primary truncate">Use soon: {suggestion.itemName}</h3>
-                  <span className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
-                    suggestion.daysRemaining <= 1 ? 'bg-red-100 text-red-800' :
-                    suggestion.daysRemaining <= 3 ? 'bg-yellow-100 text-yellow-800' :
-                    'bg-blue-100 text-blue-800'
-                  }`}>
-                    {suggestion.daysRemaining}d left
-                  </span>
-                </div>
-                <p className="text-sm text-theme-secondary opacity-80 mt-0.5 mb-3">{suggestion.reason}</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {suggestion.suggestedRecipes.slice(0, 3).map((recipe, i) => (
-                    <button
-                      key={i}
-                      onClick={() => {
-                        if (setActiveTab && setInitialSearchQuery) {
-                          setInitialSearchQuery(recipe);
-                          setActiveTab(Tab.RECIPES);
-                        }
-                      }}
-                      className="text-xs font-bold bg-theme-secondary border border-theme px-2.5 py-1.5 rounded-lg hover:bg-theme-primary transition-colors"
-                    >
-                      {recipe}
-                    </button>
-                  ))}
-                </div>
-              </>
-            ),
-          });
-        });
-
-        mealPrepSuggestions.slice(0, 4).forEach((suggestion, index) => {
-          slides.push({
-            key: `recipe-${index}`,
-            tone: 'green',
-            icon: <ChefHat className="w-5 h-5" />,
-            content: (
-              <>
-                <div className="flex items-start justify-between gap-2">
-                  <h3 className="font-serif font-bold text-base text-theme-primary truncate">{suggestion.recipe.title}</h3>
-                  {suggestion.canMake && (
-                    <span className="shrink-0 text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-bold">Ready!</span>
-                  )}
-                </div>
-                <p className="text-sm text-theme-secondary opacity-80 mt-0.5 mb-3">
-                  {suggestion.availableIngredients}/{suggestion.totalIngredients} ingredients available
-                </p>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => {
-                      setModalRecipe(suggestion.recipe);
-                      setModalContext('search');
-                      setShowRecipeModal(true);
-                      AnalyticsService.trackEvent('meal_prep_view_recipe', {
-                        recipe_title: suggestion.recipe.title,
-                        match_percentage: suggestion.matchPercentage,
-                        available_ingredients: suggestion.availableIngredients,
-                        total_ingredients: suggestion.totalIngredients,
-                        can_make: suggestion.canMake
-                      });
-                    }}
-                    className="text-xs font-bold bg-[var(--accent-color)] text-[var(--accent-text,white)] px-2.5 py-1.5 rounded-lg hover:bg-[var(--accent-color)]/90 transition-colors"
-                  >
-                    View Recipe
-                  </button>
-                  <button
-                    onClick={() => { if (setActiveTab) setActiveTab(Tab.MEALS); }}
-                    className="text-xs font-bold bg-theme-secondary border border-theme px-2.5 py-1.5 rounded-lg hover:bg-theme-primary transition-colors"
-                  >
-                    Plan Meal
-                  </button>
-                  {suggestion.missingIngredients.length > 0 && (
-                    <button
-                      onClick={() => {
-                        const missingItems = suggestion.missingIngredients
-                          .filter(match => !match.available)
-                          .map(match => match.ingredient);
-                        if (missingItems.length > 0) {
-                          addToShoppingList(missingItems);
-                        }
-                      }}
-                      className="text-xs font-bold bg-theme-secondary border border-theme px-2.5 py-1.5 rounded-lg hover:bg-theme-primary transition-colors"
-                      title={`Add ${suggestion.missingIngredients.length} missing ingredients to shopping list`}
-                    >
-                      +{suggestion.missingIngredients.length}
-                    </button>
-                  )}
-                </div>
-              </>
-            ),
-          });
-        });
-
-        if (consumptionSuggestions.length > 0) {
-          const top = consumptionSuggestions[0];
-          slides.push({
-            key: 'shopping',
-            tone: 'blue',
-            icon: <ShoppingBasket className="w-5 h-5" />,
-            content: (
-              <>
-                <h3 className="font-serif font-bold text-base text-theme-primary">{top.item} — running low</h3>
-                <p className="text-sm text-theme-secondary opacity-80 mt-0.5 mb-3">{top.reason}</p>
-                <button
-                  onClick={() => addToShoppingList([top.item])}
-                  className="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 transition-colors"
-                >
-                  Add to shopping list
-                </button>
-              </>
-            ),
-          });
-        }
-
-        slides.push({
-          key: 'cookTonight',
-          tone: 'accent',
-          icon: loadingState === LoadingState.LOADING
-            ? <Loader2 className="w-5 h-5 animate-spin" />
-            : <ChefHat className="w-5 h-5" />,
-          content: (
-            <>
-              <h3 className="font-serif font-bold text-base text-theme-primary">Not sure what to make?</h3>
-              <p className="text-sm text-theme-secondary opacity-80 mt-0.5 mb-3">Get a meal idea from what you already have in your pantry.</p>
-              <button
-                onClick={handleWhatCanICookTonight}
-                disabled={loadingState === LoadingState.LOADING}
-                className="px-3 py-1.5 rounded-lg bg-[var(--accent-color)] text-[var(--accent-text,white)] text-xs font-bold hover:bg-[var(--accent-color)]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                What can I cook tonight?
-              </button>
-            </>
-          ),
-        });
-
-        const toneCardClasses: Record<CarouselSlide['tone'], string> = {
-          purple: 'bg-gradient-to-br from-indigo-500/10 via-purple-500/5 to-pink-500/10 border-purple-500/20',
-          amber: 'bg-amber-500/8 border-amber-500/25',
-          blue: 'bg-blue-50 border-blue-200',
-          green: 'bg-gradient-to-r from-green-500/10 to-emerald-500/5 border-green-500/20',
-          accent: 'bg-[var(--accent-color)]/8 border-[var(--accent-color)]/25',
-        };
-        const toneIconClasses: Record<CarouselSlide['tone'], string> = {
-          purple: 'bg-purple-500/20 text-purple-600',
-          amber: 'bg-amber-500/20 text-amber-600',
-          blue: 'bg-blue-500/20 text-blue-600',
-          green: 'bg-green-500/20 text-green-600',
-          accent: 'bg-[var(--accent-color)]/20 text-[var(--accent-color)]',
-        };
-
-        const activeIndex = Math.min(suggestionSlide, slides.length - 1);
-
-        const scrollToSlide = (index: number) => {
-          const el = carouselRef.current;
-          if (el) el.scrollTo({ left: index * el.clientWidth, behavior: 'smooth' });
-          setSuggestionSlide(index);
-        };
-
-        const handleCarouselScroll = () => {
-          const el = carouselRef.current;
-          if (!el || el.clientWidth === 0) return;
-          const index = Math.round(el.scrollLeft / el.clientWidth);
-          setSuggestionSlide(prev => (prev === index ? prev : index));
-        };
-
-        return (
-          <div className="mb-6">
-            <div
-              ref={carouselRef}
-              onScroll={handleCarouselScroll}
-              className="flex overflow-x-auto snap-x snap-mandatory scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-            >
-              {slides.map(slide => (
-                <div key={slide.key} className="w-full shrink-0 snap-center px-0.5">
-                  <div className={`rounded-xl border p-5 h-full ${toneCardClasses[slide.tone]}`}>
-                    <div className="flex items-start gap-4">
-                      <div className={`shrink-0 p-3 rounded-lg ${toneIconClasses[slide.tone]}`}>
-                        {slide.icon}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        {slide.content}
-                      </div>
-                    </div>
-                  </div>
-                </div>
               ))}
             </div>
-
-            {slides.length > 1 && (
-              <div className="flex items-center justify-center gap-1.5 mt-2">
-                {slides.map((s, i) => (
-                  <button
-                    key={s.key}
-                    onClick={() => scrollToSlide(i)}
-                    aria-label={`Suggestion ${i + 1} of ${slides.length}`}
-                    aria-current={i === activeIndex ? 'step' : undefined}
-                    className="p-3 -m-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-color)]"
-                  >
-                    <span className={`h-1.5 rounded-full transition-all ${i === activeIndex ? 'w-5 bg-[var(--text-primary)]' : 'w-1.5 bg-[var(--text-primary)]/30'}`} />
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {mealPrepSuggestions.length > 4 && (
-              <div className="text-center mt-2">
-                <button
-                  onClick={() => { if (setActiveTab) setActiveTab(Tab.MEALS); }}
-                  className="text-xs text-[var(--accent-color)] hover:underline"
-                >
-                  View all {mealPrepSuggestions.length} recipe suggestions →
-                </button>
-              </div>
-            )}
           </div>
-        );
-      })()}
 
-      {lastImportedBatch && (
-        <div className="w-full bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4 flex items-center justify-between">
-          <div className="text-sm text-yellow-900">Imported {lastImportedBatch.length} items</div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={async () => {
-                try {
-                  // Remove imported items from the cache
-                  for (const it of lastImportedBatch) {
-                    try {
-                      await InventoryCacheService.removeItemFromCache(it.id, household?.id, user?.id);
-                    } catch (err) {
-                      log.error('Failed to remove imported item from cache', { err });
+          <div>
+            <label className="block text-sm font-medium text-theme-primary mb-2">Locations</label>
+            <div className="flex flex-wrap gap-2">
+              {['leftovers', 'pantry', 'fridge', 'freezer', 'spices', 'other'].map(location => (
+                <button
+                  key={location}
+                  onClick={() => {
+                    const newFilter = { ...pantryFilter };
+                    if (newFilter.locations.includes(location)) {
+                      newFilter.locations = newFilter.locations.filter(l => l !== location);
+                    } else {
+                      newFilter.locations.push(location);
                     }
-                  }
-                } finally {
-                  setLastImportedBatch(null);
-                  if (importedTimerRef.current) {
-                    window.clearTimeout(importedTimerRef.current);
-                    importedTimerRef.current = null;
-                  }
-                }
-              }}
-              className="px-3 py-1 bg-theme-primary text-white rounded"
-            >
-              Undo
-            </button>
+                    setPantryFilter(newFilter);
+                    savePantryFilter(newFilter);
+                  }}
+                  className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                    pantryFilter.locations.includes(location)
+                      ? 'bg-[var(--accent-color)] text-[var(--accent-text,white)]'
+                      : 'bg-theme-primary text-theme-secondary border border-theme hover:bg-theme-secondary'
+                  }`}
+                >
+                  {location.charAt(0).toUpperCase() + location.slice(1)}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex justify-end">
             <button
               onClick={() => {
-                setLastImportedBatch(null);
-                if (importedTimerRef.current) {
-                  window.clearTimeout(importedTimerRef.current);
-                  importedTimerRef.current = null;
-                }
+                setPantryFilter(defaultPantryFilter);
+                savePantryFilter(defaultPantryFilter);
               }}
-              className="px-3 py-1 bg-theme-secondary rounded border border-theme"
+              className="px-4 py-2 bg-theme-primary border border-theme rounded-lg text-theme-secondary hover:bg-theme-secondary transition-colors text-xs font-semibold"
             >
-              Dismiss
+              Clear Filters
             </button>
           </div>
         </div>
       )}
 
-      {showImportModal && (
-        <PantryImportModal
-          open={showImportModal}
-          onClose={() => setShowImportModal(false)}
-          onImported={async (items) => {
-            try {
-              // Add to current session via provided prop
-              await onAddItems(items);
-            } catch (err) {
-              log.error('Failed to add imported items to session', { err });
-            }
+      {/* Main List / Grid View */}
+      {isLoadingInventory ? (
+        <div className="space-y-2">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <PantryItemSkeleton key={index} />
+          ))}
+        </div>
+      ) : inventory.length === 0 ? (
+        <div className="text-center py-8 px-4 max-w-2xl mx-auto">
+          <div className="mb-8">
+            <div className="w-20 h-20 bg-gradient-to-tr from-[var(--accent-color)]/20 to-[var(--accent-color)]/5 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
+              <ChefHat className="w-10 h-10 text-[var(--accent-color)]" />
+            </div>
+            <h3 className="text-2xl font-extrabold text-theme-primary mb-3">Let's Stock Your Kitchen</h3>
+            <p className="text-theme-secondary opacity-80 max-w-lg mx-auto text-sm leading-relaxed">
+              Unlock smart recipe matching, expiration alerts, and automated shopping lists by adding your first ingredients.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+            <button
+              onClick={() => {
+                setAddModalInitialAction('photo');
+                setIsAddModalOpen(true);
+              }}
+              className="flex flex-col items-center p-5 bg-theme-secondary rounded-2xl border border-theme hover:border-[var(--accent-color)]/50 hover:shadow-md hover:scale-[1.02] transition-all text-center group"
+            >
+              <div className="w-12 h-12 bg-blue-500/10 rounded-xl flex items-center justify-center mb-3 text-blue-500 group-hover:bg-blue-500 group-hover:text-white transition-all">
+                <Camera className="w-6 h-6" />
+              </div>
+              <h4 className="font-bold text-theme-primary text-sm mb-1">Smart AI Scanner</h4>
+              <p className="text-xs text-theme-secondary opacity-70 leading-relaxed">
+                Snap a photo of your shelves or receipt.
+              </p>
+            </button>
+
+            <button
+              onClick={() => setIsAddModalOpen(true)}
+              className="flex flex-col items-center p-5 bg-theme-secondary rounded-2xl border border-theme hover:border-[var(--accent-color)]/50 hover:shadow-md hover:scale-[1.02] transition-all text-center group"
+            >
+              <div className="w-12 h-12 bg-green-500/10 rounded-xl flex items-center justify-center mb-3 text-green-500 group-hover:bg-green-500 group-hover:text-white transition-all">
+                <Plus className="w-6 h-6" />
+              </div>
+              <h4 className="font-bold text-theme-primary text-sm mb-1">Quick Add Staples</h4>
+              <p className="text-xs text-theme-secondary opacity-70 leading-relaxed">
+                Type items or select popular staples.
+              </p>
+            </button>
+
+            <button
+              onClick={() => setShowImportModal(true)}
+              className="flex flex-col items-center p-5 bg-theme-secondary rounded-2xl border border-theme hover:border-[var(--accent-color)]/50 hover:shadow-md hover:scale-[1.02] transition-all text-center group"
+            >
+              <div className="w-12 h-12 bg-purple-500/10 rounded-xl flex items-center justify-center mb-3 text-purple-500 group-hover:bg-purple-500 group-hover:text-white transition-all">
+                <FilePlus className="w-6 h-6" />
+              </div>
+              <h4 className="font-bold text-theme-primary text-sm mb-1">Import CSV or URL</h4>
+              <p className="text-xs text-theme-secondary opacity-70 leading-relaxed">
+                Upload a spreadsheet or scrape ingredients.
+              </p>
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div id="pantry-items-list" className="space-y-6">
+          {viewMode === 'storage' ? (
+            storageSectionOrder.map((loc) => {
+              const items = storageItemsArrays[loc] || [];
+              if (items.length === 0) return null;
+              const label = storageLabels[loc] || loc;
+              return (
+                <div key={loc} id={`storage-section-${loc}`} className="space-y-3">
+                  <div className="flex items-center justify-between border-b border-theme pb-1.5">
+                    <h3 className="font-bold text-base text-theme-primary flex items-center gap-2">
+                      <span>{label}</span>
+                      <span className="text-xs font-normal text-theme-secondary opacity-70">({items.length})</span>
+                    </h3>
+                  </div>
+
+                  {displayLayout === 'list' ? (
+                    <div className="space-y-2">
+                      {items.map((item) => (
+                        <PantryItemRow
+                          key={item.id}
+                          item={item}
+                          bulkMode={bulkMode}
+                          isSelected={selectedItems.has(item.originalIndex)}
+                          onToggleSelect={toggleItemSelection}
+                          onSelectItem={setSelectedItemIndex}
+                          getRowActionHandlers={getRowActionHandlers}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                      {items.map((item) => (
+                        <PantryItemTile
+                          key={item.id}
+                          item={item}
+                          bulkMode={bulkMode}
+                          isSelected={selectedItems.has(item.originalIndex)}
+                          onToggleSelect={toggleItemSelection}
+                          onSelectItem={setSelectedItemIndex}
+                          onDeleteItem={onDeleteItem}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          ) : (
+            sortedCategories.map((category) => {
+              const items = categoryItemsArrays[category] || [];
+              if (items.length === 0) return null;
+              return (
+                <div key={category} id={`category-section-${category}`} className="space-y-3">
+                  <div className="flex items-center justify-between border-b border-theme pb-1.5">
+                    <h3 className="font-bold text-base text-theme-primary flex items-center gap-2">
+                      <span>{category}</span>
+                      <span className="text-xs font-normal text-theme-secondary opacity-70">({items.length})</span>
+                    </h3>
+                  </div>
+
+                  {displayLayout === 'list' ? (
+                    <div className="space-y-2">
+                      {items.map((item) => (
+                        <PantryItemRow
+                          key={item.id}
+                          item={item}
+                          bulkMode={bulkMode}
+                          isSelected={selectedItems.has(item.originalIndex)}
+                          onToggleSelect={toggleItemSelection}
+                          onSelectItem={setSelectedItemIndex}
+                          getRowActionHandlers={getRowActionHandlers}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                      {items.map((item) => (
+                        <PantryItemTile
+                          key={item.id}
+                          item={item}
+                          bulkMode={bulkMode}
+                          isSelected={selectedItems.has(item.originalIndex)}
+                          onToggleSelect={toggleItemSelection}
+                          onSelectItem={setSelectedItemIndex}
+                          onDeleteItem={onDeleteItem}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
+
+      {/* Floating Bulk Action Bar */}
+      {bulkMode && (
+        <PantryBulkActionBar
+          selectedCount={selectedItems.size}
+          totalCount={inventory.length}
+          bulkLocationValue={bulkLocationValue}
+          setBulkLocationValue={setBulkLocationValue}
+          onSelectAll={selectAllItems}
+          onBulkDelete={bulkDelete}
+          onBulkMoveToShoppingList={bulkMoveToShoppingList}
+          onBulkChangeLocation={bulkChangeLocation}
+          onOpenBulkQuantityEdit={() => {
+            const items = Array.from(selectedItems).map(idx => inventory[idx]).filter(Boolean);
+            setBulkQuantityEditItems(items);
+            setShowBulkQuantityEdit(true);
           }}
+          onExitBulkMode={toggleBulkMode}
         />
       )}
 
-      {/* Floating Action Button */}
-      <button
-        onClick={() => {
-          setIsAddModalOpen(true);
-          setHasTappedAddButton(true);
-          try {
-            sessionStorage.setItem('clicked-pantry-add-button', 'true');
-          } catch (e) {
-            log.error('Failed to save clicked-pantry-add-button to sessionStorage', { error: e });
-          }
-        }}
-        data-testid="pantry-add-button"
-        className={`fixed bottom-28 right-6 z-20 bg-[var(--accent-color)] text-[var(--accent-text,white)] p-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:ring-offset-2 ${
-          shouldGlowAddButton ? 'tutorial-glow' : ''
-        }`}
-        style={{ bottom: 'calc(7rem + 15px)' }}
-        aria-label="Add items to pantry"
-        data-tutorial="add-item-button"
-      >
-        <Plus className="w-6 h-6" aria-hidden="true" />
-      </button>
-
-      <AddItemsModal
-        isOpen={isAddModalOpen}
-        onClose={() => {
-          setIsAddModalOpen(false);
-          setAddModalInitialAction(null);
-        }}
-        onAddItem={onAddItem}
-        inventory={inventory}
-        user={user}
-        initialAction={addModalInitialAction}
-        onOpenImport={() => setShowImportModal(true)}
-        onScanResultsReady={(results) => {
-          setScanResults(results);
-          setShowScanReviewModal(true);
-        }}
-      />
-
-      <ScanReviewModal
-        isOpen={showScanReviewModal && scanResults !== null}
-        onClose={() => {
-          setShowScanReviewModal(false);
-          setScanResults(null);
-        }}
-        scanResults={scanResults || []}
-        setScanResults={setScanResults}
-        receiptDestination={receiptDestination}
-        setReceiptDestination={setReceiptDestination}
-        customCategories={customCategories}
-        onAddItems={onAddItems}
-        addShoppingListItem={addShoppingListItem}
-        user={user}
-      />
-
-      <div className="space-y-1">
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mb-4 mx-1">
-          <div className="text-theme-secondary opacity-70 text-sm font-medium text-center sm:text-left">
-            <span className="font-semibold text-theme-primary">{inventory.length}</span> items{' '}
-            {viewMode === 'category'
-              ? `in ${Object.keys(groupedItems).length} categories`
-              : 'across 5 storage locations'
-            }
-          </div>
-
-          {/* Sort Dropdown */}
-          <div className="relative w-full sm:w-auto">
-            <select
-              value={sortBy}
-              onChange={(e) => {
-                const value = e.target.value as typeof sortBy;
-                setSortBy(value);
-                // Also change view mode for category/location sorts
-                if (value === 'category') {
-                  setViewMode('category');
-                } else if (value === 'location') {
-                  setViewMode('storage');
-                }
-              }}
-              className="appearance-none w-full sm:w-auto bg-theme-secondary border border-theme rounded-xl px-3 py-1.5 pr-8 text-xs font-semibold text-theme-primary shadow-sm focus:outline-none focus:ring-1 focus:ring-[var(--accent-color)]/50 cursor-pointer"
-            >
-              <option value="name">Sort by Name</option>
-              <option value="lastAdded">Sort by Last Added</option>
-              <option value="expiration">Sort by Expiration</option>
-              <option value="category">Sort by Category</option>
-              <option value="location">Sort by Location</option>
-            </select>
-            <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 text-theme-primary pointer-events-none opacity-60" />
-          </div>
-        </div>
-        {user?.isGuest && (
-          <div className="mb-3 mx-1 p-2 rounded-lg bg-theme-secondary border border-theme text-xs">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-theme-secondary font-medium">
-                {inventory.length} / 20 items used
-              </span>
-              <span className="text-[var(--accent-color)] font-medium cursor-pointer hover:underline"
-                onClick={() => appActions.addToast('Please go to the Settings tab to sign in or create an account for unlimited pantry items!', 'info', 6000)}>
-                Sign in for unlimited
-              </span>
-            </div>
-            <div className="w-full bg-theme-primary/20 rounded-full h-1.5" role="progressbar" aria-valuenow={inventory.length} aria-valuemin={0} aria-valuemax={20} aria-label={`${inventory.length} of 20 guest pantry items used`}>
-              <div
-                className={`h-1.5 rounded-full transition-all ${inventory.length >= 18 ? 'bg-red-500' : inventory.length >= 14 ? 'bg-yellow-500' : 'bg-[var(--accent-color)]'}`}
-                style={{ width: `${Math.min(100, (inventory.length / 20) * 100)}%` }}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Categories Grid - Only show in category view */}
-        {viewMode === 'category' && (
-          <div className="grid grid-cols-4 gap-4">
-            {sortedCategories.map(category => {
-              const items = categoryItemsArrays[category] || [];
-              const representativeImage = getPreferredItemDisplayImage(items[0]?.item || '', category, items[0]?.image);
-              return (
-                <div
-                  key={category}
-                  onClick={() => toggleCategory(category)}
-                  className="bg-theme-secondary rounded-lg shadow-md border border-theme overflow-hidden group hover:shadow-lg transition-all cursor-pointer"
-                >
-                  <div className="h-16 relative bg-gray-200 overflow-hidden">
-                    <img
-                      src={representativeImage}
-                      alt={category}
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent"></div>
-                    <div className="absolute bottom-2 left-2 right-2 text-white">
-                      <h4 className="text-sm font-bold leading-tight">{category}</h4>
-                      <div className="text-xs opacity-90 mt-1">
-                        {items.length} items
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Storage Location Chips - Only show in storage view. Sticky under the app
-            header so it stays reachable while the item list scrolls underneath.
-            Tapping a chip brings that section to the top of the list below (see
-            toggleStorageLocation) so it reads as a "jump to" shortcut rather than a
-            static legend. */}
-        {viewMode === 'storage' && (
-          <div
-            ref={chipRowRef}
-            className="sticky z-20 flex gap-2 overflow-x-auto py-2 mb-4 -mx-1 px-1 bg-theme-primary border-b border-theme"
-            style={{ top: 'calc(var(--app-header-h) - 100px)' }}
-          >
-            {storageOrder.map(location => {
-              const items = storageItemsArrays[location] || [];
-              const locationLabel = (storageLabels as Record<string, string>)[location] || location;
-              const isActive = storageSectionOrder[0] === location;
-              return (
-                <button
-                  key={location}
-                  onClick={() => toggleStorageLocation(location)}
-                  aria-label={`Jump to ${locationLabel}`}
-                  aria-pressed={isActive}
-                  className={`shrink-0 flex items-center gap-2 rounded-full border px-3 py-1.5 transition-colors ${
-                    isActive
-                      ? 'bg-[var(--accent-color)] border-[var(--accent-color)] text-[var(--accent-text,white)]'
-                      : 'bg-theme-secondary border-theme text-theme-primary hover:border-[var(--accent-color)]/50'
-                  }`}
-                >
-                  <StorageLocationIndicator
-                    location={location as 'pantry' | 'freezer' | 'fridge' | 'spices' | 'other'}
-                    size="sm"
-                  />
-                  <span className="text-xs font-bold whitespace-nowrap">{locationLabel}</span>
-                  <span className={`text-[10px] font-semibold ${isActive ? 'text-white/80' : 'text-theme-secondary opacity-70'}`}>
-                    {items.length}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Items List */}
-        <div id="pantry-items-list" className="mt-8 space-y-2">
-          {/* Bulk mode: one-time tip + progress bar */}
-          {bulkMode && showBulkTip && (
-            <div className="flex items-start gap-2 px-3 py-2 mb-2 rounded-lg bg-[var(--accent-color)]/10 border border-[var(--accent-color)]/30 text-sm text-theme-primary">
-              <span className="flex-1">Tap items to select them, then delete, move to shopping list, or change storage location.</span>
-              <button
-                onClick={() => { setShowBulkTip(false); localStorage.setItem('tip-bulk-select', 'seen'); }}
-                className="flex-shrink-0 text-theme-secondary hover:text-theme-primary transition-colors ml-1 mt-0.5"
-                aria-label="Dismiss tip"
-              >✕</button>
-            </div>
-          )}
-          {bulkProgress && (
-            <div className="px-1 mb-2">
-              <div className="flex justify-between text-xs text-theme-secondary mb-1">
-                <span>Processing…</span>
-                <span>{bulkProgress.current} / {bulkProgress.total}</span>
-              </div>
-              <div className="w-full bg-theme rounded-full h-1.5">
-                <div
-                  className="bg-[var(--accent-color)] h-1.5 rounded-full transition-all duration-300"
-                  style={{ width: `${(bulkProgress.current / bulkProgress.total) * 100}%` }}
-                />
-              </div>
-            </div>
-          )}
-          <div className="flex flex-col mb-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <h3 className="text-lg font-bold text-theme-primary">
-                  {viewMode === 'category' ? 'Pantry Items' : 'Storage Items'}
-                </h3>
-                
-                {/* Search Button next to header */}
-                <button
-                  onClick={() => setIsSearchModalOpen(true)}
-                  className={`p-1.5 rounded-lg border transition-colors ${
-                    searchQuery
-                      ? 'bg-[var(--accent-color)] text-[var(--accent-text,white)] border-[var(--accent-color)] shadow'
-                      : 'bg-theme-secondary border-theme text-theme-secondary hover:text-theme-primary'
-                  }`}
-                  aria-label="Search items"
-                >
-                  <Search className="w-4 h-4" />
-                </button>
-                
-                {/* Active Search Query Badge */}
-                {searchQuery && (
-                  <div className="flex items-center gap-1.5 bg-theme-secondary border border-theme rounded-lg px-2 py-0.5 text-xs text-theme-primary">
-                    <span className="truncate max-w-[80px] font-medium">"{searchQuery}"</span>
-                    <button
-                      onClick={() => setSearchQuery('')}
-                      className="p-0.5 hover:bg-theme-primary rounded-full text-theme-secondary hover:text-theme-primary transition-colors flex items-center justify-center"
-                      aria-label="Clear search"
-                    >
-                      <X className="w-2.5 h-2.5" />
-                    </button>
-                  </div>
-                )}
-
-                {/* Filter Button next to header */}
-                {(() => {
-                  const activeFilterCount =
-                    (pantryFilter.categories.length > 0 ? 1 : 0) +
-                    (pantryFilter.locations.length > 0 ? 1 : 0) +
-                    (pantryFilter.expirationStatus !== 'all' ? 1 : 0) +
-                    (pantryFilter.quantityStatus !== 'all' ? 1 : 0);
-                  const isFilterActive = activeFilterCount > 0;
-                  return (
-                    <button
-                      onClick={() => setShowFilters(!showFilters)}
-                      aria-label={showFilters ? 'Hide filters' : `Show filters${isFilterActive ? `, ${activeFilterCount} active` : ''}`}
-                      aria-expanded={showFilters}
-                      className={`relative p-1.5 rounded-lg border transition-colors ${
-                        showFilters || isFilterActive
-                          ? 'bg-[var(--accent-color)] text-[var(--accent-text,white)] border-[var(--accent-color)] shadow'
-                          : 'bg-theme-secondary border-theme text-theme-secondary hover:bg-theme-secondary'
-                      }`}
-                    >
-                      <Filter className="w-4 h-4" />
-                      {isFilterActive && (
-                        <span className="absolute -top-1.5 -right-1.5 min-w-[14px] h-3.5 px-0.5 rounded-full bg-white text-[var(--accent-color)] text-[9px] font-bold leading-3.5 flex items-center justify-center border border-[var(--accent-color)]">
-                          {activeFilterCount}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })()}
-              </div>
-              <div className="flex gap-2 items-center">
-              {viewMode === 'category' && (
-                <button
-                  onClick={collapseAllCategories}
-                  className="px-3 py-1 rounded-lg text-sm font-medium bg-theme-secondary text-theme-primary hover:bg-theme-primary transition-colors"
-                  aria-label="Collapse all category sections"
-                >
-                  Collapse All
-                </button>
-              )}
-              {bulkMode && (
-                <button
-                  onClick={selectAllItems}
-                  className="px-3 py-1 rounded-lg text-sm font-medium bg-theme-secondary text-theme-primary hover:bg-theme-primary border border-theme transition-colors"
-                  aria-label={selectedItems.size === inventory.length ? 'Deselect all items' : 'Select all items'}
-                >
-                  {selectedItems.size === inventory.length ? 'Deselect All' : 'Select All'}
-                </button>
-              )}
-              {bulkMode && selectedItems.size > 0 && (
-                <>
-                  <button
-                    onClick={bulkDelete}
-                    className="px-3 py-1 rounded-lg text-sm font-medium bg-red-500 text-white hover:bg-red-600 transition-colors"
-                    aria-label={`Delete ${selectedItems.size} selected items`}
-                  >
-                    Delete Selected ({selectedItems.size})
-                  </button>
-                  <select
-                    value={bulkLocationValue}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      if (value) {
-                        bulkChangeLocation(value as 'pantry' | 'fridge' | 'freezer' | 'spices' | 'other');
-                        setBulkLocationValue('');
-                      }
-                    }}
-                    className="px-3 py-1 rounded-lg text-sm font-medium bg-theme-secondary text-theme-primary hover:bg-theme-primary border border-theme transition-colors"
-                    aria-label="Change storage location for selected items"
-                  >
-                    <option value="">Change Location</option>
-                    <option value="pantry">📦 Pantry</option>
-                    <option value="fridge">🧊 Fridge</option>
-                    <option value="freezer">❄️ Freezer</option>
-                    <option value="spices">🌿 Spices</option>
-                    <option value="other">📦 Other</option>
-                  </select>
-                </>
-              )}
-              <button
-                onClick={toggleBulkMode}
-                className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
-                  bulkMode
-                    ? 'bg-[var(--accent-color)] text-[var(--accent-text,white)]'
-                    : 'bg-theme-secondary text-theme-primary hover:bg-theme-primary'
-                }`}
-                aria-label={bulkMode ? 'Exit bulk selection mode' : 'Enter bulk selection mode'}
-              >
-                {bulkMode ? 'Cancel' : 'Select Multiple'}
-              </button>
-              <button
-                onClick={toggleDisplayLayout}
-                className="w-8 h-8 flex items-center justify-center rounded-lg bg-theme-secondary text-theme-primary hover:bg-theme-primary transition-colors border border-theme"
-                aria-label={displayLayout === 'list' ? 'Toggle grid view' : 'Toggle list view'}
-                title={displayLayout === 'list' ? 'Grid view' : 'List view'}
-              >
-                {displayLayout === 'list' ? <LayoutGrid className="w-4 h-4" /> : <LayoutList className="w-4 h-4" />}
-              </button>
-            </div>
-          </div>
-
-          {/* Inline Filter Options */}
-          {showFilters && (
-            <div className="bg-theme-secondary p-4 rounded-xl border border-theme shadow-md mt-2 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-theme-primary mb-2">Categories</label>
-                <div className="flex flex-wrap gap-2">
-                  {Array.from(new Set(inventory.map(item => item.category).filter(Boolean))).map(category => (
-                    <button
-                      key={category}
-                      onClick={() => {
-                        const newFilter = { ...pantryFilter };
-                        if (newFilter.categories.includes(category!)) {
-                          newFilter.categories = newFilter.categories.filter(c => c !== category);
-                        } else {
-                          newFilter.categories.push(category!);
-                        }
-                        setPantryFilter(newFilter);
-                        savePantryFilter(newFilter);
-                      }}
-                      className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                        pantryFilter.categories.includes(category!)
-                          ? 'bg-[var(--accent-color)] text-[var(--accent-text,white)]'
-                          : 'bg-theme-primary text-theme-secondary border border-theme hover:bg-theme-secondary'
-                      }`}
-                      aria-label={`${pantryFilter.categories.includes(category!) ? 'Remove' : 'Add'} ${category} filter`}
-                    >
-                      {category}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-theme-primary mb-2">Locations</label>
-                <div className="flex flex-wrap gap-2">
-                  {['leftovers', 'pantry', 'fridge', 'freezer', 'spices', 'other'].map(location => (
-                    <button
-                      key={location}
-                      onClick={() => {
-                        const newFilter = { ...pantryFilter };
-                        if (newFilter.locations.includes(location)) {
-                          newFilter.locations = newFilter.locations.filter(l => l !== location);
-                        } else {
-                          newFilter.locations.push(location);
-                        }
-                        setPantryFilter(newFilter);
-                        savePantryFilter(newFilter);
-                      }}
-                      className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                        pantryFilter.locations.includes(location)
-                          ? 'bg-[var(--accent-color)] text-[var(--accent-text,white)]'
-                          : 'bg-theme-primary text-theme-secondary border border-theme hover:bg-theme-secondary'
-                      }`}
-                      aria-label={`${pantryFilter.locations.includes(location) ? 'Remove' : 'Add'} ${location.charAt(0).toUpperCase() + location.slice(1)} location filter`}
-                    >
-                      {location.charAt(0).toUpperCase() + location.slice(1)}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-theme-primary mb-2">Expiration Status</label>
-                <select
-                  value={pantryFilter.expirationStatus}
-                  onChange={(e) => {
-                    const newFilter = { ...pantryFilter, expirationStatus: e.target.value as PantryFilter['expirationStatus'] };
-                    setPantryFilter(newFilter);
-                    savePantryFilter(newFilter);
-                  }}
-                  className="w-full px-3 py-2 bg-theme-primary border border-theme rounded-lg text-theme-primary focus:border-[var(--accent-color)] focus:outline-none"
-                >
-                  <option value="all">All Items</option>
-                  <option value="attention">Needs Attention (Expired/Soon)</option>
-                  <option value="expiring-soon">Expiring Soon (7 days)</option>
-                  <option value="expired">Expired</option>
-                  <option value="fresh">Fresh</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-theme-primary mb-2">Stock Status</label>
-                <select
-                  value={pantryFilter.quantityStatus}
-                  onChange={(e) => {
-                    const newFilter = { ...pantryFilter, quantityStatus: e.target.value as PantryFilter['quantityStatus'] };
-                    setPantryFilter(newFilter);
-                    savePantryFilter(newFilter);
-                  }}
-                  className="w-full px-3 py-2 bg-theme-primary border border-theme rounded-lg text-theme-primary focus:border-[var(--accent-color)] focus:outline-none"
-                >
-                  <option value="all">All Items</option>
-                  <option value="low-stock">Low Stock (&lt;1)</option>
-                  <option value="out-of-stock">Out of Stock</option>
-                  <option value="in-stock">In Stock (≥1)</option>
-                </select>
-              </div>
-
-              <div className="flex justify-end">
-                <button
-                  onClick={() => {
-                    setPantryFilter(defaultPantryFilter);
-                    savePantryFilter(defaultPantryFilter);
-                  }}
-                  className="px-4 py-2 bg-theme-primary border border-theme rounded-lg text-theme-secondary hover:bg-theme-secondary transition-colors"
-                  aria-label="Clear all applied filters"
-                >
-                  Clear Filters
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-
-
-
-          {/* Screen reader announcement for loading state */}
-          <div aria-live="polite" aria-atomic="true" className="sr-only">
-            {isLoadingInventory ? 'Loading pantry items…' : `${inventory.length} pantry item${inventory.length === 1 ? '' : 's'} loaded`}
-          </div>
-
-          {/* Render the appropriate view */}
-          {isLoadingInventory ? (
-            <div className="space-y-2">
-              {Array.from({ length: 6 }).map((_, index) => (
-                <PantryItemSkeleton key={index} />
-              ))}
-            </div>
-          ) : inventory.length === 0 ? (
-            <div className="text-center py-8 px-4 max-w-2xl mx-auto">
-              <div className="mb-8">
-                <div className="w-20 h-20 bg-gradient-to-tr from-[var(--accent-color)]/20 to-[var(--accent-color)]/5 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
-                  <ChefHat className="w-10 h-10 text-[var(--accent-color)]" />
-                </div>
-                <h3 className="text-2xl font-extrabold text-theme-primary mb-3">Let's Stock Your Kitchen</h3>
-                <p className="text-theme-secondary opacity-80 max-w-lg mx-auto text-sm leading-relaxed">
-                  Unlock smart recipe matching, expiration alerts, and automated shopping lists by adding your first ingredients. Choose your preferred setup:
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-                {/* AI Scanner Card */}
-                <button
-                  onClick={() => {
-                    setAddModalInitialAction('photo');
-                    setIsAddModalOpen(true);
-                  }}
-                  className="flex flex-col items-center p-5 bg-theme-secondary rounded-2xl border border-theme hover:border-[var(--accent-color)]/50 hover:shadow-md hover:scale-[1.02] transition-all text-center group"
-                >
-                  <div className="w-12 h-12 bg-blue-500/10 rounded-xl flex items-center justify-center mb-3 text-blue-500 group-hover:bg-blue-500 group-hover:text-white transition-all">
-                    <Camera className="w-6 h-6" />
-                  </div>
-                  <h4 className="font-bold text-theme-primary text-sm mb-1">Smart AI Scanner</h4>
-                  <p className="text-xs text-theme-secondary opacity-70 leading-relaxed">
-                    Snap a photo of your shelves or scan a grocery receipt.
-                  </p>
-                </button>
-
-                {/* Quick Add Card */}
-                <button
-                  onClick={() => setIsAddModalOpen(true)}
-                  className="flex flex-col items-center p-5 bg-theme-secondary rounded-2xl border border-theme hover:border-[var(--accent-color)]/50 hover:shadow-md hover:scale-[1.02] transition-all text-center group"
-                >
-                  <div className="w-12 h-12 bg-green-500/10 rounded-xl flex items-center justify-center mb-3 text-green-500 group-hover:bg-green-500 group-hover:text-white transition-all">
-                    <Plus className="w-6 h-6" />
-                  </div>
-                  <h4 className="font-bold text-theme-primary text-sm mb-1">Quick Add Staples</h4>
-                  <p className="text-xs text-theme-secondary opacity-70 leading-relaxed">
-                    Quickly type items or select popular staples in seconds.
-                  </p>
-                </button>
-
-                {/* Import Card */}
-                <button
-                  onClick={() => setShowImportModal(true)}
-                  className="flex flex-col items-center p-5 bg-theme-secondary rounded-2xl border border-theme hover:border-[var(--accent-color)]/50 hover:shadow-md hover:scale-[1.02] transition-all text-center group"
-                >
-                  <div className="w-12 h-12 bg-purple-500/10 rounded-xl flex items-center justify-center mb-3 text-purple-500 group-hover:bg-purple-500 group-hover:text-white transition-all">
-                    <FilePlus className="w-6 h-6" />
-                  </div>
-                  <h4 className="font-bold text-theme-primary text-sm mb-1">Import CSV or URL</h4>
-                  <p className="text-xs text-theme-secondary opacity-70 leading-relaxed">
-                    Upload a spreadsheet or scrape ingredients from recipe links.
-                  </p>
-                </button>
-              </div>
-
-              {/* Secondary CTA */}
-              <button
-                onClick={() => {
-                  if (setActiveTab) setActiveTab(Tab.RECIPES);
-                }}
-                className="inline-flex items-center gap-1.5 text-xs font-semibold text-theme-secondary hover:text-[var(--accent-color)] hover:underline transition-colors py-2 px-3"
-              >
-                <span>Or browse recipes for inspiration first</span>
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
-          ) : (
-            (viewMode === 'category' ? categoryViewContent : storageViewContent)
-          )}
-
-        </div>
-      </div>
-
-      {/* Price Trends Modal */}
-      {showPriceTrends && (
-        <PriceTrends
-          ingredient={showPriceTrends}
-          onClose={() => setShowPriceTrends(null)}
+      {/* Item Detail Modal */}
+      {selectedItemIndex !== null && (
+        <ItemDetailModal
+          item={inventory[selectedItemIndex]}
+          onClose={() => setSelectedItemIndex(null)}
+          onUpdateItem={async (index, updates) => {
+            await updateItem(index, updates);
+          }}
+          onDeleteItem={async (index) => {
+            await onDeleteItem(index);
+            setSelectedItemIndex(null);
+          }}
+          onAddToShoppingList={addToShoppingList}
+          customCategories={customCategories}
+          originalIndex={selectedItemIndex}
         />
       )}
 
@@ -2475,23 +867,14 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
         }}
       />
 
-      {/* Item Detail Modal */}
-      {selectedItemIndex !== null && (
-        <ItemDetailModal
-          item={inventory[selectedItemIndex]}
-          onClose={() => setSelectedItemIndex(null)}
-          onUpdateItem={async (index, updates) => {
-            await updateItem(index, updates);
-          }}
-          onDeleteItem={async (index) => {
-            await onDeleteItem(index);
-            setSelectedItemIndex(null);
-          }}
-          onAddToShoppingList={addToShoppingList}
-          customCategories={customCategories}
-          originalIndex={selectedItemIndex}
-        />
-      )}
+      {/* Pantry Search Modal */}
+      <PantrySearchModal
+        isOpen={isSearchModalOpen}
+        onClose={() => setIsSearchModalOpen(false)}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        inventory={inventory}
+      />
 
       {/* Pantry Health Detail Sheet */}
       <BottomSheet
@@ -2575,17 +958,6 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
           user={user ? { id: user.id, name: user.name, email: user.email, avatar: user.avatar } : undefined}
         />
       )}
-
-
-
-      {/* Search Modal Overlay */}
-      <PantrySearchModal
-        isOpen={isSearchModalOpen}
-        onClose={() => setIsSearchModalOpen(false)}
-        searchQuery={searchQuery}
-        setSearchQuery={setSearchQuery}
-        inventory={inventory}
-      />
 
       {canShowAdBanner && <AdMobBanner />}
     </div>

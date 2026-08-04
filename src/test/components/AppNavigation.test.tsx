@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent } from '../test-utils';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { AppNavigation } from '../../../components/layout/AppNavigation';
 import { Tab } from '../../../types/app';

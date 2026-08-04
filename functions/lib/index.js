@@ -1,6 +1,8 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.wrapImpactTrackingUrl = exports.sendDailyReminders = exports.sendPushNotificationOnWrite = exports.retryPendingAccountDeletions = exports.deleteAccount = exports.handlePlaySubscriptionNotification = exports.verifyPurchase = exports.resetWeeklyUsageLimits = exports.getNutritionData = exports.migrateHouseholdClaims = exports.acceptInvitation = exports.checkInvitation = exports.removeHouseholdMember = exports.leaveHousehold = exports.inviteMember = void 0;
+const v2_1 = require("firebase-functions/v2");
+(0, v2_1.setGlobalOptions)({ region: "us-east1" });
 var inviteMember_1 = require("./inviteMember");
 Object.defineProperty(exports, "inviteMember", { enumerable: true, get: function () { return inviteMember_1.inviteMember; } });
 var leaveHousehold_1 = require("./leaveHousehold");

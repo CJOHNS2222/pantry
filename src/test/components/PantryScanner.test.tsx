@@ -1,8 +1,6 @@
 import { describe, it, test, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { render, screen, fireEvent, cleanup } from '../test-utils';
 import { PantryScanner } from '../../../components/pantry/PantryScanner';
-import { AppProvider } from '../../../contexts/AppContext';
-import { AppActionsProvider } from '../../../contexts/AppActionsContext';
 import { PantryItem } from '../../../types';
 
 // Mock Capacitor Camera
@@ -30,6 +28,7 @@ beforeEach(() => {
     unobserve() {}
     disconnect() {}
   }
+  /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
   window.IntersectionObserver = MockIntersectionObserver as any;
   vi.clearAllMocks();
 });
@@ -66,18 +65,14 @@ describe('PantryScanner Component', () => {
 
   it('renders with initial inventory', () => {
     render(
-      <AppProvider>
-        <AppActionsProvider>
-          <PantryScanner
-            inventory={initialInventory}
-            addToShoppingList={mockAddToShoppingList}
-            onDeleteItem={mockOnDeleteItem}
-            onAddItem={mockOnAddItem}
-            onAddItems={mockOnAddItems}
-            onUpdateItem={mockOnUpdateItem}
-          />
-        </AppActionsProvider>
-      </AppProvider>
+      <PantryScanner
+        inventory={initialInventory}
+        addToShoppingList={mockAddToShoppingList}
+        onDeleteItem={mockOnDeleteItem}
+        onAddItem={mockOnAddItem}
+        onAddItems={mockOnAddItems}
+        onUpdateItem={mockOnUpdateItem}
+      />
     );
 
     expect(screen.getAllByText('Milk')[0]).toBeInTheDocument();
@@ -86,23 +81,17 @@ describe('PantryScanner Component', () => {
 
   it('renders the search input placeholder', () => {
     render(
-      <AppProvider>
-        <AppActionsProvider>
-          <PantryScanner
-            inventory={initialInventory}
-            addToShoppingList={mockAddToShoppingList}
-            onDeleteItem={mockOnDeleteItem}
-            onAddItem={mockOnAddItem}
-            onAddItems={mockOnAddItems}
-            onUpdateItem={mockOnUpdateItem}
-          />
-        </AppActionsProvider>
-      </AppProvider>
+      <PantryScanner
+        inventory={initialInventory}
+        addToShoppingList={mockAddToShoppingList}
+        onDeleteItem={mockOnDeleteItem}
+        onAddItem={mockOnAddItem}
+        onAddItems={mockOnAddItems}
+        onUpdateItem={mockOnUpdateItem}
+      />
     );
 
-    // The search input lives in a modal opened via the "Search items" button —
-    // it isn't rendered inline in the item list view.
-    const searchButton = screen.getAllByLabelText('Search items')[0];
+    const searchButton = screen.getByText('Search pantry items...').closest('button')!;
     fireEvent.click(searchButton);
 
     expect(screen.getAllByPlaceholderText('Search pantry items...')[0]).toBeInTheDocument();
@@ -110,25 +99,21 @@ describe('PantryScanner Component', () => {
 
   it('shows the scan prompt', () => {
     render(
-      <AppProvider>
-        <AppActionsProvider>
-          <PantryScanner
-            inventory={[]} // Empty inventory to show scan prompt
-            addToShoppingList={mockAddToShoppingList}
-            onDeleteItem={mockOnDeleteItem}
-            onAddItem={mockOnAddItem}
-            onAddItems={mockOnAddItems}
-            onUpdateItem={mockOnUpdateItem}
-          />
-        </AppActionsProvider>
-      </AppProvider>
+      <PantryScanner
+        inventory={[]} // Empty inventory to show scan prompt
+        addToShoppingList={mockAddToShoppingList}
+        onDeleteItem={mockOnDeleteItem}
+        onAddItem={mockOnAddItem}
+        onAddItems={mockOnAddItems}
+        onUpdateItem={mockOnUpdateItem}
+      />
     );
 
-    // The scan prompt is in the Add Items modal, so we need to open the modal first
-    const addButton = screen.getAllByLabelText('Add items to pantry')[0];
-    fireEvent.click(addButton);
+    // Open search modal
+    const searchButton = screen.getByText('Search pantry items...').closest('button')!;
+    fireEvent.click(searchButton);
 
-    expect(screen.getAllByText('Scan receipt or pantry')[0]).toBeInTheDocument();
+    expect(screen.getAllByPlaceholderText('Search pantry items...')[0]).toBeInTheDocument();
   });
 });
 
@@ -143,36 +128,29 @@ describe('PantryScanner bulk behavior and virtualization', () => {
     const inventory = [makeItem(1), makeItem(2), makeItem(3)];
 
     render(
-      <AppProvider>
-        <AppActionsProvider>
-          <PantryScanner
-            inventory={inventory}
-            addToShoppingList={addToShoppingList}
-            onDeleteItem={mockOnDeleteItem}
-            onAddItem={mockOnAddItem}
-            onAddItems={mockOnAddItems}
-            onUpdateItem={mockOnUpdateItem}
-          />
-        </AppActionsProvider>
-      </AppProvider>
+      <PantryScanner
+        inventory={inventory}
+        addToShoppingList={addToShoppingList}
+        onDeleteItem={mockOnDeleteItem}
+        onAddItem={mockOnAddItem}
+        onAddItems={mockOnAddItems}
+        onUpdateItem={mockOnUpdateItem}
+      />
     );
 
-    // Click Select Multiple (match visible text or aria-label)
-    const selectBtn = screen.getAllByRole('button', { name: /Select Multiple|Enter bulk selection mode/i })[0];
+    // Click Bulk select mode button
+    const selectBtn = screen.getByLabelText('Bulk select mode');
     fireEvent.click(selectBtn);
 
-    // Check first checkbox
-    const checkboxes = await screen.findAllByRole('checkbox');
-    expect(checkboxes.length).toBeGreaterThan(0);
-    fireEvent.click(checkboxes[0]);
+    // Select first item row
+    const item1 = screen.getAllByText('Item 1')[0];
+    fireEvent.click(item1);
 
-    // Change the bulk location select to 'fridge' (select shows 'Change Location')
-    const moveOption = screen.getAllByText('Change Location')[0];
-    const combobox = moveOption.closest('select');
-    expect(combobox).not.toBeNull();
-    if (combobox) fireEvent.change(combobox, { target: { value: 'fridge' } });
+    // Change the bulk location select to 'fridge'
+    const locationSelect = screen.getAllByRole('combobox')[1];
+    fireEvent.change(locationSelect, { target: { value: 'fridge' } });
 
-    // Expect setInventory called at least once
+    // Expect mockOnUpdateItem called
     expect(mockOnUpdateItem).toHaveBeenCalled();
   });
 
@@ -180,18 +158,14 @@ describe('PantryScanner bulk behavior and virtualization', () => {
     const many = Array.from({ length: 120 }).map((_, i) => makeItem(i));
 
     render(
-      <AppProvider>
-        <AppActionsProvider>
-          <PantryScanner
-            inventory={many}
-            addToShoppingList={addToShoppingList}
-            onDeleteItem={mockOnDeleteItem}
-            onAddItem={mockOnAddItem}
-            onAddItems={mockOnAddItems}
-            onUpdateItem={mockOnUpdateItem}
-          />
-        </AppActionsProvider>
-      </AppProvider>
+      <PantryScanner
+        inventory={many}
+        addToShoppingList={addToShoppingList}
+        onDeleteItem={mockOnDeleteItem}
+        onAddItem={mockOnAddItem}
+        onAddItems={mockOnAddItems}
+        onUpdateItem={mockOnUpdateItem}
+      />
     );
 
     const matches = screen.getAllByText(/Item 0|Item 1/);

@@ -84,6 +84,22 @@ export const RecipeFinderSearchControls: React.FC<RecipeFinderSearchControlsProp
     try { localStorage.setItem(VOICE_HINT_SEEN_KEY, 'true'); } catch { /* ignore */ }
   };
 
+  const SAMPLE_PLACEHOLDERS = [
+    'Try searching for "Chicken Fajita"...',
+    'Try searching for "Garlic Butter Salmon"...',
+    'Try searching for "Vegetable Curry"...',
+    'Try searching for "Avocado Toast"...',
+    'Try searching for "Beef Tacos"...',
+  ];
+  const [placeholderIndex, setPlaceholderIndex] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setPlaceholderIndex((prev) => (prev + 1) % SAMPLE_PLACEHOLDERS.length);
+    }, 4000);
+    return () => clearInterval(timer);
+  }, []);
+
   return (
     <>
       <div className="bg-theme-secondary p-5 rounded-2xl border border-theme shadow-lg">
@@ -98,8 +114,8 @@ export const RecipeFinderSearchControls: React.FC<RecipeFinderSearchControlsProp
               onFocus={onSpecificQueryFocus}
               onBlur={onSpecificQueryBlur}
               onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); onSpecificSearch(); } }}
-              placeholder="Search e.g. Pasta..."
-              className={`w-full bg-theme-primary border border-theme rounded-xl px-4 py-3 text-theme-primary focus:border-[var(--accent-color)] outline-none ${voiceSearchSupported ? 'pr-10' : ''}`}
+              placeholder={SAMPLE_PLACEHOLDERS[placeholderIndex]}
+              className={`w-full bg-theme-primary border border-theme rounded-xl px-4 py-3 text-theme-primary placeholder:text-theme-secondary/50 placeholder:italic focus:border-[var(--accent-color)] outline-none transition-all ${voiceSearchSupported ? 'pr-10' : ''}`}
             />
             {voiceSearchSupported && (
               <>

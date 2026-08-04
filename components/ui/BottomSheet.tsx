@@ -60,6 +60,7 @@ export interface BottomSheetBodyProps {
 export interface BottomSheetFooterProps {
   children: React.ReactNode;
   className?: string;
+  style?: React.CSSProperties;
 }
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
@@ -77,9 +78,10 @@ export const BottomSheetBody: React.FC<BottomSheetBodyProps> = ({ children, clas
 );
 BottomSheetBody.displayName = 'BottomSheet.Body';
 
-export const BottomSheetFooter: React.FC<BottomSheetFooterProps> = ({ children, className = '' }) => (
+export const BottomSheetFooter: React.FC<BottomSheetFooterProps> = ({ children, className = '', style }) => (
   <div
     className={`flex-shrink-0 flex items-center gap-3 px-5 py-4 border-t border-[var(--border-color)] pb-safe ${className}`}
+    style={style}
   >
     {children}
   </div>

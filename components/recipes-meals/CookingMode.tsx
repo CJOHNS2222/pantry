@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { X, ChevronLeft, ChevronRight, UtensilsCrossed, List, BookOpen, Clock, Check } from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { X, ChevronLeft, ChevronRight, UtensilsCrossed, List, BookOpen, Clock, Check, Mic, Volume2 } from 'lucide-react';
+import { SpeechRecognition } from '@capacitor-community/speech-recognition';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { StructuredRecipe } from '../../types';
@@ -126,7 +127,72 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipes = [], initialI
   const checkedIngredients = checkedIngredientsMap[activeIndex] || {};
 
   const [showIngredientsMobile, setShowIngredientsMobile] = useState(false);
+  const [isListening, setIsListening] = useState(false);
   const wakeLockRef = useRef<{ release: () => Promise<void> } | null>(null);
+
+  const speakStep = useCallback((text: string) => {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 0.95;
+      window.speechSynthesis.speak(utterance);
+    }
+  }, []);
+
+  const toggleVoiceControl = useCallback(async () => {
+    if (isListening) {
+      setIsListening(false);
+      if (Capacitor.isNativePlatform()) {
+        await SpeechRecognition.stop().catch(() => {});
+      }
+      return;
+    }
+
+    try {
+      if (Capacitor.isNativePlatform()) {
+        await SpeechRecognition.requestPermissions();
+        await SpeechRecognition.start({ language: 'en-US', partialResults: true, popup: false });
+        setIsListening(true);
+      } else {
+        /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+        type WebSpeechCtor = new() => { continuous: boolean; interimResults: boolean; lang: string; onresult: ((e: any) => void) | null; onend: (() => void) | null; start(): void; stop(): void; };
+        /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+        const WebSpeech = ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition) as WebSpeechCtor | undefined;
+        if (WebSpeech) {
+          const recog = new WebSpeech();
+          recog.continuous = true;
+          recog.interimResults = false;
+          recog.lang = 'en-US';
+          /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+          recog.onresult = (event: any) => {
+            const last = event.results[event.results.length - 1];
+            const transcript = (last?.[0]?.transcript || '').toLowerCase().trim();
+            if (transcript.includes('next') || transcript.includes('forward')) {
+              setRecipeStepsMap(prev => {
+                const current = prev[activeIndex] || 0;
+                return { ...prev, [activeIndex]: Math.min(steps.length - 1, current + 1) };
+              });
+              HapticService.light();
+            } else if (transcript.includes('back') || transcript.includes('previous')) {
+              setRecipeStepsMap(prev => {
+                const current = prev[activeIndex] || 0;
+                return { ...prev, [activeIndex]: Math.max(0, current - 1) };
+              });
+              HapticService.light();
+            } else if (transcript.includes('read') || transcript.includes('repeat')) {
+              speakStep(steps[currentStep] || '');
+            }
+          };
+          recog.onend = () => setIsListening(false);
+          recog.start();
+          setIsListening(true);
+        }
+      }
+    } catch (err) {
+      log.error('Failed to start voice recognition in CookingMode', { error: err }, 'CookingMode');
+      setIsListening(false);
+    }
+  }, [isListening, activeIndex, steps, currentStep, speakStep]);
 
   interface ActiveTimer {
     seconds: number;
@@ -459,6 +525,30 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipes = [], initialI
             <h2 className="text-base font-bold truncate text-white mt-0.5 font-serif">{recipe.title}</h2>
           </div>
           <div className="flex items-center gap-2">
+            {/* Hands-free Voice Commands Button */}
+            <button
+              onClick={toggleVoiceControl}
+              className={`p-2 rounded-full transition-all ${
+                isListening
+                  ? 'bg-red-500 text-white animate-pulse shadow-md ring-2 ring-red-400'
+                  : 'bg-white/10 text-gray-400 hover:bg-white/20'
+              }`}
+              title={isListening ? 'Voice Commands Active (Say "Next", "Back", "Repeat")' : 'Enable Hands-free Voice Commands'}
+              aria-label="Hands-free voice commands"
+            >
+              <Mic className="w-4 h-4" />
+            </button>
+
+            {/* Read Step Aloud Button */}
+            <button
+              onClick={() => speakStep(steps[currentStep] || '')}
+              className="p-2 bg-white/10 rounded-full text-gray-400 hover:bg-white/20 transition-colors"
+              title="Read Current Step Aloud"
+              aria-label="Read step aloud"
+            >
+              <Volume2 className="w-4 h-4" />
+            </button>
+
             <button
               onClick={() => setShowIngredientsMobile(v => !v)}
               className={`p-2 rounded-full transition-colors md:hidden ${
@@ -470,6 +560,7 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipes = [], initialI
             >
               {showIngredientsMobile ? <BookOpen className="w-4 h-4" /> : <List className="w-4 h-4" />}
             </button>
+
             <button
               onClick={() => onExit()}
               className="p-2 bg-white/10 rounded-full text-gray-400 hover:bg-white/20 transition-colors"

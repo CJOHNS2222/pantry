@@ -38,6 +38,7 @@ import { SettingsAppPreferencesSection } from './SettingsAppPreferencesSection';
 import { SettingsCategoriesSection } from './SettingsCategoriesSection';
 import { SettingsFoodSafetySection } from './SettingsFoodSafetySection';
 import { SettingsGuestBanner } from './SettingsGuestBanner';
+import HapticService from '../../services/hapticService';
 import { SettingsHouseholdSection } from './SettingsHouseholdSection';
 import { SettingsLeftoverAnalyticsSection } from './SettingsLeftoverAnalyticsSection';
 import { SettingsNotificationsSection } from './SettingsNotificationsSection';
@@ -672,10 +673,15 @@ const SettingsComponent: React.FC<SettingsProps> = ({
             <p className="text-xs text-theme-secondary mt-1">Configure your app and manage your kitchen data</p>
           </div>
 
+          <SettingsGuestBanner
+            isGuest={!!user?.isGuest}
+            onLogout={onLogout}
+          />
+
           <div className="bg-theme-secondary border border-theme rounded-2xl overflow-hidden divide-y divide-theme shadow-sm">
             {/* Account Info */}
             <button
-              onClick={() => setActiveCategory('account_info')}
+              onClick={() => { HapticService.light(); setActiveCategory('account_info'); }}
               className="w-full flex items-center justify-between p-4 hover:bg-theme-primary/5 transition-colors text-left focus:outline-none"
               data-category="account-info"
             >
@@ -693,7 +699,7 @@ const SettingsComponent: React.FC<SettingsProps> = ({
 
             {/* Preferences */}
             <button
-              onClick={() => setActiveCategory('preferences')}
+              onClick={() => { HapticService.light(); setActiveCategory('preferences'); }}
               className="w-full flex items-center justify-between p-4 hover:bg-theme-primary/5 transition-colors text-left focus:outline-none"
               data-category="preferences"
             >
@@ -702,8 +708,8 @@ const SettingsComponent: React.FC<SettingsProps> = ({
                   <Sliders className="w-5 h-5" />
                 </div>
                 <div>
-                  <span className="font-semibold text-theme-primary block text-sm">Preferences</span>
-                  <span className="text-[11px] text-theme-secondary opacity-70">Theme, unit system, categories, store layout</span>
+                  <span className="font-semibold text-theme-primary block text-sm">Preferences & Theme</span>
+                  <span className="text-[11px] text-theme-secondary opacity-70">App theme, currency, dietary restrictions, units</span>
                 </div>
               </div>
               <ChevronRight className="w-4 h-4 text-theme-secondary" />
@@ -711,7 +717,7 @@ const SettingsComponent: React.FC<SettingsProps> = ({
 
             {/* Notifications */}
             <button
-              onClick={() => setActiveCategory('notifications')}
+              onClick={() => { HapticService.light(); setActiveCategory('notifications'); }}
               className="w-full flex items-center justify-between p-4 hover:bg-theme-primary/5 transition-colors text-left focus:outline-none"
               data-category="notifications"
             >
@@ -720,16 +726,16 @@ const SettingsComponent: React.FC<SettingsProps> = ({
                   <Bell className="w-5 h-5" />
                 </div>
                 <div>
-                  <span className="font-semibold text-theme-primary block text-sm">Notifications</span>
-                  <span className="text-[11px] text-theme-secondary opacity-70">Snoozed notifications, quiet hours, alert settings</span>
+                  <span className="font-semibold text-theme-primary block text-sm">Notifications & Reminders</span>
+                  <span className="text-[11px] text-theme-secondary opacity-70">Push notifications, expiration alerts, meal plan reminders</span>
                 </div>
               </div>
               <ChevronRight className="w-4 h-4 text-theme-secondary" />
             </button>
 
-            {/* Food Waste Savings */}
+            {/* Food Waste & Expiration Settings */}
             <button
-              onClick={() => setActiveCategory('food_waste')}
+              onClick={() => { HapticService.light(); setActiveCategory('food_waste'); }}
               className="w-full flex items-center justify-between p-4 hover:bg-theme-primary/5 transition-colors text-left focus:outline-none"
               data-category="food-waste"
             >
@@ -738,8 +744,8 @@ const SettingsComponent: React.FC<SettingsProps> = ({
                   <TrendingDown className="w-5 h-5" />
                 </div>
                 <div>
-                  <span className="font-semibold text-theme-primary block text-sm">Food Waste Savings</span>
-                  <span className="text-[11px] text-theme-secondary opacity-70">Leftover statistics and waste analytics</span>
+                  <span className="font-semibold text-theme-primary block text-sm">Food Waste & Expiration Rules</span>
+                  <span className="text-[11px] text-theme-secondary opacity-70">Shelf life thresholds, auto-add staples, waste tracking</span>
                 </div>
               </div>
               <ChevronRight className="w-4 h-4 text-theme-secondary" />
@@ -747,7 +753,7 @@ const SettingsComponent: React.FC<SettingsProps> = ({
 
             {/* Contact Us */}
             <button
-              onClick={() => setActiveCategory('contact_us')}
+              onClick={() => { HapticService.light(); setActiveCategory('contact_us'); }}
               className="w-full flex items-center justify-between p-4 hover:bg-theme-primary/5 transition-colors text-left focus:outline-none"
               data-category="contact-us"
             >
@@ -756,16 +762,16 @@ const SettingsComponent: React.FC<SettingsProps> = ({
                   <MessageSquare className="w-5 h-5" />
                 </div>
                 <div>
-                  <span className="font-semibold text-theme-primary block text-sm">Contact Us</span>
-                  <span className="text-[11px] text-theme-secondary opacity-70">Send feedback, privacy policy, terms of service</span>
+                  <span className="font-semibold text-theme-primary block text-sm">Contact Us & Feedback</span>
+                  <span className="text-[11px] text-theme-secondary opacity-70">Report an issue, request a feature, contact support</span>
                 </div>
               </div>
               <ChevronRight className="w-4 h-4 text-theme-secondary" />
             </button>
 
-            {/* Help */}
+            {/* Help & Tutorials */}
             <button
-              onClick={() => setActiveCategory('help')}
+              onClick={() => { HapticService.light(); setActiveCategory('help'); }}
               className="w-full flex items-center justify-between p-4 hover:bg-theme-primary/5 transition-colors text-left focus:outline-none"
               data-category="help"
             >
@@ -774,8 +780,8 @@ const SettingsComponent: React.FC<SettingsProps> = ({
                   <HelpCircle className="w-5 h-5" />
                 </div>
                 <div>
-                  <span className="font-semibold text-theme-primary block text-sm">Help</span>
-                  <span className="text-[11px] text-theme-secondary opacity-70">App documentation, guides, and FAQs</span>
+                  <span className="font-semibold text-theme-primary block text-sm">Help & FAQ</span>
+                  <span className="text-[11px] text-theme-secondary opacity-70">Frequently asked questions, app guide</span>
                 </div>
               </div>
               <ChevronRight className="w-4 h-4 text-theme-secondary" />
@@ -783,7 +789,7 @@ const SettingsComponent: React.FC<SettingsProps> = ({
 
             {/* Update */}
             <button
-              onClick={() => setActiveCategory('update')}
+              onClick={() => { HapticService.light(); setActiveCategory('update'); }}
               className="w-full flex items-center justify-between p-4 hover:bg-theme-primary/5 transition-colors text-left focus:outline-none"
               data-category="update"
             >

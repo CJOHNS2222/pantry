@@ -4,6 +4,7 @@ import { ShoppingCart, Barcode } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { Share } from '@capacitor/share';
 import { ShoppingItem, User, Household, Settings, PantryItem } from '../../types';
+import { Tab } from '../../types/app';
 import HapticService from '../../services/hapticService';
 import { ShoppingListCacheService } from '../../services/shoppingListCacheService';
 import { log } from '../../services/logService';
@@ -16,6 +17,7 @@ import { QuickAdd } from '../pantry/QuickAdd';
 import { ShoppingListAnalytics } from './ShoppingListAnalytics';
 import { AdMobBanner } from '../ui/AdMobBanner';
 import { canShowAds } from '../../utils/appUtils';
+import { SettingsGuestBanner } from '../settings/SettingsGuestBanner';
 import { ShoppingListViewModeToggle } from './ShoppingListViewModeToggle';
 import { ShoppingListPurchaseModal } from './ShoppingListPurchaseModal';
 import { ShoppingListAddItemModal } from './ShoppingListAddItemModal';
@@ -86,7 +88,7 @@ const ShoppingListComponent: React.FC<ShoppingListProps> = ({
   const intl = useIntl();
   const [newItem, setNewItem] = React.useState('');
   const [canShowAdBanner, setCanShowAdBanner] = React.useState<boolean>(false);
-  const { addToast } = useAppActions();
+  const { addToast, setActiveTab } = useAppActions();
   const { mealPlan, savedRecipes } = useApp();
   const measurementSystem = useMemo(() => getUserMeasurementSystem(user?.profile), [user?.profile]);
 
@@ -552,14 +554,11 @@ const ShoppingListComponent: React.FC<ShoppingListProps> = ({
     const targetItem = displayedItems.find(i => i.id === id);
     if (!targetItem) return;
 
-    // Track item completion/uncompletion
+    HapticService.light();
     if (!targetItem.checked) {
-      // Item is being checked (completed)
       AnalyticsService.trackShoppingListComplete(1, items.length);
-      HapticService.light();
     }
 
-    // Simply toggle the checked state without opening purchase modal
     const now = new Date();
     if (consolidateList) {
       const name = targetItem.item.toLowerCase();
@@ -588,7 +587,6 @@ const ShoppingListComponent: React.FC<ShoppingListProps> = ({
       purchasedBatch: { amount: purchaseQty, unit: purchaseUnit, expires: purchaseExpires }
     } : i));
 
-    // Add to undo history
     const original = items.find(it => it.id === itemId);
     if (original) setUndoHistory(prev => [...prev.slice(-4), { item: { ...original, checked: true }, timestamp: now }]);
 
@@ -603,6 +601,7 @@ const ShoppingListComponent: React.FC<ShoppingListProps> = ({
 
   const undoLastCheck = () => {
     if (undoHistory.length === 0) return;
+    HapticService.light();
 
     const lastAction = undoHistory[undoHistory.length - 1];
     setItems(prev => prev.map(i =>
@@ -612,16 +611,20 @@ const ShoppingListComponent: React.FC<ShoppingListProps> = ({
   };
 
   const selectAll = () => {
+    HapticService.light();
     setItems(prev => prev.map(i => ({ ...i, checked: true })));
   };
 
   const deselectAll = () => {
+    HapticService.light();
     setItems(prev => prev.map(i => ({ ...i, checked: false })));
   };
 
   const remove = (id: string) => {
     const targetItem = displayedItems.find(i => i.id === id);
     if (!targetItem) return;
+
+    HapticService.medium();
 
     if (consolidateList) {
       const name = targetItem.item.toLowerCase();
@@ -982,6 +985,13 @@ const ShoppingListComponent: React.FC<ShoppingListProps> = ({
         <h2 className="text-3xl font-serif font-bold text-theme-secondary">{intl.formatMessage({ id: 'shoppingList.title' })}</h2>
       </div>
 
+      {user?.isGuest && (
+        <SettingsGuestBanner
+          isGuest={true}
+          onLogout={() => setActiveTab(Tab.SETTINGS)}
+        />
+      )}
+
       {/* Household Sharing */}
       {householdMembers.length > 0 && (
           <HouseholdShoppingShare
@@ -1056,7 +1066,11 @@ const ShoppingListComponent: React.FC<ShoppingListProps> = ({
         <button
           onClick={() => setShowNutritionScanner(true)}
           className="fixed right-6 z-20 bg-theme-secondary text-theme-primary border border-theme p-3 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110"
-          style={{ bottom: 'calc(7rem + 15px + 4.5rem)' }}
+          style={{
+            bottom: uncheckedItemsCount > 0
+              ? 'calc(7rem + 15px + 140px)'
+              : 'calc(7rem + 15px + 70px)'
+          }}
           aria-label="Scan a product barcode to check nutrition facts before buying"
         >
           <Barcode className="w-5 h-5" />

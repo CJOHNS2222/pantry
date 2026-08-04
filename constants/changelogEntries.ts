@@ -20,6 +20,16 @@ export interface DetailedChangeEntry {
 
 export const RECENT_CHANGES: ChangeEntry[] = [
   {
+    "version": "3.0.18",
+    "date": "Aug 4, 2026",
+    "highlights": [
+      "App & Pantry Modularization — Refactored core monoliths into modular custom hooks and sub-components (PantryItemRow,…",
+      "Ubiquitous Haptic Feedback — Integrated haptic feedback across all buttons, shopping list actions, settings menus, and…",
+      "Hands-Free Cooking Mode Voice Commands — Added voice recognition & text-to-speech step reader to Cooking Mode (\"Next\",…",
+      "Mobile Touch Pull-To-Refresh & Nav Badges — Added pull-to-refresh touch gesture wrapper and dynamic navigation badge…"
+    ]
+  },
+  {
     "version": "3.0.17",
     "date": "Aug 3, 2026",
     "highlights": [
@@ -34,19 +44,28 @@ export const RECENT_CHANGES: ChangeEntry[] = [
       "Popular Recipes Categorization — Fixed categorization of desserts (chocolate cake, fudge, ice cream, etc.) in the…",
       "Build & Compiling Fixes — Resolved type safety compilation warnings in groceryCheckoutService.ts."
     ]
-  },
-  {
-    "version": "3.0.15",
-    "date": "Jul 31, 2026",
-    "highlights": [
-      "Expiring Soon Banner Fix — Resolved an issue where tapping the expiring soon banner did nothing.",
-      "Needs Attention Filter Option — Added a \"Needs Attention (Expired/Soon)\" option to the expiration status filter…",
-      "Direct Quantity Input — Added a direct text input field for item quantity in the Item Detail Modal, allowing manual…"
-    ]
   }
 ];
 
 export const ALL_CHANGES: DetailedChangeEntry[] = [
+  {
+    "version": "3.0.18",
+    "date": "Aug 4, 2026",
+    "sections": [
+      {
+        "title": "Added / Changed / Fixed",
+        "bullets": [
+          "**App & Pantry Modularization** — Refactored core monoliths into modular custom hooks and sub-components (`PantryItemRow`, `PantryItemTile`, `PantryBulkActionBar`, `PantrySearchBar`, `usePantryFilterSort`).",
+          "**Ubiquitous Haptic Feedback** — Integrated haptic feedback across all buttons, shopping list actions, settings menus, and pull-to-refresh touch gestures.",
+          "**Hands-Free Cooking Mode Voice Commands** — Added voice recognition & text-to-speech step reader to Cooking Mode (\"Next\", \"Back\", \"Repeat\").",
+          "**Mobile Touch Pull-To-Refresh & Nav Badges** — Added pull-to-refresh touch gesture wrapper and dynamic navigation badge indicators (expired items dot, shopping item count, today's meal plan dot).",
+          "**Social Tab & Guest Banners** — Added warm `EmptyState` household invitation CTA banner for solo users and guest storage limitation warning banners to Login, Settings, Pantry, and Shopping List screens.",
+          "**Recipe Finder Search Experience** — Added dynamic cycling search placeholders (`Try searching for \"Chicken Fajita\"...`) in Recipe Finder search controls.",
+          "**Cloud Functions Engine Upgrade** — Upgraded Cloud Functions runtime to Node.js 22."
+        ]
+      }
+    ]
+  },
   {
     "version": "3.0.17",
     "date": "Aug 3, 2026",

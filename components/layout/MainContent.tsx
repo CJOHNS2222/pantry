@@ -12,6 +12,7 @@ const Settings = React.lazy(() => import('../settings/Settings').then(module => 
 
 import { UsageIndicator } from '../admin-analytics/UsageIndicator';
 import ComponentErrorBoundary from '../ui/ComponentErrorBoundary';
+import { PullToRefresh } from '../ui/PullToRefresh';
 import { useApp } from '../../contexts/AppContext';
 import { useAppActions } from '../../contexts/AppActionsContext';
 
@@ -84,7 +85,7 @@ export const MainContent: React.FC = () => {
     onShowHousehold,
     setActiveSettingsCategory,
     updateMealPlan,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+     
     refreshAllData
   } = appActions;
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -133,13 +134,14 @@ export const MainContent: React.FC = () => {
       {activeTab === Tab.PANTRY && (
         <ComponentErrorBoundary componentName="PantryScanner">
           <Suspense fallback={<LoadingSpinner />}>
-            <PantryScanner
-              inventory={inventory}
-              isLoadingInventory={isLoadingInventory}
-              addToShoppingList={onAddToShoppingList}
-              addShoppingListItem={addShoppingListItem}
-              onDeleteItem={deleteItem}
-              onAddItem={addItem}
+            <PullToRefresh onRefresh={refreshAllData}>
+              <PantryScanner
+                inventory={inventory}
+                isLoadingInventory={isLoadingInventory}
+                addToShoppingList={onAddToShoppingList}
+                addShoppingListItem={addShoppingListItem}
+                onDeleteItem={deleteItem}
+                onAddItem={addItem}
                 onAddItems={addItems}
                 onUpdateItem={updateItem}
                 consumptionSuggestions={consumptionSuggestions}
@@ -150,16 +152,18 @@ export const MainContent: React.FC = () => {
                 setInitialSearchQuery={appActions.setInitialSearchQuery}
                 user={user as User}
               />
-            </Suspense>
+            </PullToRefresh>
+          </Suspense>
         </ComponentErrorBoundary>
       )}
 
       {activeTab === Tab.MEALS && (
         <ComponentErrorBoundary componentName="MealPlanner">
           <Suspense fallback={<LoadingSpinner />}>
-            <MealPlanner
-              mealPlan={mealPlan}
-              updateMealPlan={updateMealPlan}
+            <PullToRefresh onRefresh={refreshAllData}>
+              <MealPlanner
+                mealPlan={mealPlan}
+                updateMealPlan={updateMealPlan}
                 inventory={inventory}
                 shoppingList={shoppingList}
                 addToShoppingList={onAddToShoppingList}
@@ -180,23 +184,26 @@ export const MainContent: React.FC = () => {
                   // The MealPlanner component handles this internally
                 }}
               />
-            </Suspense>
+            </PullToRefresh>
+          </Suspense>
         </ComponentErrorBoundary>
       )}
       {activeTab === Tab.SHOPPING && (
         <ComponentErrorBoundary componentName="ShoppingList">
           <Suspense fallback={<LoadingSpinner />}>
-            <ShoppingList
-              items={shoppingList}
-              setItems={appState.setShoppingList}
-              onMoveToPantry={onMoveToPantry}
-              addShoppingListItem={addShoppingListItem}
-              user={user || undefined}
-              household={appState.household}
-              isLoadingShoppingList={isLoadingShoppingList}
-              settings={settings}
-              pantryItems={inventory}
-            />
+            <PullToRefresh onRefresh={refreshAllData}>
+              <ShoppingList
+                items={shoppingList}
+                setItems={appState.setShoppingList}
+                onMoveToPantry={onMoveToPantry}
+                addShoppingListItem={addShoppingListItem}
+                user={user || undefined}
+                household={appState.household}
+                isLoadingShoppingList={isLoadingShoppingList}
+                settings={settings}
+                pantryItems={inventory}
+              />
+            </PullToRefresh>
           </Suspense>
         </ComponentErrorBoundary>
       )}

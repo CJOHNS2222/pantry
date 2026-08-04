@@ -167,35 +167,38 @@ export const NutritionScannerModal: React.FC<NutritionScannerModalProps> = ({ is
           </div>
         )}
 
-        <div className="flex gap-2">
-          {slots.length < 2 && (
-            <button
-              onClick={scanProduct}
-              disabled={scanning}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-theme-secondary text-theme-primary border border-theme rounded-lg hover:bg-theme-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {scanning ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Scanning...
-                </>
-              ) : (
-                <>
-                  <Barcode className="w-4 h-4" />
-                  {slots.length === 0 ? 'Scan Product' : 'Scan Another to Compare'}
-                </>
-              )}
-            </button>
-          )}
-          <button
-            onClick={onClose}
-            className="px-4 py-3 bg-theme-secondary text-theme-primary border border-theme rounded-lg hover:bg-theme-primary transition-colors flex items-center gap-2"
-          >
-            <X className="w-4 h-4" />
-            {slots.length === 0 ? 'Cancel' : 'Done'}
-          </button>
-        </div>
       </BottomSheet.Body>
+      <BottomSheet.Footer
+        className="flex gap-2 border-t border-theme !pb-0"
+        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 24px)' }}
+      >
+        {slots.length < 2 && (
+          <button
+            onClick={scanProduct}
+            disabled={scanning}
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-theme-secondary text-theme-primary border border-theme rounded-lg hover:bg-theme-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {scanning ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Scanning...
+              </>
+            ) : (
+              <>
+                <Barcode className="w-4 h-4" />
+                {slots.length === 0 ? 'Scan Product' : 'Scan Another to Compare'}
+              </>
+            )}
+          </button>
+        )}
+        <button
+          onClick={onClose}
+          className="px-4 py-3 bg-theme-secondary text-theme-primary border border-theme rounded-lg hover:bg-theme-primary transition-colors flex items-center gap-2"
+        >
+          <X className="w-4 h-4" />
+          {slots.length === 0 ? 'Cancel' : 'Done'}
+        </button>
+      </BottomSheet.Footer>
     </BottomSheet>
   );
 };

@@ -3,7 +3,6 @@ import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/re
 import { vi, describe, test, expect, beforeEach, afterEach } from 'vitest';
 import { RecipeFinder } from '../../../components/recipes-meals/RecipeFinder';
 import { RecipeSearchResult, StructuredRecipe, SavedRecipe, PantryItem, RecipeRating, User, Household } from '../../../types';
-import { Tab } from '../../../types/app';
 
 // Mock services and utilities
 vi.mock('react-intl', () => ({
@@ -152,8 +151,8 @@ describe('RecipeFinder', () => {
   test('renders search input and basic UI elements', () => {
     render(<RecipeFinder {...defaultProps} />);
 
-    const searchInputs = screen.getAllByPlaceholderText('Search e.g. Pasta...');
-    expect(searchInputs[0]).toBeInTheDocument();
+    const searchInput = screen.getByTestId('recipefinder-search-input');
+    expect(searchInput).toBeInTheDocument();
     const searchButton = screen.getByRole('button', { name: /Suggest Recipes/i });
     expect(searchButton).toBeInTheDocument();
   });
@@ -162,8 +161,8 @@ describe('RecipeFinder', () => {
     const props = { ...defaultProps, initialSearchQuery: 'chicken stir fry' };
     render(<RecipeFinder {...props} />);
 
-    const searchInputs = screen.getAllByPlaceholderText('Search e.g. Pasta...');
-    expect(searchInputs[0]).toBeInTheDocument();
+    const searchInput = screen.getByTestId('recipefinder-search-input');
+    expect(searchInput).toBeInTheDocument();
   });
 
   test('shows loading state when searching', async () => {
@@ -173,8 +172,7 @@ describe('RecipeFinder', () => {
 
     render(<RecipeFinder {...defaultProps} />);
 
-    const searchInputs = screen.getAllByPlaceholderText('Search e.g. Pasta...');
-    const searchInput = searchInputs[0];
+    const searchInput = screen.getByTestId('recipefinder-search-input');
     const searchButton = screen.getAllByTestId('recipefinder-search-button')[0];
 
     fireEvent.change(searchInput, { target: { value: 'chicken' } });

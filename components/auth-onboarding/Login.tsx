@@ -8,6 +8,7 @@ import { signInWithEmailAndPassword, createUserWithEmailAndPassword, getAuth, Go
 import AnalyticsService from '../../services/analyticsService';
 import { validateEmail, validatePassword, validateName } from '../../src/utils/validation';
 import { log } from '../../services/logService';
+import { SettingsGuestBanner } from '../settings/SettingsGuestBanner';
 
 export const GUEST_USER_ID_KEY = 'guest_user_id';
 
@@ -420,9 +421,12 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
             Continue as Guest
           </button>
         </div>
-        <p className="text-sm text-slate-500 text-center mt-3">
-          Guest mode: local storage only, no cross-device sync.
-        </p>
+        <div className="mt-4">
+          <SettingsGuestBanner
+            isGuest={true}
+            onLogout={() => setIsSignup(true)}
+          />
+        </div>
       </div>
       
       <div className="flex-grow flex-shrink-0"></div>

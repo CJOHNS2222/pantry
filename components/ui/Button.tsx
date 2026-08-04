@@ -76,6 +76,8 @@ const SIZE_CLASSES: Record<ButtonSize, { button: string; iconOnly: string; spinn
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
+import HapticService from '../../services/hapticService';
+
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   (
     {
@@ -90,6 +92,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       disabled,
       className = '',
       children,
+      onClick,
       ...rest
     },
     ref
@@ -113,8 +116,15 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
 
     const spinnerClass = sizes.spinnerSize;
 
+    const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+      if (!isDisabled) {
+        HapticService.light();
+      }
+      onClick?.(e);
+    };
+
     return (
-      <button ref={ref} disabled={isDisabled} className={base} {...rest}>
+      <button ref={ref} disabled={isDisabled} className={base} onClick={handleClick} {...rest}>
         {loading ? (
           <>
             <Loader2 className={`${spinnerClass} animate-spin flex-shrink-0`} aria-hidden="true" />
