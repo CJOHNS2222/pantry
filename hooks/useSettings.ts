@@ -14,7 +14,11 @@ export function useSettings() {
   const [settings, setSettings] = useState(() => {
     const saved = localStorage.getItem('settings');
     if (saved) {
-      return JSON.parse(saved);
+      try {
+        return JSON.parse(saved);
+      } catch {
+        // Corrupt/partial localStorage 'settings' — fall through to defaults below
+      }
     }
     // Detect OS dark mode preference on first load
     const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;

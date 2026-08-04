@@ -94,7 +94,7 @@ const RecipeFinderComponent: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSav
 
     // Recipe suggestion logic optimized with Set lookups
     const calculateRecipeFeasibility = (recipe: SavedRecipe) => {
-        const recipeIngredients = recipe.ingredients.map(ing => ing.toLowerCase().trim());
+        const recipeIngredients = (recipe.ingredients ?? []).map(ing => ing.toLowerCase().trim());
         const { fullNamesSet, tokensSet, itemsList } = inventoryLookup;
         
         if (itemsList.length === 0 || recipeIngredients.length === 0) {

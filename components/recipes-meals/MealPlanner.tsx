@@ -988,7 +988,7 @@ const MealPlannerComponent: React.FC<MealPlannerProps> = ({ mealPlan, updateMeal
       .filter(day => day.date >= todayLocal)
       .flatMap(day =>
         [...(day.breakfast || []), ...(day.lunch || []), ...(day.dinner || [])].flatMap(meal =>
-          meal.recipe.ingredients.map((ingredient, idx) => ({
+          (meal.recipe.ingredients ?? []).map((ingredient, idx) => ({
             ingredient,
             // Use the name already parsed at recipe-save time when available,
             // instead of re-running parseIngredientForShoppingList on every
