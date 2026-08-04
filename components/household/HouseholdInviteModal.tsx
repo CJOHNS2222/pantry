@@ -65,7 +65,7 @@ export const HouseholdInviteModal: React.FC<HouseholdInviteModalProps> = ({
             <p className="text-white/80 text-sm">You've been invited to join a household</p>
           </div>
           {invites.length > 1 && (
-            <span className="ml-auto bg-white/20 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+            <span className="ml-auto bg-white/20 text-[var(--accent-text,white)] text-xs font-bold px-2 py-0.5 rounded-full">
               {invites.length}
             </span>
           )}
@@ -120,7 +120,7 @@ export const HouseholdInviteModal: React.FC<HouseholdInviteModalProps> = ({
             <button
               onClick={() => handleAccept(currentInvite)}
               disabled={isProcessing}
-              className="flex-2 flex-grow bg-[var(--accent-color)] hover:bg-[var(--accent-color)]/90 disabled:opacity-50 text-white font-bold py-3 px-6 rounded-xl transition-colors flex items-center justify-center gap-2 shadow-md"
+              className="flex-2 flex-grow bg-[var(--accent-color)] hover:bg-[var(--accent-color)]/90 disabled:opacity-50 text-[var(--accent-text,white)] font-bold py-3 px-6 rounded-xl transition-colors flex items-center justify-center gap-2 shadow-md"
             >
               {isProcessing ? (
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />

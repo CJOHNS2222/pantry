@@ -338,7 +338,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
               <button 
                 onClick={createHousehold}
                 disabled={!householdName.trim() || isCreating}
-                className="bg-[var(--accent-color)] hover:bg-[var(--accent-color)]/90 disabled:bg-gray-500 disabled:cursor-not-allowed text-white px-6 py-3 rounded-lg font-medium transition-colors w-full flex items-center justify-center"
+                className="bg-[var(--accent-color)] hover:bg-[var(--accent-color)]/90 disabled:bg-gray-500 disabled:cursor-not-allowed text-[var(--accent-text,white)] px-6 py-3 rounded-lg font-medium transition-colors w-full flex items-center justify-center"
                 data-testid="household-create-button"
               >
                 {isCreating ? (
@@ -442,7 +442,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
                 </div>
                 <button 
                   type="submit"
-                  className="bg-[var(--accent-color)] hover:bg-[var(--accent-color)]/90 text-white px-3 py-2 rounded-lg transition-colors disabled:bg-gray-500 disabled:cursor-not-allowed flex items-center justify-center w-12"
+                  className="bg-[var(--accent-color)] hover:bg-[var(--accent-color)]/90 text-[var(--accent-text,white)] px-3 py-2 rounded-lg transition-colors disabled:bg-gray-500 disabled:cursor-not-allowed flex items-center justify-center w-12"
                   disabled={isInviting || householdMemberLimitExceeded || (household?.members?.length ?? 0) >= maxMembers}
                   data-testid="household-invite-submit"
                 >
@@ -478,7 +478,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
                   <div className="flex items-center gap-3 flex-1">
                     <button 
                       className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${
-                        member.email === user.email ? 'bg-[var(--accent-color)] text-white' : 'bg-theme-secondary text-theme-primary hover:bg-theme'
+                        member.email === user.email ? 'bg-[var(--accent-color)] text-[var(--accent-text,white)]' : 'bg-theme-secondary text-theme-primary hover:bg-theme'
                       } transition-colors cursor-default`}
                     >
                       {member.name.charAt(0).toUpperCase()}

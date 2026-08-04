@@ -48,7 +48,7 @@ export const RecipeFinderPopularSection: React.FC<RecipeFinderPopularSectionProp
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <button
           onClick={() => setCacheMealTypeFilter('')}
-          className={`px-3 py-1 rounded-full border text-xs transition-colors ${cacheMealTypeFilter === '' ? 'bg-[var(--accent-color)] text-white border-[var(--accent-color)]' : 'bg-theme-secondary/40 text-theme-secondary border-theme hover:bg-theme-secondary/70'}`}
+          className={`px-3 py-1 rounded-full border text-xs transition-colors ${cacheMealTypeFilter === '' ? 'bg-[var(--accent-color)] text-[var(--accent-text,white)] border-[var(--accent-color)]' : 'bg-theme-secondary/40 text-theme-secondary border-theme hover:bg-theme-secondary/70'}`}
         >
           All Meals
         </button>
@@ -56,7 +56,7 @@ export const RecipeFinderPopularSection: React.FC<RecipeFinderPopularSectionProp
           <button
             key={meal}
             onClick={() => setCacheMealTypeFilter(meal)}
-            className={`px-3 py-1 rounded-full border text-xs capitalize transition-colors ${cacheMealTypeFilter === meal ? 'bg-[var(--accent-color)] text-white border-[var(--accent-color)]' : 'bg-theme-secondary/40 text-theme-secondary border-theme hover:bg-theme-secondary/70'}`}
+            className={`px-3 py-1 rounded-full border text-xs capitalize transition-colors ${cacheMealTypeFilter === meal ? 'bg-[var(--accent-color)] text-[var(--accent-text,white)] border-[var(--accent-color)]' : 'bg-theme-secondary/40 text-theme-secondary border-theme hover:bg-theme-secondary/70'}`}
           >
             {meal}
           </button>
@@ -97,7 +97,7 @@ export const RecipeFinderPopularSection: React.FC<RecipeFinderPopularSectionProp
           <button
             type="button"
             onClick={() => onSearchEntireDatabase(cacheMealTypeFilter, cacheCuisineFilter)}
-            className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--accent-color)] text-white text-xs font-semibold hover:opacity-95 transition-opacity shadow-md animate-fade-in"
+            className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--accent-color)] text-[var(--accent-text,white)] text-xs font-semibold hover:opacity-95 transition-opacity shadow-md animate-fade-in"
           >
             <Search className="w-3.5 h-3.5" />
             Search All {cacheCuisineFilter ? capitalize(cacheCuisineFilter) : ''} {cacheMealTypeFilter ? capitalize(cacheMealTypeFilter) : 'Recipes'}

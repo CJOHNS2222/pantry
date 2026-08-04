@@ -83,7 +83,7 @@ export const ShoppingListActionBars: React.FC<ShoppingListActionBarsProps> = ({
             </button>
             <button
               onClick={onCheckout}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider bg-[var(--accent-color)] text-white hover:bg-[var(--accent-color)]/95 shadow transition-all"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider bg-[var(--accent-color)] text-[var(--accent-text,white)] hover:bg-[var(--accent-color)]/95 shadow transition-all"
             >
               <Archive className="w-3.5 h-3.5" /> Move Checked to Pantry
             </button>

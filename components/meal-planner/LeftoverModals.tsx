@@ -57,7 +57,7 @@ export const LeftoverModals: React.FC<LeftoverModalsProps> = ({
         </Modal.Body>
         <Modal.Footer>
           <button className="px-3 py-2 rounded border border-theme" onClick={onCloseLeftoverPrompt}>Skip</button>
-          <button className="px-3 py-2 rounded bg-[var(--accent-color)] text-white" onClick={() => openCaptureWithServings()}>Capture</button>
+          <button className="px-3 py-2 rounded bg-[var(--accent-color)] text-[var(--accent-text,white)]" onClick={() => openCaptureWithServings()}>Capture</button>
         </Modal.Footer>
       </Modal>
 

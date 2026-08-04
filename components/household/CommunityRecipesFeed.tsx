@@ -86,7 +86,7 @@ export const CommunityRecipesFeed: React.FC<CommunityRecipesFeedProps> = ({
             </p>
             <button
               onClick={() => setActiveTab(Tab.RECIPES)}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--accent-color)] text-white text-sm font-semibold hover:opacity-90 transition-opacity"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--accent-color)] text-[var(--accent-text,white)] text-sm font-semibold hover:opacity-90 transition-opacity"
             >
               <UtensilsCrossed className="w-4 h-4" />
               Find &amp; Rate Recipes
@@ -154,7 +154,7 @@ export const CommunityRecipesFeed: React.FC<CommunityRecipesFeedProps> = ({
                     {latestComment && (
                       <div className="bg-theme-primary p-3 rounded-lg mb-4 border border-theme">
                         <div className="flex items-center gap-2 mb-1">
-                          <div className="w-4 h-4 rounded-full bg-[var(--accent-color)] text-[8px] text-white flex items-center justify-center">
+                          <div className="w-4 h-4 rounded-full bg-[var(--accent-color)] text-[8px] text-[var(--accent-text,white)] flex items-center justify-center">
                             {(latestComment && latestComment.userName) ? String(latestComment.userName).charAt(0) : '?'}
                           </div>
                           <span className="text-sm font-bold text-theme-secondary opacity-80">{latestComment.userName}</span>
@@ -206,7 +206,7 @@ export const CommunityRecipesFeed: React.FC<CommunityRecipesFeedProps> = ({
                             onAddToPlan(mockRecipe);
                           }
                         }}
-                        className="flex-1 py-2 bg-[var(--accent-color)]/10 text-[var(--accent-color)] font-bold text-xs uppercase tracking-wider rounded-lg hover:bg-[var(--accent-color)] hover:text-white transition-all flex items-center justify-center gap-2"
+                        className="flex-1 py-2 bg-[var(--accent-color)]/10 text-[var(--accent-color)] font-bold text-xs uppercase tracking-wider rounded-lg hover:bg-[var(--accent-color)] hover:text-[var(--accent-text,white)] transition-all flex items-center justify-center gap-2"
                       >
                         <Plus className="w-4 h-4" /> Add to Schedule
                       </button>
@@ -240,7 +240,7 @@ export const CommunityRecipesFeed: React.FC<CommunityRecipesFeedProps> = ({
             })}
             {sortedRecipes.length > 5 && (
               <div className="flex justify-center mt-4">
-                <button onClick={() => setShowAll(prev => !prev)} className="px-4 py-2 rounded bg-[var(--accent-color)] text-white text-sm font-bold shadow hover:opacity-90 transition-opacity">
+                <button onClick={() => setShowAll(prev => !prev)} className="px-4 py-2 rounded bg-[var(--accent-color)] text-[var(--accent-text,white)] text-sm font-bold shadow hover:opacity-90 transition-opacity">
                   {showAll ? 'Show Less' : `Show More (${sortedRecipes.length - 5})`}
                 </button>
               </div>

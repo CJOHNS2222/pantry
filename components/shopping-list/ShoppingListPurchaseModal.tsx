@@ -100,7 +100,7 @@ export const ShoppingListPurchaseModal: React.FC<ShoppingListPurchaseModalProps>
       </Modal.Body>
       <Modal.Footer>
         <button onClick={closePurchaseModal} className="px-4 py-2 rounded bg-theme-secondary">Cancel</button>
-        <button onClick={() => onConfirmPurchase(purchaseTargetItem.id)} className="px-4 py-2 rounded bg-[var(--accent-color)] text-white">Confirm</button>
+        <button onClick={() => onConfirmPurchase(purchaseTargetItem.id)} className="px-4 py-2 rounded bg-[var(--accent-color)] text-[var(--accent-text,white)]">Confirm</button>
       </Modal.Footer>
     </Modal>
   );

@@ -200,7 +200,7 @@ export const ModernOnboarding: React.FC<ModernOnboardingProps> = ({
       <div className="space-y-3">
         <button
           onClick={() => handleStepTransition('notifications')}
-          className="w-full bg-[var(--accent-color)] hover:bg-[var(--accent-color)]/90 text-white py-4 px-6 rounded-2xl font-semibold text-base transition-all shadow-lg flex items-center justify-center gap-2"
+          className="w-full bg-[var(--accent-color)] hover:bg-[var(--accent-color)]/90 text-[var(--accent-text,white)] py-4 px-6 rounded-2xl font-semibold text-base transition-all shadow-lg flex items-center justify-center gap-2"
           data-testid="onboard-get-started"
         >
           <Sparkles className="w-5 h-5" />
@@ -333,7 +333,7 @@ export const ModernOnboarding: React.FC<ModernOnboardingProps> = ({
         <button
           onClick={handleCommitSelections}
           disabled={committing}
-          className="w-full bg-[var(--accent-color)] hover:bg-[var(--accent-color)]/90 disabled:opacity-60 text-white py-4 px-6 rounded-2xl font-semibold transition-all flex items-center justify-center gap-2 shadow-lg"
+          className="w-full bg-[var(--accent-color)] hover:bg-[var(--accent-color)]/90 disabled:opacity-60 text-[var(--accent-text,white)] py-4 px-6 rounded-2xl font-semibold transition-all flex items-center justify-center gap-2 shadow-lg"
           data-testid="onboard-commit-recipes"
         >
           {committing ? (
@@ -431,7 +431,7 @@ export const ModernOnboarding: React.FC<ModernOnboardingProps> = ({
 
       <button
         onClick={finishOnboarding}
-        className="w-full bg-[var(--accent-color)] hover:bg-[var(--accent-color)]/90 text-white py-4 px-6 rounded-2xl font-semibold transition-all flex items-center justify-center gap-2 shadow-lg"
+        className="w-full bg-[var(--accent-color)] hover:bg-[var(--accent-color)]/90 text-[var(--accent-text,white)] py-4 px-6 rounded-2xl font-semibold transition-all flex items-center justify-center gap-2 shadow-lg"
         data-testid="onboard-finish"
       >
         <Sparkles className="w-5 h-5" />

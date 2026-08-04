@@ -259,7 +259,7 @@ const CommunityComponent: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecip
 
                 <button
                   type="submit"
-                  className="w-full py-3 bg-[var(--accent-color)] hover:bg-[var(--accent-color)]/90 text-white font-bold rounded-xl shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2"
+                  className="w-full py-3 bg-[var(--accent-color)] hover:bg-[var(--accent-color)]/90 text-[var(--accent-text,white)] font-bold rounded-xl shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2"
                 >
                   <Trophy className="w-5 h-5" /> Let's Compete!
                 </button>
@@ -392,7 +392,7 @@ const CommunityComponent: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecip
                         {/* Avatar representation */}
                         <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0 ${
                           entry.isUser 
-                            ? 'bg-[var(--accent-color)] text-white' 
+                            ? 'bg-[var(--accent-color)] text-[var(--accent-text,white)]' 
                             : entry.isHousehold 
                             ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400' 
                             : 'bg-theme-primary text-theme-secondary border border-theme'
@@ -742,7 +742,7 @@ const CommunityComponent: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecip
                       toast.success('Share text copied to clipboard!');
                     }
                   }}
-                  className="w-full py-3 bg-[var(--accent-color)] hover:bg-[var(--accent-color)]/90 text-white font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
+                  className="w-full py-3 bg-[var(--accent-color)] hover:bg-[var(--accent-color)]/90 text-[var(--accent-text,white)] font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
                 >
                   <Share2 className="w-4 h-4" /> Share Accomplishment
                 </button>
@@ -866,7 +866,7 @@ const CommunityComponent: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecip
             {/* OK Button */}
             <button
               onClick={() => setShowWasteReport(false)}
-              className="w-full py-3 bg-[var(--accent-color)] hover:bg-[var(--accent-color)]/90 text-white font-bold rounded-xl shadow-lg transition-all"
+              className="w-full py-3 bg-[var(--accent-color)] hover:bg-[var(--accent-color)]/90 text-[var(--accent-text,white)] font-bold rounded-xl shadow-lg transition-all"
             >
               Great, thanks!
             </button>

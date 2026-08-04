@@ -227,7 +227,7 @@ export const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
           onClick={handleSearch}
           data-testid="mealplanner-search-button"
           disabled={isSearching || !searchQuery.trim()}
-          className="px-6 py-2 bg-[var(--accent-color)] text-white rounded-lg font-medium hover:bg-[var(--accent-color)]/90 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="px-6 py-2 bg-[var(--accent-color)] text-[var(--accent-text,white)] rounded-lg font-medium hover:bg-[var(--accent-color)]/90 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isSearching ? 'Searching...' : 'Search'}
         </button>
@@ -288,7 +288,7 @@ export const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
                           onAddRecipe(recipe, dayIndex);
                         }}
                         data-testid={`mealplanner-add-${recipe.id || index}`}
-                        className="px-2 py-1 bg-[var(--accent-color)] text-white rounded text-xs hover:bg-[var(--accent-color)]/90"
+                        className="px-2 py-1 bg-[var(--accent-color)] text-[var(--accent-text,white)] rounded text-xs hover:bg-[var(--accent-color)]/90"
                       >
                         Add
                       </button>
@@ -340,7 +340,7 @@ export const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
                           onAddRecipe(recipe, dayIndex);
                         }}
                         data-testid={`mealplanner-add-${recipe.id}`}
-                        className="px-2 py-1 bg-[var(--accent-color)] text-white rounded text-xs hover:bg-[var(--accent-color)]/90"
+                        className="px-2 py-1 bg-[var(--accent-color)] text-[var(--accent-text,white)] rounded text-xs hover:bg-[var(--accent-color)]/90"
                       >
                         Add
                       </button>
@@ -392,7 +392,7 @@ export const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
                           onAddRecipe(recipe, dayIndex);
                         }}
                         data-testid={`mealplanner-add-${recipe.id}`}
-                        className="px-2 py-1 bg-[var(--accent-color)] text-white rounded text-xs hover:bg-[var(--accent-color)]/90"
+                        className="px-2 py-1 bg-[var(--accent-color)] text-[var(--accent-text,white)] rounded text-xs hover:bg-[var(--accent-color)]/90"
                       >
                         Add
                       </button>
@@ -451,7 +451,7 @@ export const RecipeSearchModal: React.FC<RecipeSearchModalProps> = ({
                           onAddRecipe(recipe, dayIndex);
                         }}
                         data-testid={`mealplanner-add-${recipe.id}`}
-                        className="px-2 py-1 bg-[var(--accent-color)] text-white rounded text-xs hover:bg-[var(--accent-color)]/90"
+                        className="px-2 py-1 bg-[var(--accent-color)] text-[var(--accent-text,white)] rounded text-xs hover:bg-[var(--accent-color)]/90"
                       >
                         Add
                       </button>

@@ -166,7 +166,7 @@ export const StoreLayoutEditor: React.FC<StoreLayoutEditorProps> = ({
         </div>
         <button
           onClick={addAisle}
-          className="bg-[var(--accent-color)] text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-opacity-90 transition-colors flex items-center gap-1 whitespace-nowrap"
+          className="bg-[var(--accent-color)] text-[var(--accent-text,white)] px-3 py-2 rounded-lg text-sm font-medium hover:bg-opacity-90 transition-colors flex items-center gap-1 whitespace-nowrap"
         >
           <Plus className="w-3.5 h-3.5" /> Aisle
         </button>

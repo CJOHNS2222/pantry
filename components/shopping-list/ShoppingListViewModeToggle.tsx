@@ -30,7 +30,7 @@ export const ShoppingListViewModeToggle: React.FC<ShoppingListViewModeToggleProp
         onClick={() => setViewMode('list')}
         className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
           viewMode === 'list'
-            ? 'bg-[var(--accent-color)] text-white'
+            ? 'bg-[var(--accent-color)] text-[var(--accent-text,white)]'
             : 'bg-theme-secondary text-theme-primary hover:bg-theme-primary'
         }`}
       >
@@ -40,7 +40,7 @@ export const ShoppingListViewModeToggle: React.FC<ShoppingListViewModeToggleProp
         onClick={() => setViewMode('organized')}
         className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
           viewMode === 'organized'
-            ? 'bg-[var(--accent-color)] text-white'
+            ? 'bg-[var(--accent-color)] text-[var(--accent-text,white)]'
             : 'bg-theme-secondary text-theme-primary hover:bg-theme-primary'
         }`}
       >

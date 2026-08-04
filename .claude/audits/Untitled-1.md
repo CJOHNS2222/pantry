@@ -74,12 +74,12 @@ UI/UX Audit — Stock & Spoon (delta on current changeset)
   Remediation: Add useAndroidBack(isOpen, onClose), include isSearchModalOpen in useModalOpen(...) at PantryScanner.tsx:288, and add a focus/Escape handler (or migrate to    
   Modal).
 
-  F3 (P1) — Zoom disabled via viewport metaC:\Users\cjohn\pantry\index.html:5 — maximum-scale=1.0, user-scalable=no blocks pinch-zoom and browser font-scaling (WCAG1.4.4     
+  **Completed***F3 (P1) — Zoom disabled via viewport metaC:\Users\cjohn\pantry\index.html:5 — maximum-scale=1.0, user-scalable=no blocks pinch-zoom and browser font-scaling (WCAG1.4.4     
   Resize Text,1.4.10 Reflow, and Apple's requirement to allow200% zoom).
 
   Remediation: Remove user-scalable=no and maximum-scale=1.0; keep viewport-fit=cover. If the Android webview needs it, scope it there instead of in the shared HTML.
 
-  F4 (P1) — White text on amber accent fails contrast in light themeindex.html:51 sets --accent-color: #F59E0B (amber-500) for light theme. bg-[var(--accent-color)]
+  **Completed***F4 (P1) — White text on amber accent fails contrast in light themeindex.html:51 sets --accent-color: #F59E0B (amber-500) for light theme. bg-[var(--accent-color)]
   text-white computes to ~2.1:1 — far below the4.5:1 AA requirement for the small, bold labels used on these CTAs.
 
   - C:\Users\cjohn\pantry\components\ui\Button.tsx:57 (primary variant — global)
@@ -92,6 +92,8 @@ UI/UX Audit — Stock & Spoon (delta on current changeset)
   (Dark theme uses rose-700 #BE123C with white ≈6.4:1 — passes.)
 
   Remediation: In light theme switch the accent to amber-700 (#B45309, ≈6.4:1 with white) or use dark text on amber-500.   Ask user before changing colors. 
+
+  Resolved (2026-08-03): Used the existing `--accent-text` token (dark text `#1F2937` on amber light theme / white on rose-700 dark theme, ≈7.5:1). Swept ~135 hardcoded `text-white` → `text-[var(--accent-text,white)]` across ~58 files wherever `bg-[var(--accent-color)]` is used. tsc + eslint pass; vitest failure is pre-existing React 19.2.7 `act` export issue, unrelated to this change.
 
   F5 (P2) — Touch targets under44pxWCAG2.5.5 / Apple HIG. Measured from the class strings:
 

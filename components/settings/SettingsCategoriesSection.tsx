@@ -29,7 +29,7 @@ export const SettingsCategoriesSection: React.FC<SettingsCategoriesSectionProps>
             <p className="text-sm text-theme-secondary">Create custom categories to better organize your pantry items.</p>
             <button
               onClick={onManageCategories}
-              className="bg-[var(--accent-color)] text-white px-4 py-2 rounded font-medium text-sm hover:bg-opacity-90 transition-colors"
+              className="bg-[var(--accent-color)] text-[var(--accent-text,white)] px-4 py-2 rounded font-medium text-sm hover:bg-opacity-90 transition-colors"
             >
               Manage Categories
             </button>

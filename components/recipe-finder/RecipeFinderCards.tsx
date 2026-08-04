@@ -206,7 +206,7 @@ export const RecipeFinderCard: React.FC<RecipeFinderCardProps> = ({
             className={`flex-1 border font-bold py-2 rounded-xl transition-all flex items-center justify-center gap-2 ${
               mealPlanLimitExceeded
                 ? 'bg-gray-400 text-gray-600 cursor-not-allowed opacity-50 border-gray-400'
-                : 'bg-theme-primary border-theme hover:border-[var(--accent-color)] text-[var(--accent-color)] hover:bg-[var(--accent-color)] hover:text-white'
+                : 'bg-theme-primary border-theme hover:border-[var(--accent-color)] text-[var(--accent-color)] hover:bg-[var(--accent-color)] hover:text-[var(--accent-text,white)]'
             }`}
           >
             <Plus className="w-4 h-4" /> {mealPlanLimitExceeded ? 'Limit Reached' : 'Add to Schedule'}
@@ -246,7 +246,7 @@ export const RecipeFinderTile: React.FC<RecipeFinderTileProps> = ({ recipe, rati
             e.stopPropagation();
             onAddToPlan(recipe);
           }}
-          className="absolute top-2 right-2 p-1.5 rounded-full bg-theme-primary/80 backdrop-blur-sm border border-theme text-[var(--accent-color)] hover:bg-[var(--accent-color)] hover:text-white transition-all shadow-md z-10"
+          className="absolute top-2 right-2 p-1.5 rounded-full bg-theme-primary/80 backdrop-blur-sm border border-theme text-[var(--accent-color)] hover:bg-[var(--accent-color)] hover:text-[var(--accent-text,white)] transition-all shadow-md z-10"
           title="Add to Schedule"
           aria-label={`Quick add ${recipe.title} to meal plan`}
         >

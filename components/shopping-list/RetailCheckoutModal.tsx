@@ -244,7 +244,7 @@ export const RetailCheckoutModal: React.FC<RetailCheckoutModalProps> = ({
                     <div className="flex items-center gap-3">
                       <div className={`w-5 h-5 rounded flex items-center justify-center border transition-all ${
                         isSelected 
-                          ? 'bg-[var(--accent-color)] border-[var(--accent-color)] text-white' 
+                          ? 'bg-[var(--accent-color)] border-[var(--accent-color)] text-[var(--accent-text,white)]' 
                           : 'border-theme'
                       }`}>
                         {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
@@ -318,7 +318,7 @@ export const RetailCheckoutModal: React.FC<RetailCheckoutModalProps> = ({
                       />
                       <button
                         onClick={(e) => handleSaveLink(e, item)}
-                        className="px-3 py-1 bg-[var(--accent-color)] hover:opacity-90 text-white font-bold rounded-lg text-xs flex items-center gap-1 transition-colors"
+                        className="px-3 py-1 bg-[var(--accent-color)] hover:opacity-90 text-[var(--accent-text,white)] font-bold rounded-lg text-xs flex items-center gap-1 transition-colors"
                       >
                         <Save className="w-3.5 h-3.5" /> Save
                       </button>
@@ -362,7 +362,7 @@ export const RetailCheckoutModal: React.FC<RetailCheckoutModalProps> = ({
                 </button>
                 <button
                   onClick={onClose}
-                  className="flex-1 py-3 px-4 rounded-xl bg-[var(--accent-color)] hover:opacity-95 text-white font-bold text-xs uppercase tracking-wider transition-all shadow-lg"
+                  className="flex-1 py-3 px-4 rounded-xl bg-[var(--accent-color)] hover:opacity-95 text-[var(--accent-text,white)] font-bold text-xs uppercase tracking-wider transition-all shadow-lg"
                 >
                   I'm Finished
                 </button>
@@ -388,7 +388,7 @@ export const RetailCheckoutModal: React.FC<RetailCheckoutModalProps> = ({
               <button
                 onClick={handleCheckout}
                 disabled={activeItems.length === 0}
-                className="w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl bg-[var(--accent-color)] hover:opacity-95 text-white font-bold uppercase tracking-wider text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+                className="w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl bg-[var(--accent-color)] hover:opacity-95 text-[var(--accent-text,white)] font-bold uppercase tracking-wider text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
               >
                 <span>Proceed to {{
                   walmart: 'Walmart',

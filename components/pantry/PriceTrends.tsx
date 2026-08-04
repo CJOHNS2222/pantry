@@ -72,7 +72,7 @@ const PriceTrends: React.FC<PriceTrendsProps> = ({ ingredient, onClose }) => {
           <button
             onClick={onClose}
             data-testid="pricetrends-close"
-            className="w-full bg-[var(--accent-color)] text-white py-2 px-4 rounded-lg hover:opacity-90 transition-opacity"
+            className="w-full bg-[var(--accent-color)] text-[var(--accent-text,white)] py-2 px-4 rounded-lg hover:opacity-90 transition-opacity"
           >
             Close
           </button>
@@ -144,7 +144,7 @@ const PriceTrends: React.FC<PriceTrendsProps> = ({ ingredient, onClose }) => {
         <button
           onClick={onClose}
           data-testid="pricetrends-close"
-          className="w-full bg-[var(--accent-color)] text-white py-2 px-4 rounded-lg hover:opacity-90 transition-opacity"
+          className="w-full bg-[var(--accent-color)] text-[var(--accent-text,white)] py-2 px-4 rounded-lg hover:opacity-90 transition-opacity"
         >
           Close
         </button>

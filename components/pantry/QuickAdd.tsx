@@ -82,7 +82,7 @@ export const QuickAdd: React.FC<QuickAddProps> = ({ suggestedItems, onAddItem, t
             aria-label="Scroll left"
             className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-7 h-7 flex items-center justify-center
                        rounded-full bg-theme-primary/90 shadow border border-theme
-                       text-theme-primary hover:bg-[var(--accent-color)] hover:text-white
+                       text-theme-primary hover:bg-[var(--accent-color)] hover:text-[var(--accent-text,white)]
                        active:scale-90 transition-all"
           >
             <ChevronLeft className="w-4 h-4" />
@@ -97,7 +97,7 @@ export const QuickAdd: React.FC<QuickAddProps> = ({ suggestedItems, onAddItem, t
             aria-label="Scroll right"
             className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-7 h-7 flex items-center justify-center
                        rounded-full bg-theme-primary/90 shadow border border-theme
-                       text-theme-primary hover:bg-[var(--accent-color)] hover:text-white
+                       text-theme-primary hover:bg-[var(--accent-color)] hover:text-[var(--accent-text,white)]
                        active:scale-90 transition-all"
           >
             <ChevronRight className="w-4 h-4" />

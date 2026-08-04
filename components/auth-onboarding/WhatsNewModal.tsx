@@ -122,7 +122,7 @@ export const WhatsNewModal: React.FC<WhatsNewModalProps> = ({ isOpen, onClose, s
         <div className="px-5 py-4 border-t border-theme flex justify-end">
           <button
             onClick={handleClose}
-            className="px-4 py-2 bg-[var(--accent-color)] text-white text-sm font-semibold rounded-lg hover:opacity-90 transition-opacity focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:ring-offset-2"
+            className="px-4 py-2 bg-[var(--accent-color)] text-[var(--accent-text,white)] text-sm font-semibold rounded-lg hover:opacity-90 transition-opacity focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:ring-offset-2"
           >
             Got it
           </button>

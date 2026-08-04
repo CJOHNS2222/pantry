@@ -237,7 +237,7 @@ const UserBehaviorAnalytics: React.FC = () => {
               onClick={() => setTimeRange(range)}
               className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
                 timeRange === range
-                  ? 'bg-[var(--accent-color)] text-white'
+                  ? 'bg-[var(--accent-color)] text-[var(--accent-text,white)]'
                   : 'bg-theme-secondary text-theme-primary hover:bg-theme-primary'
               }`}
             >

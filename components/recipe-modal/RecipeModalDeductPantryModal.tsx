@@ -122,7 +122,7 @@ export const RecipeModalDeductPantryModal: React.FC<RecipeModalDeductPantryModal
         </button>
         <button
           onClick={handleConfirm}
-          className="flex-1 py-2.5 bg-[var(--accent-color)] text-white rounded-xl font-bold text-sm hover:opacity-90 active:scale-95 transition-all shadow-md shadow-[var(--accent-color)]/25"
+          className="flex-1 py-2.5 bg-[var(--accent-color)] text-[var(--accent-text,white)] rounded-xl font-bold text-sm hover:opacity-90 active:scale-95 transition-all shadow-md shadow-[var(--accent-color)]/25"
         >
           Deduct Selected
         </button>

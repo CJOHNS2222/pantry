@@ -34,7 +34,7 @@ export const SettingsFeedbackSection: React.FC<SettingsFeedbackSectionProps> = (
             <button
               type="submit"
               disabled={sending || !feedback.trim()}
-              className="bg-[var(--accent-color)] text-white px-4 py-2 rounded font-medium text-sm w-full hover:bg-opacity-90 transition-colors"
+              className="bg-[var(--accent-color)] text-[var(--accent-text,white)] px-4 py-2 rounded font-medium text-sm w-full hover:bg-opacity-90 transition-colors"
             >
               {sending ? 'Sending...' : 'Send Feedback'}
             </button>

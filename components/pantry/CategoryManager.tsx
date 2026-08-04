@@ -172,7 +172,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({
                         key={emoji + idx}
                         onClick={() => setFormData(prev => ({ ...prev, icon: emoji }))}
                         className={`p-2 rounded hover:bg-theme-primary transition-colors ${
-                          formData.icon === emoji ? 'bg-[var(--accent-color)] text-white' : ''
+                          formData.icon === emoji ? 'bg-[var(--accent-color)] text-[var(--accent-text,white)]' : ''
                         }`}
                         data-testid={`category-emoji-${idx}`}
                       >
@@ -220,7 +220,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({
                   <button
                     onClick={handleSubmit}
                     disabled={!formData.name.trim()}
-                    className="flex items-center gap-2 px-4 py-2 bg-[var(--accent-color)] text-white rounded-lg hover:bg-opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    className="flex items-center gap-2 px-4 py-2 bg-[var(--accent-color)] text-[var(--accent-text,white)] rounded-lg hover:bg-opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     data-testid="category-submit"
                   >
                     <Check className="w-4 h-4" />
@@ -251,7 +251,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({
                 ) : (
                 <button
                   onClick={() => setIsAdding(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-[var(--accent-color)] text-white rounded-lg hover:bg-opacity-90 transition-colors"
+                  className="flex items-center gap-2 px-4 py-2 bg-[var(--accent-color)] text-[var(--accent-text,white)] rounded-lg hover:bg-opacity-90 transition-colors"
                   data-testid="category-add-button"
                 >
                   <Plus className="w-4 h-4" />

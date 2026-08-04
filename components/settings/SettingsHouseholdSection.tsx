@@ -45,7 +45,7 @@ export const SettingsHouseholdSection: React.FC<SettingsHouseholdSectionProps> =
                 </div>
                 <button
                   onClick={() => onShowHousehold?.()}
-                  className="px-3 py-2 bg-[var(--accent-color)] text-white rounded-lg hover:bg-[var(--accent-color)]/80 transition-colors text-sm font-medium"
+                  className="px-3 py-2 bg-[var(--accent-color)] text-[var(--accent-text,white)] rounded-lg hover:bg-[var(--accent-color)]/80 transition-colors text-sm font-medium"
                 >
                   {manageHouseholdLabel}
                 </button>
@@ -69,7 +69,7 @@ export const SettingsHouseholdSection: React.FC<SettingsHouseholdSectionProps> =
                             <div>
                               <div className="flex items-center gap-2">
                                 <p className="text-sm font-medium text-theme-primary">{member.name}</p>
-                                {isAdmin && <span className="px-2 py-0.5 bg-[var(--accent-color)] text-white text-xs rounded-full">Admin</span>}
+                                {isAdmin && <span className="px-2 py-0.5 bg-[var(--accent-color)] text-[var(--accent-text,white)] text-xs rounded-full">Admin</span>}
                                 {isCurrentUser && <span className="px-2 py-0.5 bg-blue-500 text-white text-xs rounded-full">You</span>}
                               </div>
                               <p className="text-xs text-theme-secondary">{member.email}</p>
@@ -128,7 +128,7 @@ export const SettingsHouseholdSection: React.FC<SettingsHouseholdSectionProps> =
                 <button
                   onClick={createHousehold}
                   disabled={!householdName.trim() || isCreatingHousehold}
-                  className="w-full bg-[var(--accent-color)] text-white px-4 py-2 rounded-lg font-medium hover:bg-[var(--accent-color)]/80 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors"
+                  className="w-full bg-[var(--accent-color)] text-[var(--accent-text,white)] px-4 py-2 rounded-lg font-medium hover:bg-[var(--accent-color)]/80 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors"
                 >
                   {isCreatingHousehold && <Loader2 className="w-4 h-4 animate-spin" />}
                   {isCreatingHousehold ? 'Creating...' : 'Create Household'}

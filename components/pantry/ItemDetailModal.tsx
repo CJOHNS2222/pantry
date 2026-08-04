@@ -635,7 +635,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                 {/* Save Button */}
                 <button
                   onClick={handleCloseAndPersist}
-                  className="w-full py-2 bg-[var(--accent-color)] text-white rounded-lg font-medium text-sm hover:bg-[var(--accent-color)]/80 transition-colors"
+                  className="w-full py-2 bg-[var(--accent-color)] text-[var(--accent-text,white)] rounded-lg font-medium text-sm hover:bg-[var(--accent-color)]/80 transition-colors"
                   data-testid="item-save-details"
                 >
                   SAVE
@@ -666,7 +666,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                         onClick={() => handleStorageChange(loc!)}
                         className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
                           localStorageLocation === loc
-                            ? 'bg-[var(--accent-color)] text-white'
+                            ? 'bg-[var(--accent-color)] text-[var(--accent-text,white)]'
                             : 'bg-theme-secondary text-theme-primary hover:bg-theme-primary'
                         }`}
                         data-testid={`item-storage-${loc}`}
@@ -721,7 +721,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                       <div className="flex gap-2 justify-end">
                         <button
                           onClick={handleSaveExpiration}
-                          className="px-3 py-1 text-sm bg-[var(--accent-color)] text-white rounded-lg"
+                          className="px-3 py-1 text-sm bg-[var(--accent-color)] text-[var(--accent-text,white)] rounded-lg"
                           data-testid="item-save-expiration"
                         >
                           {intl.formatMessage({ id: 'common.save' })}

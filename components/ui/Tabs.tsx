@@ -103,7 +103,7 @@ function getTriggerStyle(variant: TabsVariant, isActive: boolean, isDisabled: bo
   if (variant === 'pill') {
     return `${base} ${disabled} px-3 py-1.5 rounded-full ${
       isActive
-        ? 'bg-[var(--accent-color)] text-white shadow-sm'
+        ? 'bg-[var(--accent-color)] text-[var(--accent-text,white)] shadow-sm'
         : 'text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)]'
     }`;
   }

@@ -1683,7 +1683,7 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
                         can_make: suggestion.canMake
                       });
                     }}
-                    className="text-xs font-bold bg-[var(--accent-color)] text-white px-2.5 py-1.5 rounded-lg hover:bg-[var(--accent-color)]/90 transition-colors"
+                    className="text-xs font-bold bg-[var(--accent-color)] text-[var(--accent-text,white)] px-2.5 py-1.5 rounded-lg hover:bg-[var(--accent-color)]/90 transition-colors"
                   >
                     View Recipe
                   </button>
@@ -1749,7 +1749,7 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
               <button
                 onClick={handleWhatCanICookTonight}
                 disabled={loadingState === LoadingState.LOADING}
-                className="px-3 py-1.5 rounded-lg bg-[var(--accent-color)] text-white text-xs font-bold hover:bg-[var(--accent-color)]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-3 py-1.5 rounded-lg bg-[var(--accent-color)] text-[var(--accent-text,white)] text-xs font-bold hover:bg-[var(--accent-color)]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 What can I cook tonight?
               </button>
@@ -1910,7 +1910,7 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
           }
         }}
         data-testid="pantry-add-button"
-        className={`fixed bottom-28 right-6 z-20 bg-[var(--accent-color)] text-white p-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:ring-offset-2 ${
+        className={`fixed bottom-28 right-6 z-20 bg-[var(--accent-color)] text-[var(--accent-text,white)] p-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:ring-offset-2 ${
           shouldGlowAddButton ? 'tutorial-glow' : ''
         }`}
         style={{ bottom: 'calc(7rem + 15px)' }}
@@ -2063,7 +2063,7 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
                   aria-pressed={isActive}
                   className={`shrink-0 flex items-center gap-2 rounded-full border px-3 py-1.5 transition-colors ${
                     isActive
-                      ? 'bg-[var(--accent-color)] border-[var(--accent-color)] text-white'
+                      ? 'bg-[var(--accent-color)] border-[var(--accent-color)] text-[var(--accent-text,white)]'
                       : 'bg-theme-secondary border-theme text-theme-primary hover:border-[var(--accent-color)]/50'
                   }`}
                 >
@@ -2120,7 +2120,7 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
                   onClick={() => setIsSearchModalOpen(true)}
                   className={`p-1.5 rounded-lg border transition-colors ${
                     searchQuery
-                      ? 'bg-[var(--accent-color)] text-white border-[var(--accent-color)] shadow'
+                      ? 'bg-[var(--accent-color)] text-[var(--accent-text,white)] border-[var(--accent-color)] shadow'
                       : 'bg-theme-secondary border-theme text-theme-secondary hover:text-theme-primary'
                   }`}
                   aria-label="Search items"
@@ -2157,7 +2157,7 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
                       aria-expanded={showFilters}
                       className={`relative p-1.5 rounded-lg border transition-colors ${
                         showFilters || isFilterActive
-                          ? 'bg-[var(--accent-color)] text-white border-[var(--accent-color)] shadow'
+                          ? 'bg-[var(--accent-color)] text-[var(--accent-text,white)] border-[var(--accent-color)] shadow'
                           : 'bg-theme-secondary border-theme text-theme-secondary hover:bg-theme-secondary'
                       }`}
                     >
@@ -2224,7 +2224,7 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
                 onClick={toggleBulkMode}
                 className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
                   bulkMode
-                    ? 'bg-[var(--accent-color)] text-white'
+                    ? 'bg-[var(--accent-color)] text-[var(--accent-text,white)]'
                     : 'bg-theme-secondary text-theme-primary hover:bg-theme-primary'
                 }`}
                 aria-label={bulkMode ? 'Exit bulk selection mode' : 'Enter bulk selection mode'}
@@ -2263,7 +2263,7 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
                       }}
                       className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
                         pantryFilter.categories.includes(category!)
-                          ? 'bg-[var(--accent-color)] text-white'
+                          ? 'bg-[var(--accent-color)] text-[var(--accent-text,white)]'
                           : 'bg-theme-primary text-theme-secondary border border-theme hover:bg-theme-secondary'
                       }`}
                       aria-label={`${pantryFilter.categories.includes(category!) ? 'Remove' : 'Add'} ${category} filter`}
@@ -2292,7 +2292,7 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
                       }}
                       className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
                         pantryFilter.locations.includes(location)
-                          ? 'bg-[var(--accent-color)] text-white'
+                          ? 'bg-[var(--accent-color)] text-[var(--accent-text,white)]'
                           : 'bg-theme-primary text-theme-secondary border border-theme hover:bg-theme-secondary'
                       }`}
                       aria-label={`${pantryFilter.locations.includes(location) ? 'Remove' : 'Add'} ${location.charAt(0).toUpperCase() + location.slice(1)} location filter`}

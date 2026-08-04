@@ -545,7 +545,7 @@ const EnhancedShoppingListItemComponent: React.FC<ShoppingListItemProps> = ({
                 }}
                 className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
                   item.assignedTo === member.name
-                    ? 'bg-[var(--accent-color)] text-white border-[var(--accent-color)]'
+                    ? 'bg-[var(--accent-color)] text-[var(--accent-text,white)] border-[var(--accent-color)]'
                     : 'bg-theme text-theme-primary border-theme hover:border-[var(--accent-color)]'
                 }`}
               >
@@ -586,7 +586,7 @@ const EnhancedShoppingListItemComponent: React.FC<ShoppingListItemProps> = ({
                   onUpdateItem(item.id, { notes: noteText.trim() || undefined });
                   setShowNotes(false);
                 }}
-                className="text-xs px-3 py-1.5 bg-[var(--accent-color)] text-white font-bold rounded-lg hover:bg-[var(--accent-color)]/90 transition-colors shadow-sm cursor-pointer flex-1 flex items-center justify-center"
+                className="text-xs px-3 py-1.5 bg-[var(--accent-color)] text-[var(--accent-text,white)] font-bold rounded-lg hover:bg-[var(--accent-color)]/90 transition-colors shadow-sm cursor-pointer flex-1 flex items-center justify-center"
               >
                 Save
               </button>

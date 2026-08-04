@@ -211,7 +211,7 @@ const ExpiredItemsLaunchSheet: React.FC<ExpiredItemsLaunchSheetProps> = ({
         <button
           onClick={handleFinish}
           disabled={isProcessing}
-          className="flex-1 py-2.5 rounded-xl bg-[var(--accent-color)] hover:opacity-90 text-white font-semibold text-sm transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex-1 py-2.5 rounded-xl bg-[var(--accent-color)] hover:opacity-90 text-[var(--accent-text,white)] font-semibold text-sm transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isProcessing ? (
             <span className="flex items-center justify-center gap-2">

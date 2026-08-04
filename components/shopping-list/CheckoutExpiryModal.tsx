@@ -185,7 +185,7 @@ export const CheckoutExpiryModal: React.FC<CheckoutExpiryModalProps> = ({
                       onClick={() => handleItemModeChange(item.id, chip.value)}
                       className={`text-xs px-2.5 py-1.5 rounded-lg border transition-all ${
                         setting.mode === chip.value
-                          ? 'bg-[var(--accent-color)] text-white border-[var(--accent-color)] font-semibold shadow-sm'
+                          ? 'bg-[var(--accent-color)] text-[var(--accent-text,white)] border-[var(--accent-color)] font-semibold shadow-sm'
                           : 'bg-theme-primary/40 text-theme-secondary border-theme hover:border-[var(--accent-color)]/30'
                       }`}
                     >
@@ -199,7 +199,7 @@ export const CheckoutExpiryModal: React.FC<CheckoutExpiryModalProps> = ({
                       onClick={() => handleItemModeChange(item.id, 'custom')}
                       className={`text-xs px-2.5 py-1.5 rounded-lg border transition-all flex items-center gap-1 ${
                         setting.mode === 'custom'
-                          ? 'bg-[var(--accent-color)] text-white border-[var(--accent-color)] font-semibold shadow-sm'
+                          ? 'bg-[var(--accent-color)] text-[var(--accent-text,white)] border-[var(--accent-color)] font-semibold shadow-sm'
                           : 'bg-theme-primary/40 text-theme-secondary border-theme hover:border-[var(--accent-color)]/30'
                       }`}
                     >
@@ -231,7 +231,7 @@ export const CheckoutExpiryModal: React.FC<CheckoutExpiryModalProps> = ({
         </button>
         <button
           onClick={handleConfirm}
-          className="px-4 py-2 text-sm font-bold rounded-lg bg-[var(--accent-color)] hover:bg-[var(--accent-color)]/95 text-white transition-colors flex items-center gap-1.5 shadow-md hover:shadow-lg"
+          className="px-4 py-2 text-sm font-bold rounded-lg bg-[var(--accent-color)] hover:bg-[var(--accent-color)]/95 text-[var(--accent-text,white)] transition-colors flex items-center gap-1.5 shadow-md hover:shadow-lg"
         >
           <Check className="w-4 h-4" />
           Confirm Checkout

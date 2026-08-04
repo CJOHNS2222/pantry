@@ -71,7 +71,7 @@ export const MealPlannerCalendarSection: React.FC<MealPlannerCalendarSectionProp
               onClick={() => onSetCalendarExpanded(false)}
               className={`px-3 py-1 text-xs font-medium rounded-lg transition-colors ${
                 !isCalendarExpanded
-                  ? 'bg-[var(--accent-color)] text-white'
+                  ? 'bg-[var(--accent-color)] text-[var(--accent-text,white)]'
                   : 'text-theme-secondary hover:bg-theme-primary/20'
               }`}
             >
@@ -82,7 +82,7 @@ export const MealPlannerCalendarSection: React.FC<MealPlannerCalendarSectionProp
                 onClick={() => onSetCalendarExpanded(true)}
                 className={`px-3 py-1 text-xs font-medium rounded-lg transition-colors ${
                   isCalendarExpanded
-                    ? 'bg-[var(--accent-color)] text-white'
+                    ? 'bg-[var(--accent-color)] text-[var(--accent-text,white)]'
                     : 'text-theme-secondary hover:bg-theme-primary/20'
                 }`}
               >

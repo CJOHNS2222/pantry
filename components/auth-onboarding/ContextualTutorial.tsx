@@ -150,7 +150,7 @@ export const ContextualTip: React.FC<ContextualTipProps> = ({
                 onAction();
                 handleDismiss();
               }}
-              className="flex-1 bg-[var(--accent-color)] hover:bg-[var(--accent-color)]/90 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+              className="flex-1 bg-[var(--accent-color)] hover:bg-[var(--accent-color)]/90 text-[var(--accent-text,white)] px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
             >
               {actionLabel}
               <ChevronRight className="w-3 h-3" />

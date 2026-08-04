@@ -84,7 +84,7 @@ export const RecipeModalActionSection: React.FC<RecipeModalActionSectionProps> =
               className={`w-full py-2 font-bold border rounded-lg flex items-center justify-center gap-2 ${
                 recipeSaveLimitExceeded || isSaving
                   ? 'border-gray-400 text-gray-400 cursor-not-allowed opacity-50'
-                  : 'border-[var(--accent-color)] hover:bg-[var(--accent-color)] hover:text-white'
+                  : 'border-[var(--accent-color)] hover:bg-[var(--accent-color)] hover:text-[var(--accent-text,white)]'
               }`}
             >
               <Heart className="w-4 h-4" /> {isSaving ? 'Saving...' : recipeSaveLimitExceeded ? 'Limit Reached' : 'Save Recipe'}
@@ -101,7 +101,7 @@ export const RecipeModalActionSection: React.FC<RecipeModalActionSectionProps> =
         {(showMarkAsMade && onMarkAsMade) || (showAddToPlan && onAddToPlan) ? (
           <div className="grid grid-cols-2 gap-2">
             {showMarkAsMade && onMarkAsMade && (
-              <button onClick={onMarkAsMadeClick} className="py-2 font-bold bg-[var(--accent-color)] text-white rounded-lg flex items-center justify-center gap-2">
+              <button onClick={onMarkAsMadeClick} className="py-2 font-bold bg-[var(--accent-color)] text-[var(--accent-text,white)] rounded-lg flex items-center justify-center gap-2">
                 <CheckCircle2 className="w-4 h-4" /> Mark as Made
               </button>
             )}
@@ -113,7 +113,7 @@ export const RecipeModalActionSection: React.FC<RecipeModalActionSectionProps> =
                 }}
                 disabled={mealPlanLimitExceeded}
                 className={`py-2 font-bold rounded-lg flex items-center justify-center gap-2 ${
-                  mealPlanLimitExceeded ? 'bg-gray-400 text-gray-600 cursor-not-allowed opacity-50' : 'bg-[var(--accent-color)] text-white'
+                  mealPlanLimitExceeded ? 'bg-gray-400 text-gray-600 cursor-not-allowed opacity-50' : 'bg-[var(--accent-color)] text-[var(--accent-text,white)]'
                 }`}
               >
                 <Plus className="w-4 h-4" /> {mealPlanLimitExceeded ? 'Limit Reached' : 'Add to Schedule'}
@@ -125,7 +125,7 @@ export const RecipeModalActionSection: React.FC<RecipeModalActionSectionProps> =
         {canStartCooking && (
           <button
             onClick={onStartCooking}
-            className="w-full py-2.5 font-bold bg-[var(--accent-color)] text-white rounded-lg flex items-center justify-center gap-2 mb-1"
+            className="w-full py-2.5 font-bold bg-[var(--accent-color)] text-[var(--accent-text,white)] rounded-lg flex items-center justify-center gap-2 mb-1"
           >
             <UtensilsCrossed className="w-4 h-4" /> Start Cooking
           </button>
@@ -159,7 +159,7 @@ export const RecipeModalActionSection: React.FC<RecipeModalActionSectionProps> =
                 className={`flex-1 py-2 font-bold border rounded-lg flex items-center justify-center gap-2 ${
                   recipeSaveLimitExceeded || isSaving
                     ? 'border-gray-400 text-gray-400 cursor-not-allowed opacity-50'
-                    : 'border-[var(--accent-color)] hover:bg-[var(--accent-color)] hover:text-white'
+                    : 'border-[var(--accent-color)] hover:bg-[var(--accent-color)] hover:text-[var(--accent-text,white)]'
                 }`}
               >
                 <Heart className="w-4 h-4" /> {isSaving ? 'Saving...' : recipeSaveLimitExceeded ? 'Limit Reached' : 'Save Recipe'}

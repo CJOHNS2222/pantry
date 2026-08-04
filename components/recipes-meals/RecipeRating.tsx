@@ -351,7 +351,7 @@ export const RecipeRatingUI: React.FC<RecipeRatingUIProps> = ({
                   onClick={() => handleFeedbackToggle(option.key)}
                   className={`flex items-center gap-1 px-3 py-2 rounded-full text-xs transition-all ${
                     isSelected
-                      ? 'bg-[var(--accent-color)] text-white'
+                      ? 'bg-[var(--accent-color)] text-[var(--accent-text,white)]'
                       : 'bg-theme-primary text-theme-primary hover:bg-theme-secondary border border-theme'
                   }`}
                 >
@@ -438,7 +438,7 @@ export const RecipeRatingUI: React.FC<RecipeRatingUIProps> = ({
                   type="button"
                   onClick={handleAddModification}
                   disabled={!modificationText.trim()}
-                  className="flex-1 bg-[var(--accent-color)] text-white px-3 py-2 rounded text-sm hover:bg-[var(--accent-color)]/90 transition-colors disabled:opacity-50"
+                  className="flex-1 bg-[var(--accent-color)] text-[var(--accent-text,white)] px-3 py-2 rounded text-sm hover:bg-[var(--accent-color)]/90 transition-colors disabled:opacity-50"
                 >
                   Add Suggestion
                 </button>
@@ -458,7 +458,7 @@ export const RecipeRatingUI: React.FC<RecipeRatingUIProps> = ({
           type="submit"
           disabled={!selectedVerdict || isSubmitting}
           onClick={(e) => e.stopPropagation()}
-          className="w-full bg-[var(--accent-color)] text-white py-3 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--accent-color)]/90 flex items-center justify-center gap-2"
+          className="w-full bg-[var(--accent-color)] text-[var(--accent-text,white)] py-3 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--accent-color)]/90 flex items-center justify-center gap-2"
         >
           {isSubmitting ? (
             <>

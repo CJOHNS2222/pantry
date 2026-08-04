@@ -173,7 +173,7 @@ export const RecipeFinderSearchControls: React.FC<RecipeFinderSearchControlsProp
             onClick={onSpecificSearch}
             data-testid="recipefinder-search-button"
             disabled={loadingState === LoadingState.LOADING}
-            className="flex items-center gap-1.5 px-4 py-3 rounded-xl bg-[var(--accent-color)] text-white font-semibold text-sm hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+            className="flex items-center gap-1.5 px-4 py-3 rounded-xl bg-[var(--accent-color)] text-[var(--accent-text,white)] font-semibold text-sm hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
             aria-label="Search recipes"
             data-tutorial="search-button"
           >
@@ -202,14 +202,14 @@ export const RecipeFinderSearchControls: React.FC<RecipeFinderSearchControlsProp
                 <button
                   type="button"
                   onClick={() => onSetStrictMode(true)}
-                  className={`flex-1 text-xs font-bold rounded transition-all ${strictMode ? 'bg-[var(--accent-color)] text-white shadow-sm' : 'text-theme-secondary opacity-50'}`}
+                  className={`flex-1 text-xs font-bold rounded transition-all ${strictMode ? 'bg-[var(--accent-color)] text-[var(--accent-text,white)] shadow-sm' : 'text-theme-secondary opacity-50'}`}
                 >
                   Use Inventory Only
                 </button>
                 <button
                   type="button"
                   onClick={() => onSetStrictMode(false)}
-                  className={`flex-1 text-xs font-bold rounded transition-all ${!strictMode ? 'bg-[var(--accent-color)] text-white shadow-sm' : 'text-theme-secondary opacity-50'}`}
+                  className={`flex-1 text-xs font-bold rounded transition-all ${!strictMode ? 'bg-[var(--accent-color)] text-[var(--accent-text,white)] shadow-sm' : 'text-theme-secondary opacity-50'}`}
                 >
                   Allow Extra Items
                 </button>

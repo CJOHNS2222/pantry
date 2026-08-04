@@ -214,7 +214,7 @@ export const RecipeFinderSavedView: React.FC<RecipeFinderSavedViewProps> = ({
                     aria-pressed={savedSort === 'recent'}
                     className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${
                       savedSort === 'recent'
-                        ? 'bg-[var(--accent-color)] text-white'
+                        ? 'bg-[var(--accent-color)] text-[var(--accent-text,white)]'
                         : 'bg-theme-secondary text-theme-secondary opacity-60 hover:opacity-90'
                     }`}
                   >
@@ -226,7 +226,7 @@ export const RecipeFinderSavedView: React.FC<RecipeFinderSavedViewProps> = ({
                     aria-pressed={savedSort === 'top-rated'}
                     className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${
                       savedSort === 'top-rated'
-                        ? 'bg-[var(--accent-color)] text-white'
+                        ? 'bg-[var(--accent-color)] text-[var(--accent-text,white)]'
                         : 'bg-theme-secondary text-theme-secondary opacity-60 hover:opacity-90'
                     }`}
                   >
@@ -263,7 +263,7 @@ export const RecipeFinderSavedView: React.FC<RecipeFinderSavedViewProps> = ({
                     <h3 className="text-sm font-bold text-theme-primary">Your Custom Cookbooks</h3>
                     <button
                       onClick={() => setShowCreateCollectionModal(true)}
-                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--accent-color)] text-white text-xs font-bold shadow hover:opacity-90 transition-opacity"
+                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--accent-color)] text-[var(--accent-text,white)] text-xs font-bold shadow hover:opacity-90 transition-opacity"
                     >
                       <FolderPlus className="w-3.5 h-3.5" /> Create Cookbook
                     </button>
@@ -369,7 +369,7 @@ export const RecipeFinderSavedView: React.FC<RecipeFinderSavedViewProps> = ({
                 Import
               </button>
               <button
-                className="px-4 py-2 bg-[var(--accent-color)] text-white rounded-lg font-bold shadow hover:bg-[var(--accent-color)]/90 transition-colors text-xs"
+                className="px-4 py-2 bg-[var(--accent-color)] text-[var(--accent-text,white)] rounded-lg font-bold shadow hover:bg-[var(--accent-color)]/90 transition-colors text-xs"
                 onClick={() => setShowExportModal(true)}
                 data-tutorial="export-recipes"
               >
@@ -473,7 +473,7 @@ export const RecipeFinderSavedView: React.FC<RecipeFinderSavedViewProps> = ({
               {/* Save / Close */}
               <button
                 onClick={() => setRecipeToOrganize(null)}
-                className="w-full py-2.5 bg-[var(--accent-color)] hover:bg-[var(--accent-color)]/90 text-white font-bold rounded-xl text-xs shadow-md transition-all"
+                className="w-full py-2.5 bg-[var(--accent-color)] hover:bg-[var(--accent-color)]/90 text-[var(--accent-text,white)] font-bold rounded-xl text-xs shadow-md transition-all"
               >
                 Done Organizing
               </button>
@@ -529,7 +529,7 @@ export const RecipeFinderSavedView: React.FC<RecipeFinderSavedViewProps> = ({
                 <button
                   onClick={() => handleCreateCollection(newCollectionName)}
                   disabled={!newCollectionName.trim()}
-                  className="flex-1 py-2.5 bg-[var(--accent-color)] hover:bg-[var(--accent-color)]/90 text-white font-bold rounded-xl text-xs shadow-md disabled:opacity-50 transition-all"
+                  className="flex-1 py-2.5 bg-[var(--accent-color)] hover:bg-[var(--accent-color)]/90 text-[var(--accent-text,white)] font-bold rounded-xl text-xs shadow-md disabled:opacity-50 transition-all"
                 >
                   Create Cookbook
                 </button>

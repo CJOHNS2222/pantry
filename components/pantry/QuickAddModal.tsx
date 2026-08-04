@@ -275,7 +275,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
             <button
               onClick={() => handleSubmit()}
               disabled={!input.trim()}
-              className="px-4 py-3 bg-[var(--accent-color)] text-white rounded-lg hover:bg-[var(--accent-color)]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+              className="px-4 py-3 bg-[var(--accent-color)] text-[var(--accent-text,white)] rounded-lg hover:bg-[var(--accent-color)]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
               data-testid="quickadd-submit"
               aria-label="Add item"
             >

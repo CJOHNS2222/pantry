@@ -266,7 +266,7 @@ export const RecipeCommunityInsights: React.FC<RecipeCommunityInsightsProps> = (
                       className="w-6 h-6 rounded-full"
                     />
                   ) : (
-                    <div className="w-6 h-6 rounded-full bg-[var(--accent-color)] flex items-center justify-center text-white text-xs font-bold">
+                    <div className="w-6 h-6 rounded-full bg-[var(--accent-color)] flex items-center justify-center text-[var(--accent-text,white)] text-xs font-bold">
                       {rating.userName.charAt(0).toUpperCase()}
                     </div>
                   )}

@@ -122,7 +122,7 @@ export const MealPlannerHighlightsSection: React.FC<MealPlannerHighlightsSection
                       e.stopPropagation();
                       onViewSuggestionRecipe(suggestion);
                     }}
-                    className="flex-1 text-xs bg-[var(--accent-color)] text-white px-2 py-1 rounded hover:bg-[var(--accent-color)]/90 transition-colors"
+                    className="flex-1 text-xs bg-[var(--accent-color)] text-[var(--accent-text,white)] px-2 py-1 rounded hover:bg-[var(--accent-color)]/90 transition-colors"
                   >
                     View Recipe
                   </button>

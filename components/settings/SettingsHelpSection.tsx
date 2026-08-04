@@ -23,7 +23,7 @@ export const SettingsHelpSection: React.FC<SettingsHelpSectionProps> = ({
       <div className="p-4">
           <div className="space-y-3">
             <p className="text-sm text-theme-secondary">{description}</p>
-            <button onClick={onOpenFAQ} className="bg-[var(--accent-color)] text-white px-4 py-2 rounded font-medium text-sm hover:bg-opacity-90 transition-colors">
+            <button onClick={onOpenFAQ} className="bg-[var(--accent-color)] text-[var(--accent-text,white)] px-4 py-2 rounded font-medium text-sm hover:bg-opacity-90 transition-colors">
               {buttonLabel}
             </button>
           </div>

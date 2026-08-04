@@ -441,7 +441,7 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipes = [], initialI
         <p className="text-center text-lg text-gray-400 mb-8">No step-by-step instructions available for this recipe.</p>
         <button
           onClick={() => onExit()}
-          className="px-8 py-4 bg-[var(--accent-color)] text-white rounded-2xl font-bold text-base"
+          className="px-8 py-4 bg-[var(--accent-color)] text-[var(--accent-text,white)] rounded-2xl font-bold text-base"
         >
           Exit Cooking Mode
         </button>
@@ -463,7 +463,7 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipes = [], initialI
               onClick={() => setShowIngredientsMobile(v => !v)}
               className={`p-2 rounded-full transition-colors md:hidden ${
                 showIngredientsMobile
-                  ? 'bg-[var(--accent-color)] text-white'
+                  ? 'bg-[var(--accent-color)] text-[var(--accent-text,white)]'
                   : 'bg-white/10 text-gray-400 hover:bg-white/20'
               }`}
               aria-label={showIngredientsMobile ? 'Show steps' : 'Show ingredients'}
@@ -494,7 +494,7 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipes = [], initialI
                   }}
                   className={`flex-1 min-w-[120px] py-1.5 px-3 rounded-lg text-xs font-bold transition-all truncate ${
                     idx === activeIndex
-                      ? 'bg-[var(--accent-color)] text-white shadow-sm font-extrabold'
+                      ? 'bg-[var(--accent-color)] text-[var(--accent-text,white)] shadow-sm font-extrabold'
                       : 'text-gray-400 hover:text-gray-200 hover:bg-white/5'
                   }`}
                 >
@@ -542,7 +542,7 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipes = [], initialI
                 >
                   <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors mt-0.5 flex-shrink-0 ${
                     isChecked
-                      ? 'bg-[var(--accent-color)] border-[var(--accent-color)] text-white'
+                      ? 'bg-[var(--accent-color)] border-[var(--accent-color)] text-[var(--accent-text,white)]'
                       : 'border-white/20 group-hover:border-white/40 text-transparent'
                   }`}>
                     <Check className="w-3.5 h-3.5 stroke-[3px]" />
@@ -559,7 +559,7 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipes = [], initialI
           {showIngredientsMobile && (
             <button
               onClick={() => setShowIngredientsMobile(false)}
-              className="mt-6 w-full py-4 bg-[var(--accent-color)] text-white rounded-xl font-bold text-sm"
+              className="mt-6 w-full py-4 bg-[var(--accent-color)] text-[var(--accent-text,white)] rounded-xl font-bold text-sm"
             >
               Show Instructions Steps
             </button>
@@ -594,7 +594,7 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipes = [], initialI
                     <div className="flex items-start gap-3">
                       <span className={`text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${
                         isActive
-                          ? 'bg-[var(--accent-color)] text-white shadow-sm'
+                          ? 'bg-[var(--accent-color)] text-[var(--accent-text,white)] shadow-sm'
                           : isPassed
                           ? 'bg-white/20 text-gray-400'
                           : 'bg-white/5 text-gray-500'
@@ -638,7 +638,7 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipes = [], initialI
             return (
               <div key={idx} className="mx-6 mb-3 p-4 bg-white/5 backdrop-blur-md rounded-xl border border-white/10 flex items-center justify-between shadow-md flex-shrink-0 animate-fade-in">
                 <div className="flex items-center gap-3">
-                  <div className={`p-2 rounded-lg ${timer.isActive ? 'bg-[var(--accent-color)] text-white animate-pulse' : 'bg-white/10 text-gray-400'}`}>
+                  <div className={`p-2 rounded-lg ${timer.isActive ? 'bg-[var(--accent-color)] text-[var(--accent-text,white)] animate-pulse' : 'bg-white/10 text-gray-400'}`}>
                     <Clock className="w-4 h-4" />
                   </div>
                   <div className="min-w-0 flex-1">
@@ -693,7 +693,7 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipes = [], initialI
                   HapticService.success();
                   onExit(recipe);
                 }}
-                className="flex-1 py-3 rounded-xl font-bold text-sm bg-[var(--accent-color)] text-white flex items-center justify-center gap-1 active:opacity-85 shadow-sm"
+                className="flex-1 py-3 rounded-xl font-bold text-sm bg-[var(--accent-color)] text-[var(--accent-text,white)] flex items-center justify-center gap-1 active:opacity-85 shadow-sm"
               >
                 <UtensilsCrossed className="w-4 h-4" /> Complete Cooking
               </button>
@@ -705,7 +705,7 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipes = [], initialI
                     goTo(currentStep + 1);
                   }
                 }}
-                className="flex-1 py-3 rounded-xl font-bold text-sm bg-[var(--accent-color)] text-white flex items-center justify-center gap-1 active:opacity-85 shadow-sm"
+                className="flex-1 py-3 rounded-xl font-bold text-sm bg-[var(--accent-color)] text-[var(--accent-text,white)] flex items-center justify-center gap-1 active:opacity-85 shadow-sm"
               >
                 Next <ChevronRight className="w-4 h-4" />
               </button>

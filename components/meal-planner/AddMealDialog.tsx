@@ -53,7 +53,7 @@ export const AddMealDialog: React.FC<AddMealDialogProps> = ({
                 <button
                   key={mealType}
                   onClick={() => selectedDayForDialog !== null && onConfirm(selectedDayForDialog, mealType)}
-                  className="p-3 bg-theme-secondary hover:bg-[var(--accent-color)] hover:text-white border border-theme rounded-lg text-theme-text capitalize transition-colors"
+                  className="p-3 bg-theme-secondary hover:bg-[var(--accent-color)] hover:text-[var(--accent-text,white)] border border-theme rounded-lg text-theme-text capitalize transition-colors"
                 >
                   {mealType}
                 </button>

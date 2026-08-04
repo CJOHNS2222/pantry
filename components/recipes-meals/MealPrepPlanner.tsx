@@ -272,7 +272,7 @@ export const MealPrepPlanner: React.FC<MealPrepPlannerProps> = ({
                   onClick={() => setPlanDuration(days)}
                   className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
                     planDuration === days
-                      ? 'bg-[var(--accent-color)] text-white'
+                      ? 'bg-[var(--accent-color)] text-[var(--accent-text,white)]'
                       : 'bg-theme-secondary/20 text-theme-primary hover:bg-theme-secondary/30'
                   }`}
                 >
@@ -293,7 +293,7 @@ export const MealPrepPlanner: React.FC<MealPrepPlannerProps> = ({
                   onClick={() => setHouseholdSize(n)}
                   className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
                     householdSize === n
-                      ? 'bg-[var(--accent-color)] text-white'
+                      ? 'bg-[var(--accent-color)] text-[var(--accent-text,white)]'
                       : 'bg-theme-secondary/20 text-theme-primary hover:bg-theme-secondary/30'
                   }`}
                 >
@@ -318,7 +318,7 @@ export const MealPrepPlanner: React.FC<MealPrepPlannerProps> = ({
                   onClick={() => setMaxCookTime(t)}
                   className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                     maxCookTime === t
-                      ? 'bg-[var(--accent-color)] text-white'
+                      ? 'bg-[var(--accent-color)] text-[var(--accent-text,white)]'
                       : 'bg-theme-secondary/20 text-theme-primary hover:bg-theme-secondary/30'
                   }`}
                 >
@@ -384,7 +384,7 @@ export const MealPrepPlanner: React.FC<MealPrepPlannerProps> = ({
                             Cook together
                           </p>
                           {batches > 1 && (
-                            <span className="text-xs font-bold text-white bg-[var(--accent-color)] px-1.5 py-0.5 rounded-full">
+                            <span className="text-xs font-bold text-[var(--accent-text,white)] bg-[var(--accent-color)] px-1.5 py-0.5 rounded-full">
                               ×{batches}
                             </span>
                           )}
@@ -404,7 +404,7 @@ export const MealPrepPlanner: React.FC<MealPrepPlannerProps> = ({
                       <button
                         onClick={() => addPlanToMealPlan(plan)}
                         data-testid={`mealprep-add-${index}`}
-                        className="flex-shrink-0 bg-[var(--accent-color)] text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:opacity-90"
+                        className="flex-shrink-0 bg-[var(--accent-color)] text-[var(--accent-text,white)] px-3 py-1.5 rounded-lg text-xs font-medium hover:opacity-90"
                       >
                         Add to Plan
                       </button>
@@ -498,7 +498,7 @@ export const MealPrepPlanner: React.FC<MealPrepPlannerProps> = ({
               <button
                 onClick={handleAddCustom}
                 disabled={!customTitle.trim()}
-                className="flex items-center gap-1 px-3 py-2 rounded-lg bg-[var(--accent-color)] text-white text-sm font-medium disabled:opacity-40 hover:opacity-90 transition-opacity"
+                className="flex items-center gap-1 px-3 py-2 rounded-lg bg-[var(--accent-color)] text-[var(--accent-text,white)] text-sm font-medium disabled:opacity-40 hover:opacity-90 transition-opacity"
               >
                 <Plus className="w-4 h-4" />
                 Add
@@ -530,7 +530,7 @@ export const MealPrepPlanner: React.FC<MealPrepPlannerProps> = ({
                   title={pct >= 0.7 ? `~${Math.round(pct * 100)}% ingredients in pantry` : undefined}
                   className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs border transition-colors ${
                     selected
-                      ? 'bg-[var(--accent-color)] text-white border-[var(--accent-color)]'
+                      ? 'bg-[var(--accent-color)] text-[var(--accent-text,white)] border-[var(--accent-color)]'
                       : 'bg-theme-secondary/20 text-theme-primary border-theme-secondary/30 hover:bg-theme-secondary/30'
                   }`}
                 >
@@ -548,7 +548,7 @@ export const MealPrepPlanner: React.FC<MealPrepPlannerProps> = ({
                   key={entry.id}
                   className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs border border-dashed transition-colors ${
                     selected
-                      ? 'bg-[var(--accent-color)] text-white border-[var(--accent-color)]'
+                      ? 'bg-[var(--accent-color)] text-[var(--accent-text,white)] border-[var(--accent-color)]'
                       : 'bg-theme-secondary/10 text-theme-primary border-theme-secondary/40'
                   }`}
                 >
@@ -605,7 +605,7 @@ export const MealPrepPlanner: React.FC<MealPrepPlannerProps> = ({
               <button
                 onClick={addCustomPlanToMealPlan}
                 data-testid="mealprep-add-to-plan"
-                className="w-full bg-[var(--accent-color)] text-white py-2 rounded-lg text-sm font-medium hover:opacity-90"
+                className="w-full bg-[var(--accent-color)] text-[var(--accent-text,white)] py-2 rounded-lg text-sm font-medium hover:opacity-90"
               >
                 Add All to Meal Plan
               </button>

@@ -900,7 +900,7 @@ const SettingsComponent: React.FC<SettingsProps> = ({
                         onClick={ctaContent.accent ? () => setActiveCategory('account_info') : onShowHousehold}
                         className={`shrink-0 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors ${
                           ctaContent.accent
-                            ? 'bg-[var(--accent-color)] text-white hover:bg-[var(--accent-color)]/80'
+                            ? 'bg-[var(--accent-color)] text-[var(--accent-text,white)] hover:bg-[var(--accent-color)]/80'
                             : 'bg-theme-secondary text-theme-primary border border-theme hover:bg-theme-primary'
                         }`}
                       >
@@ -1441,19 +1441,19 @@ const SettingsComponent: React.FC<SettingsProps> = ({
               <div className="flex gap-2 bg-theme-secondary border border-theme rounded-xl p-1">
                 <button
                   onClick={() => setAdminDashboardTab('monitoring')}
-                  className={`flex-1 py-2 px-3 rounded-lg text-sm font-semibold transition-colors ${adminDashboardTab === 'monitoring' ? 'bg-[var(--accent-color)] text-white' : 'text-theme-secondary hover:text-theme-primary'}`}
+                  className={`flex-1 py-2 px-3 rounded-lg text-sm font-semibold transition-colors ${adminDashboardTab === 'monitoring' ? 'bg-[var(--accent-color)] text-[var(--accent-text,white)]' : 'text-theme-secondary hover:text-theme-primary'}`}
                 >
                   Monitoring
                 </button>
                 <button
                   onClick={() => setAdminDashboardTab('performance')}
-                  className={`flex-1 py-2 px-3 rounded-lg text-sm font-semibold transition-colors ${adminDashboardTab === 'performance' ? 'bg-[var(--accent-color)] text-white' : 'text-theme-secondary hover:text-theme-primary'}`}
+                  className={`flex-1 py-2 px-3 rounded-lg text-sm font-semibold transition-colors ${adminDashboardTab === 'performance' ? 'bg-[var(--accent-color)] text-[var(--accent-text,white)]' : 'text-theme-secondary hover:text-theme-primary'}`}
                 >
                   Performance
                 </button>
                 <button
                   onClick={() => setAdminDashboardTab('behavior')}
-                  className={`flex-1 py-2 px-3 rounded-lg text-sm font-semibold transition-colors ${adminDashboardTab === 'behavior' ? 'bg-[var(--accent-color)] text-white' : 'text-theme-secondary hover:text-theme-primary'}`}
+                  className={`flex-1 py-2 px-3 rounded-lg text-sm font-semibold transition-colors ${adminDashboardTab === 'behavior' ? 'bg-[var(--accent-color)] text-[var(--accent-text,white)]' : 'text-theme-secondary hover:text-theme-primary'}`}
                 >
                   User Behavior
                 </button>

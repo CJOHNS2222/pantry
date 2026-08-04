@@ -895,7 +895,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
               {Array.isArray(recipe.instructions) && recipe.instructions.some(s => s.trim()) && (
                 <button
                   onClick={handleStartCookingMode}
-                  className="mt-2 w-full py-2.5 bg-[var(--accent-color)] hover:bg-[var(--accent-color)]/90 text-white font-bold text-sm rounded-xl active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-sm"
+                  className="mt-2 w-full py-2.5 bg-[var(--accent-color)] hover:bg-[var(--accent-color)]/90 text-[var(--accent-text,white)] font-bold text-sm rounded-xl active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-sm"
                 >
                   <UtensilsCrossed className="w-4 h-4" />
                   <span>Start Cooking Mode</span>

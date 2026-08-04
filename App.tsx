@@ -1857,7 +1857,7 @@ const App: React.FC = () => {
           >
             <button
               onClick={() => setShowHouseholdInviteModal(true)}
-              className="w-full flex items-center justify-between gap-2 bg-[var(--accent-color)] text-white px-4 py-2 rounded-lg shadow-md text-sm font-medium animate-pulse-subtle"
+              className="w-full flex items-center justify-between gap-2 bg-[var(--accent-color)] text-[var(--accent-text,white)] px-4 py-2 rounded-lg shadow-md text-sm font-medium animate-pulse-subtle"
             >
               <span>🏠 You have {householdInvites.length === 1 ? 'a pending household invitation' : `${householdInvites.length} household invitations`}</span>
               <span className="underline whitespace-nowrap">View →</span>

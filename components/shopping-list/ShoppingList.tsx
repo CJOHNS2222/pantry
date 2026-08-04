@@ -966,7 +966,7 @@ const ShoppingListComponent: React.FC<ShoppingListProps> = ({
       {uncheckedItemsCount > 0 && (
         <button
           onClick={() => setIsCheckoutModalOpen(true)}
-          className="fixed right-6 z-20 bg-[var(--accent-color)] text-white p-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 active:scale-95 flex items-center justify-center theme-transition"
+          className="fixed right-6 z-20 bg-[var(--accent-color)] text-[var(--accent-text,white)] p-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 active:scale-95 flex items-center justify-center theme-transition"
           style={{ bottom: 'calc(7rem + 15px + 70px)' }}
           aria-label="Order ingredients online"
           title="Order online"

@@ -186,7 +186,7 @@ const RecipeImportModal: React.FC<RecipeImportModalProps> = ({ open, onClose }) 
           <button 
             onClick={handleImportRecipe} 
             disabled={loading || !url} 
-            className="flex-1 py-3 bg-[var(--accent-color)] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--accent-color)]/90 text-white rounded-xl text-xs font-bold transition-all shadow-md" 
+            className="flex-1 py-3 bg-[var(--accent-color)] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--accent-color)]/90 text-[var(--accent-text,white)] rounded-xl text-xs font-bold transition-all shadow-md" 
             data-testid="import-recipe"
           >
             {previewedRecipe ? 'Save Recipe' : 'Import Recipe'}

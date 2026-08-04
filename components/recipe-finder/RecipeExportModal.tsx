@@ -436,7 +436,7 @@ export const RecipeExportModal: React.FC<RecipeExportModalProps> = ({
                   }}
                   className={`py-1.5 rounded-lg text-xs font-bold transition-all uppercase ${
                     format === fmt
-                      ? 'bg-[var(--accent-color)] text-white shadow-sm'
+                      ? 'bg-[var(--accent-color)] text-[var(--accent-text,white)] shadow-sm'
                       : 'text-theme-secondary opacity-65 hover:opacity-100'
                   }`}
                 >
@@ -492,7 +492,7 @@ export const RecipeExportModal: React.FC<RecipeExportModalProps> = ({
         <button
           disabled={selectedRecipes.length === 0 || isExporting}
           onClick={handleExport}
-          className="flex-1 py-3 bg-[var(--accent-color)] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--accent-color)]/90 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow"
+          className="flex-1 py-3 bg-[var(--accent-color)] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--accent-color)]/90 text-[var(--accent-text,white)] rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow"
         >
           {format === 'pdf' ? (
             <>

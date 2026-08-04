@@ -106,7 +106,7 @@ export const ShoppingListAddItemModal: React.FC<ShoppingListAddItemModalProps> =
                           key={suggestion}
                           type="button"
                           onClick={() => handleSelectSuggestion(suggestion)}
-                          className="w-full text-left px-4 py-3 text-sm text-theme-primary hover:bg-[var(--accent-color)] hover:text-white transition-colors duration-150 flex items-center justify-between font-semibold"
+                          className="w-full text-left px-4 py-3 text-sm text-theme-primary hover:bg-[var(--accent-color)] hover:text-[var(--accent-text,white)] transition-colors duration-150 flex items-center justify-between font-semibold"
                         >
                           <div className="flex items-center gap-3">
                             {imageUrl ? (
@@ -152,7 +152,7 @@ export const ShoppingListAddItemModal: React.FC<ShoppingListAddItemModalProps> =
         <Modal.Footer>
           <button
             type="submit"
-            className="w-full py-3.5 rounded-xl font-bold text-sm uppercase tracking-wider flex items-center justify-center gap-2 bg-[var(--accent-color)] text-white shadow-lg hover:bg-[var(--accent-color)]/90 transition-colors"
+            className="w-full py-3.5 rounded-xl font-bold text-sm uppercase tracking-wider flex items-center justify-center gap-2 bg-[var(--accent-color)] text-[var(--accent-text,white)] shadow-lg hover:bg-[var(--accent-color)]/90 transition-colors"
           >
             <Plus className="w-4 h-4" />
             Add Item

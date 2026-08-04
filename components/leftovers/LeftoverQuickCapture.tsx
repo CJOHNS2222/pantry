@@ -186,7 +186,7 @@ export default function LeftoverQuickCapture({
         </button>
         <button
           onClick={handleSave}
-          className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-[var(--accent-color)] text-white rounded-lg hover:bg-[var(--accent-color)]/80 transition-colors"
+          className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-[var(--accent-color)] text-[var(--accent-text,white)] rounded-lg hover:bg-[var(--accent-color)]/80 transition-colors"
           disabled={loading}
           data-testid="leftoverquickcapture-save"
         >

@@ -263,7 +263,7 @@ export const SmartShoppingSuggestions: React.FC<SmartShoppingSuggestionsProps> =
             <div className="flex items-center gap-1 ml-2">
               <button
                 onClick={() => handleAddSuggestion(suggestion)}
-                className="p-1.5 bg-[var(--accent-color)] text-white rounded-md hover:bg-[var(--accent-color)]/90 transition-colors"
+                className="p-1.5 bg-[var(--accent-color)] text-[var(--accent-text,white)] rounded-md hover:bg-[var(--accent-color)]/90 transition-colors"
                 title="Add to shopping list"
               >
                 <Plus className="w-3 h-3" />

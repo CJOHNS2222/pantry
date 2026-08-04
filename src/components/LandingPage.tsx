@@ -52,7 +52,7 @@ const LandingPage: React.FC = () => {
           <div className="hidden items-center gap-6 md:flex">
             <a href="#features" className="text-sm font-medium text-theme-secondary no-underline hover:text-theme-primary">Features</a>
             <a href="#screenshots" className="text-sm font-medium text-theme-secondary no-underline hover:text-theme-primary">Why It Feels Different</a>
-            <a href="/app" className="rounded-full bg-[var(--accent-color)] px-5 py-2 text-sm font-semibold text-white no-underline transition-colors hover:bg-[var(--accent-color)]/90">
+            <a href="/app" className="rounded-full bg-[var(--accent-color)] px-5 py-2 text-sm font-semibold text-[var(--accent-text,white)] no-underline transition-colors hover:bg-[var(--accent-color)]/90">
               Open App
             </a>
           </div>
@@ -76,7 +76,7 @@ const LandingPage: React.FC = () => {
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
-              <a href="/app" className="inline-flex items-center gap-2 rounded-full bg-[var(--accent-color)] px-6 py-3 text-base font-semibold text-white no-underline transition-colors hover:bg-[var(--accent-color)]/90">
+              <a href="/app" className="inline-flex items-center gap-2 rounded-full bg-[var(--accent-color)] px-6 py-3 text-base font-semibold text-[var(--accent-text,white)] no-underline transition-colors hover:bg-[var(--accent-color)]/90">
                 Launch the app
                 <ArrowRight className="h-4 w-4" />
               </a>
@@ -165,7 +165,7 @@ const LandingPage: React.FC = () => {
               <p className="mx-auto mt-4 max-w-2xl text-lg text-theme-secondary">
                 Start with the ingredients you already own, then let Stock & Spoon carry that context through the rest of the week.
               </p>
-              <a href="/app" className="mt-8 inline-flex items-center gap-2 rounded-full bg-[var(--accent-color)] px-7 py-3 text-base font-semibold text-white no-underline transition-colors hover:bg-[var(--accent-color)]/90">
+              <a href="/app" className="mt-8 inline-flex items-center gap-2 rounded-full bg-[var(--accent-color)] px-7 py-3 text-base font-semibold text-[var(--accent-text,white)] no-underline transition-colors hover:bg-[var(--accent-color)]/90">
                 Open Stock & Spoon
                 <ArrowRight className="h-4 w-4" />
               </a>

@@ -68,7 +68,7 @@ export const SettingsAppPreferencesSection: React.FC<SettingsAppPreferencesSecti
                 type="button"
                 onClick={() => onMeasurementSystemChange('Standard')}
                 className={`px-3 py-1 text-xs font-medium rounded transition-all ${
-                  userProfile?.measurementSystem !== 'Metric' ? 'bg-[var(--accent-color)] text-white shadow-sm' : 'text-theme-secondary'
+                  userProfile?.measurementSystem !== 'Metric' ? 'bg-[var(--accent-color)] text-[var(--accent-text,white)] shadow-sm' : 'text-theme-secondary'
                 }`}
               >
                 Imperial
@@ -77,7 +77,7 @@ export const SettingsAppPreferencesSection: React.FC<SettingsAppPreferencesSecti
                 type="button"
                 onClick={() => onMeasurementSystemChange('Metric')}
                 className={`px-3 py-1 text-xs font-medium rounded transition-all ${
-                  userProfile?.measurementSystem === 'Metric' ? 'bg-[var(--accent-color)] text-white shadow-sm' : 'text-theme-secondary'
+                  userProfile?.measurementSystem === 'Metric' ? 'bg-[var(--accent-color)] text-[var(--accent-text,white)] shadow-sm' : 'text-theme-secondary'
                 }`}
               >
                 Metric

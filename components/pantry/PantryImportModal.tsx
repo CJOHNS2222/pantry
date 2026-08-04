@@ -144,7 +144,7 @@ const PantryImportModal: React.FC<PantryImportModalProps> = ({ open, onClose, on
               <span>Select File</span>
             </div>
             <div className="flex gap-2">
-              <label className="px-3 py-1.5 bg-[var(--accent-color)] hover:bg-[var(--accent-color)]/90 text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-sm">
+              <label className="px-3 py-1.5 bg-[var(--accent-color)] hover:bg-[var(--accent-color)]/90 text-[var(--accent-text,white)] rounded-xl text-xs font-bold transition-all cursor-pointer shadow-sm">
                 Browse
                 <input 
                   type="file" 
@@ -204,7 +204,7 @@ const PantryImportModal: React.FC<PantryImportModalProps> = ({ open, onClose, on
             <button 
               onClick={handleImportPantry} 
               disabled={loading || previewCount === 0} 
-              className="px-4 py-2.5 bg-[var(--accent-color)] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--accent-color)]/90 text-white rounded-xl text-xs font-bold transition-all shadow-md" 
+              className="px-4 py-2.5 bg-[var(--accent-color)] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--accent-color)]/90 text-[var(--accent-text,white)] rounded-xl text-xs font-bold transition-all shadow-md" 
               data-testid="import-pantry"
             >
               Import Pantry

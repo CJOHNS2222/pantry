@@ -263,7 +263,7 @@ export const RecipeModalDetailsSection: React.FC<RecipeModalDetailsSectionProps>
 
                     <button
                       onClick={() => setShowSubstitutions(false)}
-                      className="w-full mt-6 py-2.5 bg-[var(--accent-color)] hover:bg-[var(--accent-color)]/90 text-white rounded-xl font-bold text-sm"
+                      className="w-full mt-6 py-2.5 bg-[var(--accent-color)] hover:bg-[var(--accent-color)]/90 text-[var(--accent-text,white)] rounded-xl font-bold text-sm"
                     >
                       Got it
                     </button>

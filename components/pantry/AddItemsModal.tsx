@@ -345,7 +345,7 @@ export const AddItemsModal: React.FC<AddItemsModalProps> = ({
                 onClick={handleAnalyze}
                 data-testid="pantry-process-image-button"
                 disabled={loadingState === LoadingState.LOADING}
-                className="w-full mt-4 flex items-center justify-center gap-2 px-4 py-2 bg-[var(--accent-color)] text-white rounded-lg hover:bg-[var(--accent-color)]/80 transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full mt-4 flex items-center justify-center gap-2 px-4 py-2 bg-[var(--accent-color)] text-[var(--accent-text,white)] rounded-lg hover:bg-[var(--accent-color)]/80 transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 aria-label="Process image with AI to identify pantry items"
                 aria-disabled={loadingState === LoadingState.LOADING}
               >
@@ -452,7 +452,7 @@ export const AddItemsModal: React.FC<AddItemsModalProps> = ({
             type="submit"
             form="manual-add-form"
             disabled={!newItemText.trim()}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-[var(--accent-color)] text-white rounded-lg hover:bg-[var(--accent-color)]/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium text-sm"
+            className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-[var(--accent-color)] text-[var(--accent-text,white)] rounded-lg hover:bg-[var(--accent-color)]/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium text-sm"
             aria-label="Add item to pantry"
           >
             <Plus className="w-4 h-4" aria-hidden="true" />

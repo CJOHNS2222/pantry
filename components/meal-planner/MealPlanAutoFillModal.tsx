@@ -206,7 +206,7 @@ export const MealPlanAutoFillModal: React.FC<MealPlanAutoFillModalProps> = ({
           <button
             onClick={handleAutoFill}
             disabled={!isAnyMealTypeSelected}
-            className="flex items-center gap-2 px-5 py-2 rounded-lg bg-[var(--accent-color)] text-white text-sm font-medium hover:bg-opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            className="flex items-center gap-2 px-5 py-2 rounded-lg bg-[var(--accent-color)] text-[var(--accent-text,white)] text-sm font-medium hover:bg-opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
           >
             <Wand2 className="w-4 h-4" />
             Generate Plan

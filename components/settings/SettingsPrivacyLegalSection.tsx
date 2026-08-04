@@ -29,7 +29,7 @@ export const SettingsPrivacyLegalSection: React.FC<SettingsPrivacyLegalSectionPr
           <div className="flex flex-wrap gap-2 mt-3">
             <button
               onClick={onViewPrivacyPolicy}
-              className="bg-[var(--accent-color)] text-white px-3 py-1 rounded-lg font-medium text-sm hover:bg-opacity-90 transition-colors"
+              className="bg-[var(--accent-color)] text-[var(--accent-text,white)] px-3 py-1 rounded-lg font-medium text-sm hover:bg-opacity-90 transition-colors"
             >
               View Privacy Policy
             </button>

@@ -92,7 +92,7 @@ export const HouseholdShoppingShare: React.FC<HouseholdShoppingShareProps> = ({
                   className="w-8 h-8 rounded-full border-2 border-theme"
                 />
               ) : (
-                <div className="w-8 h-8 rounded-full bg-[var(--accent-color)] flex items-center justify-center text-white text-xs font-bold">
+                <div className="w-8 h-8 rounded-full bg-[var(--accent-color)] flex items-center justify-center text-[var(--accent-text,white)] text-xs font-bold">
                   {member.name.charAt(0).toUpperCase()}
                 </div>
               )}
@@ -172,7 +172,7 @@ export const HouseholdShoppingShare: React.FC<HouseholdShoppingShareProps> = ({
           <button
             onClick={handleSendMessage}
             disabled={!message.trim()}
-            className="px-3 py-2 bg-[var(--accent-color)] text-white rounded-lg hover:bg-[var(--accent-color)]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-3 py-2 bg-[var(--accent-color)] text-[var(--accent-text,white)] rounded-lg hover:bg-[var(--accent-color)]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <MessageCircle className="w-4 h-4" />
           </button>

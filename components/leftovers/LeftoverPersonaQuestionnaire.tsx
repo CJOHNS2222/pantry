@@ -20,7 +20,7 @@ export const LeftoverPersonaQuestionnaire: React.FC<Props> = ({ userProfile, onC
           onClick={() => setShowInfo(v => !v)}
           aria-expanded={showInfo}
           aria-label="About Food Safety Preference"
-          className="w-4 h-4 rounded-full bg-theme-primary border border-theme text-theme-secondary text-[10px] font-bold leading-none flex items-center justify-center hover:bg-[var(--accent-color)] hover:text-white transition-colors flex-shrink-0"
+          className="w-4 h-4 rounded-full bg-theme-primary border border-theme text-theme-secondary text-[10px] font-bold leading-none flex items-center justify-center hover:bg-[var(--accent-color)] hover:text-[var(--accent-text,white)] transition-colors flex-shrink-0"
         >
           i
         </button>

@@ -153,7 +153,7 @@ export const NutritionScannerModal: React.FC<NutritionScannerModalProps> = ({ is
                   {canAdd && (
                     <button
                       onClick={() => handleAdd(slot)}
-                      className="flex-shrink-0 flex items-center gap-1 px-2 py-1 text-xs bg-[var(--accent-color)] text-white rounded-lg hover:opacity-90"
+                      className="flex-shrink-0 flex items-center gap-1 px-2 py-1 text-xs bg-[var(--accent-color)] text-[var(--accent-text,white)] rounded-lg hover:opacity-90"
                       aria-label={`Add ${slot.productTitle}${onAddItem ? ' to pantry' : ' to shopping list'}`}
                     >
                       <Plus className="w-3 h-3" />

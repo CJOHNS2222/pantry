@@ -138,7 +138,7 @@ const ExpirationDatePicker: React.FC<ExpirationDatePickerProps> = ({
               onClick={() => onChange(value, t)}
               className={`px-2 py-0.5 capitalize transition-colors ${
                 type === t
-                  ? 'bg-[var(--accent-color)] text-white font-semibold'
+                  ? 'bg-[var(--accent-color)] text-[var(--accent-text,white)] font-semibold'
                   : 'bg-theme-secondary text-theme-secondary hover:bg-theme-primary'
               }`}
             >
