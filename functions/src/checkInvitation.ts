@@ -10,8 +10,8 @@ if (!getApps().length) {
 
 export const checkInvitation = onCall(
   {
-    region: "us-central1",
-    enforceAppCheck: true,
+    region: "us-east1",
+    enforceAppCheck: false,
     cors: true
   },
   async (request) => {

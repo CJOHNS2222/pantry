@@ -84,10 +84,8 @@ interface PlayRtdnPayload {
 }
 
 export const handlePlaySubscriptionNotification = onMessagePublished(
-  // Explicit region to match every other function in this project (us-central1).
-  // It first deployed to us-east1 without this set — next deploy will delete that
-  // stray us-east1 instance and recreate it here (safe: stateless webhook, no data).
-  {topic: 'play-store-notifications', region: 'us-central1'},
+  // Explicit region to match every other function in this project (us-east1).
+  {topic: 'play-store-notifications', region: 'us-east1'},
   async (event) => {
     let payload: PlayRtdnPayload;
     try {

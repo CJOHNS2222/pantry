@@ -239,7 +239,7 @@ async function inviteMemberCore(inviterUid: string, email: string, householdId: 
   return { success: true };
 }
 
-export const inviteMember = onCall({ enforceAppCheck: true }, async (request) => {
+export const inviteMember = onCall({ enforceAppCheck: false }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'You must be logged in to invite members.');
   const inviterUid = request.auth.uid;
   const { email, householdId } = request.data;

@@ -12,7 +12,7 @@ if (!getApps().length) {
  * Firebase Function to proxy USDA FoodData Central API calls
  * Solves CORS issues when calling from browser
  */
-export const getNutritionData = onCall({ enforceAppCheck: true }, async (request) => {
+export const getNutritionData = onCall({ enforceAppCheck: false }, async (request) => {
   try {
     if (!request.auth?.uid) {
       throw new HttpsError('unauthenticated', 'Authentication required.');

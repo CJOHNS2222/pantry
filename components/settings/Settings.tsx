@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Timestamp } from 'firebase/firestore';
 import DatabaseMonitoringService from '../../services/databaseMonitoringService';
 import { CategoryManager } from '../pantry/CategoryManager';
-import { getFunctions, httpsCallable } from 'firebase/functions';
+import { getCallableFunction } from '../../firebaseConfig';
 import { log } from '../../services/logService';
 import { useIntl } from 'react-intl';
 import AnalyticsService from '../../services/analyticsService';
@@ -249,8 +249,7 @@ const SettingsComponent: React.FC<SettingsProps> = ({
     if (!user) return;
     setIsDeletingAccount(true);
     try {
-      const fns = getFunctions();
-      const deleteAccountFn = httpsCallable(fns, 'deleteAccount');
+      const deleteAccountFn = await getCallableFunction('deleteAccount');
       await deleteAccountFn();
       // Auth user was deleted server-side; sign out locally
       onLogout?.();
@@ -338,8 +337,7 @@ const SettingsComponent: React.FC<SettingsProps> = ({
       // Runs server-side with Admin SDK privileges so it can legitimately clear the
       // REMOVED member's own users/{memberId}.householdId and copy their cache —
       // a client write to another user's doc is (correctly) blocked by Firestore rules.
-      const fns = getFunctions();
-      const removeHouseholdMemberFn = httpsCallable(fns, 'removeHouseholdMember');
+      const removeHouseholdMemberFn = await getCallableFunction('removeHouseholdMember');
       await removeHouseholdMemberFn({ householdId: household.id, memberId: member.id });
 
       log.info('Member removed from household', { memberId: member.id, householdId: household.id }, 'Settings');

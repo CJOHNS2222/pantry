@@ -54,8 +54,8 @@ const SAFE_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
  */
 export const wrapImpactTrackingUrl = onCall(
   {
-    region: "us-central1",
-    enforceAppCheck: true,
+    region: "us-east1",
+    enforceAppCheck: false,
     cors: true,
   },
   async (request) => {

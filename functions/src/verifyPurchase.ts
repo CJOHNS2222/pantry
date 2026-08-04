@@ -26,7 +26,7 @@ if (!getApps().length) {
   initializeApp();
 }
 
-export const verifyPurchase = onCall({ enforceAppCheck: true }, async (request) => {
+export const verifyPurchase = onCall({ enforceAppCheck: false }, async (request) => {
   const uid = request.auth?.uid;
   if (!uid) {
     throw new HttpsError("unauthenticated", "Authentication required.");

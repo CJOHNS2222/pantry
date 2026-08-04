@@ -52,7 +52,7 @@ async function clearHouseholdIdFromUser(db: FirebaseFirestore.Firestore, userId:
   }
 }
 
-export const removeHouseholdMember = onCall({ enforceAppCheck: true }, async (request) => {
+export const removeHouseholdMember = onCall({ enforceAppCheck: false }, async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'You must be logged in.');
   }

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { User, Household } from '../../types';
 import { Users, Mail, Plus, X, Settings, ChefHat } from 'lucide-react';
-import { getFunctions, httpsCallable } from "firebase/functions";
+import { getCallableFunction } from "../../firebaseConfig";
 import { PremiumFeature } from '../settings/PremiumFeature';
 import { Tab } from '../../types/app';
 import { serverTimestamp } from 'firebase/firestore';
@@ -71,8 +71,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
         addToast('You have reached the maximum number of household members for your plan. Please upgrade to add more members.', 'error');
         return;
       }
-      const functions = getFunctions();
-      const inviteMember = httpsCallable(functions, 'inviteMember');
+      const inviteMember = await getCallableFunction('inviteMember');
       
       if (!household) {
         addToast('No household selected', 'error');
@@ -143,7 +142,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
       // ADMIN's own householdId too — set the same guard as leaveHousehold so
       // useAuth's auto-heal fallback doesn't immediately resurrect it.
       sessionStorage.setItem(HOUSEHOLD_LEFT_AT_KEY, String(Date.now()));
-      const removeHouseholdMemberFunction = httpsCallable(getFunctions(), 'removeHouseholdMember');
+      const removeHouseholdMemberFunction = await getCallableFunction('removeHouseholdMember');
       await removeHouseholdMemberFunction({ householdId: household.id, memberId: id });
     } catch (error: unknown) {
       const err = error as { message?: string; code?: string };
@@ -212,7 +211,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
 
       sessionStorage.setItem(HOUSEHOLD_LEFT_AT_KEY, String(Date.now()));
 
-      const leaveHouseholdFunction = httpsCallable(getFunctions(), 'leaveHousehold');
+      const leaveHouseholdFunction = await getCallableFunction('leaveHousehold');
       await leaveHouseholdFunction({ householdId });
 
       await AnalyticsService.trackEvent('household_leave', { householdId });

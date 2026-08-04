@@ -43,7 +43,7 @@ export const getFunctionsInstance = (): Promise<Functions> => {
   }
   if (!functionsInitPromise) {
     functionsInitPromise = import('firebase/functions').then(({ getFunctions }) => {
-      functionsInstance = getFunctions(app);
+      functionsInstance = getFunctions(app, 'us-east1');
       return functionsInstance;
     });
   }

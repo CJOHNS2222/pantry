@@ -22,7 +22,7 @@ const ACCOUNT_DELETIONS_COLLECTION = 'accountDeletions';
  *
  * The client should call onLogout() immediately after receiving a successful response.
  */
-export const deleteAccount = onCall({ enforceAppCheck: true }, async (request) => {
+export const deleteAccount = onCall({ enforceAppCheck: false }, async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'You must be signed in to delete your account.');
   }

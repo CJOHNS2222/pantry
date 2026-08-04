@@ -9,7 +9,7 @@ if (!getApps().length) {
   initializeApp();
 }
 
-export const leaveHousehold = onCall({ enforceAppCheck: true }, async (request) => {
+export const leaveHousehold = onCall({ enforceAppCheck: false }, async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'You must be logged in to leave a household.');
   }

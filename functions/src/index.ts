@@ -1,3 +1,7 @@
+import { setGlobalOptions } from "firebase-functions/v2";
+
+setGlobalOptions({ region: "us-east1" });
+
 export {inviteMember} from './inviteMember';
 export {leaveHousehold} from './leaveHousehold';
 export {removeHouseholdMember} from './removeHouseholdMember';

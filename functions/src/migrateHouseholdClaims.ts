@@ -54,7 +54,7 @@ async function migrateHouseholdClaimsCore() {
   };
 }
 
-export const migrateHouseholdClaims = onCall({ enforceAppCheck: true }, async (request) => {
+export const migrateHouseholdClaims = onCall({ enforceAppCheck: false }, async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'You must be logged in to run migrations.');
   }
