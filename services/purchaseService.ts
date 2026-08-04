@@ -184,6 +184,11 @@ export function getProductPrice(productId: ProductId): string | null {
 export function purchaseProduct(productId: ProductId): Promise<PurchaseResult> {
   return new Promise((resolve) => {
     if (!Capacitor.isNativePlatform()) {
+      if (import.meta.env.DEV) {
+        log.info('[purchaseService] Mocking successful purchase for dev environment', { productId });
+        resolve({ success: true });
+        return;
+      }
       resolve({ success: false, error: 'In-app purchases are only available on the Android app.' });
       return;
     }

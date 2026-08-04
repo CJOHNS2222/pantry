@@ -5,8 +5,6 @@ import { useConfirm } from '../ui/ConfirmDialog';
 import { useToast } from '../ui/Toast';
 import { Tab } from '../../types/app';
 import { ProgressBar, BottomSheet } from '../ui';
-import { EmptyState } from '../ui/EmptyState';
-import { Button } from '../ui/Button';
 import { PantryHealthScore } from '../pantry/PantryHealthScore';
 import {
   Trophy,
@@ -130,24 +128,8 @@ const CommunityComponent: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecip
   });
   useAndroidBack(showHealthDetail, () => setShowHealthDetail(false));
 
-  const isSoloUser = !household || !household.id;
-
   return (
     <div className="space-y-6 pb-24 animate-fade-in">
-      {/* Solo user household invite banner */}
-      {isSoloUser && (
-        <EmptyState
-          icon={<Users className="w-8 h-8 text-[var(--accent-color)]" />}
-          title="Enjoying Stock & Spoon solo?"
-          description="Create or join a household to share pantry items, meal plans, and shopping lists with your home!"
-          action={
-            <Button size="sm" onClick={() => setActiveTab(Tab.SETTINGS)}>
-              Create or Join Household
-            </Button>
-          }
-          className="mb-4"
-        />
-      )}
 
       {/* Dynamic Tab Switcher */}
       <div className="sticky top-0 z-10 bg-theme-primary py-3 -mx-4 px-4 border-b border-theme/40 shadow-sm md:-mx-8 md:px-8">
@@ -387,7 +369,7 @@ const CommunityComponent: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecip
                 <div className="divide-y divide-theme">
                   {leaderboardData.map((entry) => (
                     <div
-                      key={entry.name}
+                      key={entry.id}
                       className={`flex items-center justify-between p-4 transition-colors ${
                         entry.isUser ? 'bg-[var(--accent-color)]/5 border-l-4 border-l-[var(--accent-color)]' : ''
                       }`}

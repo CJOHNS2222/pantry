@@ -91,6 +91,7 @@ export function useShoppingList(
   household?: Household | null,
   addToast?: AddToast,
   loggingOptions?: LoggingOptions,
+  refreshTrigger?: number,
 ) {
   const [shoppingList, setShoppingList] = useState<ShoppingItem[]>([]);
   const [isLoadingShoppingList, setIsLoadingShoppingList] = useState(true);
@@ -119,7 +120,7 @@ export function useShoppingList(
     return () => {
       unsub();
     };
-  }, [user?.id, user?.householdId]);
+  }, [user?.id, user?.householdId, refreshTrigger]);
 
   const addShoppingListItem = async (item: Omit<ShoppingItem, 'id'>) => {
     if (!user?.id) return;

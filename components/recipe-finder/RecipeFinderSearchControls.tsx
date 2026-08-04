@@ -101,7 +101,7 @@ export const RecipeFinderSearchControls: React.FC<RecipeFinderSearchControlsProp
   }, []);
 
   return (
-    <>
+    <div className="space-y-4">
       <div className="bg-theme-secondary p-5 rounded-2xl border border-theme shadow-lg">
         <div className="flex gap-2">
           <div className="flex-1 relative">
@@ -202,8 +202,6 @@ export const RecipeFinderSearchControls: React.FC<RecipeFinderSearchControlsProp
           </button>
         </div>
       </div>
-
-      <div className="h-3" />
 
       <div className="bg-theme-secondary p-6 rounded-2xl border border-theme shadow-xl relative overflow-hidden">
         <div className="absolute top-0 right-0 w-32 h-32 bg-[var(--accent-color)] rounded-full blur-3xl opacity-10"></div>
@@ -366,6 +364,6 @@ export const RecipeFinderSearchControls: React.FC<RecipeFinderSearchControlsProp
           </button>
         </form>
       </div>
-    </>
+    </div>
   );
 };

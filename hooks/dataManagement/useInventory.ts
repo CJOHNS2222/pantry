@@ -41,6 +41,7 @@ export function useInventory(
   addToShoppingList?: (items: string[]) => void,
   loggingOptions?: LoggingOptions,
   options?: InventoryOptions,
+  refreshTrigger?: number,
 ) {
   const [inventory, setInventory] = useState<PantryItem[]>([]);
   const [isLoadingInventory, setIsLoadingInventory] = useState(true);
@@ -140,7 +141,7 @@ export function useInventory(
     return () => {
       unsubs.forEach(unsub => unsub());
     };
-  }, [user?.id, user?.householdId, options?.disableInventoryListeners]);
+  }, [user?.id, user?.householdId, options?.disableInventoryListeners, refreshTrigger]);
 
   useEffect(() => {
     if (!inventory.length || !user?.id || user.isGuest) return;

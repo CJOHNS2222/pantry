@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { log } from '../services/logService';
 import { User, PantryItem, StructuredRecipe, Settings } from '../types';
 import { deductIngredientAmount, shouldShowExpiryAlert } from '../utils/appUtils';
@@ -45,15 +45,17 @@ export function useDataManagement(
   }
 ) {
 
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
   const household = useHousehold(user, addToast);
 
-  const inventory = useInventory(user, addToast, addToShoppingList, loggingOptions, options);
+  const inventory = useInventory(user, addToast, addToShoppingList, loggingOptions, options, refreshTrigger);
 
-  const shoppingList = useShoppingList(user, household.household, addToast, loggingOptions);
+  const shoppingList = useShoppingList(user, household.household, addToast, loggingOptions, refreshTrigger);
 
-  const mealPlan = useMealPlan(user, household.household, addToast, loggingOptions, options);
+  const mealPlan = useMealPlan(user, household.household, addToast, loggingOptions, options, refreshTrigger);
 
-  const savedRecipes = useSavedRecipes(user, household.household, addToast);
+  const savedRecipes = useSavedRecipes(user, household.household, addToast, refreshTrigger);
 
   const ratings = useRatings(user);
 
@@ -294,7 +296,10 @@ export function useDataManagement(
       setRemoteMealPlanUpdate(true);
       setRemoteSavedRecipesUpdate(true);
 
-      // The listeners will automatically reload the data
+      // Increment refreshTrigger to force listeners to unsubscribe and re-subscribe,
+      // which triggers immediate server fetches.
+      setRefreshTrigger((prev: number) => prev + 1);
+
       addToast?.('Data refreshed!', 'success');
     } catch (err) {
       log.error('Failed to refresh data:', err, 'DataManagement');

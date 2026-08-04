@@ -64,6 +64,7 @@ export function useSavedRecipes(
   user?: User | null,
   household?: Household | null,
   addToast?: AddToast,
+  refreshTrigger?: number,
 ) {
   const [savedRecipes, setSavedRecipes] = useState<SavedRecipe[]>([]);
   const [isLoadingSavedRecipes, setIsLoadingSavedRecipes] = useState(true);
@@ -94,7 +95,7 @@ export function useSavedRecipes(
     return () => {
       unsub();
     };
-  }, [user?.id, user?.householdId]);
+  }, [user?.id, user?.householdId, refreshTrigger]);
 
   // Keep recipes.used Firestore counter in sync with the actual saved-recipe count.
   // When in a household the displayed list contains all members' recipes, so we sync

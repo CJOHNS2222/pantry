@@ -97,6 +97,8 @@ const App: React.FC = () => {
     }
   }, [toast]);
 
+  const stableAddToast = useStableCallback(addToast);
+
   const { syncStatus, syncNow, updateSyncStatus } = useOfflineStatus();
   const { isAdmin } = useIsAdmin(user?.id);
 
@@ -207,7 +209,7 @@ const App: React.FC = () => {
     addItems,
     removeShoppingListItems,
     syncNow,
-    addToast,
+    addToast: stableAddToast,
   });
 
   useEffect(() => {
@@ -235,7 +237,7 @@ const App: React.FC = () => {
     inventory,
     addToShoppingList,
     setActiveTab,
-    addToast,
+    addToast: stableAddToast,
     setNotifications,
     setShowHouseholdInviteModal: modals.setShowHouseholdInviteModal,
     householdInvites: modals.householdInvites,
@@ -402,7 +404,6 @@ const App: React.FC = () => {
   const stableAddCustomCategory = useStableCallback(addCustomCategory);
   const stableUpdateCustomCategory = useStableCallback(updateCustomCategory);
   const stableDeleteCustomCategory = useStableCallback(deleteCustomCategory);
-  const stableAddToast = useStableCallback(addToast);
   const stableHandleLogout = useStableCallback(handleLogout);
   const stableCheckRecipeSaveLimit = useStableCallback(checkRecipeSaveLimit);
   const stableCheckMealPlanLimit = useStableCallback(checkMealPlanLimit);
@@ -573,10 +574,9 @@ const App: React.FC = () => {
           <AppProvider value={appContextValue}>
             <AppActionsProvider value={appActionsValue}>
               <MainContent />
+              <AppNavigation activeTab={activeTab} setActiveTab={switchTab} hiddenTabs={settings.navigation?.hiddenTabs} isKeyboardVisible={isKeyboardVisible} />
             </AppActionsProvider>
           </AppProvider>
-
-          <AppNavigation activeTab={activeTab} setActiveTab={switchTab} hiddenTabs={settings.navigation?.hiddenTabs} isKeyboardVisible={isKeyboardVisible} />
 
           {notifications.length > 0 && (
             <div className="fixed top-4 left-0 right-0 z-50 flex flex-col items-center gap-2 pointer-events-none pb-4 px-4 overflow-y-auto max-h-[50vh]">

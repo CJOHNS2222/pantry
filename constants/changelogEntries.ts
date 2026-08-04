@@ -20,6 +20,16 @@ export interface DetailedChangeEntry {
 
 export const RECENT_CHANGES: ChangeEntry[] = [
   {
+    "version": "3.0.19",
+    "date": "Aug 4, 2026",
+    "highlights": [
+      "Pantry Bulk Selection Location — Moved the bulk select mode toggle button from the search toolbar to the storage…",
+      "Copy to Shopping List Confirmation — Changed the bulk select footer \"shopping\" button to copy selected items to the…",
+      "Recipe Finder Layout Spacing — Wrapped recipe finder search controls in a unified spacing container to eliminate…",
+      "Gemini Search Images & Background Caching — Added high-quality Unsplash image matching for Gemini search results, and…"
+    ]
+  },
+  {
     "version": "3.0.18",
     "date": "Aug 4, 2026",
     "highlights": [
@@ -35,19 +45,25 @@ export const RECENT_CHANGES: ChangeEntry[] = [
     "highlights": [
       "Accessibility Improvements (F3-F18) — Remediated 16 accessibility findings: enabled viewport pinch-zoom, implemented…"
     ]
-  },
-  {
-    "version": "3.0.16",
-    "date": "Aug 1, 2026",
-    "highlights": [
-      "Food Auto-Categorization Expansion — Expanded keyword auto-categorization mapping for pantry items with hundreds of new…",
-      "Popular Recipes Categorization — Fixed categorization of desserts (chocolate cake, fudge, ice cream, etc.) in the…",
-      "Build & Compiling Fixes — Resolved type safety compilation warnings in groceryCheckoutService.ts."
-    ]
   }
 ];
 
 export const ALL_CHANGES: DetailedChangeEntry[] = [
+  {
+    "version": "3.0.19",
+    "date": "Aug 4, 2026",
+    "sections": [
+      {
+        "title": "Added / Changed / Fixed",
+        "bullets": [
+          "**Pantry Bulk Selection Location** — Moved the bulk select mode toggle button from the search toolbar to the storage location and category section headers, keeping the toolbar clean.",
+          "**Copy to Shopping List Confirmation** — Changed the bulk select footer \"shopping\" button to copy selected items to the shopping list after a confirmation prompt, keeping the items in the pantry.",
+          "**Recipe Finder Layout Spacing** — Wrapped recipe finder search controls in a unified spacing container to eliminate double-margin blank space.",
+          "**Gemini Search Images & Background Caching** — Added high-quality Unsplash image matching for Gemini search results, and automatically cached all search-returned recipes to the global Firestore recipes collection in the background."
+        ]
+      }
+    ]
+  },
   {
     "version": "3.0.18",
     "date": "Aug 4, 2026",

@@ -1,8 +1,8 @@
 import React from 'react';
 import { ChevronRight, Clock } from 'lucide-react';
 import { DisplayedPantryItem } from './usePantryFilterSort';
-import StorageLocationIndicator from './StorageLocationIndicator';
-import { formatItemQuantity, getExpirationColor } from '../../utils/appUtils';
+import { formatItemQuantity, getExpirationColor, getPreferredItemDisplayImage } from '../../utils/appUtils';
+import { ProgressiveImage } from '../ui/ProgressiveImage';
 
 import HapticService from '../../services/hapticService';
 
@@ -50,7 +50,7 @@ export const PantryItemRow: React.FC<PantryItemRowProps> = ({
             className={`w-5 h-5 rounded flex items-center justify-center border-2 transition-colors flex-shrink-0 ${
               isSelected
                 ? 'bg-[var(--accent-color)] border-[var(--accent-color)] text-white'
-                : 'border-theme-secondary hover:border-[var(--accent-color)]'
+                : 'border-theme hover:border-[var(--accent-color)]'
             }`}
             aria-label={isSelected ? `Deselect ${item.item}` : `Select ${item.item}`}
           >
@@ -62,8 +62,14 @@ export const PantryItemRow: React.FC<PantryItemRowProps> = ({
           </button>
         )}
 
-        {/* Storage Location Icon */}
-        <StorageLocationIndicator location={(item.storageLocation || 'pantry') as 'pantry' | 'freezer' | 'fridge' | 'spices' | 'other' | 'leftovers'} className="flex-shrink-0" />
+        {/* Item Image */}
+        <ProgressiveImage
+          src={getPreferredItemDisplayImage(item.item, item.category, item.image)}
+          alt={item.item}
+          className="w-10 h-10 rounded-lg object-cover bg-theme-primary border border-theme flex-shrink-0"
+          placeholderSrc="/images/placeholder.svg"
+          lazy={true}
+        />
 
         {/* Item Details */}
         <div className="flex-1 min-w-0">

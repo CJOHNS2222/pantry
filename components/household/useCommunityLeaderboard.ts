@@ -7,6 +7,7 @@ import {
 } from '../../services/LeaderboardCacheService';
 
 export interface LeaderboardEntry {
+  id: string;
   rank: number;
   name: string;
   isUser: boolean;
@@ -140,16 +141,17 @@ export function useCommunityLeaderboard({
   const leaderboardData = useMemo((): LeaderboardEntry[] => {
     // Generate realistic peers with scores centered around the user's performance
     const basePeers: Omit<LeaderboardEntry, 'rank'>[] = [
-      { name: 'The Greenfield Home', isUser: false, score: 95, streak: 8, badges: 7, isHousehold: true },
-      { name: 'Chef Sarah', isUser: false, score: 91, streak: 5, badges: 6, isHousehold: false },
-      { name: 'ZeroWasteFam', isUser: false, score: 87, streak: 12, badges: 5, isHousehold: true },
-      { name: 'BudgetBites', isUser: false, score: 82, streak: 4, badges: 4, isHousehold: false },
-      { name: 'FreshStart', isUser: false, score: 69, streak: 1, badges: 2, isHousehold: false },
-      { name: 'StaplesOnly', isUser: false, score: 54, streak: 0, badges: 1, isHousehold: false },
+      { id: 'peer_greenfield', name: 'The Greenfield Home', isUser: false, score: 95, streak: 8, badges: 7, isHousehold: true },
+      { id: 'peer_sarah', name: 'Chef Sarah', isUser: false, score: 91, streak: 5, badges: 6, isHousehold: false },
+      { id: 'peer_zerowaste', name: 'ZeroWasteFam', isUser: false, score: 87, streak: 12, badges: 5, isHousehold: true },
+      { id: 'peer_budget', name: 'BudgetBites', isUser: false, score: 82, streak: 4, badges: 4, isHousehold: false },
+      { id: 'peer_fresh', name: 'FreshStart', isUser: false, score: 69, streak: 1, badges: 2, isHousehold: false },
+      { id: 'peer_staples', name: 'StaplesOnly', isUser: false, score: 54, streak: 0, badges: 1, isHousehold: false },
     ];
 
     // Add user entry (individual view)
     const userEntry: Omit<LeaderboardEntry, 'rank'> = {
+      id: `user_${user?.id || 'me'}`,
       name: isAnonymous ? 'Pantry Champ (You)' : `${leaderboardName} (You)`,
       isUser: true,
       score: userScore,
@@ -161,6 +163,7 @@ export function useCommunityLeaderboard({
     // The current user's household, as its own leaderboard row (household view). Only
     // present when the user actually belongs to a household.
     const householdSelfEntry: Omit<LeaderboardEntry, 'rank'> | null = household ? {
+      id: `household_${household.id}`,
       name: `${household.name} (You)`,
       isUser: true,
       score: userScore,
@@ -172,7 +175,8 @@ export function useCommunityLeaderboard({
     // Other opted-in households' real scores, read from the shared global leaderboard cache.
     const globalHouseholdPeerEntries: Omit<LeaderboardEntry, 'rank'>[] = Object.entries(globalHouseholdEntries)
       .filter(([id]) => id !== household?.id)
-      .map(([, e]) => ({
+      .map(([id, e]) => ({
+        id: `household_${id}`,
         name: e.name,
         isUser: false,
         score: e.score,
@@ -188,6 +192,7 @@ export function useCommunityLeaderboard({
     const realMemberEntries: Omit<LeaderboardEntry, 'rank'>[] = (household?.members || [])
       .filter(m => m.id !== user?.id && m.status === 'active')
       .map(m => ({
+        id: `user_${m.id}`,
         name: m.name,
         isUser: false,
         score: userScore,
@@ -202,7 +207,8 @@ export function useCommunityLeaderboard({
     // household — every opted-in user gets one row here.
     const globalPeerEntries: Omit<LeaderboardEntry, 'rank'>[] = Object.entries(globalEntries)
       .filter(([id]) => id !== user?.id)
-      .map(([, e]) => ({
+      .map(([id, e]) => ({
+        id: `user_${id}`,
         name: e.name,
         isUser: false,
         score: e.score,

@@ -1,3 +1,13 @@
+## [3.0.19] - 2026-08-04
+
+### Added / Changed / Fixed
+- **Pantry Bulk Selection Location** — Moved the bulk select mode toggle button from the search toolbar to the storage location and category section headers, keeping the toolbar clean.
+- **Copy to Shopping List Confirmation** — Changed the bulk select footer "shopping" button to copy selected items to the shopping list after a confirmation prompt, keeping the items in the pantry.
+- **Recipe Finder Layout Spacing** — Wrapped recipe finder search controls in a unified spacing container to eliminate double-margin blank space.
+- **Gemini Search Images & Background Caching** — Added high-quality Unsplash image matching for Gemini search results, and automatically cached all search-returned recipes to the global Firestore recipes collection in the background.
+
+---
+
 ## [3.0.18] - 2026-08-04
 
 ### Added / Changed / Fixed

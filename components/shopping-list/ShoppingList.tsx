@@ -294,9 +294,12 @@ const ShoppingListComponent: React.FC<ShoppingListProps> = ({
   useEffect(() => {
     const allItemsCompleted = items.length > 0 && items.every(item => item.checked);
     if (allItemsCompleted) {
-      saveCurrentSession();
+      const alreadySaved = previousSessions.some(s => s.sessionId === currentSessionId);
+      if (!alreadySaved) {
+        saveCurrentSession();
+      }
     }
-  }, [items, saveCurrentSession]);
+  }, [items, saveCurrentSession, previousSessions, currentSessionId]);
 
   // Hooks for offline functionality
   const { isOnline, syncStatus, syncNow } = useOfflineStatus();

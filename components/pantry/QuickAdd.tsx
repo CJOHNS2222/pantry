@@ -32,10 +32,12 @@ export const QuickAdd: React.FC<QuickAddProps> = ({ suggestedItems, onAddItem, t
     setShowRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 4);
   }, []);
 
+  const suggestedItemsKey = suggestedItems.join(',');
+
   useEffect(() => {
     syncArrows();
     // Re-check when the list of items changes (e.g. filtered items shrink)
-  }, [suggestedItems, syncArrows]);
+  }, [suggestedItemsKey, syncArrows]);
 
   const scrollBy = (dir: 'left' | 'right') => {
     scrollRef.current?.scrollBy({ left: dir === 'left' ? -180 : 180, behavior: 'smooth' });

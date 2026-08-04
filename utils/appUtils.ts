@@ -2675,7 +2675,13 @@ export function getCommonUnitForItem(itemName: string): string {
     return 'pcs';
   }
   if (name.includes('chicken') || name.includes('beef') || name.includes('pork') || name.includes('fish') || name.includes('meat') || name.includes('cheese')) return 'lbs';
-  if (name.includes('milk') || name.includes('juice') || name.includes('soda') || name.includes('water') || name.includes('broth')) return 'cups';
+  if (name.includes('milk')) {
+    if (name.includes('condensed') || name.includes('evaporated') || name.includes('powdered')) {
+      return 'pcs';
+    }
+    return 'gallons';
+  }
+  if (name.includes('juice') || name.includes('soda') || name.includes('water') || name.includes('broth')) return 'cups';
   if (name.includes('flour') || name.includes('sugar') || name.includes('rice')) return 'lbs';
   return 'pcs';
 }

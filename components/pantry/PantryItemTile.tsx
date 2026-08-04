@@ -67,21 +67,23 @@ export const PantryItemTile: React.FC<PantryItemTileProps> = ({
         )}
 
         {/* Checkbox */}
-        <button
-          onClick={(e) => toggleSelect(e)}
-          className={`absolute top-1.5 right-1.5 w-6 h-6 rounded flex items-center justify-center border-2 transition-colors ${
-            isSelected
-              ? 'bg-[var(--accent-color)] border-[var(--accent-color)]'
-              : 'bg-black/30 border-white/60'
-          }`}
-          aria-label={isSelected ? `Deselect ${item.item}` : `Select ${item.item}`}
-        >
-          {isSelected && (
-            <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="none">
-              <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          )}
-        </button>
+        {bulkMode && (
+          <button
+            onClick={(e) => toggleSelect(e)}
+            className={`absolute top-1.5 right-1.5 w-6 h-6 rounded flex items-center justify-center border-2 transition-colors ${
+              isSelected
+                ? 'bg-[var(--accent-color)] border-[var(--accent-color)] text-white'
+                : 'bg-black/30 border-white/60 hover:border-white'
+            }`}
+            aria-label={isSelected ? `Deselect ${item.item}` : `Select ${item.item}`}
+          >
+            {isSelected && (
+              <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none">
+                <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            )}
+          </button>
+        )}
 
         {/* Detail shortcut */}
         <button

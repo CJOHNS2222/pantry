@@ -1,8 +1,8 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { useModalOpen } from '../../utils/useModalOpen';
 import { useAndroidBack } from '../../hooks/useAndroidBack';
-import { Camera, Plus, ChefHat, FilePlus } from 'lucide-react';
-import { PantryItem, LoadingState, ExpirationAlert, CustomCategory, PantryFilter, User, ShoppingItem, StructuredRecipe, SavedRecipe } from '../../types';
+import { Camera, Plus, ChefHat, FilePlus, CheckSquare } from 'lucide-react';
+import { PantryItem, LoadingState, ExpirationAlert, CustomCategory, PantryFilter, User, ShoppingItem, StructuredRecipe, SavedRecipe, ConsumptionSuggestion, RecipeSuggestion } from '../../types';
 
 import { Tab } from '../../types/app';
 import AnalyticsService from '../../services/analyticsService';
@@ -10,22 +10,27 @@ import { log } from '../../services/logService';
 
 import ItemDetailModal from './ItemDetailModal';
 import { PantryItemSkeleton } from '../ui/SkeletonLoader';
-import { generateIntelligentRecipeQuery, savePantryFilter, defaultPantryFilter, RecipeIngredientMatch } from '../../utils/searchUtils';
+import { generateIntelligentRecipeQuery, savePantryFilter, defaultPantryFilter, RecipeIngredientMatch, getMealPrepSuggestions } from '../../utils/searchUtils';
 import { getQuantityAmount } from '../../utils/quantityUtils';
 import { PantryService } from '../../services/pantryService';
 import { useApp } from '../../contexts/AppContext';
 import { useAppActions } from '../../contexts/AppActionsContext';
+import { useConfirm } from '../ui/ConfirmDialog';
 import RecipeModal from '../recipes-meals/RecipeModal';
 import { AdMobBanner } from '../ui/AdMobBanner';
 import { canShowAds } from '../../utils/appUtils';
 import { SettingsGuestBanner } from '../settings/SettingsGuestBanner';
 import FreezeTransitionModal from './FreezeTransitionModal';
+import HapticService from '../../services/hapticService';
 
 import { PantryHealthScore } from './PantryHealthScore';
 import { BottomSheet } from '../ui';
 import { BulkQuantityEditModal } from './BulkQuantityEditModal';
 import { PantrySearchModal } from './PantrySearchModal';
 import { ReceiptScanResult } from './usePantryScan';
+import { AddItemsModal } from './AddItemsModal';
+import { ScanReviewModal } from './ScanReviewModal';
+import PantryImportModal from './PantryImportModal';
 
 // New modular components & hook for PantryScanner
 import { usePantryFilterSort, DisplayedPantryItem } from './usePantryFilterSort';
@@ -33,6 +38,7 @@ import { PantryItemRow } from './PantryItemRow';
 import { PantryItemTile } from './PantryItemTile';
 import { PantryBulkActionBar } from './PantryBulkActionBar';
 import { PantrySearchBar } from './PantrySearchBar';
+import StorageLocationIndicator from './StorageLocationIndicator';
 
 interface PantryScannerProps {
   inventory: PantryItem[];
@@ -72,6 +78,7 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
 }) => {
   const appState = useApp();
   const appActions = useAppActions();
+  const confirm = useConfirm();
   const { household, savedRecipes, recipeSaveLimitExceeded, settings, mealPlan } = appState;
   const { onSaveRecipe, onRateRecipe } = appActions;
 
@@ -481,15 +488,22 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
   const bulkMoveToShoppingList = useCallback(async () => {
     if (selectedItems.size === 0) return;
     const indicesToMove = Array.from(selectedItems);
+
+    const ok = await confirm({
+      title: 'Add to Shopping List?',
+      description: `Do you want to add these ${indicesToMove.length} items to your shopping list for your next trip to the store? This will make a copy and keep them in your pantry.`,
+      confirmLabel: 'Add Copy',
+      cancelLabel: 'Cancel',
+      variant: 'default',
+    });
+    if (!ok) return;
+
     const itemsToMove = PantryService.bulkMoveToShoppingList(inventory, indicesToMove);
     addToShoppingList(itemsToMove);
-    setBulkProgress({ current: 0, total: indicesToMove.length });
-    await appActions.deleteItems(indicesToMove);
-    setBulkProgress(null);
     setSelectedItems(new Set());
     setBulkMode(false);
-    appActions.addToast(`Moved ${itemsToMove.length} item${itemsToMove.length > 1 ? 's' : ''} to shopping list`, 'success');
-  }, [selectedItems, inventory, addToShoppingList, appActions]);
+    appActions.addToast(`Copied ${itemsToMove.length} item${itemsToMove.length > 1 ? 's' : ''} to shopping list`, 'success');
+  }, [selectedItems, inventory, addToShoppingList, appActions, confirm]);
 
   // Group items by storage location
   const storageItemsArrays = useMemo(() => {
@@ -571,8 +585,6 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
         showFilters={showFilters}
         setShowFilters={setShowFilters}
         pantryFilter={pantryFilter}
-        bulkMode={bulkMode}
-        toggleBulkMode={toggleBulkMode}
         onOpenSearchModal={() => setIsSearchModalOpen(true)}
       />
 
@@ -714,6 +726,42 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
         </div>
       ) : (
         <div id="pantry-items-list" className="space-y-6">
+          {viewMode === 'storage' && (
+            <div
+              ref={_chipRowRef}
+              className="sticky z-20 flex gap-2 overflow-x-auto py-2 mb-4 -mx-1 px-1 bg-theme-primary border-b border-theme scrollbar-hide"
+              style={{ top: 'calc(var(--app-header-h, 56px) - 100px)' }}
+            >
+              {_storageOrder.map(location => {
+                const items = storageItemsArrays[location] || [];
+                const locationLabel = (storageLabels as Record<string, string>)[location] || location;
+                const isActive = storageSectionOrder[0] === location;
+                return (
+                  <button
+                    key={location}
+                    onClick={() => _toggleStorageLocation(location)}
+                    aria-label={`Jump to ${locationLabel}`}
+                    aria-pressed={isActive}
+                    className={`shrink-0 flex items-center gap-2 rounded-full border px-3 py-1.5 transition-colors ${
+                      isActive
+                        ? 'bg-[var(--accent-color)] border-[var(--accent-color)] text-[var(--accent-text,white)]'
+                        : 'bg-theme-secondary border-theme text-theme-primary hover:border-[var(--accent-color)]/50'
+                    }`}
+                  >
+                    <StorageLocationIndicator
+                      location={location as 'pantry' | 'freezer' | 'fridge' | 'spices' | 'other'}
+                      size="sm"
+                    />
+                    <span className="text-xs font-bold whitespace-nowrap">{locationLabel}</span>
+                    <span className={`text-[10px] font-semibold ${isActive ? 'text-white/80' : 'text-theme-secondary opacity-70'}`}>
+                      {items.length}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
           {viewMode === 'storage' ? (
             storageSectionOrder.map((loc) => {
               const items = storageItemsArrays[loc] || [];
@@ -723,9 +771,22 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
                 <div key={loc} id={`storage-section-${loc}`} className="space-y-3">
                   <div className="flex items-center justify-between border-b border-theme pb-1.5">
                     <h3 className="font-bold text-base text-theme-primary flex items-center gap-2">
+                      <StorageLocationIndicator location={loc as 'pantry' | 'freezer' | 'fridge' | 'spices' | 'other' | 'leftovers'} size="sm" />
                       <span>{label}</span>
                       <span className="text-xs font-normal text-theme-secondary opacity-70">({items.length})</span>
                     </h3>
+                    <button
+                      onClick={toggleBulkMode}
+                      className={`p-1.5 rounded-lg border transition-colors ${
+                        bulkMode
+                          ? 'bg-[var(--accent-color)] text-[var(--accent-text,white)] border-[var(--accent-color)] shadow-sm'
+                          : 'bg-theme-secondary border-theme text-theme-secondary hover:text-theme-primary'
+                      }`}
+                      aria-label="Bulk select mode"
+                      title="Bulk select mode"
+                    >
+                      <CheckSquare className="w-4 h-4" />
+                    </button>
                   </div>
 
                   {displayLayout === 'list' ? (
@@ -771,6 +832,18 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
                       <span>{category}</span>
                       <span className="text-xs font-normal text-theme-secondary opacity-70">({items.length})</span>
                     </h3>
+                    <button
+                      onClick={toggleBulkMode}
+                      className={`p-1.5 rounded-lg border transition-colors ${
+                        bulkMode
+                          ? 'bg-[var(--accent-color)] text-[var(--accent-text,white)] border-[var(--accent-color)] shadow-sm'
+                          : 'bg-theme-secondary border-theme text-theme-secondary hover:text-theme-primary'
+                      }`}
+                      aria-label="Bulk select mode"
+                      title="Bulk select mode"
+                    >
+                      <CheckSquare className="w-4 h-4" />
+                    </button>
                   </div>
 
                   {displayLayout === 'list' ? (
@@ -875,6 +948,70 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
         setSearchQuery={setSearchQuery}
         inventory={inventory}
       />
+
+      {/* Add Items Modal */}
+      <AddItemsModal
+        isOpen={isAddModalOpen}
+        onClose={() => {
+          setIsAddModalOpen(false);
+          setAddModalInitialAction(null);
+        }}
+        onAddItem={_onAddItem}
+        inventory={inventory}
+        user={user}
+        initialAction={_addModalInitialAction}
+        onOpenImport={() => {
+          setIsAddModalOpen(false);
+          setShowImportModal(true);
+        }}
+        onScanResultsReady={(results) => {
+          setIsAddModalOpen(false);
+          _setScanResults(results);
+          _setShowScanReviewModal(true);
+        }}
+      />
+
+      {/* Scan Review Modal */}
+      <ScanReviewModal
+        isOpen={_showScanReviewModal}
+        onClose={() => {
+          _setShowScanReviewModal(false);
+          _setScanResults([]);
+        }}
+        scanResults={_scanResults || []}
+        setScanResults={_setScanResults}
+        receiptDestination={_receiptDestination}
+        setReceiptDestination={_setReceiptDestination}
+        customCategories={customCategories}
+        onAddItems={_onAddItems}
+        addShoppingListItem={_addShoppingListItem}
+        user={user}
+      />
+
+      {/* Pantry Import Modal */}
+      <PantryImportModal
+        open={_showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onImported={(items) => {
+          _setLastImportedBatch(items);
+        }}
+      />
+
+      {/* Floating Add Button */}
+      {inventory.length > 0 && !bulkMode && (
+        <button
+          onClick={() => {
+            HapticService.light();
+            setIsAddModalOpen(true);
+          }}
+          className="fixed right-6 z-20 bg-[var(--accent-color)] text-[var(--accent-text,white)] p-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 active:scale-95 flex items-center justify-center theme-transition"
+          style={{ bottom: 'calc(5.5rem + 15px)' }}
+          aria-label="Add items to pantry"
+          title="Add items"
+        >
+          <Plus className="w-6 h-6" />
+        </button>
+      )}
 
       {/* Pantry Health Detail Sheet */}
       <BottomSheet

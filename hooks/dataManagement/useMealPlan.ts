@@ -122,6 +122,7 @@ export function useMealPlan(
   addToast?: AddToast,
   loggingOptions?: LoggingOptions,
   options?: MealPlanOptions,
+  refreshTrigger?: number,
 ) {
   const [mealPlanState, setMealPlanState] = useState<DayPlan[]>([]);
   const [mealPlanLimitExceeded, setMealPlanLimitExceeded] = useState(false);
@@ -159,7 +160,7 @@ export function useMealPlan(
     return () => {
       unsub();
     };
-  }, [user?.id, user?.householdId]);
+  }, [user?.id, user?.householdId, refreshTrigger]);
 
   // Keep mealPlanning.weeklyUsed Firestore counter in sync with actual current/future entries.
   // Past entries are excluded so they never count against the user's quota.

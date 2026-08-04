@@ -78,7 +78,7 @@ export function useNotificationHandlers({
     };
 
     checkHouseholdInvites();
-  }, [user, addToast, setHouseholdInvites, setShowHouseholdInviteModal]);
+  }, [user?.id, user?.email, user?.householdId, addToast, setHouseholdInvites, setShowHouseholdInviteModal]);
 
   const handleNotificationDismiss = useCallback(async (notificationId: string) => {
     try {

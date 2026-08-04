@@ -555,6 +555,53 @@ export const saveRecipeToFirestore = async (
 };
 
 /**
+ * Auto-cache a raw Gemini search result into its own collection (separate from
+ * `recipes`, which is user-saved/community content). Unmoderated, kept for later
+ * curation into recipe_caches — not read back into search results yet.
+ * Dedups by title so repeated searches don't pile up duplicate docs.
+ */
+export const cacheGeminiSearchRecipe = async (
+  recipe: StructuredRecipe,
+  userId: string,
+  query?: string
+): Promise<string | null> => {
+  try {
+    const existing = await DatabaseMonitoringService.getDocs(
+      DatabaseMonitoringService.query(
+        DatabaseMonitoringService.collection('geminiRecipeCache'),
+        DatabaseMonitoringService.where('title', '==', recipe.title),
+        DatabaseMonitoringService.limit(1)
+      )
+    );
+    if (!existing.empty) {
+      return null;
+    }
+
+    const cachedRecipe = {
+      title: recipe.title,
+      description: recipe.description || '',
+      ingredients: recipe.ingredients || [],
+      instructions: recipe.instructions || [],
+      cookTime: recipe.cookTime || '',
+      type: recipe.type || '',
+      image: recipe.image || '',
+      userId,
+      query: query || '',
+      dateCached: new Date().toISOString(),
+    };
+
+    const docRef = await DatabaseMonitoringService.addDoc(
+      DatabaseMonitoringService.collection('geminiRecipeCache'),
+      cachedRecipe
+    );
+    return docRef.id;
+  } catch (err: unknown) {
+    log.error('Failed to cache Gemini search recipe', { error: err, title: recipe.title }, 'RecipeService');
+    return null;
+  }
+};
+
+/**
  * Upload a File object to Firebase Storage for a recipe and return the download URL
  */
 export const uploadRecipeImageFile = async (file: File, recipeId: string): Promise<string> => {

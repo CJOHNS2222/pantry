@@ -26,8 +26,6 @@ export const PantryBulkActionBar: React.FC<PantryBulkActionBarProps> = ({
   onOpenBulkQuantityEdit,
   onExitBulkMode,
 }) => {
-  if (selectedCount === 0) return null;
-
   return (
     <div className="fixed bottom-20 left-4 right-4 max-w-lg mx-auto z-40 bg-theme-secondary border border-theme rounded-2xl p-3 shadow-2xl backdrop-blur-lg animate-slide-up flex flex-col gap-2">
       <div className="flex items-center justify-between px-1">
@@ -50,7 +48,7 @@ export const PantryBulkActionBar: React.FC<PantryBulkActionBarProps> = ({
         </div>
       </div>
 
-      <div className="grid grid-cols-4 gap-1.5 pt-1 border-t border-theme">
+      <div className={`grid grid-cols-4 gap-1.5 pt-1 border-t border-theme transition-opacity duration-200 ${selectedCount === 0 ? 'opacity-40 pointer-events-none' : ''}`}>
         {/* Change Storage Location Dropdown */}
         <div className="relative col-span-1">
           <select
@@ -62,14 +60,14 @@ export const PantryBulkActionBar: React.FC<PantryBulkActionBarProps> = ({
                 void onBulkChangeLocation(val);
               }
             }}
-            className="w-full flex items-center justify-center gap-1 py-2 px-1 rounded-xl bg-theme-primary border border-theme text-xs font-semibold text-theme-primary appearance-none cursor-pointer text-center"
+            className="w-full flex items-center justify-center gap-1 py-2 px-1 rounded-xl bg-theme-primary border border-theme text-xs font-semibold text-theme-primary appearance-none cursor-pointer text-center dark:bg-slate-800 dark:text-slate-100"
           >
-            <option value="" disabled>Location</option>
-            <option value="pantry">Pantry</option>
-            <option value="fridge">Fridge</option>
-            <option value="freezer">Freezer</option>
-            <option value="spices">Spices</option>
-            <option value="other">Other</option>
+            <option value="" disabled className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100">Location</option>
+            <option value="pantry" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100">Pantry</option>
+            <option value="fridge" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100">Fridge</option>
+            <option value="freezer" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100">Freezer</option>
+            <option value="spices" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100">Spices</option>
+            <option value="other" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100">Other</option>
           </select>
         </div>
 
