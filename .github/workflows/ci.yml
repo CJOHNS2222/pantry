@@ -1,23 +1,25 @@
 name: CI
 
 on:
-  push:
-    branches: [main]
-    # Pure docs/audit-output changes never affect build/lint/test/rules output.
-    paths-ignore:
-      - '**/*.md'
-      - 'readme/**'
-      - '.claude/audits/**'
-      - '.claude/dashboard/**'
-      - 'graphify-out/**'
-  pull_request:
-    branches: [main]
-    paths-ignore:
-      - '**/*.md'
-      - 'readme/**'
-      - '.claude/audits/**'
-      - '.claude/dashboard/**'
-      - 'graphify-out/**'
+  workflow_dispatch: {}
+  # Disabled auto-trigger (was push/pull_request on main). Re-enable by
+  # restoring push/pull_request blocks below.
+  # push:
+  #   branches: [main]
+  #   paths-ignore:
+  #     - '**/*.md'
+  #     - 'readme/**'
+  #     - '.claude/audits/**'
+  #     - '.claude/dashboard/**'
+  #     - 'graphify-out/**'
+  # pull_request:
+  #   branches: [main]
+  #   paths-ignore:
+  #     - '**/*.md'
+  #     - 'readme/**'
+  #     - '.claude/audits/**'
+  #     - '.claude/dashboard/**'
+  #     - 'graphify-out/**'
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
